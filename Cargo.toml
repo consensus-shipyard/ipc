@@ -1,8 +1,18 @@
 [package]
-name = "untitled"
+name = "fvm-utils"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+
+[workspace]
+members = [
+    "runtime",
+    "tcid",
+    "example",
+]
+
+[build-dependencies]
+fil_actor_bundler = "3.0.4"
+cid = { version = "0.8.3", default-features = false, features = ["serde-codec"] }
