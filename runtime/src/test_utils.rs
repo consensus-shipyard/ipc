@@ -102,7 +102,10 @@ const IPLD_RAW: u64 = 0x55;
 
 /// Returns an identity CID for bz.
 pub fn make_builtin(bz: &[u8]) -> Cid {
-    Cid::new_v1(IPLD_RAW, OtherMultihash::wrap(0, bz).expect("name too long"))
+    Cid::new_v1(
+        IPLD_RAW,
+        OtherMultihash::wrap(0, bz).expect("name too long"),
+    )
 }
 
 pub struct MockRuntime {
@@ -174,7 +177,10 @@ impl Expectations {
     }
 
     fn verify(&mut self) {
-        assert!(!self.expect_validate_caller_any, "expected ValidateCallerAny, not received");
+        assert!(
+            !self.expect_validate_caller_any,
+            "expected ValidateCallerAny, not received"
+        );
         assert!(
             self.expect_validate_caller_addr.is_none(),
             "expected ValidateCallerAddr {:?}, not received",
@@ -447,7 +453,11 @@ impl MockRuntime {
     }
 
     pub fn add_id_address(&mut self, source: Address, target: Address) {
-        assert_eq!(target.protocol(), Protocol::ID, "target must use ID address protocol");
+        assert_eq!(
+            target.protocol(),
+            Protocol::ID,
+            "target must use ID address protocol"
+        );
         self.id_addresses.insert(source, target);
     }
 
@@ -499,7 +509,10 @@ impl MockRuntime {
 
     #[allow(dead_code)]
     pub fn expect_verify_signature(&self, exp: ExpectedVerifySig) {
-        self.expectations.borrow_mut().expect_verify_sigs.push_back(exp);
+        self.expectations
+            .borrow_mut()
+            .expect_verify_sigs
+            .push_back(exp);
     }
 
     #[allow(dead_code)]
@@ -530,8 +543,16 @@ impl MockRuntime {
         cid: Cid,
         exit_code: ExitCode,
     ) {
-        let exp = ExpectComputeUnsealedSectorCid { reg, pieces, cid, exit_code };
-        self.expectations.borrow_mut().expect_compute_unsealed_sector_cid.push_back(exp);
+        let exp = ExpectComputeUnsealedSectorCid {
+            reg,
+            pieces,
+            cid,
+            exit_code,
+        };
+        self.expectations
+            .borrow_mut()
+            .expect_compute_unsealed_sector_cid
+            .push_back(exp);
     }
 
     #[allow(dead_code)]
@@ -560,14 +581,17 @@ impl MockRuntime {
         send_return: RawBytes,
         exit_code: ExitCode,
     ) {
-        self.expectations.borrow_mut().expect_sends.push_back(ExpectedMessage {
-            to,
-            method,
-            params,
-            value,
-            send_return,
-            exit_code,
-        })
+        self.expectations
+            .borrow_mut()
+            .expect_sends
+            .push_back(ExpectedMessage {
+                to,
+                method,
+                params,
+                value,
+                send_return,
+                exit_code,
+            })
     }
 
     #[allow(dead_code)]
@@ -615,8 +639,16 @@ impl MockRuntime {
         entropy: Vec<u8>,
         out: Randomness,
     ) {
-        let a = ExpectRandomness { tag, epoch, entropy, out };
-        self.expectations.borrow_mut().expect_get_randomness_tickets.push_back(a);
+        let a = ExpectRandomness {
+            tag,
+            epoch,
+            entropy,
+            out,
+        };
+        self.expectations
+            .borrow_mut()
+            .expect_get_randomness_tickets
+            .push_back(a);
     }
 
     #[allow(dead_code)]
@@ -627,8 +659,16 @@ impl MockRuntime {
         entropy: Vec<u8>,
         out: Randomness,
     ) {
-        let a = ExpectRandomness { tag, epoch, entropy, out };
-        self.expectations.borrow_mut().expect_get_randomness_beacon.push_back(a);
+        let a = ExpectRandomness {
+            tag,
+            epoch,
+            entropy,
+            out,
+        };
+        self.expectations
+            .borrow_mut()
+            .expect_get_randomness_beacon
+            .push_back(a);
     }
 
     #[allow(dead_code)]
@@ -648,7 +688,11 @@ impl MockRuntime {
         in_proof: Vec<u8>,
         result: anyhow::Result<()>,
     ) {
-        let a = ExpectAggregateVerifySeals { in_svis, in_proof, result };
+        let a = ExpectAggregateVerifySeals {
+            in_svis,
+            in_proof,
+            result,
+        };
         self.expectations.borrow_mut().expect_aggregate_verify_seals = Some(a);
     }
 
@@ -660,13 +704,19 @@ impl MockRuntime {
 
     #[allow(dead_code)]
     pub fn expect_gas_charge(&mut self, value: i64) {
-        self.expectations.borrow_mut().expect_gas_charge.push_back(value);
+        self.expectations
+            .borrow_mut()
+            .expect_gas_charge
+            .push_back(value);
     }
 
     ///// Private helpers /////
 
     fn require_in_call(&self) {
-        assert!(self.in_call, "invalid runtime invocation outside of method call")
+        assert!(
+            self.in_call,
+            "invalid runtime invocation outside of method call"
+        )
     }
 
     fn store_put<C: Cbor>(&self, o: &C) -> Cid {
@@ -754,7 +804,10 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
     {
         self.require_in_call();
         assert!(
-            self.expectations.borrow_mut().expect_validate_caller_type.is_some(),
+            self.expectations
+                .borrow_mut()
+                .expect_validate_caller_type
+                .is_some(),
             "unexpected validate caller code"
         );
 
@@ -766,8 +819,12 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
                 .unwrap()
         };
         let types: Vec<Cid> = types.into_iter().map(find_by_type).collect();
-        let expected_caller_type =
-            self.expectations.borrow_mut().expect_validate_caller_type.clone().unwrap();
+        let expected_caller_type = self
+            .expectations
+            .borrow_mut()
+            .expect_validate_caller_type
+            .clone()
+            .unwrap();
         assert_eq!(
             &types, &expected_caller_type,
             "unexpected validate caller code {:?}, expected {:?}",
@@ -782,8 +839,10 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         }
 
         self.expectations.borrow_mut().expect_validate_caller_type = None;
-        Err(actor_error!(forbidden; "caller type {:?} forbidden, allowed: {:?}",
-                self.caller_type, types))
+        Err(
+            actor_error!(forbidden; "caller type {:?} forbidden, allowed: {:?}",
+                self.caller_type, types),
+        )
     }
 
     fn current_balance(&self) -> TokenAmount {
@@ -925,7 +984,12 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             params
         );
 
-        let expected_msg = self.expectations.borrow_mut().expect_sends.pop_front().unwrap();
+        let expected_msg = self
+            .expectations
+            .borrow_mut()
+            .expect_sends
+            .pop_front()
+            .unwrap();
 
         assert!(
             expected_msg.to == to
@@ -950,7 +1014,10 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             if value > *balance {
                 return Err(ActorError::unchecked(
                     ExitCode::SYS_SENDER_STATE_INVALID,
-                    format!("cannot send value: {:?} exceeds balance: {:?}", value, *balance),
+                    format!(
+                        "cannot send value: {:?} exceeds balance: {:?}",
+                        value, *balance
+                    ),
                 ));
             }
             *balance -= value;
@@ -958,13 +1025,19 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
 
         match expected_msg.exit_code {
             ExitCode::OK => Ok(expected_msg.send_return),
-            x => Err(ActorError::unchecked(x, "Expected message Fail".to_string())),
+            x => Err(ActorError::unchecked(
+                x,
+                "Expected message Fail".to_string(),
+            )),
         }
     }
 
     fn new_actor_address(&mut self) -> Result<Address, ActorError> {
         self.require_in_call();
-        let ret = *self.new_actor_addr.as_ref().expect("unexpected call to new actor address");
+        let ret = *self
+            .new_actor_addr
+            .as_ref()
+            .expect("unexpected call to new actor address");
         self.new_actor_addr = None;
         Ok(ret)
     }
@@ -995,7 +1068,11 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             panic!("unexpected call to delete actor: {}", addr);
         }
         if exp_act.as_ref().unwrap() != addr {
-            panic!("attempt to delete wrong actor. Expected: {}, got: {}", exp_act.unwrap(), addr);
+            panic!(
+                "attempt to delete wrong actor. Expected: {}, got: {}",
+                exp_act.unwrap(),
+                addr
+            );
         }
         Ok(())
     }
@@ -1020,9 +1097,17 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
 
     fn charge_gas(&mut self, _: &'static str, value: i64) {
         let mut exs = self.expectations.borrow_mut();
-        assert!(!exs.expect_gas_charge.is_empty(), "unexpected gas charge {:?}", value);
+        assert!(
+            !exs.expect_gas_charge.is_empty(),
+            "unexpected gas charge {:?}",
+            value
+        );
         let expected = exs.expect_gas_charge.pop_front().unwrap();
-        assert_eq!(expected, value, "expected gas charge {:?}, actual {:?}", expected, value);
+        assert_eq!(
+            expected, value,
+            "expected gas charge {:?}, actual {:?}",
+            expected, value
+        );
     }
 
     fn base_fee(&self) -> TokenAmount {
@@ -1045,7 +1130,11 @@ impl Primitives for MockRuntime {
                 hex::encode(plaintext)
             );
         }
-        let exp = self.expectations.borrow_mut().expect_verify_sigs.pop_front();
+        let exp = self
+            .expectations
+            .borrow_mut()
+            .expect_verify_sigs
+            .pop_front();
         if let Some(exp) = exp {
             if exp.sig != *signature || exp.signer != *signer || &exp.plaintext[..] != plaintext {
                 panic!(
@@ -1087,7 +1176,10 @@ impl Primitives for MockRuntime {
             .pop_front()
             .expect("Unexpected syscall to ComputeUnsealedSectorCID");
 
-        assert_eq!(exp.reg, reg, "Unexpected compute_unsealed_sector_cid : reg mismatch");
+        assert_eq!(
+            exp.reg, reg,
+            "Unexpected compute_unsealed_sector_cid : reg mismatch"
+        );
         assert!(
             exp.pieces[..].eq(pieces),
             "Unexpected compute_unsealed_sector_cid : pieces mismatch"
@@ -1203,7 +1295,10 @@ impl Verifier for MockRuntime {
             .expect("unexpected call to verify aggregate seals");
         assert_eq!(exp.in_svis.len(), aggregate.infos.len(), "length mismatch");
         for (i, exp_svi) in exp.in_svis.iter().enumerate() {
-            assert_eq!(exp_svi.sealed_cid, aggregate.infos[i].sealed_cid, "mismatched sealed CID");
+            assert_eq!(
+                exp_svi.sealed_cid, aggregate.infos[i].sealed_cid,
+                "mismatched sealed CID"
+            );
             assert_eq!(
                 exp_svi.unsealed_cid, aggregate.infos[i].unsealed_cid,
                 "mismatched unsealed CID"
@@ -1220,9 +1315,18 @@ impl Verifier for MockRuntime {
             .expect_replica_verify
             .take()
             .expect("unexpected call to verify replica update");
-        assert_eq!(exp.input.update_proof_type, replica.update_proof_type, "mismatched proof type");
-        assert_eq!(exp.input.new_sealed_cid, replica.new_sealed_cid, "mismatched new sealed CID");
-        assert_eq!(exp.input.old_sealed_cid, replica.old_sealed_cid, "mismatched old sealed CID");
+        assert_eq!(
+            exp.input.update_proof_type, replica.update_proof_type,
+            "mismatched proof type"
+        );
+        assert_eq!(
+            exp.input.new_sealed_cid, replica.new_sealed_cid,
+            "mismatched new sealed CID"
+        );
+        assert_eq!(
+            exp.input.old_sealed_cid, replica.old_sealed_cid,
+            "mismatched old sealed CID"
+        );
         assert_eq!(
             exp.input.new_unsealed_cid, replica.new_unsealed_cid,
             "mismatched new unsealed CID"
