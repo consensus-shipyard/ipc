@@ -15,9 +15,6 @@ pub fn invoke(param: u32) -> u32 {
     runtime::fvm::trampoline::<Actor>(param)
 }
 
-// #[cfg(feature = "fil-actor")]
-// fil_actors_runtime::wasm_trampoline!(Actor);
-
 /// SCA actor methods available
 #[derive(FromPrimitive)]
 #[repr(u64)]

@@ -13,7 +13,6 @@ use cid::Cid;
 use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_hamt::{BytesKey, Error as HamtError, Hamt};
-use fvm_shared::bigint::BigInt;
 pub use fvm_shared::BLOCKS_PER_EPOCH as EXPECTED_LEADERS_PER_EPOCH;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -48,9 +47,6 @@ pub type Map<'bs, BS, V> = Hamt<&'bs BS, V, BytesKey>;
 
 /// Array type used within actors. The underlying type is an AMT.
 pub type Array<'bs, V, BS> = Amt<V, &'bs BS>;
-
-/// Deal weight
-pub type DealWeight = BigInt;
 
 /// Create a hamt with a custom bitwidth.
 #[inline]
