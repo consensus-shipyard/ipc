@@ -7,10 +7,10 @@ mod amt;
 mod hamt;
 mod link;
 
+pub use address::*;
 pub use amt::TAmt;
 pub use hamt::THamt;
 pub use link::TLink;
-pub use address::*;
 
 /// Helper type to be able to define `Code` as a generic parameter.
 pub trait CodeType {
