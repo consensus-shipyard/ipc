@@ -5,7 +5,6 @@ use core::fmt;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
-use anyhow::anyhow;
 use cid::multihash::{Code, Multihash as OtherMultihash};
 use cid::Cid;
 use fvm_ipld_blockstore::MemoryBlockstore;
@@ -16,16 +15,9 @@ use fvm_shared::address::{Address, Protocol};
 use fvm_shared::clock::ChainEpoch;
 
 use fvm_shared::commcid::{FIL_COMMITMENT_SEALED, FIL_COMMITMENT_UNSEALED};
-use fvm_shared::consensus::ConsensusFault;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::ExitCode;
-use fvm_shared::piece::PieceInfo;
-use fvm_shared::randomness::Randomness;
-use fvm_shared::sector::{
-    AggregateSealVerifyInfo, AggregateSealVerifyProofAndInfos, RegisteredSealProof,
-    ReplicaUpdateInfo, SealVerifyInfo, WindowPoStVerifyInfo,
-};
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{ActorID, MethodNum};
 
@@ -34,10 +26,7 @@ use multihash::MultihashDigest;
 
 use rand::prelude::*;
 
-use crate::runtime::{
-    ActorCode, DomainSeparationTag, MessageInfo, Policy, Primitives, Runtime, RuntimePolicy,
-    Verifier,
-};
+use crate::runtime::{ActorCode, MessageInfo, Primitives, Runtime};
 use crate::{actor_error, ActorError};
 
 type Func = dyn Fn(&[u8]) -> [u8; 32];
@@ -71,21 +60,6 @@ lazy_static! {
         map.insert(*VERIFREG_ACTOR_CODE_ID, Type::VerifiedRegistry);
         map
     };
-    pub static ref ACTOR_CODES: BTreeMap<Type, Cid> = [
-        (Type::System, *SYSTEM_ACTOR_CODE_ID),
-        (Type::Init, *INIT_ACTOR_CODE_ID),
-        (Type::Cron, *CRON_ACTOR_CODE_ID),
-        (Type::Account, *ACCOUNT_ACTOR_CODE_ID),
-        (Type::Power, *POWER_ACTOR_CODE_ID),
-        (Type::Miner, *MINER_ACTOR_CODE_ID),
-        (Type::Market, *MARKET_ACTOR_CODE_ID),
-        (Type::PaymentChannel, *PAYCH_ACTOR_CODE_ID),
-        (Type::Multisig, *MULTISIG_ACTOR_CODE_ID),
-        (Type::Reward, *REWARD_ACTOR_CODE_ID),
-        (Type::VerifiedRegistry, *VERIFREG_ACTOR_CODE_ID),
-    ]
-    .into_iter()
-    .collect();
     pub static ref CALLER_TYPES_SIGNABLE: Vec<Cid> =
         vec![*ACCOUNT_ACTOR_CODE_ID, *MULTISIG_ACTOR_CODE_ID];
     pub static ref NON_SINGLETON_CODES: BTreeMap<Cid, ()> = {
@@ -134,9 +108,6 @@ pub struct MockRuntime {
     // Expectations
     pub expectations: RefCell<Expectations>,
 
-    // policy
-    pub policy: Policy,
-
     pub circulating_supply: TokenAmount,
 }
 
@@ -159,15 +130,6 @@ pub struct Expectations {
     pub expect_create_actor: Option<ExpectCreateActor>,
     pub expect_delete_actor: Option<Address>,
     pub expect_verify_sigs: VecDeque<ExpectedVerifySig>,
-    pub expect_verify_seal: Option<ExpectVerifySeal>,
-    pub expect_verify_post: Option<ExpectVerifyPoSt>,
-    pub expect_compute_unsealed_sector_cid: VecDeque<ExpectComputeUnsealedSectorCid>,
-    pub expect_verify_consensus_fault: Option<ExpectVerifyConsensusFault>,
-    pub expect_get_randomness_tickets: VecDeque<ExpectRandomness>,
-    pub expect_get_randomness_beacon: VecDeque<ExpectRandomness>,
-    pub expect_batch_verify_seals: Option<ExpectBatchVerifySeals>,
-    pub expect_aggregate_verify_seals: Option<ExpectAggregateVerifySeals>,
-    pub expect_replica_verify: Option<ExpectReplicaVerify>,
     pub expect_gas_charge: VecDeque<i64>,
 }
 
@@ -212,51 +174,6 @@ impl Expectations {
             self.expect_verify_sigs
         );
         assert!(
-            self.expect_verify_seal.is_none(),
-            "expect_verify_seal {:?}, not received",
-            self.expect_verify_seal
-        );
-        assert!(
-            self.expect_verify_post.is_none(),
-            "expect_verify_post {:?}, not received",
-            self.expect_verify_post
-        );
-        assert!(
-            self.expect_compute_unsealed_sector_cid.is_empty(),
-            "expect_compute_unsealed_sector_cid: {:?}, not received",
-            self.expect_compute_unsealed_sector_cid
-        );
-        assert!(
-            self.expect_verify_consensus_fault.is_none(),
-            "expect_verify_consensus_fault {:?}, not received",
-            self.expect_verify_consensus_fault
-        );
-        assert!(
-            self.expect_get_randomness_tickets.is_empty(),
-            "expect_get_randomness_tickets {:?}, not received",
-            self.expect_get_randomness_tickets
-        );
-        assert!(
-            self.expect_get_randomness_beacon.is_empty(),
-            "expect_get_randomness_beacon {:?}, not received",
-            self.expect_get_randomness_beacon
-        );
-        assert!(
-            self.expect_batch_verify_seals.is_none(),
-            "expect_batch_verify_seals {:?}, not received",
-            self.expect_batch_verify_seals
-        );
-        assert!(
-            self.expect_aggregate_verify_seals.is_none(),
-            "expect_aggregate_verify_seals {:?}, not received",
-            self.expect_aggregate_verify_seals
-        );
-        assert!(
-            self.expect_replica_verify.is_none(),
-            "expect_replica_verify {:?}, not received",
-            self.expect_replica_verify
-        );
-        assert!(
             self.expect_gas_charge.is_empty(),
             "expect_gas_charge {:?}, not received",
             self.expect_gas_charge
@@ -285,7 +202,6 @@ impl Default for MockRuntime {
             store: Default::default(),
             in_transaction: Default::default(),
             expectations: Default::default(),
-            policy: Default::default(),
             circulating_supply: Default::default(),
         }
     }
@@ -318,61 +234,7 @@ pub struct ExpectedVerifySig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExpectVerifySeal {
-    seal: SealVerifyInfo,
-    exit_code: ExitCode,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExpectVerifyPoSt {
-    post: WindowPoStVerifyInfo,
-    exit_code: ExitCode,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExpectVerifyConsensusFault {
-    require_correct_input: bool,
-    block_header_1: Vec<u8>,
-    block_header_2: Vec<u8>,
-    block_header_extra: Vec<u8>,
-    fault: Option<ConsensusFault>,
-    exit_code: ExitCode,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExpectComputeUnsealedSectorCid {
-    reg: RegisteredSealProof,
-    pieces: Vec<PieceInfo>,
-    cid: Cid,
-    exit_code: ExitCode,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExpectRandomness {
-    tag: DomainSeparationTag,
-    epoch: ChainEpoch,
-    entropy: Vec<u8>,
-    out: Randomness,
-}
-
-#[derive(Debug)]
-pub struct ExpectBatchVerifySeals {
-    input: Vec<SealVerifyInfo>,
-    result: anyhow::Result<Vec<bool>>,
-}
-
-#[derive(Debug)]
-pub struct ExpectAggregateVerifySeals {
-    in_svis: Vec<AggregateSealVerifyInfo>,
-    in_proof: Vec<u8>,
-    result: anyhow::Result<()>,
-}
-
-#[derive(Debug)]
-pub struct ExpectReplicaVerify {
-    input: ReplicaUpdateInfo,
-    result: anyhow::Result<()>,
-}
+pub struct ExpectRandomness {}
 
 pub fn expect_empty(res: RawBytes) {
     assert_eq!(res, RawBytes::default());
@@ -516,46 +378,6 @@ impl MockRuntime {
     }
 
     #[allow(dead_code)]
-    pub fn expect_verify_consensus_fault(
-        &self,
-        h1: Vec<u8>,
-        h2: Vec<u8>,
-        extra: Vec<u8>,
-        fault: Option<ConsensusFault>,
-        exit_code: ExitCode,
-    ) {
-        self.expectations.borrow_mut().expect_verify_consensus_fault =
-            Some(ExpectVerifyConsensusFault {
-                require_correct_input: true,
-                block_header_1: h1,
-                block_header_2: h2,
-                block_header_extra: extra,
-                fault,
-                exit_code,
-            });
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_compute_unsealed_sector_cid(
-        &self,
-        reg: RegisteredSealProof,
-        pieces: Vec<PieceInfo>,
-        cid: Cid,
-        exit_code: ExitCode,
-    ) {
-        let exp = ExpectComputeUnsealedSectorCid {
-            reg,
-            pieces,
-            cid,
-            exit_code,
-        };
-        self.expectations
-            .borrow_mut()
-            .expect_compute_unsealed_sector_cid
-            .push_back(exp);
-    }
-
-    #[allow(dead_code)]
     pub fn expect_validate_caller_type(&mut self, types: Vec<Cid>) {
         assert!(!types.is_empty(), "addrs must be non-empty");
         self.expectations.borrow_mut().expect_validate_caller_type = Some(types);
@@ -601,18 +423,6 @@ impl MockRuntime {
     }
 
     #[allow(dead_code)]
-    pub fn expect_verify_seal(&mut self, seal: SealVerifyInfo, exit_code: ExitCode) {
-        let a = ExpectVerifySeal { seal, exit_code };
-        self.expectations.borrow_mut().expect_verify_seal = Some(a);
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_verify_post(&mut self, post: WindowPoStVerifyInfo, exit_code: ExitCode) {
-        let a = ExpectVerifyPoSt { post, exit_code };
-        self.expectations.borrow_mut().expect_verify_post = Some(a);
-    }
-
-    #[allow(dead_code)]
     pub fn set_received(&mut self, amount: TokenAmount) {
         self.value_received = amount;
     }
@@ -630,76 +440,6 @@ impl MockRuntime {
     #[allow(dead_code)]
     pub fn set_epoch(&mut self, epoch: ChainEpoch) {
         self.epoch = epoch;
-    }
-
-    pub fn expect_get_randomness_from_tickets(
-        &mut self,
-        tag: DomainSeparationTag,
-        epoch: ChainEpoch,
-        entropy: Vec<u8>,
-        out: Randomness,
-    ) {
-        let a = ExpectRandomness {
-            tag,
-            epoch,
-            entropy,
-            out,
-        };
-        self.expectations
-            .borrow_mut()
-            .expect_get_randomness_tickets
-            .push_back(a);
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_get_randomness_from_beacon(
-        &mut self,
-        tag: DomainSeparationTag,
-        epoch: ChainEpoch,
-        entropy: Vec<u8>,
-        out: Randomness,
-    ) {
-        let a = ExpectRandomness {
-            tag,
-            epoch,
-            entropy,
-            out,
-        };
-        self.expectations
-            .borrow_mut()
-            .expect_get_randomness_beacon
-            .push_back(a);
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_batch_verify_seals(
-        &mut self,
-        input: Vec<SealVerifyInfo>,
-        result: anyhow::Result<Vec<bool>>,
-    ) {
-        let a = ExpectBatchVerifySeals { input, result };
-        self.expectations.borrow_mut().expect_batch_verify_seals = Some(a);
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_aggregate_verify_seals(
-        &mut self,
-        in_svis: Vec<AggregateSealVerifyInfo>,
-        in_proof: Vec<u8>,
-        result: anyhow::Result<()>,
-    ) {
-        let a = ExpectAggregateVerifySeals {
-            in_svis,
-            in_proof,
-            result,
-        };
-        self.expectations.borrow_mut().expect_aggregate_verify_seals = Some(a);
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_replica_verify(&mut self, input: ReplicaUpdateInfo, result: anyhow::Result<()>) {
-        let a = ExpectReplicaVerify { input, result };
-        self.expectations.borrow_mut().expect_replica_verify = Some(a);
     }
 
     #[allow(dead_code)]
@@ -861,72 +601,6 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
     fn get_actor_code_cid(&self, addr: &Address) -> Option<Cid> {
         self.require_in_call();
         self.actor_code_cids.get(addr).cloned()
-    }
-
-    fn get_randomness_from_tickets(
-        &self,
-        tag: DomainSeparationTag,
-        epoch: ChainEpoch,
-        entropy: &[u8],
-    ) -> Result<Randomness, ActorError> {
-        let expected = self
-            .expectations
-            .borrow_mut()
-            .expect_get_randomness_tickets
-            .pop_front()
-            .expect("unexpected call to get_randomness_from_tickets");
-
-        assert!(epoch <= self.epoch, "attempt to get randomness from future");
-        assert_eq!(
-            expected.tag, tag,
-            "unexpected domain separation tag, expected: {:?}, actual: {:?}",
-            expected.tag, tag
-        );
-        assert_eq!(
-            expected.epoch, epoch,
-            "unexpected epoch, expected: {:?}, actual: {:?}",
-            expected.epoch, epoch
-        );
-        assert_eq!(
-            expected.entropy, *entropy,
-            "unexpected entroy, expected {:?}, actual: {:?}",
-            expected.entropy, entropy
-        );
-
-        Ok(expected.out)
-    }
-
-    fn get_randomness_from_beacon(
-        &self,
-        tag: DomainSeparationTag,
-        epoch: ChainEpoch,
-        entropy: &[u8],
-    ) -> Result<Randomness, ActorError> {
-        let expected = self
-            .expectations
-            .borrow_mut()
-            .expect_get_randomness_beacon
-            .pop_front()
-            .expect("unexpected call to get_randomness_from_beacon");
-
-        assert!(epoch <= self.epoch, "attempt to get randomness from future");
-        assert_eq!(
-            expected.tag, tag,
-            "unexpected domain separation tag, expected: {:?}, actual: {:?}",
-            expected.tag, tag
-        );
-        assert_eq!(
-            expected.epoch, epoch,
-            "unexpected epoch, expected: {:?}, actual: {:?}",
-            expected.epoch, epoch
-        );
-        assert_eq!(
-            expected.entropy, *entropy,
-            "unexpected entroy, expected {:?}, actual: {:?}",
-            expected.entropy, entropy
-        );
-
-        Ok(expected.out)
     }
 
     fn create<C: Cbor>(&mut self, obj: &C) -> Result<(), ActorError> {
@@ -1163,181 +837,6 @@ impl Primitives for MockRuntime {
 
     fn hash_blake2b(&self, data: &[u8]) -> [u8; 32] {
         (*self.hash_func)(data)
-    }
-    fn compute_unsealed_sector_cid(
-        &self,
-        reg: RegisteredSealProof,
-        pieces: &[PieceInfo],
-    ) -> anyhow::Result<Cid> {
-        let exp = self
-            .expectations
-            .borrow_mut()
-            .expect_compute_unsealed_sector_cid
-            .pop_front()
-            .expect("Unexpected syscall to ComputeUnsealedSectorCID");
-
-        assert_eq!(
-            exp.reg, reg,
-            "Unexpected compute_unsealed_sector_cid : reg mismatch"
-        );
-        assert!(
-            exp.pieces[..].eq(pieces),
-            "Unexpected compute_unsealed_sector_cid : pieces mismatch"
-        );
-
-        if exp.exit_code != ExitCode::OK {
-            return Err(anyhow!(ActorError::unchecked(
-                exp.exit_code,
-                "Expected Failure".to_string(),
-            )));
-        }
-        Ok(exp.cid)
-    }
-}
-
-impl Verifier for MockRuntime {
-    fn verify_seal(&self, seal: &SealVerifyInfo) -> anyhow::Result<()> {
-        let exp = self
-            .expectations
-            .borrow_mut()
-            .expect_verify_seal
-            .take()
-            .expect("Unexpected syscall to verify seal");
-
-        assert_eq!(exp.seal, *seal, "Unexpected seal verification");
-        if exp.exit_code != ExitCode::OK {
-            return Err(anyhow!(ActorError::unchecked(
-                exp.exit_code,
-                "Expected Failure".to_string(),
-            )));
-        }
-        Ok(())
-    }
-
-    fn verify_post(&self, post: &WindowPoStVerifyInfo) -> anyhow::Result<()> {
-        let exp = self
-            .expectations
-            .borrow_mut()
-            .expect_verify_post
-            .take()
-            .expect("Unexpected syscall to verify PoSt");
-
-        assert_eq!(exp.post, *post, "Unexpected PoSt verification");
-        if exp.exit_code != ExitCode::OK {
-            return Err(anyhow!(ActorError::unchecked(
-                exp.exit_code,
-                "Expected Failure".to_string(),
-            )));
-        }
-        Ok(())
-    }
-
-    fn verify_consensus_fault(
-        &self,
-        h1: &[u8],
-        h2: &[u8],
-        extra: &[u8],
-    ) -> anyhow::Result<Option<ConsensusFault>> {
-        let exp = self
-            .expectations
-            .borrow_mut()
-            .expect_verify_consensus_fault
-            .take()
-            .expect("Unexpected syscall to verify_consensus_fault");
-
-        if exp.require_correct_input {
-            assert_eq!(exp.block_header_1, h1, "Header 1 mismatch");
-            assert_eq!(exp.block_header_2, h2, "Header 2 mismatch");
-            assert_eq!(exp.block_header_extra, extra, "Header extra mismatch");
-        }
-        if exp.exit_code != ExitCode::OK {
-            return Err(anyhow!(ActorError::unchecked(
-                exp.exit_code,
-                "Expected Failure".to_string(),
-            )));
-        }
-        Ok(exp.fault)
-    }
-
-    fn batch_verify_seals(&self, batch: &[SealVerifyInfo]) -> anyhow::Result<Vec<bool>> {
-        let exp = self
-            .expectations
-            .borrow_mut()
-            .expect_batch_verify_seals
-            .take()
-            .expect("unexpected call to batch verify seals");
-        assert_eq!(exp.input.len(), batch.len(), "length mismatch");
-
-        for (i, exp_svi) in exp.input.iter().enumerate() {
-            assert_eq!(
-                exp_svi.sealed_cid, batch[i].sealed_cid,
-                "sealed CID mismatch at index {}",
-                i
-            );
-            assert_eq!(
-                exp_svi.unsealed_cid, batch[i].unsealed_cid,
-                "unsealed CID mismatch at index {}",
-                i
-            );
-        }
-        exp.result
-    }
-
-    fn verify_aggregate_seals(
-        &self,
-        aggregate: &AggregateSealVerifyProofAndInfos,
-    ) -> anyhow::Result<()> {
-        let exp = self
-            .expectations
-            .borrow_mut()
-            .expect_aggregate_verify_seals
-            .take()
-            .expect("unexpected call to verify aggregate seals");
-        assert_eq!(exp.in_svis.len(), aggregate.infos.len(), "length mismatch");
-        for (i, exp_svi) in exp.in_svis.iter().enumerate() {
-            assert_eq!(
-                exp_svi.sealed_cid, aggregate.infos[i].sealed_cid,
-                "mismatched sealed CID"
-            );
-            assert_eq!(
-                exp_svi.unsealed_cid, aggregate.infos[i].unsealed_cid,
-                "mismatched unsealed CID"
-            );
-        }
-        assert_eq!(exp.in_proof, aggregate.proof, "proof mismatch");
-        exp.result
-    }
-
-    fn verify_replica_update(&self, replica: &ReplicaUpdateInfo) -> anyhow::Result<()> {
-        let exp = self
-            .expectations
-            .borrow_mut()
-            .expect_replica_verify
-            .take()
-            .expect("unexpected call to verify replica update");
-        assert_eq!(
-            exp.input.update_proof_type, replica.update_proof_type,
-            "mismatched proof type"
-        );
-        assert_eq!(
-            exp.input.new_sealed_cid, replica.new_sealed_cid,
-            "mismatched new sealed CID"
-        );
-        assert_eq!(
-            exp.input.old_sealed_cid, replica.old_sealed_cid,
-            "mismatched old sealed CID"
-        );
-        assert_eq!(
-            exp.input.new_unsealed_cid, replica.new_unsealed_cid,
-            "mismatched new unsealed CID"
-        );
-        exp.result
-    }
-}
-
-impl RuntimePolicy for MockRuntime {
-    fn policy(&self) -> &Policy {
-        &self.policy
     }
 }
 

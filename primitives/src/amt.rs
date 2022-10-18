@@ -18,7 +18,7 @@ const AMT_BIT_WIDTH: u32 = 3;
 ///
 /// # Example
 /// ```
-/// use tcid::{TCid, TAmt};
+/// use primitives::{TCid, TAmt};
 /// use fvm_ipld_blockstore::MemoryBlockstore;
 /// use fvm_ipld_encoding::tuple::*;
 /// use fvm_ipld_encoding::Cbor;

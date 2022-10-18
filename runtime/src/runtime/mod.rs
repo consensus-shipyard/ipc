@@ -10,18 +10,13 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::consensus::ConsensusFault;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
-use fvm_shared::piece::PieceInfo;
-use fvm_shared::randomness::Randomness;
 use fvm_shared::sector::{
-    AggregateSealVerifyProofAndInfos, RegisteredSealProof, ReplicaUpdateInfo, SealVerifyInfo,
-    WindowPoStVerifyInfo,
+    AggregateSealVerifyProofAndInfos, ReplicaUpdateInfo, SealVerifyInfo, WindowPoStVerifyInfo,
 };
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{ActorID, MethodNum};
 
 pub use self::actor_code::*;
-pub use self::policy::*;
-pub use self::randomness::DomainSeparationTag;
 use crate::ActorError;
 
 mod actor_code;
@@ -32,12 +27,9 @@ pub mod fvm;
 #[cfg(feature = "fil-actor")]
 mod actor_blockstore;
 
-pub mod policy;
-mod randomness;
-
 /// Runtime is the VM's internal runtime object.
 /// this is everything that is accessible to actors, beyond parameters.
-pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy {
+pub trait Runtime<BS: Blockstore>: Primitives {
     /// The network protocol version number at the current epoch.
     fn network_version(&self) -> NetworkVersion;
 
@@ -67,26 +59,6 @@ pub trait Runtime<BS: Blockstore>: Primitives + Verifier + RuntimePolicy {
 
     /// Look up the code ID at an actor address.
     fn get_actor_code_cid(&self, addr: &Address) -> Option<Cid>;
-
-    /// Randomness returns a (pseudo)random byte array drawing from the latest
-    /// ticket chain from a given epoch and incorporating requisite entropy.
-    /// This randomness is fork dependant but also biasable because of this.
-    fn get_randomness_from_tickets(
-        &self,
-        personalization: DomainSeparationTag,
-        rand_epoch: ChainEpoch,
-        entropy: &[u8],
-    ) -> Result<Randomness, ActorError>;
-
-    /// Randomness returns a (pseudo)random byte array drawing from the latest
-    /// beacon from a given epoch and incorporating requisite entropy.
-    /// This randomness is not tied to any fork of the chain, and is unbiasable.
-    fn get_randomness_from_beacon(
-        &self,
-        personalization: DomainSeparationTag,
-        rand_epoch: ChainEpoch,
-        entropy: &[u8],
-    ) -> Result<Randomness, ActorError>;
 
     /// Initializes the state object.
     /// This is only valid when the state has not yet been initialized.
@@ -181,13 +153,6 @@ pub trait MessageInfo {
 pub trait Primitives {
     /// Hashes input data using blake2b with 256 bit output.
     fn hash_blake2b(&self, data: &[u8]) -> [u8; 32];
-
-    /// Computes an unsealed sector CID (CommD) from its constituent piece CIDs (CommPs) and sizes.
-    fn compute_unsealed_sector_cid(
-        &self,
-        proof_type: RegisteredSealProof,
-        pieces: &[PieceInfo],
-    ) -> Result<Cid, anyhow::Error>;
 
     /// Verifies that a signature is valid for an address and plaintext.
     fn verify_signature(

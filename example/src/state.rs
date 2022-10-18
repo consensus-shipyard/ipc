@@ -3,8 +3,8 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::Cbor;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::address::Address;
+use primitives::{TCid, THamt};
 use serde::{Deserialize, Serialize};
-use tcid::{TCid, THamt};
 
 /// Sample struct for user persistence
 #[derive(Serialize, Deserialize)]

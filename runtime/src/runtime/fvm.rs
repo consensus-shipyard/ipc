@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Error};
+use anyhow::Error;
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
@@ -11,22 +11,13 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::{ErrorNumber, ExitCode};
-use fvm_shared::piece::PieceInfo;
-use fvm_shared::randomness::Randomness;
-use fvm_shared::sector::{
-    AggregateSealVerifyProofAndInfos, RegisteredSealProof, ReplicaUpdateInfo, SealVerifyInfo,
-    WindowPoStVerifyInfo,
-};
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{ActorID, MethodNum};
 #[cfg(feature = "fake-proofs")]
 use sha2::{Digest, Sha256};
 
 use crate::runtime::actor_blockstore::ActorBlockstore;
-use crate::runtime::{
-    ActorCode, ConsensusFault, DomainSeparationTag, MessageInfo, Policy, Primitives, RuntimePolicy,
-    Verifier,
-};
+use crate::runtime::{ActorCode, MessageInfo, Primitives};
 use crate::{actor_error, ActorError, Runtime};
 
 lazy_static! {
@@ -45,8 +36,6 @@ pub struct FvmRuntime<B = ActorBlockstore> {
     in_transaction: bool,
     /// Indicates that the caller has been validated.
     caller_validated: bool,
-    /// The runtime policy
-    policy: Policy,
 }
 
 impl Default for FvmRuntime {
@@ -55,7 +44,6 @@ impl Default for FvmRuntime {
             blockstore: ActorBlockstore,
             in_transaction: false,
             caller_validated: false,
-            policy: Policy::default(),
         }
     }
 }
@@ -69,11 +57,6 @@ impl<B> FvmRuntime<B> {
             ));
         }
         Ok(())
-    }
-
-    #[allow(dead_code)]
-    fn policy_mut(&mut self) -> &mut Policy {
-        &mut self.policy
     }
 }
 
@@ -163,67 +146,6 @@ where
 
     fn get_actor_code_cid(&self, addr: &Address) -> Option<Cid> {
         fvm::actor::get_actor_code_cid(addr)
-    }
-
-    fn resolve_builtin_actor_type(&self, code_id: &Cid) -> Option<Type> {
-        fvm::actor::get_builtin_actor_type(code_id)
-    }
-
-    fn get_code_cid_for_type(&self, typ: Type) -> Cid {
-        fvm::actor::get_code_cid_for_type(typ)
-    }
-
-    fn get_randomness_from_tickets(
-        &self,
-        personalization: DomainSeparationTag,
-        rand_epoch: ChainEpoch,
-        entropy: &[u8],
-    ) -> Result<Randomness, ActorError> {
-        // Note: For Go actors, Lotus treated all failures to get randomness as "fatal" errors,
-        // which it then translated into exit code SysErrReserved1 (= 4, and now known as
-        // SYS_ILLEGAL_INSTRUCTION), rather than just aborting with an appropriate exit code.
-        //
-        // We can replicate that here prior to network v16, but from nv16 onwards the FVM will
-        // override the attempt to use a system exit code, and produce
-        // SYS_ILLEGAL_EXIT_CODE (9) instead.
-        //
-        // Since that behaviour changes, we may as well abort with a more appropriate exit code
-        // explicitly.
-        fvm::rand::get_chain_randomness(personalization as i64, rand_epoch, entropy).map_err(|e| {
-            if self.network_version() < NetworkVersion::V16 {
-                ActorError::unchecked(ExitCode::SYS_ILLEGAL_INSTRUCTION,
-                    "failed to get chain randomness".into())
-            } else {
-                match e {
-                    ErrorNumber::LimitExceeded => {
-                        actor_error!(illegal_argument; "randomness lookback exceeded: {}", e)
-                    }
-                    e => actor_error!(assertion_failed; "get chain randomness failed with an unexpected error: {}", e),
-                }
-            }
-        })
-    }
-
-    fn get_randomness_from_beacon(
-        &self,
-        personalization: DomainSeparationTag,
-        rand_epoch: ChainEpoch,
-        entropy: &[u8],
-    ) -> Result<Randomness, ActorError> {
-        // See note on exit codes in get_randomness_from_tickets.
-        fvm::rand::get_beacon_randomness(personalization as i64, rand_epoch, entropy).map_err(|e| {
-            if self.network_version() < NetworkVersion::V16 {
-                ActorError::unchecked(ExitCode::SYS_ILLEGAL_INSTRUCTION,
-                    "failed to get chain randomness".into())
-            } else {
-                match e {
-                    ErrorNumber::LimitExceeded => {
-                        actor_error!(illegal_argument; "randomness lookback exceeded: {}", e)
-                    }
-                    e => actor_error!(assertion_failed; "get chain randomness failed with an unexpected error: {}", e),
-                }
-            }
-        })
     }
 
     fn create<C: Cbor>(&mut self, obj: &C) -> Result<(), ActorError> {
@@ -369,6 +291,14 @@ where
         Ok(fvm::sself::self_destruct(beneficiary)?)
     }
 
+    fn resolve_builtin_actor_type(&self, code_id: &Cid) -> Option<Type> {
+        fvm::actor::get_builtin_actor_type(code_id)
+    }
+
+    fn get_code_cid_for_type(&self, typ: Type) -> Cid {
+        fvm::actor::get_code_cid_for_type(typ)
+    }
+
     fn total_fil_circ_supply(&self) -> TokenAmount {
         fvm::network::total_fil_circ_supply()
     }
@@ -386,6 +316,10 @@ impl<B> Primitives for FvmRuntime<B>
 where
     B: Blockstore,
 {
+    fn hash_blake2b(&self, data: &[u8]) -> [u8; 32] {
+        fvm::crypto::hash_blake2b(data)
+    }
+
     fn verify_signature(
         &self,
         signature: &Signature,
@@ -396,143 +330,6 @@ where
             Ok(true) => Ok(()),
             Ok(false) | Err(_) => Err(Error::msg("invalid signature")),
         }
-    }
-
-    fn hash_blake2b(&self, data: &[u8]) -> [u8; 32] {
-        fvm::crypto::hash_blake2b(data)
-    }
-
-    fn compute_unsealed_sector_cid(
-        &self,
-        proof_type: RegisteredSealProof,
-        pieces: &[PieceInfo],
-    ) -> Result<Cid, Error> {
-        // The only actor that invokes this (market actor) is generating the
-        // exit code ErrIllegalArgument. We should probably move that here, or to the syscall itself.
-        fvm::crypto::compute_unsealed_sector_cid(proof_type, pieces)
-            .map_err(|e| anyhow!("failed to compute unsealed sector CID; exit code: {}", e))
-    }
-}
-
-#[cfg(not(feature = "fake-proofs"))]
-impl<B> Verifier for FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn verify_seal(&self, vi: &SealVerifyInfo) -> Result<(), Error> {
-        match fvm::crypto::verify_seal(vi) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(Error::msg("invalid seal")),
-            Err(e) => Err(anyhow!("failed to verify seal: {}", e)),
-        }
-    }
-
-    fn verify_post(&self, verify_info: &WindowPoStVerifyInfo) -> Result<(), Error> {
-        match fvm::crypto::verify_post(verify_info) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(Error::msg("invalid post")),
-            Err(e) => Err(anyhow!("failed to verify post: {}", e)),
-        }
-    }
-
-    fn verify_consensus_fault(
-        &self,
-        h1: &[u8],
-        h2: &[u8],
-        extra: &[u8],
-    ) -> Result<Option<ConsensusFault>, Error> {
-        fvm::crypto::verify_consensus_fault(h1, h2, extra)
-            .map_err(|e| anyhow!("failed to verify fault: {}", e))
-    }
-
-    fn batch_verify_seals(&self, batch: &[SealVerifyInfo]) -> anyhow::Result<Vec<bool>> {
-        fvm::crypto::batch_verify_seals(batch)
-            .map_err(|e| anyhow!("failed to verify batch seals: {}", e))
-    }
-
-    fn verify_aggregate_seals(
-        &self,
-        aggregate: &AggregateSealVerifyProofAndInfos,
-    ) -> Result<(), Error> {
-        match fvm::crypto::verify_aggregate_seals(aggregate) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(Error::msg("invalid aggregate")),
-            Err(e) => Err(anyhow!("failed to verify aggregate: {}", e)),
-        }
-    }
-
-    fn verify_replica_update(&self, replica: &ReplicaUpdateInfo) -> Result<(), Error> {
-        match fvm::crypto::verify_replica_update(replica) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(Error::msg("invalid replica")),
-            Err(e) => Err(anyhow!("failed to verify replica: {}", e)),
-        }
-    }
-}
-
-#[cfg(feature = "fake-proofs")]
-impl<B> Verifier for FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn verify_seal(&self, _vi: &SealVerifyInfo) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn verify_post(&self, verify_info: &WindowPoStVerifyInfo) -> Result<(), Error> {
-        let mut info = verify_info.clone();
-        if info.proofs.len() != 1 {
-            return Err(Error::msg("expected 1 proof entry"));
-        }
-
-        info.randomness.0[31] &= 0x3f;
-        let mut hasher = Sha256::new();
-
-        hasher.update(info.randomness.0);
-        for si in info.challenged_sectors {
-            hasher.update(RawBytes::serialize(si)?.bytes());
-        }
-
-        let expected_proof = hasher.finalize();
-
-        if *verify_info.proofs[0].proof_bytes.as_slice() == expected_proof[..] {
-            return Ok(());
-        }
-
-        Err(Error::msg("[fake-post-validation] window post was invalid"))
-    }
-
-    fn verify_consensus_fault(
-        &self,
-        _h1: &[u8],
-        _h2: &[u8],
-        _extra: &[u8],
-    ) -> Result<Option<ConsensusFault>, Error> {
-        Ok(None)
-    }
-
-    fn batch_verify_seals(&self, batch: &[SealVerifyInfo]) -> anyhow::Result<Vec<bool>> {
-        Ok(batch.iter().map(|_| true).collect())
-    }
-
-    fn verify_aggregate_seals(
-        &self,
-        _aggregate: &AggregateSealVerifyProofAndInfos,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn verify_replica_update(&self, _replica: &ReplicaUpdateInfo) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<B> RuntimePolicy for FvmRuntime<B>
-where
-    B: Blockstore,
-{
-    fn policy(&self) -> &Policy {
-        &self.policy
     }
 }
 
