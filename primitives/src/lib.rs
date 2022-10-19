@@ -2,14 +2,15 @@ use std::{fmt::Display, marker::PhantomData};
 
 use cid::{multihash::Code, Cid};
 
-mod address;
 mod amt;
 mod hamt;
 mod link;
+mod taddress;
 
 pub use amt::TAmt;
 pub use hamt::THamt;
 pub use link::TLink;
+pub use taddress::*;
 
 /// Helper type to be able to define `Code` as a generic parameter.
 pub trait CodeType {
