@@ -2,12 +2,12 @@ use std::{fmt::Display, marker::PhantomData};
 
 use cid::{multihash::Code, Cid};
 
-mod address;
+mod taddress;
 mod amt;
 mod hamt;
 mod link;
 
-pub use address::*;
+pub use taddress::*;
 pub use amt::TAmt;
 pub use hamt::THamt;
 pub use link::TLink;
