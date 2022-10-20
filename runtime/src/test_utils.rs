@@ -10,7 +10,6 @@ use cid::Cid;
 use fvm_ipld_blockstore::MemoryBlockstore;
 use fvm_ipld_encoding::de::DeserializeOwned;
 use fvm_ipld_encoding::{Cbor, CborStore, RawBytes};
-use fvm_shared::actor::builtin::Type;
 use fvm_shared::address::{Address, Protocol};
 use fvm_shared::clock::ChainEpoch;
 
@@ -27,7 +26,7 @@ use multihash::MultihashDigest;
 use rand::prelude::*;
 
 use crate::runtime::{ActorCode, MessageInfo, Primitives, Runtime};
-use crate::{actor_error, ActorError};
+use crate::{actor_error, ActorError, Type};
 
 type Func = dyn Fn(&[u8]) -> [u8; 32];
 
