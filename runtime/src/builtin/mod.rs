@@ -1,10 +1,10 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use num_derive::FromPrimitive;
 pub use self::network::*;
 pub use self::shared::*;
 pub use self::singletons::*;
+use num_derive::FromPrimitive;
 
 pub mod network;
 pub mod shared;
@@ -33,6 +33,23 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn from_i32(u: i32) -> Self {
+        match u {
+            1 => Type::System,
+            2 => Type::Init,
+            3 => Type::Cron,
+            4 => Type::Account,
+            5 => Type::Power,
+            6 => Type::Miner,
+            7 => Type::Market,
+            8 => Type::PaymentChannel,
+            9 => Type::Multisig,
+            10 => Type::Reward,
+            11 => Type::VerifiedRegistry,
+            _ => Type::DataCap,
+        }
+    }
+
     pub fn name(&self) -> &'static str {
         match *self {
             Type::System => "system",

@@ -273,7 +273,7 @@ where
                 actor_error!(assertion_failed; "create_actor is not allowed during transaction"),
             );
         }
-        fvm::actor::create_actor(actor_id, &code_id).map_err(|e| match e {
+        fvm::actor::create_actor(actor_id, &code_id, None).map_err(|e| match e {
             ErrorNumber::IllegalArgument => {
                 ActorError::illegal_argument("failed to create actor".into())
             }
@@ -291,7 +291,7 @@ where
     }
 
     fn resolve_builtin_actor_type(&self, code_id: &Cid) -> Option<Type> {
-        fvm::actor::get_builtin_actor_type(code_id).and_then(Type::from_i32)
+        fvm::actor::get_builtin_actor_type(code_id).map(Type::from_i32)
     }
 
     fn get_code_cid_for_type(&self, typ: Type) -> Cid {
