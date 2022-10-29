@@ -14,7 +14,3 @@ members = [
     "primitives",
     "example",
 ]
-
-[build-dependencies]
-fil_actor_bundler = "3.0.4"
-cid = { version = "0.8.3", default-features = false, features = ["serde-codec"] }
