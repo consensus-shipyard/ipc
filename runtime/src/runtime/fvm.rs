@@ -12,12 +12,16 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::{ErrorNumber, ExitCode};
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{ActorID, MethodNum};
+use num_traits::Zero;
 #[cfg(feature = "fake-proofs")]
 use sha2::{Digest, Sha256};
 
+use crate::cbor::deserialize;
 use crate::runtime::actor_blockstore::ActorBlockstore;
 use crate::runtime::{ActorCode, MessageInfo, Primitives};
 use crate::{actor_error, ActorError, Runtime, Type};
+
+pub const PUBKEY_ADDRESS_METHOD: u64 = 2;
 
 lazy_static! {
     /// Cid of the empty array Cbor bytes (`EMPTY_ARR_BYTES`).
@@ -264,7 +268,7 @@ where
     }
 
     fn new_actor_address(&mut self) -> Result<Address, ActorError> {
-        Ok(fvm::actor::new_actor_address())
+        Ok(fvm::actor::next_actor_address())
     }
 
     fn create_actor(&mut self, code_id: Cid, actor_id: ActorID) -> Result<(), ActorError> {
@@ -383,4 +387,27 @@ pub fn trampoline<C: ActorCode>(params: u32) -> u32 {
     } else {
         fvm::ipld::put_block(DAG_CBOR, ret.bytes()).expect("failed to write result")
     }
+}
+
+pub fn resolve_secp_bls<BS, RT>(rt: &RT, addr: &Address) -> Result<Address, ActorError>
+where
+    BS: Blockstore,
+    RT: Runtime<BS>,
+{
+    let resolved = match rt.resolve_address(addr) {
+        Some(id) => id,
+        None => {
+            return Err(ActorError::illegal_argument(String::from(
+                "couldn't resolve actor address",
+            )))
+        }
+    };
+    let ret = rt.send(
+        resolved,
+        PUBKEY_ADDRESS_METHOD,
+        RawBytes::default(),
+        TokenAmount::zero(),
+    )?;
+
+    deserialize::<Address>(&ret, "address response")
 }
