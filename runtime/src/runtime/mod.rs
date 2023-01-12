@@ -47,6 +47,9 @@ pub trait Runtime<BS: Blockstore>: Primitives {
     fn validate_immediate_caller_type<'a, I>(&mut self, types: I) -> Result<(), ActorError>
     where
         I: IntoIterator<Item = &'a Type>;
+    fn validate_immediate_caller_not_type<'a, I>(&mut self, types: I) -> Result<(), ActorError>
+    where
+        I: IntoIterator<Item = &'a Type>;
 
     /// The balance of the receiver.
     fn current_balance(&self) -> TokenAmount;

@@ -139,6 +139,27 @@ where
         }
     }
 
+    fn validate_immediate_caller_not_type<'a, I>(&mut self, types: I) -> Result<(), ActorError>
+    where
+        I: IntoIterator<Item = &'a Type>,
+    {
+        self.assert_not_validated()?;
+        let caller_cid = {
+            let caller_addr = self.message().caller();
+            self.get_actor_code_cid(&caller_addr)
+                .expect("failed to lookup caller code")
+        };
+
+        match self.resolve_builtin_actor_type(&caller_cid) {
+            Some(typ) if types.into_iter().any(|t| *t == typ) => Err(actor_error!(forbidden;
+                                 "caller cid type {} is one of the not supported", caller_cid)),
+            _ => {
+                self.caller_validated = true;
+                Ok(())
+            }
+        }
+    }
+
     fn current_balance(&self) -> TokenAmount {
         fvm::sself::current_balance()
     }

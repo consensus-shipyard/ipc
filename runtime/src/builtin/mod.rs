@@ -10,6 +10,8 @@ pub mod network;
 pub mod shared;
 pub mod singletons;
 
+pub const CALLER_TYPES_SIGNABLE: &[Type] = &[Type::Account, Type::Multisig];
+
 /// Identifies the builtin actor types for usage with the
 /// actor::resolve_builtin_actor_type syscall.
 /// Note that there is a mirror of this enum in the FVM SDK src/actors/builtins.rs.

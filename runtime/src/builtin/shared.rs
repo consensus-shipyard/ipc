@@ -30,7 +30,7 @@ where
         Default::default(),
     )
     .map_err(|e| {
-        e.wrap(&format!(
+        e.wrap(format!(
             "failed to send zero balance to address {}",
             address
         ))

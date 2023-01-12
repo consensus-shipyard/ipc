@@ -383,6 +383,14 @@ impl MockRuntime {
     }
 
     #[allow(dead_code)]
+    pub fn expect_validate_caller_not_type(&mut self, types: Vec<Cid>) {
+        // we add type as an expectation to ensure that we did the type check
+        // and then perform the explicit "not_type" check in the validate of
+        // the MockRuntime
+        self.expect_validate_caller_type(types)
+    }
+
+    #[allow(dead_code)]
     pub fn expect_validate_caller_any(&self) {
         self.expectations.borrow_mut().expect_validate_caller_any = true;
     }
@@ -582,6 +590,48 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             actor_error!(forbidden; "caller type {:?} forbidden, allowed: {:?}",
                 self.caller_type, types),
         )
+    }
+
+    fn validate_immediate_caller_not_type<'a, I>(&mut self, types: I) -> Result<(), ActorError>
+    where
+        I: IntoIterator<Item = &'a Type>,
+    {
+        self.require_in_call();
+
+        // still requires the caller type to be set otherwise we cannot check against not type
+        assert!(
+            self.expectations
+                .borrow_mut()
+                .expect_validate_caller_type
+                .is_some(),
+            "unexpected validate caller code"
+        );
+
+        let find_by_type = |typ| {
+            (*ACTOR_TYPES)
+                .iter()
+                .find_map(|(cid, t)| if t == typ { Some(cid) } else { None })
+                .cloned()
+                .unwrap()
+        };
+        let types: Vec<Cid> = types.into_iter().map(find_by_type).collect();
+        let expected_caller_type = self
+            .expectations
+            .borrow_mut()
+            .expect_validate_caller_type
+            .clone()
+            .unwrap();
+
+        let mut r = Ok(());
+        for unexpected in &types {
+            if expected_caller_type.contains(unexpected) {
+                r = Err(actor_error!(forbidden; "caller type {:?} not expected", unexpected));
+                break;
+            }
+        }
+
+        self.expectations.borrow_mut().expect_validate_caller_type = None;
+        r
     }
 
     fn current_balance(&self) -> TokenAmount {
