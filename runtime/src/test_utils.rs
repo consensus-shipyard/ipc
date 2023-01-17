@@ -596,8 +596,6 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         )
     }
 
-    // TODO: Is this check and `validate_immediate_caller_type` useful at all? It's just doing
-    // TODO: a check passed in the unit test?
     fn validate_immediate_caller_not_type<'a, I>(&mut self, types: I) -> Result<(), ActorError>
     where
         I: IntoIterator<Item = &'a Type>,
