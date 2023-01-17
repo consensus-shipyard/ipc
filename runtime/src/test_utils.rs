@@ -388,7 +388,9 @@ impl MockRuntime {
         // we add type as an expectation to ensure that we did the type check
         // and then perform the explicit "not_type" check in the validate of
         // the MockRuntime
-        self.expectations.borrow_mut().expect_validate_caller_not_type = Some(types);
+        self.expectations
+            .borrow_mut()
+            .expect_validate_caller_not_type = Some(types);
     }
 
     #[allow(dead_code)]
@@ -635,7 +637,9 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             }
         }
 
-        self.expectations.borrow_mut().expect_validate_caller_not_type = None;
+        self.expectations
+            .borrow_mut()
+            .expect_validate_caller_not_type = None;
         r
     }
 
