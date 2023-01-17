@@ -125,6 +125,7 @@ pub struct Expectations {
     pub expect_validate_caller_any: bool,
     pub expect_validate_caller_addr: Option<Vec<Address>>,
     pub expect_validate_caller_type: Option<Vec<Cid>>,
+    pub expect_validate_caller_not_type: Option<Vec<Cid>>,
     pub expect_sends: VecDeque<ExpectedMessage>,
     pub expect_create_actor: Option<ExpectCreateActor>,
     pub expect_delete_actor: Option<Address>,
@@ -387,7 +388,7 @@ impl MockRuntime {
         // we add type as an expectation to ensure that we did the type check
         // and then perform the explicit "not_type" check in the validate of
         // the MockRuntime
-        self.expect_validate_caller_type(types)
+        self.expectations.borrow_mut().expect_validate_caller_not_type = Some(types);
     }
 
     #[allow(dead_code)]
@@ -545,6 +546,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
                 self.message().caller(), &addrs
         ))
     }
+
     fn validate_immediate_caller_type<'a, I>(&mut self, types: I) -> Result<(), ActorError>
     where
         I: IntoIterator<Item = &'a Type>,
@@ -592,6 +594,8 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         )
     }
 
+    // TODO: Is this check and `validate_immediate_caller_type` useful at all? It's just doing
+    // TODO: a check passed in the unit test?
     fn validate_immediate_caller_not_type<'a, I>(&mut self, types: I) -> Result<(), ActorError>
     where
         I: IntoIterator<Item = &'a Type>,
@@ -602,7 +606,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         assert!(
             self.expectations
                 .borrow_mut()
-                .expect_validate_caller_type
+                .expect_validate_caller_not_type
                 .is_some(),
             "unexpected validate caller code"
         );
@@ -615,22 +619,23 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
                 .unwrap()
         };
         let types: Vec<Cid> = types.into_iter().map(find_by_type).collect();
-        let expected_caller_type = self
+
+        let expect_validate_caller_not_type = self
             .expectations
             .borrow_mut()
-            .expect_validate_caller_type
+            .expect_validate_caller_not_type
             .clone()
             .unwrap();
 
         let mut r = Ok(());
         for unexpected in &types {
-            if expected_caller_type.contains(unexpected) {
+            if !expect_validate_caller_not_type.contains(unexpected) {
                 r = Err(actor_error!(forbidden; "caller type {:?} not expected", unexpected));
                 break;
             }
         }
 
-        self.expectations.borrow_mut().expect_validate_caller_type = None;
+        self.expectations.borrow_mut().expect_validate_caller_not_type = None;
         r
     }
 
