@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*"]
+members = ["fendermint/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -8,3 +8,8 @@ authors = ["Protocol Labs"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 license-file = "LICENSE-APACHE"
+
+
+[workspace.dependencies]
+async-trait = "0.1.61"
+futures = "0.3"

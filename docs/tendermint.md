@@ -187,3 +187,7 @@ And we can see commits in the ABCI server:
 ```
 
 So it looks like something changed during the `0.34` to `0.37` transition in the Protobuf encoding that the decoder doesn't expect. We'll have to find out what and fix it.
+
+As it turned out the reason was the change in the length encoding between the two versions of Tendermint: going from `varint` to `varuint`. This is something that has been updated before in `tendermint-rs` when `0.35` was being adopted, before it was subsequently abandoned; but the fix was easy to find on Github.
+
+On further delibration `tower-abci` seems to have plenty of benefits; updating it to work with the draft version of `tendermint-rs` and the `0.37` pre-release only required a [few changes](https://github.com/consensus-shipyard/tower-abci/pull/1), so that's what we're aiming to go with.

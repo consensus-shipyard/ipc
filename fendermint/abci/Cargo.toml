@@ -1,0 +1,24 @@
+[package]
+name = "fendermint_abci"
+description = "ABCI++ adapter using tendermint-rs and tower-abci"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
+tower = "0.4"
+
+tower-abci = { git = "https://github.com/consensus-shipyard/tower-abci.git", branch = "tendermint-v0.37" }
+tendermint = { git = "https://github.com/aakoshh/tendermint-rs.git", branch = "mikhail/multi-tc-version-support" }
+
+
+[dev-dependencies]
+async-stm = "0.1.2"
+im = "15.1.0"
+structopt = "0.3"
+tokio = { version = "1" }
+tracing = "0.1"
+tracing-subscriber = "0.3"
