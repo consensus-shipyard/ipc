@@ -3,9 +3,7 @@
 
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use fvm_ipld_encoding::{RawBytes};
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::consensus::ConsensusFault;
@@ -16,6 +14,8 @@ use fvm_shared::sector::{
 };
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{ActorID, MethodNum};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 pub use self::actor_code::*;
 use crate::{ActorError, Type};
@@ -27,6 +27,11 @@ pub mod fvm;
 
 #[cfg(feature = "fil-actor")]
 mod actor_blockstore;
+
+pub(crate) mod empty;
+
+pub use empty::EMPTY_ARR_CID;
+use fvm_ipld_encoding::ipld_block::IpldBlock;
 
 /// Runtime is the VM's internal runtime object.
 /// this is everything that is accessible to actors, beyond parameters.
@@ -70,7 +75,7 @@ pub trait Runtime<BS: Blockstore>: Primitives {
     fn create<T: Serialize>(&mut self, obj: &T) -> Result<(), ActorError>;
 
     /// Loads a readonly copy of the state of the receiver into the argument.
-    fn state<T: Serialize>(&self) -> Result<T, ActorError>;
+    fn state<T: DeserializeOwned>(&self) -> Result<T, ActorError>;
 
     /// Loads a mutable copy of the state of the receiver, passes it to `f`,
     /// and after `f` completes puts the state object back to the store and sets it as
@@ -97,9 +102,9 @@ pub trait Runtime<BS: Blockstore>: Primitives {
         &self,
         to: &Address,
         method: MethodNum,
-        params: RawBytes,
+        params: Option<IpldBlock>,
         value: TokenAmount,
-    ) -> Result<RawBytes, ActorError>;
+    ) -> Result<Option<IpldBlock>, ActorError>;
 
     /// Computes an address for a new actor. The returned address is intended to uniquely refer to
     /// the actor even in the event of a chain re-org (whereas an ID-address might refer to a

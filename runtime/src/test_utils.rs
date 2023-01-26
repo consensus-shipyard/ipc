@@ -9,10 +9,11 @@ use cid::multihash::{Code, Multihash as OtherMultihash};
 use cid::Cid;
 use fvm_ipld_blockstore::MemoryBlockstore;
 use fvm_ipld_encoding::de::DeserializeOwned;
-use serde::Serialize;
+use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_encoding::{CborStore, RawBytes};
 use fvm_shared::address::{Address, Protocol};
 use fvm_shared::clock::ChainEpoch;
+use serde::Serialize;
 
 use fvm_shared::commcid::{FIL_COMMITMENT_SEALED, FIL_COMMITMENT_UNSEALED};
 use fvm_shared::crypto::signature::Signature;
@@ -222,7 +223,7 @@ pub struct ExpectedMessage {
     pub value: TokenAmount,
 
     // returns from applying expectedMessage
-    pub send_return: RawBytes,
+    pub send_return: Option<IpldBlock>,
     pub exit_code: ExitCode,
 }
 
@@ -327,8 +328,8 @@ impl MockRuntime {
     pub fn call<A: ActorCode>(
         &mut self,
         method_num: MethodNum,
-        params: &RawBytes,
-    ) -> Result<RawBytes, ActorError> {
+        params: Option<IpldBlock>,
+    ) -> Result<Option<IpldBlock>, ActorError> {
         self.in_call = true;
         let prev_state = self.state;
         let res = A::invoke_method(self, method_num, params);
@@ -668,7 +669,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         Ok(())
     }
 
-    fn state<T: Serialize>(&self) -> Result<T, ActorError> {
+    fn state<T: DeserializeOwned>(&self) -> Result<T, ActorError> {
         Ok(self.store_get(self.state.as_ref().unwrap()))
     }
 
@@ -696,11 +697,11 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
 
     fn send(
         &self,
-        to: Address,
+        to: &Address,
         method: MethodNum,
-        params: RawBytes,
+        params: Option<IpldBlock>,
         value: TokenAmount,
-    ) -> Result<RawBytes, ActorError> {
+    ) -> Result<Option<IpldBlock>, ActorError> {
         self.require_in_call();
         if self.in_transaction {
             return Err(actor_error!(assertion_failed; "side-effect within transaction"));
