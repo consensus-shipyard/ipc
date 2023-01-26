@@ -2,10 +2,11 @@ use anyhow::Error;
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{to_vec, Cbor, CborStore, RawBytes, DAG_CBOR};
+use fvm_ipld_encoding::{to_vec, CborStore, RawBytes, DAG_CBOR};
 use fvm_sdk as fvm;
 use fvm_sdk::NO_DATA_BLOCK_ID;
 use fvm_shared::address::Address;
+use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
@@ -13,8 +14,9 @@ use fvm_shared::error::{ErrorNumber, ExitCode};
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{ActorID, MethodNum};
 use num_traits::Zero;
-#[cfg(feature = "fake-proofs")]
-use sha2::{Digest, Sha256};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
 
 use crate::cbor::deserialize;
 use crate::runtime::actor_blockstore::ActorBlockstore;
@@ -172,7 +174,7 @@ where
         fvm::actor::get_actor_code_cid(addr)
     }
 
-    fn create<C: Cbor>(&mut self, obj: &C) -> Result<(), ActorError> {
+    fn create<T: Serialize>(&mut self, obj: &T) -> Result<(), ActorError> {
         let root = fvm::sself::root()?;
         if root != *EMPTY_ARR_CID {
             return Err(
@@ -185,7 +187,7 @@ where
         Ok(())
     }
 
-    fn state<C: Cbor>(&self) -> Result<C, ActorError> {
+    fn state<T: DeserializeOwned>(&self) -> Result<T, ActorError> {
         let root = fvm::sself::root()?;
         Ok(ActorBlockstore
             .get_cbor(&root)
@@ -193,10 +195,10 @@ where
             .expect("State does not exist for actor state root"))
     }
 
-    fn transaction<C, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
+    fn transaction<S, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
     where
-        C: Cbor,
-        F: FnOnce(&mut C, &mut Self) -> Result<RT, ActorError>,
+        S: Serialize + DeserializeOwned,
+        F: FnOnce(&mut S, &mut Self) -> Result<RT, ActorError>,
     {
         let state_cid = fvm::sself::root()
             .map_err(|_| actor_error!(illegal_argument; "failed to get actor root state CID"))?;
@@ -204,7 +206,7 @@ where
         log::debug!("getting cid: {}", state_cid);
 
         let mut state = ActorBlockstore
-            .get_cbor::<C>(&state_cid)
+            .get_cbor::<S>(&state_cid)
             .map_err(|_| actor_error!(illegal_argument; "failed to get actor state"))?
             .expect("State does not exist for actor state root");
 
@@ -225,39 +227,26 @@ where
 
     fn send(
         &self,
-        to: Address,
+        to: &Address,
         method: MethodNum,
-        params: RawBytes,
+        params: Option<IpldBlock>,
         value: TokenAmount,
-    ) -> Result<RawBytes, ActorError> {
+    ) -> Result<Option<IpldBlock>, ActorError> {
         if self.in_transaction {
             return Err(actor_error!(assertion_failed; "send is not allowed during transaction"));
         }
-        match fvm::send::send(&to, method, params, value) {
+        match fvm::send::send(to, method, params, value, None, SendFlags::empty()) {
             Ok(ret) => {
                 if ret.exit_code.is_success() {
                     Ok(ret.return_data)
                 } else {
-                    // The returned code can't be simply propagated as it may be a system exit code.
-                    // TODO: improve propagation once we return a RuntimeError.
-                    // Ref https://github.com/filecoin-project/builtin-actors/issues/144
-                    let exit_code = match ret.exit_code {
-                        // This means the called actor did something wrong. We can't "make up" a
-                        // reasonable exit code.
-                        ExitCode::SYS_MISSING_RETURN
-                        | ExitCode::SYS_ILLEGAL_INSTRUCTION
-                        | ExitCode::SYS_ILLEGAL_EXIT_CODE => ExitCode::USR_UNSPECIFIED,
-                        // We don't expect any other system errors.
-                        code if code.is_system_error() => ExitCode::USR_ASSERTION_FAILED,
-                        // Otherwise, pass it through.
-                        code => code,
-                    };
-                    Err(ActorError::unchecked(
-                        exit_code,
+                    Err(ActorError::checked(
+                        ret.exit_code,
                         format!(
                             "send to {} method {} aborted with code {}",
                             to, method, ret.exit_code
                         ),
+                        ret.return_data,
                     ))
                 }
             }
@@ -288,9 +277,11 @@ where
         }
     }
 
+
     fn new_actor_address(&mut self) -> Result<Address, ActorError> {
-        Ok(fvm::actor::new_actor_address())
+        Ok(fvm::actor::next_actor_address())
     }
+
 
     fn create_actor(&mut self, code_id: Cid, actor_id: ActorID) -> Result<(), ActorError> {
         if self.in_transaction {
@@ -369,44 +360,65 @@ where
 /// 5a. In case of error, aborts the execution with the emitted exit code, or
 /// 5b. In case of success, stores the return data as a block and returns the latter.
 pub fn trampoline<C: ActorCode>(params: u32) -> u32 {
-    fvm::debug::init_logging();
+    init_logging();
 
     std::panic::set_hook(Box::new(|info| {
-        fvm::vm::abort(
-            ExitCode::USR_ASSERTION_FAILED.value(),
-            Some(&format!("{}", info)),
-        )
+        fvm::vm::abort(ExitCode::USR_ASSERTION_FAILED.value(), Some(&format!("{}", info)))
     }));
 
     let method = fvm::message::method_number();
-    log::debug!("fetching parameters block: {}", params);
-    let params = fvm::message::params_raw(params)
-        .expect("params block invalid")
-        .1;
-    let params = RawBytes::new(params);
-    log::debug!("input params: {:x?}", params.bytes());
+    let params = fvm::message::params_raw(params).expect("params block invalid");
 
     // Construct a new runtime.
     let mut rt = FvmRuntime::default();
     // Invoke the method, aborting if the actor returns an errored exit code.
-    let ret = C::invoke_method(&mut rt, method, &params)
+    let ret = C::invoke_method(&mut rt, method, params)
         .unwrap_or_else(|err| fvm::vm::abort(err.exit_code().value(), Some(err.msg())));
 
     // Abort with "assertion failed" if the actor failed to validate the caller somewhere.
     // We do this after handling the error, because the actor may have encountered an error before
     // it even could validate the caller.
     if !rt.caller_validated {
-        fvm::vm::abort(
-            ExitCode::USR_ASSERTION_FAILED.value(),
-            Some("failed to validate caller"),
-        )
+        fvm::vm::abort(ExitCode::USR_ASSERTION_FAILED.value(), Some("failed to validate caller"))
     }
 
     // Then handle the return value.
-    if ret.is_empty() {
-        NO_DATA_BLOCK_ID
-    } else {
-        fvm::ipld::put_block(DAG_CBOR, ret.bytes()).expect("failed to write result")
+    match ret {
+        None => NO_DATA_BLOCK_ID,
+        Some(ret_block) => fvm::ipld::put_block(ret_block.codec, ret_block.data.as_slice())
+            .expect("failed to write result"),
+    }
+}
+
+
+/// If debugging is enabled in the VM, installs a logger that sends messages to the FVM log syscall.
+/// Messages are prefixed with "[LEVEL] ".
+/// If debugging is not enabled, no logger will be installed which means that log!() and
+/// similar calls will be dropped without either formatting args or making a syscall.
+/// Note that, when debugging, the log syscalls will charge gas that wouldn't be charged
+/// when debugging is not enabled.
+///
+/// Note: this is similar to fvm::debug::init_logging() from the FVM SDK, but
+/// that doesn't work (at FVM SDK v2.2).
+fn init_logging() {
+    struct Logger;
+
+    impl log::Log for Logger {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record) {
+            // Note the log system won't automatically call enabled() before this,
+            // so it's canonical to check it here.
+            // But logging must have been enabled at initialisation time in order for
+            // the logger to be installed.
+            // There's currently no use for dynamically disabling logging, so just skip checking.
+            let msg = format!("[{}] {}", record.level(), record.args());
+            fvm::debug::log(msg);
+        }
+
+        fn flush(&self) {}
     }
 }
 

@@ -9,7 +9,8 @@ use cid::multihash::{Code, Multihash as OtherMultihash};
 use cid::Cid;
 use fvm_ipld_blockstore::MemoryBlockstore;
 use fvm_ipld_encoding::de::DeserializeOwned;
-use fvm_ipld_encoding::{Cbor, CborStore, RawBytes};
+use serde::Serialize;
+use fvm_ipld_encoding::{CborStore, RawBytes};
 use fvm_shared::address::{Address, Protocol};
 use fvm_shared::clock::ChainEpoch;
 
@@ -273,11 +274,11 @@ pub fn expect_abort<T: fmt::Debug>(exit_code: ExitCode, res: Result<T, ActorErro
 impl MockRuntime {
     ///// Runtime access for tests /////
 
-    pub fn get_state<T: Cbor>(&self) -> T {
+    pub fn get_state<T: Serialize>(&self) -> T {
         self.store_get(self.state.as_ref().unwrap())
     }
 
-    pub fn replace_state<C: Cbor>(&mut self, obj: &C) {
+    pub fn replace_state<T: Serialize>(&mut self, obj: &T) {
         self.state = Some(self.store_put(obj));
     }
 
@@ -469,7 +470,7 @@ impl MockRuntime {
         )
     }
 
-    fn store_put<C: Cbor>(&self, o: &C) -> Cid {
+    fn store_put<T: Serialize>(&self, o: &T) -> Cid {
         self.store.put_cbor(&o, Code::Blake2b256).unwrap()
     }
 
@@ -659,7 +660,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         self.actor_code_cids.get(addr).cloned()
     }
 
-    fn create<C: Cbor>(&mut self, obj: &C) -> Result<(), ActorError> {
+    fn create<T: Serialize>(&mut self, obj: &T) -> Result<(), ActorError> {
         if self.state.is_some() {
             return Err(actor_error!(illegal_state; "state already constructed"));
         }
@@ -667,14 +668,14 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         Ok(())
     }
 
-    fn state<C: Cbor>(&self) -> Result<C, ActorError> {
+    fn state<T: Serialize>(&self) -> Result<T, ActorError> {
         Ok(self.store_get(self.state.as_ref().unwrap()))
     }
 
-    fn transaction<C, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
+    fn transaction<T, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
     where
-        C: Cbor,
-        F: FnOnce(&mut C, &mut Self) -> Result<RT, ActorError>,
+        T: Serialize,
+        F: FnOnce(&mut T, &mut Self) -> Result<RT, ActorError>,
     {
         if self.in_transaction {
             return Err(actor_error!(assertion_failed; "nested transaction"));

@@ -3,7 +3,9 @@
 
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{Cbor, RawBytes};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use fvm_ipld_encoding::{RawBytes};
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::consensus::ConsensusFault;
@@ -65,10 +67,10 @@ pub trait Runtime<BS: Blockstore>: Primitives {
     /// Initializes the state object.
     /// This is only valid when the state has not yet been initialized.
     /// NOTE: we should also limit this to being invoked during the constructor method
-    fn create<C: Cbor>(&mut self, obj: &C) -> Result<(), ActorError>;
+    fn create<T: Serialize>(&mut self, obj: &T) -> Result<(), ActorError>;
 
     /// Loads a readonly copy of the state of the receiver into the argument.
-    fn state<C: Cbor>(&self) -> Result<C, ActorError>;
+    fn state<T: Serialize>(&self) -> Result<T, ActorError>;
 
     /// Loads a mutable copy of the state of the receiver, passes it to `f`,
     /// and after `f` completes puts the state object back to the store and sets it as
@@ -77,10 +79,10 @@ pub trait Runtime<BS: Blockstore>: Primitives {
     /// During the call to `f`, execution is protected from side-effects, (including message send).
     ///
     /// Returns the result of `f`.
-    fn transaction<C, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
+    fn transaction<T, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
     where
-        C: Cbor,
-        F: FnOnce(&mut C, &mut Self) -> Result<RT, ActorError>;
+        T: Serialize + DeserializeOwned,
+        F: FnOnce(&mut T, &mut Self) -> Result<RT, ActorError>;
 
     /// Returns reference to blockstore
     fn store(&self) -> &BS;
@@ -93,7 +95,7 @@ pub trait Runtime<BS: Blockstore>: Primitives {
     /// invoking the target actor/method.
     fn send(
         &self,
-        to: Address,
+        to: &Address,
         method: MethodNum,
         params: RawBytes,
         value: TokenAmount,
