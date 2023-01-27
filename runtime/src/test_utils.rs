@@ -10,7 +10,7 @@ use cid::Cid;
 use fvm_ipld_blockstore::MemoryBlockstore;
 use fvm_ipld_encoding::de::DeserializeOwned;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_ipld_encoding::{CborStore, RawBytes};
+use fvm_ipld_encoding::CborStore;
 use fvm_shared::address::{Address, Protocol};
 use fvm_shared::clock::ChainEpoch;
 use serde::Serialize;
@@ -219,7 +219,7 @@ pub struct ExpectCreateActor {
 pub struct ExpectedMessage {
     pub to: Address,
     pub method: MethodNum,
-    pub params: RawBytes,
+    pub params: Option<IpldBlock>,
     pub value: TokenAmount,
 
     // returns from applying expectedMessage
@@ -238,8 +238,8 @@ pub struct ExpectedVerifySig {
 #[derive(Clone, Debug)]
 pub struct ExpectRandomness {}
 
-pub fn expect_empty(res: RawBytes) {
-    assert_eq!(res, RawBytes::default());
+pub fn expect_empty(res: Option<IpldBlock>) {
+    assert!(res.is_none());
 }
 
 pub fn expect_abort_contains_message<T: fmt::Debug>(
@@ -275,7 +275,7 @@ pub fn expect_abort<T: fmt::Debug>(exit_code: ExitCode, res: Result<T, ActorErro
 impl MockRuntime {
     ///// Runtime access for tests /////
 
-    pub fn get_state<T: Serialize>(&self) -> T {
+    pub fn get_state<T: DeserializeOwned>(&self) -> T {
         self.store_get(self.state.as_ref().unwrap())
     }
 
@@ -410,9 +410,9 @@ impl MockRuntime {
         &mut self,
         to: Address,
         method: MethodNum,
-        params: RawBytes,
+        params: Option<IpldBlock>,
         value: TokenAmount,
-        send_return: RawBytes,
+        send_return: Option<IpldBlock>,
         exit_code: ExitCode,
     ) {
         self.expectations
@@ -675,7 +675,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
 
     fn transaction<T, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
     where
-        T: Serialize,
+        T: Serialize + DeserializeOwned,
         F: FnOnce(&mut T, &mut Self) -> Result<RT, ActorError>,
     {
         if self.in_transaction {
@@ -709,7 +709,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
 
         assert!(
             !self.expectations.borrow_mut().expect_sends.is_empty(),
-            "unexpected expectedMessage to: {:?} method: {:?}, value: {:?}, params: {:?}",
+            "unexpected message to: {:?} method: {:?}, value: {:?}, params: {:?}",
             to,
             method,
             value,
@@ -723,23 +723,10 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             .pop_front()
             .unwrap();
 
-        assert!(
-            expected_msg.to == to
-                && expected_msg.method == method
-                && expected_msg.params == params
-                && expected_msg.value == value,
-            "expectedMessage being sent does not match expectation.\n\
-             Message  - to: {:?}, method: {:?}, value: {:?}, params: {:?}\n\
-             Expected - to: {:?}, method: {:?}, value: {:?}, params: {:?}",
-            to,
-            method,
-            value,
-            params,
-            expected_msg.to,
-            expected_msg.method,
-            expected_msg.value,
-            expected_msg.params,
-        );
+        assert_eq!(expected_msg.to, *to);
+        assert_eq!(expected_msg.method, method);
+        assert_eq!(expected_msg.params, params);
+        assert_eq!(expected_msg.value, value);
 
         {
             let mut balance = self.balance.borrow_mut();

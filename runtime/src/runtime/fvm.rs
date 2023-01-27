@@ -3,7 +3,7 @@ use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_ipld_encoding::{to_vec, CborStore, RawBytes, DAG_CBOR};
+use fvm_ipld_encoding::{to_vec, CborStore, DAG_CBOR};
 use fvm_sdk as fvm;
 use fvm_sdk::NO_DATA_BLOCK_ID;
 use fvm_shared::address::Address;
@@ -18,10 +18,9 @@ use num_traits::Zero;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::cbor::deserialize;
 use crate::runtime::actor_blockstore::ActorBlockstore;
 use crate::runtime::{ActorCode, MessageInfo, Primitives};
-use crate::{actor_error, ActorError, Runtime, Type};
+use crate::{actor_error, deserialize_block, ActorError, Runtime, Type};
 
 pub const PUBKEY_ADDRESS_METHOD: u64 = 2;
 
@@ -440,5 +439,5 @@ where
     };
     let ret = rt.send(&resolved, PUBKEY_ADDRESS_METHOD, None, TokenAmount::zero())?;
 
-    deserialize::<Address>(&ret, "address response")
+    deserialize_block(ret)
 }
