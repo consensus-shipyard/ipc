@@ -364,7 +364,7 @@ pub fn trampoline<C: ActorCode>(params: u32) -> u32 {
     std::panic::set_hook(Box::new(|info| {
         fvm::vm::abort(
             ExitCode::USR_ASSERTION_FAILED.value(),
-            Some(&format!("{}", info)),
+            Some(&format!("{info}")),
         )
     }));
 

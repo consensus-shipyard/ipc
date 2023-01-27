@@ -20,12 +20,7 @@ pub fn resolve_to_id_addr(rt: &mut impl Runtime, address: &Address) -> anyhow::R
 
     // send 0 balance to the account so an ID address for it is created and then try to resolve
     rt.send(address, METHOD_SEND, Default::default(), Default::default())
-        .map_err(|e| {
-            e.wrap(format!(
-                "failed to send zero balance to address {}",
-                address
-            ))
-        })?;
+        .map_err(|e| e.wrap(format!("failed to send zero balance to address {address}",)))?;
 
     rt.resolve_address(address).ok_or_else(|| {
         anyhow::anyhow!(

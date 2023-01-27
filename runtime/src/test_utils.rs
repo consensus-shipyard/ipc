@@ -265,8 +265,7 @@ pub fn expect_abort_contains_message<T: fmt::Debug>(
     res: Result<T, ActorError>,
 ) {
     let err = res.expect_err(&format!(
-        "expected abort with exit code {}, but call succeeded",
-        expect_exit_code
+        "expected abort with exit code {expect_exit_code}, but call succeeded"
     ));
     assert_eq!(
         err.exit_code(),
@@ -279,9 +278,7 @@ pub fn expect_abort_contains_message<T: fmt::Debug>(
     let err_msg = err.msg();
     assert!(
         err.msg().contains(expect_msg),
-        "expected err message '{}' to contain '{}'",
-        err_msg,
-        expect_msg,
+        "expected err message '{err_msg}' to contain '{expect_msg}'",
     );
 }
 
@@ -599,8 +596,7 @@ impl<BS: Blockstore> Runtime for MockRuntime<BS> {
             .unwrap();
         assert_eq!(
             &types, &expected_caller_type,
-            "unexpected validate caller code {:?}, expected {:?}",
-            types, expected_caller_type,
+            "unexpected validate caller code {types:?}, expected {expected_caller_type:?}"
         );
 
         for expected in &types {
@@ -728,11 +724,7 @@ impl<BS: Blockstore> Runtime for MockRuntime<BS> {
 
         assert!(
             !self.expectations.borrow_mut().expect_sends.is_empty(),
-            "unexpected message to: {:?} method: {:?}, value: {:?}, params: {:?}",
-            to,
-            method,
-            value,
-            params
+            "unexpected message to: {to:?} method: {method:?}, value: {value:?}, params: {params:?}"
         );
 
         let expected_msg = self
@@ -803,7 +795,7 @@ impl<BS: Blockstore> Runtime for MockRuntime<BS> {
         }
         let exp_act = self.expectations.borrow_mut().expect_delete_actor.take();
         if exp_act.is_none() {
-            panic!("unexpected call to delete actor: {}", addr);
+            panic!("unexpected call to delete actor: {addr}");
         }
         if exp_act.as_ref().unwrap() != addr {
             panic!(
@@ -837,14 +829,12 @@ impl<BS: Blockstore> Runtime for MockRuntime<BS> {
         let mut exs = self.expectations.borrow_mut();
         assert!(
             !exs.expect_gas_charge.is_empty(),
-            "unexpected gas charge {:?}",
-            value
+            "unexpected gas charge {value:?}"
         );
         let expected = exs.expect_gas_charge.pop_front().unwrap();
         assert_eq!(
             expected, value,
-            "expected gas charge {:?}, actual {:?}",
-            expected, value
+            "expected gas charge {expected:?}, actual {value:?}"
         );
     }
 
