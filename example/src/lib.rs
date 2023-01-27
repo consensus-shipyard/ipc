@@ -22,7 +22,7 @@ pub fn invoke(param: u32) -> u32 {
 pub enum Method {
     /// Constructor for Storage Power Actor
     Constructor = METHOD_CONSTRUCTOR,
-    Persist = 2,
+    Persist = frc42_dispatch::method_hash!("Persist"),
 }
 
 pub struct Actor;
