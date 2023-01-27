@@ -12,7 +12,7 @@ pub trait ActorCode {
     type Methods;
     /// Invokes method with runtime on the actor's code. Method number will match one
     /// defined by the Actor, and parameters will be serialized and used in execution
-    fn invoke_method<RT, BS>(
+    fn invoke_method<RT>(
         rt: &mut RT,
         method: MethodNum,
         params: Option<IpldBlock>,
@@ -21,6 +21,6 @@ pub trait ActorCode {
         // TODO: remove the clone requirement on the blockstore when we fix "replica update" to not
         // hold onto state between transactions.
         // https://github.com/filecoin-project/builtin-actors/issues/133
-        RT: Runtime<BS>,
-        BS: Blockstore + Clone;
+        RT: Runtime,
+        RT::Blockstore: Blockstore + Clone;
 }

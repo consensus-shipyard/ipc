@@ -4,10 +4,11 @@
 use core::fmt;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::rc::Rc;
 
 use cid::multihash::{Code, Multihash as OtherMultihash};
 use cid::Cid;
-use fvm_ipld_blockstore::MemoryBlockstore;
+use fvm_ipld_blockstore::{Blockstore, MemoryBlockstore};
 use fvm_ipld_encoding::de::DeserializeOwned;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_encoding::CborStore;
@@ -83,7 +84,7 @@ pub fn make_builtin(bz: &[u8]) -> Cid {
     )
 }
 
-pub struct MockRuntime {
+pub struct MockRuntime<BS = MemoryBlockstore> {
     pub epoch: ChainEpoch,
     pub miner: Address,
     pub base_fee: TokenAmount,
@@ -103,7 +104,7 @@ pub struct MockRuntime {
 
     // VM Impl
     pub in_call: bool,
-    pub store: MemoryBlockstore,
+    pub store: Rc<BS>,
     pub in_transaction: bool,
 
     // Expectations
@@ -112,12 +113,28 @@ pub struct MockRuntime {
     pub circulating_supply: TokenAmount,
 }
 
-impl MockRuntime {
-    pub fn new(receiver: Address, caller: Address) -> MockRuntime {
-        MockRuntime {
-            receiver,
-            caller,
-            ..Default::default()
+impl<BS> MockRuntime<BS> {
+    pub fn new(store: BS) -> Self {
+        Self {
+            epoch: Default::default(),
+            miner: Address::new_id(0),
+            base_fee: Default::default(),
+            id_addresses: Default::default(),
+            actor_code_cids: Default::default(),
+            new_actor_addr: Default::default(),
+            receiver: Address::new_id(0),
+            caller: Address::new_id(0),
+            caller_type: Default::default(),
+            value_received: Default::default(),
+            hash_func: Box::new(blake2b_256),
+            network_version: NetworkVersion::V0,
+            state: Default::default(),
+            balance: Default::default(),
+            in_call: Default::default(),
+            store: Rc::new(store),
+            in_transaction: Default::default(),
+            expectations: Default::default(),
+            circulating_supply: Default::default(),
         }
     }
 }
@@ -272,7 +289,7 @@ pub fn expect_abort<T: fmt::Debug>(exit_code: ExitCode, res: Result<T, ActorErro
     expect_abort_contains_message(exit_code, "", res);
 }
 
-impl MockRuntime {
+impl<BS: Blockstore> MockRuntime<BS> {
     ///// Runtime access for tests /////
 
     pub fn get_state<T: DeserializeOwned>(&self) -> T {
@@ -480,7 +497,7 @@ impl MockRuntime {
     }
 }
 
-impl MessageInfo for MockRuntime {
+impl<BS> MessageInfo for MockRuntime<BS> {
     fn caller(&self) -> Address {
         self.caller
     }
@@ -492,7 +509,9 @@ impl MessageInfo for MockRuntime {
     }
 }
 
-impl Runtime<MemoryBlockstore> for MockRuntime {
+impl<BS: Blockstore> Runtime for MockRuntime<BS> {
+    type Blockstore = Rc<BS>;
+
     fn network_version(&self) -> NetworkVersion {
         self.network_version
     }
@@ -656,9 +675,9 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         self.id_addresses.get(address).cloned()
     }
 
-    fn get_actor_code_cid(&self, addr: &Address) -> Option<Cid> {
+    fn get_actor_code_cid(&self, id: &ActorID) -> Option<Cid> {
         self.require_in_call();
-        self.actor_code_cids.get(addr).cloned()
+        self.actor_code_cids.get(&Address::new_id(*id)).cloned()
     }
 
     fn create<T: Serialize>(&mut self, obj: &T) -> Result<(), ActorError> {
@@ -691,7 +710,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         ret
     }
 
-    fn store(&self) -> &MemoryBlockstore {
+    fn store(&self) -> &Rc<BS> {
         &self.store
     }
 
@@ -834,7 +853,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
     }
 }
 
-impl Primitives for MockRuntime {
+impl<BS> Primitives for MockRuntime<BS> {
     fn verify_signature(
         &self,
         signature: &Signature,

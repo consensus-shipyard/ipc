@@ -81,10 +81,12 @@ impl MessageInfo for FvmMessage {
     }
 }
 
-impl<B> Runtime<B> for FvmRuntime<B>
+impl<B> Runtime for FvmRuntime<B>
 where
     B: Blockstore,
 {
+    type Blockstore = B;
+
     fn network_version(&self) -> NetworkVersion {
         fvm::network::version()
     }
@@ -126,7 +128,7 @@ where
         self.assert_not_validated()?;
         let caller_cid = {
             let caller_addr = self.message().caller();
-            self.get_actor_code_cid(&caller_addr)
+            self.get_actor_code_cid(&caller_addr.id().unwrap())
                 .expect("failed to lookup caller code")
         };
 
@@ -147,7 +149,7 @@ where
         self.assert_not_validated()?;
         let caller_cid = {
             let caller_addr = self.message().caller();
-            self.get_actor_code_cid(&caller_addr)
+            self.get_actor_code_cid(&caller_addr.id().unwrap())
                 .expect("failed to lookup caller code")
         };
 
@@ -169,8 +171,8 @@ where
         fvm::actor::resolve_address(address).map(Address::new_id)
     }
 
-    fn get_actor_code_cid(&self, addr: &Address) -> Option<Cid> {
-        fvm::actor::get_actor_code_cid(addr)
+    fn get_actor_code_cid(&self, id: &ActorID) -> Option<Cid> {
+        fvm::actor::get_actor_code_cid(&Address::new_id(*id))
     }
 
     fn create<T: Serialize>(&mut self, obj: &T) -> Result<(), ActorError> {
@@ -424,11 +426,7 @@ fn init_logging() {
     }
 }
 
-pub fn resolve_secp_bls<BS, RT>(rt: &RT, addr: &Address) -> Result<Address, ActorError>
-where
-    BS: Blockstore,
-    RT: Runtime<BS>,
-{
+pub fn resolve_secp_bls(rt: &mut impl Runtime, addr: &Address) -> Result<Address, ActorError> {
     let resolved = match rt.resolve_address(addr) {
         Some(id) => id,
         None => {

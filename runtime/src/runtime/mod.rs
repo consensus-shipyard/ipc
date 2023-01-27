@@ -34,7 +34,9 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 
 /// Runtime is the VM's internal runtime object.
 /// this is everything that is accessible to actors, beyond parameters.
-pub trait Runtime<BS: Blockstore>: Primitives {
+pub trait Runtime: Primitives {
+    type Blockstore: Blockstore;
+
     /// The network protocol version number at the current epoch.
     fn network_version(&self) -> NetworkVersion;
 
@@ -66,7 +68,7 @@ pub trait Runtime<BS: Blockstore>: Primitives {
     fn resolve_address(&self, address: &Address) -> Option<Address>;
 
     /// Look up the code ID at an actor address.
-    fn get_actor_code_cid(&self, addr: &Address) -> Option<Cid>;
+    fn get_actor_code_cid(&self, id: &ActorID) -> Option<Cid>;
 
     /// Initializes the state object.
     /// This is only valid when the state has not yet been initialized.
@@ -89,7 +91,7 @@ pub trait Runtime<BS: Blockstore>: Primitives {
         F: FnOnce(&mut T, &mut Self) -> Result<RT, ActorError>;
 
     /// Returns reference to blockstore
-    fn store(&self) -> &BS;
+    fn store(&self) -> &Self::Blockstore;
 
     /// Sends a message to another actor, returning the exit code and return value envelope.
     /// If the invoked method does not return successfully, its state changes
