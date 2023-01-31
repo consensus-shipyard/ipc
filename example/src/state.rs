@@ -1,6 +1,5 @@
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::Cbor;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::address::Address;
 use primitives::{TCid, THamt};
@@ -25,8 +24,6 @@ pub struct State {
     pub call_count: usize,
     pub typed_hamt: TCid<THamt<Cid, User>>,
 }
-
-impl Cbor for State {}
 
 impl State {
     pub fn new<BS: Blockstore>(store: &BS) -> anyhow::Result<Self> {

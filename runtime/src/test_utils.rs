@@ -4,14 +4,17 @@
 use core::fmt;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::rc::Rc;
 
 use cid::multihash::{Code, Multihash as OtherMultihash};
 use cid::Cid;
-use fvm_ipld_blockstore::MemoryBlockstore;
+use fvm_ipld_blockstore::{Blockstore, MemoryBlockstore};
 use fvm_ipld_encoding::de::DeserializeOwned;
-use fvm_ipld_encoding::{Cbor, CborStore, RawBytes};
+use fvm_ipld_encoding::ipld_block::IpldBlock;
+use fvm_ipld_encoding::CborStore;
 use fvm_shared::address::{Address, Protocol};
 use fvm_shared::clock::ChainEpoch;
+use serde::Serialize;
 
 use fvm_shared::commcid::{FIL_COMMITMENT_SEALED, FIL_COMMITMENT_UNSEALED};
 use fvm_shared::crypto::signature::Signature;
@@ -81,7 +84,7 @@ pub fn make_builtin(bz: &[u8]) -> Cid {
     )
 }
 
-pub struct MockRuntime {
+pub struct MockRuntime<BS = MemoryBlockstore> {
     pub epoch: ChainEpoch,
     pub miner: Address,
     pub base_fee: TokenAmount,
@@ -101,7 +104,7 @@ pub struct MockRuntime {
 
     // VM Impl
     pub in_call: bool,
-    pub store: MemoryBlockstore,
+    pub store: Rc<BS>,
     pub in_transaction: bool,
 
     // Expectations
@@ -110,12 +113,28 @@ pub struct MockRuntime {
     pub circulating_supply: TokenAmount,
 }
 
-impl MockRuntime {
-    pub fn new(receiver: Address, caller: Address) -> MockRuntime {
-        MockRuntime {
-            receiver,
-            caller,
-            ..Default::default()
+impl<BS> MockRuntime<BS> {
+    pub fn new(store: BS) -> Self {
+        Self {
+            epoch: Default::default(),
+            miner: Address::new_id(0),
+            base_fee: Default::default(),
+            id_addresses: Default::default(),
+            actor_code_cids: Default::default(),
+            new_actor_addr: Default::default(),
+            receiver: Address::new_id(0),
+            caller: Address::new_id(0),
+            caller_type: Default::default(),
+            value_received: Default::default(),
+            hash_func: Box::new(blake2b_256),
+            network_version: NetworkVersion::V0,
+            state: Default::default(),
+            balance: Default::default(),
+            in_call: Default::default(),
+            store: Rc::new(store),
+            in_transaction: Default::default(),
+            expectations: Default::default(),
+            circulating_supply: Default::default(),
         }
     }
 }
@@ -217,11 +236,11 @@ pub struct ExpectCreateActor {
 pub struct ExpectedMessage {
     pub to: Address,
     pub method: MethodNum,
-    pub params: RawBytes,
+    pub params: Option<IpldBlock>,
     pub value: TokenAmount,
 
     // returns from applying expectedMessage
-    pub send_return: RawBytes,
+    pub send_return: Option<IpldBlock>,
     pub exit_code: ExitCode,
 }
 
@@ -236,8 +255,8 @@ pub struct ExpectedVerifySig {
 #[derive(Clone, Debug)]
 pub struct ExpectRandomness {}
 
-pub fn expect_empty(res: RawBytes) {
-    assert_eq!(res, RawBytes::default());
+pub fn expect_empty(res: Option<IpldBlock>) {
+    assert!(res.is_none());
 }
 
 pub fn expect_abort_contains_message<T: fmt::Debug>(
@@ -246,8 +265,7 @@ pub fn expect_abort_contains_message<T: fmt::Debug>(
     res: Result<T, ActorError>,
 ) {
     let err = res.expect_err(&format!(
-        "expected abort with exit code {}, but call succeeded",
-        expect_exit_code
+        "expected abort with exit code {expect_exit_code}, but call succeeded"
     ));
     assert_eq!(
         err.exit_code(),
@@ -260,9 +278,7 @@ pub fn expect_abort_contains_message<T: fmt::Debug>(
     let err_msg = err.msg();
     assert!(
         err.msg().contains(expect_msg),
-        "expected err message '{}' to contain '{}'",
-        err_msg,
-        expect_msg,
+        "expected err message '{err_msg}' to contain '{expect_msg}'",
     );
 }
 
@@ -270,14 +286,14 @@ pub fn expect_abort<T: fmt::Debug>(exit_code: ExitCode, res: Result<T, ActorErro
     expect_abort_contains_message(exit_code, "", res);
 }
 
-impl MockRuntime {
+impl<BS: Blockstore> MockRuntime<BS> {
     ///// Runtime access for tests /////
 
-    pub fn get_state<T: Cbor>(&self) -> T {
+    pub fn get_state<T: DeserializeOwned>(&self) -> T {
         self.store_get(self.state.as_ref().unwrap())
     }
 
-    pub fn replace_state<C: Cbor>(&mut self, obj: &C) {
+    pub fn replace_state<T: Serialize>(&mut self, obj: &T) {
         self.state = Some(self.store_put(obj));
     }
 
@@ -326,8 +342,8 @@ impl MockRuntime {
     pub fn call<A: ActorCode>(
         &mut self,
         method_num: MethodNum,
-        params: &RawBytes,
-    ) -> Result<RawBytes, ActorError> {
+        params: Option<IpldBlock>,
+    ) -> Result<Option<IpldBlock>, ActorError> {
         self.in_call = true;
         let prev_state = self.state;
         let res = A::invoke_method(self, method_num, params);
@@ -408,9 +424,9 @@ impl MockRuntime {
         &mut self,
         to: Address,
         method: MethodNum,
-        params: RawBytes,
+        params: Option<IpldBlock>,
         value: TokenAmount,
-        send_return: RawBytes,
+        send_return: Option<IpldBlock>,
         exit_code: ExitCode,
     ) {
         self.expectations
@@ -469,7 +485,7 @@ impl MockRuntime {
         )
     }
 
-    fn store_put<C: Cbor>(&self, o: &C) -> Cid {
+    fn store_put<T: Serialize>(&self, o: &T) -> Cid {
         self.store.put_cbor(&o, Code::Blake2b256).unwrap()
     }
 
@@ -478,7 +494,7 @@ impl MockRuntime {
     }
 }
 
-impl MessageInfo for MockRuntime {
+impl<BS> MessageInfo for MockRuntime<BS> {
     fn caller(&self) -> Address {
         self.caller
     }
@@ -490,7 +506,9 @@ impl MessageInfo for MockRuntime {
     }
 }
 
-impl Runtime<MemoryBlockstore> for MockRuntime {
+impl<BS: Blockstore> Runtime for MockRuntime<BS> {
+    type Blockstore = Rc<BS>;
+
     fn network_version(&self) -> NetworkVersion {
         self.network_version
     }
@@ -578,8 +596,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             .unwrap();
         assert_eq!(
             &types, &expected_caller_type,
-            "unexpected validate caller code {:?}, expected {:?}",
-            types, expected_caller_type,
+            "unexpected validate caller code {types:?}, expected {expected_caller_type:?}"
         );
 
         for expected in &types {
@@ -654,12 +671,12 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         self.id_addresses.get(address).cloned()
     }
 
-    fn get_actor_code_cid(&self, addr: &Address) -> Option<Cid> {
+    fn get_actor_code_cid(&self, id: &ActorID) -> Option<Cid> {
         self.require_in_call();
-        self.actor_code_cids.get(addr).cloned()
+        self.actor_code_cids.get(&Address::new_id(*id)).cloned()
     }
 
-    fn create<C: Cbor>(&mut self, obj: &C) -> Result<(), ActorError> {
+    fn create<T: Serialize>(&mut self, obj: &T) -> Result<(), ActorError> {
         if self.state.is_some() {
             return Err(actor_error!(illegal_state; "state already constructed"));
         }
@@ -667,14 +684,14 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         Ok(())
     }
 
-    fn state<C: Cbor>(&self) -> Result<C, ActorError> {
+    fn state<T: DeserializeOwned>(&self) -> Result<T, ActorError> {
         Ok(self.store_get(self.state.as_ref().unwrap()))
     }
 
-    fn transaction<C, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
+    fn transaction<T, RT, F>(&mut self, f: F) -> Result<RT, ActorError>
     where
-        C: Cbor,
-        F: FnOnce(&mut C, &mut Self) -> Result<RT, ActorError>,
+        T: Serialize + DeserializeOwned,
+        F: FnOnce(&mut T, &mut Self) -> Result<RT, ActorError>,
     {
         if self.in_transaction {
             return Err(actor_error!(assertion_failed; "nested transaction"));
@@ -689,17 +706,17 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         ret
     }
 
-    fn store(&self) -> &MemoryBlockstore {
+    fn store(&self) -> &Rc<BS> {
         &self.store
     }
 
     fn send(
         &self,
-        to: Address,
+        to: &Address,
         method: MethodNum,
-        params: RawBytes,
+        params: Option<IpldBlock>,
         value: TokenAmount,
-    ) -> Result<RawBytes, ActorError> {
+    ) -> Result<Option<IpldBlock>, ActorError> {
         self.require_in_call();
         if self.in_transaction {
             return Err(actor_error!(assertion_failed; "side-effect within transaction"));
@@ -707,11 +724,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
 
         assert!(
             !self.expectations.borrow_mut().expect_sends.is_empty(),
-            "unexpected expectedMessage to: {:?} method: {:?}, value: {:?}, params: {:?}",
-            to,
-            method,
-            value,
-            params
+            "unexpected message to: {to:?} method: {method:?}, value: {value:?}, params: {params:?}"
         );
 
         let expected_msg = self
@@ -721,23 +734,10 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
             .pop_front()
             .unwrap();
 
-        assert!(
-            expected_msg.to == to
-                && expected_msg.method == method
-                && expected_msg.params == params
-                && expected_msg.value == value,
-            "expectedMessage being sent does not match expectation.\n\
-             Message  - to: {:?}, method: {:?}, value: {:?}, params: {:?}\n\
-             Expected - to: {:?}, method: {:?}, value: {:?}, params: {:?}",
-            to,
-            method,
-            value,
-            params,
-            expected_msg.to,
-            expected_msg.method,
-            expected_msg.value,
-            expected_msg.params,
-        );
+        assert_eq!(expected_msg.to, *to);
+        assert_eq!(expected_msg.method, method);
+        assert_eq!(expected_msg.params, params);
+        assert_eq!(expected_msg.value, value);
 
         {
             let mut balance = self.balance.borrow_mut();
@@ -795,7 +795,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         }
         let exp_act = self.expectations.borrow_mut().expect_delete_actor.take();
         if exp_act.is_none() {
-            panic!("unexpected call to delete actor: {}", addr);
+            panic!("unexpected call to delete actor: {addr}");
         }
         if exp_act.as_ref().unwrap() != addr {
             panic!(
@@ -829,14 +829,12 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
         let mut exs = self.expectations.borrow_mut();
         assert!(
             !exs.expect_gas_charge.is_empty(),
-            "unexpected gas charge {:?}",
-            value
+            "unexpected gas charge {value:?}"
         );
         let expected = exs.expect_gas_charge.pop_front().unwrap();
         assert_eq!(
             expected, value,
-            "expected gas charge {:?}, actual {:?}",
-            expected, value
+            "expected gas charge {expected:?}, actual {value:?}"
         );
     }
 
@@ -845,7 +843,7 @@ impl Runtime<MemoryBlockstore> for MockRuntime {
     }
 }
 
-impl Primitives for MockRuntime {
+impl<BS> Primitives for MockRuntime<BS> {
     fn verify_signature(
         &self,
         signature: &Signature,

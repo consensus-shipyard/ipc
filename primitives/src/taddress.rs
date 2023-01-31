@@ -4,7 +4,6 @@ use std::{convert::TryFrom, fmt::Display, marker::PhantomData, str::FromStr};
 
 use serde::de::Error;
 
-use fvm_ipld_encoding::Cbor;
 use fvm_shared::address::{Address, Payload};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -107,16 +106,9 @@ where
         let raw = Address::deserialize(deserializer)?;
         match Self::try_from(raw) {
             Ok(addr) => Ok(addr),
-            Err(e) => Err(D::Error::custom(format!("wrong address type: {}", e))),
+            Err(e) => Err(D::Error::custom(format!("wrong address type: {e}"))),
         }
     }
-}
-
-impl<T> Cbor for TAddress<T>
-where
-    Self: TryFrom<Address>,
-    <Self as TryFrom<Address>>::Error: Display,
-{
 }
 
 /// Apparently CBOR has problems using `Address` as a key in `HashMap`.
@@ -147,16 +139,9 @@ where
     {
         let str = String::deserialize(deserializer)?;
         let raw = Address::from_str(&str)
-            .map_err(|e| D::Error::custom(format!("not an address string: {:?}", e)))?;
+            .map_err(|e| D::Error::custom(format!("not an address string: {e:?}")))?;
         let addr = TAddress::<T>::try_from(raw)
-            .map_err(|e| D::Error::custom(format!("wrong address type: {}", e)))?;
+            .map_err(|e| D::Error::custom(format!("wrong address type: {e}")))?;
         Ok(Self(addr))
     }
-}
-
-impl<T> Cbor for TAddressKey<T>
-where
-    TAddress<T>: TryFrom<Address>,
-    <TAddress<T> as TryFrom<Address>>::Error: Display,
-{
 }
