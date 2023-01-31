@@ -1,16 +1,26 @@
-all: build
-.PHONY: all
+.PHONY: all build test lint license check-fmt check-clippy
+
+all: test build
 
 build:
-	cargo build
-.PHONY: build
+	cargo build --release
+
+test:
+	cargo test --release
 
 clean:
 	cargo clean
 
-lint: license clean
-	cargo fmt --all
-	cargo clippy --all -- -D warnings -A clippy::upper_case_acronyms
+lint: \
+	license \
+	check-fmt \
+	check-clippy
 
 license:
 	./scripts/add_license.sh
+
+check-fmt:
+	cargo fmt --all --check
+
+check-clippy:
+	cargo clippy --all -- -D warnings
