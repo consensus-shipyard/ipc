@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -55,7 +55,7 @@ jobs:
 
     steps:
       - name: Check out the project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
@@ -64,6 +64,10 @@ jobs:
           target: wasm32-unknown-unknown
           toolchain: ${{ matrix.rust }}
           override: true
+
+      # Protobuf compiler required by libp2p-core
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
 
       - name: Setup sccache
         uses: hanabi1224/sccache-action@v1.2.0 # https://github.com/hanabi1224/sccache-action used by Forest.

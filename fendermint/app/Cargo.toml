@@ -7,3 +7,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+
+# The current 0.2.0 version of forest_db is not published to crates.io.
+# Using the `tag` of the `forest` repo rather than the `version` of just `forest_db` so we don't get a random commit in `main`.
+forest_db = { git = "https://github.com/ChainSafe/forest.git", tag = "v0.6.0" }
