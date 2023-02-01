@@ -1,5 +1,5 @@
 [workspace]
-members = ["fendermint/*"]
+members = ["fendermint/abci", "fendermint/app", "fendermint/vm/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,11 +11,14 @@ license-file = "LICENSE-APACHE"
 
 
 [workspace.dependencies]
-async-trait = "0.1.61"
+async-trait = "0.1"
 futures = "0.3"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 tempfile = "3.3"
-
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_tuple = "0.5"
+cid = { version = "0.8", default-features = false, features = ["serde-codec", "std", "arb"] }
 
 # Stable FVM dependencies from crates.io
 fvm_ipld_blockstore = "0.1"
