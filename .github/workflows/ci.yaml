@@ -51,7 +51,9 @@ jobs:
       RUST_BACKTRACE: full
       RUSTFLAGS: -Dwarnings
       CARGO_INCREMENTAL: '0'
-      SCCACHE_CACHE_SIZE: 2G
+      SCCACHE_CACHE_SIZE: 10G
+      CC: "sccache clang"
+      CXX: "sccache clang++"
 
     steps:
       - name: Check out the project
@@ -75,8 +77,11 @@ jobs:
         continue-on-error: true
         with:
           release-name: v0.3.1
-          cache-key: cargo-${{ matrix.os }}-${{matrix.rust}}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain', 'rust-toolchain.toml') }}
-          cache-update: false # It contains the lock file, should be immutable.
+          # Caching everything separately, in case they don't ask for the same things to be compiled.
+          cache-key: ${{ matrix.make.name }}-${{ matrix.os }}-${{matrix.rust}}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain', 'rust-toolchain.toml') }}
+          # Not sure why we should ever update a cache that has the hash of the lock file in it.
+          # In Forest it only contains the rust-toolchain, so it makes sense to update because dependencies could have changed.
+          cache-update: false
 
       - name: ${{ matrix.make.name }}
         run: make ${{ matrix.make.task }}

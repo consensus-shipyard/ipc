@@ -5,6 +5,7 @@ all: test build
 build:
 	cargo build --release
 
+# Using --release for testing because wasm can otherwise be slow.
 test:
 	cargo test --release
 
@@ -23,4 +24,4 @@ check-fmt:
 	cargo fmt --all --check
 
 check-clippy:
-	cargo clippy --all --release -- -D warnings
+	cargo clippy --all -- -D warnings
