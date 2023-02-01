@@ -1,2 +1,2 @@
-# ipc-client
-Implementation of an IPC client
+# ipc-agent
+Implementation of an IPC agent
