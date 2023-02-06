@@ -7,9 +7,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anyhow = { workspace = true }
-cid = { workspace = true }
+thiserror = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }
+
+cid = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }

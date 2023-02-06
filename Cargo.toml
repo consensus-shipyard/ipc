@@ -11,11 +11,13 @@ license-file = "LICENSE-APACHE"
 
 
 [workspace.dependencies]
+anyhow = "1"
 async-trait = "0.1"
+async-stm = "0.1.2"
 futures = "0.3"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 tempfile = "3.3"
-anyhow = "1"
+thiserror = "1"
 serde = { version = "1", features = ["derive"] }
 serde_tuple = "0.5"
 cid = { version = "0.8", default-features = false, features = ["serde-codec", "std", "arb"] }
@@ -28,3 +30,7 @@ fvm_ipld_car = "0.6"
 # The following are on crates.io but as pre-releases.
 fvm = { version = "3.0.0-alpha.21", default-features = false } # no opencl or it fails on CI
 fvm_shared = "3.0.0-alpha.17"
+
+# Tendermint dependencies are forked because we are building against 0.37 release candidates.
+tower-abci = { git = "https://github.com/consensus-shipyard/tower-abci.git", branch = "tendermint-v0.37" }
+tendermint = { git = "https://github.com/aakoshh/tendermint-rs.git", branch = "mikhail/multi-tc-version-support" }

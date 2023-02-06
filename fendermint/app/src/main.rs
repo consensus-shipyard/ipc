@@ -1,9 +1,30 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::sync::Arc;
+
+use fendermint_abci::ApplicationService;
+use fendermint_app::app;
+use fendermint_vm_interpreter::{
+    bytes::BytesMessageInterpreter, chain::ChainMessageInterpreter, fvm::FvmMessageInterpreter,
+    signed::SignedMessageInterpreter,
+};
+use forest_db::rocks::RocksDb;
+
 #[tokio::main]
 async fn main() {
-    println!("Soon.")
+    let interpreter = FvmMessageInterpreter::<RocksDb>::new();
+    let interpreter = SignedMessageInterpreter::new(interpreter);
+    let interpreter = ChainMessageInterpreter::new(interpreter);
+    let interpreter = BytesMessageInterpreter::new(interpreter);
+
+    let db = open_db();
+    let app = app::App::new(db, interpreter);
+    let _service = ApplicationService(app);
+}
+
+fn open_db() -> Arc<RocksDb> {
+    todo!()
 }
 
 #[cfg(test)]

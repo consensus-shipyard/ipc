@@ -6,6 +6,16 @@ use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::crypto::signature::{Signature, SignatureType};
 use fvm_shared::message::Message;
 
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum SignedMessageError {
+    #[error("message cannot be serialized")]
+    Ipld(#[from] fvm_ipld_encoding::Error),
+    #[error("invalid signature: {0}")]
+    InvalidSignature(String),
+}
+
 /// Represents a wrapped message with signature bytes.
 ///
 /// This is the message
@@ -26,21 +36,27 @@ impl SignedMessage {
     /// Generate a new signed message from fields.
     ///
     /// The signature will be verified.
-    pub fn new_checked(message: Message, signature: Signature) -> anyhow::Result<SignedMessage> {
+    pub fn new_checked(
+        message: Message,
+        signature: Signature,
+    ) -> Result<SignedMessage, SignedMessageError> {
         Self::verify_signature(&message, &signature)?;
         Ok(SignedMessage { message, signature })
     }
 
     /// Verify that the message CID was signed by the `from` address.
-    pub fn verify_signature(message: &Message, signature: &Signature) -> anyhow::Result<()> {
+    pub fn verify_signature(
+        message: &Message,
+        signature: &Signature,
+    ) -> Result<(), SignedMessageError> {
         let cid = crate::cid(&message)?.to_bytes();
         signature
             .verify(&cid, &message.from)
-            .map_err(anyhow::Error::msg)
+            .map_err(SignedMessageError::InvalidSignature)
     }
 
     /// Verifies that the from address of the message generated the signature.
-    pub fn verify(&self) -> anyhow::Result<()> {
+    pub fn verify(&self) -> Result<(), SignedMessageError> {
         Self::verify_signature(&self.message, &self.signature)
     }
 

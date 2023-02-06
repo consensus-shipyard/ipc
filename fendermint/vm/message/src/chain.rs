@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use serde::{Deserialize, Serialize};
 
-use crate::signed_message::SignedMessage;
+use crate::signed::SignedMessage;
 
 /// The different kinds of messages that can appear in blocks, ie. the transactions
 /// we can receive from Tendermint through the ABCI.
@@ -15,7 +15,7 @@ use crate::signed_message::SignedMessage;
 #[serde(untagged)]
 pub enum ChainMessage {
     /// A message that can be passed on to the FVM as-is.
-    SelfContained(SignedMessage),
+    Signed(SignedMessage),
     // TODO: ForResolution - A message CID proposed for async resolution.
     // This will not need a signature, it is proposed by the validator who made the block.
     // We might want to add a `from` and a signature anyway if we want to reward relayers.

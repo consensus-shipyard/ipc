@@ -4,8 +4,8 @@ use cid::{multihash, multihash::MultihashDigest, Cid};
 use fvm_ipld_encoding::{to_vec, Error as IpldError, DAG_CBOR};
 use serde::Serialize;
 
-pub mod chain_message;
-pub mod signed_message;
+pub mod chain;
+pub mod signed;
 
 /// Calculate the CID using Blake2b256 digest and DAG_CBOR.
 ///

@@ -11,12 +11,12 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 tower = "0.4"
 
-tower-abci = { git = "https://github.com/consensus-shipyard/tower-abci.git", branch = "tendermint-v0.37" }
-tendermint = { git = "https://github.com/aakoshh/tendermint-rs.git", branch = "mikhail/multi-tc-version-support" }
+tower-abci = { workspace = true }
+tendermint = { workspace = true }
 
 
 [dev-dependencies]
-async-stm = "0.1.2"
+async-stm = { workspace = true }
 im = "15.1.0"
 structopt = "0.3"
 tokio = { version = "1" }

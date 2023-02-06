@@ -126,7 +126,7 @@ pub trait Application {
 }
 
 /// Wrapper to adapt an `Application` to a `tower::Service`.
-pub struct ApplicationService<A>(pub A);
+pub struct ApplicationService<A: Application + Sync + Send + Clone + 'static>(pub A);
 
 impl<A> Service<Request> for ApplicationService<A>
 where

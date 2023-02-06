@@ -1,0 +1,21 @@
+[package]
+name = "fendermint_vm_interpreter"
+description = "Execute messages using the FVM"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fendermint_vm_message = { path = "../message" }
+
+async-trait = { workspace = true }
+anyhow = { workspace = true }
+
+cid = { workspace = true }
+fvm = { workspace = true }
+fvm_shared = { workspace = true }
+fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
