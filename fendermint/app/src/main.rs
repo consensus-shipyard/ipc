@@ -38,7 +38,14 @@ mod tests {
         // Just to see if dependencies compile together, see if we can load an actor bundle into a temporary RocksDB.
         // Run it with `cargo run -p fendermint_app`
 
-        let bundle = actors_v10::BUNDLE_CAR;
+        // Not loading the actors from the library any more. It would be possible, as long as dependencies are aligned.
+        // let bundle_car = actors_v10::BUNDLE_CAR;
+
+        let bundle_path = std::env::var("BUILTIN_ACTORS_BUNDLE")
+            .unwrap_or("../../../builtin-actors/output/bundle.car".to_owned());
+
+        let bundle_car = std::fs::read(&bundle_path)
+            .expect(&format!("failed to load bundle CAR from {bundle_path}"));
 
         let dir = tempfile::Builder::new()
             .tempdir()
@@ -47,7 +54,7 @@ mod tests {
         let db =
             RocksDb::open(path.clone(), &RocksDbConfig::default()).expect("error creating RocksDB");
 
-        let _cids = load_car_unchecked(&db, bundle)
+        let _cids = load_car_unchecked(&db, bundle_car.as_slice())
             .await
             .expect("error loading bundle CAR");
     }

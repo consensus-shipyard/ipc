@@ -26,7 +26,7 @@ pub type FvmMessage = fvm_shared::message::Message;
 /// a field, we might just have a CID.
 pub struct FvmApplyRet {
     pub apply_ret: ApplyRet,
-    pub gas_limit: i64,
+    pub gas_limit: u64,
 }
 
 /// A state we create for the execution of all the messages in a block.

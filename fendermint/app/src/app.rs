@@ -259,8 +259,8 @@ fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     // gas_cost = gas_fee_cap * gas_limit; this is how much the account is charged up front.
     // &base_fee_burn + &over_estimation_burn + &refund + &miner_tip == gas_cost
     // But that's in tokens. I guess the closes to what we want is the limit.
-    let gas_wanted = ret.gas_limit;
-    let gas_used = receipt.gas_used;
+    let gas_wanted: i64 = ret.gas_limit.try_into().expect("gas wanted not i64");
+    let gas_used: i64 = receipt.gas_used.try_into().expect("gas used not i64");
 
     let data = receipt.return_data.to_vec().into();
     let events = to_events(ret.apply_ret.events);

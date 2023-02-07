@@ -33,6 +33,8 @@ tempfile = { workspace = true }
 # Load the same built-in actor bundle as the ref-fvm integration tests. We'll probably need built-in actors,
 # for example to deploy Solidity code. We can compile Wasm actors and deploy them too, but certain functions
 # in `ref-fvm` like looking up actor addresses depend on built-in actors like the `InitActor` maintaining state.
-# TODO: This is dev-dependency for testing - in prod it whould be taken from a file, not packaged with the app, so the release cycle is independent.
-# TODO: Figure out how to load only what we need, and nothing else.
-actors-v10 = { package = "fil_builtin_actors_bundle", git = "https://github.com/filecoin-project/builtin-actors", branch = "next", features = ["m2-native"] }
+# NOTE: The following would add this as a dependency. The problem is that this makes it more difficult to compile
+# the project because now when there is a new version of the FVM released, we also need a new version of the
+# actor project to be released. In prod, we'd just load it from a file, so let's see if that works.
+# We can build a bundle CAR with the Makefile.
+# actors-v10 = { package = "fil_builtin_actors_bundle", git = "https://github.com/filecoin-project/builtin-actors", branch = "next", features = ["m2-native"] }
