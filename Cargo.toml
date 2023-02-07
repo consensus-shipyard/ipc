@@ -1,5 +1,5 @@
 [workspace]
-members = ["fendermint/abci", "fendermint/app", "fendermint/vm/*"]
+members = ["fendermint/abci", "fendermint/app", "fendermint/testing", "fendermint/vm/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

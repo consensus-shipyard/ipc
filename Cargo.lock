@@ -82,6 +82,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e90af4de65aa7b293ef2d09daff88501eb254f58edde2e1ac02c82d873eadad"
 
 [[package]]
+name = "arbtest"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d48cee94156b8405b421abf4dc77852a150448f2ece19293238693aa316c75ab"
+dependencies = [
+ "arbitrary",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1189,6 +1198,14 @@ dependencies = [
  "tempfile",
  "tendermint",
  "tokio",
+]
+
+[[package]]
+name = "fendermint_testing"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "arbtest",
 ]
 
 [[package]]
