@@ -1381,12 +1381,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_vm_actor_interface"
+version = "0.1.0"
+dependencies = [
+ "fvm_shared 3.0.0-alpha.17",
+ "paste",
+]
+
+[[package]]
 name = "fendermint_vm_interpreter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "cid",
+ "fendermint_vm_actor_interface",
  "fendermint_vm_message",
  "fvm",
  "fvm_ipld_blockstore",

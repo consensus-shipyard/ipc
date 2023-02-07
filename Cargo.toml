@@ -15,14 +15,15 @@ anyhow = "1"
 async-trait = "0.1"
 async-stm = "0.1.2"
 futures = "0.3"
+paste = "1"
+serde = { version = "1", features = ["derive"] }
+serde_tuple = "0.5"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 tempfile = "3.3"
 thiserror = "1"
-serde = { version = "1", features = ["derive"] }
-serde_tuple = "0.5"
-cid = { version = "0.8", default-features = false, features = ["serde-codec", "std", "arb"] }
 
 # Stable FVM dependencies from crates.io
+cid = { version = "0.8", default-features = false, features = ["serde-codec", "std", "arb"] }
 fvm_ipld_blockstore = "0.1"
 fvm_ipld_encoding = "0.3"
 fvm_ipld_car = "0.6"

@@ -5,15 +5,16 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 
 use cid::Cid;
+use fendermint_vm_actor_interface::{cron, system};
 use fvm::{
     call_manager::DefaultCallManager,
     engine::{EngineConfig, EnginePool},
     executor::{ApplyRet, DefaultExecutor, Executor},
-    machine::{DefaultMachine, NetworkConfig},
+    machine::{DefaultMachine, Machine, NetworkConfig},
     DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{clock::ChainEpoch, econ::TokenAmount, version::NetworkVersion};
+use fvm_shared::{clock::ChainEpoch, econ::TokenAmount, version::NetworkVersion, BLOCK_GAS_LIMIT};
 
 use crate::{externs::FendermintExterns, Interpreter, Timestamp};
 
@@ -106,13 +107,50 @@ where
 {
     type State = FvmState<DB>;
     type Message = FvmMessage;
-    type BeginOutput = ();
+    type BeginOutput = FvmApplyRet;
     type DeliverOutput = FvmApplyRet;
     type EndOutput = ();
 
-    async fn begin(&self, state: Self::State) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
-        // TODO: Cron.
-        Ok((state, ()))
+    async fn begin(
+        &self,
+        mut state: Self::State,
+    ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
+        // Block height (FVM epoch) as sequence is intentional
+        let height = state.executor.context().epoch;
+        // Arbitrarily large gas limit for cron (matching how Forest does it, which matches Lotus).
+        // XXX: Our blocks are not necessarily expected to be 30 seconds apart, so the gas limit might be wrong.
+        let gas_limit = BLOCK_GAS_LIMIT * 10000;
+        // Cron.
+        let msg = FvmMessage {
+            from: system::SYSTEM_ACTOR_ADDR,
+            to: cron::CRON_ACTOR_ADDR,
+            sequence: height as u64,
+            gas_limit,
+            method_num: cron::Method::EpochTick as u64,
+            params: Default::default(),
+            value: Default::default(),
+            version: Default::default(),
+            gas_fee_cap: Default::default(),
+            gas_premium: Default::default(),
+        };
+
+        let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
+
+        let apply_ret =
+            state
+                .executor
+                .execute_message(msg, fvm::executor::ApplyKind::Implicit, raw_length)?;
+
+        if let Some(err) = apply_ret.failure_info {
+            anyhow::bail!("failed to apply block cron message: {}", err);
+        }
+
+        let ret = FvmApplyRet {
+            apply_ret,
+            gas_limit,
+        };
+
+        Ok((state, ret))
     }
 
     async fn deliver(

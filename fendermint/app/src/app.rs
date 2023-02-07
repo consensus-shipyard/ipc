@@ -14,8 +14,9 @@ use fendermint_vm_interpreter::signed::SignedMesssageApplyRet;
 use fendermint_vm_interpreter::{Interpreter, Timestamp};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::event::StampedEvent;
 use fvm_shared::version::NetworkVersion;
-use tendermint::abci::{request, response, Code};
+use tendermint::abci::{request, response, Code, Event};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -114,7 +115,7 @@ where
     I: Interpreter<
         State = FvmState<DB>,
         Message = Vec<u8>,
-        BeginOutput = (),
+        BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRet,
         EndOutput = (),
     >,
@@ -262,12 +263,7 @@ fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     let gas_used = receipt.gas_used;
 
     let data = receipt.return_data.to_vec().into();
-
-    // TODO: Convert events. This is currently not possible because the event fields are private.
-    // I changed that in https://github.com/filecoin-project/ref-fvm/pull/1507 but it's still in review.
-    // A possible workaround would be to retrieve the events by their CID, and use a custom type to parse.
-    // It will be part of https://github.com/filecoin-project/ref-fvm/pull/1635 :)
-    let events = Vec::new();
+    let events = to_events(ret.apply_ret.events);
 
     response::DeliverTx {
         code,
@@ -295,6 +291,16 @@ fn to_end_block(_ret: ()) -> response::EndBlock {
 /// Map the return values from cron operations.
 ///
 /// (Currently just a placeholder).
-fn to_begin_block(_ret: ()) -> response::BeginBlock {
-    response::BeginBlock { events: Vec::new() }
+fn to_begin_block(ret: FvmApplyRet) -> response::BeginBlock {
+    let events = to_events(ret.apply_ret.events);
+
+    response::BeginBlock { events }
+}
+
+fn to_events(_stamped_events: Vec<StampedEvent>) -> Vec<Event> {
+    // TODO: Convert events. This is currently not possible because the event fields are private.
+    // I changed that in https://github.com/filecoin-project/ref-fvm/pull/1507 but it's still in review.
+    // A possible workaround would be to retrieve the events by their CID, and use a custom type to parse.
+    // It will be part of https://github.com/filecoin-project/ref-fvm/pull/1635 :)
+    Vec::new()
 }
