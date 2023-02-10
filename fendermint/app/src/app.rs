@@ -54,9 +54,9 @@ impl<DB, I> App<DB, I>
 where
     DB: Blockstore + 'static,
 {
-    pub fn new(db: Arc<DB>, interpreter: I) -> Self {
+    pub fn new(db: DB, interpreter: I) -> Self {
         Self {
-            db,
+            db: Arc::new(db),
             interpreter: Arc::new(interpreter),
             exec_state: Arc::new(Mutex::new(None)),
         }

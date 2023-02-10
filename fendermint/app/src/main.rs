@@ -1,8 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::sync::Arc;
-
 use fendermint_abci::ApplicationService;
 use fendermint_app::app;
 use fendermint_vm_interpreter::{
@@ -19,11 +17,12 @@ async fn main() {
     let interpreter = BytesMessageInterpreter::new(interpreter);
 
     let db = open_db();
+
     let app = app::App::new(db, interpreter);
     let _service = ApplicationService(app);
 }
 
-fn open_db() -> Arc<RocksDb> {
+fn open_db() -> RocksDb {
     todo!()
 }
 
