@@ -13,7 +13,7 @@ license-file = "LICENSE-APACHE"
 [workspace.dependencies]
 anyhow = "1"
 async-trait = "0.1"
-async-stm = "0.1.2"
+async-stm = "0.2"
 futures = "0.3"
 paste = "1"
 serde = { version = "1", features = ["derive"] }

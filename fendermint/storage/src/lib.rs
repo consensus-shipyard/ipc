@@ -9,6 +9,11 @@ use std::marker::PhantomData;
 #[cfg(feature = "inmem")]
 pub mod im;
 
+/// Common test utilities.
+#[cfg(feature = "testing")]
+#[allow(dead_code)]
+pub mod testing;
+
 /// Possible errors during key-value operations.
 #[derive(Debug)]
 pub enum KVError {
@@ -153,6 +158,3 @@ where
         kv.delete(&self.ns, k)
     }
 }
-
-#[cfg(test)]
-mod tests;

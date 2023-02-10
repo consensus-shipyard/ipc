@@ -1,6 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::{Codec, KVCollection, KVRead, KVReadable, KVStore, KVTransaction, KVWritable, KVWrite};
+use crate::{
+    Codec, KVCollection, KVError, KVRead, KVReadable, KVStore, KVTransaction, KVWritable, KVWrite,
+};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -9,19 +11,24 @@ use std::thread;
 
 /// We'll see how this works out. We would have to wrap any KVStore
 /// with something that can handle strings as namespaces.
-type TestNamespace = &'static str;
+pub type TestNamespace = &'static str;
+
+/// Return all namespaces used by the tests, so they can be pre-allocated, if necessary.
+pub fn test_namespaces() -> &'static [&'static str] {
+    ["foo", "bar", "fizz", "buzz", "spam", "eggs"].as_slice()
+}
 
 /// Test operations on some collections with known types,
 /// so we can have the simplest possible model implementation.
 #[derive(Clone, Debug)]
-enum TestOpKV<K, V> {
+pub enum TestOpKV<K, V> {
     Get(K),
     Put(K, V),
     Del(K),
 }
 
 #[derive(Clone, Debug)]
-enum TestOpNs {
+pub enum TestOpNs {
     S2I(TestNamespace, TestOpKV<String, u8>),
     I2S(TestNamespace, TestOpKV<u8, String>),
     Rollback,
@@ -38,8 +45,8 @@ impl Arbitrary for TestOpNs {
     fn arbitrary(g: &mut Gen) -> Self {
         use TestOpKV::*;
         use TestOpNs::*;
-        match u8::arbitrary(g) % 100 {
-            i if i < 49 => {
+        match u8::arbitrary(g) % 10 {
+            i if i < 4 => {
                 let ns = g.choose(&["spam", "eggs"]).unwrap();
                 let k = *g.choose(&["foo", "bar"]).unwrap();
                 match u8::arbitrary(g) % 10 {
@@ -48,7 +55,7 @@ impl Arbitrary for TestOpNs {
                     _ => S2I(ns, Del(k.to_owned())),
                 }
             }
-            i if i < 98 => {
+            i if i < 9 => {
                 let ns = g.choose(&["fizz", "buzz"]).unwrap();
                 let k = u8::arbitrary(g) % 2;
                 match u8::arbitrary(g) % 10 {
@@ -95,7 +102,7 @@ impl<const N: usize> Arbitrary for TestDataMulti<N> {
     }
 }
 
-struct TestDataStore;
+pub struct TestDataStore;
 
 impl KVStore for TestDataStore {
     type Namespace = TestNamespace;
@@ -229,18 +236,26 @@ where
     S: KVStore<Namespace = TestNamespace> + Clone + Codec<String> + Codec<u8>,
     B: KVWritable<S> + KVReadable<S> + Clone + Send + 'static,
 {
-    let apply_sut = |sut: &B, data: &TestData| {
+    // Tests can now fail during writes because they realise some other transaction has already committed.
+    let try_apply_sut = |sut: &B, data: &TestData| -> Result<(), KVError> {
         let mut tx = sut.write();
         for op in data.ops.iter() {
             match op {
-                TestOpNs::S2I(ns, TestOpKV::Put(k, v)) => tx.put(ns, k, v).unwrap(),
-                TestOpNs::S2I(ns, TestOpKV::Del(k)) => tx.delete(ns, k).unwrap(),
-                TestOpNs::I2S(ns, TestOpKV::Put(k, v)) => tx.put(ns, k, v).unwrap(),
-                TestOpNs::I2S(ns, TestOpKV::Del(k)) => tx.delete(ns, k).unwrap(),
+                TestOpNs::S2I(ns, TestOpKV::Put(k, v)) => tx.put(ns, k, v)?,
+                TestOpNs::S2I(ns, TestOpKV::Del(k)) => tx.delete(ns, k)?,
+                TestOpNs::I2S(ns, TestOpKV::Put(k, v)) => tx.put(ns, k, v)?,
+                TestOpNs::I2S(ns, TestOpKV::Del(k)) => tx.delete(ns, k)?,
                 _ => (),
             }
         }
-        tx.commit().unwrap();
+        tx.commit()
+    };
+
+    // Try to apply once, if it fails due to conflict, retry, otherwise panic.
+    let apply_sut = move |sut: &B, data: &TestData| match try_apply_sut(sut, data) {
+        Err(KVError::Conflict) => try_apply_sut(sut, data).unwrap(),
+        Err(other) => panic!("error applying test data: {other:?}"),
+        Ok(()) => (),
     };
 
     let sutc = sut.clone();
@@ -254,7 +269,7 @@ where
     let apply_model = |a: &TestData, b: &TestData| -> bool {
         let mut model = Model::default();
         // First apply all the writes
-        for op in a.ops.iter().chain(b.ops.iter()).map(|op| op.clone()) {
+        for op in a.ops.iter().chain(b.ops.iter()).cloned() {
             match op {
                 TestOpNs::S2I(ns, TestOpKV::Put(k, v)) => {
                     model.s2i.entry(ns).or_default().insert(k, v);
@@ -275,14 +290,14 @@ where
         for op in a.ops.iter().chain(b.ops.iter()) {
             match op {
                 TestOpNs::S2I(ns, TestOpKV::Get(k)) => {
-                    let expected = tx.get::<String, u8>(&ns, k).unwrap();
+                    let expected = tx.get::<String, u8>(ns, k).unwrap();
                     let found = model.s2i.get(ns).and_then(|m| m.get(k)).cloned();
                     if found != expected {
                         return false;
                     }
                 }
                 TestOpNs::I2S(ns, TestOpKV::Get(k)) => {
-                    let expected = tx.get::<u8, String>(&ns, k).unwrap();
+                    let expected = tx.get::<u8, String>(ns, k).unwrap();
                     let found = model.i2s.get(ns).and_then(|m| m.get(k)).cloned();
                     if found != expected {
                         return false;
@@ -315,22 +330,16 @@ where
     let mut gets = Vec::new();
     let mut ok = true;
 
-    for op in data.ops.clone() {
-        match op {
-            TestOpNs::S2I(ns, op) => {
-                let coll = colls.s2i(ns);
-                apply_both(&mut txw, &mut model.s2i, coll, ns, op.clone());
-                match &op {
-                    TestOpKV::Get(k) => {
-                        if coll.get(&txr, &k).unwrap().is_some() {
-                            ok = false;
-                        }
-                        gets.push((ns, op));
-                    }
-                    _ => {}
+    for op in data.ops {
+        if let TestOpNs::S2I(ns, op) = op {
+            let coll = colls.s2i(ns);
+            apply_both(&mut txw, &mut model.s2i, coll, ns, op.clone());
+            if let TestOpKV::Get(k) = &op {
+                if coll.get(&txr, k).unwrap().is_some() {
+                    ok = false;
                 }
+                gets.push((ns, op));
             }
-            _ => {}
         }
     }
 
@@ -339,14 +348,11 @@ where
 
     for (ns, op) in &gets {
         let coll = colls.s2i(ns);
-        match op {
-            TestOpKV::Get(k) => {
-                let found = coll.get(&txr, &k).unwrap();
-                if found.is_some() {
-                    ok = false;
-                }
+        if let TestOpKV::Get(k) = op {
+            let found = coll.get(&txr, k).unwrap();
+            if found.is_some() {
+                ok = false;
             }
-            _ => unreachable!(),
         }
     }
 
@@ -356,15 +362,12 @@ where
 
     for (ns, op) in &gets {
         let coll = colls.s2i(ns);
-        match op {
-            TestOpKV::Get(k) => {
-                let found = coll.get(&txr, &k).unwrap();
-                let expected = model.s2i.get(ns).and_then(|m| m.get(k)).cloned();
-                if found != expected {
-                    ok = false;
-                }
+        if let TestOpKV::Get(k) = op {
+            let found = coll.get(&txr, k).unwrap();
+            let expected = model.s2i.get(ns).and_then(|m| m.get(k)).cloned();
+            if found != expected {
+                ok = false;
             }
-            _ => unreachable!(),
         }
     }
 
@@ -405,70 +408,4 @@ where
         }
     }
     true
-}
-
-#[cfg(feature = "inmem")]
-mod im {
-    use std::borrow::Cow;
-
-    use crate::{im::InMemoryBackend, Codec, Decode, Encode, KVError, KVResult, KVStore};
-    use quickcheck_macros::quickcheck;
-    use serde::{de::DeserializeOwned, Serialize};
-
-    use super::{TestData, TestDataMulti, TestNamespace};
-
-    #[derive(Clone)]
-    struct TestKVStore;
-
-    impl KVStore for TestKVStore {
-        type Namespace = TestNamespace;
-        type Repr = Vec<u8>;
-    }
-
-    impl<T: Serialize> Encode<T> for TestKVStore {
-        fn to_repr(value: &T) -> KVResult<Cow<Self::Repr>> {
-            fvm_ipld_encoding::to_vec(value)
-                .map_err(|e| KVError::Codec(Box::new(e)))
-                .map(Cow::Owned)
-        }
-    }
-    impl<T: DeserializeOwned> Decode<T> for TestKVStore {
-        fn from_repr(repr: &Self::Repr) -> KVResult<T> {
-            fvm_ipld_encoding::from_slice(repr).map_err(|e| KVError::Codec(Box::new(e)))
-        }
-    }
-
-    impl<T> Codec<T> for TestKVStore where TestKVStore: Encode<T> + Decode<T> {}
-
-    #[quickcheck]
-    fn writable(data: TestData) -> bool {
-        let backend = InMemoryBackend::<TestKVStore>::default();
-        super::check_writable(&backend, data)
-    }
-
-    #[quickcheck]
-    fn write_isolation(data: TestDataMulti<2>) -> bool {
-        // XXX: It isn't safe to use this backend without locking writes if writes are concurrent.
-        // It's just here to try the test on something.
-        let backend = InMemoryBackend::<TestKVStore>::new(false);
-        super::check_write_isolation(&backend, data)
-    }
-
-    #[quickcheck]
-    fn write_isolation_concurrent(data1: TestData, data2: TestData) -> bool {
-        let backend = InMemoryBackend::<TestKVStore>::default();
-        super::check_write_isolation_concurrent(&backend, data1, data2)
-    }
-
-    #[quickcheck]
-    fn write_serialization_concurrent(data1: TestData, data2: TestData) -> bool {
-        let backend = InMemoryBackend::<TestKVStore>::default();
-        super::check_write_serialization_concurrent(&backend, data1, data2)
-    }
-
-    #[quickcheck]
-    fn read_isolation(data: TestData) -> bool {
-        let backend = InMemoryBackend::<TestKVStore>::default();
-        super::check_read_isolation(&backend, data)
-    }
 }

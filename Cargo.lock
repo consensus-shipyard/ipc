@@ -110,9 +110,9 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 
 [[package]]
 name = "async-stm"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f99763a14a960c91336f6374dc9cb131aa46386a19ceb8dd1f1cf7052a51e51"
+checksum = "7f502cd40d617759c2e1125ff6565aa05ed21ec097e2ae7fed0266a8ecef34d0"
 dependencies = [
  "parking_lot",
  "tokio",
@@ -263,13 +263,13 @@ dependencies = [
 
 [[package]]
 name = "blake2b_simd"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72936ee4afc7f8f736d1c38383b56480b5497b4617b4a77bdbf1d2ababc76127"
+checksum = "3c2f0dc9a68c6317d884f97cc36cf5a3d20ba14ce404227df55e1af708ab04bc"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.2",
- "constant_time_eq 0.1.5",
+ "constant_time_eq 0.2.4",
 ]
 
 [[package]]
@@ -285,13 +285,13 @@ dependencies = [
 
 [[package]]
 name = "blake2s_simd"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db539cc2b5f6003621f1cd9ef92d7ded8ea5232c7de0f9faa2de251cd98730d4"
+checksum = "6637f448b9e61dfadbdcbae9a885fadee1f3eaffb1f8d3c1965d3ade8bdfd44f"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.2",
- "constant_time_eq 0.1.5",
+ "constant_time_eq 0.2.4",
 ]
 
 [[package]]
@@ -1169,7 +1169,9 @@ dependencies = [
  "cid",
  "fendermint_storage",
  "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "num_cpus",
+ "quickcheck 1.0.3",
  "rocksdb",
  "serde",
  "tempfile",
@@ -1477,9 +1479,9 @@ dependencies = [
 
 [[package]]
 name = "fvm"
-version = "3.0.0-alpha.23"
+version = "3.0.0-alpha.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc7f02183491679545c586c92e8b594d2e02603a239bddbd5234cf95cf4cef60"
+checksum = "560201e145435e4a3741fe5e6f37b7854273af9f344ca13957232ccb58834a1f"
 dependencies = [
  "anyhow",
  "blake2b_simd",
@@ -2222,7 +2224,7 @@ checksum = "1c346cf9999c631f002d8f977c4eaeaa0e6386f16007202308d0b3757522c2cc"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
- "blake2s_simd 1.0.0",
+ "blake2s_simd 1.0.1",
  "blake3",
  "core2",
  "digest 0.10.6",
@@ -3582,9 +3584,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.5"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e267c18a719545b481171952a79f8c25c80361463ba44bc7fa9eba7c742ef4f"
+checksum = "bc6a3b08b64e6dfad376fa2432c7b1f01522e37a623c3050bc95db2d3ff21583"
 dependencies = [
  "bytes",
  "futures-core",
@@ -3617,7 +3619,7 @@ dependencies = [
  "rand 0.8.5",
  "slab",
  "tokio",
- "tokio-util 0.7.5",
+ "tokio-util 0.7.6",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -3846,9 +3848,9 @@ dependencies = [
 
 [[package]]
 name = "wasmparser"
-version = "0.99.0"
+version = "0.100.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ef3b717afc67f848f412d4f02c127dd3e35a0eecd58c684580414df4fde01d3"
+checksum = "64b20236ab624147dfbb62cf12a19aaf66af0e41b8398838b66e997d07d269d4"
 dependencies = [
  "indexmap",
  "url",
@@ -3856,12 +3858,12 @@ dependencies = [
 
 [[package]]
 name = "wasmprinter"
-version = "0.2.49"
+version = "0.2.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27c13dff901f9354fa9a6a877152d9c5642513645985635c9b83bcca99e40ea1"
+checksum = "b2d3f7d7cb1e00ae9f91bb21f2856cdc68a913afb3b6b33fca5a83dba8c8c4eb"
 dependencies = [
  "anyhow",
- "wasmparser 0.99.0",
+ "wasmparser 0.100.0",
 ]
 
 [[package]]
@@ -4215,9 +4217,9 @@ dependencies = [
 
 [[package]]
 name = "zstd-sys"
-version = "2.0.6+zstd.1.5.2"
+version = "2.0.7+zstd.1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68a3f9792c0c3dc6c165840a75f47ae1f4da402c2d006881129579f6597e801b"
+checksum = "94509c3ba2fe55294d752b79842c530ccfab760192521df74a081a78d2b3c7f5"
 dependencies = [
  "cc",
  "libc",

@@ -30,7 +30,7 @@ check-fmt:
 	cargo fmt --all --check
 
 check-clippy:
-	cargo clippy --all -- -D warnings
+	cargo clippy --all --tests -- -D clippy::all
 
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;

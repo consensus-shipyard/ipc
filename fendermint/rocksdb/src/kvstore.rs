@@ -72,6 +72,14 @@ pub struct RocksDbWriteTx<'a> {
     tx: ManuallyDrop<Transaction<'a, OptimisticTransactionDB>>,
 }
 
+impl<'a> RocksDbWriteTx<'a> {
+    // This method takes the transaction without running the panicky destructor.
+    fn take_tx(self) -> Transaction<'a, OptimisticTransactionDB> {
+        let mut this = ManuallyDrop::new(self);
+        unsafe { ManuallyDrop::take(&mut this.tx) }
+    }
+}
+
 impl<S> KVReadable<S> for RocksDb
 where
     S: KVStore<Repr = Vec<u8>>,
@@ -191,14 +199,13 @@ where
 
 impl<'a> KVTransaction for RocksDbWriteTx<'a> {
     fn commit(self) -> KVResult<()> {
-        // This method cleans up the transaction without running the panicky destructor.
-        let mut this = ManuallyDrop::new(self);
-        let tx = unsafe { ManuallyDrop::take(&mut this.tx) };
+        let tx = self.take_tx();
         tx.commit().map_err(to_kv_error)
     }
 
     fn rollback(self) -> KVResult<()> {
-        self.tx.rollback().map_err(to_kv_error)
+        let tx = self.take_tx();
+        tx.rollback().map_err(to_kv_error)
     }
 }
 
@@ -215,5 +222,112 @@ fn to_kv_error(e: rocksdb::Error) -> KVError {
         KVError::Conflict
     } else {
         KVError::Unexpected(Box::new(e))
+    }
+}
+
+#[cfg(all(feature = "kvstore", test))]
+mod tests {
+    use std::borrow::Cow;
+
+    use quickcheck::{QuickCheck, Testable};
+    use serde::{de::DeserializeOwned, Serialize};
+
+    use fendermint_storage::{testing::*, Codec, Decode, Encode, KVError, KVResult, KVStore};
+
+    use crate::{RocksDb, RocksDbConfig};
+
+    const TEST_COUNT: u64 = 20;
+
+    #[derive(Clone)]
+    struct TestKVStore;
+
+    impl KVStore for TestKVStore {
+        type Namespace = TestNamespace;
+        type Repr = Vec<u8>;
+    }
+
+    impl<T: Serialize> Encode<T> for TestKVStore {
+        fn to_repr(value: &T) -> KVResult<Cow<Self::Repr>> {
+            fvm_ipld_encoding::to_vec(value)
+                .map_err(|e| KVError::Codec(Box::new(e)))
+                .map(Cow::Owned)
+        }
+    }
+    impl<T: DeserializeOwned> Decode<T> for TestKVStore {
+        fn from_repr(repr: &Self::Repr) -> KVResult<T> {
+            fvm_ipld_encoding::from_slice(repr).map_err(|e| KVError::Codec(Box::new(e)))
+        }
+    }
+
+    impl<T> Codec<T> for TestKVStore where TestKVStore: Encode<T> + Decode<T> {}
+
+    fn new_backend() -> RocksDb {
+        let dir = tempfile::Builder::new()
+            .tempdir()
+            .expect("error creating temporary path for db");
+        let path = dir.path().join("rocksdb");
+        let db = RocksDb::open(path, &RocksDbConfig::default()).expect("error creating RocksDB");
+
+        // Create the column families the test will use.
+        for name in test_namespaces() {
+            let _ = db.new_cf_handle(name).unwrap();
+        }
+
+        db
+    }
+
+    // Not using the `#[quickcheck]` macro so I can run fewer tests becasue they are slow.
+    fn run_quickcheck<F: Testable>(f: F) {
+        QuickCheck::new().tests(TEST_COUNT).quickcheck(f)
+    }
+
+    #[test]
+    fn writable() {
+        run_quickcheck(
+            (|data| {
+                let backend = new_backend();
+                check_writable::<TestKVStore>(&backend, data)
+            }) as fn(TestData) -> bool,
+        )
+    }
+
+    #[test]
+    fn write_isolation() {
+        run_quickcheck(
+            (|data| {
+                let backend = new_backend();
+                check_write_isolation::<TestKVStore>(&backend, data)
+            }) as fn(TestDataMulti<2>) -> bool,
+        )
+    }
+
+    #[test]
+    fn write_isolation_concurrent() {
+        run_quickcheck(
+            (|data1, data2| {
+                let backend = new_backend();
+                check_write_isolation_concurrent::<TestKVStore, _>(&backend, data1, data2)
+            }) as fn(TestData, TestData) -> bool,
+        )
+    }
+
+    #[test]
+    fn write_serialization_concurrent() {
+        run_quickcheck(
+            (|data1, data2| {
+                let backend = new_backend();
+                check_write_serialization_concurrent::<TestKVStore, _>(&backend, data1, data2)
+            }) as fn(TestData, TestData) -> bool,
+        )
+    }
+
+    #[test]
+    fn read_isolation() {
+        run_quickcheck(
+            (|data| {
+                let backend = new_backend();
+                check_read_isolation::<TestKVStore, _>(&backend, data)
+            }) as fn(TestData) -> bool,
+        )
     }
 }

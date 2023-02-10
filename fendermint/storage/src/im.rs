@@ -182,3 +182,69 @@ where
         Ok(())
     }
 }
+
+#[cfg(all(feature = "inmem", test))]
+mod tests {
+    use std::borrow::Cow;
+
+    use crate::{im::InMemoryBackend, Codec, Decode, Encode, KVError, KVResult, KVStore};
+    use quickcheck_macros::quickcheck;
+    use serde::{de::DeserializeOwned, Serialize};
+
+    use crate::testing::*;
+
+    #[derive(Clone)]
+    struct TestKVStore;
+
+    impl KVStore for TestKVStore {
+        type Namespace = TestNamespace;
+        type Repr = Vec<u8>;
+    }
+
+    impl<T: Serialize> Encode<T> for TestKVStore {
+        fn to_repr(value: &T) -> KVResult<Cow<Self::Repr>> {
+            fvm_ipld_encoding::to_vec(value)
+                .map_err(|e| KVError::Codec(Box::new(e)))
+                .map(Cow::Owned)
+        }
+    }
+    impl<T: DeserializeOwned> Decode<T> for TestKVStore {
+        fn from_repr(repr: &Self::Repr) -> KVResult<T> {
+            fvm_ipld_encoding::from_slice(repr).map_err(|e| KVError::Codec(Box::new(e)))
+        }
+    }
+
+    impl<T> Codec<T> for TestKVStore where TestKVStore: Encode<T> + Decode<T> {}
+
+    #[quickcheck]
+    fn writable(data: TestData) -> bool {
+        let backend = InMemoryBackend::<TestKVStore>::default();
+        check_writable(&backend, data)
+    }
+
+    #[quickcheck]
+    fn write_isolation(data: TestDataMulti<2>) -> bool {
+        // XXX: It isn't safe to use this backend without locking writes if writes are concurrent.
+        // It's just here to try the test on something.
+        let backend = InMemoryBackend::<TestKVStore>::new(false);
+        check_write_isolation(&backend, data)
+    }
+
+    #[quickcheck]
+    fn write_isolation_concurrent(data1: TestData, data2: TestData) -> bool {
+        let backend = InMemoryBackend::<TestKVStore>::default();
+        check_write_isolation_concurrent(&backend, data1, data2)
+    }
+
+    #[quickcheck]
+    fn write_serialization_concurrent(data1: TestData, data2: TestData) -> bool {
+        let backend = InMemoryBackend::<TestKVStore>::default();
+        check_write_serialization_concurrent(&backend, data1, data2)
+    }
+
+    #[quickcheck]
+    fn read_isolation(data: TestData) -> bool {
+        let backend = InMemoryBackend::<TestKVStore>::default();
+        check_read_isolation(&backend, data)
+    }
+}

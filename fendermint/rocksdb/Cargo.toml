@@ -12,7 +12,7 @@ license.workspace = true
 num_cpus = "1.14"
 rocksdb = { version = "0.19", features = ["multi-threaded-cf"] }
 anyhow = { workspace = true }
-fendermint_storage = { path = "../storage", optional = true }
+fendermint_storage = { path = "../storage", optional = true, features = ["testing"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
@@ -21,6 +21,8 @@ fvm_ipld_blockstore = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+quickcheck = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
 
 [features]
 default = ["lz4", "blockstore", "kvstore"]
