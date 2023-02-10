@@ -5,7 +5,6 @@ use fendermint_storage::Decode;
 use fendermint_storage::Encode;
 use fendermint_storage::KVResult;
 use fendermint_storage::KVTransaction;
-use fendermint_storage::KVTransactionPrepared;
 use fendermint_storage::KVWritable;
 use fendermint_storage::KVWrite;
 use fendermint_storage::{KVError, KVRead, KVReadable, KVStore};
@@ -191,28 +190,6 @@ where
 }
 
 impl<'a> KVTransaction for RocksDbWriteTx<'a> {
-    type Prepared = Self;
-
-    fn prepare(self) -> KVResult<Option<Self::Prepared>> {
-        // TODO: Prepare will write changes into the WAL, so commit is simple and quick.
-        // But it's not clear if any write conflicts will be detected here, or only during commit time.
-        // If this is a misunderstanding, then this library would be unable to work the way STM assumes,
-        // and we can just go back to work with `TransactionDB` which locks column families being updated.
-        // Or we can just forget `prepare`, and add a `try_commit` with an option of failure after all the
-        // locks over the STM data structures have been acquired.
-        match self.tx.prepare() {
-            Err(e) if e.kind() == ErrorKind::Busy => Ok(None),
-            Err(e) => Err(to_kv_error(e)),
-            Ok(()) => Ok(Some(self)),
-        }
-    }
-
-    fn rollback(self) -> KVResult<()> {
-        self.tx.rollback().map_err(to_kv_error)
-    }
-}
-
-impl<'a> KVTransactionPrepared for RocksDbWriteTx<'a> {
     fn commit(self) -> KVResult<()> {
         // This method cleans up the transaction without running the panicky destructor.
         let mut this = ManuallyDrop::new(self);
@@ -221,7 +198,7 @@ impl<'a> KVTransactionPrepared for RocksDbWriteTx<'a> {
     }
 
     fn rollback(self) -> KVResult<()> {
-        KVTransaction::rollback(self)
+        self.tx.rollback().map_err(to_kv_error)
     }
 }
 

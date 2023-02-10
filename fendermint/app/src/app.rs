@@ -7,9 +7,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::Application;
-use fendermint_storage::{
-    Codec, Encode, KVRead, KVReadable, KVStore, KVTransaction, KVWritable, KVWrite,
-};
+use fendermint_storage::{Codec, Encode, KVRead, KVReadable, KVStore, KVWritable, KVWrite};
 use fendermint_vm_interpreter::bytes::BytesMessageApplyRet;
 use fendermint_vm_interpreter::chain::ChainMessageApplyRet;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmState};
@@ -94,11 +92,9 @@ where
 
     /// Set the last committed state.
     fn set_committed_state(&self, state: AppState) {
-        let mut tx = self.db.write();
-        tx.put(&self.namespace, &AppStoreKey::State, &state)
-            .expect("put failed");
-        let committed = tx.prepare_and_commit().expect("commit failed");
-        assert!(committed, "not committed")
+        self.db
+            .with_write(|tx| tx.put(&self.namespace, &AppStoreKey::State, &state))
+            .expect("commit failed");
     }
 
     /// Put the execution state during block execution. Has to be empty.
