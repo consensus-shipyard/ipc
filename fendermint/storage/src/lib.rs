@@ -12,6 +12,8 @@ pub mod im;
 /// Possible errors during key-value operations.
 #[derive(Debug)]
 pub enum KVError {
+    /// The operation failed because there was a write conflict.
+    Conflict,
     /// KV transaction was aborted due to some business rule violation.
     Abort(Box<dyn Error + Send + Sync>),
     /// An error occurred during serializing or deserializing the data.

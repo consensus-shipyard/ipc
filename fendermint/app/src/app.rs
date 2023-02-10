@@ -7,6 +7,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::Application;
+use fendermint_storage::{
+    Codec, Encode, KVRead, KVReadable, KVStore, KVTransaction, KVWritable, KVWrite,
+};
 use fendermint_vm_interpreter::bytes::BytesMessageApplyRet;
 use fendermint_vm_interpreter::chain::ChainMessageApplyRet;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmState};
@@ -16,12 +19,18 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::event::StampedEvent;
 use fvm_shared::version::NetworkVersion;
+use serde::{Deserialize, Serialize};
 use tendermint::abci::{request, response, Code, Event};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// TODO: What range should we use for our own error codes? Should we shift FVM errors?
+#[derive(Serialize)]
+#[repr(u8)]
+pub enum AppStoreKey {
+    State,
+}
 
+// TODO: What range should we use for our own error codes? Should we shift FVM errors?
 #[repr(u32)]
 enum AppError {
     /// Failed to deserialize the transaction.
@@ -30,9 +39,10 @@ enum AppError {
     InvalidSignature = 52,
 }
 
-struct AppState {
+#[derive(Serialize, Deserialize)]
+pub struct AppState {
     block_height: u64,
-    state_root: Cid,
+    state_root: Cid, // TODO: Use TCid
     network_version: NetworkVersion,
     base_fee: TokenAmount,
     circ_supply: TokenAmount,
@@ -40,41 +50,55 @@ struct AppState {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, I>
+pub struct App<DB, S, I>
 where
     DB: Blockstore + 'static,
+    S: KVStore,
 {
     db: Arc<DB>,
+    /// Namespace under which to persist application state.
+    namespace: S::Namespace,
+    /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
     /// State accumulating changes during block execution.
     exec_state: Arc<Mutex<Option<FvmState<DB>>>>,
 }
 
-impl<DB, I> App<DB, I>
+impl<DB, S, I> App<DB, S, I>
 where
     DB: Blockstore + 'static,
+    S: KVStore,
 {
-    pub fn new(db: DB, interpreter: I) -> Self {
+    pub fn new(db: DB, namespace: S::Namespace, interpreter: I) -> Self {
         Self {
             db: Arc::new(db),
+            namespace,
             interpreter: Arc::new(interpreter),
             exec_state: Arc::new(Mutex::new(None)),
         }
     }
 }
 
-impl<DB, I> App<DB, I>
+impl<DB, S, I> App<DB, S, I>
 where
-    DB: Blockstore + 'static,
+    S: KVStore + Codec<AppState> + Encode<AppStoreKey>,
+    DB: Blockstore + KVWritable<S> + KVReadable<S> + 'static,
 {
     /// Get the last committed state.
     fn committed_state(&self) -> AppState {
-        todo!("retrieve state from the DB")
+        let tx = self.db.read();
+        tx.get(&self.namespace, &AppStoreKey::State)
+            .expect("get failed")
+            .expect("app state not found") // TODO: Init during setup.
     }
 
     /// Set the last committed state.
-    fn set_committed_state(&self, _state: AppState) {
-        todo!("write state to the DB")
+    fn set_committed_state(&self, state: AppState) {
+        let mut tx = self.db.write();
+        tx.put(&self.namespace, &AppStoreKey::State, &state)
+            .expect("put failed");
+        let committed = tx.prepare_and_commit().expect("commit failed");
+        assert!(committed, "not committed")
     }
 
     /// Put the execution state during block execution. Has to be empty.
@@ -109,9 +133,11 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConensusResponse` for example.
 #[async_trait]
-impl<DB, I> Application for App<DB, I>
+impl<DB, S, I> Application for App<DB, S, I>
 where
-    DB: Blockstore + Clone + Send + Sync + 'static,
+    S: KVStore + Codec<AppState> + Encode<AppStoreKey>,
+    S::Namespace: Sync,
+    DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     I: Interpreter<
         State = FvmState<DB>,
         Message = Vec<u8>,

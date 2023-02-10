@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_abci::ApplicationService;
-use fendermint_app::app;
+use fendermint_app::{app, store::AppStore};
+use fendermint_rocksdb::RocksDb;
 use fendermint_vm_interpreter::{
     bytes::BytesMessageInterpreter, chain::ChainMessageInterpreter, fvm::FvmMessageInterpreter,
     signed::SignedMessageInterpreter,
 };
-use forest_db::rocks::RocksDb;
 
 #[tokio::main]
 async fn main() {
@@ -17,8 +17,8 @@ async fn main() {
     let interpreter = BytesMessageInterpreter::new(interpreter);
 
     let db = open_db();
-
-    let app = app::App::new(db, interpreter);
+    let ns = db.new_cf_handle("app").unwrap();
+    let app = app::App::<_, AppStore, _>::new(db, ns, interpreter);
     let _service = ApplicationService(app);
 }
 
@@ -28,8 +28,7 @@ fn open_db() -> RocksDb {
 
 #[cfg(test)]
 mod tests {
-    use forest_db::rocks::RocksDb;
-    use forest_db::rocks_config::RocksDbConfig;
+    use fendermint_rocksdb::{RocksDb, RocksDbConfig};
     use fvm_ipld_car::load_car_unchecked;
 
     #[tokio::test]

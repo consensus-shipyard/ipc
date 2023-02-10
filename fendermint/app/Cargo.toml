@@ -11,8 +11,11 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 tendermint = { workspace = true }
+serde = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
+fendermint_storage = { path = "../storage" }
+fendermint_rocksdb = { path = "../rocksdb" }
 fendermint_vm_interpreter = { path = "../vm/interpreter" }
 fendermint_vm_message = { path = "../vm/message" }
 
@@ -22,10 +25,6 @@ fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_car = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
-
-# The current 0.2.0 version of forest_db is not published to crates.io.
-# Using the `tag` of the `forest` repo rather than the `version` of just `forest_db` so we don't get a random commit in `main`.
-forest_db = { git = "https://github.com/ChainSafe/forest.git", tag = "v0.6.0", features = ["rocksdb"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

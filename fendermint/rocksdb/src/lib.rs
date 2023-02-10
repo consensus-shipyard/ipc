@@ -1,0 +1,10 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+mod rocks;
+
+#[cfg(feature = "blockstore")]
+mod blockstore;
+#[cfg(feature = "kvstore")]
+mod kvstore;
+
+pub use rocks::{Error as RocksDbError, RocksDb, RocksDbConfig};
