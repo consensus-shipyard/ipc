@@ -36,4 +36,4 @@ tempfile = { workspace = true }
 # the project because now when there is a new version of the FVM released, we also need a new version of the
 # actor project to be released. In prod, we'd just load it from a file, so let's see if that works.
 # We can build a bundle CAR with the Makefile.
-# actors-v10 = { package = "fil_builtin_actors_bundle", git = "https://github.com/filecoin-project/builtin-actors", branch = "next", features = ["m2-native"] }
+# actors-v10 = { package = "fil_builtin_actors_bundle", git = "https://github.com/filecoin-project/builtin-actors", branch = "next" }

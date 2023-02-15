@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::marker::PhantomData;
 
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
 use cid::Cid;
@@ -11,12 +12,16 @@ use fvm::{
     engine::{EngineConfig, EnginePool},
     executor::{ApplyRet, DefaultExecutor, Executor},
     machine::{DefaultMachine, Machine, NetworkConfig},
+    state_tree::StateTree,
     DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{clock::ChainEpoch, econ::TokenAmount, version::NetworkVersion, BLOCK_GAS_LIMIT};
+use fvm_shared::{
+    address::Address, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
+    version::NetworkVersion, BLOCK_GAS_LIMIT,
+};
 
-use crate::{externs::FendermintExterns, Interpreter, Timestamp};
+use crate::{externs::FendermintExterns, CheckInterpreter, Interpreter, Timestamp};
 
 pub type FvmMessage = fvm_shared::message::Message;
 
@@ -27,6 +32,14 @@ pub type FvmMessage = fvm_shared::message::Message;
 pub struct FvmApplyRet {
     pub apply_ret: ApplyRet,
     pub gas_limit: u64,
+}
+
+/// Transaction check results are expressed by the exit code, so that hopefully
+/// they would result in the same error code if they were applied.
+pub struct FvmCheckRet {
+    pub sender: Address,
+    pub gas_limit: u64,
+    pub exit_code: ExitCode,
 }
 
 /// A state we create for the execution of all the messages in a block.
@@ -47,7 +60,7 @@ where
         block_height: ChainEpoch,
         block_timestamp: Timestamp,
         network_version: NetworkVersion,
-        initial_state: Cid,
+        initial_state_root: Cid,
         base_fee: TokenAmount,
         circ_supply: TokenAmount,
     ) -> anyhow::Result<Self> {
@@ -56,7 +69,7 @@ where
         // TODO: Configure:
         // * circ_supply; by default it's for Filecoin
         // * base_fee; by default it's zero
-        let mut mc = nc.for_epoch(block_height, block_timestamp.0, initial_state);
+        let mut mc = nc.for_epoch(block_height, block_timestamp.0, initial_state_root);
         mc.set_base_fee(base_fee);
         mc.set_circulating_supply(circ_supply);
 
@@ -177,5 +190,102 @@ where
     async fn end(&self, state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
         // TODO: Epoch transitions for checkpointing.
         Ok((state, ()))
+    }
+}
+
+pub struct ReadOnlyBlockstore<DB>(DB);
+
+impl<DB> Blockstore for ReadOnlyBlockstore<DB>
+where
+    DB: Blockstore,
+{
+    fn get(&self, k: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
+        self.0.get(k)
+    }
+
+    fn put_keyed(&self, _k: &Cid, _block: &[u8]) -> anyhow::Result<()> {
+        panic!("never intended to use put on the read-only blockstore")
+    }
+}
+
+/// A state we create for the execution of all the messages in a block.
+pub struct FvmCheckState<DB>
+where
+    DB: Blockstore + 'static,
+{
+    state_tree: StateTree<ReadOnlyBlockstore<DB>>,
+}
+
+impl<DB> FvmCheckState<DB>
+where
+    DB: Blockstore + 'static,
+{
+    pub fn new(blockstore: DB, initial_state_root: Cid) -> anyhow::Result<Self> {
+        // Sanity check that the blockstore contains the supplied state root.
+        if !blockstore
+            .has(&initial_state_root)
+            .context("failed to load initial state-root")?
+        {
+            return Err(anyhow!(
+                "blockstore doesn't have the initial state-root {}",
+                initial_state_root
+            ));
+        }
+
+        // Create a new state tree from the supplied root.
+        let state_tree = {
+            let bstore = ReadOnlyBlockstore(blockstore);
+            StateTree::new_from_root(bstore, &initial_state_root)?
+        };
+
+        let state = FvmCheckState { state_tree };
+
+        Ok(state)
+    }
+}
+
+#[async_trait]
+impl<DB> CheckInterpreter for FvmMessageInterpreter<DB>
+where
+    DB: Blockstore + 'static + Send + Sync,
+{
+    type State = FvmCheckState<DB>;
+    type Message = FvmMessage;
+    type Output = FvmCheckRet;
+
+    /// Check that:
+    /// * sender exists
+    /// * sender nonce matches the message sequence
+    /// * sender has enough funds to cover the gas cost
+    async fn check(
+        &self,
+        mut state: Self::State,
+        msg: Self::Message,
+        _is_recheck: bool,
+    ) -> anyhow::Result<(Self::State, Self::Output)> {
+        let checked = |state, exit_code| {
+            let ret = FvmCheckRet {
+                sender: msg.from,
+                gas_limit: msg.gas_limit,
+                exit_code,
+            };
+            Ok((state, ret))
+        };
+
+        // NOTE: This would be a great place for let-else, but clippy runs into a compilation bug.
+        if let Some(id) = state.state_tree.lookup_id(&msg.from)? {
+            if let Some(mut actor) = state.state_tree.get_actor(id)? {
+                let balance_needed = msg.gas_fee_cap * msg.gas_limit;
+                if actor.balance < balance_needed || actor.sequence != msg.sequence {
+                    return checked(state, ExitCode::SYS_SENDER_STATE_INVALID);
+                } else {
+                    actor.sequence += 1;
+                    actor.balance -= balance_needed;
+                    state.state_tree.set_actor(id, actor);
+                    return checked(state, ExitCode::OK);
+                }
+            }
+        }
+        return checked(state, ExitCode::SYS_SENDER_INVALID);
     }
 }

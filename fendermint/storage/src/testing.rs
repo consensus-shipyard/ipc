@@ -15,7 +15,7 @@ pub type TestNamespace = &'static str;
 
 /// Return all namespaces used by the tests, so they can be pre-allocated, if necessary.
 pub fn test_namespaces() -> &'static [&'static str] {
-    ["foo", "bar", "fizz", "buzz", "spam", "eggs"].as_slice()
+    ["fizz", "buzz", "spam", "eggs"].as_slice()
 }
 
 /// Test operations on some collections with known types,
@@ -45,8 +45,8 @@ impl Arbitrary for TestOpNs {
     fn arbitrary(g: &mut Gen) -> Self {
         use TestOpKV::*;
         use TestOpNs::*;
-        match u8::arbitrary(g) % 10 {
-            i if i < 4 => {
+        match u8::arbitrary(g) % 100 {
+            i if i < 47 => {
                 let ns = g.choose(&["spam", "eggs"]).unwrap();
                 let k = *g.choose(&["foo", "bar"]).unwrap();
                 match u8::arbitrary(g) % 10 {
@@ -55,7 +55,7 @@ impl Arbitrary for TestOpNs {
                     _ => S2I(ns, Del(k.to_owned())),
                 }
             }
-            i if i < 9 => {
+            i if i < 94 => {
                 let ns = g.choose(&["fizz", "buzz"]).unwrap();
                 let k = u8::arbitrary(g) % 2;
                 match u8::arbitrary(g) % 10 {

@@ -8,16 +8,18 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::Application;
 use fendermint_storage::{Codec, Encode, KVRead, KVReadable, KVStore, KVWritable, KVWrite};
-use fendermint_vm_interpreter::bytes::BytesMessageApplyRet;
-use fendermint_vm_interpreter::chain::ChainMessageApplyRet;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmState};
-use fendermint_vm_interpreter::signed::SignedMesssageApplyRet;
-use fendermint_vm_interpreter::{Interpreter, Timestamp};
+use fendermint_vm_interpreter::bytes::{BytesMessageApplyRet, BytesMessageCheckRet};
+use fendermint_vm_interpreter::chain::{ChainMessageApplyRet, IllegalMessage};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmCheckState, FvmState};
+use fendermint_vm_interpreter::signed::InvalidSignature;
+use fendermint_vm_interpreter::{CheckInterpreter, Interpreter, Timestamp};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::error::ExitCode;
 use fvm_shared::event::StampedEvent;
 use fvm_shared::version::NetworkVersion;
 use serde::{Deserialize, Serialize};
+use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response, Code, Event};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -35,6 +37,8 @@ enum AppError {
     InvalidEncoding = 51,
     /// Failed to validate the user signature.
     InvalidSignature = 52,
+    /// User sent a message they should not construct.
+    IllegalMessage = 53,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,18 +58,20 @@ where
     S: KVStore,
 {
     db: Arc<DB>,
-    /// Namespace under which to persist application state.
+    /// Namespace to store app state.
     namespace: S::Namespace,
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
     /// State accumulating changes during block execution.
     exec_state: Arc<Mutex<Option<FvmState<DB>>>>,
+    /// Projected partial state accumulating during transaction checks.
+    check_state: Arc<tokio::sync::Mutex<Option<FvmCheckState<DB>>>>,
 }
 
 impl<DB, S, I> App<DB, S, I>
 where
-    DB: Blockstore + 'static,
-    S: KVStore,
+    S: KVStore + Codec<AppState> + Encode<AppStoreKey>,
+    DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + 'static,
 {
     pub fn new(db: DB, namespace: S::Namespace, interpreter: I) -> Self {
         Self {
@@ -73,6 +79,7 @@ where
             namespace,
             interpreter: Arc::new(interpreter),
             exec_state: Arc::new(Mutex::new(None)),
+            check_state: Arc::new(tokio::sync::Mutex::new(None)),
         }
     }
 }
@@ -132,7 +139,7 @@ where
 impl<DB, S, I> Application for App<DB, S, I>
 where
     S: KVStore + Codec<AppState> + Encode<AppStoreKey>,
-    S::Namespace: Sync,
+    S::Namespace: Sync + Send,
     DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     I: Interpreter<
         State = FvmState<DB>,
@@ -140,6 +147,11 @@ where
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRet,
         EndOutput = (),
+    >,
+    I: CheckInterpreter<
+        State = FvmCheckState<DB>,
+        Message = Vec<u8>,
+        Output = BytesMessageCheckRet,
     >,
 {
     /// Provide information about the ABCI application.
@@ -169,12 +181,42 @@ where
     }
 
     /// Check the given transaction before putting it into the local mempool.
-    async fn check_tx(&self, _request: request::CheckTx) -> response::CheckTx {
-        todo!("make an interpreter for checks, on a projected state")
+    async fn check_tx(&self, request: request::CheckTx) -> response::CheckTx {
+        // Keep the guard through the check, so there can be only one at a time.
+        let mut guard = self.check_state.lock().await;
+
+        let state = guard.take().unwrap_or_else(|| {
+            let db = self.db.as_ref().to_owned();
+            let state = self.committed_state();
+            FvmCheckState::new(db, state.state_root).expect("error creating check state")
+        });
+
+        // TODO: We can make use of `request.kind` to skip signature checks on repeated calls.
+        let is_recheck = request.kind == CheckTxKind::Recheck;
+        let (state, result) = self
+            .interpreter
+            .check(state, request.tx.to_vec(), is_recheck)
+            .await
+            .expect("error running check");
+
+        // Update the check state.
+        *guard = Some(state);
+
+        match result {
+            Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
+            Ok(result) => match result {
+                Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
+                Ok(result) => match result {
+                    Err(InvalidSignature(d)) => invalid_check_tx(AppError::InvalidSignature, d),
+                    Ok(ret) => to_check_tx(ret),
+                },
+            },
+        }
     }
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
     async fn begin_block(&self, request: request::BeginBlock) -> response::BeginBlock {
+        let db = self.db.as_ref().to_owned();
         let state = self.committed_state();
         let height = request.header.height.into();
         let timestamp = Timestamp(
@@ -185,7 +227,6 @@ where
                 .try_into()
                 .expect("negative timestamp"),
         );
-        let db = self.db.as_ref().to_owned();
 
         let state = FvmState::new(
             db,
@@ -219,12 +260,10 @@ where
         match result {
             Err(e) => invalid_deliver_tx(AppError::InvalidEncoding, e.description),
             Ok(ret) => match ret {
-                ChainMessageApplyRet::Signed(SignedMesssageApplyRet::InvalidSignature(d)) => {
+                ChainMessageApplyRet::Signed(Err(InvalidSignature(d))) => {
                     invalid_deliver_tx(AppError::InvalidSignature, d)
                 }
-                ChainMessageApplyRet::Signed(SignedMesssageApplyRet::Applied(ret)) => {
-                    to_deliver_tx(ret)
-                }
+                ChainMessageApplyRet::Signed(Ok(ret)) => to_deliver_tx(ret),
             },
         }
     }
@@ -249,6 +288,10 @@ where
         state.state_root = state_root;
         self.set_committed_state(state);
 
+        // Reset check state.
+        let mut guard = self.check_state.lock().await;
+        *guard = None;
+
         response::Commit {
             data: state_root.to_bytes().into(),
             // We have to retain blocks until we can support Snapshots.
@@ -267,15 +310,19 @@ fn invalid_deliver_tx(err: AppError, description: String) -> response::DeliverTx
     }
 }
 
+/// Response to check where the input was blatantly invalid.
+/// This indicates that the user who sent the transaction is either attacking or has a faulty client.
+fn invalid_check_tx(err: AppError, description: String) -> response::CheckTx {
+    response::CheckTx {
+        code: Code::Err(NonZeroU32::try_from(err as u32).expect("error codes are non-zero")),
+        info: description,
+        ..Default::default()
+    }
+}
+
 fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     let receipt = ret.apply_ret.msg_receipt;
-    let code = if receipt.exit_code.is_success() {
-        Code::Ok
-    } else {
-        Code::Err(
-            NonZeroU32::try_from(receipt.exit_code.value()).expect("error codes are non-zero"),
-        )
-    };
+    let code = to_code(receipt.exit_code);
 
     // Based on the sanity check in the `DefaultExecutor`.
     // gas_cost = gas_fee_cap * gas_limit; this is how much the account is charged up front.
@@ -296,6 +343,23 @@ fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
         gas_used,
         events,
         codespace: Default::default(),
+    }
+}
+
+fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
+    response::CheckTx {
+        code: to_code(ret.exit_code),
+        gas_wanted: ret.gas_limit.try_into().expect("gas wanted not i64"),
+        sender: ret.sender.to_string(),
+        ..Default::default()
+    }
+}
+
+fn to_code(exit_code: ExitCode) -> Code {
+    if exit_code.is_success() {
+        Code::Ok
+    } else {
+        Code::Err(NonZeroU32::try_from(exit_code.value()).expect("error codes are non-zero"))
     }
 }
 

@@ -48,4 +48,4 @@ $(BUILTIN_ACTORS_BUNDLE): $(BUILTIN_ACTORS_CODE)
 	git checkout next && \
 	git pull && \
 	rustup target add wasm32-unknown-unknown && \
-	cargo run --release --features "m2-native" -- -o output/$(shell basename $@)
+	cargo run --release -- -o output/$(shell basename $@)

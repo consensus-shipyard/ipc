@@ -77,3 +77,31 @@ pub trait Interpreter: Sync + Send {
     /// requests once every 1000 blocks.
     async fn end(&self, state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)>;
 }
+
+/// Check if messages can be added to the mempool by performing certain validation
+/// over a projected version of the state. Does not execute transactions fully,
+/// just does basic validation. The state is updated so that things like nonces
+/// and balances are adjusted as if the transaction was executed. This way an
+/// account can send multiple messages in a row, not just the next that follows
+/// its current nonce.
+#[async_trait]
+pub trait CheckInterpreter: Sync + Send {
+    type State: Send;
+    type Message: Send;
+    type Output;
+
+    /// Called when a new user transaction is being added to the mempool.
+    ///
+    /// Returns the updated state, and the check output, which should be
+    /// able to describe both the success and failure cases.
+    ///
+    /// The recheck flags indicates that we are checking the transaction
+    /// again because we have seen a new block and the state changed.
+    /// As an optimisation, checks that do not depend on state can be skipped.
+    async fn check(
+        &self,
+        state: Self::State,
+        msg: Self::Message,
+        is_recheck: bool,
+    ) -> anyhow::Result<(Self::State, Self::Output)>;
+}
