@@ -80,6 +80,9 @@ name = "arbitrary"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e90af4de65aa7b293ef2d09daff88501eb254f58edde2e1ac02c82d873eadad"
+dependencies = [
+ "derive_arbitrary",
+]
 
 [[package]]
 name = "arbtest"
@@ -877,6 +880,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_arbitrary"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8beee4701e2e229e8098bbdecdca12449bc3e322f137d269182fa1291e20bd00"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "derive_builder"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1224,9 +1238,14 @@ dependencies = [
 name = "fendermint_vm_message"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "cid",
+ "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "quickcheck 1.0.3",
+ "quickcheck_macros",
+ "rand 0.8.5",
  "serde",
  "serde_tuple",
  "thiserror",
@@ -1616,6 +1635,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b594b4d4c1393f03e3430f106c09874fcac565e68a560686de37ca2982a61d1a"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "bitflags",
  "blake2b_simd",
  "bls-signatures",
@@ -1634,6 +1654,7 @@ dependencies = [
  "num-derive",
  "num-integer",
  "num-traits",
+ "quickcheck 1.0.3",
  "serde",
  "serde_repr",
  "serde_tuple",
@@ -2303,6 +2324,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+ "quickcheck 1.0.3",
 ]
 
 [[package]]

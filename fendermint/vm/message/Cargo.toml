@@ -14,3 +14,21 @@ serde_tuple = { workspace = true }
 cid = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
+
+arbitrary = { workspace = true, optional = true }
+quickcheck = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+
+[dev-dependencies]
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
+
+# Enable arb on self for tests.
+# Ideally we could do this with `#[cfg(any(test, feature = "arb"))]`,
+# however in that case all the extra dependencies would not kick in,
+# and we'd have to repeat all those dependencies.
+fendermint_vm_message = { path = ".", features = ["arb"] }
+
+[features]
+default = []
+arb = ["arbitrary", "quickcheck", "fvm_shared/arb", "cid/arb", "rand"]

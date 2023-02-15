@@ -4,6 +4,8 @@ use cid::{multihash, multihash::MultihashDigest, Cid};
 use fvm_ipld_encoding::{to_vec, Error as IpldError, DAG_CBOR};
 use serde::Serialize;
 
+#[cfg(feature = "arb")]
+mod arb_cid;
 pub mod chain;
 pub mod signed;
 

@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
@@ -51,8 +52,15 @@ where
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         match msg {
             ChainMessage::Signed(msg) => {
-                let (state, ret) = self.inner.deliver(state, msg).await?;
+                let (state, ret) = self.inner.deliver(state, *msg).await?;
                 Ok((state, ChainMessageApplyRet::Signed(ret)))
+            }
+            ChainMessage::ForExecution(_) | ChainMessage::ForResolution(_) => {
+                // This only happens if a validator is malicious or we have made a programming error.
+                // I expect for now that we don't run with untrusted validators, so it's okay to quit.
+                Err(anyhow!(
+                    "The handling of ForExecution and ForResolution is not yet implemented."
+                ))
             }
         }
     }
@@ -83,9 +91,13 @@ where
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         match msg {
             ChainMessage::Signed(msg) => {
-                let (state, ret) = self.inner.check(state, msg, is_recheck).await?;
+                let (state, ret) = self.inner.check(state, *msg, is_recheck).await?;
 
                 Ok((state, Ok(ret)))
+            }
+            ChainMessage::ForExecution(_) | ChainMessage::ForResolution(_) => {
+                // Users cannot send these messages, only validators can propose them in blocks.
+                Ok((state, Err(IllegalMessage)))
             }
         }
     }
