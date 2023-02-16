@@ -2,6 +2,7 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use cid::Cid;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::crypto::signature::{Signature, SignatureType};
 use fvm_shared::message::Message;
@@ -44,12 +45,17 @@ impl SignedMessage {
         Ok(SignedMessage { message, signature })
     }
 
+    /// Calculate the CID of an FVM message.
+    pub fn cid(message: &Message) -> Result<Cid, fvm_ipld_encoding::Error> {
+        crate::cid(message)
+    }
+
     /// Verify that the message CID was signed by the `from` address.
     pub fn verify_signature(
         message: &Message,
         signature: &Signature,
     ) -> Result<(), SignedMessageError> {
-        let cid = crate::cid(&message)?.to_bytes();
+        let cid = Self::cid(message)?.to_bytes();
         signature
             .verify(&cid, &message.from)
             .map_err(SignedMessageError::InvalidSignature)

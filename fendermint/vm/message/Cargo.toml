@@ -22,6 +22,7 @@ rand = { workspace = true, optional = true }
 [dev-dependencies]
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
+hex = { workspace = true }
 
 # Enable arb on self for tests.
 # Ideally we could do this with `#[cfg(any(test, feature = "arb"))]`,

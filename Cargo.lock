@@ -1243,6 +1243,7 @@ dependencies = [
  "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "hex",
  "quickcheck 1.0.3",
  "quickcheck_macros",
  "rand 0.8.5",
