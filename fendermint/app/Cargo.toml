@@ -12,6 +12,7 @@ async-trait = { workspace = true }
 tokio = { workspace = true }
 tendermint = { workspace = true }
 serde = { workspace = true }
+hex = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 fendermint_storage = { path = "../storage" }
