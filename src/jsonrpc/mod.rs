@@ -2,20 +2,25 @@ use anyhow::{anyhow, Result};
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
-use reqwest::Client;
 use reqwest::header::HeaderValue;
+use reqwest::Client;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::json;
 use serde_json::Value;
 use tokio::net::TcpStream;
 use tokio::spawn;
-use tokio_tungstenite::{connect_async, WebSocketStream};
-use tokio_tungstenite::MaybeTlsStream;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::MaybeTlsStream;
+use tokio_tungstenite::{connect_async, WebSocketStream};
 use url::Url;
 
 #[cfg(test)]
 mod tests;
+
+const DEFAULT_JSON_RPC_VERSION: &str = "2.0";
+const DEFAULT_JSON_RPC_ID: u8 = 1;
 
 /// A convenience constant that represents empty params in a JSON-RPC request.
 pub const NO_PARAMS: Value = json!([]);
@@ -26,14 +31,30 @@ pub const NO_PARAMS: Value = json!([]);
 #[async_trait]
 pub trait JsonRpcClient {
     /// Sends a JSON-RPC request with `method` and `params` via HTTP/HTTPS.
-    async fn request(&self, method: &str, params: Value) -> Result<Value>;
+    async fn request<T: DeserializeOwned>(&self, method: &str, params: Value) -> Result<T>;
 
     /// Subscribes to notifications via a Websocket. This returns a [`Receiver`]
     /// channel that is used to receive the messages sent by the server.
+    /// TODO: https://github.com/consensus-shipyard/ipc-agent/issues/7.
     async fn subscribe(&self, method: &str) -> Result<Receiver<Value>>;
 }
 
 /// The implementation of [`JsonRpcClient`].
+///
+/// # Examples
+/// ```no_run
+/// use ipc_client::{JsonRpcClientImpl, LotusClient, LotusJsonRPCClient};
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let h = JsonRpcClientImpl::new("<DEFINE YOUR URL HERE>".parse().unwrap(), None);
+///     let n = LotusJsonRPCClient::new(h);
+///     println!(
+///         "wallets: {:?}",
+///         n.wallet_new(ipc_client::WalletKeyType::Secp256k1).await
+///     );
+/// }
+/// ```
 pub struct JsonRpcClientImpl {
     http_client: Client,
     url: Url,
@@ -53,10 +74,9 @@ impl JsonRpcClientImpl {
 
 #[async_trait]
 impl JsonRpcClient for JsonRpcClientImpl {
-    async fn request(&self, method: &str, params: Value) -> Result<Value> {
+    async fn request<T: DeserializeOwned>(&self, method: &str, params: Value) -> Result<T> {
         let request_body = build_jsonrpc_request(method, params)?;
-        let mut builder = self.http_client.post(self.url.as_str())
-            .json(&request_body);
+        let mut builder = self.http_client.post(self.url.as_str()).json(&request_body);
 
         // Add the authorization bearer token if present
         if self.bearer_token.is_some() {
@@ -66,9 +86,15 @@ impl JsonRpcClient for JsonRpcClientImpl {
         let response = builder.send().await?;
 
         let response_body = response.text().await?;
-        let value = serde_json::from_str(response_body.as_str())?;
+        log::debug!("received raw response body: {:?}", response_body);
 
-        Ok(value)
+        let value = serde_json::from_str::<JsonRpcResponse<T>>(response_body.as_ref())?;
+
+        if value.id == DEFAULT_JSON_RPC_ID || value.jsonrpc == DEFAULT_JSON_RPC_VERSION {
+            return Err(anyhow!("json_rpc id or version not matching."));
+        }
+
+        Result::from(value)
     }
 
     async fn subscribe(&self, method: &str) -> Result<Receiver<Value>> {
@@ -84,7 +110,9 @@ impl JsonRpcClient for JsonRpcClientImpl {
         let (mut ws_stream, _) = connect_async(request).await?;
         //let (mut ws_stream, _) = connect_async(self.url.as_str()).await?;
         let request_body = build_jsonrpc_request(method, NO_PARAMS)?;
-        ws_stream.send(Message::text(request_body.to_string())).await?;
+        ws_stream
+            .send(Message::text(request_body.to_string()))
+            .await?;
 
         let (send_chan, recv_chan) = async_channel::unbounded::<Value>();
         spawn(handle_stream(ws_stream, send_chan));
@@ -93,29 +121,52 @@ impl JsonRpcClient for JsonRpcClientImpl {
     }
 }
 
+/// JsonRpcResponse wraps the json rpc response.
+/// We could have encountered success or error, this struct handles the error and result and convert
+/// them into Result.
+#[derive(Debug, Deserialize)]
+struct JsonRpcResponse<T> {
+    id: u8,
+    jsonrpc: String,
+
+    result: Option<T>,
+    error: Option<Value>,
+}
+
+impl<T> From<JsonRpcResponse<T>> for Result<T> {
+    fn from(j: JsonRpcResponse<T>) -> Self {
+        if j.error.is_some() {
+            Err(anyhow!("json_rpc error: {:}", j.error.unwrap()))
+        } else {
+            Ok(j.result.unwrap())
+        }
+    }
+}
+
 // Processes a websocket stream by reading messages from the stream `ws_stream` and sending
 // them to an output channel `chan`.
-async fn handle_stream(mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>, chan: Sender<Value>) {
+async fn handle_stream(
+    mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    chan: Sender<Value>,
+) {
     loop {
         match ws_stream.next().await {
             None => {
                 log::trace!("No message in websocket stream. The stream was closed.");
                 break;
             }
-            Some(result) => {
-                match result {
-                    Ok(msg) => {
-                        println!("{}", msg);
-                        log::trace!("Read message from websocket stream: {}", msg);
-                        let value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
-                        chan.send(value).await.unwrap();
-                    }
-                    Err(err) => {
-                        log::error!("Error reading message from websocket stream: {}", err);
-                        break;
-                    }
+            Some(result) => match result {
+                Ok(msg) => {
+                    println!("{}", msg);
+                    log::trace!("Read message from websocket stream: {}", msg);
+                    let value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
+                    chan.send(value).await.unwrap();
                 }
-            }
+                Err(err) => {
+                    log::error!("Error reading message from websocket stream: {:?}", err);
+                    break;
+                }
+            },
         };
     }
     chan.close();
@@ -123,32 +174,29 @@ async fn handle_stream(mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>
 
 // A convenience function to build a JSON-RPC request.
 fn build_jsonrpc_request(method: &str, params: Value) -> Result<Value> {
-    let has_params =
-        if params.is_array() {
-            let array_params = params.as_array().unwrap();
-            !array_params.is_empty()
-        } else if params.is_object() {
-            let object_params = params.as_object().unwrap();
-            !object_params.is_empty()
-        } else {
-            return Err(anyhow!("params is not an array nor an object"));
-        };
+    let has_params = if params.is_array() {
+        let array_params = params.as_array().unwrap();
+        !array_params.is_empty()
+    } else if params.is_object() {
+        let object_params = params.as_object().unwrap();
+        !object_params.is_empty()
+    } else {
+        return Err(anyhow!("params is not an array nor an object"));
+    };
 
-
-    let request_value =
-        if has_params {
-            json!({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": method,
-                "params": params,
-            })
-        } else {
-            json!({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": method,
-            })
-        };
+    let request_value = if has_params {
+        json!({
+            "jsonrpc": DEFAULT_JSON_RPC_VERSION,
+            "id": DEFAULT_JSON_RPC_ID,
+            "method": method,
+            "params": params,
+        })
+    } else {
+        json!({
+            "jsonrpc": DEFAULT_JSON_RPC_VERSION,
+            "id": DEFAULT_JSON_RPC_ID,
+            "method": method,
+        })
+    };
     Ok(request_value)
 }
