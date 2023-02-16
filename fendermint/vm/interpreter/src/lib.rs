@@ -4,7 +4,6 @@ use async_trait::async_trait;
 
 pub mod bytes;
 pub mod chain;
-mod externs;
 pub mod fvm;
 pub mod signed;
 
