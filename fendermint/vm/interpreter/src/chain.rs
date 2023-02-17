@@ -7,7 +7,7 @@ use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 
 use crate::{
     signed::{SignedMessageApplyRet, SignedMessageCheckRet},
-    CheckInterpreter, Interpreter,
+    CheckInterpreter, Interpreter, QueryInterpreter,
 };
 
 /// A message a user is not supposed to send.
@@ -100,5 +100,23 @@ where
                 Ok((state, Err(IllegalMessage)))
             }
         }
+    }
+}
+
+#[async_trait]
+impl<I> QueryInterpreter for ChainMessageInterpreter<I>
+where
+    I: QueryInterpreter,
+{
+    type State = I::State;
+    type Query = I::Query;
+    type Output = I::Output;
+
+    async fn query(
+        &self,
+        state: Self::State,
+        qry: Self::Query,
+    ) -> anyhow::Result<(Self::State, Self::Output)> {
+        self.inner.query(state, qry).await
     }
 }

@@ -13,6 +13,9 @@ LINES=4
 
 ret=0
 
+# NOTE: When files are moved/split/deleted, the following queries would find and recreate them in the original place.
+# To avoid that, first commit the changes, then run the linter; that way only the new places are affected.
+
 # Look for files without headers.
 for file in $(git grep --cached -Il '' -- '*.rs'); do
   header=$(head -$LINES "$file")

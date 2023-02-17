@@ -104,3 +104,21 @@ pub trait CheckInterpreter: Sync + Send {
         is_recheck: bool,
     ) -> anyhow::Result<(Self::State, Self::Output)>;
 }
+
+/// Run a query over the ledger.
+#[async_trait]
+pub trait QueryInterpreter: Sync + Send {
+    type State: Send;
+    type Query: Send;
+    type Output;
+
+    /// Run a single query against the state.
+    ///
+    /// It takes and returns the state in case we wanted to do some caching of
+    /// things which otherwise aren't safe to send over async boundaries.
+    async fn query(
+        &self,
+        state: Self::State,
+        qry: Self::Query,
+    ) -> anyhow::Result<(Self::State, Self::Output)>;
+}

@@ -8,11 +8,15 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::Application;
 use fendermint_storage::{Codec, Encode, KVRead, KVReadable, KVStore, KVWritable, KVWrite};
-use fendermint_vm_interpreter::bytes::{BytesMessageApplyRet, BytesMessageCheckRet};
+use fendermint_vm_interpreter::bytes::{
+    BytesMessageApplyRet, BytesMessageCheckRet, BytesMessageQuery, BytesMessageQueryRet,
+};
 use fendermint_vm_interpreter::chain::{ChainMessageApplyRet, IllegalMessage};
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmCheckState, FvmState};
+use fendermint_vm_interpreter::fvm::{
+    FvmApplyRet, FvmCheckRet, FvmCheckState, FvmQueryRet, FvmQueryState, FvmState,
+};
 use fendermint_vm_interpreter::signed::InvalidSignature;
-use fendermint_vm_interpreter::{CheckInterpreter, Interpreter, Timestamp};
+use fendermint_vm_interpreter::{CheckInterpreter, Interpreter, QueryInterpreter, Timestamp};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::ExitCode;
@@ -23,6 +27,14 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response, Code, Event, EventAttribute};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// IPLD encoding of data types we know we must be able to encode.
+macro_rules! must_encode {
+    ($var:ident) => {
+        fvm_ipld_encoding::to_vec(&$var)
+            .unwrap_or_else(|e| panic!("error encoding {}: {}", stringify!($var), e))
+    };
+}
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -87,8 +99,12 @@ where
 impl<DB, S, I> App<DB, S, I>
 where
     S: KVStore + Codec<AppState> + Encode<AppStoreKey>,
-    DB: Blockstore + KVWritable<S> + KVReadable<S> + 'static,
+    DB: Blockstore + KVWritable<S> + KVReadable<S> + 'static + Clone,
 {
+    /// Get an owned clone of the database.
+    fn clone_db(&self) -> DB {
+        self.db.as_ref().clone()
+    }
     /// Get the last committed state.
     fn committed_state(&self) -> AppState {
         let tx = self.db.read();
@@ -153,14 +169,22 @@ where
         Message = Vec<u8>,
         Output = BytesMessageCheckRet,
     >,
+    I: QueryInterpreter<
+        State = FvmQueryState<DB>,
+        Query = BytesMessageQuery,
+        Output = BytesMessageQueryRet,
+    >,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> response::Info {
         let state = self.committed_state();
+
         let height =
             tendermint::block::Height::try_from(state.block_height).expect("height too big");
+
         let app_hash = tendermint::hash::AppHash::try_from(state.state_root.to_bytes())
             .expect("hash can be wrapped");
+
         response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
@@ -176,8 +200,24 @@ where
     }
 
     /// Query the application for data at the current or past height.
-    async fn query(&self, _request: request::Query) -> response::Query {
-        todo!("make a query interpreter")
+    async fn query(&self, request: request::Query) -> response::Query {
+        let db = self.clone_db();
+        // TODO: Store the state for each height, or the last N heights, then use `request.height`.
+        let state = self.committed_state();
+        let block_height = state.block_height;
+        let state = FvmQueryState::new(db, state.state_root).expect("error creating query state");
+        let qry = (request.path, request.data.to_vec());
+
+        let (_, result) = self
+            .interpreter
+            .query(state, qry)
+            .await
+            .expect("error running query");
+
+        match result {
+            Err(e) => invalid_query(AppError::InvalidEncoding, e.description),
+            Ok(result) => to_query(result, block_height),
+        }
     }
 
     /// Check the given transaction before putting it into the local mempool.
@@ -186,16 +226,18 @@ where
         let mut guard = self.check_state.lock().await;
 
         let state = guard.take().unwrap_or_else(|| {
-            let db = self.db.as_ref().to_owned();
+            let db = self.clone_db();
             let state = self.committed_state();
             FvmCheckState::new(db, state.state_root).expect("error creating check state")
         });
 
-        // TODO: We can make use of `request.kind` to skip signature checks on repeated calls.
-        let is_recheck = request.kind == CheckTxKind::Recheck;
         let (state, result) = self
             .interpreter
-            .check(state, request.tx.to_vec(), is_recheck)
+            .check(
+                state,
+                request.tx.to_vec(),
+                request.kind == CheckTxKind::Recheck,
+            )
             .await
             .expect("error running check");
 
@@ -216,7 +258,7 @@ where
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
     async fn begin_block(&self, request: request::BeginBlock) -> response::BeginBlock {
-        let db = self.db.as_ref().to_owned();
+        let db = self.clone_db();
         let state = self.committed_state();
         let height = request.header.height.into();
         let timestamp = Timestamp(
@@ -282,10 +324,12 @@ where
     /// Commit the current state at the current height.
     async fn commit(&self) -> response::Commit {
         let exec_state = self.take_exec_state();
+        let block_height = exec_state.block_height();
         let state_root = exec_state.commit().expect("failed to commit FVM");
 
         let mut state = self.committed_state();
         state.state_root = state_root;
+        state.block_height = block_height.try_into().expect("negative height");
         self.set_committed_state(state);
 
         // Reset check state.
@@ -310,10 +354,19 @@ fn invalid_deliver_tx(err: AppError, description: String) -> response::DeliverTx
     }
 }
 
-/// Response to check where the input was blatantly invalid.
+/// Response to checks where the input was blatantly invalid.
 /// This indicates that the user who sent the transaction is either attacking or has a faulty client.
 fn invalid_check_tx(err: AppError, description: String) -> response::CheckTx {
     response::CheckTx {
+        code: Code::Err(NonZeroU32::try_from(err as u32).expect("error codes are non-zero")),
+        info: description,
+        ..Default::default()
+    }
+}
+
+/// Response to queries where the input was blatantly invalid.
+fn invalid_query(err: AppError, description: String) -> response::Query {
+    response::Query {
         code: Code::Err(NonZeroU32::try_from(err as u32).expect("error codes are non-zero")),
         info: description,
         ..Default::default()
@@ -328,8 +381,8 @@ fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     // gas_cost = gas_fee_cap * gas_limit; this is how much the account is charged up front.
     // &base_fee_burn + &over_estimation_burn + &refund + &miner_tip == gas_cost
     // But that's in tokens. I guess the closes to what we want is the limit.
-    let gas_wanted: i64 = ret.gas_limit.try_into().expect("gas wanted not i64");
-    let gas_used: i64 = receipt.gas_used.try_into().expect("gas used not i64");
+    let gas_wanted: i64 = ret.gas_limit.try_into().unwrap_or(i64::MAX);
+    let gas_used: i64 = receipt.gas_used.try_into().unwrap_or(i64::MAX);
 
     let data = receipt.return_data.to_vec().into();
     let events = to_events("message", ret.apply_ret.events);
@@ -349,7 +402,7 @@ fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
 fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
     response::CheckTx {
         code: to_code(ret.exit_code),
-        gas_wanted: ret.gas_limit.try_into().expect("gas wanted not i64"),
+        gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
         ..Default::default()
     }
@@ -407,4 +460,39 @@ fn to_events(kind: &str, stamped_events: Vec<StampedEvent>) -> Vec<Event> {
             Event::new(kind.to_string(), attrs)
         })
         .collect()
+}
+
+/// Map to query results.
+fn to_query(ret: FvmQueryRet, block_height: u64) -> response::Query {
+    let exit_code = match ret {
+        FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => ExitCode::USR_NOT_FOUND,
+        FvmQueryRet::Ipld(_) | FvmQueryRet::ActorState(_) => ExitCode::OK,
+    };
+
+    // The return value has a `key` field which is supposed to be set to the data matched.
+    // Although at this point I don't have access to the input like the CID looked up,
+    // but I assume the query sender has. Rather than repeat everything, I'll add the key
+    // where it gives some extra information, like the actor ID, just to keep this option visible.
+    let (key, value) = match ret {
+        FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => (Vec::new(), Vec::new()),
+        FvmQueryRet::Ipld(Some(bz)) => (Vec::new(), bz),
+        FvmQueryRet::ActorState(Some(x)) => {
+            let (id, st) = *x;
+            let k = must_encode!(id);
+            let v = must_encode!(st);
+            (k, v)
+        }
+    };
+
+    // The height here is the height of the block that was committed, not in which the app hash appeared,
+    // so according to Tendermint docstrings we need to return plus one.
+    let height = tendermint::block::Height::try_from(block_height + 1).expect("height too big");
+
+    response::Query {
+        code: to_code(exit_code),
+        key: key.into(),
+        value: value.into(),
+        height,
+        ..Default::default()
+    }
 }

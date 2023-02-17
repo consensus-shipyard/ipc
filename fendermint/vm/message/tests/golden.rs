@@ -48,6 +48,13 @@ fn read_or_create<T>(
 /// comparing to a debug string (which should at least be readable enough to show what changed).
 ///
 /// If the golden file doesn't exist, create one now.
+///
+/// Note that the CBOR files will be encoded as hexadecimal strings.
+/// To view them in something like https://cbor.dev/ you can use for example `xxd`:
+///
+/// ```text
+/// cat example.cbor | xxd -r -p > example.cbor.bin
+/// ```
 fn test_cbor_txt<T: Serialize + DeserializeOwned + Debug>(
     prefix: &str,
     name: &str,
@@ -110,7 +117,8 @@ macro_rules! golden_cid {
     };
 }
 
-/// Examples of `ChainMessage`.
+/// Examples of `ChainMessage`, which is what the client has to send,
+/// or at least what appears in blocks.
 mod chain {
     use fendermint_vm_message::chain::ChainMessage;
     use quickcheck::Arbitrary;
@@ -143,10 +151,43 @@ mod chain {
     }
 }
 
-/// Examples of FVM messages, which is what we sign.
+/// Examples of FVM messages, which is what the client needs to sign.
 mod fvm {
     use fendermint_vm_message::signed::SignedMessage;
     use quickcheck::Arbitrary;
 
     golden_cid! { "fvm", message, |g| SignedMessage::arbitrary(g).message, |m| SignedMessage::cid(m).unwrap() }
+}
+
+/// Examples of query requests the client needs to send, and client responses it will receive.
+mod query {
+    mod request {
+        use fendermint_vm_message::query::FvmQuery;
+        use quickcheck::Arbitrary;
+
+        golden_cbor! { "query/request", ipld, |g| {
+            loop {
+                if let msg @ FvmQuery::Ipld(_) = FvmQuery::arbitrary(g) {
+                    return msg
+                }
+            }
+        }}
+
+        golden_cbor! { "query/request", actor_state, |g| {
+            loop {
+                if let msg @ FvmQuery::ActorState(_) = FvmQuery::arbitrary(g) {
+                    return msg
+                }
+            }
+        }}
+    }
+
+    mod response {
+        use fendermint_vm_message::query::ActorState;
+        use quickcheck::Arbitrary;
+
+        golden_cbor! { "query/response", actor_state, |g| {
+            ActorState::arbitrary(g)
+        }}
+    }
 }

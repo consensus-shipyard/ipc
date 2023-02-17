@@ -7,7 +7,7 @@ use fendermint_vm_message::signed::{SignedMessage, SignedMessageError};
 
 use crate::{
     fvm::{FvmApplyRet, FvmCheckRet, FvmMessage},
-    CheckInterpreter, Interpreter,
+    CheckInterpreter, Interpreter, QueryInterpreter,
 };
 
 /// Message validation failed due to an invalid signature.
@@ -96,5 +96,23 @@ where
                 Ok((state, Ok(ret)))
             }
         }
+    }
+}
+
+#[async_trait]
+impl<I> QueryInterpreter for SignedMessageInterpreter<I>
+where
+    I: QueryInterpreter,
+{
+    type State = I::State;
+    type Query = I::Query;
+    type Output = I::Output;
+
+    async fn query(
+        &self,
+        state: Self::State,
+        qry: Self::Query,
+    ) -> anyhow::Result<(Self::State, Self::Output)> {
+        self.inner.query(state, qry).await
     }
 }

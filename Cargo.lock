@@ -1233,6 +1233,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "serde",
 ]
 
 [[package]]
