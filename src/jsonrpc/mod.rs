@@ -90,7 +90,7 @@ impl JsonRpcClient for JsonRpcClientImpl {
 
         let value = serde_json::from_str::<JsonRpcResponse<T>>(response_body.as_ref())?;
 
-        if value.id == DEFAULT_JSON_RPC_ID || value.jsonrpc == DEFAULT_JSON_RPC_VERSION {
+        if value.id != DEFAULT_JSON_RPC_ID || value.jsonrpc != DEFAULT_JSON_RPC_VERSION {
             return Err(anyhow!("json_rpc id or version not matching."));
         }
 
@@ -108,7 +108,6 @@ impl JsonRpcClient for JsonRpcClientImpl {
         }
 
         let (mut ws_stream, _) = connect_async(request).await?;
-        //let (mut ws_stream, _) = connect_async(self.url.as_str()).await?;
         let request_body = build_jsonrpc_request(method, NO_PARAMS)?;
         ws_stream
             .send(Message::text(request_body.to_string()))
