@@ -17,8 +17,9 @@ async fn main() {
     let interpreter = BytesMessageInterpreter::new(interpreter);
 
     let db = open_db();
-    let ns = db.new_cf_handle("app").unwrap();
-    let app = app::App::<_, AppStore, _>::new(db, ns, interpreter);
+    let app_ns = db.new_cf_handle("app").unwrap();
+    let state_hist_ns = db.new_cf_handle("state_hist").unwrap();
+    let app = app::App::<_, AppStore, _>::new(db, app_ns, state_hist_ns, interpreter);
     let _service = ApplicationService(app);
 }
 
