@@ -33,9 +33,13 @@ thiserror = "1.0.38"
 fvm_shared = {workspace = true}
 fil_actors_runtime = {workspace = true}
 ipc-sdk = { workspace = true }
+ipc-subnet-actor = { workspace = true }
+ipc-gateway = { workspace = true }
 
 [workspace.dependencies]
 fvm_shared = { version = "=3.0.0-alpha.17", default-features = false }
 fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", features = ["fil-actor"] }
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git" }
+ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
+ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
 
