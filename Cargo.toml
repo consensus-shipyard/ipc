@@ -1,7 +1,16 @@
+[workspace]
+members = [".", "ipld/resolver"]
+
+[workspace.package]
+authors = ["Protocol Labs"]
+edition = "2021"
+license-file = "LICENSE"
+
 [package]
 name = "ipc-client"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+license-file.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -27,11 +36,11 @@ toml = "0.7.2"
 url = { version = "2.3.1", features = ["serde"] }
 warp = "0.3.3"
 bytes = "1.4.0"
-clap = {version = "4.1.4", features = ["env", "derive"] }
+clap = { version = "4.1.4", features = ["env", "derive"] }
 thiserror = "1.0.38"
 
-fvm_shared = {workspace = true}
-fil_actors_runtime = {workspace = true}
+fvm_shared = { workspace = true }
+fil_actors_runtime = { workspace = true }
 ipc-sdk = { workspace = true }
 ipc-subnet-actor = { workspace = true }
 ipc-gateway = { workspace = true }
@@ -42,4 +51,3 @@ fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", 
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git" }
 ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
 ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
-

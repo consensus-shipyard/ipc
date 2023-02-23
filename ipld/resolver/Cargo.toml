@@ -1,0 +1,11 @@
+[package]
+name = "ipc_ipld_resolver"
+description = "P2P library to resolve IPLD content across IPC subnets."
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license-file.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
