@@ -5,4 +5,7 @@ mod lotus;
 mod manager;
 mod server;
 
-fn main() {}
+#[tokio::main]
+async fn main() {
+    cli::cli().await;
+}

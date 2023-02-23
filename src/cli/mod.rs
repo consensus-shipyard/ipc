@@ -1,6 +1,10 @@
 use async_trait::async_trait;
 use clap::Args;
 
+mod commands;
+
+pub use commands::cli;
+
 /// The trait that represents the abstraction of a command line handler. To implement a new command
 /// line operation, implement this trait and register it.
 ///
