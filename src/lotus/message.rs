@@ -7,6 +7,7 @@ use fvm_shared::MethodNum;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use anyhow::anyhow;
+use serde_json::Value;
 use strum::{AsRefStr, Display, EnumString};
 
 /// Exec actor parameters
@@ -160,6 +161,18 @@ impl MpoolPushMessage {
             max_fee: None,
         }
     }
+}
+
+/// A simplified struct representing a `ChainHead` response that does not decode the `blocks` field.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ChainHeadResponse {
+    #[allow(dead_code)]
+    pub cids: Vec<CIDMap>,
+    #[allow(dead_code)]
+    pub blocks: Vec<Value>,
+    #[allow(dead_code)]
+    pub height: u64,
 }
 
 impl TryFrom<CIDMap> for Cid {

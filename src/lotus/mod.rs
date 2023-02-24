@@ -15,7 +15,7 @@ use std::fmt::Debug;
 pub use crate::lotus::client::LotusJsonRPCClient;
 pub use crate::lotus::message::{MpoolPushMessage, MpoolPushMessageResponseInner};
 pub use crate::lotus::message::{
-    ReadStateResponse, StateWaitMsgResponse, WalletKeyType, WalletListResponse,
+    ChainHeadResponse, ReadStateResponse, StateWaitMsgResponse, WalletKeyType, WalletListResponse,
 };
 
 /// The network version of lotus network.
@@ -58,4 +58,8 @@ pub trait LotusClient {
         address: Address,
         tipset: Cid,
     ) -> Result<ReadStateResponse<State>>;
+
+    /// Returns the current head of the chain.
+    /// See: https://lotus.filecoin.io/reference/lotus/chain/#chainhead
+    async fn chain_head(&self) -> Result<ChainHeadResponse>;
 }

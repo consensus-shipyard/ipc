@@ -37,3 +37,12 @@ async fn state_actor_manifest_cid() {
     let cids = client.state_actor_code_cids(version).await.unwrap();
     assert!(!cids.is_empty());
 }
+
+#[tokio::test]
+async fn chain_head() {
+    let client = get_lotus_client();
+    let head = client.chain_head().await.unwrap();
+    assert!(!head.cids.is_empty());
+    assert!(!head.blocks.is_empty());
+    assert_eq!(head.cids.len(), head.blocks.len());
+}

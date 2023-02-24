@@ -1,11 +1,8 @@
 use std::collections::HashMap;
-use crate::lotus::message::{
-    CIDMap, MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
-    ReadStateResponse, StateWaitMsgResponse, WalletKeyType, WalletListResponse,
-};
-use crate::jsonrpc::JsonRpcClient;
-use crate::lotus::{LotusClient, NetworkVersion};
-use anyhow::{anyhow, Result};
+use std::fmt::Debug;
+use std::str::FromStr;
+
+use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
 use fvm_shared::address::Address;
@@ -13,8 +10,14 @@ use fvm_shared::econ::TokenAmount;
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
-use std::fmt::Debug;
-use std::str::FromStr;
+
+use crate::jsonrpc::{JsonRpcClient, NO_PARAMS};
+use crate::lotus::message::{
+    CIDMap, ChainHeadResponse, MpoolPushMessage, MpoolPushMessageResponse,
+    MpoolPushMessageResponseInner, ReadStateResponse, StateWaitMsgResponse, WalletKeyType,
+    WalletListResponse,
+};
+use crate::lotus::{LotusClient, NetworkVersion};
 
 // RPC methods
 mod methods {
@@ -27,6 +30,7 @@ mod methods {
     pub const WALLET_LIST: &str = "Filecoin.WalletList";
     pub const WALLET_DEFAULT_ADDRESS: &str = "Filecoin.WalletDefaultAddress";
     pub const STATE_READ_STATE: &str = "Filecoin.StateReadState";
+    pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
 }
 
 /// The struct implementation for Lotus Client API. It allows for multiple different trait
@@ -194,6 +198,15 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             )
             .await?;
         log::debug!("received read_state response: {r:?}");
+        Ok(r)
+    }
+
+    async fn chain_head(&self) -> Result<ChainHeadResponse> {
+        let r = self
+            .client
+            .request::<ChainHeadResponse>(methods::CHAIN_HEAD, NO_PARAMS)
+            .await?;
+        log::debug!("received chain_head response: {r:?}");
         Ok(r)
     }
 }
