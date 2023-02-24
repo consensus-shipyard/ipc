@@ -4,6 +4,8 @@ use url::Url;
 
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 
+/// The default endpoints for public lotus node. If the urls fail in running tests, need to
+/// check these endpoints again.
 const HTTP_ENDPOINT: &str = "https://api.node.glif.io/rpc/v0";
 const WS_ENDPOINT: &str = "wss://wss.node.glif.io/apigw/lotus/rpc/v0";
 

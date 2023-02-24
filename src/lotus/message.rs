@@ -6,6 +6,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use anyhow::anyhow;
 use strum::{AsRefStr, Display, EnumString};
 
 /// Exec actor parameters
@@ -158,6 +159,15 @@ impl MpoolPushMessage {
             version: None,
             max_fee: None,
         }
+    }
+}
+
+impl TryFrom<CIDMap> for Cid {
+    type Error = anyhow::Error;
+
+    fn try_from(cid_map: CIDMap) -> Result<Self, Self::Error> {
+        let cid_option: Option<Cid> = cid_map.into();
+        cid_option.ok_or(anyhow!("cid not found"))
     }
 }
 

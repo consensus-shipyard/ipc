@@ -179,6 +179,8 @@ fn build_jsonrpc_request(method: &str, params: Value) -> Result<Value> {
     } else if params.is_object() {
         let object_params = params.as_object().unwrap();
         !object_params.is_empty()
+    } else if params.is_null() {
+        false
     } else {
         return Err(anyhow!("params is not an array nor an object"));
     };

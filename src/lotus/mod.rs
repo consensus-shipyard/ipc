@@ -1,7 +1,10 @@
 pub mod client;
 ///! The lotus api to interact with lotus node
 pub mod message;
+#[cfg(test)]
+mod tests;
 
+use std::collections::HashMap;
 use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
@@ -15,6 +18,10 @@ pub use crate::lotus::message::{
     ReadStateResponse, StateWaitMsgResponse, WalletKeyType, WalletListResponse,
 };
 
+/// The network version of lotus network.
+/// see https://github.com/filecoin-project/go-state-types/blob/f6fd668a32b4b4a0bc39fd69d8a5f8fb11f49461/network/version.go#L7
+pub type NetworkVersion = u32;
+
 /// The Lotus client api to interact with the Lotus node.
 #[async_trait]
 pub trait LotusClient {
@@ -26,6 +33,15 @@ pub trait LotusClient {
 
     /// Wait for the message cid of a particular nonce, see: https://lotus.filecoin.io/reference/lotus/state/#statewaitmsg
     async fn state_wait_msg(&self, cid: Cid, nonce: u64) -> Result<StateWaitMsgResponse>;
+
+    /// Returns the name of the network the node is synced to, see https://lotus.filecoin.io/reference/lotus/state/#statenetworkname
+    async fn state_network_name(&self) -> Result<String>;
+
+    /// Returns the network version at the given tipset, see https://lotus.filecoin.io/reference/lotus/state/#statenetworkversion
+    async fn state_network_version(&self, tip_sets: Vec<Cid>) -> Result<NetworkVersion>;
+
+    /// Returns the CID of the builtin actors manifest for the given network version, see https://github.com/filecoin-project/lotus/blob/master/documentation/en/api-v1-unstable-methods.md#stateactormanifestcid
+    async fn state_actor_code_cids(&self, network_version: NetworkVersion) -> Result<HashMap<String, Cid>>;
 
     /// Get the default wallet of the node, see: https://lotus.filecoin.io/reference/lotus/wallet/#walletdefaultaddress
     async fn wallet_default(&self) -> Result<Address>;
