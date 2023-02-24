@@ -7,7 +7,7 @@ edition = "2021"
 license-file = "LICENSE"
 
 [package]
-name = "ipc-client"
+name = "ipc_agent"
 version = "0.1.0"
 edition.workspace = true
 license-file.workspace = true
