@@ -43,7 +43,7 @@ pub trait JsonRpcClient {
 ///
 /// # Examples
 /// ```no_run
-/// use ipc_client::{JsonRpcClientImpl, LotusClient, LotusJsonRPCClient};
+/// use ipc_agent::{jsonrpc::JsonRpcClientImpl, lotus::LotusClient, lotus::LotusJsonRPCClient};
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -51,7 +51,7 @@ pub trait JsonRpcClient {
 ///     let n = LotusJsonRPCClient::new(h);
 ///     println!(
 ///         "wallets: {:?}",
-///         n.wallet_new(ipc_client::WalletKeyType::Secp256k1).await
+///         n.wallet_new(ipc_agent::lotus::WalletKeyType::Secp256k1).await
 ///     );
 /// }
 /// ```

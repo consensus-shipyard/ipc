@@ -15,12 +15,12 @@ use crate::config::JSON_RPC_ENDPOINT;
 ///
 /// # Examples
 /// ```no_run
-/// use agent::config::Config;
-/// use agent::node::jsonrpc::JsonRPCServer;
+/// use ipc_agent::config::Config;
+/// use ipc_agent::server::jsonrpc::JsonRPCServer;
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let config = Config::from_file("PATH TO YOUR CONFIG FILE");
+///     let config = Config::from_file("PATH TO YOUR CONFIG FILE").unwrap();
 ///     let n = JsonRPCServer::new(config.server);
 ///     n.run().await;
 /// }

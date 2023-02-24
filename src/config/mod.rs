@@ -9,6 +9,7 @@ mod subnet;
 
 use std::collections::HashMap;
 use std::fs;
+use std::path::Path;
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -21,29 +22,28 @@ pub const JSON_RPC_VERSION: &str = "2.0";
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
 /// this struct.
 #[derive(Deserialize)]
-pub(crate) struct Config {
+pub struct Config {
     pub server: Server,
     pub subnets: HashMap<String, Subnet>,
 }
 
 impl Config {
     /// Reads a TOML configuration in the `s` string and returns a [`Config`] struct.
-    pub fn from_str(s: &str) -> Result<Self> {
-        let config = toml::from_str(&s)?;
+    pub fn from_toml_str(s: &str) -> Result<Self> {
+        let config = toml::from_str(s)?;
         Ok(config)
     }
 
     /// Reads a TOML configuration file specified in the `path` and returns a [`Config`] struct.
-    pub fn from_file(path: &str) -> Result<Self> {
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
         let contents = fs::read_to_string(path)?;
-        let config: Config = Config::from_str(contents.as_str())?;
+        let config: Config = Config::from_toml_str(contents.as_str())?;
         Ok(config)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::net::SocketAddr;
     use std::str::FromStr;
 
@@ -52,7 +52,7 @@ mod tests {
     use ipc_sdk::subnet_id::{ROOTNET_ID, SubnetID};
     use url::Url;
 
-    use crate::config::{Config, Server, Subnet};
+    use crate::config::Config;
 
     // Arguments for the config's fields
     const SERVER_JSON_RPC_ADDR: &str = "127.0.0.1:3030";
@@ -134,6 +134,6 @@ mod tests {
         "#
         );
 
-        Config::from_str(config_str.as_str()).unwrap()
+        Config::from_toml_str(config_str.as_str()).unwrap()
     }
 }

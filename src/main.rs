@@ -1,9 +1,4 @@
-mod cli;
-mod config;
-mod jsonrpc;
-mod lotus;
-mod manager;
-mod server;
+use ipc_agent::cli;
 
 #[tokio::main]
 async fn main() {
