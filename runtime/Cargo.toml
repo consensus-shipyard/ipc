@@ -38,7 +38,7 @@ serde_repr = "0.1.8"
 regex = "1"
 itertools = "0.10"
 paste = "1.0.9"
-
+serde_tuple = "0.5.0"
 
 [dependencies.sha2]
 version = "0.10"

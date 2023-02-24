@@ -9,6 +9,7 @@ use num_derive::FromPrimitive;
 pub mod network;
 pub mod shared;
 pub mod singletons;
+pub mod types;
 
 pub const CALLER_TYPES_SIGNABLE: &[Type] = &[Type::Account, Type::Multisig];
 
