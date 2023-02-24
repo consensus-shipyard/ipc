@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.7;
 
-interface ISubnetCoordinatorActor {
+interface IGateway {
     /// Register is called by subnet actors to put the required collateral
     /// and register the subnet to the hierarchy.
     function register() external;

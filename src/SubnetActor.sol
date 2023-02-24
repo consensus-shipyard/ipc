@@ -24,14 +24,14 @@ contract SubnetActor is ISubnetActor {
     mapping(address => uint256) public stake;
     /// @notice current status of the subnet
     Status public status;
-    /// @notice genesis block number
-    uint64 public genesis;
+    /// @notice genesis block
+    bytes public genesis;
     /// @notice number of blocks after which finality is reached
-    uint64 public finalityThreshold;
+    int64 public finalityThreshold;
     /// @notice number of blocks between two checkpoints
-    uint64 public checkPeriod;
+    int64 public checkPeriod;
     /// @notice block number to corresponding checkpoint at that block
-    mapping(uint64 => Checkpoint) public checkpoints;
+    mapping(int64 => Checkpoint) public checkpoints;
     /// @notice CID to Votes (list of validators)
     mapping(bytes => address[]) windowChecks;
     /// @notice List of validators in the subnet
@@ -47,9 +47,9 @@ contract SubnetActor is ISubnetActor {
         ConsensusType _consensus,
         uint256 _minValidatorStake,
         uint64 _minValidators,
-        uint64 _finalityThreshold,
-        uint64 _checkPeriod,
-        uint64 _genesis
+        int64 _finalityThreshold,
+        int64 _checkPeriod,
+        bytes memory _genesis
     ) {
         parentId = _parentId;
         name = _name;

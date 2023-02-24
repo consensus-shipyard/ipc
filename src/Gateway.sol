@@ -4,12 +4,12 @@ pragma solidity ^0.8.7;
 import "./structs/Checkpoint.sol";
 import "./structs/Postbox.sol";
 import "./enums/Status.sol";
-import "./interfaces/ISubnetCoordinatorActor.sol";
+import "./interfaces/IGateway.sol";
 
-contract SubnetCoordinatorActor is ISubnetCoordinatorActor {
-    uint64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
-    uint256 constant MIN_COLLATERAL_AMOUNT = 1 ether;
-    uint256 constant MAX_NONCE = type(uint256).max;
+contract Gateway is IGateway {
+    int64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
+    uint64 constant MIN_COLLATERAL_AMOUNT = 1 ether;
+    uint64 constant MAX_NONCE = type(uint64).max;
 
     /// @notice ID of the current network
     SubnetID public networkName;
@@ -25,10 +25,10 @@ contract SubnetCoordinatorActor is ISubnetCoordinatorActor {
     mapping(bytes => Subnet) public subnets;
 
     /// @notice Checkpoint period in number of epochs for the subnet
-    uint64 public checkPeriod;
+    int64 public checkPeriod;
 
     /// @notice Checkpoint templates in the SCA per epoch
-    mapping(uint256 => Checkpoint) public checkpoints;
+    mapping(int64 => Checkpoint) public checkpoints;
 
     /// @notice Stores information about the list of messages and child msgMetas being propagated in checkpoints to the top of the hierarchy.
     /// FIXME: refactor with custom getter and make it private?
@@ -41,24 +41,24 @@ contract SubnetCoordinatorActor is ISubnetCoordinatorActor {
     mapping(uint256 => PostBoxItem) public postbox;
 
     /// @notice Latest nonce of a cross message sent from subnet.
-    uint256 public nonce;
+    uint64 public nonce;
 
     /// @notice Nonce of bottom-up messages for msgMeta received from checkpoints.
     /// This nonce is used to mark with a nonce the metadata about cross-net
     /// messages received in checkpoints. This is used to order the
     /// bottom-up cross-net messages received through checkpoints.
-    uint256 public bottomUpNonce;
+    uint64 public bottomUpNonce;
 
     /// @notice Queue of bottom-up cross-net messages to be applied.
     /// bottom up nonce => CrossMsgMeta
-    mapping(uint256 => CrossMsgMeta) public bottomUpMsgMeta;
+    mapping(uint64 => CrossMsgMeta) public bottomUpMsgMeta;
 
     /// @notice AppliedNonces keep track of the next nonce of the message to be applied.
     /// This prevents potential replay attacks.
-    uint256 public appliedBottomUpNonce;
-    uint256 public appliedTopDownNonce;
+    uint64 public appliedBottomUpNonce;
+    uint64 public appliedTopDownNonce;
 
-    constructor(string memory _networkName, uint64 _checkpointPeriod) {
+    constructor(string memory _networkName, int64 _checkpointPeriod) {
         networkName = SubnetID(_networkName, address(0));
         minStake = MIN_COLLATERAL_AMOUNT;
         checkPeriod = _checkpointPeriod > DEFAULT_CHECKPOINT_PERIOD

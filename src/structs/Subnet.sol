@@ -15,7 +15,7 @@ struct Subnet {
     SubnetID id;
     uint256 stake;
     mapping(uint256 => CrossMsg) topDownMsgs;
-    uint256 nonce;
+    uint64 nonce;
     uint256 circSupply;
     Status status;
     Checkpoint prevCheckpoint;

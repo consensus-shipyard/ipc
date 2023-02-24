@@ -11,7 +11,7 @@ struct Checkpoint {
 struct CheckData {
     SubnetID source;
     bytes tipSet;
-    uint64 epoch;
+    int64 epoch;
     bytes prevCheck;
     ChildCheck[] children;
     CrossMsgMeta crossMsgs;
@@ -23,8 +23,8 @@ struct ChildCheck {
 }
 
 struct CrossMsgMeta {
-    CrossMsg msgsCid;
-    uint256 nonce;
+    CrossMsgs msgsCid;
+    uint64 nonce;
     uint256 value;
     uint256 fee;
 }
@@ -42,7 +42,7 @@ struct StorableMsg {
     IPCAddress from;
     IPCAddress to;
     uint256 value;
-    uint256 nonce;
+    uint64 nonce;
     uint64 method;
     bytes params;
 }
