@@ -1,7 +1,3 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::str::FromStr;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
@@ -10,6 +6,9 @@ use fvm_shared::econ::TokenAmount;
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::str::FromStr;
 
 use crate::jsonrpc::{JsonRpcClient, NO_PARAMS};
 use crate::lotus::message::{
@@ -121,7 +120,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     async fn state_network_version(&self, tip_sets: Vec<Cid>) -> Result<NetworkVersion> {
         // refer to: https://lotus.filecoin.io/reference/lotus/state/#statenetworkversion
         let params = json!([
-            tip_sets.into_iter().map(|cid| CIDMap::from(cid)).collect::<Vec<_>>()
+            tip_sets.into_iter().map(CIDMap::from).collect::<Vec<_>>()
         ]);
 
         let r = self

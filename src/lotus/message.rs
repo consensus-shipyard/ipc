@@ -1,12 +1,16 @@
 //! This file contains the various response types to be used byt the lotus api.
 
+use anyhow::anyhow;
 use cid::Cid;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use anyhow::anyhow;
+use base64::Engine;
+use fil_actors_runtime::cbor;
+use fvm_ipld_encoding::RawBytes;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use strum::{AsRefStr, Display, EnumString};
 
@@ -38,7 +42,7 @@ pub enum WalletKeyType {
 pub type WalletListResponse = Vec<String>;
 
 /// Helper struct to interact with lotus node
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CIDMap {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "/")]
@@ -49,13 +53,12 @@ pub struct CIDMap {
 #[serde(rename_all = "PascalCase")]
 pub struct StateWaitMsgResponse {
     #[allow(dead_code)]
-    message: CIDMap,
+    pub message: CIDMap,
+    pub receipt: Receipt,
     #[allow(dead_code)]
-    receipt: Receipt,
+    pub tip_set: Vec<CIDMap>,
     #[allow(dead_code)]
-    tip_set: Vec<CIDMap>,
-    #[allow(dead_code)]
-    height: u64,
+    pub height: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,11 +76,11 @@ pub struct ReadStateResponse<State> {
 #[serde(rename_all = "PascalCase")]
 pub struct Receipt {
     #[allow(dead_code)]
-    exit_code: u32,
+    pub exit_code: u32,
+    #[serde(rename = "Return")]
+    pub result: String,
     #[allow(dead_code)]
-    r#return: String,
-    #[allow(dead_code)]
-    gas_used: u64,
+    pub gas_used: u64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -108,15 +111,12 @@ pub struct MpoolPushMessageResponseInner {
     pub version: u16,
 
     #[serde(rename = "CID")]
-    pub cid: CIDMap,
+    cid: CIDMap,
 }
 
 impl MpoolPushMessageResponseInner {
-    pub fn get_root_cid(&self) -> Option<Cid> {
-        self.cid
-            .cid
-            .as_ref()
-            .map(|s| Cid::from_str(s).expect("server sent invalid cid"))
+    pub fn cid(&self) -> anyhow::Result<Cid> {
+        Cid::try_from(self.cid.clone())
     }
 
     pub fn to(&self) -> anyhow::Result<Address> {
@@ -180,7 +180,7 @@ impl TryFrom<CIDMap> for Cid {
 
     fn try_from(cid_map: CIDMap) -> Result<Self, Self::Error> {
         let cid_option: Option<Cid> = cid_map.into();
-        cid_option.ok_or(anyhow!("cid not found"))
+        cid_option.ok_or_else(|| anyhow!("cid not found"))
     }
 }
 
@@ -206,6 +206,24 @@ impl From<Cid> for CIDMap {
             cid: Some(c.to_string()),
         }
     }
+}
+
+impl Receipt {
+   pub fn parse_result_into<T: DeserializeOwned>(self) -> anyhow::Result<T> {
+       let r = base64::engine::general_purpose::STANDARD.decode(self.result)
+           .map_err(|e| {
+               log::error!("cannot base64 decode due to {e:?}");
+               anyhow!("cannot decode return string")
+           })?;
+
+       cbor::deserialize::<T>(
+           &RawBytes::new(r),
+           "deserialize create subnet return response"
+       ).map_err(|e| {
+           log::error!("cannot decode bytes due to {e:?}");
+           anyhow!("cannot cbor deserialize return data")
+       })
+   }
 }
 
 #[cfg(test)]

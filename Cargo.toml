@@ -38,14 +38,17 @@ warp = "0.3.3"
 bytes = "1.4.0"
 clap = { version = "4.1.4", features = ["env", "derive"] }
 thiserror = "1.0.38"
+serde_tuple = "0.5.0"
 
 fvm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true }
 ipc-sdk = { workspace = true }
 ipc-subnet-actor = { workspace = true }
 ipc-gateway = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
 
 [workspace.dependencies]
+fvm_ipld_encoding = "0.3.3"
 fvm_shared = { version = "=3.0.0-alpha.17", default-features = false }
 fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", features = ["fil-actor"] }
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git" }
