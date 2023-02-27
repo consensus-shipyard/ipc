@@ -1,16 +1,20 @@
 use std::collections::HashMap;
 
-use crate::jsonrpc::JsonRpcClient;
-use crate::lotus::{LotusClient, LotusJsonRPCClient, MpoolPushMessage};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
+use fil_actors_runtime::types::{InitExecParams, InitExecReturn, INIT_EXEC_METHOD_NUM};
 use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
-use fil_actors_runtime::types::{INIT_EXEC_METHOD_NUM, InitExecParams, InitExecReturn};
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_gateway::Checkpoint;
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_subnet_actor::{ConstructParams, JoinParams, types::MANIFEST_ID};
+use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
+
+use crate::jsonrpc::JsonRpcClient;
+use crate::lotus::client::LotusJsonRPCClient;
+use crate::lotus::LotusClient;
+use crate::lotus::message::mpool::MpoolPushMessage;
+
 use super::subnet::{SubnetInfo, SubnetManager};
 
 pub struct LotusSubnetManager<T: JsonRpcClient> {
@@ -45,7 +49,9 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         );
 
         let state_wait_response = self.lotus_client.state_wait_msg(message_cid, nonce).await?;
-        let result = state_wait_response.receipt.parse_result_into::<InitExecReturn>()?;
+        let result = state_wait_response
+            .receipt
+            .parse_result_into::<InitExecReturn>()?;
         let addr = result.id_address;
         log::info!("created subnet result: {addr:}");
 
@@ -92,7 +98,10 @@ impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
     /// Checks the `network` is the one we are currently talking to.
     async fn is_network_match(&self, network: &SubnetID) -> Result<bool> {
         let network_name = self.lotus_client.state_network_name().await?;
-        log::debug!("current network name: {network_name:?}, to check network: {:?}", network.to_string());
+        log::debug!(
+            "current network name: {network_name:?}, to check network: {:?}",
+            network.to_string()
+        );
 
         Ok(network.to_string() == network_name)
     }

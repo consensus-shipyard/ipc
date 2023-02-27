@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::str::FromStr;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
@@ -6,16 +10,15 @@ use fvm_shared::econ::TokenAmount;
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::str::FromStr;
 
 use crate::jsonrpc::{JsonRpcClient, NO_PARAMS};
-use crate::lotus::message::{
-    CIDMap, ChainHeadResponse, MpoolPushMessage, MpoolPushMessageResponse,
-    MpoolPushMessageResponseInner, ReadStateResponse, StateWaitMsgResponse, WalletKeyType,
-    WalletListResponse,
+use crate::lotus::message::chain::ChainHeadResponse;
+use crate::lotus::message::mpool::{
+    MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
+use crate::lotus::message::state::{ReadStateResponse, StateWaitMsgResponse};
+use crate::lotus::message::wallet::{WalletKeyType, WalletListResponse};
+use crate::lotus::message::CIDMap;
 use crate::lotus::{LotusClient, NetworkVersion};
 
 // RPC methods
@@ -119,9 +122,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
 
     async fn state_network_version(&self, tip_sets: Vec<Cid>) -> Result<NetworkVersion> {
         // refer to: https://lotus.filecoin.io/reference/lotus/state/#statenetworkversion
-        let params = json!([
-            tip_sets.into_iter().map(CIDMap::from).collect::<Vec<_>>()
-        ]);
+        let params = json!([tip_sets.into_iter().map(CIDMap::from).collect::<Vec<_>>()]);
 
         let r = self
             .client
@@ -132,7 +133,10 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         Ok(r)
     }
 
-    async fn state_actor_code_cids(&self, network_version: NetworkVersion) -> Result<HashMap<String, Cid>> {
+    async fn state_actor_code_cids(
+        &self,
+        network_version: NetworkVersion,
+    ) -> Result<HashMap<String, Cid>> {
         // refer to: https://github.com/filecoin-project/lotus/blob/master/documentation/en/api-v1-unstable-methods.md#stateactormanifestcid
         let params = json!([network_version]);
 

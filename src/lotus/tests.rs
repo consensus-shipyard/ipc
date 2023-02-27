@@ -1,6 +1,8 @@
 use url::Url;
+
 use crate::jsonrpc::JsonRpcClientImpl;
-use crate::lotus::{LotusClient, LotusJsonRPCClient};
+use crate::lotus::client::LotusJsonRPCClient;
+use crate::lotus::LotusClient;
 
 const HTTP_ENDPOINT: &str = "https://api.node.glif.io/rpc/v0";
 
@@ -13,10 +15,7 @@ fn get_lotus_client() -> LotusJsonRPCClient<JsonRpcClientImpl> {
 #[tokio::test]
 async fn state_network_name() {
     let client = get_lotus_client();
-    assert_eq!(
-        client.state_network_name().await.unwrap(),
-        "mainnet"
-    );
+    assert_eq!(client.state_network_name().await.unwrap(), "mainnet");
 }
 
 #[tokio::test]
