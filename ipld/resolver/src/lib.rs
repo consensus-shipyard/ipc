@@ -1,14 +1,5 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+// TODO (IPC-38): Remove dead code allowances.
+#[allow(dead_code)]
+mod behaviour;
+#[allow(dead_code)]
+mod service;
