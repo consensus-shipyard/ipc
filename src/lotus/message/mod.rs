@@ -24,7 +24,7 @@ impl TryFrom<CIDMap> for Cid {
 
     fn try_from(cid_map: CIDMap) -> Result<Self, Self::Error> {
         let cid_option: Option<Cid> = cid_map.into();
-        cid_option.ok_or(anyhow!("cid not found"))
+        cid_option.ok_or_else(|| anyhow!("cid not found"))
     }
 }
 
