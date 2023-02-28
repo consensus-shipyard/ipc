@@ -37,6 +37,20 @@ mod methods {
 
 /// The struct implementation for Lotus Client API. It allows for multiple different trait
 /// extension.
+/// # Examples
+/// ```no_run
+/// use ipc_agent::{jsonrpc::JsonRpcClientImpl, lotus::LotusClient, lotus::client::LotusJsonRPCClient};
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let h = JsonRpcClientImpl::new("<DEFINE YOUR URL HERE>".parse().unwrap(), None);
+///     let n = LotusJsonRPCClient::new(h);
+///     println!(
+///         "wallets: {:?}",
+///         n.wallet_new(ipc_agent::lotus::message::wallet::WalletKeyType::Secp256k1).await
+///     );
+/// }
+/// ```
 pub struct LotusJsonRPCClient<T: JsonRpcClient> {
     client: T,
 }
