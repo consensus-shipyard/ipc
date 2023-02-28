@@ -2,17 +2,21 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
 use fvm_shared::address::Address;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use ipc_gateway::Checkpoint;
+use ipc_sdk::subnet_id::SubnetID;
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::jsonrpc::{JsonRpcClient, NO_PARAMS};
 use crate::lotus::message::chain::ChainHeadResponse;
+use crate::lotus::message::ipc::IPCGetPrevCheckpointForChildResponse;
 use crate::lotus::message::mpool::{
     MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
@@ -33,7 +37,12 @@ mod methods {
     pub const WALLET_DEFAULT_ADDRESS: &str = "Filecoin.WalletDefaultAddress";
     pub const STATE_READ_STATE: &str = "Filecoin.StateReadState";
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
+    pub const IPC_GET_PREV_CHECKPOINT_FOR_CHILD: &str = "Filecoin.IPCGetPrevCheckpointForChild";
+    pub const IPC_GET_CHECKPOINT_TEMPLATE: &str = "Filecoin.IPCGetCheckpointTemplate";
 }
+
+/// The default gateway actor address
+const GATEWAY_ACTOR_ADDRESS: &str = "f064";
 
 /// The struct implementation for Lotus Client API. It allows for multiple different trait
 /// extension.
@@ -224,6 +233,36 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .request::<ChainHeadResponse>(methods::CHAIN_HEAD, NO_PARAMS)
             .await?;
         log::debug!("received chain_head response: {r:?}");
+        Ok(r)
+    }
+
+    async fn ipc_get_prev_checkpoint_for_child(
+        &self,
+        child_subnet_id: SubnetID,
+    ) -> Result<IPCGetPrevCheckpointForChildResponse> {
+        let parent = match child_subnet_id.parent() {
+            None => return Err(anyhow!("The child_subnet_id must be a valid child subnet")),
+            Some(parent) => parent,
+        };
+        let subnet_actor = child_subnet_id.subnet_actor().to_string();
+        let params =
+            json!([GATEWAY_ACTOR_ADDRESS, {"Parent": parent.to_string(), "Actor": subnet_actor}]);
+
+        let r = self
+            .client
+            .request::<IPCGetPrevCheckpointForChildResponse>(
+                methods::IPC_GET_PREV_CHECKPOINT_FOR_CHILD,
+                params,
+            )
+            .await?;
+        Ok(r)
+    }
+
+    async fn ipc_get_checkpoint_template(&self, epoch: ChainEpoch) -> Result<Checkpoint> {
+        let r = self.client.request::<Checkpoint>(
+            methods::IPC_GET_CHECKPOINT_TEMPLATE,
+            json!([GATEWAY_ACTOR_ADDRESS, epoch])
+        ).await?;
         Ok(r)
     }
 }

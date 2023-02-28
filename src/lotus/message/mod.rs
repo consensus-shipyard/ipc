@@ -10,6 +10,7 @@ pub mod chain;
 pub mod mpool;
 pub mod state;
 pub mod wallet;
+pub mod ipc;
 
 /// Helper struct to interact with lotus node
 #[derive(Deserialize, Serialize, Debug, Clone)]

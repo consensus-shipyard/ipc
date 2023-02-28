@@ -6,12 +6,17 @@ use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
 use fvm_shared::address::Address;
+use fvm_shared::clock::ChainEpoch;
+use ipc_gateway::Checkpoint;
+use ipc_sdk::subnet_id::SubnetID;
 use serde::de::DeserializeOwned;
 
 use message::chain::ChainHeadResponse;
 use message::mpool::{MpoolPushMessage, MpoolPushMessageResponseInner};
 use message::state::{ReadStateResponse, StateWaitMsgResponse};
 use message::wallet::{WalletKeyType, WalletListResponse};
+
+use crate::lotus::message::ipc::IPCGetPrevCheckpointForChildResponse;
 
 pub mod client;
 pub mod message;
@@ -65,4 +70,11 @@ pub trait LotusClient {
     /// Returns the current head of the chain.
     /// See: https://lotus.filecoin.io/reference/lotus/chain/#chainhead
     async fn chain_head(&self) -> Result<ChainHeadResponse>;
+
+    async fn ipc_get_prev_checkpoint_for_child(
+        &self,
+        child_subnet_id: SubnetID,
+    ) -> Result<IPCGetPrevCheckpointForChildResponse>;
+
+    async fn ipc_get_checkpoint_template(&self, epoch: ChainEpoch) -> Result<Checkpoint>;
 }
