@@ -1,13 +1,15 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! The module contains the handlers implementation for the json rpc server.
 
 pub mod create;
 
-use anyhow::{anyhow, Result};
-use std::collections::HashMap;
-use serde_json::Value;
-pub use create::{CreateSubnetResponse, CreateSubnetParams};
 use crate::server::create::CreateSubnetHandler;
 use crate::server::JsonRPCRequestHandler;
+use anyhow::{anyhow, Result};
+pub use create::{CreateSubnetParams, CreateSubnetResponse};
+use serde_json::Value;
+use std::collections::HashMap;
 
 pub type Method = String;
 
@@ -25,7 +27,7 @@ impl Handlers {
     pub fn new() -> Self {
         let mut handlers = HashMap::new();
 
-        let create_subnet = HandlerWrapper::CreateSubnet(CreateSubnetHandler{});
+        let create_subnet = HandlerWrapper::CreateSubnet(CreateSubnetHandler {});
         handlers.insert(String::from("create_subnet"), create_subnet);
 
         Self { handlers }
@@ -42,5 +44,11 @@ impl Handlers {
         } else {
             Err(anyhow!("method not supported"))
         }
+    }
+}
+
+impl Default for Handlers {
+    fn default() -> Self {
+        Self::new()
     }
 }

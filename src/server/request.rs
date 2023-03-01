@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

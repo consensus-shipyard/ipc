@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! The Daemon command line handler that prints the info about IPC Agent.
 
 use async_trait::async_trait;

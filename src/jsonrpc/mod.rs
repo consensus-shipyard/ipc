@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use anyhow::{anyhow, Result};
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;

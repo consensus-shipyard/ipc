@@ -1,10 +1,12 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
+use fil_actors_runtime::types::{InitExecParams, InitExecReturn, INIT_EXEC_METHOD_NUM};
 use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
-use fil_actors_runtime::types::{INIT_EXEC_METHOD_NUM, InitExecParams, InitExecReturn};
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use ipc_gateway::Checkpoint;
 use ipc_sdk::subnet_id::SubnetID;
@@ -12,9 +14,9 @@ use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
 use crate::jsonrpc::JsonRpcClient;
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::LotusClient;
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
+use crate::lotus::LotusClient;
 
 use super::subnet::{SubnetInfo, SubnetManager};
 
@@ -43,7 +45,9 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         );
 
         let state_wait_response = self.mpool_push_and_wait(message).await?;
-        let result = state_wait_response.receipt.parse_result_into::<InitExecReturn>()?;
+        let result = state_wait_response
+            .receipt
+            .parse_result_into::<InitExecReturn>()?;
         let addr = result.id_address;
         log::info!("created subnet result: {addr:}");
 
@@ -78,7 +82,9 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
     }
 
     async fn leave_subnet(&self, subnet: SubnetID, from: Address) -> Result<()> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("cannot leave root"))?;
+        let parent = subnet
+            .parent()
+            .ok_or_else(|| anyhow!("cannot leave root"))?;
         if !self.is_network_match(&parent).await? {
             return Err(anyhow!("subnet actor being deployed in the wrong parent network, parent network names do not match"));
         }
@@ -88,7 +94,8 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             from,
             ipc_subnet_actor::Method::Leave as MethodNum,
             vec![],
-        )).await?;
+        ))
+        .await?;
         log::info!("left subnet: {subnet:}");
 
         Ok(())
@@ -105,7 +112,8 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             from,
             ipc_subnet_actor::Method::Kill as MethodNum,
             vec![],
-        )).await?;
+        ))
+        .await?;
         log::info!("left subnet: {subnet:}");
 
         Ok(())

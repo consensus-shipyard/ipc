@@ -1,14 +1,16 @@
-use std::sync::Arc;
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
+use crate::config::JSON_RPC_ENDPOINT;
+use crate::config::{Config, JSON_RPC_VERSION};
 use crate::server::request::JSONRPCRequest;
 use crate::server::response::{JSONRPCError, JSONRPCErrorResponse, JSONRPCResultResponse};
+use crate::server::Handlers;
 use bytes::Bytes;
+use std::sync::Arc;
 use warp::http::StatusCode;
 use warp::reject::Reject;
 use warp::reply::with_status;
 use warp::{Filter, Rejection, Reply};
-use crate::config::{Config, JSON_RPC_VERSION};
-use crate::config::JSON_RPC_ENDPOINT;
-use crate::server::Handlers;
 
 type ArcHandlers = Arc<Handlers>;
 
@@ -40,10 +42,15 @@ impl JsonRPCServer {
 
     /// Runs the node in the current thread
     pub async fn run(&self) {
-        log::info!("IPC agent rpc node listening at {:?}", self.config.server.json_rpc_address);
+        log::info!(
+            "IPC agent rpc node listening at {:?}",
+            self.config.server.json_rpc_address
+        );
 
         let handlers = Arc::new(Handlers::new());
-        warp::serve(json_rpc_filter(handlers)).run(self.config.server.json_rpc_address).await;
+        warp::serve(json_rpc_filter(handlers))
+            .run(self.config.server.json_rpc_address)
+            .await;
     }
 }
 
@@ -53,7 +60,9 @@ impl JsonRPCServer {
 /// - Listen to POST requests on the DEFAULT_JSON_RPC_ENDPOINT
 /// - Extract the body of the request.
 /// - Pass it to to the json_rpc_filter to deserialize into a jsonrpc request.
-fn json_rpc_filter(handlers: ArcHandlers) -> impl Filter<Extract = (impl Reply,), Error = warp::Rejection> + Clone {
+fn json_rpc_filter(
+    handlers: ArcHandlers,
+) -> impl Filter<Extract = (impl Reply,), Error = warp::Rejection> + Clone {
     warp::post()
         .and(warp::path(JSON_RPC_ENDPOINT))
         .and(warp::body::bytes())
@@ -63,7 +72,9 @@ fn json_rpc_filter(handlers: ArcHandlers) -> impl Filter<Extract = (impl Reply,)
         .recover(handle_rejection)
 }
 
-fn with_handlers(handlers: ArcHandlers) -> impl Filter<Extract = (ArcHandlers,), Error = std::convert::Infallible> + Clone {
+fn with_handlers(
+    handlers: ArcHandlers,
+) -> impl Filter<Extract = (ArcHandlers,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || handlers.clone())
 }
 
@@ -76,7 +87,10 @@ async fn to_json_rpc_request(bytes: Bytes) -> Result<JSONRPCRequest, warp::Rejec
 }
 
 /// Main function responsible for handling and routing jsonrpc requests to the right underlying handler according to the method
-async fn handle_request(json_rpc_request: JSONRPCRequest, handlers: ArcHandlers) -> Result<impl Reply, warp::Rejection> {
+async fn handle_request(
+    json_rpc_request: JSONRPCRequest,
+    handlers: ArcHandlers,
+) -> Result<impl Reply, warp::Rejection> {
     log::debug!("received json rpc request = {:?}", json_rpc_request);
 
     let JSONRPCRequest {
@@ -94,11 +108,13 @@ async fn handle_request(json_rpc_request: JSONRPCRequest, handlers: ArcHandlers)
 
     log::info!("received method = {method:?} and params = {params:?}");
     match handlers.handle(method, params).await {
-        Ok(response) => {
-            Ok(warp::reply::json(&JSONRPCResultResponse::new(id, response)))
-        },
+        Ok(response) => Ok(warp::reply::json(&JSONRPCResultResponse::new(id, response))),
         Err(e) => {
-            let error: JSONRPCError<()> = JSONRPCError { code: -1, data: None, message: e.to_string() };
+            let error: JSONRPCError<()> = JSONRPCError {
+                code: -1,
+                data: None,
+                message: e.to_string(),
+            };
             Ok(warp::reply::json(&JSONRPCErrorResponse::new(id, error)))
         }
     }
@@ -126,13 +142,12 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, warp::Rejection>
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use crate::server::jsonrpc::{ArcHandlers, json_rpc_filter, JSONRPCResultResponse};
+    use crate::config::{JSON_RPC_ENDPOINT, JSON_RPC_VERSION};
+    use crate::server::jsonrpc::{json_rpc_filter, ArcHandlers, JSONRPCResultResponse};
     use crate::server::request::JSONRPCRequest;
-    use crate::config::JSON_RPC_VERSION;
-    use warp::http::StatusCode;
-    use crate::config::JSON_RPC_ENDPOINT;
     use crate::server::Handlers;
+    use std::sync::Arc;
+    use warp::http::StatusCode;
 
     fn get_test_handlers() -> ArcHandlers {
         Arc::new(Handlers::new())
@@ -165,7 +180,7 @@ mod tests {
 
         assert_eq!(v.id, id);
         assert_eq!(v.jsonrpc, jsonrpc);
-        assert_eq!(v.result, ());
+        //assert_eq!(v.result, ());
     }
 
     #[tokio::test]

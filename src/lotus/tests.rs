@@ -1,5 +1,5 @@
-use std::str::FromStr;
-use ipc_sdk::subnet_id::SubnetID;
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use url::Url;
 
 use crate::jsonrpc::JsonRpcClientImpl;

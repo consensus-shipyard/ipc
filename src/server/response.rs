@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use crate::config::JSON_RPC_VERSION;
 use serde::{Deserialize, Serialize};
 

@@ -1,11 +1,13 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! Deserialization utils for config mod.
 
+use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
+use serde::de::{Error, SeqAccess};
 use serde::Deserializer;
 use std::fmt::Formatter;
-use serde::de::{Error, SeqAccess};
 use std::str::FromStr;
-use fvm_shared::address::Address;
 
 /// A serde deserialization method to deserialize a subnet path string into a [`SubnetID`].
 pub(crate) fn deserialize_subnet_id<'de, D>(deserializer: D) -> anyhow::Result<SubnetID, D::Error>
@@ -32,7 +34,9 @@ where
 
 /// A serde deserialization method to deserialize a list of account strings into a vector of
 /// [`Address`].
-pub(crate) fn deserialize_accounts<'de, D>(deserializer: D) -> anyhow::Result<Vec<Address>, D::Error>
+pub(crate) fn deserialize_accounts<'de, D>(
+    deserializer: D,
+) -> anyhow::Result<Vec<Address>, D::Error>
 where
     D: Deserializer<'de>,
 {

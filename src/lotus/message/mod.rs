@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! This module contains the various response types to be used byt the lotus api.
 
 use std::str::FromStr;
@@ -7,10 +9,10 @@ use cid::Cid;
 use serde::{Deserialize, Serialize};
 
 pub mod chain;
+pub mod ipc;
 pub mod mpool;
 pub mod state;
 pub mod wallet;
-pub mod ipc;
 
 /// Helper struct to interact with lotus node
 #[derive(Deserialize, Serialize, Debug, Clone)]

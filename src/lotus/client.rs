@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -259,10 +261,13 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     }
 
     async fn ipc_get_checkpoint_template(&self, epoch: ChainEpoch) -> Result<Checkpoint> {
-        let r = self.client.request::<Checkpoint>(
-            methods::IPC_GET_CHECKPOINT_TEMPLATE,
-            json!([GATEWAY_ACTOR_ADDRESS, epoch])
-        ).await?;
+        let r = self
+            .client
+            .request::<Checkpoint>(
+                methods::IPC_GET_CHECKPOINT_TEMPLATE,
+                json!([GATEWAY_ACTOR_ADDRESS, epoch]),
+            )
+            .await?;
         Ok(r)
     }
 }

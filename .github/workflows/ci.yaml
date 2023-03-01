@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  # Check code formatting; anything that doesn't require compilation.
+  pre-compile-checks:
+    name: Pre-compile checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt
+      - name: Check code formatting
+        run: make check-fmt
+      - name: Check license headers
+        run: make license
+
+  # Test matrix, running tasks from the Makefile.
+  tests:
+    needs: [pre-compile-checks]
+    name: ${{ matrix.make.name }} (${{ matrix.os }}, ${{ matrix.rust }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        rust: [nightly]
+        make:
+          - name: Lint
+            task: lint
+          - name: Test
+            task: test
+        exclude:
+          - rust: stable
+            make:
+              name: Lint
+
+    env:
+      RUST_BACKTRACE: full
+      RUSTFLAGS: -Dwarnings
+      CARGO_INCREMENTAL: '0'
+      SCCACHE_CACHE_SIZE: 10G
+      CC: "sccache clang"
+      CXX: "sccache clang++"
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: wasm32-unknown-unknown
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt,clippy
+
+      # Protobuf compiler required by libp2p-core
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup sccache
+        uses: hanabi1224/sccache-action@v1.2.0 # https://github.com/hanabi1224/sccache-action used by Forest.
+        timeout-minutes: 5
+        continue-on-error: true
+        with:
+          release-name: v0.3.1
+          # Caching everything separately, in case they don't ask for the same things to be compiled.
+          cache-key: ${{ matrix.make.name }}-${{ matrix.os }}-${{matrix.rust}}-${{ hashFiles('Cargo.lock', 'rust-toolchain', 'rust-toolchain.toml') }}
+          # Not sure why we should ever update a cache that has the hash of the lock file in it.
+          # In Forest it only contains the rust-toolchain, so it makes sense to update because dependencies could have changed.
+          cache-update: false
+
+      - name: ${{ matrix.make.name }}
+        run: make ${{ matrix.make.task }}

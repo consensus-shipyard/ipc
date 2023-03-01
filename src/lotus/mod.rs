@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 ///! The lotus api to interact with lotus node
 use std::collections::HashMap;
 use std::fmt::Debug;

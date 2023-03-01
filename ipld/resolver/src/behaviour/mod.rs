@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use libipld::store::StoreParams;
 use libp2p::{gossipsub::Gossipsub, identify, ping, swarm::NetworkBehaviour};
 use libp2p_bitswap::Bitswap;
