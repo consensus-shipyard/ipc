@@ -1,5 +1,6 @@
+// Copyright 2022-2023 Protocol Labs
 // Copyright 2019-2022 ChainSafe Systems
-// SPDX-License-Identifier: Apache-2.0, MIT
+// SPDX-License-Identifier: MIT
 use std::{
     borrow::Cow,
     cmp,

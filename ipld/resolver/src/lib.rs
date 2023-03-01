@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 // TODO (IPC-38): Remove dead code allowances.
 #[allow(dead_code)]
 mod behaviour;
