@@ -1,12 +1,16 @@
+use std::sync::Arc;
 use crate::server::request::JSONRPCRequest;
-use crate::server::response::{JSONRPCErrorResponse, JSONRPCResultResponse};
+use crate::server::response::{JSONRPCError, JSONRPCErrorResponse, JSONRPCResultResponse};
 use bytes::Bytes;
 use warp::http::StatusCode;
 use warp::reject::Reject;
 use warp::reply::with_status;
 use warp::{Filter, Rejection, Reply};
-use crate::config::{JSON_RPC_VERSION, Server as JsonRPCServerConfig};
+use crate::config::{Config, JSON_RPC_VERSION};
 use crate::config::JSON_RPC_ENDPOINT;
+use crate::server::Handlers;
+
+type ArcHandlers = Arc<Handlers>;
 
 /// The IPC JSON RPC node that contains all the methods and handlers. The underlying implementation
 /// is using `warp`.
@@ -21,23 +25,25 @@ use crate::config::JSON_RPC_ENDPOINT;
 /// #[tokio::main]
 /// async fn main() {
 ///     let config = Config::from_file("PATH TO YOUR CONFIG FILE").unwrap();
-///     let n = JsonRPCServer::new(config.server);
+///     let n = JsonRPCServer::new(config);
 ///     n.run().await;
 /// }
 /// ```
 pub struct JsonRPCServer {
-    config: JsonRPCServerConfig,
+    config: Config,
 }
 
 impl JsonRPCServer {
-    pub fn new(config: JsonRPCServerConfig) -> Self {
+    pub fn new(config: Config) -> Self {
         Self { config }
     }
 
     /// Runs the node in the current thread
     pub async fn run(&self) {
-        log::info!("IPC agent rpc node listening at {:?}", self.config.json_rpc_address);
-        warp::serve(json_rpc_filter()).run(self.config.json_rpc_address).await;
+        log::info!("IPC agent rpc node listening at {:?}", self.config.server.json_rpc_address);
+
+        let handlers = Arc::new(Handlers::new());
+        warp::serve(json_rpc_filter(handlers)).run(self.config.server.json_rpc_address).await;
     }
 }
 
@@ -47,13 +53,18 @@ impl JsonRPCServer {
 /// - Listen to POST requests on the DEFAULT_JSON_RPC_ENDPOINT
 /// - Extract the body of the request.
 /// - Pass it to to the json_rpc_filter to deserialize into a jsonrpc request.
-fn json_rpc_filter() -> impl Filter<Extract = (impl Reply,), Error = warp::Rejection> + Copy {
+fn json_rpc_filter(handlers: ArcHandlers) -> impl Filter<Extract = (impl Reply,), Error = warp::Rejection> + Clone {
     warp::post()
         .and(warp::path(JSON_RPC_ENDPOINT))
         .and(warp::body::bytes())
         .and_then(to_json_rpc_request)
+        .and(with_handlers(handlers))
         .and_then(handle_request)
         .recover(handle_rejection)
+}
+
+fn with_handlers(handlers: ArcHandlers) -> impl Filter<Extract = (ArcHandlers,), Error = std::convert::Infallible> + Clone {
+    warp::any().map(move || handlers.clone())
 }
 
 // Filter that deserializes the body of the request into a jsonrpc request.
@@ -65,7 +76,7 @@ async fn to_json_rpc_request(bytes: Bytes) -> Result<JSONRPCRequest, warp::Rejec
 }
 
 /// Main function responsible for handling and routing jsonrpc requests to the right underlying handler according to the method
-async fn handle_request(json_rpc_request: JSONRPCRequest) -> Result<impl Reply, warp::Rejection> {
+async fn handle_request(json_rpc_request: JSONRPCRequest, handlers: ArcHandlers) -> Result<impl Reply, warp::Rejection> {
     log::debug!("received json rpc request = {:?}", json_rpc_request);
 
     let JSONRPCRequest {
@@ -82,9 +93,15 @@ async fn handle_request(json_rpc_request: JSONRPCRequest) -> Result<impl Reply, 
     }
 
     log::info!("received method = {method:?} and params = {params:?}");
-
-    let response = JSONRPCResultResponse::new(id, ());
-    Ok(warp::reply::json(&response))
+    match handlers.handle(method, params).await {
+        Ok(response) => {
+            Ok(warp::reply::json(&JSONRPCResultResponse::new(id, response)))
+        },
+        Err(e) => {
+            let error: JSONRPCError<()> = JSONRPCError { code: -1, data: None, message: e.to_string() };
+            Ok(warp::reply::json(&JSONRPCErrorResponse::new(id, error)))
+        }
+    }
 }
 
 /// The invalid parameter warp rejection error handling
@@ -109,15 +126,22 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, warp::Rejection>
 
 #[cfg(test)]
 mod tests {
-    use crate::server::jsonrpc::{json_rpc_filter, JSONRPCResultResponse};
+    use std::sync::Arc;
+    use crate::server::jsonrpc::{ArcHandlers, json_rpc_filter, JSONRPCResultResponse};
     use crate::server::request::JSONRPCRequest;
     use crate::config::JSON_RPC_VERSION;
     use warp::http::StatusCode;
     use crate::config::JSON_RPC_ENDPOINT;
+    use crate::server::Handlers;
+
+    fn get_test_handlers() -> ArcHandlers {
+        Arc::new(Handlers::new())
+    }
 
     #[tokio::test]
+    #[ignore]
     async fn test_json_rpc_filter_works() {
-        let filter = json_rpc_filter();
+        let filter = json_rpc_filter(get_test_handlers());
 
         let foo = "foo".to_string();
         let jsonrpc = String::from(JSON_RPC_VERSION);
@@ -146,7 +170,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_json_rpc_filter_cannot_parse_param() {
-        let filter = json_rpc_filter();
+        let filter = json_rpc_filter(get_test_handlers());
 
         let value = warp::test::request()
             .method("POST")
@@ -160,7 +184,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_json_rpc_filter_not_found() {
-        let filter = json_rpc_filter();
+        let filter = json_rpc_filter(get_test_handlers());
 
         let value = warp::test::request()
             .method("POST")

@@ -20,9 +20,7 @@ impl CommandLineHandler for LaunchDaemon {
 
         log::debug!("launching json rpc server with args: {:?}", arguments);
 
-        let config = Config::from_file(&arguments.config_file)?.server;
-        log::info!("starting IPC-agent daemon at: {:}", config.json_rpc_address);
-
+        let config = Config::from_file(&arguments.config_file)?;
         let server = JsonRPCServer::new(config);
         server.run().await;
 

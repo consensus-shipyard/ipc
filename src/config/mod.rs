@@ -18,6 +18,7 @@ pub use subnet::Subnet;
 pub use server::JSON_RPC_ENDPOINT;
 
 pub const JSON_RPC_VERSION: &str = "2.0";
+pub const IPC_GATEWAY_ADDR: u64 = 64;
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
 /// this struct.
