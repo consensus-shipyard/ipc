@@ -39,6 +39,13 @@ pub enum Event {
 
     /// Event emitted when the last connection to a peer is closed.
     Disconnected(PeerId, Vec<Multiaddr>),
+
+    /// Event emitted when a peer is added or updated in the routing table,
+    /// which means if we later ask for its addresses, they should be known.
+    Added(PeerId, Vec<Multiaddr>),
+
+    /// Event emitted when a peer is removed from the routing table.
+    Removed(PeerId),
 }
 
 /// `Discovery` behaviour configuration.
@@ -274,19 +281,38 @@ impl NetworkBehaviour for Behaviour {
         // Poll Kademlia.
         while let Poll::Ready(ev) = self.inner.poll(cx, params) {
             match ev {
-                // Not propagating Kademlia specific events, just the ones meant for the Swarm.
-                // The Kademlia configuration should ensure that peers are added automatically to the bucket,
-                // without need for manual action, so this should be informational only.
-                // The only event which could be a warning is the `UnroutablePeer`; I don't fully understand
-                // under which conditions it can arise though. It might be a good idea to log that.
-                NetworkBehaviourAction::GenerateEvent(out) => {
-                    if let ev @ KademliaEvent::UnroutablePeer { .. } = out {
-                        debug!("unexpected Kademlia event: {ev:?}")
+                NetworkBehaviourAction::GenerateEvent(ev) => {
+                    match ev {
+                        // Not expecting unroutable peers
+                        KademliaEvent::UnroutablePeer { .. } => {
+                            debug!("unexpected Kademlia event: {ev:?}")
+                        }
+                        // Information only.
+                        KademliaEvent::InboundRequest { .. }
+                        | KademliaEvent::OutboundQueryProgressed { .. } => {}
+                        // The config ensures peers are added to the table if there's room.
+                        // We're not emitting these as known peers because the address will probably not be returned by `addresses_of_peer`,
+                        // so the outside service would have to keep track, which is not what we want.
+                        KademliaEvent::PendingRoutablePeer { .. }
+                        | KademliaEvent::RoutablePeer { .. } => {}
+                        // This event should ensure that we will be able to answer address lookups later.
+                        KademliaEvent::RoutingUpdated {
+                            peer,
+                            addresses,
+                            old_peer,
+                            ..
+                        } => {
+                            // There are two events here; we can only return one, so let's defer them to the outbox.
+                            if let Some(peer_id) = old_peer {
+                                self.outbox.push_back(Event::Removed(peer_id))
+                            }
+                            self.outbox
+                                .push_back(Event::Added(peer, addresses.into_vec()))
+                        }
                     }
-                    continue;
                 }
                 other => {
-                    return Poll::Ready(other.map_out(|_| unreachable!("continue'd")));
+                    return Poll::Ready(other.map_out(|_| unreachable!("already handled")));
                 }
             }
         }
