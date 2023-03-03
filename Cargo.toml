@@ -22,7 +22,7 @@ futures-util = { version = "0.3", default-features = false, features = ["sink", 
 indoc = "2.0.0"
 log = { workspace = true }
 reqwest = { version = "0.11.13", features = ["json"] }
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1.0.91"
 cid = { version = "0.8.3", default-features = false, features = ["serde-codec"] }
 tokio = { workspace = true }
@@ -50,11 +50,15 @@ fvm_ipld_encoding = { workspace = true }
 
 [workspace.dependencies]
 anyhow = "1.0"
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 tokio = { version = "1.16", features = ["full"] }
-log = "0.4"
+quickcheck = "1"
+quickcheck_macros = "1"
 
-fvm_ipld_encoding = "0.3.3"
+
+fvm_ipld_encoding = "0.3"
 fvm_shared = { version = "=3.0.0-alpha.17", default-features = false }
 fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", features = ["fil-actor"] }
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git" }

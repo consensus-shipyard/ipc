@@ -12,7 +12,39 @@ license-file.workspace = true
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-libp2p = { version = "0.50", default-features = false, features = ["gossipsub", "kad", "identify", "ping", "noise", "yamux", "tcp", "dns", "mplex", "request-response", "metrics", "tokio", "macros"] }
+libp2p = { version = "0.50", default-features = false, features = [
+  "gossipsub",
+  "kad",
+  "identify",
+  "ping",
+  "noise",
+  "yamux",
+  "tcp",
+  "dns",
+  "mplex",
+  "request-response",
+  "metrics",
+  "tokio",
+  "macros",
+  "serde",
+  "secp256k1",
+] }
 libp2p-bitswap = "0.25"
 libipld = { workspace = true }
 log = { workspace = true }
+serde = { workspace = true }
+quickcheck = { workspace = true, optional = true }
+
+ipc-sdk = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_shared = { workspace = true, optional = true }
+
+[dev-dependencies]
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
+fvm_shared = { workspace = true, features = ["arb"] }
+
+
+[features]
+default = ["arb"]
+arb = ["quickcheck", "fvm_shared/arb"]
