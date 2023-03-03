@@ -10,7 +10,7 @@ use std::{
 };
 
 use libp2p::{
-    core::{connection::ConnectionId, identity::PublicKey},
+    core::connection::ConnectionId,
     kad::{
         handler::KademliaHandlerProto, store::MemoryStore, Kademlia, KademliaConfig, KademliaEvent,
         QueryId,
@@ -25,8 +25,9 @@ use libp2p::{
     Multiaddr, PeerId,
 };
 use log::debug;
-use thiserror::Error;
 use tokio::time::Interval;
+
+use super::NetworkConfig;
 
 // NOTE: The Discovery behaviour is largely based on what exists in Forest. If it ain't broken...
 // NOTE: Not sure if emitting events is going to be useful yet, but for now it's an example of having one.
@@ -48,22 +49,20 @@ pub enum Event {
     Removed(PeerId),
 }
 
-/// `Discovery` behaviour configuration.
+/// Configuration for [`discovery::Behaviour`].
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Our own peer ID, needed to bootstrap Kademlia.
-    local_peer_id: PeerId,
-    /// Static list of addresses to bootstrap from.
-    user_defined: Vec<(PeerId, Multiaddr)>,
+    /// Custom nodes which never expire, e.g. bootstrap or reserved nodes.
+    ///
+    /// The addresses must end with a `/p2p/<peer-id>` part.
+    pub static_addresses: Vec<Multiaddr>,
     /// Number of connections at which point we pause further discovery lookups.
-    target_connections: usize,
+    pub target_connections: usize,
     /// Option to disable Kademlia, for example in a fixed static network.
-    enable_kademlia: bool,
-    /// Name of the network in the Kademlia protocol.
-    network_name: String,
+    pub enable_kademlia: bool,
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ConfigError {
     #[error("invalid network: {0}")]
     InvalidNetwork(String),
@@ -73,65 +72,6 @@ pub enum ConfigError {
     NoBootstrapAddress,
 }
 
-pub struct ConfigBuilder(Config);
-
-impl ConfigBuilder {
-    /// Create a default configuration with the given public key.
-    pub fn new(local_public_key: PublicKey, network_name: String) -> Result<Self, ConfigError> {
-        if network_name.is_empty() {
-            Err(ConfigError::InvalidNetwork(network_name))
-        } else {
-            Ok(Self(Config {
-                local_peer_id: local_public_key.to_peer_id(),
-                user_defined: Vec::new(),
-                target_connections: usize::MAX,
-                enable_kademlia: true,
-                network_name,
-            }))
-        }
-    }
-
-    /// Set the number of active connections at which we pause discovery.
-    pub fn with_max_connections(&mut self, limit: usize) -> &mut Self {
-        self.0.target_connections = limit;
-        self
-    }
-
-    /// Set custom nodes which never expire, e.g. bootstrap or reserved nodes.
-    ///
-    /// The addresses must end with a `/p2p/<peer-id>` part.
-    pub fn with_user_defined<I>(&mut self, user_defined: I) -> Result<&mut Self, ConfigError>
-    where
-        I: IntoIterator<Item = Multiaddr>,
-    {
-        for multiaddr in user_defined {
-            let mut addr = multiaddr.clone();
-            if let Some(Protocol::P2p(mh)) = addr.pop() {
-                let peer_id = PeerId::from_multihash(mh).unwrap();
-                self.0.user_defined.push((peer_id, addr))
-            } else {
-                return Err(ConfigError::InvalidBootstrapAddress(multiaddr));
-            }
-        }
-        Ok(self)
-    }
-
-    /// Configures if Kademlia is enabled.
-    pub fn with_kademlia(&mut self, value: bool) -> &mut Self {
-        self.0.enable_kademlia = value;
-        self
-    }
-
-    /// Finish configuration and do a final check.
-    pub fn build(self) -> Result<Config, ConfigError> {
-        if self.0.enable_kademlia && self.0.user_defined.is_empty() {
-            Err(ConfigError::NoBootstrapAddress)
-        } else {
-            Ok(self.0)
-        }
-    }
-}
-
 /// Discovery behaviour, periodically running a random lookup with Kademlia to find new peers.
 ///
 /// Our other option for peer discovery would be to rely on the Peer Exchange of Gossipsub.
@@ -139,7 +79,7 @@ impl ConfigBuilder {
 pub struct Behaviour {
     /// User-defined list of nodes and their addresses.
     /// Typically includes bootstrap nodes, or it can be used for a static network.
-    user_defined: Vec<(PeerId, Multiaddr)>,
+    static_addresses: Vec<(PeerId, Multiaddr)>,
     /// Kademlia behaviour, if enabled.
     inner: Toggle<Kademlia<MemoryStore>>,
     /// Number of current connections.
@@ -153,39 +93,54 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    /// Create a [`discovery::Behaviour`] from this configuration.
-    pub fn new(config: Config) -> Self {
-        let kademlia_opt = if config.enable_kademlia {
+    /// Create a [`discovery::Behaviour`] from the configuration.
+    pub fn new(nc: NetworkConfig, dc: Config) -> Result<Self, ConfigError> {
+        if nc.network_name.is_empty() {
+            return Err(ConfigError::InvalidNetwork(nc.network_name));
+        }
+        // Parse static addresses.
+        let mut static_addresses = Vec::new();
+        for multiaddr in dc.static_addresses {
+            let mut addr = multiaddr.clone();
+            if let Some(Protocol::P2p(mh)) = addr.pop() {
+                let peer_id = PeerId::from_multihash(mh).unwrap();
+                static_addresses.push((peer_id, addr))
+            } else {
+                return Err(ConfigError::InvalidBootstrapAddress(multiaddr));
+            }
+        }
+
+        let kademlia_opt = if dc.enable_kademlia {
             let mut kad_config = KademliaConfig::default();
-            let protocol_name = format!("/ipc/kad/{}/kad/1.0.0", config.network_name);
+            let protocol_name = format!("/ipc/{}/kad/1.0.0", nc.network_name);
             kad_config.set_protocol_names(vec![Cow::Owned(protocol_name.as_bytes().to_vec())]);
 
-            let store = MemoryStore::new(config.local_peer_id);
+            let store = MemoryStore::new(nc.local_peer_id());
 
-            let mut kademlia = Kademlia::with_config(config.local_peer_id, store, kad_config);
+            let mut kademlia = Kademlia::with_config(nc.local_peer_id(), store, kad_config);
 
-            for (peer_id, addr) in config.user_defined.iter() {
+            for (peer_id, addr) in static_addresses.iter() {
                 kademlia.add_address(peer_id, addr.clone());
             }
 
             // This shouldn't happen, we already checked the config.
             kademlia
                 .bootstrap()
-                .unwrap_or_else(|e| panic!("Kademlia bootstrap failed: {}", e));
+                .map_err(|_| ConfigError::NoBootstrapAddress)?;
 
             Some(kademlia)
         } else {
             None
         };
 
-        Self {
-            user_defined: config.user_defined,
+        Ok(Self {
+            static_addresses,
             inner: kademlia_opt.into(),
             lookup_interval: tokio::time::interval(Duration::from_secs(1)),
             outbox: VecDeque::new(),
             num_connections: 0,
-            target_connections: config.target_connections,
-        }
+            target_connections: dc.target_connections,
+        })
     }
 
     /// Lookup a peer, unless we already know their address, so that we have a chance to connect to them later.
@@ -209,7 +164,7 @@ impl NetworkBehaviour for Behaviour {
 
     fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
         let mut addrs = self
-            .user_defined
+            .static_addresses
             .iter()
             .filter(|(p, _)| p == peer_id)
             .map(|(_, a)| a.clone())
