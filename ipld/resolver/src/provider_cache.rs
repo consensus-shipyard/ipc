@@ -26,6 +26,10 @@ pub struct SubnetProviderCache {
     /// reaches this value, we remove the subnet with the smallest number of providers;
     /// hopefully this would be a subnet
     max_subnets: usize,
+    /// User defined list of subnets which will never be pruned. This can be used to
+    /// ward off attacks that would prevent us from adding subnets we know we want to
+    /// support, and not rely on dynamic discovery of their peers.
+    pinned_subnets: HashSet<SubnetID>,
     /// Set of peers with known addresses. Only such peers can be added to the cache.
     routable_peers: HashSet<PeerId>,
     /// List of peer IDs supporting each subnet.
@@ -35,13 +39,24 @@ pub struct SubnetProviderCache {
 }
 
 impl SubnetProviderCache {
-    pub fn new(max_subnets: usize) -> Self {
+    pub fn new(max_subnets: usize, static_subnets: Vec<SubnetID>) -> Self {
         Self {
+            pinned_subnets: HashSet::from_iter(static_subnets.into_iter()),
             max_subnets,
             routable_peers: Default::default(),
             subnet_providers: Default::default(),
             peer_timestamps: Default::default(),
         }
+    }
+
+    /// Pin a subnet, after which it won't be pruned.
+    pub fn pin_subnet(&mut self, subnet_id: SubnetID) {
+        self.pinned_subnets.insert(subnet_id);
+    }
+
+    /// Unpin a subnet, which allows it to be pruned.
+    pub fn unpin_subnet(&mut self, subnet_id: &SubnetID) {
+        self.pinned_subnets.remove(subnet_id);
     }
 
     /// Mark a peer as routable.
@@ -128,9 +143,15 @@ impl SubnetProviderCache {
 
             counts.sort_by_key(|(_, count)| *count);
 
-            for (subnet_id, _) in counts.into_iter().take(to_prune) {
+            for (subnet_id, _) in counts {
+                if self.pinned_subnets.contains(&subnet_id) {
+                    continue;
+                }
                 self.subnet_providers.remove(&subnet_id);
                 removed_subnet_ids.insert(subnet_id);
+                if removed_subnet_ids.len() == to_prune {
+                    break;
+                }
             }
         }
 
@@ -279,7 +300,7 @@ mod tests {
     #[quickcheck]
     fn prop_subnets_pruned(records: TestRecords, max_subnets: usize) -> bool {
         let max_subnets = max_subnets % 10;
-        let mut cache = SubnetProviderCache::new(max_subnets);
+        let mut cache = SubnetProviderCache::new(max_subnets, Vec::new());
         for record in records.0 {
             cache.set_routable(record.peer_id);
             if cache.add_provider(&record).is_none() {
@@ -290,9 +311,36 @@ mod tests {
     }
 
     #[quickcheck]
+    fn prop_subnets_pinned(records: TestRecords) -> Result<(), String> {
+        // Find two subnets to pin.
+        let providers = build_providers(&records.0);
+        if providers.len() < 2 {
+            return Ok(());
+        }
+
+        let subnets = providers.keys().take(2).collect::<Vec<_>>();
+
+        let mut cache = SubnetProviderCache::new(3, vec![subnets[0].clone()]);
+        cache.pin_subnet(subnets[1].clone());
+
+        for record in records.0 {
+            cache.set_routable(record.peer_id);
+            cache.add_provider(&record);
+        }
+
+        if !cache.subnet_providers.contains_key(subnets[0]) {
+            return Err("static subnet not found".into());
+        }
+        if !cache.subnet_providers.contains_key(subnets[1]) {
+            return Err("pinned subnet not found".into());
+        }
+        Ok(())
+    }
+
+    #[quickcheck]
     fn prop_providers_listed(records: TestRecords) -> Result<(), String> {
         let records = records.0;
-        let mut cache = SubnetProviderCache::new(usize::MAX);
+        let mut cache = SubnetProviderCache::new(usize::MAX, Vec::new());
 
         for record in records.iter() {
             cache.set_routable(record.peer_id);
@@ -310,7 +358,7 @@ mod tests {
         cutoff_timestamp: Timestamp,
     ) -> Result<(), String> {
         let mut records = records.0;
-        let mut cache = SubnetProviderCache::new(usize::MAX);
+        let mut cache = SubnetProviderCache::new(usize::MAX, Vec::new());
         for record in records.iter() {
             cache.set_routable(record.peer_id);
             cache.add_provider(record);

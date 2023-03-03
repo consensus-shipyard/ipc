@@ -12,3 +12,5 @@ mod service;
 
 #[cfg(any(test, feature = "arb"))]
 mod arb;
+
+mod hash;

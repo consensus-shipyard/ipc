@@ -1,11 +1,33 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use libipld::store::StoreParams;
-use libp2p::{identify, ping, swarm::NetworkBehaviour};
+use libp2p::{
+    identify,
+    identity::{Keypair, PublicKey},
+    ping,
+    swarm::NetworkBehaviour,
+    PeerId,
+};
 use libp2p_bitswap::Bitswap;
 
 mod discovery;
 mod membership;
+
+pub struct NetworkConfig {
+    /// Cryptographic key used to sign messages.
+    pub local_key: Keypair,
+    /// Network name to be differentiate this peer group.
+    pub network_name: String,
+}
+
+impl NetworkConfig {
+    pub fn local_public_key(&self) -> PublicKey {
+        self.local_key.public()
+    }
+    pub fn local_peer_id(&self) -> PeerId {
+        self.local_public_key().to_peer_id()
+    }
+}
 
 /// Libp2p behaviour to manage content resolution from other subnets, using:
 ///
