@@ -7,7 +7,6 @@ use clap::Args;
 use std::fmt::Debug;
 
 use crate::cli::CommandLineHandler;
-use crate::config::Config;
 use crate::server::jsonrpc::JsonRPCServer;
 
 /// The command to start the ipc agent json rpc server in the foreground.
@@ -22,9 +21,8 @@ impl CommandLineHandler for LaunchDaemon {
 
         log::debug!("launching json rpc server with args: {:?}", arguments);
 
-        let config = Config::from_file(&arguments.config_file)?;
-        let server = JsonRPCServer::new(config);
-        server.run().await;
+        let server = JsonRPCServer::from_config_path(&arguments.config_file)?;
+        server.run().await?;
 
         Ok(())
     }
