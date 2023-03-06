@@ -5,6 +5,7 @@
 mod config;
 pub mod create;
 
+use crate::config::json_rpc_methods;
 use crate::config::ReloadableConfig;
 use crate::server::create::CreateSubnetHandler;
 use crate::server::handlers::config::ReloadConfigHandler;
@@ -42,14 +43,14 @@ impl Handlers {
         let mut handlers = HashMap::new();
 
         let create_subnet = HandlerWrapper::CreateSubnet(CreateSubnetHandler {});
-        handlers.insert(String::from("create_subnet"), create_subnet);
+        handlers.insert(String::from(json_rpc_methods::CREATE_SUBNET), create_subnet);
 
         let config = ReloadableConfig::new(config_path_string.clone())?;
         let reload_config = HandlerWrapper::ReloadConfig(ReloadConfigHandler::new(
             Arc::new(config),
             config_path_string,
         ));
-        handlers.insert(String::from("reload_config"), reload_config);
+        handlers.insert(String::from(json_rpc_methods::RELOAD_CONFIG), reload_config);
 
         Ok(Self { handlers })
     }

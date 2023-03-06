@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 //! This mod contains the different command line implementations.
 
+mod create;
 mod daemon;
 
+use crate::cli::commands::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
-use crate::cli::CommandLineHandler;
+use crate::cli::{CommandLineHandler, GlobalArguments};
 use clap::{Parser, Subcommand};
 use std::fmt::Debug;
 
@@ -19,13 +21,20 @@ enum Commands {
     /// and not in the background as what daemon processes are. Still, this struct contains `Daemon`
     /// due to the convention from `lotus` and the expected behavior from the filecoin user group.
     Daemon(LaunchDaemonArgs),
+    CreateSubnet(CreateSubnetArgs),
 }
 
 /// The overall command line struct to be used by `clap`.
 #[derive(Debug, Parser)]
-#[command(name = "ipc", about = "The IPC agent command line tool")]
+#[command(
+    name = "ipc",
+    about = "The IPC agent command line tool",
+    version = "v0.0.1"
+)]
 #[command(propagate_version = true)]
 struct IPCAgentCliCommands {
+    #[clap(flatten)]
+    global_params: GlobalArguments,
     #[command(subcommand)]
     command: Commands,
 }
@@ -62,8 +71,10 @@ pub async fn cli() {
     // parse the arguments
     let args = IPCAgentCliCommands::parse();
 
+    let global = &args.global_params;
     let r = match &args.command {
-        Commands::Daemon(args) => LaunchDaemon::handle(args).await,
+        Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
+        Commands::CreateSubnet(args) => CreateSubnet::handle(global, args).await,
     };
 
     if let Err(e) = r {

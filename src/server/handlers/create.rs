@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateSubnetParams {
     pub parent: String,
     pub name: String,
@@ -17,7 +17,7 @@ pub struct CreateSubnetParams {
     pub check_period: ChainEpoch,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateSubnetResponse {
     /// The address of the created subnet
     pub address: String,
