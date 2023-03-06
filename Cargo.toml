@@ -48,6 +48,9 @@ ipc-subnet-actor = { workspace = true }
 ipc-gateway = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 
+[dev-dependencies]
+tempfile = "3.4.0"
+
 [workspace.dependencies]
 anyhow = "1.0"
 log = "0.4"
