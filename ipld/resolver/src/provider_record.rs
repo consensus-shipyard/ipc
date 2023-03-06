@@ -38,7 +38,7 @@ impl Sub<Duration> for Timestamp {
     type Output = Self;
 
     fn sub(self, rhs: Duration) -> Self {
-        Self(self.0.saturating_sub(rhs.as_secs()))
+        Self(self.as_secs().saturating_sub(rhs.as_secs()))
     }
 }
 
@@ -46,7 +46,7 @@ impl Add<Duration> for Timestamp {
     type Output = Self;
 
     fn add(self, rhs: Duration) -> Self {
-        Self(self.0.saturating_add(rhs.as_secs()))
+        Self(self.as_secs().saturating_add(rhs.as_secs()))
     }
 }
 
@@ -128,14 +128,6 @@ impl SignedProviderRecord {
         Ok(signed_record)
     }
 
-    pub fn record(&self) -> &ProviderRecord {
-        &self.record
-    }
-
-    pub fn envelope(&self) -> &SignedEnvelope {
-        &self.envelope
-    }
-
     pub fn into_record(self) -> ProviderRecord {
         self.record
     }
@@ -206,7 +198,7 @@ mod tests {
 
     #[quickcheck]
     fn prop_roundtrip(signed_record: SignedProviderRecord) -> bool {
-        let envelope_bytes = signed_record.envelope().clone().into_protobuf_encoding();
+        let envelope_bytes = signed_record.envelope.into_protobuf_encoding();
 
         let envelope =
             SignedEnvelope::from_protobuf_encoding(&envelope_bytes).expect("envelope roundtrip");
@@ -219,7 +211,7 @@ mod tests {
 
     #[quickcheck]
     fn prop_tamper_proof(signed_record: SignedProviderRecord, idx: usize) -> bool {
-        let mut envelope_bytes = signed_record.envelope().clone().into_protobuf_encoding();
+        let mut envelope_bytes = signed_record.envelope.into_protobuf_encoding();
         // Do some kind of mutation to a random byte in the envelope; after that it should not validate.
         let idx = idx % envelope_bytes.len();
         envelope_bytes[idx] = u8::MAX - envelope_bytes[idx];

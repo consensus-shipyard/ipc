@@ -12,7 +12,9 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapStore, QueryId};
+use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapStore};
+
+pub type QueryId = libp2p_bitswap::QueryId;
 
 // Not much to do here, just hiding the `Progress` event as I don't think we'll need it.
 // We can't really turn it into anything more meaningful; the outer Service, which drives

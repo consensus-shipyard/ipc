@@ -8,11 +8,16 @@ use libp2p::{
     swarm::NetworkBehaviour,
     PeerId,
 };
+use libp2p_bitswap::BitswapStore;
 
-mod content;
-mod discovery;
-mod membership;
+pub mod content;
+pub mod discovery;
+pub mod membership;
 
+pub use discovery::Config as DiscoveryConfig;
+pub use membership::Config as MembershipConfig;
+
+#[derive(Clone, Debug)]
 pub struct NetworkConfig {
     /// Cryptographic key used to sign messages.
     pub local_key: Keypair,
@@ -29,22 +34,65 @@ impl NetworkConfig {
     }
 }
 
-/// Libp2p behaviour to manage content resolution from other subnets, using:
+#[derive(thiserror::Error, Debug)]
+pub enum ConfigError {
+    #[error("Error in the discovery configuration")]
+    Discovery(#[from] discovery::ConfigError),
+    #[error("Error in the membership configuration")]
+    Membership(#[from] membership::ConfigError),
+}
+
+/// Libp2p behaviour bundle to manage content resolution from other subnets, using:
 ///
 /// * Kademlia for peer discovery
 /// * Gossipsub to advertise subnet membership
 /// * Bitswap to resolve CIDs
 #[derive(NetworkBehaviour)]
-pub struct IpldResolver<P: StoreParams> {
+pub struct Behaviour<P: StoreParams> {
     ping: ping::Behaviour,
     identify: identify::Behaviour,
     discovery: discovery::Behaviour,
     membership: membership::Behaviour,
-    bitswap: content::Behaviour<P>,
+    content: content::Behaviour<P>,
 }
 
 // Unfortunately by using `#[derive(NetworkBehaviour)]` we cannot easily inspects events
 // from the inner behaviours, e.g. we cannot poll a behaviour and if it returns something
-// of interest then call a method on another behaviour. We can do this in another wrapper
+// of interest then call a method on another behaviour. We can do this in yet another wrapper
 // where we manually implement `NetworkBehaviour`, or the outer service where we drive the
-// Swarm; there we are free to call any of the behaviours.
+// Swarm; there we are free to call any of the behaviours as well as the Swarm.
+
+impl<P: StoreParams> Behaviour<P> {
+    pub fn new<S>(
+        nc: NetworkConfig,
+        dc: DiscoveryConfig,
+        mc: MembershipConfig,
+        store: S,
+    ) -> Result<Self, ConfigError>
+    where
+        S: BitswapStore<Params = P>,
+    {
+        Ok(Self {
+            ping: Default::default(),
+            identify: identify::Behaviour::new(identify::Config::new(
+                "ipfs/0.1.0".into(),
+                nc.local_public_key(),
+            )),
+            discovery: discovery::Behaviour::new(nc.clone(), dc)?,
+            membership: membership::Behaviour::new(nc, mc)?,
+            content: content::Behaviour::new(store),
+        })
+    }
+
+    pub fn discovery_mut(&mut self) -> &mut discovery::Behaviour {
+        &mut self.discovery
+    }
+
+    pub fn membership_mut(&mut self) -> &mut membership::Behaviour {
+        &mut self.membership
+    }
+
+    pub fn content_mut(&mut self) -> &mut content::Behaviour<P> {
+        &mut self.content
+    }
+}

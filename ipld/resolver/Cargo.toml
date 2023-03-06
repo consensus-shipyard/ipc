@@ -11,6 +11,7 @@ license-file.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 blake2b_simd = { workspace = true }
+bloom = "0.3"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 libp2p = { version = "0.50", default-features = false, features = [
