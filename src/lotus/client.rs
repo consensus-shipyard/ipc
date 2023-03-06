@@ -16,9 +16,13 @@ use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
-use crate::jsonrpc::{JsonRpcClient, NO_PARAMS};
+use crate::config::Subnet;
+use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 use crate::lotus::message::chain::ChainHeadResponse;
-use crate::lotus::message::ipc::IPCGetPrevCheckpointForChildResponse;
+use crate::lotus::message::ipc::{
+    IPCGetPrevCheckpointForChildResponse, IPCReadGatewayStateResponse,
+    IPCReadSubnetActorStateResponse,
+};
 use crate::lotus::message::mpool::{
     MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
@@ -41,6 +45,8 @@ mod methods {
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
     pub const IPC_GET_PREV_CHECKPOINT_FOR_CHILD: &str = "Filecoin.IPCGetPrevCheckpointForChild";
     pub const IPC_GET_CHECKPOINT_TEMPLATE: &str = "Filecoin.IPCGetCheckpointTemplate";
+    pub const IPC_READ_GATEWAY_STATE: &str = "Filecoin.IPCReadGatewayState";
+    pub const IPC_READ_SUBNET_ACTOR_STATE: &str = "Filecoin.IPCReadSubnetActorState";
 }
 
 /// The default gateway actor address
@@ -269,5 +275,41 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             )
             .await?;
         Ok(r)
+    }
+
+    async fn ipc_read_gateway_state(&self, tip_set: Cid) -> Result<IPCReadGatewayStateResponse> {
+        let params = json!([GATEWAY_ACTOR_ADDRESS, [CIDMap::from(tip_set)]]);
+        let r = self
+            .client
+            .request::<IPCReadGatewayStateResponse>(methods::IPC_READ_GATEWAY_STATE, params)
+            .await?;
+        Ok(r)
+    }
+
+    async fn ipc_read_subnet_actor_state(
+        &self,
+        tip_set: Cid,
+    ) -> Result<IPCReadSubnetActorStateResponse> {
+        let params = json!([GATEWAY_ACTOR_ADDRESS, [CIDMap::from(tip_set)]]);
+        let r = self
+            .client
+            .request::<IPCReadSubnetActorStateResponse>(
+                methods::IPC_READ_SUBNET_ACTOR_STATE,
+                params,
+            )
+            .await?;
+        Ok(r)
+    }
+}
+
+impl LotusJsonRPCClient<JsonRpcClientImpl> {
+    /// A constructor that returns a `LotusJsonRPCClient` from a `Subnet`. The returned
+    /// `LotusJsonRPCClient` makes requests to the URL defined in the `Subnet`.
+    #[allow(dead_code)]
+    pub(crate) fn from_subnet(subnet: &Subnet) -> Self {
+        let url = subnet.jsonrpc_api_http.clone();
+        let auth_token = subnet.auth_token.as_deref();
+        let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token);
+        LotusJsonRPCClient::new(jsonrpc_client)
     }
 }

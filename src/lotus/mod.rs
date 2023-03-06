@@ -18,7 +18,10 @@ use message::mpool::{MpoolPushMessage, MpoolPushMessageResponseInner};
 use message::state::{ReadStateResponse, StateWaitMsgResponse};
 use message::wallet::{WalletKeyType, WalletListResponse};
 
-use crate::lotus::message::ipc::IPCGetPrevCheckpointForChildResponse;
+use crate::lotus::message::ipc::{
+    IPCGetPrevCheckpointForChildResponse, IPCReadGatewayStateResponse,
+    IPCReadSubnetActorStateResponse,
+};
 
 pub mod client;
 pub mod message;
@@ -78,5 +81,15 @@ pub trait LotusClient {
         child_subnet_id: SubnetID,
     ) -> Result<IPCGetPrevCheckpointForChildResponse>;
 
+    /// Returns the checkpoint template at `epoch`.
     async fn ipc_get_checkpoint_template(&self, epoch: ChainEpoch) -> Result<Checkpoint>;
+
+    /// Returns the state of the gateway actor at `tip_set`.
+    async fn ipc_read_gateway_state(&self, tip_set: Cid) -> Result<IPCReadGatewayStateResponse>;
+
+    /// Returns the state of the subnet actor at `tip_set`.
+    async fn ipc_read_subnet_actor_state(
+        &self,
+        tip_set: Cid,
+    ) -> Result<IPCReadSubnetActorStateResponse>;
 }

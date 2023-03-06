@@ -7,7 +7,7 @@
 
 mod deserialize;
 mod server;
-mod subnet;
+pub mod subnet;
 
 use std::collections::HashMap;
 use std::fs;
