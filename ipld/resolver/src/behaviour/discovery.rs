@@ -98,6 +98,7 @@ impl Behaviour {
         if nc.network_name.is_empty() {
             return Err(ConfigError::InvalidNetwork(nc.network_name));
         }
+
         // Parse static addresses.
         let mut static_addresses = Vec::new();
         for multiaddr in dc.static_addresses {
@@ -133,11 +134,19 @@ impl Behaviour {
             None
         };
 
+        let mut outbox = VecDeque::new();
+
+        // It would be nice to use `.group_by` here but it's unstable.
+        // Make sure static peers are reported as routable.
+        for (peer_id, addr) in static_addresses.iter() {
+            outbox.push_back(Event::Added(*peer_id, vec![addr.clone()]))
+        }
+
         Ok(Self {
             static_addresses,
             inner: kademlia_opt.into(),
             lookup_interval: tokio::time::interval(Duration::from_secs(1)),
-            outbox: VecDeque::new(),
+            outbox,
             num_connections: 0,
             target_connections: dc.target_connections,
         })
@@ -150,6 +159,11 @@ impl Behaviour {
                 kademlia.get_closest_peers(peer_id);
             }
         }
+    }
+
+    /// Check if a peer has a user defined addresses.
+    fn is_static(&self, peer_id: PeerId) -> bool {
+        self.static_addresses.iter().any(|(id, _)| *id == peer_id)
     }
 }
 
@@ -259,7 +273,9 @@ impl NetworkBehaviour for Behaviour {
                         } => {
                             // There are two events here; we can only return one, so let's defer them to the outbox.
                             if let Some(peer_id) = old_peer {
-                                self.outbox.push_back(Event::Removed(peer_id))
+                                if self.is_static(peer_id) {
+                                    self.outbox.push_back(Event::Removed(peer_id))
+                                }
                             }
                             self.outbox
                                 .push_back(Event::Added(peer, addresses.into_vec()))

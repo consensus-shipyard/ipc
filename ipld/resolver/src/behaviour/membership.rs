@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use ipc_sdk::subnet_id::SubnetID;
 use libp2p::core::connection::ConnectionId;
+use libp2p::gossipsub::error::SubscriptionError;
 use libp2p::gossipsub::{
     GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, IdentTopic, MessageAuthenticity,
     MessageId, Topic,
@@ -35,7 +36,7 @@ const PUBSUB_MEMBERSHIP: &str = "/ipc/membership";
 #[derive(Debug)]
 pub enum Event {
     /// Indicate a change in the subnets a peer is known to support.
-    Updated((PeerId, ProviderDelta)),
+    Updated(PeerId, ProviderDelta),
 
     /// Indicate that we no longer treat a peer as routable and removed all their supported subnet associations.
     Removed(PeerId),
@@ -47,6 +48,7 @@ pub enum Event {
 }
 
 /// Configuration for [`membership::Behaviour`].
+#[derive(Clone, Debug)]
 pub struct Config {
     /// User defined list of subnets which will never be pruned from the cache.
     pub static_subnets: Vec<SubnetID>,
@@ -64,6 +66,8 @@ pub enum ConfigError {
     InvalidNetwork(String),
     #[error("invalid gossipsub config: {0}")]
     InvalidGossipsubConfig(String),
+    #[error("error subscribing to topic")]
+    Subscription(#[from] SubscriptionError),
 }
 
 /// A [`NetworkBehaviour`] internally using [`Gossipsub`] to learn which
@@ -122,6 +126,9 @@ impl Behaviour {
             )
             .map_err(ConfigError::InvalidGossipsubConfig)?;
 
+        // Subscribe to the topic.
+        gossipsub.subscribe(&membership_topic)?;
+
         // Don't publish immediately, it's empty. Let the creator call `set_subnet_ids` to trigger initially.
         let mut interval = tokio::time::interval(mc.publish_interval);
         interval.reset();
@@ -171,6 +178,11 @@ impl Behaviour {
         self.provider_cache.pin_subnet(subnet_id)
     }
 
+    /// Make a subnet pruneable.
+    pub fn unpin_subnet(&mut self, subnet_id: &SubnetID) {
+        self.provider_cache.unpin_subnet(subnet_id)
+    }
+
     /// Send a message through Gossipsub to let everyone know about the current configuration.
     fn publish_membership(&mut self) -> anyhow::Result<()> {
         let record = SignedProviderRecord::new(&self.local_key, self.subnet_ids.clone())?;
@@ -211,7 +223,7 @@ impl Behaviour {
                 Ok(record) => match self.provider_cache.add_provider(&record) {
                     None => return Some(Event::Skipped(record.peer_id)),
                     Some(d) if d.is_empty() => return None,
-                    Some(d) => return Some(Event::Updated((record.peer_id, d))),
+                    Some(d) => return Some(Event::Updated(record.peer_id, d)),
                 },
                 Err(e) => {
                     warn!(
