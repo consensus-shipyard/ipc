@@ -125,6 +125,8 @@ fn config_str() -> String {
         r#"
             [server]
             json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
+            network = 0
+
             [subnets]
             [subnets.root]
             id = "{ROOT_ID}"
@@ -145,6 +147,8 @@ fn config_str_diff_addr() -> String {
         r#"
             [server]
             json_rpc_address = "127.0.0.1:3031"
+            network = 0
+
             [subnets]
             [subnets.root]
             id = "{ROOT_ID}"
@@ -165,6 +169,7 @@ fn read_config() -> Config {
         r#"
             [server]
             json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
+            network = 0
 
             [subnets]
 

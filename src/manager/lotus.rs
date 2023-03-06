@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 
+use crate::config::Subnet;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -12,7 +13,7 @@ use ipc_gateway::Checkpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
-use crate::jsonrpc::JsonRpcClient;
+use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
@@ -174,5 +175,12 @@ impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
         cid_map
             .remove(MANIFEST_ID)
             .ok_or_else(|| anyhow!("actor cid not found"))
+    }
+}
+
+impl LotusSubnetManager<JsonRpcClientImpl> {
+    pub fn from_subnet(subnet: &Subnet) -> Self {
+        let client = LotusJsonRPCClient::from_subnet(subnet);
+        LotusSubnetManager::new(client)
     }
 }

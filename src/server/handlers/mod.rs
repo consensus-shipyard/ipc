@@ -4,11 +4,13 @@
 
 mod config;
 pub mod create;
+mod subnet;
 
 use crate::config::json_rpc_methods;
 use crate::config::ReloadableConfig;
 use crate::server::create::CreateSubnetHandler;
 use crate::server::handlers::config::ReloadConfigHandler;
+use crate::server::handlers::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
 pub use create::{CreateSubnetParams, CreateSubnetResponse};
@@ -42,15 +44,20 @@ impl Handlers {
     pub fn new(config_path_string: String) -> Result<Self> {
         let mut handlers = HashMap::new();
 
-        let create_subnet = HandlerWrapper::CreateSubnet(CreateSubnetHandler {});
-        handlers.insert(String::from(json_rpc_methods::CREATE_SUBNET), create_subnet);
+        let config = Arc::new(ReloadableConfig::new(config_path_string.clone())?);
+        handlers.insert(
+            String::from(json_rpc_methods::RELOAD_CONFIG),
+            HandlerWrapper::ReloadConfig(ReloadConfigHandler::new(
+                config.clone(),
+                config_path_string,
+            )),
+        );
 
-        let config = ReloadableConfig::new(config_path_string.clone())?;
-        let reload_config = HandlerWrapper::ReloadConfig(ReloadConfigHandler::new(
-            Arc::new(config),
-            config_path_string,
-        ));
-        handlers.insert(String::from(json_rpc_methods::RELOAD_CONFIG), reload_config);
+        let pool = Arc::new(SubnetManagerPool::from_reload_config(config));
+        handlers.insert(
+            String::from(json_rpc_methods::CREATE_SUBNET),
+            HandlerWrapper::CreateSubnet(CreateSubnetHandler::new(pool)),
+        );
 
         Ok(Self { handlers })
     }
