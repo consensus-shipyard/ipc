@@ -8,8 +8,8 @@ use libp2p::{
     swarm::NetworkBehaviour,
     PeerId,
 };
-use libp2p_bitswap::Bitswap;
 
+mod content;
 mod discovery;
 mod membership;
 
@@ -40,7 +40,7 @@ pub struct IpldResolver<P: StoreParams> {
     identify: identify::Behaviour,
     discovery: discovery::Behaviour,
     membership: membership::Behaviour,
-    bitswap: Bitswap<P>, // TODO (IPC-36): Wrap
+    bitswap: content::Behaviour<P>,
 }
 
 // Unfortunately by using `#[derive(NetworkBehaviour)]` we cannot easily inspects events
