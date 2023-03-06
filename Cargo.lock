@@ -2415,6 +2415,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "blake2b_simd",
+ "fvm_ipld_blockstore",
  "fvm_ipld_encoding 0.3.3",
  "fvm_shared 3.0.0-alpha.17",
  "ipc-sdk",

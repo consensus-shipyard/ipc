@@ -14,3 +14,6 @@ mod service;
 mod arb;
 
 mod hash;
+
+#[cfg(feature = "missing_blocks")]
+pub mod missing_blocks;

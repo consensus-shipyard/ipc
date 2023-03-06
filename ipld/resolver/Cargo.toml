@@ -39,6 +39,7 @@ quickcheck = { workspace = true, optional = true }
 ipc-sdk = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true, optional = true }
+fvm_ipld_blockstore = { workspace = true, optional = true }
 
 [dev-dependencies]
 quickcheck = { workspace = true }
@@ -47,5 +48,6 @@ fvm_shared = { workspace = true, features = ["arb"] }
 
 
 [features]
-default = ["arb"]
+default = ["arb", "missing_blocks"]
 arb = ["quickcheck", "fvm_shared/arb"]
+missing_blocks = ["fvm_ipld_blockstore"]
