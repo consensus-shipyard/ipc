@@ -12,8 +12,8 @@ use std::{
 use libp2p::{
     core::connection::ConnectionId,
     kad::{
-        handler::KademliaHandlerProto, store::MemoryStore, Kademlia, KademliaConfig, KademliaEvent,
-        QueryId,
+        handler::KademliaHandlerProto, store::MemoryStore, InboundRequest, Kademlia,
+        KademliaConfig, KademliaEvent, KademliaStoreInserts, QueryId,
     },
     multiaddr::Protocol,
     swarm::{
@@ -24,7 +24,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use log::debug;
+use log::{debug, warn};
 use tokio::time::Interval;
 
 use super::NetworkConfig;
@@ -115,6 +115,10 @@ impl Behaviour {
             let mut kad_config = KademliaConfig::default();
             let protocol_name = format!("/ipc/{}/kad/1.0.0", nc.network_name);
             kad_config.set_protocol_names(vec![Cow::Owned(protocol_name.as_bytes().to_vec())]);
+
+            // Disable inserting records into the memory store, so peers cannot send `PutRecord`
+            // messages to store content in the memory of our node.
+            kad_config.set_record_filtering(KademliaStoreInserts::FilterBoth);
 
             let store = MemoryStore::new(nc.local_peer_id());
 
@@ -255,6 +259,11 @@ impl NetworkBehaviour for Behaviour {
                         // Not expecting unroutable peers
                         KademliaEvent::UnroutablePeer { .. } => {
                             debug!("unexpected Kademlia event: {ev:?}")
+                        }
+                        KademliaEvent::InboundRequest {
+                            request: InboundRequest::PutRecord { source, .. },
+                        } => {
+                            warn!("disallowed Kademlia requests from {source}",)
                         }
                         // Information only.
                         KademliaEvent::InboundRequest { .. }
