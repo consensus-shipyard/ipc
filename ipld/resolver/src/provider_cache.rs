@@ -20,6 +20,7 @@ impl ProviderDelta {
     }
 }
 
+/// Track which subnets are provided for by which set of peers.
 pub struct SubnetProviderCache {
     /// Maximum number of subnets to track, to protect against DoS attacks, trying to
     /// flood someone with subnets that don't actually exist. When the number of subnets
@@ -78,8 +79,13 @@ impl SubnetProviderCache {
     }
 
     /// Check if a peer has been marked as routable.
-    pub fn is_routable(&self, peer_id: PeerId) -> bool {
-        self.routable_peers.contains(&peer_id)
+    pub fn is_routable(&self, peer_id: &PeerId) -> bool {
+        self.routable_peers.contains(peer_id)
+    }
+
+    /// Check whether we have received recent updates from a peer.
+    pub fn has_timestamp(&self, peer_id: &PeerId) -> bool {
+        self.peer_timestamps.contains_key(peer_id)
     }
 
     /// Try to add a provider to the cache.
@@ -89,7 +95,7 @@ impl SubnetProviderCache {
     /// Returns `Some` if the peer is routable, containing the newly added
     /// and newly removed associations for this peer.
     pub fn add_provider(&mut self, record: &ProviderRecord) -> Option<ProviderDelta> {
-        if !self.is_routable(record.peer_id) {
+        if !self.is_routable(&record.peer_id) {
             return None;
         }
 
