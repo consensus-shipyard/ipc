@@ -20,6 +20,7 @@ use libp2p::{
 use libp2p::{identify, ping};
 use libp2p_bitswap::BitswapStore;
 use log::{debug, error, trace, warn};
+use rand::seq::SliceRandom;
 use tokio::select;
 use tokio::sync::oneshot::{self, Sender};
 
@@ -31,13 +32,16 @@ use crate::behaviour::{
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
 
+/// Channel to complete the results with.
+type ResponseChannel = oneshot::Sender<ResolveResult>;
+
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
 struct Query {
     cid: Cid,
     subnet_id: SubnetID,
     fallback_peer_ids: Vec<PeerId>,
-    response_channel: oneshot::Sender<ResolveResult>,
+    response_channel: ResponseChannel,
 }
 
 /// Keeps track of where to send query responses to.
@@ -49,20 +53,24 @@ type QueryMap = HashMap<content::QueryId, Query>;
 #[error("No known peers for subnet {0}")]
 pub struct NoKnownPeers(SubnetID);
 
+#[derive(Debug, Clone)]
 pub struct ConnectionConfig {
     /// The address where we will listen to incoming connections.
-    listen_addr: Multiaddr,
+    pub listen_addr: Multiaddr,
     /// Maximum number of incoming connections.
-    max_incoming: u32,
+    pub max_incoming: u32,
     /// Expected number of peers, for sizing the Bloom filter.
-    expected_peer_count: u32,
+    pub expected_peer_count: u32,
+    /// Maximum number of peers to send Bitswap requests to in a single attempt.
+    pub max_peers_per_query: u32,
 }
 
+#[derive(Debug, Clone)]
 pub struct Config {
-    network: NetworkConfig,
-    discovery: DiscoveryConfig,
-    membership: MembershipConfig,
-    connection: ConnectionConfig,
+    pub network: NetworkConfig,
+    pub discovery: DiscoveryConfig,
+    pub membership: MembershipConfig,
+    pub connection: ConnectionConfig,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -96,13 +104,13 @@ impl Client {
     }
 
     /// Add a subnet supported by this node.
-    pub fn add_provided_subnets(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
+    pub fn add_provided_subnet(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
         let req = Request::AddProvidedSubnet(subnet_id);
         self.send_request(req)
     }
 
     /// Remove a subnet no longer supported by this node.
-    pub fn remove_provided_subnets(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
+    pub fn remove_provided_subnet(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
         let req = Request::RemoveProvidedSubnet(subnet_id);
         self.send_request(req)
     }
@@ -134,20 +142,38 @@ impl Client {
 
 /// The `Service` handles P2P communication to resolve IPLD content by wrapping and driving a number of `libp2p` behaviours.
 pub struct Service<P: StoreParams> {
+    peer_id: PeerId,
     listen_addr: Multiaddr,
     swarm: Swarm<Behaviour<P>>,
     queries: QueryMap,
     request_rx: tokio::sync::mpsc::UnboundedReceiver<Request>,
     background_lookup_filter: BloomFilter,
+    max_peers_per_query: usize,
 }
 
 impl<P: StoreParams> Service<P> {
+    /// Build a [`Service`] and a [`Client`] with the default `tokio` transport.
     pub fn new<S>(config: Config, store: S) -> Result<(Self, Client), ConfigError>
     where
         S: BitswapStore<Params = P>,
     {
+        Self::new_with_transport(config, store, build_transport)
+    }
+
+    /// Build a [`Service`] and a [`Client`] by passing in a transport factory function.
+    ///
+    /// The main goal is to be facilitate testing with a [`MemoryTransport`].
+    pub fn new_with_transport<S, F>(
+        config: Config,
+        store: S,
+        transport: F,
+    ) -> Result<(Self, Client), ConfigError>
+    where
+        S: BitswapStore<Params = P>,
+        F: FnOnce(Keypair) -> Boxed<(PeerId, StreamMuxerBox)>,
+    {
         let peer_id = config.network.local_peer_id();
-        let transport = build_transport(config.network.local_key.clone());
+        let transport = transport(config.network.local_key.clone());
         let behaviour = Behaviour::new(config.network, config.discovery, config.membership, store)?;
 
         // NOTE: Hardcoded values from Forest. Will leave them as is until we know we need to change.
@@ -168,6 +194,7 @@ impl<P: StoreParams> Service<P> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         let service = Self {
+            peer_id,
             listen_addr: config.connection.listen_addr,
             swarm,
             queries: Default::default(),
@@ -176,6 +203,11 @@ impl<P: StoreParams> Service<P> {
                 0.1,
                 config.connection.expected_peer_count,
             ),
+            max_peers_per_query: config
+                .connection
+                .max_peers_per_query
+                .try_into()
+                .expect("u32 should be usize"),
         };
 
         let client = Client { request_tx: tx };
@@ -231,19 +263,23 @@ impl<P: StoreParams> Service<P> {
         match event.result {
             Ok(ping::Success::Ping { rtt }) => {
                 trace!(
-                    "PingSuccess::Ping rtt to {} is {} ms",
+                    "PingSuccess::Ping rtt to {} from {} is {} ms",
                     peer_id,
+                    self.peer_id,
                     rtt.as_millis()
                 );
             }
             Ok(ping::Success::Pong) => {
-                trace!("PingSuccess::Pong from {peer_id}");
+                trace!("PingSuccess::Pong from {peer_id} to {}", self.peer_id);
             }
             Err(ping::Failure::Timeout) => {
-                debug!("PingFailure::Timeout from {peer_id}");
+                debug!("PingFailure::Timeout from {peer_id} to {}", self.peer_id);
             }
             Err(ping::Failure::Other { error }) => {
-                warn!("PingFailure::Other from {peer_id}: {error}");
+                warn!(
+                    "PingFailure::Other from {peer_id} to {}: {error}",
+                    self.peer_id
+                );
             }
             Err(ping::Failure::Unsupported) => {
                 warn!("Banning peer {peer_id} due to protocol error");
@@ -255,23 +291,36 @@ impl<P: StoreParams> Service<P> {
     fn handle_identify_event(&mut self, event: identify::Event) {
         if let identify::Event::Error { peer_id, error } = event {
             warn!("Error identifying {peer_id}: {error}")
+        } else if let identify::Event::Received { peer_id, info } = event {
+            debug!("protocols supported by {peer_id}: {:?}", info.protocols);
+            debug!("adding identified address of {peer_id} to {}", self.peer_id);
+            self.discovery_mut().add_identified(&peer_id, info);
         }
     }
 
     fn handle_discovery_event(&mut self, event: discovery::Event) {
         match event {
-            discovery::Event::Added(peer_id, _) => self.membership_mut().set_routable(peer_id),
-            discovery::Event::Removed(peer_id) => self.membership_mut().set_unroutable(peer_id),
-            discovery::Event::Connected(_, _) => {}
-            discovery::Event::Disconnected(_, _) => {}
+            discovery::Event::Added(peer_id, _) => {
+                debug!("adding routable peer {peer_id} to {}", self.peer_id);
+                self.membership_mut().set_routable(peer_id)
+            }
+            discovery::Event::Removed(peer_id) => {
+                debug!("removing unroutable peer {peer_id} from {}", self.peer_id);
+                self.membership_mut().set_unroutable(peer_id)
+            }
         }
     }
 
     fn handle_membership_event(&mut self, event: membership::Event) {
         match event {
             membership::Event::Skipped(peer_id) => {
+                debug!("skipped adding provider {peer_id} to {}", self.peer_id);
                 // Don't repeatedly look up peers we can't add to the routing table.
                 if self.background_lookup_filter.insert(&peer_id) {
+                    debug!(
+                        "triggering background lookup of {peer_id} on {}",
+                        self.peer_id
+                    );
                     self.discovery_mut().background_lookup(peer_id)
                 }
             }
@@ -285,11 +334,69 @@ impl<P: StoreParams> Service<P> {
         match event {
             content::Event::Complete(query_id, result) => {
                 if let Some(query) = self.queries.remove(&query_id) {
-                    self.handle_query_result(query, result);
+                    self.resolve_query(query, result);
                 } else {
                     warn!("query ID not found");
                 }
             }
+        }
+    }
+
+    /// Handle an internal request coming from a [`Client`].
+    fn handle_request(&mut self, request: Request) {
+        match request {
+            Request::SetProvidedSubnets(ids) => {
+                if let Err(e) = self.membership_mut().set_provided_subnets(ids) {
+                    warn!("failed to publish set provided subnets: {e}")
+                }
+            }
+            Request::AddProvidedSubnet(id) => {
+                if let Err(e) = self.membership_mut().add_provided_subnet(id) {
+                    warn!("failed to publish added provided subnet: {e}")
+                }
+            }
+            Request::RemoveProvidedSubnet(id) => {
+                if let Err(e) = self.membership_mut().remove_provided_subnet(id) {
+                    warn!("failed to publish removed provided subnet: {e}")
+                }
+            }
+            Request::PinSubnet(id) => self.membership_mut().pin_subnet(id),
+            Request::UnpinSubnet(id) => self.membership_mut().unpin_subnet(&id),
+
+            Request::Resolve(cid, subnet_id, response_channel) => {
+                self.start_query(cid, subnet_id, response_channel)
+            }
+        }
+    }
+
+    /// Start a CID resolution.
+    fn start_query(&mut self, cid: Cid, subnet_id: SubnetID, response_channel: ResponseChannel) {
+        let mut peers = self.membership_mut().providers_of_subnet(&subnet_id);
+
+        if peers.is_empty() {
+            send_resolve_result(response_channel, Err(anyhow!(NoKnownPeers(subnet_id))));
+        } else {
+            // Connect to them in a random order, so as not to overwhelm any specific peer.
+            peers.shuffle(&mut rand::thread_rng());
+
+            // Prioritize peers we already have an established connection with.
+            let (connected, known) = peers
+                .into_iter()
+                .partition::<Vec<_>, _>(|id| self.swarm.is_connected(id));
+
+            let peers = [connected, known].into_iter().flatten().collect();
+            let (peers, fallback) = self.split_peers_for_query(peers);
+
+            let query = Query {
+                cid,
+                subnet_id,
+                response_channel,
+                fallback_peer_ids: fallback,
+            };
+
+            let query_id = self.content_mut().resolve(cid, peers);
+
+            self.queries.insert(query_id, query);
         }
     }
 
@@ -298,7 +405,7 @@ impl<P: StoreParams> Service<P> {
     /// query and send the result to them. By default these are the peers
     /// we know support the subnet, but weren't connected to when the we
     /// first attempted the resolution.
-    fn handle_query_result(&mut self, mut query: Query, result: ResolveResult) {
+    fn resolve_query(&mut self, mut query: Query, result: ResolveResult) {
         match result {
             Ok(_) => send_resolve_result(query.response_channel, result),
             Err(_) if query.fallback_peer_ids.is_empty() => {
@@ -313,67 +420,24 @@ impl<P: StoreParams> Service<P> {
                     query.fallback_peer_ids.len()
                 );
 
-                // Now we can go all in; alternatively we could take the next N peers.
+                // Try to resolve from the next batch of peers.
                 let peers = std::mem::take(&mut query.fallback_peer_ids);
-
+                let (peers, fallback) = self.split_peers_for_query(peers);
                 let query_id = self.content_mut().resolve(query.cid, peers);
+
+                // Leave the rest for later.
+                query.fallback_peer_ids = fallback;
 
                 self.queries.insert(query_id, query);
             }
         }
     }
 
-    /// Handle an internal request coming from a [`Client`].
-    fn handle_request(&mut self, request: Request) {
-        match request {
-            Request::SetProvidedSubnets(ids) => {
-                if let Err(e) = self.membership_mut().set_provided_subnets(ids) {
-                    error!("error setting provided subnets: {e}")
-                }
-            }
-            Request::AddProvidedSubnet(id) => {
-                if let Err(e) = self.membership_mut().add_provided_subnet(id) {
-                    error!("error adding provided subnet: {e}")
-                }
-            }
-            Request::RemoveProvidedSubnet(id) => {
-                if let Err(e) = self.membership_mut().remove_provided_subnet(id) {
-                    error!("error removing provided subnet: {e}")
-                }
-            }
-            Request::PinSubnet(id) => self.membership_mut().pin_subnet(id),
-            Request::UnpinSubnet(id) => self.membership_mut().unpin_subnet(&id),
-
-            Request::Resolve(cid, subnet_id, response_channel) => {
-                let peers = self.membership_mut().providers_of_subnet(&subnet_id);
-                if peers.is_empty() {
-                    send_resolve_result(response_channel, Err(anyhow!(NoKnownPeers(subnet_id))));
-                } else {
-                    let (connected, known) = peers
-                        .into_iter()
-                        .partition::<Vec<_>, _>(|id| self.swarm.is_connected(id));
-
-                    let (peers, fallback) = if connected.is_empty() {
-                        (known, vec![])
-                    } else {
-                        // Use just the connected ones, however many there are.
-                        // Alternatively we could take the first N combined.
-                        (connected, known)
-                    };
-
-                    let query = Query {
-                        cid,
-                        subnet_id,
-                        response_channel,
-                        fallback_peer_ids: fallback,
-                    };
-
-                    let query_id = self.content_mut().resolve(cid, peers);
-
-                    self.queries.insert(query_id, query);
-                }
-            }
-        }
+    /// Split peers into a group we query now and a group we fall back on if the current batch fails.
+    fn split_peers_for_query(&self, mut peers: Vec<PeerId>) -> (Vec<PeerId>, Vec<PeerId>) {
+        let size = std::cmp::min(self.max_peers_per_query, peers.len());
+        let fallback = peers.split_off(size);
+        (peers, fallback)
     }
 
     // The following are helper functions because Rust Analyzer has trouble with recognising that `swarm.behaviour_mut()` is a legal call.

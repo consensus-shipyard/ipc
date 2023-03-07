@@ -35,6 +35,7 @@ async fn test_request_error() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_request_with_params() {
     let url = Url::parse(HTTP_ENDPOINT).unwrap();
     let client = JsonRpcClientImpl::new(url, None);

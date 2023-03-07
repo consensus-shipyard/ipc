@@ -30,10 +30,12 @@ libp2p = { version = "0.50", default-features = false, features = [
   "macros",
   "serde",
   "secp256k1",
+  "plaintext",
 ] }
 libp2p-bitswap = "0.25"
 libipld = { workspace = true }
 log = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 quickcheck = { workspace = true, optional = true }
 
@@ -45,8 +47,9 @@ fvm_ipld_blockstore = { workspace = true, optional = true }
 [dev-dependencies]
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
+env_logger = { workspace = true }
 fvm_shared = { workspace = true, features = ["arb"] }
-
+fvm_ipld_hamt = "0.6"
 
 [features]
 default = ["arb", "missing_blocks"]

@@ -75,7 +75,7 @@ impl<P: StoreParams> Behaviour<P> {
         Ok(Self {
             ping: Default::default(),
             identify: identify::Behaviour::new(identify::Config::new(
-                "ipfs/0.1.0".into(),
+                "ipfs/1.0.0".into(),
                 nc.local_public_key(),
             )),
             discovery: discovery::Behaviour::new(nc.clone(), dc)?,

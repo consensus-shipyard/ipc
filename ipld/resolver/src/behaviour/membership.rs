@@ -9,7 +9,7 @@ use libp2p::core::connection::ConnectionId;
 use libp2p::gossipsub::error::SubscriptionError;
 use libp2p::gossipsub::{
     GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, IdentTopic, MessageAuthenticity,
-    MessageId, Topic,
+    MessageId, Topic, TopicHash,
 };
 use libp2p::identity::Keypair;
 use libp2p::swarm::derive_prelude::FromSwarm;
@@ -21,11 +21,11 @@ use libp2p::{
     PeerId,
 };
 use log::{debug, error, warn};
-use tokio::time::Interval;
+use tokio::time::{Instant, Interval};
 
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
-use crate::provider_record::{SignedProviderRecord, Timestamp};
+use crate::provider_record::{ProviderRecord, SignedProviderRecord, Timestamp};
 
 use super::NetworkConfig;
 
@@ -56,6 +56,8 @@ pub struct Config {
     pub max_subnets: usize,
     /// Publish interval for supported subnets.
     pub publish_interval: Duration,
+    /// Minimum time between publishing own provider record in reaction to new joiners.
+    pub min_time_between_publish: Duration,
     /// Maximum age of provider records before the peer is removed without an update.
     pub max_provider_age: Duration,
 }
@@ -90,6 +92,12 @@ pub struct Behaviour {
     /// This acts like a heartbeat; if a peer doesn't publish its snapshot for a long time,
     /// other agents can prune it from their cache and not try to contact for resolution.
     publish_interval: Interval,
+    /// Minimum time between publishing own provider record in reaction to new joiners.
+    min_time_between_publish: Duration,
+    /// Last time we gossiped our own provider record.
+    last_publish_timestamp: Timestamp,
+    /// Next time we will gossip our own provider record.
+    next_publish_timestamp: Timestamp,
     /// Maximum time a provider can be without an update before it's pruned from the cache.
     max_provider_age: Duration,
 }
@@ -141,6 +149,9 @@ impl Behaviour {
             subnet_ids: Default::default(),
             provider_cache: SubnetProviderCache::new(mc.max_subnets, mc.static_subnets),
             publish_interval: interval,
+            min_time_between_publish: mc.min_time_between_publish,
+            last_publish_timestamp: Timestamp::default(),
+            next_publish_timestamp: Timestamp::now() + mc.publish_interval,
             max_provider_age: mc.max_provider_age,
         })
     }
@@ -188,6 +199,9 @@ impl Behaviour {
         let record = SignedProviderRecord::new(&self.local_key, self.subnet_ids.clone())?;
         let data = record.into_envelope().into_protobuf_encoding();
         let _msg_id = self.inner.publish(self.membership_topic.clone(), data)?;
+        self.last_publish_timestamp = Timestamp::now();
+        self.next_publish_timestamp = self.last_publish_timestamp + self.publish_interval.period();
+        self.publish_interval.reset(); // In case the change wasn't tiggered by the schedule.
         Ok(())
     }
 
@@ -195,7 +209,8 @@ impl Behaviour {
     ///
     /// Call this method when the discovery service learns the address of a peer.
     pub fn set_routable(&mut self, peer_id: PeerId) {
-        self.provider_cache.set_routable(peer_id)
+        self.provider_cache.set_routable(peer_id);
+        self.publish_for_new_peer(peer_id);
     }
 
     /// Mark a peer as unroutable in the cache.
@@ -217,14 +232,10 @@ impl Behaviour {
     /// then raise domain event to let the rest of the application know about a
     /// provider. Also update all the book keeping in the behaviour that we use
     /// to answer future queries about the topic.
-    fn handle_message(&mut self, msg: GossipsubMessage) -> Option<Event> {
+    fn handle_message(&mut self, msg: GossipsubMessage) {
         if msg.topic == self.membership_topic.hash() {
             match SignedProviderRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
-                Ok(record) => match self.provider_cache.add_provider(&record) {
-                    None => return Some(Event::Skipped(record.peer_id)),
-                    Some(d) if d.is_empty() => return None,
-                    Some(d) => return Some(Event::Updated(record.peer_id, d)),
-                },
+                Ok(record) => self.handle_provider_record(record),
                 Err(e) => {
                     warn!(
                         "Gossip message from peer {:?} could not be deserialized: {e}",
@@ -233,9 +244,72 @@ impl Behaviour {
                 }
             }
         } else {
-            warn!("unknown gossipsub topic: {}", msg.topic);
+            warn!(
+                "unknown gossipsub topic in message from {:?}: {}",
+                msg.source, msg.topic
+            );
         }
-        None
+    }
+
+    /// Try to add a provider record to the cache.
+    ///
+    /// If this is the first time we receive a record from the peer,
+    /// reciprocate by publishing our own.
+    fn handle_provider_record(&mut self, record: ProviderRecord) {
+        let is_new = !self.provider_cache.has_timestamp(&record.peer_id);
+        let (event, publish) = match self.provider_cache.add_provider(&record) {
+            None => (Some(Event::Skipped(record.peer_id)), false),
+            Some(d) if d.is_empty() => (None, false),
+            Some(d) => (Some(Event::Updated(record.peer_id, d)), is_new),
+        };
+
+        if let Some(event) = event {
+            self.outbox.push_back(event);
+        }
+
+        if publish {
+            self.publish_for_new_peer(record.peer_id)
+        }
+    }
+
+    /// Handle new subscribers to the membership topic.
+    fn handle_subscriber(&mut self, peer_id: PeerId, topic: TopicHash) {
+        if topic == self.membership_topic.hash() {
+            self.publish_for_new_peer(peer_id)
+        } else {
+            warn!(
+                "unknown gossipsub topic in subscription from {}: {}",
+                peer_id, topic
+            )
+        }
+    }
+
+    /// Publish our provider record when we encounter a new peer, unless we have recently done so.
+    fn publish_for_new_peer(&mut self, peer_id: PeerId) {
+        if self.subnet_ids.is_empty() {
+            // We have nothing, so there's no need for them to know this ASAP.
+            // The reason we shouldn't disable periodic publishing of empty
+            // records completely is because it would also remove one of
+            // triggers for non-connected peers to eagerly publish their
+            // subnets when they see our empty records. Plus they could
+            // be good to show on metrics, to have a single source of
+            // the cluster size available on any node.
+            return;
+        }
+        let now = Timestamp::now();
+        if self.last_publish_timestamp > now - self.min_time_between_publish {
+            debug!("recently published, not publishing again for peer {peer_id}");
+        } else if self.next_publish_timestamp <= now + self.min_time_between_publish {
+            debug!("publishing soon for new peer {peer_id}"); // don't let new joiners delay it forever by hitting the next block
+        } else {
+            debug!("publishing for new peer {peer_id}");
+            // Create a new timer, rather than publish and reset. This way we don't repeat error handling.
+            // Give some time for Kademlia and Identify to do their bit on both sides. Works better in tests.
+            let delayed = Instant::now() + self.min_time_between_publish;
+            self.next_publish_timestamp = now + self.min_time_between_publish;
+            self.publish_interval =
+                tokio::time::interval_at(delayed, self.publish_interval.period())
+        }
     }
 
     /// Remove any membership record that hasn't been updated for a long time.
@@ -287,7 +361,7 @@ impl NetworkBehaviour for Behaviour {
         // Republish our current peer record snapshot and prune old records.
         if self.publish_interval.poll_tick(cx).is_ready() {
             if let Err(e) = self.publish_membership() {
-                error!("error publishing membership: {e}")
+                warn!("failed to publish membership: {e}")
             };
             self.prune_membership();
         }
@@ -306,16 +380,17 @@ impl NetworkBehaviour for Behaviour {
                         // insignificant. For this reason I oped to use messages instead, and let the content
                         // carry the information, spreading through the Gossipsub network regardless of the
                         // number of connected peers.
-                        GossipsubEvent::Subscribed { .. } | GossipsubEvent::Unsubscribed { .. } => {
+                        GossipsubEvent::Subscribed { peer_id, topic } => {
+                            self.handle_subscriber(peer_id, topic)
                         }
+
+                        GossipsubEvent::Unsubscribed { .. } => {}
                         // Log potential misconfiguration.
                         GossipsubEvent::GossipsubNotSupported { peer_id } => {
                             debug!("peer {peer_id} doesn't support gossipsub");
                         }
                         GossipsubEvent::Message { message, .. } => {
-                            if let Some(ev) = self.handle_message(message) {
-                                return Poll::Ready(NetworkBehaviourAction::GenerateEvent(ev));
-                            }
+                            self.handle_message(message);
                         }
                     }
                 }

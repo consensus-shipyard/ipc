@@ -12,5 +12,5 @@ mod arb;
 #[cfg(feature = "missing_blocks")]
 pub mod missing_blocks;
 
-pub use behaviour::{DiscoveryConfig, MembershipConfig};
+pub use behaviour::{DiscoveryConfig, MembershipConfig, NetworkConfig};
 pub use service::{Client, Config, ConnectionConfig, NoKnownPeers, Service};
