@@ -14,7 +14,7 @@ use libp2p::{
     identify::Info,
     kad::{
         handler::KademliaHandlerProto, store::MemoryStore, InboundRequest, Kademlia,
-        KademliaConfig, KademliaEvent, KademliaStoreInserts, QueryId,
+        KademliaConfig, KademliaEvent, KademliaStoreInserts, QueryId, QueryResult,
     },
     multiaddr::Protocol,
     swarm::{
@@ -87,6 +87,8 @@ pub struct Behaviour {
     target_connections: usize,
     /// Interval between random lookups.
     lookup_interval: Interval,
+    /// Buffer incoming identify requests until we have finished the bootstrap.
+    bootstrap_buffer: Option<Vec<(PeerId, Info)>>,
     /// Events to return when polled.
     outbox: VecDeque<Event>,
 }
@@ -113,6 +115,8 @@ impl Behaviour {
         let mut outbox = VecDeque::new();
         let protocol_name = format!("/ipc/{}/kad/1.0.0", nc.network_name);
 
+        let mut bootstrap_buffer = None;
+
         let kademlia_opt = if dc.enable_kademlia {
             let mut kad_config = KademliaConfig::default();
             kad_config.set_protocol_names(vec![Cow::Owned(protocol_name.as_bytes().to_vec())]);
@@ -134,6 +138,8 @@ impl Behaviour {
                 kademlia
                     .bootstrap()
                     .map_err(|_| ConfigError::NoBootstrapAddress)?;
+
+                bootstrap_buffer = Some(Vec::new());
             }
 
             Some(kademlia)
@@ -154,6 +160,7 @@ impl Behaviour {
             lookup_interval: tokio::time::interval(Duration::from_secs(1)),
             outbox,
             num_connections: 0,
+            bootstrap_buffer,
             target_connections: dc.target_connections,
         })
     }
@@ -177,10 +184,20 @@ impl Behaviour {
     /// This seems to be the only way, because Kademlia rightfully treats
     /// incoming connections as ephemeral addresses, but doesn't have an
     /// alternative exchange mechanism.
-    pub fn add_identified(&mut self, peer_id: &PeerId, info: &Info) {
+    pub fn add_identified(&mut self, peer_id: &PeerId, info: Info) {
         if info.protocols.contains(&self.protocol_name) {
-            for addr in info.listen_addrs.iter().cloned() {
-                self.add_address(peer_id, addr);
+            // If we are still in the process of bootstrapping peers, buffer the incoming self-identify records,
+            // to protect against eclipse attacks that could fill the k-table with entries to crowd out honest peers.
+            if let Some(buffer) = self.bootstrap_buffer.as_mut() {
+                if buffer.len() < self.target_connections
+                    && !buffer.iter().any(|(id, _)| id == peer_id)
+                {
+                    buffer.push((*peer_id, info))
+                }
+            } else {
+                for addr in info.listen_addrs.iter().cloned() {
+                    self.add_address(peer_id, addr);
+                }
             }
         }
     }
@@ -285,8 +302,21 @@ impl NetworkBehaviour for Behaviour {
                             warn!("disallowed Kademlia requests from {source}",)
                         }
                         // Information only.
-                        KademliaEvent::InboundRequest { .. }
-                        | KademliaEvent::OutboundQueryProgressed { .. } => {}
+                        KademliaEvent::InboundRequest { .. } => {}
+                        // Finish bootstrapping.
+                        KademliaEvent::OutboundQueryProgressed { result, step, .. } => match result
+                        {
+                            QueryResult::Bootstrap(result) if step.last => {
+                                debug!("Bootstrapping finished with {result:?}");
+                                if let Some(buffer) = self.bootstrap_buffer.take() {
+                                    debug!("Adding {} self-identified peers.", buffer.len());
+                                    for (peer_id, info) in buffer {
+                                        self.add_identified(&peer_id, info)
+                                    }
+                                }
+                            }
+                            _ => {}
+                        },
                         // The config ensures peers are added to the table if there's room.
                         // We're not emitting these as known peers because the address will probably not be returned by `addresses_of_peer`,
                         // so the outside service would have to keep track, which is not what we want.

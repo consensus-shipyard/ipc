@@ -294,7 +294,7 @@ impl<P: StoreParams> Service<P> {
         } else if let identify::Event::Received { peer_id, info } = event {
             debug!("protocols supported by {peer_id}: {:?}", info.protocols);
             debug!("adding identified address of {peer_id} to {}", self.peer_id);
-            self.discovery_mut().add_identified(&peer_id, &info);
+            self.discovery_mut().add_identified(&peer_id, info);
         }
     }
 
