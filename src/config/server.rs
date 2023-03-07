@@ -17,4 +17,5 @@ pub struct Server {
 pub mod json_rpc_methods {
     pub const CREATE_SUBNET: &str = "ipc_createSubnet";
     pub const RELOAD_CONFIG: &str = "ipc_reloadConfig";
+    pub const QUERY_VALIDATOR_SET: &str = "ipc_queryValidatorSet";
 }
