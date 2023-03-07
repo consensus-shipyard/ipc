@@ -287,7 +287,7 @@ impl NetworkBehaviour for Behaviour {
         // Republish our current peer record snapshot and prune old records.
         if self.publish_interval.poll_tick(cx).is_ready() {
             if let Err(e) = self.publish_membership() {
-                error!("error publishing membership: {e}")
+                warn!("failed to publish membership: {e}")
             };
             self.prune_membership();
         }

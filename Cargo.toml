@@ -54,12 +54,14 @@ tempfile = "3.4.0"
 [workspace.dependencies]
 anyhow = "1.0"
 log = "0.4"
+env_logger = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 tokio = { version = "1.16", features = ["full"] }
 quickcheck = "1"
 quickcheck_macros = "1"
 blake2b_simd = "1.0"
+rand = "0.8"
 
 fvm_ipld_blockstore = "0.1"
 fvm_ipld_encoding = "0.3"
