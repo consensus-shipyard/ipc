@@ -170,6 +170,7 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
             listen_addr: Multiaddr::from(Protocol::Memory(rng.gen::<u64>())),
             expected_peer_count: cluster_size,
             max_incoming: cluster_size,
+            max_peers_per_query: cluster_size,
         },
         network: NetworkConfig {
             local_key: Keypair::generate_secp256k1(),
