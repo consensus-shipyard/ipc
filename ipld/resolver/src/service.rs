@@ -20,6 +20,7 @@ use libp2p::{
 use libp2p::{identify, ping};
 use libp2p_bitswap::BitswapStore;
 use log::{debug, error, trace, warn};
+use rand::seq::SliceRandom;
 use tokio::select;
 use tokio::sync::oneshot::{self, Sender};
 
@@ -31,13 +32,16 @@ use crate::behaviour::{
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
 
+/// Channel to complete the results with.
+type ResponseChannel = oneshot::Sender<ResolveResult>;
+
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
 struct Query {
     cid: Cid,
     subnet_id: SubnetID,
     fallback_peer_ids: Vec<PeerId>,
-    response_channel: oneshot::Sender<ResolveResult>,
+    response_channel: ResponseChannel,
 }
 
 /// Keeps track of where to send query responses to.
@@ -57,6 +61,8 @@ pub struct ConnectionConfig {
     pub max_incoming: u32,
     /// Expected number of peers, for sizing the Bloom filter.
     pub expected_peer_count: u32,
+    /// Maximum number of peers to send Bitswap requests to in a single attempt.
+    pub max_peers_per_query: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +148,7 @@ pub struct Service<P: StoreParams> {
     queries: QueryMap,
     request_rx: tokio::sync::mpsc::UnboundedReceiver<Request>,
     background_lookup_filter: BloomFilter,
+    max_peers_per_query: usize,
 }
 
 impl<P: StoreParams> Service<P> {
@@ -196,6 +203,11 @@ impl<P: StoreParams> Service<P> {
                 0.1,
                 config.connection.expected_peer_count,
             ),
+            max_peers_per_query: config
+                .connection
+                .max_peers_per_query
+                .try_into()
+                .expect("u32 should be usize"),
         };
 
         let client = Client { request_tx: tx };
@@ -322,40 +334,10 @@ impl<P: StoreParams> Service<P> {
         match event {
             content::Event::Complete(query_id, result) => {
                 if let Some(query) = self.queries.remove(&query_id) {
-                    self.handle_query_result(query, result);
+                    self.resolve_query(query, result);
                 } else {
                     warn!("query ID not found");
                 }
-            }
-        }
-    }
-
-    /// Handle the results from a resolve attempt. If it succeeded, notify the
-    /// listener. Otherwise if we have fallback peers to try, start another
-    /// query and send the result to them. By default these are the peers
-    /// we know support the subnet, but weren't connected to when the we
-    /// first attempted the resolution.
-    fn handle_query_result(&mut self, mut query: Query, result: ResolveResult) {
-        match result {
-            Ok(_) => send_resolve_result(query.response_channel, result),
-            Err(_) if query.fallback_peer_ids.is_empty() => {
-                send_resolve_result(query.response_channel, result)
-            }
-            Err(e) => {
-                debug!(
-                    "resolving {} from {} failed with {}, but there are {} fallback peers to try",
-                    query.cid,
-                    query.subnet_id,
-                    e,
-                    query.fallback_peer_ids.len()
-                );
-
-                // Now we can go all in; alternatively we could take the next N peers.
-                let peers = std::mem::take(&mut query.fallback_peer_ids);
-
-                let query_id = self.content_mut().resolve(query.cid, peers);
-
-                self.queries.insert(query_id, query);
             }
         }
     }
@@ -382,35 +364,80 @@ impl<P: StoreParams> Service<P> {
             Request::UnpinSubnet(id) => self.membership_mut().unpin_subnet(&id),
 
             Request::Resolve(cid, subnet_id, response_channel) => {
-                let peers = self.membership_mut().providers_of_subnet(&subnet_id);
-                if peers.is_empty() {
-                    send_resolve_result(response_channel, Err(anyhow!(NoKnownPeers(subnet_id))));
-                } else {
-                    let (connected, known) = peers
-                        .into_iter()
-                        .partition::<Vec<_>, _>(|id| self.swarm.is_connected(id));
-
-                    let (peers, fallback) = if connected.is_empty() {
-                        (known, vec![])
-                    } else {
-                        // Use just the connected ones, however many there are.
-                        // Alternatively we could take the first N combined.
-                        (connected, known)
-                    };
-
-                    let query = Query {
-                        cid,
-                        subnet_id,
-                        response_channel,
-                        fallback_peer_ids: fallback,
-                    };
-
-                    let query_id = self.content_mut().resolve(cid, peers);
-
-                    self.queries.insert(query_id, query);
-                }
+                self.start_query(cid, subnet_id, response_channel)
             }
         }
+    }
+
+    /// Start a CID resolution.
+    fn start_query(&mut self, cid: Cid, subnet_id: SubnetID, response_channel: ResponseChannel) {
+        let mut peers = self.membership_mut().providers_of_subnet(&subnet_id);
+
+        if peers.is_empty() {
+            send_resolve_result(response_channel, Err(anyhow!(NoKnownPeers(subnet_id))));
+        } else {
+            // Connect to them in a random order, so as not to overwhelm any specific peer.
+            peers.shuffle(&mut rand::thread_rng());
+
+            // Prioritize peers we already have an established connection with.
+            let (connected, known) = peers
+                .into_iter()
+                .partition::<Vec<_>, _>(|id| self.swarm.is_connected(id));
+
+            let peers = [connected, known].into_iter().flatten().collect();
+            let (peers, fallback) = self.split_peers_for_query(peers);
+
+            let query = Query {
+                cid,
+                subnet_id,
+                response_channel,
+                fallback_peer_ids: fallback,
+            };
+
+            let query_id = self.content_mut().resolve(cid, peers);
+
+            self.queries.insert(query_id, query);
+        }
+    }
+
+    /// Handle the results from a resolve attempt. If it succeeded, notify the
+    /// listener. Otherwise if we have fallback peers to try, start another
+    /// query and send the result to them. By default these are the peers
+    /// we know support the subnet, but weren't connected to when the we
+    /// first attempted the resolution.
+    fn resolve_query(&mut self, mut query: Query, result: ResolveResult) {
+        match result {
+            Ok(_) => send_resolve_result(query.response_channel, result),
+            Err(_) if query.fallback_peer_ids.is_empty() => {
+                send_resolve_result(query.response_channel, result)
+            }
+            Err(e) => {
+                debug!(
+                    "resolving {} from {} failed with {}, but there are {} fallback peers to try",
+                    query.cid,
+                    query.subnet_id,
+                    e,
+                    query.fallback_peer_ids.len()
+                );
+
+                // Try to resolve from the next batch of peers.
+                let peers = std::mem::take(&mut query.fallback_peer_ids);
+                let (peers, fallback) = self.split_peers_for_query(peers);
+                let query_id = self.content_mut().resolve(query.cid, peers);
+
+                // Leave the rest for later.
+                query.fallback_peer_ids = fallback;
+
+                self.queries.insert(query_id, query);
+            }
+        }
+    }
+
+    /// Split peers into a group we query now and a group we fall back on if the current batch fails.
+    fn split_peers_for_query(&self, mut peers: Vec<PeerId>) -> (Vec<PeerId>, Vec<PeerId>) {
+        let size = std::cmp::min(self.max_peers_per_query, peers.len());
+        let fallback = peers.split_off(size);
+        (peers, fallback)
     }
 
     // The following are helper functions because Rust Analyzer has trouble with recognising that `swarm.behaviour_mut()` is a legal call.
