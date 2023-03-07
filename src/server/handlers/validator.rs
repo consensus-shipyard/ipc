@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! Expose the subnet actor validator set
 
 use crate::config::ReloadableConfig;
@@ -7,6 +9,7 @@ use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
+use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::Validator;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -42,9 +45,14 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let tip_set = Cid::from_str(&request.tip_set)?;
+        let parent = SubnetID::from_str(&request.subnet)?
+            .parent()
+            .ok_or_else(|| anyhow!("cannot get for root"))?
+            .to_string();
 
         let config = self.config.get_config();
-        let subnet = match config.subnets.get(&request.subnet) {
+        // TODO: once get_by_subnet_id is merged, will use parent subnet id directly.
+        let subnet = match config.subnets.get(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(s) => s,
         };
