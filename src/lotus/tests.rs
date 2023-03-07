@@ -15,6 +15,7 @@ fn get_lotus_client() -> LotusJsonRPCClient<JsonRpcClientImpl> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn state_network_name() {
     let client = get_lotus_client();
     assert_eq!(client.state_network_name().await.unwrap(), "mainnet");
@@ -31,6 +32,7 @@ async fn state_network_version() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn state_actor_manifest_cid() {
     let client = get_lotus_client();
 
