@@ -1,4 +1,4 @@
-.PHONY: all build test lint license check-fmt check-clippy
+.PHONY: all build test lint license check-fmt check-clippy diagrams
 
 all: test build
 
@@ -24,3 +24,12 @@ check-fmt:
 
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
+
+diagrams:
+	$(MAKE) -C docs/diagrams
+
+check-diagrams: diagrams
+	if git diff --name-only docs/diagrams | grep .png; then \
+		echo "There are uncommitted changes to the diagrams"; \
+		exit 1; \
+	fi
