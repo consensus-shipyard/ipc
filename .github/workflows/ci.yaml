@@ -26,6 +26,8 @@ jobs:
         run: make check-fmt
       - name: Check license headers
         run: make license
+      - name: Check diagrams
+        run: make check-diagrams
 
   # Test matrix, running tasks from the Makefile.
   tests:
