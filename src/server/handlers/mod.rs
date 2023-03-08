@@ -5,12 +5,14 @@
 mod config;
 pub mod create;
 mod subnet;
+mod validator;
 
 use crate::config::json_rpc_methods;
 use crate::config::ReloadableConfig;
 use crate::server::create::CreateSubnetHandler;
 use crate::server::handlers::config::ReloadConfigHandler;
 use crate::server::handlers::subnet::SubnetManagerPool;
+use crate::server::handlers::validator::QueryValidatorSetHandler;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
 pub use create::{CreateSubnetParams, CreateSubnetResponse};
@@ -24,6 +26,7 @@ pub type Method = String;
 enum HandlerWrapper {
     CreateSubnet(CreateSubnetHandler),
     ReloadConfig(ReloadConfigHandler),
+    QueryValidatorSet(QueryValidatorSetHandler),
 }
 
 /// The collection of all json rpc handlers
@@ -53,6 +56,11 @@ impl Handlers {
             )),
         );
 
+        handlers.insert(
+            String::from(json_rpc_methods::QUERY_VALIDATOR_SET),
+            HandlerWrapper::QueryValidatorSet(QueryValidatorSetHandler::new(config.clone())),
+        );
+
         let pool = Arc::new(SubnetManagerPool::from_reload_config(config));
         handlers.insert(
             String::from(json_rpc_methods::CREATE_SUBNET),
@@ -72,6 +80,10 @@ impl Handlers {
                 HandlerWrapper::ReloadConfig(handler) => {
                     handler.handle(serde_json::from_value(params)?).await?;
                     Ok(serde_json::to_value(())?)
+                }
+                HandlerWrapper::QueryValidatorSet(handler) => {
+                    let r = handler.handle(serde_json::from_value(params)?).await?;
+                    Ok(serde_json::to_value(r)?)
                 }
             }
         } else {
