@@ -44,6 +44,7 @@ impl ReloadableConfig {
     /// Triggers a reload of the config from the target path
     pub async fn reload(&self, path: String) -> Result<()> {
         let new_config = Config::from_file_async(path).await?;
+        log::info!("new config loaded: {new_config:?}");
 
         let mut config = self.config.write().unwrap();
         let r = config.deref_mut();

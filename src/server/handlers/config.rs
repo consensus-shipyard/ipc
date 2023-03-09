@@ -5,10 +5,10 @@
 use crate::config::ReloadableConfig;
 use crate::server::JsonRPCRequestHandler;
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReloadConfigParams {
     pub path: Option<String>,
 }

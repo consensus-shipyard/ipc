@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: MIT
 //! Create subnet cli command handler.
 
-use anyhow::Result;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::clock::ChainEpoch;
 use std::fmt::Debug;
-use url::Url;
 
+use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
@@ -22,7 +21,7 @@ impl CommandLineHandler for CreateSubnet {
     type Arguments = CreateSubnetArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        log::debug!("launching json rpc server with args: {:?}", arguments);
+        log::debug!("create subnet with args: {:?}", arguments);
 
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
@@ -67,19 +66,4 @@ pub(crate) struct CreateSubnetArgs {
     pub finality_threshold: ChainEpoch,
     #[arg(help = "The checkpoint period")]
     pub check_period: ChainEpoch,
-}
-
-fn get_ipc_agent_url(ipc_agent_url: &Option<String>, global: &GlobalArguments) -> Result<Url> {
-    let url = match ipc_agent_url {
-        Some(url) => url.parse()?,
-        None => {
-            let config = global.config()?;
-            let addr = config.server.json_rpc_address.to_string();
-            // We are resolving back to our own ipc-agent node.
-            // Since it's our own node, we will use http since we
-            // should be in the same network.
-            format!("http://{addr:}").parse()?
-        }
-    };
-    Ok(url)
 }

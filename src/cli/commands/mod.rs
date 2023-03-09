@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: MIT
 //! This mod contains the different command line implementations.
 
+mod config;
 mod create;
 mod daemon;
 
+use crate::cli::commands::config::{ReloadConfig, ReloadConfigArgs};
 use crate::cli::commands::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::fmt::Debug;
+use url::Url;
 
 /// The collection of all subcommands to be called, see clap's documentation for usage. Internal
 /// to the current mode. Register a new command accordingly.
@@ -22,6 +26,7 @@ enum Commands {
     /// due to the convention from `lotus` and the expected behavior from the filecoin user group.
     Daemon(LaunchDaemonArgs),
     CreateSubnet(CreateSubnetArgs),
+    ReloadConfig(ReloadConfigArgs),
 }
 
 /// The overall command line struct to be used by `clap`.
@@ -75,6 +80,7 @@ pub async fn cli() {
     let r = match &args.command {
         Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
         Commands::CreateSubnet(args) => CreateSubnet::handle(global, args).await,
+        Commands::ReloadConfig(args) => ReloadConfig::handle(global, args).await,
     };
 
     if let Err(e) = r {
@@ -84,4 +90,22 @@ pub async fn cli() {
             e
         )
     }
+}
+
+pub(crate) fn get_ipc_agent_url(
+    ipc_agent_url: &Option<String>,
+    global: &GlobalArguments,
+) -> Result<Url> {
+    let url = match ipc_agent_url {
+        Some(url) => url.parse()?,
+        None => {
+            let config = global.config()?;
+            let addr = config.server.json_rpc_address.to_string();
+            // We are resolving back to our own ipc-agent node.
+            // Since it's our own node, we will use http since we
+            // should be in the same network.
+            format!("http://{addr:}/json_rpc").parse()?
+        }
+    };
+    Ok(url)
 }

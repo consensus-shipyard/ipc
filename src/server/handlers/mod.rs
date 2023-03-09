@@ -13,6 +13,7 @@ use crate::server::handlers::validator::QueryValidatorSetHandler;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+pub use config::ReloadConfigParams;
 use manager::create::CreateSubnetHandler;
 pub use manager::create::{CreateSubnetParams, CreateSubnetResponse};
 use manager::join::JoinSubnetHandler;

@@ -8,7 +8,7 @@ use url::Url;
 use crate::config::deserialize::{deserialize_accounts, deserialize_subnet_id};
 
 /// Represents a subnet declaration in the config.
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Subnet {
     #[serde(deserialize_with = "deserialize_subnet_id")]
     pub id: SubnetID,

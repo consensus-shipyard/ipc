@@ -29,7 +29,7 @@ pub const DEFAULT_IPC_GATEWAY_ADDR: u64 = 64;
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
 /// this struct.
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Config {
     pub server: Server,
     pub subnets: HashMap<String, Subnet>,
