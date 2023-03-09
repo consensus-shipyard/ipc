@@ -3,35 +3,46 @@
 //! The module contains the handlers implementation for the json rpc server.
 
 mod config;
-pub mod create;
-mod subnet;
+mod manager;
 mod validator;
 
 use crate::config::json_rpc_methods;
 use crate::config::ReloadableConfig;
-use crate::server::create::CreateSubnetHandler;
 use crate::server::handlers::config::ReloadConfigHandler;
-use crate::server::handlers::subnet::SubnetManagerPool;
 use crate::server::handlers::validator::QueryValidatorSetHandler;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
-pub use create::{CreateSubnetParams, CreateSubnetResponse};
+use async_trait::async_trait;
+use manager::create::CreateSubnetHandler;
+pub use manager::create::{CreateSubnetParams, CreateSubnetResponse};
+use manager::join::JoinSubnetHandler;
+use manager::kill::KillSubnetHandler;
+use manager::leave::LeaveSubnetHandler;
+use manager::subnet::SubnetManagerPool;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 pub type Method = String;
 
-/// A util enum to avoid Box<dyn> mess in Handlers struct
-enum HandlerWrapper {
-    CreateSubnet(CreateSubnetHandler),
-    ReloadConfig(ReloadConfigHandler),
-    QueryValidatorSet(QueryValidatorSetHandler),
-}
-
 /// The collection of all json rpc handlers
 pub struct Handlers {
-    handlers: HashMap<Method, HandlerWrapper>,
+    handlers: HashMap<Method, Box<dyn HandlerWrapper>>,
+}
+
+/// A util trait to avoid Box<dyn> and associated type mess in Handlers struct
+#[async_trait]
+trait HandlerWrapper: Send + Sync {
+    async fn handle(&self, params: Value) -> Result<Value>;
+}
+
+#[async_trait]
+impl<H: JsonRPCRequestHandler + Send + Sync> HandlerWrapper for H {
+    async fn handle(&self, params: Value) -> Result<Value> {
+        let p = serde_json::from_value(params)?;
+        let r = self.handle(p).await?;
+        Ok(serde_json::to_value(r)?)
+    }
 }
 
 impl Handlers {
@@ -48,44 +59,34 @@ impl Handlers {
         let mut handlers = HashMap::new();
 
         let config = Arc::new(ReloadableConfig::new(config_path_string.clone())?);
-        handlers.insert(
-            String::from(json_rpc_methods::RELOAD_CONFIG),
-            HandlerWrapper::ReloadConfig(ReloadConfigHandler::new(
-                config.clone(),
-                config_path_string,
-            )),
-        );
+        let h: Box<dyn HandlerWrapper> =
+            Box::new(ReloadConfigHandler::new(config.clone(), config_path_string));
+        handlers.insert(String::from(json_rpc_methods::RELOAD_CONFIG), h);
 
-        handlers.insert(
-            String::from(json_rpc_methods::QUERY_VALIDATOR_SET),
-            HandlerWrapper::QueryValidatorSet(QueryValidatorSetHandler::new(config.clone())),
-        );
+        // subnet manager methods
+        let pool = Arc::new(SubnetManagerPool::from_reload_config(config.clone()));
+        let h: Box<dyn HandlerWrapper> = Box::new(CreateSubnetHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::CREATE_SUBNET), h);
 
-        let pool = Arc::new(SubnetManagerPool::from_reload_config(config));
-        handlers.insert(
-            String::from(json_rpc_methods::CREATE_SUBNET),
-            HandlerWrapper::CreateSubnet(CreateSubnetHandler::new(pool)),
-        );
+        let h: Box<dyn HandlerWrapper> = Box::new(LeaveSubnetHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::LEAVE_SUBNET), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(KillSubnetHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::KILL_SUBNET), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(JoinSubnetHandler::new(pool));
+        handlers.insert(String::from(json_rpc_methods::JOIN_SUBNET), h);
+
+        // query validator
+        let h: Box<dyn HandlerWrapper> = Box::new(QueryValidatorSetHandler::new(config));
+        handlers.insert(String::from(json_rpc_methods::QUERY_VALIDATOR_SET), h);
 
         Ok(Self { handlers })
     }
 
     pub async fn handle(&self, method: Method, params: Value) -> Result<Value> {
         if let Some(wrapper) = self.handlers.get(&method) {
-            match wrapper {
-                HandlerWrapper::CreateSubnet(handler) => {
-                    let r = handler.handle(serde_json::from_value(params)?).await?;
-                    Ok(serde_json::to_value(r)?)
-                }
-                HandlerWrapper::ReloadConfig(handler) => {
-                    handler.handle(serde_json::from_value(params)?).await?;
-                    Ok(serde_json::to_value(())?)
-                }
-                HandlerWrapper::QueryValidatorSet(handler) => {
-                    let r = handler.handle(serde_json::from_value(params)?).await?;
-                    Ok(serde_json::to_value(r)?)
-                }
-            }
+            wrapper.handle(params).await
         } else {
             Err(anyhow!("method not supported"))
         }

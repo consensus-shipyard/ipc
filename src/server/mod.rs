@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;
 
@@ -17,7 +18,7 @@ pub use handlers::*;
 /// The JSON RPC server request handler trait.
 #[async_trait]
 pub trait JsonRPCRequestHandler {
-    type Request: Debug;
+    type Request: Debug + DeserializeOwned + Send;
     type Response: Debug + Serialize;
 
     /// Handles the request sent to the json rpc server. Returns a response back.

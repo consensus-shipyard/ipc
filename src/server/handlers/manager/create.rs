@@ -4,7 +4,7 @@
 
 use crate::config::DEFAULT_IPC_GATEWAY_ADDR;
 use crate::manager::SubnetManager;
-use crate::server::handlers::subnet::SubnetManagerPool;
+use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
