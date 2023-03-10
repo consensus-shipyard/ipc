@@ -12,8 +12,7 @@ license-file.workspace = true
 anyhow = { workspace = true }
 blake2b_simd = { workspace = true }
 bloom = "0.3"
-thiserror = { workspace = true }
-tokio = { workspace = true }
+gcra = "0.3"
 lazy_static = { workspace = true }
 libp2p = { version = "0.50", default-features = false, features = [
   "gossipsub",
@@ -33,18 +32,23 @@ libp2p = { version = "0.50", default-features = false, features = [
   "secp256k1",
   "plaintext",
 ] }
-libp2p-bitswap = "0.25"
 libipld = { workspace = true }
 log = { workspace = true }
 prometheus = { workspace = true }
+quickcheck = { workspace = true, optional = true }
 rand = { workspace = true }
 serde = { workspace = true }
-quickcheck = { workspace = true, optional = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
 
 ipc-sdk = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true, optional = true }
 fvm_ipld_blockstore = { workspace = true, optional = true }
+
+# Using a fork of libp2p-bitswap so that we can do rate limiting.
+#libp2p-bitswap = "0.25"
+libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap", branch = "req-res-pub" }
 
 [dev-dependencies]
 quickcheck = { workspace = true }

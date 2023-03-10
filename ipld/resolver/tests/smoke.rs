@@ -23,7 +23,8 @@ use anyhow::anyhow;
 use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID};
 use ipc_ipld_resolver::{
-    Client, Config, ConnectionConfig, DiscoveryConfig, MembershipConfig, NetworkConfig, Service,
+    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig,
+    NetworkConfig, Service,
 };
 use ipc_sdk::subnet_id::{SubnetID, ROOTNET_ID};
 use libipld::Cid;
@@ -187,6 +188,10 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
             publish_interval: Duration::from_secs(5),
             min_time_between_publish: Duration::from_secs(1),
             max_provider_age: Duration::from_secs(60),
+        },
+        content: ContentConfig {
+            rate_limit_bytes: 1 << 20,
+            rate_limit_period: Duration::from_secs(60),
         },
     };
 

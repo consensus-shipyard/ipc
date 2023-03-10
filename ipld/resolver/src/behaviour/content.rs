@@ -1,10 +1,18 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use std::task::{Context, Poll};
+use std::{
+    collections::{HashMap, VecDeque},
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use libipld::{store::StoreParams, Cid};
 use libp2p::{
+    core::ConnectedPoint,
+    futures::channel::oneshot,
+    multiaddr::Protocol,
+    request_response::handler::RequestResponseHandlerEvent,
     swarm::{
         derive_prelude::{ConnectionId, FromSwarm},
         ConnectionHandler, IntoConnectionHandler, NetworkBehaviour, NetworkBehaviourAction,
@@ -12,10 +20,14 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapStore};
+use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapResponse, BitswapStore};
+use log::warn;
 use prometheus::Registry;
 
-use crate::stats;
+use crate::{
+    limiter::{RateLimit, RateLimiter},
+    stats,
+};
 
 pub type QueryId = libp2p_bitswap::QueryId;
 
@@ -37,20 +49,59 @@ pub enum Event {
     /// caller can use the [`missing_blocks`] function to check
     /// whether a retry is necessary.
     Complete(QueryId, anyhow::Result<()>),
+
+    /// Event raised when we want to execute some logic with the `BitswapResponse`.
+    /// This is only raised if we are tracking rate limits. The service has to
+    /// do the forwarding between the two oneshot channels, and call this module
+    /// back between doing so.
+    BitswapForward {
+        peer_id: PeerId,
+        /// Receive response from the [`Bitswap`] behaviour.
+        /// Normally this goes straight to the handler.
+        response_rx: oneshot::Receiver<BitswapResponse>,
+        /// Forward the response to the handler.
+        response_tx: oneshot::Sender<BitswapResponse>,
+    },
+}
+
+/// Configuration for [`content::Behaviour`].
+#[derive(Debug, Clone)]
+pub struct Config {
+    /// Number of bytes that can be consumed remote peers in a time period.
+    ///
+    /// 0 means no limit.
+    pub rate_limit_bytes: u32,
+    /// Length of the time period at which the consumption limit fills.
+    ///
+    /// 0 means no limit.
+    pub rate_limit_period: Duration,
 }
 
 /// Behaviour built on [`Bitswap`] to resolve IPLD content from [`Cid`] to raw bytes.
 pub struct Behaviour<P: StoreParams> {
     inner: Bitswap<P>,
+    /// Remember which address peers connected from, so we can apply the rate limit
+    /// on the address, and not on the peer ID which they can change easily.
+    peer_addresses: HashMap<PeerId, Multiaddr>,
+    /// Limit the amount of data served by remote address.
+    rate_limiter: RateLimiter<Multiaddr>,
+    rate_limit: RateLimit,
+    outbox: VecDeque<Event>,
 }
 
 impl<P: StoreParams> Behaviour<P> {
-    pub fn new<S>(store: S) -> Self
+    pub fn new<S>(config: Config, store: S) -> Self
     where
         S: BitswapStore<Params = P>,
     {
         let bitswap = Bitswap::new(BitswapConfig::default(), store);
-        Self { inner: bitswap }
+        Self {
+            inner: bitswap,
+            peer_addresses: Default::default(),
+            rate_limiter: RateLimiter::new(config.rate_limit_period),
+            rate_limit: RateLimit::new(config.rate_limit_bytes, config.rate_limit_period),
+            outbox: Default::default(),
+        }
     }
 
     /// Register Prometheus metrics.
@@ -83,6 +134,41 @@ impl<P: StoreParams> Behaviour<P> {
         // Not passing any missing items, which will result in a call to `BitswapStore::missing_blocks`.
         self.inner.sync(cid, peers, [].into_iter())
     }
+
+    /// Check if we are using rate limiting.
+    fn has_rate_limits(&self) -> bool {
+        !(self.rate_limit.resource_limit == 0 || self.rate_limit.period.is_zero())
+    }
+
+    /// Check whether the peer has already exhaused their rate limit.
+    fn check_rate_limit(&mut self, peer_id: &PeerId, cid: &Cid) -> bool {
+        if !self.has_rate_limits() {
+            return true;
+        }
+        if let Some(addr) = self.peer_addresses.get(peer_id).cloned() {
+            let bytes = cid.to_bytes().len().try_into().unwrap_or(u32::MAX);
+
+            if !self.rate_limiter.add(&self.rate_limit, addr, bytes) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Callback by the service after [`Event::BitswapForward`].
+    pub fn rate_limit_used(&mut self, peer_id: PeerId, bytes: usize) {
+        if self.has_rate_limits() {
+            if let Some(addr) = self.peer_addresses.get(&peer_id).cloned() {
+                let bytes = bytes.try_into().unwrap_or(u32::MAX);
+                let _ = self.rate_limiter.add(&self.rate_limit, addr, bytes);
+            }
+        }
+    }
+
+    /// Update the rate limit to a new value, keeping the period as-is.
+    pub fn update_rate_limit(&mut self, bytes: u32) {
+        self.rate_limit = RateLimit::new(bytes, self.rate_limit.period)
+    }
 }
 
 impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
@@ -98,6 +184,33 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
+        // Store the remote address.
+        match &event {
+            FromSwarm::ConnectionEstablished(c) => {
+                if c.other_established == 0 {
+                    let peer_addr = match c.endpoint {
+                        ConnectedPoint::Dialer {
+                            address: listen_addr,
+                            ..
+                        } => listen_addr.clone(),
+                        ConnectedPoint::Listener {
+                            send_back_addr: ephemeral_addr,
+                            ..
+                        } => select_non_ephemeral(ephemeral_addr.clone()),
+                    };
+                    self.peer_addresses.insert(c.peer_id, peer_addr);
+                }
+            }
+            FromSwarm::ConnectionClosed(c) => {
+                if c.remaining_established == 0 {
+                    self.peer_addresses.remove(&c.peer_id);
+                }
+            }
+            // Note: Ignoring FromSwarm::AddressChange - as long as the same peer connects,
+            // not updating the address provides continuity of resource consumption.
+            _ => {}
+        }
+
         self.inner.on_swarm_event(event)
     }
 
@@ -107,8 +220,39 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         connection_id: ConnectionId,
         event: <<Self::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::OutEvent,
     ) {
-        self.inner
-            .on_connection_handler_event(peer_id, connection_id, event)
+        match event {
+            RequestResponseHandlerEvent::Request {
+                request_id,
+                request,
+                sender,
+            } if self.has_rate_limits() => {
+                if !self.check_rate_limit(&peer_id, &request.cid) {
+                    warn!("rate limiting {peer_id}");
+                    stats::CONTENT_RATE_LIMITED.inc();
+                    return;
+                }
+                // We need to hijack the response channel to record the size, otherwise it goes straight to the handler.
+                let (tx, rx) = libp2p::futures::channel::oneshot::channel();
+                let event = RequestResponseHandlerEvent::Request {
+                    request_id,
+                    request,
+                    sender: tx,
+                };
+
+                self.inner
+                    .on_connection_handler_event(peer_id, connection_id, event);
+
+                let forward = Event::BitswapForward {
+                    peer_id,
+                    response_rx: rx,
+                    response_tx: sender,
+                };
+                self.outbox.push_back(forward);
+            }
+            _ => self
+                .inner
+                .on_connection_handler_event(peer_id, connection_id, event),
+        }
     }
 
     fn poll(
@@ -116,6 +260,11 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         cx: &mut Context<'_>,
         params: &mut impl PollParameters,
     ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ConnectionHandler>> {
+        // Emit own events first.
+        if let Some(ev) = self.outbox.pop_front() {
+            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(ev));
+        }
+        // Poll Bitswap.
         while let Poll::Ready(ev) = self.inner.poll(cx, params) {
             match ev {
                 NetworkBehaviourAction::GenerateEvent(ev) => match ev {
@@ -133,5 +282,54 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         }
 
         Poll::Pending
+    }
+}
+
+/// Get rid of parts of an address which are considered ephemeral,
+/// keeping just the parts which would stay the same if for example
+/// the same peer opened another connection from a different random port.
+fn select_non_ephemeral(mut addr: Multiaddr) -> Multiaddr {
+    let mut keep = Vec::new();
+    while let Some(proto) = addr.pop() {
+        match proto {
+            // Some are valid on their own right.
+            Protocol::Ip4(_) | Protocol::Ip6(_) => {
+                keep.clear();
+                keep.push(proto);
+                break;
+            }
+            // Skip P2P peer ID, they might use a different identity.
+            Protocol::P2p(_) => {}
+            // Skip ephemeral parts.
+            Protocol::Tcp(_) | Protocol::Udp(_) => {}
+            // Everything else we keep until we see better options.
+            _ => {
+                keep.push(proto);
+            }
+        }
+    }
+    keep.reverse();
+    Multiaddr::from_iter(keep.into_iter())
+}
+
+#[cfg(test)]
+mod tests {
+    use libp2p::Multiaddr;
+
+    use super::select_non_ephemeral;
+
+    #[test]
+    fn non_ephemeral_addr() {
+        let examples = [
+            ("/ip4/127.0.0.1/udt/sctp/5678", "/ip4/127.0.0.1"),
+            ("/ip4/95.217.194.97/tcp/8008/p2p/12D3KooWC1EaEEpghwnPdd89LaPTKEweD1PRLz4aRBkJEA9UiUuS", "/ip4/95.217.194.97"),
+            ("/udt/memory/10/p2p/12D3KooWC1EaEEpghwnPdd89LaPTKEweD1PRLz4aRBkJEA9UiUuS", "/udt/memory/10")
+        ];
+
+        for (addr, exp) in examples {
+            let addr: Multiaddr = addr.parse().unwrap();
+            let exp: Multiaddr = exp.parse().unwrap();
+            assert_eq!(select_non_ephemeral(addr), exp);
+        }
     }
 }

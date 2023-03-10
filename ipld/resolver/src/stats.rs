@@ -107,4 +107,9 @@ metrics! {
         "content_connected_peers",
         "Number of connected peers in a resolution"
     ));
+
+    CONTENT_RATE_LIMITED: IntCounter = IntCounter::new(
+        "content_rate_limited",
+        "Number of rate limited requests"
+    );
 }

@@ -18,7 +18,7 @@ use libp2p::{
     yamux, Multiaddr, PeerId, Swarm, Transport,
 };
 use libp2p::{identify, ping};
-use libp2p_bitswap::BitswapStore;
+use libp2p_bitswap::{BitswapResponse, BitswapStore};
 use log::{debug, error, trace, warn};
 use prometheus::Registry;
 use rand::seq::SliceRandom;
@@ -26,8 +26,8 @@ use tokio::select;
 use tokio::sync::oneshot::{self, Sender};
 
 use crate::behaviour::{
-    self, content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, DiscoveryConfig,
-    MembershipConfig, NetworkConfig,
+    self, content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
+    DiscoveryConfig, MembershipConfig, NetworkConfig,
 };
 use crate::stats;
 
@@ -73,6 +73,7 @@ pub struct Config {
     pub discovery: DiscoveryConfig,
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
+    pub content: ContentConfig,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -83,6 +84,8 @@ enum Request {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, oneshot::Sender<ResolveResult>),
+    RateLimitUsed(PeerId, usize),
+    UpdateRateLimit(u32),
 }
 
 /// A facade to the [`Service`] to provide a nicer interface than message passing would allow on its own.
@@ -140,6 +143,16 @@ impl Client {
         let res = rx.await?;
         Ok(res)
     }
+
+    /// Update the rate limit based on new projections for the same timeframe
+    /// the `content::Behaviour` was originally configured with. This can be
+    /// used if we can't come up with a good estimate for the amount of data
+    /// we have to serve from the subnets we participate in, but we can adjust
+    /// them on the fly based on what we observe on chain.
+    pub fn update_rate_limit(&self, bytes: u32) -> anyhow::Result<()> {
+        let req = Request::UpdateRateLimit(bytes);
+        self.send_request(req)
+    }
 }
 
 /// The `Service` handles P2P communication to resolve IPLD content by wrapping and driving a number of `libp2p` behaviours.
@@ -149,6 +162,7 @@ pub struct Service<P: StoreParams> {
     swarm: Swarm<Behaviour<P>>,
     queries: QueryMap,
     request_rx: tokio::sync::mpsc::UnboundedReceiver<Request>,
+    request_tx: tokio::sync::mpsc::UnboundedSender<Request>,
     background_lookup_filter: BloomFilter,
     max_peers_per_query: usize,
 }
@@ -176,7 +190,13 @@ impl<P: StoreParams> Service<P> {
     {
         let peer_id = config.network.local_peer_id();
         let transport = transport(config.network.local_key.clone());
-        let behaviour = Behaviour::new(config.network, config.discovery, config.membership, store)?;
+        let behaviour = Behaviour::new(
+            config.network,
+            config.discovery,
+            config.membership,
+            config.content,
+            store,
+        )?;
 
         // NOTE: Hardcoded values from Forest. Will leave them as is until we know we need to change.
 
@@ -201,6 +221,7 @@ impl<P: StoreParams> Service<P> {
             swarm,
             queries: Default::default(),
             request_rx: rx,
+            request_tx: tx.clone(),
             background_lookup_filter: BloomFilter::with_rate(
                 0.1,
                 config.connection.expected_peer_count,
@@ -244,10 +265,8 @@ impl<P: StoreParams> Service<P> {
                 request = self.request_rx.recv() => match request {
                     // A Client sent us a request.
                     Some(req) => self.handle_request(req),
+                    // This shouldn't happen because the service has a copy of the sender.
                     // All Client instances have been dropped.
-                    // We could keep the Swarm alive to serve content to others,
-                    // but we ourselves are unable to send requests. Let's treat
-                    // this as time to quit.
                     None => { break; }
                 }
             };
@@ -354,6 +373,22 @@ impl<P: StoreParams> Service<P> {
                     warn!("query ID not found");
                 }
             }
+            content::Event::BitswapForward {
+                peer_id,
+                response_rx,
+                response_tx,
+            } => {
+                let request_tx = self.request_tx.clone();
+                tokio::task::spawn(async move {
+                    if let Ok(res) = response_rx.await {
+                        if let BitswapResponse::Block(bz) = &res {
+                            let _ = request_tx.send(Request::RateLimitUsed(peer_id, bz.len()));
+                        }
+                        // Forward, if the listener is still open.
+                        let _ = response_tx.send(res);
+                    }
+                });
+            }
         }
     }
 
@@ -381,6 +416,10 @@ impl<P: StoreParams> Service<P> {
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
+            Request::RateLimitUsed(peer_id, bytes) => {
+                self.content_mut().rate_limit_used(peer_id, bytes)
+            }
+            Request::UpdateRateLimit(bytes) => self.content_mut().update_rate_limit(bytes),
         }
     }
 
