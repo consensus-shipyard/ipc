@@ -20,6 +20,7 @@ use libp2p::{
 use libp2p::{identify, ping};
 use libp2p_bitswap::BitswapStore;
 use log::{debug, error, trace, warn};
+use prometheus::Registry;
 use rand::seq::SliceRandom;
 use tokio::select;
 use tokio::sync::oneshot::{self, Sender};
@@ -28,6 +29,7 @@ use crate::behaviour::{
     self, content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, DiscoveryConfig,
     MembershipConfig, NetworkConfig,
 };
+use crate::stats;
 
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
@@ -215,6 +217,13 @@ impl<P: StoreParams> Service<P> {
         Ok((service, client))
     }
 
+    /// Register Prometheus metrics.
+    pub fn register_metrics(&mut self, registry: &Registry) -> anyhow::Result<()> {
+        self.content_mut().register_metrics(registry)?;
+        stats::register_metrics(registry)?;
+        Ok(())
+    }
+
     /// Start the swarm listening for incoming connections and drive the events forward.
     pub async fn run(mut self) -> anyhow::Result<()> {
         // Start the swarm.
@@ -262,6 +271,8 @@ impl<P: StoreParams> Service<P> {
         let peer_id = event.peer.to_base58();
         match event.result {
             Ok(ping::Success::Ping { rtt }) => {
+                stats::PING_SUCCESS.inc();
+                stats::PING_RTT.observe(rtt.as_millis() as f64);
                 trace!(
                     "PingSuccess::Ping rtt to {} from {} is {} ms",
                     peer_id,
@@ -273,9 +284,11 @@ impl<P: StoreParams> Service<P> {
                 trace!("PingSuccess::Pong from {peer_id} to {}", self.peer_id);
             }
             Err(ping::Failure::Timeout) => {
+                stats::PING_TIMEOUT.inc();
                 debug!("PingFailure::Timeout from {peer_id} to {}", self.peer_id);
             }
             Err(ping::Failure::Other { error }) => {
+                stats::PING_FAILURE.inc();
                 warn!(
                     "PingFailure::Other from {peer_id} to {}: {error}",
                     self.peer_id
@@ -290,8 +303,10 @@ impl<P: StoreParams> Service<P> {
 
     fn handle_identify_event(&mut self, event: identify::Event) {
         if let identify::Event::Error { peer_id, error } = event {
+            stats::IDENTIFY_FAILURE.inc();
             warn!("Error identifying {peer_id}: {error}")
         } else if let identify::Event::Received { peer_id, info } = event {
+            stats::IDENTIFY_RECEIVED.inc();
             debug!("protocols supported by {peer_id}: {:?}", info.protocols);
             debug!("adding identified address of {peer_id} to {}", self.peer_id);
             self.discovery_mut().add_identified(&peer_id, info);
@@ -373,7 +388,10 @@ impl<P: StoreParams> Service<P> {
     fn start_query(&mut self, cid: Cid, subnet_id: SubnetID, response_channel: ResponseChannel) {
         let mut peers = self.membership_mut().providers_of_subnet(&subnet_id);
 
+        stats::CONTENT_RESOLVE_PEERS.observe(peers.len() as f64);
+
         if peers.is_empty() {
+            stats::CONTENT_RESOLVE_NO_PEERS.inc();
             send_resolve_result(response_channel, Err(anyhow!(NoKnownPeers(subnet_id))));
         } else {
             // Connect to them in a random order, so as not to overwhelm any specific peer.
@@ -383,6 +401,8 @@ impl<P: StoreParams> Service<P> {
             let (connected, known) = peers
                 .into_iter()
                 .partition::<Vec<_>, _>(|id| self.swarm.is_connected(id));
+
+            stats::CONTENT_CONNECTED_PEERS.observe(connected.len() as f64);
 
             let peers = [connected, known].into_iter().flatten().collect();
             let (peers, fallback) = self.split_peers_for_query(peers);
@@ -407,11 +427,16 @@ impl<P: StoreParams> Service<P> {
     /// first attempted the resolution.
     fn resolve_query(&mut self, mut query: Query, result: ResolveResult) {
         match result {
-            Ok(_) => send_resolve_result(query.response_channel, result),
+            Ok(_) => {
+                stats::CONTENT_RESOLVE_SUCCESS.inc();
+                send_resolve_result(query.response_channel, result)
+            }
             Err(_) if query.fallback_peer_ids.is_empty() => {
+                stats::CONTENT_RESOLVE_FAILURE.inc();
                 send_resolve_result(query.response_channel, result)
             }
             Err(e) => {
+                stats::CONTENT_RESOLVE_FALLBACK.inc();
                 debug!(
                     "resolving {} from {} failed with {}, but there are {} fallback peers to try",
                     query.cid,

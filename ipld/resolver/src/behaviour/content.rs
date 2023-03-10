@@ -13,6 +13,9 @@ use libp2p::{
     Multiaddr, PeerId,
 };
 use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapStore};
+use prometheus::Registry;
+
+use crate::stats;
 
 pub type QueryId = libp2p_bitswap::QueryId;
 
@@ -47,8 +50,12 @@ impl<P: StoreParams> Behaviour<P> {
         S: BitswapStore<Params = P>,
     {
         let bitswap = Bitswap::new(BitswapConfig::default(), store);
-        // TODO: `bitswap.register_metrics(prometheus::default_registry())`
         Self { inner: bitswap }
+    }
+
+    /// Register Prometheus metrics.
+    pub fn register_metrics(&self, registry: &Registry) -> anyhow::Result<()> {
+        self.inner.register_metrics(registry)
     }
 
     /// Recursively resolve a [`Cid`] and all underlying CIDs into blocks.
@@ -72,6 +79,7 @@ impl<P: StoreParams> Behaviour<P> {
     /// The underlying [`libp2p_request_response::RequestResponse`] behaviour
     /// will initiate connections to the peers which aren't connected at the moment.
     pub fn resolve(&mut self, cid: Cid, peers: Vec<PeerId>) -> QueryId {
+        stats::CONTENT_RESOLVE_RUNNING.inc();
         // Not passing any missing items, which will result in a call to `BitswapStore::missing_blocks`.
         self.inner.sync(cid, peers, [].into_iter())
     }
@@ -113,6 +121,7 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
                 NetworkBehaviourAction::GenerateEvent(ev) => match ev {
                     BitswapEvent::Progress(_, _) => {}
                     BitswapEvent::Complete(id, result) => {
+                        stats::CONTENT_RESOLVE_RUNNING.dec();
                         let out = Event::Complete(id, result);
                         return Poll::Ready(NetworkBehaviourAction::GenerateEvent(out));
                     }

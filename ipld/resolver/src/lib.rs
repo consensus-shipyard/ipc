@@ -5,6 +5,7 @@ mod hash;
 mod provider_cache;
 mod provider_record;
 mod service;
+mod stats;
 
 #[cfg(any(test, feature = "arb"))]
 mod arb;
