@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use anyhow::anyhow;
 use ipc_sdk::subnet_id::SubnetID;
 use libp2p::core::connection::ConnectionId;
 use libp2p::gossipsub::error::SubscriptionError;
@@ -26,6 +27,7 @@ use tokio::time::{Instant, Interval};
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
 use crate::provider_record::{ProviderRecord, SignedProviderRecord, Timestamp};
+use crate::stats;
 
 use super::NetworkConfig;
 
@@ -198,11 +200,20 @@ impl Behaviour {
     fn publish_membership(&mut self) -> anyhow::Result<()> {
         let record = SignedProviderRecord::new(&self.local_key, self.subnet_ids.clone())?;
         let data = record.into_envelope().into_protobuf_encoding();
-        let _msg_id = self.inner.publish(self.membership_topic.clone(), data)?;
-        self.last_publish_timestamp = Timestamp::now();
-        self.next_publish_timestamp = self.last_publish_timestamp + self.publish_interval.period();
-        self.publish_interval.reset(); // In case the change wasn't tiggered by the schedule.
-        Ok(())
+        match self.inner.publish(self.membership_topic.clone(), data) {
+            Err(e) => {
+                stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
+                Err(anyhow!(e))
+            }
+            Ok(_msg_id) => {
+                stats::MEMBERSHIP_PUBLISH_SUCCESS.inc();
+                self.last_publish_timestamp = Timestamp::now();
+                self.next_publish_timestamp =
+                    self.last_publish_timestamp + self.publish_interval.period();
+                self.publish_interval.reset(); // In case the change wasn't tiggered by the schedule.
+                Ok(())
+            }
+        }
     }
 
     /// Mark a peer as routable in the cache.
@@ -210,6 +221,8 @@ impl Behaviour {
     /// Call this method when the discovery service learns the address of a peer.
     pub fn set_routable(&mut self, peer_id: PeerId) {
         self.provider_cache.set_routable(peer_id);
+        stats::MEMBERSHIP_ROUTABLE_PEERS
+            .set(self.provider_cache.num_routable().try_into().unwrap());
         self.publish_for_new_peer(peer_id);
     }
 
@@ -237,6 +250,7 @@ impl Behaviour {
             match SignedProviderRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
                 Ok(record) => self.handle_provider_record(record),
                 Err(e) => {
+                    stats::MEMBERSHIP_INVALID_MESSAGE.inc();
                     warn!(
                         "Gossip message from peer {:?} could not be deserialized: {e}",
                         msg.source
@@ -244,6 +258,7 @@ impl Behaviour {
                 }
             }
         } else {
+            stats::MEMBERSHIP_UNKNOWN_TOPIC.inc();
             warn!(
                 "unknown gossipsub topic in message from {:?}: {}",
                 msg.source, msg.topic
@@ -256,11 +271,16 @@ impl Behaviour {
     /// If this is the first time we receive a record from the peer,
     /// reciprocate by publishing our own.
     fn handle_provider_record(&mut self, record: ProviderRecord) {
-        let is_new = !self.provider_cache.has_timestamp(&record.peer_id);
         let (event, publish) = match self.provider_cache.add_provider(&record) {
-            None => (Some(Event::Skipped(record.peer_id)), false),
-            Some(d) if d.is_empty() => (None, false),
-            Some(d) => (Some(Event::Updated(record.peer_id, d)), is_new),
+            None => {
+                stats::MEMBERSHIP_SKIPPED_PEERS.inc();
+                (Some(Event::Skipped(record.peer_id)), false)
+            }
+            Some(d) if d.is_empty() && !d.is_new => (None, false),
+            Some(d) => {
+                let publish = d.is_new;
+                (Some(Event::Updated(record.peer_id, d)), publish)
+            }
         };
 
         if let Some(event) = event {
@@ -268,6 +288,7 @@ impl Behaviour {
         }
 
         if publish {
+            stats::MEMBERSHIP_PROVIDER_PEERS.inc();
             self.publish_for_new_peer(record.peer_id)
         }
     }
@@ -277,6 +298,7 @@ impl Behaviour {
         if topic == self.membership_topic.hash() {
             self.publish_for_new_peer(peer_id)
         } else {
+            stats::MEMBERSHIP_UNKNOWN_TOPIC.inc();
             warn!(
                 "unknown gossipsub topic in subscription from {}: {}",
                 peer_id, topic
@@ -317,6 +339,7 @@ impl Behaviour {
         let cutoff_timestamp = Timestamp::now() - self.max_provider_age;
         let pruned = self.provider_cache.prune_providers(cutoff_timestamp);
         for peer_id in pruned {
+            stats::MEMBERSHIP_PROVIDER_PEERS.dec();
             self.outbox.push_back(Event::Removed(peer_id))
         }
     }

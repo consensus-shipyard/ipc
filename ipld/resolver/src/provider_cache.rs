@@ -8,8 +8,9 @@ use libp2p::PeerId;
 use crate::provider_record::{ProviderRecord, Timestamp};
 
 /// Change in the supported subnets of a peer.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ProviderDelta {
+    pub is_new: bool,
     pub added: Vec<SubnetID>,
     pub removed: Vec<SubnetID>,
 }
@@ -78,6 +79,11 @@ impl SubnetProviderCache {
         }
     }
 
+    /// Number of routable peers.
+    pub fn num_routable(&mut self) -> usize {
+        self.routable_peers.len()
+    }
+
     /// Check if a peer has been marked as routable.
     pub fn is_routable(&self, peer_id: &PeerId) -> bool {
         self.routable_peers.contains(peer_id)
@@ -99,7 +105,11 @@ impl SubnetProviderCache {
             return None;
         }
 
-        let mut delta = ProviderDelta::default();
+        let mut delta = ProviderDelta {
+            is_new: !self.has_timestamp(&record.peer_id),
+            added: Vec::new(),
+            removed: Vec::new(),
+        };
 
         let timestamp = self.peer_timestamps.entry(record.peer_id).or_default();
 
