@@ -85,7 +85,8 @@ pub struct Behaviour<P: StoreParams> {
     peer_addresses: HashMap<PeerId, Multiaddr>,
     /// Limit the amount of data served by remote address.
     rate_limiter: RateLimiter<Multiaddr>,
-    rate_limit: RateLimit,
+    rate_limit_period: Duration,
+    rate_limit: Option<RateLimit>,
     outbox: VecDeque<Event>,
 }
 
@@ -95,11 +96,20 @@ impl<P: StoreParams> Behaviour<P> {
         S: BitswapStore<Params = P>,
     {
         let bitswap = Bitswap::new(BitswapConfig::default(), store);
+        let rate_limit = if config.rate_limit_bytes == 0 || config.rate_limit_period.is_zero() {
+            None
+        } else {
+            Some(RateLimit::new(
+                config.rate_limit_bytes,
+                config.rate_limit_period,
+            ))
+        };
         Self {
             inner: bitswap,
             peer_addresses: Default::default(),
             rate_limiter: RateLimiter::new(config.rate_limit_period),
-            rate_limit: RateLimit::new(config.rate_limit_bytes, config.rate_limit_period),
+            rate_limit_period: config.rate_limit_period,
+            rate_limit,
             outbox: Default::default(),
         }
     }
@@ -135,21 +145,15 @@ impl<P: StoreParams> Behaviour<P> {
         self.inner.sync(cid, peers, [].into_iter())
     }
 
-    /// Check if we are using rate limiting.
-    fn has_rate_limits(&self) -> bool {
-        !(self.rate_limit.resource_limit == 0 || self.rate_limit.period.is_zero())
-    }
-
     /// Check whether the peer has already exhaused their rate limit.
     fn check_rate_limit(&mut self, peer_id: &PeerId, cid: &Cid) -> bool {
-        if !self.has_rate_limits() {
-            return true;
-        }
-        if let Some(addr) = self.peer_addresses.get(peer_id).cloned() {
-            let bytes = cid.to_bytes().len().try_into().unwrap_or(u32::MAX);
+        if let Some(ref rate_limit) = self.rate_limit {
+            if let Some(addr) = self.peer_addresses.get(peer_id).cloned() {
+                let bytes = cid.to_bytes().len().try_into().unwrap_or(u32::MAX);
 
-            if !self.rate_limiter.add(&self.rate_limit, addr, bytes) {
-                return false;
+                if !self.rate_limiter.add(rate_limit, addr, bytes) {
+                    return false;
+                }
             }
         }
         true
@@ -157,17 +161,21 @@ impl<P: StoreParams> Behaviour<P> {
 
     /// Callback by the service after [`Event::BitswapForward`].
     pub fn rate_limit_used(&mut self, peer_id: PeerId, bytes: usize) {
-        if self.has_rate_limits() {
+        if let Some(ref rate_limit) = self.rate_limit {
             if let Some(addr) = self.peer_addresses.get(&peer_id).cloned() {
                 let bytes = bytes.try_into().unwrap_or(u32::MAX);
-                let _ = self.rate_limiter.add(&self.rate_limit, addr, bytes);
+                let _ = self.rate_limiter.add(rate_limit, addr, bytes);
             }
         }
     }
 
     /// Update the rate limit to a new value, keeping the period as-is.
     pub fn update_rate_limit(&mut self, bytes: u32) {
-        self.rate_limit = RateLimit::new(bytes, self.rate_limit.period)
+        if bytes == 0 || self.rate_limit_period.is_zero() {
+            self.rate_limit = None;
+        } else {
+            self.rate_limit = Some(RateLimit::new(bytes, self.rate_limit_period))
+        }
     }
 }
 
@@ -225,7 +233,7 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
                 request_id,
                 request,
                 sender,
-            } if self.has_rate_limits() => {
+            } if self.rate_limit.is_some() => {
                 if !self.check_rate_limit(&peer_id, &request.cid) {
                     warn!("rate limiting {peer_id}");
                     stats::CONTENT_RATE_LIMITED.inc();
