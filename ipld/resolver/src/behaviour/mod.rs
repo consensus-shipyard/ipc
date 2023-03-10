@@ -14,6 +14,7 @@ pub mod content;
 pub mod discovery;
 pub mod membership;
 
+pub use content::Config as ContentConfig;
 pub use discovery::Config as DiscoveryConfig;
 pub use membership::Config as MembershipConfig;
 
@@ -67,6 +68,7 @@ impl<P: StoreParams> Behaviour<P> {
         nc: NetworkConfig,
         dc: DiscoveryConfig,
         mc: MembershipConfig,
+        cc: ContentConfig,
         store: S,
     ) -> Result<Self, ConfigError>
     where
@@ -80,7 +82,7 @@ impl<P: StoreParams> Behaviour<P> {
             )),
             discovery: discovery::Behaviour::new(nc.clone(), dc)?,
             membership: membership::Behaviour::new(nc, mc)?,
-            content: content::Behaviour::new(store),
+            content: content::Behaviour::new(cc, store),
         })
     }
 
