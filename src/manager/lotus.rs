@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 
-use crate::config::Subnet;
+use crate::config::{Subnet, DEFAULT_IPC_GATEWAY_ADDR};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -146,8 +146,26 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         Ok(map)
     }
 
-    async fn fund(&self, _subnet: SubnetID, _from: Address, _amount: TokenAmount) -> Result<()> {
-        todo!()
+    async fn fund(&self, subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<()> {
+        // The current connection should be directed to the gateway,
+        // which shares the same network id.
+        if !self.is_network_match(&subnet).await? {
+            return Err(anyhow!(
+                "subnet actor being funded not matching current network"
+            ));
+        }
+
+        let fund_params = cbor::serialize(&subnet, "fund subnet actor params")?;
+        let mut message = MpoolPushMessage::new(
+            Address::new_id(DEFAULT_IPC_GATEWAY_ADDR),
+            from,
+            ipc_gateway::Method::Fund as MethodNum,
+            fund_params.to_vec(),
+        );
+        message.value = amount;
+
+        let state_wait_response = self.mpool_push_and_wait(message).await?;
+        state_wait_response.receipt.parse_result_into::<()>()
     }
 
     async fn release(&self, _subnet: SubnetID, _from: Address) -> Result<()> {
