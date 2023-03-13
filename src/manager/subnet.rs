@@ -6,6 +6,7 @@ use crate::lotus::message::ipc::SubnetInfo;
 ///! IPC node-specific traits.
 use anyhow::Result;
 use async_trait::async_trait;
+use cid::Cid;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_gateway::Checkpoint;
 use ipc_sdk::subnet_id::SubnetID;
@@ -51,4 +52,27 @@ pub trait SubnetManager {
         &self,
         gateway_addr: Address,
     ) -> Result<HashMap<SubnetID, SubnetInfo>>;
+
+    /// Fund injects new funds from an account of the parent chain to a subnet
+    async fn fund(&self, subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<()>;
+
+    /// Release creates a new check message to release funds in parent chain
+    async fn release(&self, subnet: SubnetID, from: Address) -> Result<()>;
+
+    /// Propagate a cross-net message forward
+    async fn propagate(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        postbox_msg_cid: Cid,
+    ) -> anyhow::Result<()>;
+
+    /// Whitelist a series of addresses as propagator of a cross net message
+    async fn whitelist_propagator(
+        &self,
+        subnet: SubnetID,
+        postbox_msg_cid: Cid,
+        from: Address,
+        to_add: Vec<Address>,
+    ) -> anyhow::Result<()>;
 }

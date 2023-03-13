@@ -145,6 +145,33 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         }
         Ok(map)
     }
+
+    async fn fund(&self, _subnet: SubnetID, _from: Address, _amount: TokenAmount) -> Result<()> {
+        todo!()
+    }
+
+    async fn release(&self, _subnet: SubnetID, _from: Address) -> Result<()> {
+        todo!()
+    }
+
+    async fn propagate(
+        &self,
+        _subnet: SubnetID,
+        _from: Address,
+        _postbox_msg_cid: Cid,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    async fn whitelist_propagator(
+        &self,
+        _subnet: SubnetID,
+        _postbox_msg_cid: Cid,
+        _from: Address,
+        _to_add: Vec<Address>,
+    ) -> Result<()> {
+        todo!()
+    }
 }
 
 impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
