@@ -8,7 +8,6 @@ use crate::server::Handlers;
 use anyhow::Result;
 use bytes::Bytes;
 
-use fvm_shared::address::set_current_network;
 use std::sync::Arc;
 use warp::http::StatusCode;
 use warp::reject::Reject;
@@ -59,9 +58,6 @@ impl JsonRPCServer {
             "IPC agent rpc node listening at {:?}",
             self.config.server.json_rpc_address
         );
-
-        // need to set network, otherwise Address::from_str will throw error.
-        set_current_network(self.config.server.network);
 
         let handlers = Arc::new(Handlers::new(self.default_config_path.clone())?);
         warp::serve(json_rpc_filter(handlers))

@@ -1,6 +1,5 @@
 [server]
 json_rpc_address = "127.0.0.1:3030"
-network = 1 # we are in the test network, 0 is mainnet
 
 [subnets]
 
