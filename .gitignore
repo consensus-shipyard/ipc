@@ -2,3 +2,4 @@
 *.iml
 /target
 docs/diagrams/plantuml.jar
+bin

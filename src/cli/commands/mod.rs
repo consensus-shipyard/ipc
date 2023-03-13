@@ -7,7 +7,7 @@ mod create;
 mod daemon;
 mod list_subnets;
 
-use crate::cli::commands::config::{ReloadConfig, ReloadConfigArgs};
+use crate::cli::commands::config::{InitConfig, InitConfigArgs, ReloadConfig, ReloadConfigArgs};
 use crate::cli::commands::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::cli::commands::list_subnets::{ListSubnets, ListSubnetsArgs};
@@ -27,8 +27,13 @@ enum Commands {
     /// and not in the background as what daemon processes are. Still, this struct contains `Daemon`
     /// due to the convention from `lotus` and the expected behavior from the filecoin user group.
     Daemon(LaunchDaemonArgs),
-    CreateSubnet(CreateSubnetArgs),
+
+    /// Config commands
     ReloadConfig(ReloadConfigArgs),
+    InitConfig(InitConfigArgs),
+
+    /// Subnet manager commands
+    CreateSubnet(CreateSubnetArgs),
     ListSubnets(ListSubnetsArgs),
 }
 
@@ -82,8 +87,11 @@ pub async fn cli() {
     let global = &args.global_params;
     let r = match &args.command {
         Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
-        Commands::CreateSubnet(args) => CreateSubnet::handle(global, args).await,
+        // Config commands
         Commands::ReloadConfig(args) => ReloadConfig::handle(global, args).await,
+        Commands::InitConfig(args) => InitConfig::handle(global, args).await,
+        // Subnet manager commands
+        Commands::CreateSubnet(args) => CreateSubnet::handle(global, args).await,
         Commands::ListSubnets(args) => ListSubnets::handle(global, args).await,
     };
 
