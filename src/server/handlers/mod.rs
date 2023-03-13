@@ -9,6 +9,7 @@ mod validator;
 use crate::config::json_rpc_methods;
 use crate::config::ReloadableConfig;
 use crate::server::handlers::config::ReloadConfigHandler;
+use crate::server::handlers::manager::list_subnets::ListSubnetsHandler;
 use crate::server::handlers::validator::QueryValidatorSetHandler;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
@@ -19,6 +20,7 @@ pub use manager::create::{CreateSubnetParams, CreateSubnetResponse};
 use manager::join::JoinSubnetHandler;
 use manager::kill::KillSubnetHandler;
 use manager::leave::LeaveSubnetHandler;
+pub use manager::list_subnets::ListSubnetsParams;
 use manager::subnet::SubnetManagerPool;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -75,8 +77,11 @@ impl Handlers {
         let h: Box<dyn HandlerWrapper> = Box::new(KillSubnetHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::KILL_SUBNET), h);
 
-        let h: Box<dyn HandlerWrapper> = Box::new(JoinSubnetHandler::new(pool));
+        let h: Box<dyn HandlerWrapper> = Box::new(JoinSubnetHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::JOIN_SUBNET), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool));
+        handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);
 
         // query validator
         let h: Box<dyn HandlerWrapper> = Box::new(QueryValidatorSetHandler::new(config));

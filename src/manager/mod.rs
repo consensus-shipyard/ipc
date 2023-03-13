@@ -3,5 +3,6 @@
 mod lotus;
 mod subnet;
 
+pub use crate::lotus::message::ipc::SubnetInfo;
 pub use lotus::LotusSubnetManager;
 pub use subnet::SubnetManager;

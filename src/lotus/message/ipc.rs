@@ -1,6 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
+use ipc_gateway::Status;
+use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 
 use crate::lotus::message::CIDMap;
@@ -27,6 +30,19 @@ pub struct IPCReadGatewayStateResponse {
 pub struct IPCReadSubnetActorStateResponse {
     pub check_period: ChainEpoch,
     pub validator_set: ValidatorSet,
+}
+
+/// SubnetInfo is an auxiliary struct that collects relevant information about the state of a subnet
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubnetInfo {
+    /// Id of the subnet.
+    pub id: SubnetID,
+    /// Collateral staked in the subnet.
+    pub stake: TokenAmount,
+    /// Circulating supply available in the subnet.
+    pub circ_supply: TokenAmount,
+    /// State of the Subnet (Initialized, Active, Killed)
+    pub status: Status,
 }
 
 /// We need to redefine the struct here due to:

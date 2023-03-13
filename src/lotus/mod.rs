@@ -22,6 +22,7 @@ use crate::lotus::message::ipc::{
     IPCGetPrevCheckpointForChildResponse, IPCReadGatewayStateResponse,
     IPCReadSubnetActorStateResponse,
 };
+use crate::manager::SubnetInfo;
 
 pub mod client;
 pub mod message;
@@ -93,4 +94,7 @@ pub trait LotusClient {
         subnet_id: &SubnetID,
         tip_set: Cid,
     ) -> Result<IPCReadSubnetActorStateResponse>;
+
+    /// Returns the list of subnets in a gateway.
+    async fn ipc_list_child_subnets(&self, gateway_addr: Address) -> Result<Vec<SubnetInfo>>;
 }
