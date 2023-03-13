@@ -26,6 +26,7 @@ serde = { workspace = true }
 serde_json = "1.0.91"
 cid = { version = "0.8.3", default-features = false, features = ["serde-codec"] }
 tokio = { workspace = true }
+tokio-graceful-shutdown = "0.12.1"
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 derive_builder = "0.12.0"
 num-traits = "0.2.15"
@@ -47,6 +48,7 @@ ipc-sdk = { workspace = true }
 ipc-subnet-actor = { workspace = true }
 ipc-gateway = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
+primitives = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.4.0"
@@ -73,3 +75,4 @@ ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git" }
 ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
 ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
+primitives = { git = "https://github.com/consensus-shipyard/fvm-utils"}
