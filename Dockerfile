@@ -28,3 +28,5 @@ FROM debian:bullseye-slim
 COPY --from=builder /app/output/bin/ipc_agent /usr/local/bin/ipc_agent
 
 ENTRYPOINT ["ipc_agent"]
+
+EXPOSE 3030
