@@ -73,12 +73,12 @@ impl CommandLineHandler for InitConfig {
         }
         let mut file = std::fs::File::create(&path).map_err(|e| {
             log::error!("couldn't create config file");
-            return e;
+            e
         })?;
         file.write_all(DEFAULT_CONFIG_TEMPLATE.as_bytes())
             .map_err(|e| {
                 log::error!("error populating empty config template");
-                return e;
+                e
             })?;
 
         log::info!("Empty config populated successful in {}", &path);
