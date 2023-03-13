@@ -147,9 +147,9 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
     }
 
     async fn fund(&self, subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<()> {
-        // The current connection should be directed to the gateway,
-        // which shares the same network id.
-        if !self.is_network_match(&subnet).await? {
+        // When we perform the fund, we should send to the gateway of the subnet's parent
+        let parent = subnet.parent().ok_or_else(|| anyhow!("cannot fund root"))?;
+        if !self.is_network_match(&parent).await? {
             return Err(anyhow!(
                 "subnet actor being funded not matching current network"
             ));
@@ -164,12 +164,27 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         );
         message.value = amount;
 
-        let state_wait_response = self.mpool_push_and_wait(message).await?;
-        state_wait_response.receipt.parse_result_into::<()>()
+        self.mpool_push_and_wait(message).await?;
+        Ok(())
     }
 
-    async fn release(&self, _subnet: SubnetID, _from: Address) -> Result<()> {
-        todo!()
+    async fn release(&self, subnet: SubnetID, from: Address) -> Result<()> {
+        // When we perform the release, we should send to the gateway of the subnet
+        if !self.is_network_match(&subnet).await? {
+            return Err(anyhow!(
+                "subnet actor being released not matching current network"
+            ));
+        }
+
+        let message = MpoolPushMessage::new(
+            Address::new_id(DEFAULT_IPC_GATEWAY_ADDR),
+            from,
+            ipc_gateway::Method::Release as MethodNum,
+            vec![],
+        );
+
+        self.mpool_push_and_wait(message).await?;
+        Ok(())
     }
 
     async fn propagate(
