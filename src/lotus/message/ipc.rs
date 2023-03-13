@@ -51,9 +51,9 @@ pub struct SubnetInfo {
 /// the tuple as json.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ValidatorSet {
-    validators: Option<Vec<Validator>>,
+    pub validators: Option<Vec<Validator>>,
     // sequence number that uniquely identifies a validator set
-    configuration_number: u64,
+    pub configuration_number: u64,
 }
 
 /// The validator struct. See `ValidatorSet` comment on why we need this duplicated definition.
