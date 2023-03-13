@@ -42,7 +42,7 @@ pub trait LotusClient {
     ) -> Result<MpoolPushMessageResponseInner>;
 
     /// Wait for the message cid of a particular nonce, see: https://lotus.filecoin.io/reference/lotus/state/#statewaitmsg
-    async fn state_wait_msg(&self, cid: Cid, nonce: u64) -> Result<StateWaitMsgResponse>;
+    async fn state_wait_msg(&self, cid: Cid) -> Result<StateWaitMsgResponse>;
 
     /// Returns the name of the network the node is synced to, see https://lotus.filecoin.io/reference/lotus/state/#statenetworkname
     async fn state_network_name(&self) -> Result<String>;
@@ -90,6 +90,7 @@ pub trait LotusClient {
     /// Returns the state of the subnet actor at `tip_set`.
     async fn ipc_read_subnet_actor_state(
         &self,
+        subnet_id: &SubnetID,
         tip_set: Cid,
     ) -> Result<IPCReadSubnetActorStateResponse>;
 }

@@ -4,13 +4,13 @@
 
 use crate::config::ReloadableConfig;
 use crate::lotus::client::LotusJsonRPCClient;
+use crate::lotus::message::ipc::ValidatorSet;
 use crate::lotus::LotusClient;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_subnet_actor::ValidatorSet;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -45,7 +45,8 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let tip_set = Cid::from_str(&request.tip_set)?;
-        let parent = SubnetID::from_str(&request.subnet)?
+        let subnet_id = SubnetID::from_str(&request.subnet)?;
+        let parent = subnet_id
             .parent()
             .ok_or_else(|| anyhow!("cannot get for root"))?
             .to_string();
@@ -58,7 +59,9 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
         };
 
         let lotus = LotusJsonRPCClient::from_subnet(subnet);
-        let response = lotus.ipc_read_subnet_actor_state(tip_set).await?;
+        let response = lotus
+            .ipc_read_subnet_actor_state(&subnet_id, tip_set)
+            .await?;
 
         Ok(QueryValidatorSetResponse {
             validator_set: response.validator_set,

@@ -144,10 +144,9 @@ impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
         let mem_push_response = self.lotus_client.mpool_push_message(message).await?;
 
         let message_cid = mem_push_response.cid()?;
-        let nonce = mem_push_response.nonce;
-        log::debug!("message published with cid: {message_cid:?} and nonce: {nonce:?}");
+        log::debug!("message published with cid: {message_cid:?}");
 
-        self.lotus_client.state_wait_msg(message_cid, nonce).await
+        self.lotus_client.state_wait_msg(message_cid).await
     }
 
     /// Checks the `network` is the one we are currently talking to.
