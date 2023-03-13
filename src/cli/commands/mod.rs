@@ -7,16 +7,15 @@ mod daemon;
 mod manager;
 
 use crate::cli::commands::config::{InitConfig, InitConfigArgs, ReloadConfig, ReloadConfigArgs};
-use crate::cli::commands::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
+use crate::cli::commands::manager::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::manager::join::{JoinSubnet, JoinSubnetArgs};
 use crate::cli::commands::manager::kill::{KillSubnet, KillSubnetArgs};
 use crate::cli::commands::manager::leave::{LeaveSubnet, LeaveSubnetArgs};
+use crate::cli::commands::manager::list_subnets::{ListSubnets, ListSubnetsArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use manager::create::{CreateSubnet, CreateSubnetArgs};
-use manager::list_subnets::{ListSubnets, ListSubnetsArgs};
 use std::fmt::Debug;
 use url::Url;
 

@@ -58,7 +58,7 @@ pub(crate) struct CreateSubnetArgs {
     pub parent: String,
     #[arg(long, short, help = "The name of the subnet")]
     pub name: String,
-    #[arg(long, help = "The minimal validator stake amount")]
+    #[arg(long, help = "The minimal validator stake amount (in whole FIL units)")]
     pub min_validator_stake: u64,
     #[arg(long, help = "The minimal number of validators")]
     pub min_validators: u64,

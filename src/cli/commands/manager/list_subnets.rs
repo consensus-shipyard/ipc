@@ -53,6 +53,6 @@ pub(crate) struct ListSubnetsArgs {
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The gateway address to query subnets")]
     pub gateway_address: String,
-    #[arg(help = "The subnet id to query subnets")]
+    #[arg(long, short, help = "The subnet id to query child subnets")]
     pub subnet_id: String,
 }

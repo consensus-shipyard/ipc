@@ -47,14 +47,18 @@ impl CommandLineHandler for JoinSubnet {
 #[derive(Debug, Args)]
 #[command(about = "Join a subnet")]
 pub(crate) struct JoinSubnetArgs {
-    #[arg(help = "The JSON RPC server url for ipc agent")]
+    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(help = "The address that joins the subnet")]
+    #[arg(long, short, help = "The address that joins the subnet")]
     pub from: Option<String>,
-    #[arg(help = "The subnet to join")]
+    #[arg(long, short, help = "The subnet to join")]
     pub subnet: String,
-    #[arg(help = "The collateral to stake in the subnet")]
+    #[arg(
+        long,
+        short,
+        help = "The collateral to stake in the subnet (in whole FIL units)"
+    )]
     pub collateral: u64,
-    #[arg(help = "The validator net address")]
+    #[arg(long, short, help = "The validator net address")]
     pub validator_net_addr: String,
 }

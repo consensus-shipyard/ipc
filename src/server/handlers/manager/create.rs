@@ -61,7 +61,7 @@ impl JsonRPCRequestHandler for CreateSubnetHandler {
             name: request.name,
             ipc_gateway_addr: DEFAULT_IPC_GATEWAY_ADDR,
             consensus: ConsensusType::Mir,
-            min_validator_stake: TokenAmount::from_atto(request.min_validator_stake),
+            min_validator_stake: TokenAmount::from_whole(request.min_validator_stake), // In FIL
             min_validators: request.min_validators,
             finality_threshold: request.finality_threshold,
             check_period: request.check_period,
