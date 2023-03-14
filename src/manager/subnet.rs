@@ -57,7 +57,7 @@ pub trait SubnetManager {
     async fn fund(&self, subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<()>;
 
     /// Release creates a new check message to release funds in parent chain
-    async fn release(&self, subnet: SubnetID, from: Address) -> Result<()>;
+    async fn release(&self, subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<()>;
 
     /// Propagate a cross-net message forward
     async fn propagate(
