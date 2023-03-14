@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 
-use crate::config::{Subnet, DEFAULT_IPC_GATEWAY_ADDR};
+use crate::config::Subnet;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -146,45 +146,12 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         Ok(map)
     }
 
-    async fn fund(&self, subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<()> {
-        // When we perform the fund, we should send to the gateway of the subnet's parent
-        let parent = subnet.parent().ok_or_else(|| anyhow!("cannot fund root"))?;
-        if !self.is_network_match(&parent).await? {
-            return Err(anyhow!(
-                "subnet actor being funded not matching current network"
-            ));
-        }
-
-        let fund_params = cbor::serialize(&subnet, "fund subnet actor params")?;
-        let mut message = MpoolPushMessage::new(
-            Address::new_id(DEFAULT_IPC_GATEWAY_ADDR),
-            from,
-            ipc_gateway::Method::Fund as MethodNum,
-            fund_params.to_vec(),
-        );
-        message.value = amount;
-
-        self.mpool_push_and_wait(message).await?;
-        Ok(())
+    async fn fund(&self, _subnet: SubnetID, _from: Address, _amount: TokenAmount) -> Result<()> {
+        todo!()
     }
 
-    async fn release(&self, subnet: SubnetID, from: Address) -> Result<()> {
-        // When we perform the release, we should send to the gateway of the subnet
-        if !self.is_network_match(&subnet).await? {
-            return Err(anyhow!(
-                "subnet actor being released not matching current network"
-            ));
-        }
-
-        let message = MpoolPushMessage::new(
-            Address::new_id(DEFAULT_IPC_GATEWAY_ADDR),
-            from,
-            ipc_gateway::Method::Release as MethodNum,
-            vec![],
-        );
-
-        self.mpool_push_and_wait(message).await?;
-        Ok(())
+    async fn release(&self, _subnet: SubnetID, _from: Address) -> Result<()> {
+        todo!()
     }
 
     async fn propagate(
