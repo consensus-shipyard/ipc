@@ -12,7 +12,7 @@ use anyhow::{anyhow, Result};
 
 pub(crate) fn check_subnet(subnet: &Subnet) -> Result<()> {
     if subnet.auth_token.is_none() {
-        log::error!("must provide auth token");
+        log::error!("subnet {:?} does not have auth token", subnet.id);
         return Err(anyhow!("Internal server error"));
     }
     Ok(())
