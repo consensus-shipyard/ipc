@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Kill a subnet cli command handler.
+//! Fund cli command handler.
 
 use async_trait::async_trait;
 use clap::Args;
@@ -10,43 +10,45 @@ use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::kill::KillSubnetParams;
+use crate::server::fund::FundParams;
 
-/// The command to kill an existing subnet.
-pub(crate) struct KillSubnet;
+/// The command to send funds to a subnet from parent
+pub(crate) struct Fund;
 
 #[async_trait]
-impl CommandLineHandler for KillSubnet {
-    type Arguments = KillSubnetArgs;
+impl CommandLineHandler for Fund {
+    type Arguments = FundArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        log::debug!("kill subnet with args: {:?}", arguments);
+        log::debug!("fund operation with args: {:?}", arguments);
 
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
-        let params = KillSubnetParams {
+        let params = FundParams {
             subnet: arguments.subnet.clone(),
             from: arguments.from.clone(),
+            amount: arguments.amount,
         };
-
         json_rpc_client
-            .request::<()>(json_rpc_methods::KILL_SUBNET, serde_json::to_value(params)?)
+            .request::<()>(json_rpc_methods::FUND, serde_json::to_value(params)?)
             .await?;
 
-        log::info!("killed subnet: {:}", arguments.subnet);
+        log::info!("funded subnet: {:}", arguments.subnet);
 
         Ok(())
     }
 }
 
 #[derive(Debug, Args)]
-#[command(about = "Kill an existing subnet")]
-pub(crate) struct KillSubnetArgs {
+#[command(about = "Send funds from a parent to a child subnet")]
+pub(crate) struct FundArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(long, short, help = "The address that kills the subnet")]
+    #[arg(long, short, help = "The address to send funds from and to")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to kill")]
+    #[arg(long, short, help = "The subnet to fund")]
     pub subnet: String,
+    #[arg(help = "The amount to fund in FIL")]
+    pub amount: u64,
 }

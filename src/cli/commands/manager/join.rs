@@ -10,7 +10,7 @@ use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::JoinSubnetParams;
+use crate::server::join::JoinSubnetParams;
 
 /// The command to join a subnet
 pub(crate) struct JoinSubnet;

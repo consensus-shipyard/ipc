@@ -13,7 +13,7 @@ use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::manager::SubnetInfo;
-use crate::server::ListSubnetsParams;
+use crate::server::list_subnets::ListSubnetsParams;
 
 /// The command to create a new subnet actor.
 pub(crate) struct ListSubnets;
