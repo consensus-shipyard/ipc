@@ -61,5 +61,5 @@ pub struct ValidatorSet {
 pub struct Validator {
     pub addr: String,
     pub net_addr: String,
-    pub weight: u64,
+    pub weight: String,
 }
