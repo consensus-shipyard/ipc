@@ -46,10 +46,10 @@ impl CommandLineHandler for LeaveSubnet {
 #[derive(Debug, Args)]
 #[command(about = "Leaving a subnet")]
 pub(crate) struct LeaveSubnetArgs {
-    #[arg(help = "The JSON RPC server url for ipc agent")]
+    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(help = "The address that leaves the subnet")]
+    #[arg(long, short, help = "The address that leaves the subnet")]
     pub from: Option<String>,
-    #[arg(help = "The subnet to leave")]
+    #[arg(long, short, help = "The subnet to leave")]
     pub subnet: String,
 }

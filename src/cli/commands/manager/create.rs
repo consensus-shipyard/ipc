@@ -27,6 +27,7 @@ impl CommandLineHandler for CreateSubnet {
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
         let params = CreateSubnetParams {
+            from: arguments.from.clone(),
             parent: arguments.parent.clone(),
             name: arguments.name.clone(),
             min_validator_stake: arguments.min_validator_stake,
@@ -52,18 +53,20 @@ impl CommandLineHandler for CreateSubnet {
 #[derive(Debug, Args)]
 #[command(about = "Create a new subnet actor")]
 pub(crate) struct CreateSubnetArgs {
-    #[arg(help = "The JSON RPC server url for ipc agent")]
+    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(help = "The parent subnet to create the new actor in")]
+    #[arg(long, short, help = "The address that creates the subnet")]
+    pub from: Option<String>,
+    #[arg(long, short, help = "The parent subnet to create the new actor in")]
     pub parent: String,
-    #[arg(help = "The name of the subnet")]
+    #[arg(long, short, help = "The name of the subnet")]
     pub name: String,
-    #[arg(help = "The minimal validator stake amount")]
+    #[arg(long, help = "The minimal validator stake amount (in whole FIL units)")]
     pub min_validator_stake: u64,
-    #[arg(help = "The minimal number of validators")]
+    #[arg(long, help = "The minimal number of validators")]
     pub min_validators: u64,
-    #[arg(help = "The finality threshold for MIR")]
+    #[arg(long, help = "The finality threshold for MIR")]
     pub finality_threshold: ChainEpoch,
-    #[arg(help = "The checkpoint period")]
+    #[arg(long, help = "The checkpoint period")]
     pub check_period: ChainEpoch,
 }

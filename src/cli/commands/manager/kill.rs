@@ -43,10 +43,10 @@ impl CommandLineHandler for KillSubnet {
 #[derive(Debug, Args)]
 #[command(about = "Kill an existing subnet")]
 pub(crate) struct KillSubnetArgs {
-    #[arg(help = "The JSON RPC server url for ipc agent")]
+    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(help = "The address that kills the subnet")]
+    #[arg(long, short, help = "The address that kills the subnet")]
     pub from: Option<String>,
-    #[arg(help = "The subnet to kill")]
+    #[arg(long, short, help = "The subnet to kill")]
     pub subnet: String,
 }

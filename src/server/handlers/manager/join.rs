@@ -1,13 +1,13 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Create subnet handler and parameters
+//! Join subnet handler and parameters
 
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
+use crate::server::handlers::manager::{check_subnet, parse_from};
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::JoinParams;
@@ -53,11 +53,12 @@ impl JsonRPCRequestHandler for JoinSubnetHandler {
         let join_params = JoinParams {
             validator_net_addr: request.validator_net_addr,
         };
-        let collateral = TokenAmount::from_atto(request.collateral);
-        let from = match request.from {
-            Some(addr) => Address::from_str(&addr)?,
-            None => conn.subnet().accounts[0],
-        };
+        let collateral = TokenAmount::from_whole(request.collateral); // In FIL, not atto
+
+        let subnet_config = conn.subnet();
+        check_subnet(subnet_config)?;
+
+        let from = parse_from(subnet_config, request.from)?;
 
         conn.manager()
             .join_subnet(subnet, from, collateral, join_params)

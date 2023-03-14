@@ -33,6 +33,8 @@ pub trait CommandLineHandler {
 #[derive(Debug, Args, Clone)]
 pub struct GlobalArguments {
     #[arg(
+        short,
+        long,
         help = "The toml config file path for IPC Agent, default to ${HOME}/.ipc_agent/config.toml"
     )]
     config_path: Option<String>,

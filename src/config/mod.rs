@@ -27,6 +27,27 @@ pub use subnet::Subnet;
 pub const JSON_RPC_VERSION: &str = "2.0";
 pub const DEFAULT_IPC_GATEWAY_ADDR: u64 = 64;
 
+/// Default config template
+pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
+[server]
+json_rpc_address = "127.0.0.1:3030"
+
+[subnets]
+
+[subnets."/root"]
+id = "/root"
+jsonrpc_api_http = "http://127.0.0.1:1235/rpc/v1"
+jsonrpc_api_ws = "wss://example.org/rpc/v0"
+auth_token = "YOUR TOKEN"
+accounts = ["t01"]
+
+[subnets."/root/t01"]
+id = "/root/t01"
+jsonrpc_api_http = "http://127.0.0.1:1235/rpc/v1"
+auth_token = "YOUR TOKEN"
+accounts = ["t01"]
+"#;
+
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
 /// this struct.
 #[derive(Deserialize, Debug)]

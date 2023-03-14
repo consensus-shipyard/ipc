@@ -6,16 +6,16 @@ mod config;
 mod daemon;
 mod manager;
 
-use crate::cli::commands::config::{ReloadConfig, ReloadConfigArgs};
+use crate::cli::commands::config::{InitConfig, InitConfigArgs, ReloadConfig, ReloadConfigArgs};
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
+use crate::cli::commands::manager::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::manager::join::{JoinSubnet, JoinSubnetArgs};
 use crate::cli::commands::manager::kill::{KillSubnet, KillSubnetArgs};
 use crate::cli::commands::manager::leave::{LeaveSubnet, LeaveSubnetArgs};
+use crate::cli::commands::manager::list_subnets::{ListSubnets, ListSubnetsArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use manager::create::{CreateSubnet, CreateSubnetArgs};
-use manager::list_subnets::{ListSubnets, ListSubnetsArgs};
 use std::fmt::Debug;
 use url::Url;
 
@@ -29,8 +29,13 @@ enum Commands {
     /// and not in the background as what daemon processes are. Still, this struct contains `Daemon`
     /// due to the convention from `lotus` and the expected behavior from the filecoin user group.
     Daemon(LaunchDaemonArgs),
-    CreateSubnet(CreateSubnetArgs),
+
+    /// Config commands
     ReloadConfig(ReloadConfigArgs),
+    InitConfig(InitConfigArgs),
+
+    /// Subnet manager commands
+    CreateSubnet(CreateSubnetArgs),
     ListSubnets(ListSubnetsArgs),
     JoinSubnet(JoinSubnetArgs),
     LeaveSubnet(LeaveSubnetArgs),
@@ -87,8 +92,11 @@ pub async fn cli() {
     let global = &args.global_params;
     let r = match &args.command {
         Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
-        Commands::CreateSubnet(args) => CreateSubnet::handle(global, args).await,
+        // Config commands
         Commands::ReloadConfig(args) => ReloadConfig::handle(global, args).await,
+        Commands::InitConfig(args) => InitConfig::handle(global, args).await,
+        // Subnet manager commands
+        Commands::CreateSubnet(args) => CreateSubnet::handle(global, args).await,
         Commands::ListSubnets(args) => ListSubnets::handle(global, args).await,
         Commands::JoinSubnet(args) => JoinSubnet::handle(global, args).await,
         Commands::LeaveSubnet(args) => LeaveSubnet::handle(global, args).await,

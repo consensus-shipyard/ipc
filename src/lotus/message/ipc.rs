@@ -6,6 +6,9 @@ use ipc_gateway::Status;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 
+use crate::lotus::message::deserialize::{
+    deserialize_subnet_id_from_map, deserialize_token_amount_from_str,
+};
 use crate::lotus::message::CIDMap;
 
 #[derive(Deserialize, Debug)]
@@ -36,10 +39,13 @@ pub struct IPCReadSubnetActorStateResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubnetInfo {
     /// Id of the subnet.
+    #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
     pub id: SubnetID,
     /// Collateral staked in the subnet.
+    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
     pub stake: TokenAmount,
     /// Circulating supply available in the subnet.
+    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
     pub circ_supply: TokenAmount,
     /// State of the Subnet (Initialized, Active, Killed)
     pub status: Status,
@@ -61,5 +67,5 @@ pub struct ValidatorSet {
 pub struct Validator {
     pub addr: String,
     pub net_addr: String,
-    pub weight: u64,
+    pub weight: String,
 }
