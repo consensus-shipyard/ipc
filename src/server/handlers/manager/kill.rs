@@ -3,6 +3,7 @@
 //! Kill subnet handler and parameters
 
 use crate::manager::SubnetManager;
+use crate::server::handlers::manager::check_subnet;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::{parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
@@ -46,7 +47,10 @@ impl JsonRPCRequestHandler for KillSubnetHandler {
             Some(conn) => conn,
         };
 
-        let from = parse_from(conn.subnet(), request.from)?;
+        let subnet_config = conn.subnet();
+        check_subnet(subnet_config)?;
+
+        let from = parse_from(subnet_config, request.from)?;
 
         conn.manager().kill_subnet(subnet, from).await
     }
