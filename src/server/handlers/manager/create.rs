@@ -5,10 +5,10 @@
 use crate::config::DEFAULT_IPC_GATEWAY_ADDR;
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
+use crate::server::handlers::manager::{check_subnet, parse_from};
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
@@ -70,10 +70,10 @@ impl JsonRPCRequestHandler for CreateSubnetHandler {
             genesis: vec![],
         };
 
-        let from = match request.from {
-            Some(addr) => Address::from_str(&addr)?,
-            None => conn.subnet().accounts[0],
-        };
+        let subnet_config = conn.subnet();
+        check_subnet(subnet_config)?;
+
+        let from = parse_from(subnet_config, request.from)?;
 
         let created_subnet_addr = conn
             .manager()

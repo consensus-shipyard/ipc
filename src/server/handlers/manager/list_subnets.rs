@@ -4,6 +4,7 @@
 
 use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::SubnetManager;
+use crate::server::handlers::manager::check_subnet;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
@@ -42,6 +43,9 @@ impl JsonRPCRequestHandler for ListSubnetsHandler {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
+
+        let subnet_config = conn.subnet();
+        check_subnet(subnet_config)?;
 
         let gateway_addr = Address::from_str(&request.gateway_address)?;
         conn.manager().list_child_subnets(gateway_addr).await
