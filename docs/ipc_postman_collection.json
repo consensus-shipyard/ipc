@@ -1,0 +1,207 @@
+{
+	"info": {
+		"_postman_id": "9d6fd94c-2851-4d49-9ba0-68e3f31161ba",
+		"name": "ipc",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "15161140"
+	},
+	"item": [
+		{
+			"name": "Lotus json rpc",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"Filecoin.IPCListChildSubnets\",\n    \"params\": [\n        \"f064\"\n    ],\n    \"jsonrpc\": \"2.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:1233/rpc/v1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "1233",
+					"path": [
+						"rpc",
+						"v1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List subnets",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_listChildSubnets\",\n    \"params\": {\n        \"gateway_address\": \"f064\",\n        \"subnet_id\": \"/root\"\n    },\n    \"jsonrpc\": \"2.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3030/json_rpc",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3030",
+					"path": [
+						"json_rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Join subnet",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_joinSubnet\",\n    \"params\": {\n        \"subnet\": \"/root/t01003\",\n        \"collateral\": 10,\n        \"min_validators\": 0,\n        \"validator_net_addr\": \"test\"\n    },\n    \"jsonrpc\": \"2.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3030/json_rpc",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3030",
+					"path": [
+						"json_rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Leave subnet",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_leaveSubnet\",\n    \"params\": {\n        \"subnet\": \"/root/t01003\"\n    },\n    \"jsonrpc\": \"2.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3030/json_rpc",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3030",
+					"path": [
+						"json_rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Kill subnet",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_killSubnet\",\n    \"params\": {\n        \"subnet\": \"/root/t01003\"\n    },\n    \"jsonrpc\": \"2.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3030/json_rpc",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3030",
+					"path": [
+						"json_rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Query validator set",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_queryValidatorSet\",\n    \"params\": {\n        \"subnet\": \"/root/t01003\",\n        \"tip_set\": \"bafy2bzaced5izm5ns454dlu5niyhunullvjgyepft3gsycziwbem75zom5mx4\"\n    },\n    \"jsonrpc\": \"2.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3030/json_rpc",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3030",
+					"path": [
+						"json_rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create subnet",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_createSubnet\",\n    \"params\": {\n        \"parent\": \"/root\",\n        \"name\": \"test2\",\n        \"min_validator_stake\": 1,\n        \"min_validators\": 0,\n        \"finality_threshold\": 2,\n        \"check_period\": 10\n    },\n    \"jsonrpc\": \"2.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3030/json_rpc",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3030",
+					"path": [
+						"json_rpc"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
