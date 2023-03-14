@@ -1,13 +1,12 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Create subnet handler and parameters
+//! Leave subnet handler and parameters
 
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
-use crate::server::JsonRPCRequestHandler;
+use crate::server::{parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -47,10 +46,7 @@ impl JsonRPCRequestHandler for LeaveSubnetHandler {
             Some(conn) => conn,
         };
 
-        let from = match request.from {
-            Some(addr) => Address::from_str(&addr)?,
-            None => conn.subnet().accounts[0],
-        };
+        let from = parse_from(conn.subnet(), request.from)?;
 
         conn.manager().leave_subnet(subnet, from).await
     }

@@ -6,8 +6,8 @@ mod config;
 mod manager;
 mod validator;
 
-use crate::config::json_rpc_methods;
 use crate::config::ReloadableConfig;
+use crate::config::{json_rpc_methods, Subnet};
 use crate::server::handlers::config::ReloadConfigHandler;
 use crate::server::handlers::manager::list_subnets::ListSubnetsHandler;
 use crate::server::handlers::validator::QueryValidatorSetHandler;
@@ -15,6 +15,7 @@ use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 pub use config::ReloadConfigParams;
+use fvm_shared::address::Address;
 use manager::create::CreateSubnetHandler;
 pub use manager::create::{CreateSubnetParams, CreateSubnetResponse};
 use manager::join::JoinSubnetHandler;
@@ -27,6 +28,7 @@ pub use manager::list_subnets::ListSubnetsParams;
 use manager::subnet::SubnetManagerPool;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
 pub type Method = String;
@@ -100,4 +102,18 @@ impl Handlers {
             Err(anyhow!("method not supported"))
         }
     }
+}
+
+pub(crate) fn parse_from(subnet: &Subnet, from: Option<String>) -> Result<Address> {
+    let addr = match from {
+        Some(addr) => Address::from_str(&addr)?,
+        None => {
+            if subnet.accounts.is_empty() {
+                return Err(anyhow!("no account config"));
+            } else {
+                subnet.accounts[0]
+            }
+        }
+    };
+    Ok(addr)
 }
