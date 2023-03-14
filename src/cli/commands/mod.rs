@@ -3,17 +3,19 @@
 //! This mod contains the different command line implementations.
 
 mod config;
-mod create;
 mod daemon;
-mod list_subnets;
+mod manager;
 
 use crate::cli::commands::config::{ReloadConfig, ReloadConfigArgs};
-use crate::cli::commands::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
-use crate::cli::commands::list_subnets::{ListSubnets, ListSubnetsArgs};
+use crate::cli::commands::manager::join::{JoinSubnet, JoinSubnetArgs};
+use crate::cli::commands::manager::kill::{KillSubnet, KillSubnetArgs};
+use crate::cli::commands::manager::leave::{LeaveSubnet, LeaveSubnetArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use manager::create::{CreateSubnet, CreateSubnetArgs};
+use manager::list_subnets::{ListSubnets, ListSubnetsArgs};
 use std::fmt::Debug;
 use url::Url;
 
@@ -30,6 +32,9 @@ enum Commands {
     CreateSubnet(CreateSubnetArgs),
     ReloadConfig(ReloadConfigArgs),
     ListSubnets(ListSubnetsArgs),
+    JoinSubnet(JoinSubnetArgs),
+    LeaveSubnet(LeaveSubnetArgs),
+    KillSubnet(KillSubnetArgs),
 }
 
 /// The overall command line struct to be used by `clap`.
@@ -85,6 +90,9 @@ pub async fn cli() {
         Commands::CreateSubnet(args) => CreateSubnet::handle(global, args).await,
         Commands::ReloadConfig(args) => ReloadConfig::handle(global, args).await,
         Commands::ListSubnets(args) => ListSubnets::handle(global, args).await,
+        Commands::JoinSubnet(args) => JoinSubnet::handle(global, args).await,
+        Commands::LeaveSubnet(args) => LeaveSubnet::handle(global, args).await,
+        Commands::KillSubnet(args) => KillSubnet::handle(global, args).await,
     };
 
     if let Err(e) = r {
