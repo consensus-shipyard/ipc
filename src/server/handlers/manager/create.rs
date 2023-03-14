@@ -8,6 +8,7 @@ use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
@@ -18,6 +19,7 @@ use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateSubnetParams {
+    pub from: Option<String>,
     pub parent: String,
     pub name: String,
     pub min_validator_stake: u64,
@@ -61,16 +63,21 @@ impl JsonRPCRequestHandler for CreateSubnetHandler {
             name: request.name,
             ipc_gateway_addr: DEFAULT_IPC_GATEWAY_ADDR,
             consensus: ConsensusType::Mir,
-            min_validator_stake: TokenAmount::from_atto(request.min_validator_stake),
+            min_validator_stake: TokenAmount::from_whole(request.min_validator_stake), // In FIL
             min_validators: request.min_validators,
             finality_threshold: request.finality_threshold,
             check_period: request.check_period,
             genesis: vec![],
         };
 
+        let from = match request.from {
+            Some(addr) => Address::from_str(&addr)?,
+            None => conn.subnet().accounts[0],
+        };
+
         let created_subnet_addr = conn
             .manager()
-            .create_subnet(conn.subnet().accounts[0], constructor_params)
+            .create_subnet(from, constructor_params)
             .await?;
 
         Ok(CreateSubnetResponse {

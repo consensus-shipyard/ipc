@@ -53,7 +53,7 @@ impl JsonRPCRequestHandler for JoinSubnetHandler {
         let join_params = JoinParams {
             validator_net_addr: request.validator_net_addr,
         };
-        let collateral = TokenAmount::from_atto(request.collateral);
+        let collateral = TokenAmount::from_whole(request.collateral); // In FIL, not atto
         let from = match request.from {
             Some(addr) => Address::from_str(&addr)?,
             None => conn.subnet().accounts[0],

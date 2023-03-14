@@ -3,7 +3,7 @@
 all: test build
 
 build:
-	cargo build --release
+	cargo build -Z unstable-options --release --out-dir ./bin
 
 test:
 	cargo test --release --workspace

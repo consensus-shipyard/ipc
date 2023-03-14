@@ -23,7 +23,10 @@ impl CommandLineHandler for LaunchDaemon {
             global
         );
 
-        let server = JsonRPCServer::from_config_path(&global.config_path())?;
+        let server = JsonRPCServer::from_config_path(&global.config_path()).map_err(|e| {
+            log::error!("error getting config from path");
+            e
+        })?;
         server.run().await?;
 
         Ok(())
