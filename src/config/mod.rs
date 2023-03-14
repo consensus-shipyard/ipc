@@ -46,7 +46,7 @@ id = "/root/t01"
 jsonrpc_api_http = "http://127.0.0.1:1235/rpc/v1"
 auth_token = "YOUR TOKEN"
 accounts = ["t01"]
-    "#;
+"#;
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
 /// this struct.
