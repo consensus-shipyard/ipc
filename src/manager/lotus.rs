@@ -9,7 +9,7 @@ use cid::Cid;
 use fil_actors_runtime::types::{InitExecParams, InitExecReturn, INIT_EXEC_METHOD_NUM};
 use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
-use ipc_gateway::Checkpoint;
+use ipc_gateway::{Checkpoint, PropagateParams, WhitelistPropagatorParams};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
@@ -188,23 +188,57 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         Ok(())
     }
 
-    async fn propagate(
-        &self,
-        _subnet: SubnetID,
-        _from: Address,
-        _postbox_msg_cid: Cid,
-    ) -> Result<()> {
-        todo!()
+    async fn propagate(&self, subnet: SubnetID, from: Address, postbox_msg_cid: Cid) -> Result<()> {
+        if !self.is_network_match(&subnet).await? {
+            return Err(anyhow!("propagation not targeting the correct network"));
+        }
+
+        let params = cbor::serialize(
+            &PropagateParams {
+                postbox_cid: postbox_msg_cid,
+            },
+            "propagate params",
+        )?;
+
+        let message = MpoolPushMessage::new(
+            Address::new_id(DEFAULT_IPC_GATEWAY_ADDR),
+            from,
+            ipc_gateway::Method::Propagate as MethodNum,
+            params.to_vec(),
+        );
+
+        self.mpool_push_and_wait(message).await?;
+        Ok(())
     }
 
     async fn whitelist_propagator(
         &self,
-        _subnet: SubnetID,
-        _postbox_msg_cid: Cid,
-        _from: Address,
-        _to_add: Vec<Address>,
+        subnet: SubnetID,
+        postbox_msg_cid: Cid,
+        from: Address,
+        to_add: Vec<Address>,
     ) -> Result<()> {
-        todo!()
+        if !self.is_network_match(&subnet).await? {
+            return Err(anyhow!("whitelist not targeting the correct network"));
+        }
+
+        let params = cbor::serialize(
+            &WhitelistPropagatorParams {
+                postbox_cid: postbox_msg_cid,
+                to_add,
+            },
+            "whitelist propagate params",
+        )?;
+
+        let message = MpoolPushMessage::new(
+            Address::new_id(DEFAULT_IPC_GATEWAY_ADDR),
+            from,
+            ipc_gateway::Method::WhiteListPropagator as MethodNum,
+            params.to_vec(),
+        );
+
+        self.mpool_push_and_wait(message).await?;
+        Ok(())
     }
 }
 
