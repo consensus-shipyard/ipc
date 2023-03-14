@@ -18,7 +18,6 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
-pub use deserialize::{deserialize_subnet_id_from_map, deserialize_token_amount_from_str};
 pub use reload::ReloadableConfig;
 use serde::Deserialize;
 pub use server::JSON_RPC_ENDPOINT;

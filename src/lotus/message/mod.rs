@@ -8,7 +8,11 @@ use anyhow::anyhow;
 use cid::Cid;
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+mod tests;
+
 pub mod chain;
+pub mod deserialize;
 pub mod ipc;
 pub mod mpool;
 pub mod state;

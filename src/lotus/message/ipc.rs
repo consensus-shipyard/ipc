@@ -1,12 +1,14 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::config::{deserialize_subnet_id_from_map, deserialize_token_amount_from_str};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::Status;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 
+use crate::lotus::message::deserialize::{
+    deserialize_subnet_id_from_map, deserialize_token_amount_from_str,
+};
 use crate::lotus::message::CIDMap;
 
 #[derive(Deserialize, Debug)]
