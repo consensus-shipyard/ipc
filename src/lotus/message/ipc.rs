@@ -1,5 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+use crate::config::{deserialize_subnet_id_from_map, deserialize_token_amount_from_str};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::Status;
@@ -36,10 +37,13 @@ pub struct IPCReadSubnetActorStateResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubnetInfo {
     /// Id of the subnet.
+    #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
     pub id: SubnetID,
     /// Collateral staked in the subnet.
+    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
     pub stake: TokenAmount,
     /// Circulating supply available in the subnet.
+    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
     pub circ_supply: TokenAmount,
     /// State of the Subnet (Initialized, Active, Killed)
     pub status: Status,
