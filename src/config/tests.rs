@@ -50,7 +50,7 @@ async fn reload_works() {
     let h_cloned = h.clone();
     tokio::spawn(async move {
         {
-            let &(ref lock, ref cvar) = &*pair;
+            let (lock, cvar) = &*pair;
             let mut started = lock.lock().unwrap();
             while !*started {
                 started = cvar.wait(started).unwrap();
@@ -62,12 +62,13 @@ async fn reload_works() {
         let mut file = file.reopen().unwrap();
         file.write_all(config_str.as_bytes()).unwrap();
 
-        h_cloned.reload(path).await.unwrap();
+        h_cloned.set_path(path);
+        h_cloned.reload().await.unwrap();
     });
 
     let mut rx = h.new_subscriber();
     {
-        let &(ref lock, ref cvar) = &*pair2;
+        let (lock, cvar) = &*pair2;
         let mut started = lock.lock().unwrap();
         *started = true;
         cvar.notify_one();

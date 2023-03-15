@@ -5,7 +5,6 @@
 use crate::config::Config;
 use anyhow::Result;
 use std::ops::DerefMut;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 
@@ -14,6 +13,7 @@ use tokio::sync::broadcast;
 /// needs to be notified when config has updated, just make a new subscription. Once received a
 /// notification, read the config again to obtain the latest config.
 pub struct ReloadableConfig {
+    path: RwLock<Arc<String>>,
     config: RwLock<Arc<Config>>,
     broadcast_tx: broadcast::Sender<()>,
     /// We keep at least one channel active, so that we dont encounter a `SendError`. We might need to use it later.
@@ -22,13 +22,14 @@ pub struct ReloadableConfig {
 }
 
 impl ReloadableConfig {
-    pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn new(path: String) -> Result<Self> {
         // we dont really need a big channel, the frequency should be very very low
         let (broadcast_tx, broadcast_rx) = broadcast::channel(8);
 
-        let config = RwLock::new(Arc::new(Config::from_file(path)?));
+        let config = RwLock::new(Arc::new(Config::from_file(path.clone())?));
 
         Ok(Self {
+            path: RwLock::new(Arc::new(path)),
             config,
             broadcast_tx,
             broadcast_rx,
@@ -41,8 +42,15 @@ impl ReloadableConfig {
         config.clone()
     }
 
-    /// Triggers a reload of the config from the target path
-    pub async fn reload(&self, path: String) -> Result<()> {
+    /// Sets a new path for future reloads.
+    pub fn set_path(&self, path: String) {
+        let mut p = self.path.write().unwrap();
+        *p = Arc::new(path);
+    }
+
+    /// Triggers a reload of the config.
+    pub async fn reload(&self) -> Result<()> {
+        let path = self.path.read().unwrap().to_string();
         let new_config = Config::from_file_async(path).await?;
         log::info!("new config loaded: {new_config:?}");
 

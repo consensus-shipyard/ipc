@@ -1,18 +1,19 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::config::JSON_RPC_ENDPOINT;
-use crate::config::{Config, JSON_RPC_VERSION};
-use crate::server::request::JSONRPCRequest;
-use crate::server::response::{JSONRPCError, JSONRPCErrorResponse, JSONRPCResultResponse};
-use crate::server::Handlers;
+use std::sync::Arc;
+
 use anyhow::Result;
 use bytes::Bytes;
-
-use std::sync::Arc;
 use warp::http::StatusCode;
 use warp::reject::Reject;
 use warp::reply::with_status;
 use warp::{Filter, Rejection, Reply};
+
+use crate::config::JSON_RPC_VERSION;
+use crate::config::{ReloadableConfig, JSON_RPC_ENDPOINT};
+use crate::server::request::JSONRPCRequest;
+use crate::server::response::{JSONRPCError, JSONRPCErrorResponse, JSONRPCResultResponse};
+use crate::server::Handlers;
 
 type ArcHandlers = Arc<Handlers>;
 
@@ -23,45 +24,39 @@ type ArcHandlers = Arc<Handlers>;
 ///
 /// # Examples
 /// ```no_run
+/// use std::sync::Arc;
+///
 /// use ipc_agent::config::Config;
+/// use ipc_agent::config::ReloadableConfig;
 /// use ipc_agent::server::jsonrpc::JsonRPCServer;
 ///
 /// #[tokio::main]
 /// async fn main() {
 ///     let path = "PATH TO YOUR CONFIG FILE";
-///     let n = JsonRPCServer::from_config_path(path).unwrap();
-///     n.run().await;
+///     let config = Arc::new(ReloadableConfig::new(path.to_string()).unwrap());
+///     let n = JsonRPCServer::new(config);
+///     n.run().await.unwrap();
 /// }
 /// ```
 pub struct JsonRPCServer {
-    config: Config,
-    /// The default path to reload config from
-    default_config_path: String,
+    config: Arc<ReloadableConfig>,
 }
 
 impl JsonRPCServer {
-    pub fn new(config: Config, default_config_path: String) -> Self {
-        Self {
-            config,
-            default_config_path,
-        }
-    }
-
-    pub fn from_config_path(config_path_str: &str) -> Result<Self> {
-        let config = Config::from_file(config_path_str)?;
-        Ok(Self::new(config, String::from(config_path_str)))
+    pub fn new(config: Arc<ReloadableConfig>) -> Self {
+        Self { config }
     }
 
     /// Runs the node in the current thread
     pub async fn run(&self) -> Result<()> {
         log::info!(
             "IPC agent rpc node listening at {:?}",
-            self.config.server.json_rpc_address
+            self.config.get_config().server.json_rpc_address
         );
 
-        let handlers = Arc::new(Handlers::new(self.default_config_path.clone())?);
+        let handlers = Arc::new(Handlers::new(self.config.clone())?);
         warp::serve(json_rpc_filter(handlers))
-            .run(self.config.server.json_rpc_address)
+            .run(self.config.get_config().server.json_rpc_address)
             .await;
         Ok(())
     }
@@ -155,12 +150,14 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, warp::Rejection>
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use warp::http::StatusCode;
+
     use crate::config::{JSON_RPC_ENDPOINT, JSON_RPC_VERSION};
     use crate::server::jsonrpc::{json_rpc_filter, ArcHandlers, JSONRPCResultResponse};
     use crate::server::request::JSONRPCRequest;
     use crate::server::Handlers;
-    use std::sync::Arc;
-    use warp::http::StatusCode;
 
     fn get_empty_handlers() -> ArcHandlers {
         Arc::new(Handlers::empty_handlers())

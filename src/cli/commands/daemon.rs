@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: MIT
 //! The Daemon command line handler that prints the info about IPC Agent.
 
+use std::fmt::Debug;
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use clap::Args;
-use std::fmt::Debug;
 
 use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::config::ReloadableConfig;
 use crate::server::jsonrpc::JsonRPCServer;
 
 /// The command to start the ipc agent json rpc server in the foreground.
@@ -23,10 +26,9 @@ impl CommandLineHandler for LaunchDaemon {
             global
         );
 
-        let server = JsonRPCServer::from_config_path(&global.config_path()).map_err(|e| {
-            log::error!("error getting config from path");
-            e
-        })?;
+        let reloadable_config = Arc::new(ReloadableConfig::new(global.config_path())?);
+
+        let server = JsonRPCServer::new(reloadable_config);
         server.run().await?;
 
         Ok(())

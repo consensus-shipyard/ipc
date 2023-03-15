@@ -16,15 +16,11 @@ pub struct ReloadConfigParams {
 /// The create subnet json rpc method handler.
 pub(crate) struct ReloadConfigHandler {
     config: Arc<ReloadableConfig>,
-    default_config_path: String,
 }
 
 impl ReloadConfigHandler {
-    pub fn new(config: Arc<ReloadableConfig>, default_config_path: String) -> Self {
-        Self {
-            config,
-            default_config_path,
-        }
+    pub fn new(config: Arc<ReloadableConfig>) -> Self {
+        Self { config }
     }
 }
 
@@ -36,9 +32,9 @@ impl JsonRPCRequestHandler for ReloadConfigHandler {
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         log::info!("received request to reload config: {request:?}");
 
-        let path = request
-            .path
-            .unwrap_or_else(|| self.default_config_path.clone());
-        self.config.reload(path).await
+        if request.path.is_some() {
+            self.config.set_path(request.path.unwrap());
+        }
+        self.config.reload().await
     }
 }

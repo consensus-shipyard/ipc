@@ -61,12 +61,10 @@ impl Handlers {
         }
     }
 
-    pub fn new(config_path_string: String) -> Result<Self> {
+    pub fn new(config: Arc<ReloadableConfig>) -> Result<Self> {
         let mut handlers = HashMap::new();
 
-        let config = Arc::new(ReloadableConfig::new(config_path_string.clone())?);
-        let h: Box<dyn HandlerWrapper> =
-            Box::new(ReloadConfigHandler::new(config.clone(), config_path_string));
+        let h: Box<dyn HandlerWrapper> = Box::new(ReloadConfigHandler::new(config.clone()));
         handlers.insert(String::from(json_rpc_methods::RELOAD_CONFIG), h);
 
         // subnet manager methods
