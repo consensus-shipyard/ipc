@@ -37,15 +37,18 @@ pub struct IPCReadSubnetActorStateResponse {
 
 /// SubnetInfo is an auxiliary struct that collects relevant information about the state of a subnet
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct SubnetInfo {
     /// Id of the subnet.
     #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
+    #[serde(rename = "ID")]
     pub id: SubnetID,
     /// Collateral staked in the subnet.
     #[serde(deserialize_with = "deserialize_token_amount_from_str")]
     pub stake: TokenAmount,
     /// Circulating supply available in the subnet.
     #[serde(deserialize_with = "deserialize_token_amount_from_str")]
+    #[serde(rename = "CircSupply")]
     pub circ_supply: TokenAmount,
     /// State of the Subnet (Initialized, Active, Killed)
     pub status: Status,

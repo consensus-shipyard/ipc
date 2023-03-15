@@ -3,6 +3,7 @@
 //! Deserialization utils for lotus/ipc types.
 
 use fvm_shared::address::Address;
+use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::de::{Error, MapAccess};
@@ -87,7 +88,7 @@ where
         where
             E: Error,
         {
-            let u: u64 = v.parse().map_err(E::custom)?;
+            let u = BigInt::from_str(v).map_err(E::custom)?;
             Ok(TokenAmount::from_atto(u))
         }
     }

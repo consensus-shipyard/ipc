@@ -71,10 +71,10 @@ fn test_token_amount_from_str() {
 
     let raw_str = r#"
     {
-        "TokenAmount": "1000000000000000000"
+        "TokenAmount": "20000000000000000000"
     }"#;
 
     let w: Result<Wrapper, _> = serde_json::from_str(raw_str);
     assert!(w.is_ok());
-    assert_eq!(w.unwrap().token_amount, TokenAmount::from_whole(1));
+    assert_eq!(w.unwrap().token_amount, TokenAmount::from_whole(20));
 }

@@ -44,7 +44,11 @@ impl CommandLineHandler for CreateSubnet {
             .await?
             .address;
 
-        log::info!("created subnet actor with address: {address:}");
+        log::info!(
+            "created subnet actor with id: {}/{}",
+            arguments.parent,
+            address
+        );
 
         Ok(())
     }
