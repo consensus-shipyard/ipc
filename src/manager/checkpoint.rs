@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use cid::Cid;
 use fil_actors_runtime::cbor;
 use futures_util::stream::FuturesUnordered;
@@ -21,7 +22,7 @@ use primitives::TCid;
 use tokio::select;
 use tokio::sync::Notify;
 use tokio::time::sleep;
-use tokio_graceful_shutdown::SubsystemHandle;
+use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 
 use crate::config::{ReloadableConfig, Subnet};
 use crate::jsonrpc::JsonRpcClient;
@@ -41,16 +42,17 @@ pub struct CheckpointSubsystem {
 
 impl CheckpointSubsystem {
     /// Creates a new `CheckpointSubsystem` with a configuration `config`.
-    #[allow(dead_code)]
     pub fn new(config: Arc<ReloadableConfig>) -> Self {
         Self { config }
     }
+}
 
+#[async_trait]
+impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
     /// Runs the checkpoint subsystem, which actively monitors subnets and submits checkpoints.
     /// For each (account, subnet) that exists in the config, the subnet is monitored and checkpoints
     /// are submitted at the appropriate epochs.
-    #[allow(dead_code)]
-    async fn run(&self, subsys: SubsystemHandle) -> Result<()> {
+    async fn run(self, subsys: SubsystemHandle) -> Result<()> {
         // Each event in this channel is notification of a new config.
         let mut config_chan = self.config.new_subscriber();
 
