@@ -3,6 +3,8 @@ pragma solidity ^0.8.7;
 
 import "./Subnet.sol";
 
+/// @title Checkpoint struct and related structs
+/// @author LimeChain team
 struct Checkpoint {
     CheckData data;
     bytes signature;
@@ -12,30 +14,26 @@ struct CheckData {
     SubnetID source;
     bytes tipSet;
     int64 epoch;
-    bytes prevCheck;
+    bytes32 prevHash;
     ChildCheck[] children;
     CrossMsgMeta crossMsgs;
 }
 
 struct ChildCheck {
     SubnetID source;
-    bytes[] checks;
+    bytes32[] checks;
 }
 
 struct CrossMsgMeta {
-    CrossMsgs msgsCid;
     uint64 nonce;
     uint256 value;
     uint256 fee;
+    CrossMsg[] msgs;
 }
 
 struct CrossMsg {
     StorableMsg message;
     bool wrapped;
-}
-
-struct CrossMsgs {
-    CrossMsg[] msgs;
 }
 
 struct StorableMsg {
