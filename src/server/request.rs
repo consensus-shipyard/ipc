@@ -7,7 +7,7 @@ use serde_json::Value;
 /// to the one of the Ethereum RPC: https://ethereum.org/en/developers/docs/apis/json-rpc/#curl-examples
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JSONRPCRequest {
-    pub id: u16,
+    pub id: u64,
     pub jsonrpc: String,
     pub method: String,
     pub params: Value,

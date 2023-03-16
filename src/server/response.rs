@@ -10,13 +10,13 @@ const INVALID_REQUEST_CODE: i32 = -32600;
 /// the spec: https://www.jsonrpc.org/specification#response_object
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JSONRPCResultResponse<T> {
-    pub id: u16,
+    pub id: u64,
     pub jsonrpc: String,
     pub result: T,
 }
 
 impl<T: Serialize> JSONRPCResultResponse<T> {
-    pub fn new(id: u16, result: T) -> Self {
+    pub fn new(id: u64, result: T) -> Self {
         Self {
             id,
             jsonrpc: String::from(JSON_RPC_VERSION),
@@ -36,13 +36,13 @@ pub struct JSONRPCError<T> {
 /// The json rpc error response. It is the standard form our json-rpc and follows the spec: https://www.jsonrpc.org/specification#response_object
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JSONRPCErrorResponse<T> {
-    pub id: u16,
+    pub id: u64,
     pub jsonrpc: String,
     pub error: JSONRPCError<T>,
 }
 
 impl JSONRPCErrorResponse<()> {
-    pub fn invalid_request(id: u16) -> Self {
+    pub fn invalid_request(id: u64) -> Self {
         Self {
             id,
             jsonrpc: String::from(JSON_RPC_VERSION),
@@ -55,7 +55,7 @@ impl JSONRPCErrorResponse<()> {
     }
 }
 impl<T: Serialize> JSONRPCErrorResponse<T> {
-    pub fn new(id: u16, error: JSONRPCError<T>) -> Self {
+    pub fn new(id: u64, error: JSONRPCError<T>) -> Self {
         Self {
             id,
             jsonrpc: String::from(JSON_RPC_VERSION),
