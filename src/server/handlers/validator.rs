@@ -18,7 +18,6 @@ use std::sync::Arc;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryValidatorSetParams {
     pub subnet: String,
-    pub tip_set: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,7 +43,6 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
     type Response = QueryValidatorSetResponse;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let tip_set = Cid::from_str(&request.tip_set)?;
         let subnet_id = SubnetID::from_str(&request.subnet)?;
         let parent = subnet_id
             .parent()
@@ -59,6 +57,14 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
         };
 
         let lotus = LotusJsonRPCClient::from_subnet(subnet);
+
+        // Read the parent's chain head and obtain the tip set CID.
+        // FIXME: This is used all over the place, make it a more
+        // compact function
+        let parent_head = lotus.chain_head().await?;
+        let cid_map = parent_head.cids.first().unwrap().clone();
+        let tip_set = Cid::try_from(cid_map)?;
+
         let response = lotus
             .ipc_read_subnet_actor_state(&subnet_id, tip_set)
             .await?;
