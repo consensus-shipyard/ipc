@@ -75,7 +75,15 @@ impl JsonRpcClient for JsonRpcClientImpl {
         let response_body = response.text().await?;
         log::debug!("received raw response body: {:?}", response_body);
 
-        let value = serde_json::from_str::<JsonRpcResponse<T>>(response_body.as_ref())?;
+        let value =
+            serde_json::from_str::<JsonRpcResponse<T>>(response_body.as_ref()).map_err(|e| {
+                log::error!("cannot parse json rpc client response: {:?}", response_body);
+                anyhow!(
+                    "cannot parse json rpc response: {:} due to {:}",
+                    response_body,
+                    e.to_string()
+                )
+            })?;
 
         if value.id != DEFAULT_JSON_RPC_ID || value.jsonrpc != DEFAULT_JSON_RPC_VERSION {
             return Err(anyhow!("json_rpc id or version not matching."));
