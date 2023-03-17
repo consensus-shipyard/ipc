@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use anyhow::{anyhow, Result};
@@ -23,6 +25,7 @@ mod tests;
 
 const DEFAULT_JSON_RPC_VERSION: &str = "2.0";
 const DEFAULT_JSON_RPC_ID: u8 = 1;
+const DEFAULT_REQ_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// A convenience constant that represents empty params in a JSON-RPC request.
 pub const NO_PARAMS: Value = json!([]);
@@ -64,6 +67,7 @@ impl JsonRpcClient for JsonRpcClientImpl {
     async fn request<T: DeserializeOwned>(&self, method: &str, params: Value) -> Result<T> {
         let request_body = build_jsonrpc_request(method, params)?;
         let mut builder = self.http_client.post(self.url.as_str()).json(&request_body);
+        builder = builder.timeout(DEFAULT_REQ_TIMEOUT);
 
         // Add the authorization bearer token if present
         if self.bearer_token.is_some() {
