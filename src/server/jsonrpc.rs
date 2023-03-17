@@ -3,7 +3,10 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use bytes::Bytes;
+use tokio::sync::Notify;
+use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use warp::http::StatusCode;
 use warp::reject::Reject;
 use warp::reply::with_status;
@@ -25,8 +28,10 @@ type ArcHandlers = Arc<Handlers>;
 /// # Examples
 /// ```no_run
 /// use std::sync::Arc;
+/// use std::time::Duration;
 ///
-/// use ipc_agent::config::Config;
+/// use tokio_graceful_shutdown::{IntoSubsystem, Toplevel};
+///
 /// use ipc_agent::config::ReloadableConfig;
 /// use ipc_agent::server::jsonrpc::JsonRPCServer;
 ///
@@ -34,8 +39,13 @@ type ArcHandlers = Arc<Handlers>;
 /// async fn main() {
 ///     let path = "PATH TO YOUR CONFIG FILE";
 ///     let config = Arc::new(ReloadableConfig::new(path.to_string()).unwrap());
-///     let n = JsonRPCServer::new(config);
-///     n.run().await.unwrap();
+///     let server = JsonRPCServer::new(config);
+///     Toplevel::new()
+///         .start("JSON-RPC server subsystem", server.into_subsystem())
+///         .catch_signals()
+///         .handle_shutdown_requests(Duration::from_secs(10))
+///         .await
+///         .unwrap();
 /// }
 /// ```
 pub struct JsonRPCServer {
@@ -46,18 +56,35 @@ impl JsonRPCServer {
     pub fn new(config: Arc<ReloadableConfig>) -> Self {
         Self { config }
     }
+}
 
-    /// Runs the node in the current thread
-    pub async fn run(&self) -> Result<()> {
+#[async_trait]
+impl IntoSubsystem<anyhow::Error> for JsonRPCServer {
+    /// Runs the JSON-RPC server as a subsystem.
+    async fn run(self, subsys: SubsystemHandle) -> Result<()> {
         log::info!(
             "IPC agent rpc node listening at {:?}",
             self.config.get_config().server.json_rpc_address
         );
 
+        // For notifying the server to gracefully shutdown.
+        let notify_send = Arc::new(Notify::new());
+        let notify_recv = notify_send.clone();
+
+        // Start the server.
         let handlers = Arc::new(Handlers::new(self.config.clone())?);
-        warp::serve(json_rpc_filter(handlers))
-            .run(self.config.get_config().server.json_rpc_address)
-            .await;
+        let (_, server) = warp::serve(json_rpc_filter(handlers)).bind_with_graceful_shutdown(
+            self.config.get_config().server.json_rpc_address,
+            async move { notify_recv.notified().await },
+        );
+        let server_handle = tokio::spawn(server);
+
+        // Wait for the shutdown signal and gracefully shutdown.
+        subsys.on_shutdown_requested().await;
+        log::info!("Shutting down IPC agent rpc node");
+        notify_send.notify_waiters();
+        server_handle.await?;
+
         Ok(())
     }
 }

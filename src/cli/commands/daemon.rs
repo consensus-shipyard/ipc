@@ -8,7 +8,6 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use clap::Args;
-use tokio::try_join;
 use tokio_graceful_shutdown::{IntoSubsystem, Toplevel};
 
 use crate::cli::{CommandLineHandler, GlobalArguments};
@@ -35,24 +34,15 @@ impl CommandLineHandler for LaunchDaemon {
 
         let reloadable_config = Arc::new(ReloadableConfig::new(global.config_path())?);
 
-        // Start checkpoint subsystem.
-        let ch_subsys = CheckpointSubsystem::new(reloadable_config.clone());
-        let subsys_handle = tokio::spawn({
-            Toplevel::new()
-                .start("Checkpoint subsystem", ch_subsys.into_subsystem())
-                .catch_signals()
-                .handle_shutdown_requests(SUBSYSTEM_WAIT_TIME_SECS)
-        });
-
-        // Start JSON-RPC server.
-        // TODO: convert JsonRPCServer to a subsystem.
+        // Start subsystems.
+        let checkpointing = CheckpointSubsystem::new(reloadable_config.clone());
         let server = JsonRPCServer::new(reloadable_config.clone());
-        let server_handle = tokio::spawn(async move { server.run().await });
-
-        // Drive the futures. Return if some encounters an error.
-        let results = try_join!(subsys_handle, server_handle)?;
-        results.0?;
-        results.1?;
+        Toplevel::new()
+            .start("Checkpoint subsystem", checkpointing.into_subsystem())
+            .start("JSON-RPC server subsystem", server.into_subsystem())
+            .catch_signals()
+            .handle_shutdown_requests(SUBSYSTEM_WAIT_TIME_SECS)
+            .await?;
 
         Ok(())
     }

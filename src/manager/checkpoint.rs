@@ -69,26 +69,38 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
                     .push(manage_subnet((child, parent), stop_subnet_managers.clone()));
             }
 
+            log::debug!("We have {} subnets to manage", manage_subnet_futures.len());
+
             // Spawn a task to drive the `manage_subnet` futures.
             let manage_subnets_task =
                 tokio::spawn(manage_subnet_futures.collect::<Vec<Result<()>>>());
 
             // Watch for shutdown requests and config changes.
             let is_shutdown = select! {
-                _ = subsys.on_shutdown_requested() => { true },
+                _ = subsys.on_shutdown_requested() => {
+                    log::info!("Shutting down checkpointing subsystem");
+                    true
+                },
                 r = config_chan.recv() => {
+                    log::info!("Config changed, reloading checkpointing subsystem");
                     match r {
                         Ok(_) => { false },
-                        Err(_) => { true },
+                        Err(_) => {
+                            log::error!("Config channel unexpectedly closed, shutting down checkpointing subsystem");
+                            true
+                        },
                     }
                 },
             };
 
+            // Cleanly stop the `manage_subnet` futures.
+            stop_subnet_managers.notify_waiters();
+            log::debug!("Waiting for subnet managers to stop");
+            let results = manage_subnets_task.await?;
+            log::info!("Subnet managers have stopped");
+            results.into_iter().collect::<Result<Vec<_>>>()?;
+
             if is_shutdown {
-                // Cleanly stop the `manage_subnet` futures and return.
-                stop_subnet_managers.notify_waiters();
-                let results = manage_subnets_task.await?;
-                results.into_iter().collect::<Result<Vec<_>>>()?;
                 return anyhow::Ok(());
             }
         }
