@@ -20,5 +20,14 @@ pub struct InitExecReturn {
     pub robust_address: Address,
 }
 
+impl Default for InitExecReturn {
+    fn default() -> Self {
+        Self {
+            id_address: Address::new_id(0),
+            robust_address: Address::new_id(0),
+        }
+    }
+}
+
 /// Init actor exec method number, see https://github.com/filecoin-project/builtin-actors/blob/fb759f87fcd5de0a98cb61966cd27f680df83364/actors/init/src/lib.rs#L32
 pub const INIT_EXEC_METHOD_NUM: MethodNum = 2;
