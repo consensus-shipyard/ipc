@@ -22,4 +22,5 @@ pub mod json_rpc_methods {
     pub const LIST_CHILD_SUBNETS: &str = "ipc_listChildSubnets";
     pub const RELOAD_CONFIG: &str = "ipc_reloadConfig";
     pub const QUERY_VALIDATOR_SET: &str = "ipc_queryValidatorSet";
+    pub const SEND_VALUE: &str = "ipc_sendValue";
 }

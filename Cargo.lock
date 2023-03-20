@@ -1493,7 +1493,7 @@ checksum = "93ace6ec7cc19c8ed33a32eaa9ea692d7faea05006b5356b9e2b668ec4bc3955"
 [[package]]
 name = "fil_actors_runtime"
 version = "0.0.1"
-source = "git+https://github.com/consensus-shipyard/fvm-utils#9f8f945629dbe8d4dfd9084701f38eb30bb8bcc2"
+source = "git+https://github.com/consensus-shipyard/fvm-utils#4b837189a5e3009280001ecfeb18fae4ec3c599e"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
@@ -4145,7 +4145,7 @@ dependencies = [
 [[package]]
 name = "primitives"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/fvm-utils#9f8f945629dbe8d4dfd9084701f38eb30bb8bcc2"
+source = "git+https://github.com/consensus-shipyard/fvm-utils#4b837189a5e3009280001ecfeb18fae4ec3c599e"
 dependencies = [
  "anyhow",
  "cid",

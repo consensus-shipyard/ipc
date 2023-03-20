@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use fil_actors_runtime::types::{InitExecParams, InitExecReturn, INIT_EXEC_METHOD_NUM};
 use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
+use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use ipc_gateway::{Checkpoint, PropagateParams, WhitelistPropagatorParams};
 use ipc_sdk::subnet_id::SubnetID;
@@ -238,6 +239,16 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         );
 
         self.mpool_push_and_wait(message).await?;
+        Ok(())
+    }
+
+    /// Send value between two addresses in a subnet
+    async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
+        let mut message = MpoolPushMessage::new(to, from, METHOD_SEND, Vec::new());
+        message.value = amount;
+        self.mpool_push_and_wait(message).await?;
+        log::info!("sending FIL from {from:} to {to:}");
+
         Ok(())
     }
 }

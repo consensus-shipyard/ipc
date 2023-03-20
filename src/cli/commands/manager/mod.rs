@@ -8,4 +8,5 @@ pub mod leave;
 pub mod list_subnets;
 pub mod propagate;
 pub mod release;
+pub mod send_value;
 pub mod whitelist;
