@@ -1,8 +1,10 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::config::{Subnet, DEFAULT_IPC_GATEWAY_ADDR};
+use crate::lotus::message::wallet::WalletKeyType;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -250,6 +252,12 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         log::info!("sending FIL from {from:} to {to:}");
 
         Ok(())
+    }
+
+    async fn wallet_new(&self, key_type: WalletKeyType) -> Result<Address> {
+        log::info!("creating new wallet");
+        let addr_str = self.lotus_client.wallet_new(key_type).await?;
+        Address::from_str(&addr_str).map_err(|_| anyhow!("cannot get address from string output"))
     }
 }
 

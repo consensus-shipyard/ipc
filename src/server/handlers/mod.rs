@@ -30,6 +30,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use self::wallet::WalletNewHandler;
+
 pub type Method = String;
 
 /// The collection of all json rpc handlers
@@ -96,6 +98,9 @@ impl Handlers {
 
         let h: Box<dyn HandlerWrapper> = Box::new(SendValueHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::SEND_VALUE), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(WalletNewHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::WALLET_NEW), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool));
         handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);

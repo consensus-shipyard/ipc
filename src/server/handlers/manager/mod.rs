@@ -10,6 +10,7 @@ pub mod propagate;
 pub mod release;
 pub mod send_value;
 pub mod subnet;
+pub mod wallet;
 pub mod whitelist;
 
 use crate::config::Subnet;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 
-use crate::lotus::message::ipc::SubnetInfo;
+use crate::lotus::message::{ipc::SubnetInfo, wallet::WalletKeyType};
 ///! IPC node-specific traits.
 use anyhow::Result;
 use async_trait::async_trait;
@@ -73,4 +73,7 @@ pub trait SubnetManager {
 
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()>;
+
+    ///  Create new wallet in a subnet
+    async fn wallet_new(&self, key_type: WalletKeyType) -> Result<Address>;
 }
