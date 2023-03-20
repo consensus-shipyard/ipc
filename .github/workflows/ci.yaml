@@ -65,7 +65,7 @@ jobs:
           profile: minimal
           target: wasm32-unknown-unknown
           toolchain: ${{ matrix.rust }}
-          override: true
+          components: rustfmt,clippy
 
       # Protobuf compiler required by libp2p-core
       - name: Install Protoc

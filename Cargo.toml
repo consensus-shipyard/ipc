@@ -40,9 +40,9 @@ fvm_ipld_car = "0.6"
 # 0.10 breaks some API.
 cid = { version = "0.8", features = ["serde-codec", "std"] }
 
-# The following are on crates.io but as pre-releases.
-fvm = { version = "3.0.0-rc.1", default-features = false }         # no opencl feature or it fails on CI
-fvm_shared = { version = "3.0.0-alpha.20", features = ["crypto"] }
+# The following are on crates.io but they might be pre-releases.
+fvm = { version = "3.1", default-features = false }     # no opencl feature or it fails on CI
+fvm_shared = { version = "3.1", features = ["crypto"] }
 
 # Tendermint dependencies are forked because we are building against 0.37 release candidates.
 tower-abci = { git = "https://github.com/consensus-shipyard/tower-abci.git", branch = "tendermint-v0.37" }
