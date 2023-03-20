@@ -23,9 +23,6 @@ use clap::{Parser, Subcommand};
 use std::fmt::Debug;
 use url::Url;
 
-use self::manager::send_value::{SendValue, SendValueArgs};
-use self::manager::wallet::{WalletNew, WalletNewArgs};
-
 /// The collection of all subcommands to be called, see clap's documentation for usage. Internal
 /// to the current mode. Register a new command accordingly.
 #[derive(Debug, Subcommand)]
@@ -51,8 +48,6 @@ enum Commands {
     Release(ReleaseArgs),
     Propagate(PropagateArgs),
     WhitelistPropagator(WhitelistPropagatorArgs),
-    SendValue(SendValueArgs),
-    WalletNew(WalletNewArgs),
 }
 
 /// The overall command line struct to be used by `clap`.
@@ -118,8 +113,6 @@ pub async fn cli() {
         Commands::Release(args) => Release::handle(global, args).await,
         Commands::Propagate(args) => Propagate::handle(global, args).await,
         Commands::WhitelistPropagator(args) => WhitelistPropagator::handle(global, args).await,
-        Commands::SendValue(args) => SendValue::handle(global, args).await,
-        Commands::WalletNew(args) => WalletNew::handle(global, args).await,
     };
 
     if let Err(e) = r {

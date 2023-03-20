@@ -39,19 +39,15 @@ pub struct Receipt {
     #[allow(dead_code)]
     exit_code: u32,
     #[serde(rename = "Return")]
-    pub result: Option<String>,
+    pub result: String,
     #[allow(dead_code)]
     gas_used: u64,
 }
 
 impl Receipt {
-    pub fn parse_result_into<T: Default + DeserializeOwned>(self) -> anyhow::Result<T> {
-        if self.result.is_none() {
-            return Ok(Default::default());
-        }
-
+    pub fn parse_result_into<T: DeserializeOwned>(self) -> anyhow::Result<T> {
         let r = base64::engine::general_purpose::STANDARD
-            .decode(self.result.unwrap())
+            .decode(self.result)
             .map_err(|e| {
                 log::error!("cannot base64 decode due to {e:?}");
                 anyhow!("cannot decode return string")

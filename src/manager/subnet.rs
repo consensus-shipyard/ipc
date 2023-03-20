@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 
-use crate::lotus::message::{ipc::SubnetInfo, wallet::WalletKeyType};
+use crate::lotus::message::ipc::SubnetInfo;
 ///! IPC node-specific traits.
 use anyhow::Result;
 use async_trait::async_trait;
@@ -60,7 +60,12 @@ pub trait SubnetManager {
     async fn release(&self, subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<()>;
 
     /// Propagate a cross-net message forward
-    async fn propagate(&self, subnet: SubnetID, from: Address, postbox_msg_cid: Cid) -> Result<()>;
+    async fn propagate(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        postbox_msg_cid: Cid,
+    ) -> anyhow::Result<()>;
 
     /// Whitelist a series of addresses as propagator of a cross net message
     async fn whitelist_propagator(
@@ -69,11 +74,5 @@ pub trait SubnetManager {
         postbox_msg_cid: Cid,
         from: Address,
         to_add: Vec<Address>,
-    ) -> Result<()>;
-
-    /// Send value between two addresses in a subnet
-    async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()>;
-
-    ///  Create new wallet in a subnet
-    async fn wallet_new(&self, key_type: WalletKeyType) -> Result<Address>;
+    ) -> anyhow::Result<()>;
 }
