@@ -14,6 +14,7 @@ use crate::server::handlers::manager::list_subnets::ListSubnetsHandler;
 use crate::server::handlers::manager::propagate::PropagateHandler;
 use crate::server::handlers::manager::release::ReleaseHandler;
 use crate::server::handlers::manager::whitelist::WhitelistPropagatorHandler;
+use crate::server::handlers::send_value::SendValueHandler;
 use crate::server::handlers::validator::QueryValidatorSetHandler;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
@@ -28,6 +29,8 @@ pub use manager::*;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use self::wallet::WalletNewHandler;
 
 pub type Method = String;
 
@@ -92,6 +95,12 @@ impl Handlers {
 
         let h: Box<dyn HandlerWrapper> = Box::new(WhitelistPropagatorHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::WHITELIST_PROPAGATOR), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(SendValueHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::SEND_VALUE), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(WalletNewHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::WALLET_NEW), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool));
         handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);
