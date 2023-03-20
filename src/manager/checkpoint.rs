@@ -62,7 +62,7 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
 
             // Create a `manage_subnet` future for each (child, parent) subnet pair under management
             // and collect them in a `FuturesUnordered` set.
-            let manage_subnet_futures = FuturesUnordered::new();
+            let mut manage_subnet_futures = FuturesUnordered::new();
             let stop_subnet_managers = Arc::new(Notify::new());
             for (child, parent) in subnets_to_manage(&config.subnets) {
                 manage_subnet_futures
@@ -72,8 +72,20 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
             log::debug!("We have {} subnets to manage", manage_subnet_futures.len());
 
             // Spawn a task to drive the `manage_subnet` futures.
-            let manage_subnets_task =
-                tokio::spawn(manage_subnet_futures.collect::<Vec<Result<()>>>());
+            let manage_subnets_task = tokio::spawn(async move {
+                loop {
+                    match manage_subnet_futures.next().await {
+                        Some(Ok(())) => {}
+                        Some(Err(e)) => {
+                            log::error!("Error in manage_subnet: {}", e);
+                        }
+                        None => {
+                            log::debug!("All manage_subnet_futures have finished");
+                            break;
+                        }
+                    }
+                }
+            });
 
             // Watch for shutdown requests and config changes.
             let is_shutdown = select! {
@@ -95,10 +107,8 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
 
             // Cleanly stop the `manage_subnet` futures.
             stop_subnet_managers.notify_waiters();
-            log::debug!("Waiting for subnet managers to stop");
-            let results = manage_subnets_task.await?;
-            log::info!("Subnet managers have stopped");
-            results.into_iter().collect::<Result<Vec<_>>>()?;
+            log::debug!("Waiting for subnet managers to finish");
+            manage_subnets_task.await?;
 
             if is_shutdown {
                 return anyhow::Ok(());
@@ -131,6 +141,12 @@ fn subnets_to_manage(subnets: &HashMap<String, Subnet>) -> Vec<(Subnet, Subnet)>
 
 /// Monitors a subnet `child` for checkpoint blocks. It emits an event for every new checkpoint block.
 async fn manage_subnet((child, parent): (Subnet, Subnet), stop_notify: Arc<Notify>) -> Result<()> {
+    log::info!(
+        "Starting checkpoint manager for (child, parent) subnet pair ({}, {})",
+        child.id,
+        parent.id
+    );
+
     let child_client = LotusJsonRPCClient::from_subnet(&child);
     let parent_client = LotusJsonRPCClient::from_subnet(&parent);
 
@@ -156,6 +172,12 @@ async fn manage_subnet((child, parent): (Subnet, Subnet), stop_notify: Arc<Notif
         let epoch: ChainEpoch = ChainEpoch::try_from(child_head.height)?;
         if epoch % period == 0 {
             // It's a checkpointing epoch and we may have checkpoints to submit.
+            log::info!(
+                "Checkpointing epoch {} for subnet pair ({}, {})",
+                epoch,
+                child.id,
+                parent.id
+            );
 
             // First, we check which accounts are in the validator set. This is done by reading
             // the parent's chain head and requesting the state at that tip set.
@@ -187,6 +209,12 @@ async fn manage_subnet((child, parent): (Subnet, Subnet), stop_notify: Arc<Notif
             let child_tip_set = Cid::try_from(child_head.cids.first().unwrap().clone())?;
             for account in child.accounts.iter() {
                 if validator_set.contains(account) {
+                    log::info!(
+                        "Submitting checkpoint for account {}  from child {} to parent {}",
+                        account,
+                        child.id,
+                        parent.id
+                    );
                     submit_checkpoint(
                         child_tip_set,
                         epoch,
