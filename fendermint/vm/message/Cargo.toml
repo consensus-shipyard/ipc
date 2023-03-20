@@ -29,6 +29,7 @@ hex = { workspace = true }
 # however in that case all the extra dependencies would not kick in,
 # and we'd have to repeat all those dependencies.
 fendermint_vm_message = { path = ".", features = ["arb"] }
+fendermint_testing = { path = "../../testing" }
 
 [features]
 default = []

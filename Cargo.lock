@@ -1203,6 +1203,11 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "arbtest",
+ "cid",
+ "fvm_ipld_encoding",
+ "hex",
+ "quickcheck 1.0.3",
+ "serde",
 ]
 
 [[package]]
@@ -1235,6 +1240,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "cid",
+ "fendermint_testing",
  "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
