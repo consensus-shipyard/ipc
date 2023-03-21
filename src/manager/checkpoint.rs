@@ -249,9 +249,11 @@ async fn submit_checkpoint<T: JsonRpcClient + Send + Sync>(
 ) -> Result<()> {
     let mut checkpoint = Checkpoint::new(child_subnet.id.clone(), epoch);
 
-    // Get the children checkpoints from the template on the gateway actor of the child subnet.
+    // From the template on the gateway actor of the child subnet, we get the children checkpoints
+    // and the bottom-up cross-net messages.
     let template = child_client.ipc_get_checkpoint_template(epoch).await?;
     checkpoint.data.children = template.data.children;
+    checkpoint.data.cross_msgs = template.data.cross_msgs;
 
     // Get the CID of previous checkpoint of the child subnet from the gateway actor of the parent
     // subnet.
