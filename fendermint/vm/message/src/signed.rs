@@ -99,9 +99,8 @@ impl SignedMessage {
 /// Signed message with an invalid random signature.
 #[cfg(feature = "arb")]
 mod arb {
+    use fendermint_testing::arb::{ArbAddress, ArbTokenAmount};
     use fvm_shared::{crypto::signature::Signature, message::Message};
-
-    use crate::arb::{fix_address, fix_tokens};
 
     use super::SignedMessage;
 
@@ -109,11 +108,11 @@ mod arb {
     impl quickcheck::Arbitrary for SignedMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             let mut message = Message::arbitrary(g);
-            message.gas_fee_cap = fix_tokens(message.gas_fee_cap);
-            message.gas_premium = fix_tokens(message.gas_premium);
-            message.value = fix_tokens(message.value);
-            message.to = fix_address(message.to);
-            message.from = fix_address(message.from);
+            message.gas_fee_cap = ArbTokenAmount::arbitrary(g).0;
+            message.gas_premium = ArbTokenAmount::arbitrary(g).0;
+            message.value = ArbTokenAmount::arbitrary(g).0;
+            message.to = ArbAddress::arbitrary(g).0;
+            message.from = ArbAddress::arbitrary(g).0;
 
             Self {
                 message,

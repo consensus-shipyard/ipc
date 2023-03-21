@@ -19,6 +19,8 @@ arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
+fendermint_testing = { path = "../../testing", optional = true }
+
 [dev-dependencies]
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
@@ -29,8 +31,8 @@ hex = { workspace = true }
 # however in that case all the extra dependencies would not kick in,
 # and we'd have to repeat all those dependencies.
 fendermint_vm_message = { path = ".", features = ["arb"] }
-fendermint_testing = { path = "../../testing" }
+fendermint_testing = { path = "../../testing", features = ["golden"] }
 
 [features]
 default = []
-arb = ["arbitrary", "quickcheck", "fvm_shared/arb", "cid/arb", "rand"]
+arb = ["arbitrary", "quickcheck", "fvm_shared/arb", "cid/arb", "rand", "fendermint_testing/arb"]

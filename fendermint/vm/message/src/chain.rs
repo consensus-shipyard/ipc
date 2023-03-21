@@ -1,6 +1,6 @@
-use cid::Cid;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 
 use crate::signed::SignedMessage;
@@ -35,15 +35,17 @@ pub enum ChainMessage {
 
 #[cfg(feature = "arb")]
 mod arb {
+    use fendermint_testing::arb::ArbCid;
+
     use super::ChainMessage;
-    use crate::{arb::cid::arbitrary_cid, signed::SignedMessage};
+    use crate::signed::SignedMessage;
 
     impl quickcheck::Arbitrary for ChainMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match u8::arbitrary(g) % 3 {
                 0 => ChainMessage::Signed(Box::new(SignedMessage::arbitrary(g))),
-                1 => ChainMessage::ForResolution(arbitrary_cid(g)),
-                _ => ChainMessage::ForExecution(arbitrary_cid(g)),
+                1 => ChainMessage::ForResolution(ArbCid::arbitrary(g).0),
+                _ => ChainMessage::ForExecution(ArbCid::arbitrary(g).0),
             }
         }
     }
@@ -55,7 +57,7 @@ mod tests {
     use quickcheck_macros::quickcheck;
 
     #[quickcheck]
-    fn chain_message(value0: ChainMessage) {
+    fn chain_message_cbor(value0: ChainMessage) {
         let repr = fvm_ipld_encoding::to_vec(&value0).expect("failed to encode");
         let value1: ChainMessage =
             fvm_ipld_encoding::from_slice(repr.as_ref()).expect("failed to decode");

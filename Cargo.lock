@@ -1204,10 +1204,14 @@ dependencies = [
  "arbitrary",
  "arbtest",
  "cid",
+ "fendermint_testing",
  "fvm_ipld_encoding",
+ "fvm_shared",
  "hex",
  "quickcheck 1.0.3",
+ "rand 0.8.5",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1216,6 +1220,25 @@ version = "0.1.0"
 dependencies = [
  "fvm_shared",
  "paste",
+]
+
+[[package]]
+name = "fendermint_vm_genesis"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "fendermint_testing",
+ "fendermint_vm_genesis",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex",
+ "libsecp256k1",
+ "num-traits",
+ "quickcheck 1.0.3",
+ "quickcheck_macros",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

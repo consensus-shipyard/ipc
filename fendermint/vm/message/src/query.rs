@@ -45,17 +45,15 @@ pub struct ActorState {
 
 #[cfg(feature = "arb")]
 mod arb {
-    use fvm_shared::{address::Address, econ::TokenAmount};
-
-    use crate::arb::{cid::arbitrary_cid, fix_address, fix_tokens};
+    use fendermint_testing::arb::{ArbAddress, ArbCid, ArbTokenAmount};
 
     use super::{ActorState, FvmQuery};
 
     impl quickcheck::Arbitrary for FvmQuery {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match u8::arbitrary(g) % 2 {
-                0 => FvmQuery::Ipld(arbitrary_cid(g)),
-                _ => FvmQuery::ActorState(fix_address(Address::arbitrary(g))),
+                0 => FvmQuery::Ipld(ArbCid::arbitrary(g).0),
+                _ => FvmQuery::ActorState(ArbAddress::arbitrary(g).0),
             }
         }
     }
@@ -63,11 +61,11 @@ mod arb {
     impl quickcheck::Arbitrary for ActorState {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             Self {
-                code: arbitrary_cid(g),
-                state: arbitrary_cid(g),
+                code: ArbCid::arbitrary(g).0,
+                state: ArbCid::arbitrary(g).0,
                 sequence: u64::arbitrary(g),
-                balance: fix_tokens(TokenAmount::arbitrary(g)),
-                delegated_address: Option::<Address>::arbitrary(g).map(fix_address),
+                balance: ArbTokenAmount::arbitrary(g).0,
+                delegated_address: Option::<ArbAddress>::arbitrary(g).map(|a| a.0),
             }
         }
     }

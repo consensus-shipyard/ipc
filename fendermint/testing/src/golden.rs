@@ -48,6 +48,42 @@ fn read_or_create<T>(
 /// comparing to a debug string (which should at least be readable enough to show what changed).
 ///
 /// If the golden file doesn't exist, create one now.
+fn test_txt<T>(
+    prefix: &str,
+    name: &str,
+    arb_data: fn(g: &mut quickcheck::Gen) -> T,
+    ext: &str,
+    to_string: fn(&T) -> String,
+    from_string: fn(&String) -> Result<T, String>,
+) -> T
+where
+    T: Serialize + DeserializeOwned + Debug,
+{
+    // We may not need this, but it shouldn't be too expensive to generate.
+    let mut g = quickcheck::Gen::new(10);
+    let data0 = arb_data(&mut g);
+
+    // Debug string of a wrapper.
+    let to_debug = |w: &T| format!("{:?}", w);
+
+    let repr = read_or_create(prefix, name, ext, &data0, to_string);
+
+    let data1: T = from_string(&repr)
+        .unwrap_or_else(|e| panic!("Cannot deserialize {prefix}/{name}.{ext}: {e}"));
+
+    // Use the deserialised data as fallback for the debug string, so if the txt doesn't exist, it's created
+    // from what we just read back.
+    let txt = read_or_create(prefix, name, "txt", &data0, to_debug);
+
+    // This will fail if either the CBOR or the Debug format changes.
+    // At that point we should either know that it's a legitimate regression because we changed the model,
+    // or catch it as an unexpected regression, indicating that we made some backwards incompatible change.
+    assert_eq!(to_debug(&data1), txt.trim_end());
+
+    data1
+}
+
+/// Test CBOR golden file.
 ///
 /// Note that the CBOR files will be encoded as hexadecimal strings.
 /// To view them in something like https://cbor.dev/ you can use for example `xxd`:
@@ -60,32 +96,36 @@ pub fn test_cbor_txt<T: Serialize + DeserializeOwned + Debug>(
     name: &str,
     arb_data: fn(g: &mut quickcheck::Gen) -> T,
 ) -> T {
-    // We may not need this, but it shouldn't be too expensive to generate.
-    let mut g = quickcheck::Gen::new(10);
-    let data0 = arb_data(&mut g);
+    test_txt(
+        prefix,
+        name,
+        arb_data,
+        "cbor",
+        |d| {
+            let bz = fvm_ipld_encoding::to_vec(d).expect("failed to serialize");
+            hex::encode(bz)
+        },
+        |s| {
+            let bz = hex::decode(s).map_err(|e| format!("faled to decode hex: {e}"))?;
+            fvm_ipld_encoding::from_slice(&bz).map_err(|e| format!("failed to decode CBOR: {e}"))
+        },
+    )
+}
 
-    // Debug string of a wrapper.
-    let to_debug = |w: &T| format!("{:?}", w);
-
-    let cbor = read_or_create(prefix, name, "cbor", &data0, |d| {
-        let bz = fvm_ipld_encoding::to_vec(d).expect("failed to serialize");
-        hex::encode(bz)
-    });
-
-    let bz = hex::decode(cbor).expect("failed to decode hex");
-    let data1: T = fvm_ipld_encoding::from_slice(&bz)
-        .unwrap_or_else(|_| panic!("Cannot deserialize {}/{}.cbor", prefix, name));
-
-    // Use the deserialised data as fallback for the debug string, so if the txt doesn't exist, it's created
-    // from what we just read back.
-    let txt = read_or_create(prefix, name, "txt", &data0, to_debug);
-
-    // This will fail if either the CBOR or the Debug format changes.
-    // At that point we should either know that it's a legitimate regression because we changed the model,
-    // or catch it as an unexpected regression, indicating that we made some backwards incompatible change.
-    assert_eq!(to_debug(&data1), txt.trim_end());
-
-    data1
+/// Same as [`test_cbor_txt`] but with JSON.
+pub fn test_json_txt<T: Serialize + DeserializeOwned + Debug>(
+    prefix: &str,
+    name: &str,
+    arb_data: fn(g: &mut quickcheck::Gen) -> T,
+) -> T {
+    test_txt(
+        prefix,
+        name,
+        arb_data,
+        "json",
+        |d| serde_json::to_string_pretty(d).expect("failed to serialize"),
+        |s| serde_json::from_str(s).map_err(|e| format!("failed to decode JSON: {e}")),
+    )
 }
 
 /// Test that the CID of something we deserialized from CBOR matches what we saved earlier,
@@ -112,6 +152,24 @@ macro_rules! golden_cbor {
         fn $name() {
             let label = stringify!($name);
             $crate::golden::test_cbor_txt($prefix, &label, $gen);
+        }
+    };
+}
+
+/// Create a test which calls [`test_json_txt`].
+///
+/// # Example
+///
+/// ```ignore
+///        golden_json! { "genesis", genesis, Genesis::arbitrary}
+/// ```
+#[macro_export]
+macro_rules! golden_json {
+    ($prefix:literal, $name:ident, $gen:expr) => {
+        #[test]
+        fn $name() {
+            let label = stringify!($name);
+            $crate::golden::test_json_txt($prefix, &label, $gen);
         }
     };
 }

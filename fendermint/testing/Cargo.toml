@@ -9,13 +9,25 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { workspace = true }
-arbitrary = { workspace = true }
-quickcheck = { workspace = true }
-hex = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+arbitrary = { workspace = true, optional = true }
+quickcheck = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 
-cid = { workspace = true }
-fvm_ipld_encoding = { workspace = true }
+cid = { workspace = true, optional = true }
+fvm_ipld_encoding = { workspace = true, optional = true }
+fvm_shared = { workspace = true, optional = true }
 
 [dev-dependencies]
 arbtest = { workspace = true }
+arbitrary = { workspace = true }
+
+fendermint_testing = { path = ".", features = ["smt"] }
+
+[features]
+default = []
+smt = ["arbitrary"]
+golden = ["quickcheck", "hex", "serde", "serde_json", "cid", "fvm_ipld_encoding"]
+arb = ["quickcheck", "rand", "cid", "fvm_shared"]
