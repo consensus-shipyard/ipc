@@ -15,6 +15,7 @@ pub mod chain;
 pub mod deserialize;
 pub mod ipc;
 pub mod mpool;
+pub mod serialize;
 pub mod state;
 pub mod wallet;
 

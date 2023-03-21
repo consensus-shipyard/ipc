@@ -333,9 +333,9 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         let params = json!([gateway_addr.to_string()]);
         let r = self
             .client
-            .request(methods::IPC_LIST_CHILD_SUBNETS, params)
+            .request::<Option<Vec<SubnetInfo>>>(methods::IPC_LIST_CHILD_SUBNETS, params)
             .await?;
-        Ok(r)
+        Ok(r.unwrap_or_default())
     }
 }
 
