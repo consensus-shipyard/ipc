@@ -1,5 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+#![feature(try_blocks)]
 use fvm_shared::address::{set_current_network, Network};
 use ipc_agent::cli;
 use num_traits::FromPrimitive;
