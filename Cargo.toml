@@ -39,6 +39,7 @@ k256 = "0.11"                                             # Same as tendermint-r
 fvm_ipld_blockstore = "0.1"
 fvm_ipld_encoding = "0.3"
 fvm_ipld_car = "0.6"
+fvm_ipld_hamt = "0.6"
 # Using 0.8 because of ref-fvm.
 # 0.9 would be better because of its updated quickcheck dependency.
 # 0.10 breaks some API.

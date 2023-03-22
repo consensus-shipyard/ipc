@@ -153,6 +153,7 @@ pub struct Validator {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
+    pub network_name: String,
     pub network_version: NetworkVersion,
     #[serde(
         serialize_with = "serialize_tokens",
@@ -227,6 +228,7 @@ mod arb {
             let nv = usize::arbitrary(g) % 10 + 1;
             let na = usize::arbitrary(g) % 10;
             Self {
+                network_name: String::arbitrary(g),
                 network_version: NetworkVersion::new(*g.choose(&[18u32]).unwrap()),
                 base_fee: ArbTokenAmount::arbitrary(g).0,
                 validators: (0..nv).map(|_| Arbitrary::arbitrary(g)).collect(),

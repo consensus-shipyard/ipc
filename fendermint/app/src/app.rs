@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::future::Future;
 use std::num::NonZeroU32;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::anyhow;
@@ -90,6 +91,7 @@ where
     S: KVStore,
 {
     db: Arc<DB>,
+    actor_bundle_path: PathBuf,
     /// Namespace to store app state.
     namespace: S::Namespace,
     /// Collection of past state hashes.
@@ -118,12 +120,14 @@ where
 {
     pub fn new(
         db: DB,
+        actor_bundle_path: PathBuf,
         app_namespace: S::Namespace,
         hist_namespace: S::Namespace,
         interpreter: I,
     ) -> Self {
         Self {
             db: Arc::new(db),
+            actor_bundle_path,
             namespace: app_namespace,
             state_hist: KVCollection::new(hist_namespace),
             interpreter: Arc::new(interpreter),
@@ -286,13 +290,25 @@ where
             circ_supply: genesis.circ_supply(),
         };
 
-        let mut state = FvmGenesisState::new(self.clone_db()).expect("error creating state");
-        state.create_genesis_actors(&genesis);
+        let bundle_path = &self.actor_bundle_path;
+        let bundle = std::fs::read(bundle_path)
+            .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
+
+        let mut state = FvmGenesisState::new(self.clone_db(), &bundle)
+            .await
+            .expect("error creating state");
+
+        state
+            .create_genesis_actors(&genesis)
+            .expect("error creating genesis actors");
+
         app_state.state_root = state.commit().expect("error committing state");
+
+        let validators = genesis_validators(&genesis).expect("error projecting validators");
 
         let response = response::InitChain {
             consensus_params: None,
-            validators: genesis_validators(&genesis).expect("error projecting validators"),
+            validators,
             app_hash: app_state.app_hash(),
         };
 

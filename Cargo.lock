@@ -1294,8 +1294,14 @@ dependencies = [
 name = "fendermint_vm_actor_interface"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "cid",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_ipld_hamt",
  "fvm_shared",
  "paste",
+ "serde",
 ]
 
 [[package]]
@@ -1329,8 +1335,10 @@ dependencies = [
  "fendermint_vm_message",
  "fvm",
  "fvm_ipld_blockstore",
+ "fvm_ipld_car",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "num-traits",
  "serde",
 ]
 

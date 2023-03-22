@@ -11,16 +11,20 @@
 //! the relevant pieces of code. By limiting this choice to this crate,
 //! the rest of the application can avoid ad-hoc magic numbers.
 //!
-//! For reference, the IDs can be found in [singletons](https://github.com/filecoin-project/builtin-actors/blob/master/runtime/src/builtin/singletons.rs).
+//! The actor IDs can be found in [singletons](https://github.com/filecoin-project/builtin-actors/blob/master/runtime/src/builtin/singletons.rs),
+//! while the code IDs are in [builtins](https://github.com/filecoin-project/builtin-actors/blob/master/runtime/src/runtime/builtins.rs)
 
 macro_rules! define_singleton {
-    ($name:ident = $id:literal) => {
+    ($name:ident { id: $id:literal, code_id: $code_id:literal }) => {
         paste::paste! {
-            pub const [<$name _ID>]: fvm_shared::ActorID = $id;
-            pub const [<$name _ADDR>]: fvm_shared::address::Address = fvm_shared::address::Address::new_id([<$name _ID>]);
+            pub const [<$name _ACTOR_ID>]: fvm_shared::ActorID = $id;
+            pub const [<$name _ACTOR_ADDR>]: fvm_shared::address::Address = fvm_shared::address::Address::new_id([<$name _ACTOR_ID>]);
+            /// Position of the actor in the builtin actor bundle manifest.
+            pub const [<$name _ACTOR_CODE_ID>]: u32 = $code_id;
         }
     };
 }
 
 pub mod cron;
+pub mod init;
 pub mod system;
