@@ -4,18 +4,21 @@ use std::future::Future;
 use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex};
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::Application;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
+use fendermint_vm_genesis::Genesis;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRet, BytesMessageCheckRet, BytesMessageQuery, BytesMessageQueryRet,
 };
 use fendermint_vm_interpreter::chain::{ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::{
-    FvmApplyRet, FvmCheckRet, FvmCheckState, FvmQueryRet, FvmQueryState, FvmState,
+    FvmApplyRet, FvmCheckRet, FvmCheckState, FvmExecState, FvmGenesisState, FvmQueryRet,
+    FvmQueryState,
 };
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{CheckInterpreter, Interpreter, QueryInterpreter, Timestamp};
@@ -72,6 +75,13 @@ pub struct AppState {
     circ_supply: TokenAmount,
 }
 
+impl AppState {
+    pub fn app_hash(&self) -> tendermint::hash::AppHash {
+        tendermint::hash::AppHash::try_from(self.state_root.to_bytes())
+            .expect("hash can be wrapped")
+    }
+}
+
 /// Handle ABCI requests.
 #[derive(Clone)]
 pub struct App<DB, S, I>
@@ -92,7 +102,7 @@ where
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
     /// State accumulating changes during block execution.
-    exec_state: Arc<Mutex<Option<FvmState<DB>>>>,
+    exec_state: Arc<Mutex<Option<FvmExecState<DB>>>>,
     /// Projected partial state accumulating during transaction checks.
     check_state: Arc<tokio::sync::Mutex<Option<FvmCheckState<DB>>>>,
     /// How much history to keep.
@@ -167,14 +177,14 @@ where
     }
 
     /// Put the execution state during block execution. Has to be empty.
-    fn put_exec_state(&self, state: FvmState<DB>) {
+    fn put_exec_state(&self, state: FvmExecState<DB>) {
         let mut guard = self.exec_state.lock().expect("mutex poisoned");
         assert!(guard.is_some(), "exec state not empty");
         *guard = Some(state);
     }
 
     /// Take the execution state during block execution. Has to be non-empty.
-    fn take_exec_state(&self) -> FvmState<DB> {
+    fn take_exec_state(&self) -> FvmExecState<DB> {
         let mut guard = self.exec_state.lock().expect("mutex poisoned");
         guard.take().expect("exec state empty")
     }
@@ -182,8 +192,8 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> anyhow::Result<T>
     where
-        F: FnOnce(FvmState<DB>) -> R,
-        R: Future<Output = anyhow::Result<(FvmState<DB>, T)>>,
+        F: FnOnce(FvmExecState<DB>) -> R,
+        R: Future<Output = anyhow::Result<(FvmExecState<DB>, T)>>,
     {
         let state = self.take_exec_state();
         let (state, ret) = f(state).await?;
@@ -226,7 +236,7 @@ where
     S::Namespace: Sync + Send,
     DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     I: Interpreter<
-        State = FvmState<DB>,
+        State = FvmExecState<DB>,
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRet,
@@ -250,21 +260,45 @@ where
         let height =
             tendermint::block::Height::try_from(state.block_height).expect("height too big");
 
-        let app_hash = tendermint::hash::AppHash::try_from(state.state_root.to_bytes())
-            .expect("hash can be wrapped");
-
         response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
             app_version: 1,
             last_block_height: height,
-            last_block_app_hash: app_hash,
+            last_block_app_hash: state.app_hash(),
         }
     }
 
     /// Called once upon genesis.
-    async fn init_chain(&self, _request: request::InitChain) -> response::InitChain {
-        Default::default()
+    async fn init_chain(&self, request: request::InitChain) -> response::InitChain {
+        // TODO (IPC-44): Use the serialized application state instead of `Genesis`.
+        let genesis: Genesis =
+            parse_genesis(&request.app_state_bytes).expect("failed to parse genesis");
+
+        let height = request.initial_height.into();
+
+        let mut app_state = AppState {
+            block_height: height,
+            state_root: Default::default(),
+            oldest_state_height: height,
+            network_version: genesis.network_version,
+            base_fee: genesis.base_fee.clone(),
+            circ_supply: genesis.circ_supply(),
+        };
+
+        let mut state = FvmGenesisState::new(self.clone_db()).expect("error creating state");
+        state.create_genesis_actors(&genesis);
+        app_state.state_root = state.commit().expect("error committing state");
+
+        let response = response::InitChain {
+            consensus_params: None,
+            validators: genesis_validators(&genesis).expect("error projecting validators"),
+            app_hash: app_state.app_hash(),
+        };
+
+        self.set_committed_state(app_state);
+
+        response
     }
 
     /// Query the application for data at the current or past height.
@@ -336,7 +370,7 @@ where
                 .expect("negative timestamp"),
         );
 
-        let state = FvmState::new(
+        let state = FvmExecState::new(
             db,
             height,
             timestamp,
@@ -561,4 +595,37 @@ fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query {
         height,
         ..Default::default()
     }
+}
+
+/// Parse the initial genesis either as JSON or CBOR.
+fn parse_genesis(bytes: &[u8]) -> anyhow::Result<Genesis> {
+    try_parse_genesis_json(bytes).or_else(|e1| {
+        try_parse_genesis_cbor(bytes)
+            .map_err(|e2| anyhow!("failed to deserialize genesis as JSON or CBOR: {e1}; {e2}"))
+    })
+}
+
+fn try_parse_genesis_json(bytes: &[u8]) -> anyhow::Result<Genesis> {
+    let json = String::from_utf8(bytes.to_vec())?;
+    let genesis = serde_json::from_str(&json)?;
+    Ok(genesis)
+}
+
+fn try_parse_genesis_cbor(bytes: &[u8]) -> anyhow::Result<Genesis> {
+    let genesis = fvm_ipld_encoding::from_slice(bytes)?;
+    Ok(genesis)
+}
+
+/// Project Genesis validators to Tendermint.
+fn genesis_validators(genesis: &Genesis) -> anyhow::Result<Vec<tendermint::validator::Update>> {
+    let mut updates = vec![];
+    for v in genesis.validators.iter() {
+        let bz = v.public_key.0.serialize();
+        let key = k256::ecdsa::VerifyingKey::from_sec1_bytes(&bz)?;
+        updates.push(tendermint::validator::Update {
+            pub_key: tendermint::public_key::PublicKey::Secp256k1(key),
+            power: tendermint::vote::Power::try_from(v.power.0)?,
+        });
+    }
+    Ok(updates)
 }

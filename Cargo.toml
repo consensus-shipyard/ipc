@@ -32,6 +32,7 @@ rand_chacha = "0.3"
 hex = "0.4"
 base64 = "0.21"
 num-traits = "0.2"
+k256 = "0.11"                                             # Same as tendermint-rs
 
 
 # Stable FVM dependencies from crates.io
@@ -49,4 +50,4 @@ fvm_shared = { version = "3.1", features = ["crypto"] }
 
 # Tendermint dependencies are forked because we are building against 0.37 release candidates.
 tower-abci = { git = "https://github.com/consensus-shipyard/tower-abci.git", branch = "tendermint-v0.37" }
-tendermint = { git = "https://github.com/aakoshh/tendermint-rs.git", branch = "mikhail/multi-tc-version-support" }
+tendermint = { git = "https://github.com/aakoshh/tendermint-rs.git", branch = "mikhail/multi-tc-version-support", features = ["secp256k1"] }

@@ -10,7 +10,7 @@ use fvm_shared::BLOCK_GAS_LIMIT;
 
 use crate::Interpreter;
 
-use super::{FvmMessage, FvmMessageInterpreter, FvmState};
+use super::{FvmExecState, FvmMessage, FvmMessageInterpreter};
 
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups
@@ -32,7 +32,7 @@ impl<DB> Interpreter for FvmMessageInterpreter<DB>
 where
     DB: Blockstore + 'static + Send + Sync,
 {
-    type State = FvmState<DB>;
+    type State = FvmExecState<DB>;
     type Message = FvmMessage;
     type BeginOutput = FvmApplyRet;
     type DeliverOutput = FvmApplyRet;

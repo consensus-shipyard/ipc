@@ -73,7 +73,7 @@ where
 
     // Use the deserialised data as fallback for the debug string, so if the txt doesn't exist, it's created
     // from what we just read back.
-    let txt = read_or_create(prefix, name, "txt", &data0, to_debug);
+    let txt = read_or_create(prefix, name, "txt", &data1, to_debug);
 
     // This will fail if either the CBOR or the Debug format changes.
     // At that point we should either know that it's a legitimate regression because we changed the model,

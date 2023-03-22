@@ -10,6 +10,7 @@ license.workspace = true
 
 [dependencies]
 fendermint_vm_message = { path = "../message" }
+fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_actor_interface = { path = "../actor_interface" }
 
 async-trait = { workspace = true }
