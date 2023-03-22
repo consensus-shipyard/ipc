@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use fendermint_storage::{Codec, Decode, Encode, KVError, KVResult, KVStore};
 use fvm_ipld_encoding::{de::DeserializeOwned, serde::Serialize};
 
+/// [`KVStore`] type we use to store data in the database.
 #[derive(Clone)]
 pub struct AppStore;
 
