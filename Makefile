@@ -2,7 +2,7 @@
 
 BUILTIN_ACTORS_DIR:=../builtin-actors
 BUILTIN_ACTORS_CODE:=$(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs")
-BUILTIN_ACTORS_BUNDLE:=../builtin-actors/output/bundle.car
+BUILTIN_ACTORS_BUNDLE:=$(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
 
 all: test build
 
@@ -11,7 +11,7 @@ build:
 
 # Using --release for testing because wasm can otherwise be slow.
 test: $(BUILTIN_ACTORS_BUNDLE)
-	BUILTIN_ACTORS_BUNDLE=../../$(BUILTIN_ACTORS_BUNDLE) cargo test --release
+	BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) cargo test --release
 
 clean:
 	cargo clean

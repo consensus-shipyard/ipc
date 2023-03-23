@@ -19,6 +19,7 @@ async fn main() {
     let interpreter = BytesMessageInterpreter::new(interpreter);
 
     let db = open_db();
+    // TODO: Read the bundle path from config.
     let bundle_path = bundle_path();
     let app_ns = db.new_cf_handle("app").unwrap();
     let state_hist_ns = db.new_cf_handle("state_hist").unwrap();
@@ -30,6 +31,7 @@ fn open_db() -> RocksDb {
     todo!()
 }
 
+// TODO: Read from config instead of env var with a fallback to hardcoded path.
 fn bundle_path() -> PathBuf {
     let bundle_path = std::env::var("BUILTIN_ACTORS_BUNDLE")
         .unwrap_or_else(|_| "../../../builtin-actors/output/bundle.car".to_owned());
@@ -40,9 +42,8 @@ fn bundle_path() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use fendermint_rocksdb::{RocksDb, RocksDbConfig};
+    use fendermint_vm_interpreter::fvm::bundle::bundle_path;
     use fvm_ipld_car::load_car_unchecked;
-
-    use crate::bundle_path;
 
     #[tokio::test]
     async fn load_car() {

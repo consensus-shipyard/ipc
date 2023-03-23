@@ -21,7 +21,7 @@ paste = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
 serde_tuple = "0.5"
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tempfile = "3.3"
 thiserror = "1"
 quickcheck = "1"
@@ -32,7 +32,7 @@ rand_chacha = "0.3"
 hex = "0.4"
 base64 = "0.21"
 num-traits = "0.2"
-k256 = "0.11"                                             # Same as tendermint-rs
+k256 = "0.11"                                                       # Same as tendermint-rs
 
 
 # Stable FVM dependencies from crates.io

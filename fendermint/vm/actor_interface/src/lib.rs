@@ -26,5 +26,6 @@ macro_rules! define_singleton {
 }
 
 pub mod cron;
+pub mod eam;
 pub mod init;
 pub mod system;

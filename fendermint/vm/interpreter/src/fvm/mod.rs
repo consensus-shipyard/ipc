@@ -8,6 +8,9 @@ mod externs;
 mod query;
 mod state;
 
+#[cfg(any(test, feature = "bundle"))]
+pub mod bundle;
+
 pub use check::FvmCheckRet;
 pub use exec::FvmApplyRet;
 pub use fendermint_vm_message::query::FvmQuery;

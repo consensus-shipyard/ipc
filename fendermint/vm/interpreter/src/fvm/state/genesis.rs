@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use cid::{multihash::Code, Cid};
-use fendermint_vm_actor_interface::{cron, init, system};
+use fendermint_vm_actor_interface::{cron, eam, init, system};
 use fendermint_vm_genesis::Genesis;
 use fvm::{
     machine::Manifest,
@@ -19,7 +19,7 @@ use serde::Serialize;
 /// A state we create for the execution of genesis initialisation.
 pub struct FvmGenesisState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore,
 {
     manifest_data_cid: Cid,
     manifest: Manifest,
@@ -28,7 +28,7 @@ where
 
 impl<DB> FvmGenesisState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore,
 {
     pub async fn new(store: DB, bundle: &[u8]) -> anyhow::Result<Self> {
         // Load the actor bundle.
@@ -81,6 +81,9 @@ where
     /// * burnt funds?
     /// * faucet?
     /// * IPC
+    ///
+    /// See [Lotus](https://github.com/filecoin-project/lotus/blob/v1.20.4/chain/gen/genesis/genesis.go) for reference
+    /// and the [ref-fvm tester](https://github.com/filecoin-project/ref-fvm/blob/fvm%40v3.1.0/testing/integration/src/tester.rs#L99-L103).
     pub fn create_genesis_actors(&mut self, genesis: &Genesis) -> anyhow::Result<()> {
         // System actor
         let system_state = system::State {
@@ -110,6 +113,15 @@ where
             cron::CRON_ACTOR_CODE_ID,
             cron::CRON_ACTOR_ID,
             &cron_state,
+            TokenAmount::zero(),
+        )?;
+
+        // Ethereum Account Manager (EAM) actor
+        let eam_state = [(); 0]; // Based on how it's done in `Tester`.
+        self.create_singleton_actor(
+            eam::EAM_ACTOR_CODE_ID,
+            eam::EAM_ACTOR_ID,
+            &eam_state,
             TokenAmount::zero(),
         )?;
 
@@ -154,5 +166,34 @@ where
         self.state_tree.set_actor(id, actor_state);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fendermint_vm_genesis::Genesis;
+    use fvm_ipld_blockstore::MemoryBlockstore;
+    use quickcheck::Arbitrary;
+
+    use crate::fvm::bundle::bundle_path;
+
+    use super::FvmGenesisState;
+
+    #[tokio::test]
+    async fn load_genesis() {
+        let mut g = quickcheck::Gen::new(5);
+        let genesis = Genesis::arbitrary(&mut g);
+        let bundle = std::fs::read(bundle_path()).expect("failed to read bundle");
+        let store = MemoryBlockstore::new();
+
+        let mut state = FvmGenesisState::new(&store, &bundle)
+            .await
+            .expect("failed to create state");
+
+        state
+            .create_genesis_actors(&genesis)
+            .expect("failed to create actors");
+
+        let _state_root = state.commit().expect("failed to commit");
     }
 }

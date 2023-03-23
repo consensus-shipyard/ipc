@@ -24,3 +24,14 @@ fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_car = { workspace = true }
+
+[dev-dependencies]
+quickcheck = { workspace = true }
+tokio = { workspace = true }
+
+fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
+
+
+[features]
+default = []
+bundle = []
