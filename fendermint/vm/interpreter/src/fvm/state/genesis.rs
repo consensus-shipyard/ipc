@@ -3,8 +3,8 @@
 
 use anyhow::{anyhow, Context};
 use cid::{multihash::Code, Cid};
-use fendermint_vm_actor_interface::{account, cron, eam, init, multisig, system};
-use fendermint_vm_genesis::{Account, ActorMeta, Genesis, Multisig};
+use fendermint_vm_actor_interface::{account, init, multisig};
+use fendermint_vm_genesis::{Account, Multisig};
 use fvm::{
     machine::Manifest,
     state_tree::{ActorState, StateTree},
@@ -21,9 +21,9 @@ pub struct FvmGenesisState<DB>
 where
     DB: Blockstore,
 {
-    manifest_data_cid: Cid,
-    manifest: Manifest,
-    pub state_tree: StateTree<DB>,
+    pub manifest_data_cid: Cid,
+    pub manifest: Manifest,
+    state_tree: StateTree<DB>,
 }
 
 impl<DB> FvmGenesisState<DB>
@@ -66,87 +66,6 @@ where
         Ok(state)
     }
 
-    /// Initialize actor states from the Genesis spec.
-    ///
-    /// This method doesn't create all builtin Filecoin actors,
-    /// it leaves out the ones specific to file storage.
-    ///
-    /// The ones included are:
-    /// * system
-    /// * init
-    /// * cron
-    /// * EAM
-    ///
-    /// TODO:
-    /// * burnt funds?
-    /// * faucet?
-    /// * IPC
-    ///
-    /// See [Lotus](https://github.com/filecoin-project/lotus/blob/v1.20.4/chain/gen/genesis/genesis.go) for reference
-    /// and the [ref-fvm tester](https://github.com/filecoin-project/ref-fvm/blob/fvm%40v3.1.0/testing/integration/src/tester.rs#L99-L103).
-    pub fn create_genesis_actors(&mut self, genesis: Genesis) -> anyhow::Result<()> {
-        // System actor
-        let system_state = system::State {
-            builtin_actors: self.manifest_data_cid,
-        };
-        self.create_actor(
-            system::SYSTEM_ACTOR_CODE_ID,
-            system::SYSTEM_ACTOR_ID,
-            &system_state,
-            TokenAmount::zero(),
-        )?;
-
-        // Init actor
-        let (init_state, addr_to_id) = init::State::new(
-            self.state_tree.store(),
-            genesis.network_name.clone(),
-            &genesis.accounts,
-        )?;
-        self.create_actor(
-            init::INIT_ACTOR_CODE_ID,
-            init::INIT_ACTOR_ID,
-            &init_state,
-            TokenAmount::zero(),
-        )?;
-
-        // Cron actor
-        let cron_state = cron::State {
-            entries: vec![], // TODO: Maybe with the IPC.
-        };
-        self.create_actor(
-            cron::CRON_ACTOR_CODE_ID,
-            cron::CRON_ACTOR_ID,
-            &cron_state,
-            TokenAmount::zero(),
-        )?;
-
-        // Ethereum Account Manager (EAM) actor
-        let eam_state = [(); 0]; // Based on how it's done in `Tester`.
-        self.create_actor(
-            eam::EAM_ACTOR_CODE_ID,
-            eam::EAM_ACTOR_ID,
-            &eam_state,
-            TokenAmount::zero(),
-        )?;
-
-        // Create accounts
-        let mut next_id = init::FIRST_NON_SINGLETON_ADDR + addr_to_id.len() as u64;
-        for a in genesis.accounts {
-            let balance = a.balance;
-            match a.meta {
-                ActorMeta::Account(acct) => {
-                    self.create_account_actor(acct, balance, &addr_to_id)?;
-                }
-                ActorMeta::MultiSig(ms) => {
-                    self.create_multisig_actor(ms, balance, &addr_to_id, next_id)?;
-                    next_id += 1;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Flush the data to the block store.
     pub fn commit(mut self) -> anyhow::Result<Cid> {
         let root = self.state_tree.flush()?;
@@ -154,7 +73,7 @@ where
     }
 
     /// Creates an actor using code specified in the manifest.
-    fn create_actor(
+    pub fn create_actor(
         &mut self,
         code_id: u32,
         id: ActorID,
@@ -182,7 +101,7 @@ where
         Ok(())
     }
 
-    fn create_account_actor(
+    pub fn create_account_actor(
         &mut self,
         acct: Account,
         balance: TokenAmount,
@@ -198,7 +117,7 @@ where
         self.create_actor(account::ACCOUNT_ACTOR_CODE_ID, *id, &state, balance)
     }
 
-    fn create_multisig_actor(
+    pub fn create_multisig_actor(
         &mut self,
         ms: Multisig,
         balance: TokenAmount,
@@ -233,39 +152,14 @@ where
         self.create_actor(multisig::MULTISIG_ACTOR_CODE_ID, next_id, &state, balance)
     }
 
+    pub fn store(&self) -> &DB {
+        self.state_tree.store()
+    }
+
     fn put_state(&mut self, state: impl Serialize) -> anyhow::Result<Cid> {
         self.state_tree
             .store()
             .put_cbor(&state, Code::Blake2b256)
             .context("failed to store actor state")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use fendermint_vm_genesis::Genesis;
-    use fvm_ipld_blockstore::MemoryBlockstore;
-    use quickcheck::Arbitrary;
-
-    use crate::fvm::bundle::bundle_path;
-
-    use super::FvmGenesisState;
-
-    #[tokio::test]
-    async fn load_genesis() {
-        let mut g = quickcheck::Gen::new(5);
-        let genesis = Genesis::arbitrary(&mut g);
-        let bundle = std::fs::read(bundle_path()).expect("failed to read bundle");
-        let store = MemoryBlockstore::new();
-
-        let mut state = FvmGenesisState::new(&store, &bundle)
-            .await
-            .expect("failed to create state");
-
-        state
-            .create_genesis_actors(genesis)
-            .expect("failed to create actors");
-
-        let _state_root = state.commit().expect("failed to commit");
     }
 }

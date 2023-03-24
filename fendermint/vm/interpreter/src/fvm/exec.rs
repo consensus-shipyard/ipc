@@ -8,7 +8,7 @@ use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::BLOCK_GAS_LIMIT;
 
-use crate::Interpreter;
+use crate::ExecInterpreter;
 
 use super::{FvmExecState, FvmMessage, FvmMessageInterpreter};
 
@@ -28,7 +28,7 @@ impl<DB> Default for FvmMessageInterpreter<DB> {
 }
 
 #[async_trait]
-impl<DB> Interpreter for FvmMessageInterpreter<DB>
+impl<DB> ExecInterpreter for FvmMessageInterpreter<DB>
 where
     DB: Blockstore + 'static + Send + Sync,
 {

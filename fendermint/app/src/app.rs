@@ -10,16 +10,17 @@ use fendermint_abci::Application;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
-use fendermint_vm_genesis::Genesis;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRet, BytesMessageCheckRet, BytesMessageQuery, BytesMessageQueryRet,
 };
 use fendermint_vm_interpreter::chain::{ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::{
-    FvmApplyRet, FvmCheckState, FvmExecState, FvmGenesisState, FvmQueryState,
+    FvmApplyRet, FvmCheckState, FvmExecState, FvmGenesisOutput, FvmGenesisState, FvmQueryState,
 };
 use fendermint_vm_interpreter::signed::InvalidSignature;
-use fendermint_vm_interpreter::{CheckInterpreter, Interpreter, QueryInterpreter};
+use fendermint_vm_interpreter::{
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, QueryInterpreter,
+};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
@@ -226,7 +227,7 @@ where
     S: KVStore + Codec<AppState> + Encode<AppStoreKey> + Encode<BlockHeight> + Codec<Cid>,
     S::Namespace: Sync + Send,
     DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
-    I: Interpreter<
+    I: ExecInterpreter<
         State = FvmExecState<DB>,
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
@@ -242,6 +243,11 @@ where
         State = FvmQueryState<DB>,
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRet,
+    >,
+    I: GenesisInterpreter<
+        State = FvmGenesisState<DB>,
+        Genesis = Vec<u8>,
+        Output = FvmGenesisOutput,
     >,
 {
     /// Provide information about the ABCI application.
@@ -262,36 +268,33 @@ where
 
     /// Called once upon genesis.
     async fn init_chain(&self, request: request::InitChain) -> response::InitChain {
-        // TODO (IPC-44): Use the serialized application state instead of `Genesis`.
-        let genesis: Genesis =
-            parse_genesis(&request.app_state_bytes).expect("failed to parse genesis");
-
-        let height = request.initial_height.into();
-
-        let mut app_state = AppState {
-            block_height: height,
-            state_root: Default::default(),
-            oldest_state_height: height,
-            network_version: genesis.network_version,
-            base_fee: genesis.base_fee.clone(),
-            circ_supply: genesis.circ_supply(),
-        };
-
         let bundle_path = &self.actor_bundle_path;
         let bundle = std::fs::read(bundle_path)
             .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
 
-        let validators = genesis_validators(&genesis).expect("error projecting validators");
-
-        let mut state = FvmGenesisState::new(self.clone_db(), &bundle)
+        let state = FvmGenesisState::new(self.clone_db(), &bundle)
             .await
             .expect("error creating state");
 
-        state
-            .create_genesis_actors(genesis)
-            .expect("error creating genesis actors");
+        let (state, out) = self
+            .interpreter
+            .init(state, request.app_state_bytes.to_vec())
+            .await
+            .expect("failed to init from genesis");
 
-        app_state.state_root = state.commit().expect("error committing state");
+        let state_root = state.commit().expect("failed to commit state");
+        let height = request.initial_height.into();
+        let validators =
+            to_validator_updates(out.validators).expect("failed to convert validators");
+
+        let app_state = AppState {
+            block_height: height,
+            state_root,
+            oldest_state_height: height,
+            network_version: out.network_version,
+            base_fee: out.base_fee,
+            circ_supply: out.circ_supply,
+        };
 
         let response = response::InitChain {
             consensus_params: None,

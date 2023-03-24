@@ -11,7 +11,7 @@ use fvm::state_tree::StateTree;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID};
 
-use super::ReadOnlyBlockstore;
+use crate::fvm::store::ReadOnlyBlockstore;
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
@@ -40,7 +40,7 @@ where
         }
 
         let state = Self {
-            store: ReadOnlyBlockstore(blockstore),
+            store: ReadOnlyBlockstore::new(blockstore),
             state_root,
             // NOTE: Not loading a state tree in case it's not needed; it would initialize the HAMT.
             state_tree: RefCell::new(None),

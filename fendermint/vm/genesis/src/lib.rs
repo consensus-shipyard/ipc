@@ -10,7 +10,7 @@ use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use libsecp256k1::curve::Affine;
 use libsecp256k1::PublicKey;
-use num_traits::{Num, Zero};
+use num_traits::Num;
 use serde::de::Error;
 use serde::{de, Deserialize, Serialize, Serializer};
 
@@ -168,14 +168,6 @@ pub struct Genesis {
     pub base_fee: TokenAmount,
     pub validators: Vec<Validator>,
     pub accounts: Vec<Actor>,
-}
-
-impl Genesis {
-    pub fn circ_supply(&self) -> TokenAmount {
-        self.accounts
-            .iter()
-            .fold(TokenAmount::zero(), |s, a| s + a.balance.clone())
-    }
 }
 
 #[cfg(feature = "arb")]

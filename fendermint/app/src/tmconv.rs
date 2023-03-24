@@ -1,8 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Conversions to Tendermint data types.
-use anyhow::anyhow;
-use fendermint_vm_genesis::Genesis;
+use fendermint_vm_genesis::Validator;
 use fendermint_vm_interpreter::{
     fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet},
     Timestamp,
@@ -172,29 +171,12 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
     }
 }
 
-/// Parse the initial genesis either as JSON or CBOR.
-pub fn parse_genesis(bytes: &[u8]) -> anyhow::Result<Genesis> {
-    try_parse_genesis_json(bytes).or_else(|e1| {
-        try_parse_genesis_cbor(bytes)
-            .map_err(|e2| anyhow!("failed to deserialize genesis as JSON or CBOR: {e1}; {e2}"))
-    })
-}
-
-pub fn try_parse_genesis_json(bytes: &[u8]) -> anyhow::Result<Genesis> {
-    let json = String::from_utf8(bytes.to_vec())?;
-    let genesis = serde_json::from_str(&json)?;
-    Ok(genesis)
-}
-
-pub fn try_parse_genesis_cbor(bytes: &[u8]) -> anyhow::Result<Genesis> {
-    let genesis = fvm_ipld_encoding::from_slice(bytes)?;
-    Ok(genesis)
-}
-
 /// Project Genesis validators to Tendermint.
-pub fn genesis_validators(genesis: &Genesis) -> anyhow::Result<Vec<tendermint::validator::Update>> {
+pub fn to_validator_updates(
+    validators: Vec<Validator>,
+) -> anyhow::Result<Vec<tendermint::validator::Update>> {
     let mut updates = vec![];
-    for v in genesis.validators.iter() {
+    for v in validators {
         let bz = v.public_key.0.serialize();
         let key = k256::ecdsa::VerifyingKey::from_sec1_bytes(&bz)?;
         updates.push(tendermint::validator::Update {

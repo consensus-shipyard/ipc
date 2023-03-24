@@ -10,7 +10,7 @@ pub mod signed;
 /// Unix timestamp (in seconds) of the current block.
 pub struct Timestamp(pub u64);
 
-/// The `Interpreter`applies messages on some state, which is
+/// The `ExecInterpreter` applies messages on some state, which is
 /// tied to the lifecycle of a block in the ABCI.
 ///
 /// By making it generic, the intention is that interpreters can
@@ -43,7 +43,7 @@ pub struct Timestamp(pub u64);
 /// signalling unexpected problems there's no recovering from and
 /// that should stop the block processing altogether.
 #[async_trait]
-pub trait Interpreter: Sync + Send {
+pub trait ExecInterpreter: Sync + Send {
     type State: Send;
     type Message: Send;
     type BeginOutput;
@@ -120,5 +120,22 @@ pub trait QueryInterpreter: Sync + Send {
         &self,
         state: Self::State,
         qry: Self::Query,
+    ) -> anyhow::Result<(Self::State, Self::Output)>;
+}
+
+/// Initialize the chain state.
+///
+/// This could be from the original genesis file, or perhaps a checkpointed snapshot.
+#[async_trait]
+pub trait GenesisInterpreter: Sync + Send {
+    type State: Send;
+    type Genesis: Send;
+    type Output;
+
+    /// Initialize the chain.
+    async fn init(
+        &self,
+        state: Self::State,
+        genesis: Self::Genesis,
     ) -> anyhow::Result<(Self::State, Self::Output)>;
 }

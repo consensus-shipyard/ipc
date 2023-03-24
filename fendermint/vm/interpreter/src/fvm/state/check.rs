@@ -7,7 +7,7 @@ use cid::Cid;
 use fvm::state_tree::StateTree;
 use fvm_ipld_blockstore::Blockstore;
 
-use super::ReadOnlyBlockstore;
+use crate::fvm::store::ReadOnlyBlockstore;
 
 /// A state we create for the execution of all the messages in a block.
 pub struct FvmCheckState<DB>
@@ -35,7 +35,7 @@ where
 
         // Create a new state tree from the supplied root.
         let state_tree = {
-            let bstore = ReadOnlyBlockstore(blockstore);
+            let bstore = ReadOnlyBlockstore::new(blockstore);
             StateTree::new_from_root(bstore, &initial_state_root)?
         };
 
