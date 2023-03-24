@@ -18,3 +18,5 @@ fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
+
+fendermint_vm_genesis = { path = "../genesis" }

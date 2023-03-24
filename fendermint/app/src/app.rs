@@ -281,17 +281,17 @@ where
         let bundle = std::fs::read(bundle_path)
             .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
 
+        let validators = genesis_validators(&genesis).expect("error projecting validators");
+
         let mut state = FvmGenesisState::new(self.clone_db(), &bundle)
             .await
             .expect("error creating state");
 
         state
-            .create_genesis_actors(&genesis)
+            .create_genesis_actors(genesis)
             .expect("error creating genesis actors");
 
         app_state.state_root = state.commit().expect("error committing state");
-
-        let validators = genesis_validators(&genesis).expect("error projecting validators");
 
         let response = response::InitChain {
             consensus_params: None,

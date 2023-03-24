@@ -87,16 +87,22 @@ where
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Account {
+    pub owner: ActorAddr,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Multisig {
+    pub signers: Vec<ActorAddr>,
+    pub threshold: u64,
+    pub vesting_duration: u64,
+    pub vesting_start: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ActorMeta {
-    Account {
-        owner: ActorAddr,
-    },
-    MultiSig {
-        signers: Vec<ActorAddr>,
-        threshold: usize,
-        vesting_duration: u64,
-        vesting_start: u64,
-    },
+    Account(Account),
+    MultiSig(Multisig),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -174,7 +180,9 @@ impl Genesis {
 
 #[cfg(feature = "arb")]
 mod arb {
-    use crate::{Actor, ActorAddr, ActorMeta, Genesis, Power, Validator, ValidatorKey};
+    use crate::{
+        Account, Actor, ActorAddr, ActorMeta, Genesis, Multisig, Power, Validator, ValidatorKey,
+    };
     use fendermint_testing::arb::{ArbAddress, ArbTokenAmount};
     use fvm_shared::version::NetworkVersion;
     use quickcheck::{Arbitrary, Gen};
@@ -183,21 +191,21 @@ mod arb {
     impl Arbitrary for ActorMeta {
         fn arbitrary(g: &mut Gen) -> Self {
             if bool::arbitrary(g) {
-                ActorMeta::Account {
+                ActorMeta::Account(Account {
                     owner: ActorAddr(ArbAddress::arbitrary(g).0),
-                }
+                })
             } else {
-                let n = usize::arbitrary(g) % 4 + 2;
+                let n = u64::arbitrary(g) % 4 + 2;
                 let signers = (0..n)
                     .map(|_| ActorAddr(ArbAddress::arbitrary(g).0))
                     .collect();
-                let threshold = usize::arbitrary(g) % n + 1;
-                ActorMeta::MultiSig {
+                let threshold = u64::arbitrary(g) % n + 1;
+                ActorMeta::MultiSig(Multisig {
                     signers,
                     threshold,
                     vesting_duration: u64::arbitrary(g),
                     vesting_start: u64::arbitrary(g),
-                }
+                })
             }
         }
     }
