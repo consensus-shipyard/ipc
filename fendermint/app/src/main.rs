@@ -1,42 +1,85 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{path::PathBuf, str::FromStr};
-
+use clap::Parser;
 use fendermint_abci::ApplicationService;
-use fendermint_app::{app, store::AppStore};
-use fendermint_rocksdb::RocksDb;
+use fendermint_app::{
+    options::{Command, Options},
+    settings::Settings,
+    App, AppStore,
+};
+use fendermint_rocksdb::{RocksDb, RocksDbConfig};
 use fendermint_vm_interpreter::{
     bytes::BytesMessageInterpreter, chain::ChainMessageInterpreter, fvm::FvmMessageInterpreter,
     signed::SignedMessageInterpreter,
 };
+use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() {
-    let interpreter = FvmMessageInterpreter::<RocksDb>::new();
-    let interpreter = SignedMessageInterpreter::new(interpreter);
-    let interpreter = ChainMessageInterpreter::new(interpreter);
-    let interpreter = BytesMessageInterpreter::new(interpreter);
+    let opts = Options::parse();
 
-    let db = open_db();
-    // TODO: Read the bundle path from config.
-    let bundle_path = bundle_path();
-    let app_ns = db.new_cf_handle("app").unwrap();
-    let state_hist_ns = db.new_cf_handle("state_hist").unwrap();
-    let app = app::App::<_, AppStore, _>::new(db, bundle_path, app_ns, state_hist_ns, interpreter);
-    let _service = ApplicationService(app);
+    // Log events to stdout.
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(opts.tracing_level())
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    if let Some(Command::Run { ref mode }) = opts.command {
+        let config_dir = match opts.config_dir() {
+            Some(d) if d.is_dir() => d,
+            Some(d) if d.exists() => panic!("config '{d:?}' is a not a directory"),
+            Some(d) => panic!("config '{d:?}' does not exist"),
+            None => panic!("could not find a config directory to use"),
+        };
+
+        let settings = Settings::new(config_dir, mode).expect("error parsing settings");
+
+        let interpreter = FvmMessageInterpreter::<RocksDb>::new();
+        let interpreter = SignedMessageInterpreter::new(interpreter);
+        let interpreter = ChainMessageInterpreter::new(interpreter);
+        let interpreter = BytesMessageInterpreter::new(interpreter);
+
+        let db = open_db(&settings).expect("error opening DB");
+        let app_ns = db.new_cf_handle("app").unwrap();
+        let state_hist_ns = db.new_cf_handle("state_hist").unwrap();
+
+        let app = App::<_, AppStore, _>::new(
+            db,
+            settings.builtin_actors_bundle,
+            app_ns,
+            state_hist_ns,
+            interpreter,
+        );
+
+        let service = ApplicationService(app);
+
+        // Split it into components.
+        let (consensus, mempool, snapshot, info) =
+            tower_abci::split::service(service, settings.abci.bound);
+
+        // Hand those components to the ABCI server. This is where tower layers could be added.
+        let server = tower_abci::Server::builder()
+            .consensus(consensus)
+            .snapshot(snapshot)
+            .mempool(mempool)
+            .info(info)
+            .finish()
+            .expect("error creating ABCI server");
+
+        // Run the ABCI server.
+        server
+            .listen(settings.abci.listen_addr())
+            .await
+            .expect("error listening to ABCI requests");
+    }
 }
 
-fn open_db() -> RocksDb {
-    todo!()
-}
-
-// TODO: Read from config instead of env var with a fallback to hardcoded path.
-fn bundle_path() -> PathBuf {
-    let bundle_path = std::env::var("BUILTIN_ACTORS_BUNDLE")
-        .unwrap_or_else(|_| "../../../builtin-actors/output/bundle.car".to_owned());
-
-    PathBuf::from_str(&bundle_path).expect("malformed bundle path")
+fn open_db(settings: &Settings) -> anyhow::Result<RocksDb> {
+    let path = settings.data_dir.join("rocksdb");
+    let db = RocksDb::open(path, &RocksDbConfig::default())?;
+    Ok(db)
 }
 
 #[cfg(test)]

@@ -1,0 +1,7 @@
+data_dir = "~/.fendermint/data"
+builtin_actors_bundle = "~/.fendermint/bundle.car"
+
+[abci]
+host = "127.0.0.1"
+port = 26658
+bound = 1

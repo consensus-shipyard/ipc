@@ -18,7 +18,7 @@ fn workspace_dir() -> PathBuf {
 
 /// Path to the builtin-actor bundle, indended to be used in tests.
 pub fn bundle_path() -> PathBuf {
-    let bundle_path = std::env::var("BUILTIN_ACTORS_BUNDLE").unwrap_or_else(|_| {
+    let bundle_path = std::env::var("FM_BUILTIN_ACTORS_BUNDLE").unwrap_or_else(|_| {
         workspace_dir()
             .join("../builtin-actors/output/bundle.car")
             .to_string_lossy()

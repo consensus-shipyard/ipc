@@ -11,7 +11,7 @@ build:
 
 # Using --release for testing because wasm can otherwise be slow.
 test: $(BUILTIN_ACTORS_BUNDLE)
-	BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) cargo test --release
+	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) cargo test --release
 
 clean:
 	cargo clean
