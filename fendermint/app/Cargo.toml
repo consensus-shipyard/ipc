@@ -46,3 +46,8 @@ tempfile = { workspace = true }
 # actor project to be released. In prod, we'd just load it from a file, so let's see if that works.
 # We can build a bundle CAR with the Makefile.
 # actors-v10 = { package = "fil_builtin_actors_bundle", git = "https://github.com/filecoin-project/builtin-actors", branch = "next" }
+
+# Using a single binary to run the application as well as to execute client commands.
+[[bin]]
+name = "fendermint"
+path = "src/main.rs"

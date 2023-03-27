@@ -20,7 +20,7 @@ pub struct Options {
     pub debug: u8,
 
     #[command(subcommand)]
-    pub command: Option<Command>,
+    pub command: Option<Commands>,
 }
 
 impl Options {
@@ -49,8 +49,8 @@ impl Options {
     }
 }
 
-#[derive(Subcommand)]
-pub enum Command {
+#[derive(Subcommand, Debug)]
+pub enum Commands {
     /// Run the [`App`], listening to ABCI requests from Tendermint.
     Run {
         /// Optionally override the default configuration.
