@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ipc_sdk::subnet_id::SubnetID;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -12,8 +11,8 @@ use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::manager::SubnetInfo;
 use crate::server::list_subnets::ListSubnetsParams;
+use serde::Deserialize;
 
 /// The command to create a new subnet actor.
 pub(crate) struct ListSubnets;
@@ -34,7 +33,7 @@ impl CommandLineHandler for ListSubnets {
         };
 
         let subnets = json_rpc_client
-            .request::<HashMap<SubnetID, SubnetInfo>>(
+            .request::<HashMap<String, SubnetInfoWrapper>>(
                 json_rpc_methods::LIST_CHILD_SUBNETS,
                 serde_json::to_value(params)?,
             )
@@ -55,4 +54,20 @@ pub(crate) struct ListSubnetsArgs {
     pub gateway_address: String,
     #[arg(long, short, help = "The subnet id to query child subnets")]
     pub subnet_id: String,
+}
+
+/// A simplified wrapper for Subnet Info response. The SubnetInfo struct is deserialized differently
+/// as that struct is targeting deserialization from Actor. SubnetInfoWrapper is targeting ipc-agent
+/// rpc server, it is using different data structure and casing, i.e. id in actor is represented as
+/// a map, but in ipc-agent rpc server, it is a string.
+#[derive(Debug, Deserialize)]
+struct SubnetInfoWrapper {
+    #[allow(dead_code)]
+    id: String,
+    #[allow(dead_code)]
+    stake: String,
+    #[allow(dead_code)]
+    circ_supply: String,
+    #[allow(dead_code)]
+    status: i32,
 }

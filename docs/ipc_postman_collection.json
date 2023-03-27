@@ -13,7 +13,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"id\": 1,\n    \"method\": \"Filecoin.IPCListChildSubnets\",\n    \"params\": [\n        \"f064\"\n    ],\n    \"jsonrpc\": \"2.0\"\n}",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"Filecoin.IPCListChildSubnets\",\n    \"params\": [\n        \"t064\"\n    ],\n    \"jsonrpc\": \"2.0\"\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -42,7 +42,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_listChildSubnets\",\n    \"params\": {\n        \"gateway_address\": \"f064\",\n        \"subnet_id\": \"/root\"\n    },\n    \"jsonrpc\": \"2.0\"\n}",
+					"raw": "{\n    \"id\": 1,\n    \"method\": \"ipc_listChildSubnets\",\n    \"params\": {\n        \"gateway_address\": \"t064\",\n        \"subnet_id\": \"/root\"\n    },\n    \"jsonrpc\": \"2.0\"\n}",
 					"options": {
 						"raw": {
 							"language": "json"

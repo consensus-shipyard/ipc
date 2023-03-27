@@ -18,7 +18,7 @@ use crate::lotus::message::CIDMap;
 #[serde(rename_all = "PascalCase")]
 pub struct IPCGetPrevCheckpointForChildResponse {
     #[serde(rename = "CID")]
-    pub cid: CIDMap,
+    pub cid: Option<CIDMap>,
 }
 
 /// The state of a gateway actor. The struct omits all fields that are not relevant for the
@@ -81,4 +81,36 @@ pub struct Validator {
     pub addr: String,
     pub net_addr: String,
     pub weight: String,
+}
+
+/// This deserializes from the `gateway::Checkpoint`, we need to redefine
+/// here because the Lotus API json serializes and the cbor tuple deserializer is not
+/// able to pick it up automatically
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct CheckpointResponse {
+    pub data: CheckpointData,
+    pub sig: Option<Vec<u8>>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct CheckpointData {
+    #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
+    pub source: SubnetID,
+    pub proof: Option<String>,
+    pub epoch: i64,
+    pub children: Option<Vec<CheckData>>,
+    #[serde(rename(deserialize = "PrevCheck"))]
+    pub prev_check: Option<CIDMap>,
+    #[serde(rename(deserialize = "CrossMsgs"))]
+    pub cross_msgs: Option<CIDMap>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct CheckData {
+    #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
+    pub source: SubnetID,
+    pub checks: Vec<CIDMap>,
 }

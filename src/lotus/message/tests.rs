@@ -1,11 +1,11 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use fvm_shared::address::{set_current_network, Network};
 use std::str::FromStr;
 
 use crate::lotus::message::deserialize::{
     deserialize_subnet_id_from_map, deserialize_token_amount_from_str,
 };
+use crate::lotus::message::ipc::CheckpointResponse;
 use crate::manager::SubnetInfo;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::Status;
@@ -27,14 +27,14 @@ fn test_subnet_from_map() {
     let raw_str = r#"
     {
         "ID": {
-            "Parent": "/root/f01",
-            "Actor": "f064"
+            "Parent": "/root/t01",
+            "Actor": "t064"
         }
     }"#;
 
     let w: Result<SubnetIdWrapper, _> = serde_json::from_str(raw_str);
     assert!(w.is_ok());
-    assert_eq!(w.unwrap().id, SubnetID::from_str("/root/f01/f064").unwrap())
+    assert_eq!(w.unwrap().id, SubnetID::from_str("/root/t01/t064").unwrap())
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn test_subnet_from_map_error() {
     {
         "Id": {
             "Parent": 65,
-            "Actor": "f064"
+            "Actor": "t064"
         }
     }"#;
 
@@ -99,8 +99,6 @@ fn test_subnet_info_to_str() {
 
 #[test]
 fn test_subnet_info_from_str() {
-    set_current_network(Network::Testnet);
-
     let raw_str = r#"
     {
         "ID": {
@@ -118,6 +116,29 @@ fn test_subnet_info_from_str() {
     }
     "#;
 
-    let w: Result<SubnetInfo, _> = serde_json::from_str(raw_str);
-    assert!(w.is_ok());
+    let w: SubnetInfo = serde_json::from_str(raw_str).unwrap();
+    assert_eq!(w.id, SubnetID::from_str("/root/t010000000002").unwrap());
+}
+
+#[test]
+fn test_checkpoint_template_from_str() {
+    let raw_str = r#"
+    {
+    "Data": {
+        "Source": {
+            "Parent": "/root",
+            "Actor": "t01002"
+        },
+        "Proof": null,
+        "Epoch": 0,
+        "PrevCheck": null,
+        "Children": null,
+        "CrossMsgs": null
+    },
+    "Sig": null
+    }
+    "#;
+
+    let w: CheckpointResponse = serde_json::from_str(raw_str).unwrap();
+    assert_eq!(w.data.source, SubnetID::from_str("/root/t01002").unwrap());
 }

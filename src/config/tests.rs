@@ -16,13 +16,13 @@ use crate::config::{Config, ReloadableConfig};
 // Arguments for the config's fields
 const SERVER_JSON_RPC_ADDR: &str = "127.0.0.1:3030";
 const ROOT_ID: &str = "/root";
-const CHILD_ID: &str = "/root/f0100";
+const CHILD_ID: &str = "/root/t0100";
 const ROOT_AUTH_TOKEN: &str = "ROOT_AUTH_TOKEN";
 const CHILD_AUTH_TOKEN: &str = "CHILD_AUTH_TOKEN";
 const JSONRPC_API_HTTP: &str = "https://example.org/rpc/v0";
 const JSONRPC_API_WS: &str = "ws://example.org/rpc/v0";
 const ACCOUNT_ADDRESS: &str =
-    "f3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a";
+    "t3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a";
 
 #[tokio::test]
 async fn reload_works() {

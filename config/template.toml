@@ -10,7 +10,7 @@ jsonrpc_api_ws = "wss://example.org/rpc/v0"
 auth_token = "YOUR ROOT AUTH TOKEN"
 
 [subnets.child]
-id = "/root/f0100"
+id = "/root/t0100"
 jsonrpc_api_http = "https://example.org/rpc/v2"
 auth_token = "YOUR CHILD AUTH TOKEN"
-accounts = ["f3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a"]
+accounts = ["t3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a"]
