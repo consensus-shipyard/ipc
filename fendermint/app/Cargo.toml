@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+base64 = { workspace = true }
 clap = { workspace = true }
 config = { workspace = true }
 tokio = { workspace = true }
@@ -20,6 +21,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 hex = { workspace = true }
 k256 = { workspace = true }
+libsecp256k1 = { workspace = true }
+rand_chacha = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 fendermint_storage = { path = "../storage" }
@@ -37,6 +40,11 @@ fvm_shared = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
+
+fendermint_vm_genesis = { path = "../vm/genesis", features = ["arb"] }
+
 
 # Load the same built-in actor bundle as the ref-fvm integration tests. We'll probably need built-in actors,
 # for example to deploy Solidity code. We can compile Wasm actors and deploy them too, but certain functions

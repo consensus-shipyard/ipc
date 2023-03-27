@@ -183,6 +183,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
+name = "base64"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
+
+[[package]]
 name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1285,6 +1291,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.21.0",
  "cid",
  "clap 4.1.13",
  "config 0.13.3",
@@ -1301,6 +1308,10 @@ dependencies = [
  "fvm_shared",
  "hex",
  "k256",
+ "libsecp256k1",
+ "quickcheck 1.0.3",
+ "quickcheck_macros",
+ "rand_chacha 0.3.1",
  "serde",
  "serde_json",
  "tempfile",
@@ -2268,7 +2279,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95b09eff1b35ed3b33b877ced3a691fc7a481919c7e29c53c906226fcf55e2a1"
 dependencies = [
  "arrayref",
- "base64",
+ "base64 0.13.1",
  "digest 0.9.0",
  "hmac-drbg",
  "libsecp256k1-core",
@@ -3178,7 +3189,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88073939a61e5b7680558e6be56b419e208420c2adb92be54921fa6b72283f1a"
 dependencies = [
- "base64",
+ "base64 0.13.1",
  "bitflags",
  "serde",
 ]

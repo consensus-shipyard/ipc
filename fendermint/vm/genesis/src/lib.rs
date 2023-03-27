@@ -211,13 +211,19 @@ mod arb {
         }
     }
 
-    impl Arbitrary for Validator {
+    impl Arbitrary for ValidatorKey {
         fn arbitrary(g: &mut Gen) -> Self {
             let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
             let sk = libsecp256k1::SecretKey::random(&mut rng);
             let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+            Self::new(pk)
+        }
+    }
+
+    impl Arbitrary for Validator {
+        fn arbitrary(g: &mut Gen) -> Self {
             Self {
-                public_key: ValidatorKey::new(pk),
+                public_key: ValidatorKey::arbitrary(g),
                 power: Power(u64::arbitrary(g)),
             }
         }

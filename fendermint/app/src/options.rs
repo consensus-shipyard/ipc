@@ -3,10 +3,10 @@
 
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use tracing::Level;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(version)]
 pub struct Options {
     /// Set a custom directory for configuration files.
@@ -15,12 +15,16 @@ pub struct Options {
     #[arg(short, long, value_name = "FILE")]
     config_dir: Option<PathBuf>,
 
+    /// Optionally override the default configuration.
+    #[arg(short, long, default_value = "dev")]
+    pub mode: String,
+
     /// Turn debugging information on.
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub debug: u8,
 
     #[command(subcommand)]
-    pub command: Option<Commands>,
+    pub command: Commands,
 }
 
 impl Options {
@@ -52,9 +56,20 @@ impl Options {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Run the [`App`], listening to ABCI requests from Tendermint.
-    Run {
-        /// Optionally override the default configuration.
-        #[arg(short, long, default_value = "dev")]
-        mode: String,
-    },
+    Run(RunArgs),
+    /// Generate a new Secp256k1 key pair and export them to files in base64 format.
+    Keygen(KeygenArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct RunArgs;
+
+#[derive(Args, Debug)]
+pub struct KeygenArgs {
+    /// Name used to distinguish the files from other exported keys.
+    #[arg(short, long)]
+    pub name: String,
+    /// Directory to export the key files to; it must exist.
+    #[arg(short, long, default_value = ".")]
+    pub out_dir: PathBuf,
 }

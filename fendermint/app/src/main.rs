@@ -8,7 +8,7 @@ mod cmd;
 mod options;
 mod settings;
 
-use options::{Commands, Options};
+use options::Options;
 
 #[tokio::main]
 async fn main() {
@@ -21,14 +21,9 @@ async fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    if let Some(ref cmd) = opts.command {
-        let result = match cmd {
-            Commands::Run { mode } => cmd::run::run(opts.config_dir(), mode.as_ref()).await,
-        };
-        if let Err(e) = result {
-            tracing::error!("failed to execute {cmd:?}: {e}");
-            std::process::exit(1);
-        }
+    if let Err(e) = cmd::exec(&opts).await {
+        tracing::error!("failed to execute {:?}: {e}", opts);
+        std::process::exit(1);
     }
 }
 
