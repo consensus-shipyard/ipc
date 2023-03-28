@@ -184,19 +184,22 @@ async fn manage_subnet((child, parent): (Subnet, Subnet), stop_notify: Arc<Notif
             // check if it has already been successfully committed.
             // FIXME: We shouldn't just check if OK, but that the error
             // received is that the checkpoint is not committed yet.
-            if parent_client
-                .ipc_get_checkpoint(&child.id, epoch)
-                .await
-                .is_ok()
-            {
-                log::debug!("checkpoint for epoch {epoch:} already committed. Nothing to do yet!");
-                // Sleep for an appropriate amount of time before checking the chain head again or return
-                // if a stop notification is received.
-                if !wait_next_iteration(&stop_notify).await? {
-                    return Ok(());
+            match parent_client.ipc_get_checkpoint(&child.id, epoch).await {
+                Ok(_) => {
+                    log::debug!(
+                        "checkpoint for epoch {epoch:} already committed. Nothing to do yet!"
+                    );
+                    // Sleep for an appropriate amount of time before checking the chain head again or return
+                    // if a stop notification is received.
+                    if !wait_next_iteration(&stop_notify).await? {
+                        return Ok(());
+                    }
+                    continue;
                 }
-                continue;
-            }
+                Err(e) => {
+                    log::debug!("tracking error from get_checkpoint: {}", e.to_string());
+                }
+            };
 
             // It's a checkpointing epoch and we may have checkpoints to submit.
             log::info!(

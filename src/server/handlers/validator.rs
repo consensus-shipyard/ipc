@@ -22,8 +22,10 @@ pub struct QueryValidatorSetParams {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryValidatorSetResponse {
-    /// The address of the created subnet
+    /// The validator set for the subnet fetched from the parent.
     pub validator_set: ValidatorSet,
+    /// Minimum number of validators required by the subnet
+    pub min_validators: u64,
 }
 
 /// The create subnet json rpc method handler.
@@ -71,6 +73,7 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
 
         Ok(QueryValidatorSetResponse {
             validator_set: response.validator_set,
+            min_validators: response.min_validators,
         })
     }
 }

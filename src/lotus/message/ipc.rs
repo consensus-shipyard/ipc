@@ -36,6 +36,7 @@ pub struct IPCReadGatewayStateResponse {
 pub struct IPCReadSubnetActorStateResponse {
     pub check_period: ChainEpoch,
     pub validator_set: ValidatorSet,
+    pub min_validators: u64,
 }
 
 /// SubnetInfo is an auxiliary struct that collects relevant information about the state of a subnet
