@@ -1,7 +1,7 @@
+use std::collections::{HashMap, HashSet};
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use std::collections::hash_map::RandomState;
-use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -334,6 +334,21 @@ async fn submit_checkpoint<T: JsonRpcClient + Send + Sync>(
         checkpoint.data.prev_check = TCid::from(cid);
     }
     checkpoint.data.proof = child_tip_set.to_bytes();
+
+    // The checkpoint is constructed. We now check if this validator already submitted a vote
+    // for this checkpoint. If so, we do not submit the checkpoint again.
+    let votes = parent_client
+        .ipc_get_votes_for_checkpoint(child_subnet.id.clone(), checkpoint.cid())
+        .await?;
+
+    if votes.validators.contains(account) {
+        log::info!(
+            "Checkpoint for {epoch:} in subnet: {:?} already submitted by validator: {:?}",
+            &child_subnet.id,
+            account
+        );
+        return Ok(());
+    }
 
     // The checkpoint is constructed. Now we call the `submit_checkpoint` method on the subnet actor
     // of the child subnet that is deployed on the parent subnet.
