@@ -6,12 +6,13 @@
 use std::path::PathBuf;
 
 use crate::{
-    options::{Commands, Options},
+    options::{Commands, GenesisCommands, Options},
     settings::{expand_tilde, Settings},
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
+pub mod genesis;
 pub mod keygen;
 pub mod run;
 
@@ -57,10 +58,17 @@ macro_rules! cmd {
 
 /// Execute the command specified in the options.
 pub async fn exec(opts: &Options) -> anyhow::Result<()> {
-    match &opts.command {
-        Commands::Run(args) => args.exec(settings(opts)?).await,
-        Commands::Keygen(args) => args.exec(()).await,
-    }
+    let fut = match &opts.command {
+        Commands::Run(args) => args.exec(settings(opts)?),
+        Commands::Keygen(args) => args.exec(()),
+        Commands::Genesis(gargs) => {
+            let genesis_file = gargs.genesis_file.clone();
+            match &gargs.command {
+                GenesisCommands::New(args) => args.exec(genesis_file),
+            }
+        }
+    };
+    fut.await
 }
 
 /// Try to parse the settings in the configuration directory.

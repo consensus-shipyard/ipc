@@ -1330,6 +1330,7 @@ dependencies = [
  "hex",
  "k256",
  "libsecp256k1",
+ "num-traits",
  "quickcheck 1.0.3",
  "quickcheck_macros",
  "rand_chacha 0.3.1",

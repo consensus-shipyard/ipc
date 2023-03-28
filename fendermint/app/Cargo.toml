@@ -24,6 +24,7 @@ hex = { workspace = true }
 k256 = { workspace = true }
 libsecp256k1 = { workspace = true }
 rand_chacha = { workspace = true }
+num-traits = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 fendermint_storage = { path = "../storage" }
