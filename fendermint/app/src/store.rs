@@ -11,7 +11,7 @@ pub struct AppStore;
 
 impl KVStore for AppStore {
     type Repr = Vec<u8>;
-    type Namespace = &'static str;
+    type Namespace = String;
 }
 
 impl<T> Codec<T> for AppStore where AppStore: Encode<T> + Decode<T> {}

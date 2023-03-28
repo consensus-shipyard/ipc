@@ -2,7 +2,9 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use rocksdb::{OptimisticTransactionDB, Options, WriteBatchWithTransaction};
+use rocksdb::{
+    ColumnFamilyDescriptor, OptimisticTransactionDB, Options, WriteBatchWithTransaction,
+};
 use std::{path::Path, sync::Arc};
 
 mod config;
@@ -35,6 +37,26 @@ impl RocksDb {
         let db_opts = config.into();
         Ok(Self {
             db: Arc::new(OptimisticTransactionDB::open(&db_opts, path)?),
+            options: db_opts,
+        })
+    }
+
+    /// Open all column families with the same config.
+    pub fn open_cf<P, I, N>(path: P, config: &RocksDbConfig, cfs: I) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+        I: Iterator<Item = N>,
+        N: AsRef<str>,
+    {
+        let db_opts: rocksdb::Options = config.into();
+
+        let cfs =
+            cfs.map(|cf| ColumnFamilyDescriptor::new(cf.as_ref().to_owned(), db_opts.clone()));
+
+        let db = OptimisticTransactionDB::open_cf_descriptors(&db_opts, path, cfs)?;
+
+        Ok(Self {
+            db: Arc::new(db),
             options: db_opts,
         })
     }

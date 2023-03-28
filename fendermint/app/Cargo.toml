@@ -12,6 +12,7 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 clap = { workspace = true }
 config = { workspace = true }
+dirs = { workspace = true }
 tokio = { workspace = true }
 tendermint = { workspace = true }
 tower-abci = { workspace = true }

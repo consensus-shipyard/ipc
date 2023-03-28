@@ -4,11 +4,12 @@
 use anyhow::{anyhow, Context};
 use fendermint_abci::ApplicationService;
 use fendermint_app::{App, AppStore};
-use fendermint_rocksdb::{RocksDb, RocksDbConfig};
+use fendermint_rocksdb::{namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_interpreter::{
     bytes::BytesMessageInterpreter, chain::ChainMessageInterpreter, fvm::FvmMessageInterpreter,
     signed::SignedMessageInterpreter,
 };
+use tracing::info;
 
 use crate::{cmd, options::RunArgs, settings::Settings};
 
@@ -19,15 +20,14 @@ cmd! {
         let interpreter = ChainMessageInterpreter::new(interpreter);
         let interpreter = BytesMessageInterpreter::new(interpreter);
 
-        let db = open_db(&settings).expect("error opening DB");
-        let app_ns = db.new_cf_handle("app").unwrap();
-        let state_hist_ns = db.new_cf_handle("state_hist").unwrap();
+        let ns = Namespaces::default();
+        let db = open_db(&settings, &ns).expect("error opening DB");
 
         let app = App::<_, AppStore, _>::new(
             db,
-            settings.builtin_actors_bundle,
-            app_ns,
-            state_hist_ns,
+            settings.builtin_actors_bundle(),
+            ns.app,
+            ns.state_hist,
             interpreter,
         );
 
@@ -56,8 +56,19 @@ cmd! {
     }
 }
 
-fn open_db(settings: &Settings) -> anyhow::Result<RocksDb> {
-    let path = settings.data_dir.join("rocksdb");
-    let db = RocksDb::open(path, &RocksDbConfig::default())?;
+namespaces! {
+    Namespaces {
+        app,
+        state_hist
+    }
+}
+
+fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
+    let path = settings.data_dir().join("rocksdb");
+    info!(
+        path = path.to_string_lossy().into_owned(),
+        "opening database"
+    );
+    let db = RocksDb::open_cf(path, &RocksDbConfig::default(), ns.values().iter())?;
     Ok(db)
 }

@@ -3,7 +3,7 @@
 
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize)]
 pub struct AbciSettings {
@@ -21,8 +21,8 @@ impl AbciSettings {
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub data_dir: PathBuf,
-    pub builtin_actors_bundle: PathBuf,
+    data_dir: PathBuf,
+    builtin_actors_bundle: PathBuf,
     pub abci: AbciSettings,
 }
 
@@ -45,17 +45,57 @@ impl Settings {
         // You can deserialize (and thus freeze) the entire configuration as
         s.try_deserialize()
     }
+
+    pub fn data_dir(&self) -> PathBuf {
+        expand_tilde(&self.data_dir)
+    }
+
+    pub fn builtin_actors_bundle(&self) -> PathBuf {
+        expand_tilde(&self.builtin_actors_bundle)
+    }
+}
+
+/// Expand paths that begin with "~" to `$HOME`.
+pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
+    let p = path.as_ref().to_path_buf();
+    if !p.starts_with("~") {
+        return p;
+    }
+    if p == Path::new("~") {
+        return dirs::home_dir().unwrap_or(p);
+    }
+    dirs::home_dir()
+        .map(|mut h| {
+            if h == Path::new("/") {
+                // `~/foo` becomes just `/foo` instead of `//foo` if `/` is home.
+                p.strip_prefix("~").unwrap().to_path_buf()
+            } else {
+                h.push(p.strip_prefix("~/").unwrap());
+                h
+            }
+        })
+        .unwrap_or(p)
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
+    use super::expand_tilde;
     use super::Settings;
 
     #[test]
     fn parse_default() {
         let default_dir = PathBuf::from("config");
         Settings::new(default_dir, "test").unwrap();
+    }
+
+    #[test]
+    fn tilde_expands_to_home() {
+        let home = std::env::var("HOME").expect("should work on Linux");
+        let home_project = PathBuf::from(format!("{}/.project", home));
+        assert_eq!(expand_tilde("~/.project"), home_project);
+        assert_eq!(expand_tilde("/foo/bar"), PathBuf::from("/foo/bar"));
+        assert_eq!(expand_tilde("~foo/bar"), PathBuf::from("~foo/bar"));
     }
 }

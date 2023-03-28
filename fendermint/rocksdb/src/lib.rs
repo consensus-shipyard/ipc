@@ -7,4 +7,6 @@ mod blockstore;
 #[cfg(feature = "kvstore")]
 mod kvstore;
 
+pub mod namespaces;
+
 pub use rocks::{Error as RocksDbError, RocksDb, RocksDbConfig};
