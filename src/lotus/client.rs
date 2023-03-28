@@ -19,7 +19,9 @@ use serde_json::json;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 use crate::lotus::json::ToJson;
 use crate::lotus::message::chain::ChainHeadResponse;
-use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
+use crate::lotus::message::ipc::{
+    IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, Votes,
+};
 use crate::lotus::message::mpool::{
     MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
@@ -49,6 +51,7 @@ mod methods {
     pub const IPC_READ_GATEWAY_STATE: &str = "Filecoin.IPCReadGatewayState";
     pub const IPC_READ_SUBNET_ACTOR_STATE: &str = "Filecoin.IPCReadSubnetActorState";
     pub const IPC_LIST_CHILD_SUBNETS: &str = "Filecoin.IPCListChildSubnets";
+    pub const IPC_GET_VOTES_FOR_CHECKPOINT: &str = "Filecoin.IPCGetVotesForCheckpoint";
 }
 
 /// The default gateway actor address
@@ -343,6 +346,19 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .request::<Option<Vec<SubnetInfo>>>(methods::IPC_LIST_CHILD_SUBNETS, params)
             .await?;
         Ok(r.unwrap_or_default())
+    }
+
+    async fn ipc_get_votes_for_checkpoint(
+        &self,
+        subnet_id: SubnetID,
+        checkpoint_cid: Cid,
+    ) -> Result<Votes> {
+        let params = json!([subnet_id.to_json(), CIDMap::from(checkpoint_cid)]);
+        let r = self
+            .client
+            .request::<Votes>(methods::IPC_GET_VOTES_FOR_CHECKPOINT, params)
+            .await?;
+        Ok(r)
     }
 }
 

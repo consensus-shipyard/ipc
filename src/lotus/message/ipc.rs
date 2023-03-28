@@ -1,6 +1,8 @@
 use cid::Cid;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::{Checkpoint, Status, CHECKPOINT_GENESIS_CID};
@@ -137,6 +139,12 @@ pub struct CheckData {
     pub source: SubnetID,
     #[serde(rename(deserialize = "Checks"))]
     pub checks: Vec<CIDMap>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct Votes {
+    pub validators: Vec<Address>,
 }
 
 impl TryFrom<CheckpointResponse> for Checkpoint {

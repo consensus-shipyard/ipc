@@ -18,7 +18,9 @@ use message::mpool::{MpoolPushMessage, MpoolPushMessageResponseInner};
 use message::state::{ReadStateResponse, StateWaitMsgResponse};
 use message::wallet::{WalletKeyType, WalletListResponse};
 
-use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
+use crate::lotus::message::ipc::{
+    IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, Votes,
+};
 use crate::manager::SubnetInfo;
 
 use self::message::CIDMap;
@@ -104,4 +106,11 @@ pub trait LotusClient {
 
     /// Returns the list of subnets in a gateway.
     async fn ipc_list_child_subnets(&self, gateway_addr: Address) -> Result<Vec<SubnetInfo>>;
+
+    // Returns the votes for a checkpoint with a specific cid.
+    async fn ipc_get_votes_for_checkpoint(
+        &self,
+        subnet: SubnetID,
+        checkpoint_cid: Cid,
+    ) -> Result<Votes>;
 }
