@@ -62,6 +62,14 @@ pub trait SubnetManager {
     /// Propagate a cross-net message forward
     async fn propagate(&self, subnet: SubnetID, from: Address, postbox_msg_cid: Cid) -> Result<()>;
 
+    /// Sets a new net address to an existing validator
+    async fn set_validator_net_addr(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        validator_net_addr: String,
+    ) -> Result<()>;
+
     /// Whitelist a series of addresses as propagator of a cross net message
     async fn whitelist_propagator(
         &self,

@@ -16,6 +16,7 @@ use crate::server::handlers::manager::release::ReleaseHandler;
 use crate::server::handlers::manager::whitelist::WhitelistPropagatorHandler;
 use crate::server::handlers::send_value::SendValueHandler;
 use crate::server::handlers::validator::QueryValidatorSetHandler;
+use crate::server::net_addr::SetValidatorNetAddrHandler;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -101,6 +102,9 @@ impl Handlers {
 
         let h: Box<dyn HandlerWrapper> = Box::new(WalletNewHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::WALLET_NEW), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(SetValidatorNetAddrHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::SET_VALIDATOR_NET_ADDR), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool));
         handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);
