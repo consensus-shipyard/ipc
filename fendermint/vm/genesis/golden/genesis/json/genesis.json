@@ -11,7 +11,7 @@
   "accounts": [
     {
       "meta": {
-        "MultiSig": {
+        "Multisig": {
           "signers": [
             "f416233396226455331208fbmbuetoc3d46yac4adbiteqc2su54idbrx5vxcq",
             "f2rhrqc4g2kj7adah7rvgixfbzmh5qdqddf2hi62q",
@@ -34,7 +34,7 @@
     },
     {
       "meta": {
-        "MultiSig": {
+        "Multisig": {
           "signers": [
             "f1ejckx7y6wgr2ee2zwiac7ctssbt7dsqrxtihkpq",
             "f23t4sbtkead6ir2qf3xcuytcigaf7r42mrpt76gy",

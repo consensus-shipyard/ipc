@@ -41,7 +41,7 @@ impl State {
             ActorMeta::Account(acc) => {
                 vec![acc.owner.0]
             }
-            ActorMeta::MultiSig(ms) => ms.signers.iter().map(|a| a.0).collect(),
+            ActorMeta::Multisig(ms) => ms.signers.iter().map(|a| a.0).collect(),
         });
 
         let mut next_id = FIRST_NON_SINGLETON_ADDR;
@@ -61,7 +61,7 @@ impl State {
         // mapping is trivial (it's an ID type address). To avoid the init actor
         // using the same ID for something else, give it a higher ID to use next.
         for a in accounts.iter() {
-            if let ActorMeta::MultiSig { .. } = a.meta {
+            if let ActorMeta::Multisig { .. } = a.meta {
                 next_id += 1;
             }
         }

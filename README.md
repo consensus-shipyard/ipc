@@ -8,3 +8,4 @@ The following documentation should help with getting oriented:
 
 * [Architecture Overview](./docs/architecture.md)
 * [Getting started with Tendermint](./docs/tendermint.md)
+* [Running Fendermint](./docs/running.md)

@@ -40,7 +40,7 @@ pub struct Multisig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ActorMeta {
     Account(Account),
-    MultiSig(Multisig),
+    Multisig(Multisig),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

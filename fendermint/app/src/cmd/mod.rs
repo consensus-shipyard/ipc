@@ -26,7 +26,7 @@ pub trait Cmd {
 ///
 /// ```text
 /// cmd! {
-///   <type-name>(self, settings) {
+///   <arg-type>(self, settings: <settings-type>) {
 ///     <exec-body>
 ///   }
 /// }
@@ -65,6 +65,8 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
             let genesis_file = gargs.genesis_file.clone();
             match &gargs.command {
                 GenesisCommands::New(args) => args.exec(genesis_file),
+                GenesisCommands::AddAccount(args) => args.exec(genesis_file),
+                GenesisCommands::AddMultisig(args) => args.exec(genesis_file),
             }
         }
     };

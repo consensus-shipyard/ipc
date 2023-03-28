@@ -115,7 +115,7 @@ where
                 ActorMeta::Account(acct) => {
                     state.create_account_actor(acct, balance, &addr_to_id)?;
                 }
-                ActorMeta::MultiSig(ms) => {
+                ActorMeta::Multisig(ms) => {
                     state.create_multisig_actor(ms, balance, &addr_to_id, next_id)?;
                     next_id += 1;
                 }

@@ -22,7 +22,7 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     if let Err(e) = cmd::exec(&opts).await {
-        tracing::error!("failed to execute {:?}: {e}", opts);
+        tracing::error!("failed to execute {:?}: {e:?}", opts);
         std::process::exit(1);
     }
 }

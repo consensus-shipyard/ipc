@@ -56,6 +56,10 @@ pub enum Commands {
 pub enum GenesisCommands {
     /// Create a new Genesis file, with accounts and validators to be added later.
     New(GenesisNewArgs),
+    /// Add an account to the genesis file.
+    AddAccount(GenesisAddAccountArgs),
+    /// Add a multi-sig account to the genesis file.
+    AddMultisig(GenesisAddMultisigArgs),
 }
 
 #[derive(Args, Debug)]
@@ -64,17 +68,17 @@ pub struct RunArgs;
 #[derive(Args, Debug)]
 pub struct KeygenArgs {
     /// Name used to distinguish the files from other exported keys.
-    #[arg(short, long)]
+    #[arg(long, short)]
     pub name: String,
     /// Directory to export the key files to; it must exist.
-    #[arg(short, long, default_value = ".")]
+    #[arg(long, short, default_value = ".")]
     pub out_dir: PathBuf,
 }
 
 #[derive(Args, Debug)]
 pub struct GenesisArgs {
     /// Path to the genesis JSON file.
-    #[arg(short, long)]
+    #[arg(long, short)]
     pub genesis_file: PathBuf,
 
     #[command(subcommand)]
@@ -84,14 +88,43 @@ pub struct GenesisArgs {
 #[derive(Args, Debug)]
 pub struct GenesisNewArgs {
     /// Name of the network and chain.
-    #[arg(long)]
+    #[arg(long, short = 'n')]
     pub network_name: String,
     /// Network version, governs which set of built-in actors to use.
-    #[arg(long, default_value = "18", value_parser = parse_network_version)]
+    #[arg(long, short = 'v', default_value = "18", value_parser = parse_network_version)]
     pub network_version: NetworkVersion,
-    /// Base fee for running transactions.
-    #[arg(long, value_parser = parse_token_amount)]
+    /// Base fee for running transactions in atto.
+    #[arg(long, short = 'f', value_parser = parse_token_amount)]
     pub base_fee: TokenAmount,
+}
+
+#[derive(Args, Debug)]
+pub struct GenesisAddAccountArgs {
+    /// Path to the Secp256k1 public key exported in base64 format.
+    #[arg(long, short)]
+    pub public_key: PathBuf,
+    /// Initial balance in atto.
+    #[arg(long, short, value_parser = parse_token_amount)]
+    pub balance: TokenAmount,
+}
+
+#[derive(Args, Debug)]
+pub struct GenesisAddMultisigArgs {
+    /// Path to the Secp256k1 public key exported in base64 format, one for each signatory.
+    #[arg(long, short)]
+    pub public_key: Vec<PathBuf>,
+    /// Initial balance in atto.
+    #[arg(long, short, value_parser = parse_token_amount)]
+    pub balance: TokenAmount,
+    /// Number of signatures required.
+    #[arg(long, short)]
+    pub threshold: u64,
+    /// Linear unlock duration in block heights.
+    #[arg(long, short = 'd')]
+    pub vesting_duration: u64,
+    /// Linear unlock start block height.
+    #[arg(long, short = 's')]
+    pub vesting_start: u64,
 }
 
 fn parse_network_version(s: &str) -> Result<NetworkVersion, String> {

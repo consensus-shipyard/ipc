@@ -20,7 +20,7 @@ impl Arbitrary for ActorMeta {
                 .map(|_| ActorAddr(ArbAddress::arbitrary(g).0))
                 .collect();
             let threshold = u64::arbitrary(g) % n + 1;
-            ActorMeta::MultiSig(Multisig {
+            ActorMeta::Multisig(Multisig {
                 signers,
                 threshold,
                 vesting_duration: u64::arbitrary(g),
