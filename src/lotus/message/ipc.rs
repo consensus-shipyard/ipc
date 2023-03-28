@@ -1,9 +1,11 @@
+use cid::Cid;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use ipc_gateway::Status;
+use ipc_gateway::{Checkpoint, Status, CHECKPOINT_GENESIS_CID};
 use ipc_sdk::subnet_id::SubnetID;
+use primitives::TCid;
 use serde::{Deserialize, Serialize};
 
 use crate::lotus::message::deserialize::{
@@ -88,30 +90,115 @@ pub struct Validator {
 /// here because the Lotus API json serializes and the cbor tuple deserializer is not
 /// able to pick it up automatically
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "PascalCase")]
 pub struct CheckpointResponse {
+    #[serde(rename(deserialize = "Data"))]
     pub data: CheckpointData,
+    #[serde(rename(deserialize = "Sig"))]
+    #[serde(with = "serde_bytes")]
     pub sig: Option<Vec<u8>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "PascalCase")]
 pub struct CheckpointData {
+    #[serde(rename(deserialize = "Source"))]
     #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
     pub source: SubnetID,
-    pub proof: Option<String>,
+    #[serde(rename(deserialize = "Proof"))]
+    #[serde(with = "serde_bytes")]
+    pub proof: Option<Vec<u8>>,
+    #[serde(rename(deserialize = "Epoch"))]
     pub epoch: i64,
+    #[serde(rename(deserialize = "Children"))]
     pub children: Option<Vec<CheckData>>,
     #[serde(rename(deserialize = "PrevCheck"))]
     pub prev_check: Option<CIDMap>,
     #[serde(rename(deserialize = "CrossMsgs"))]
-    pub cross_msgs: Option<CIDMap>,
+    pub cross_msgs: Option<CrossMsgMetaWrapper>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Default, Deserialize, Serialize)]
+pub struct CrossMsgMetaWrapper {
+    #[serde(rename(deserialize = "MsgsCid"))]
+    pub msgs_cid: Option<CIDMap>,
+    #[serde(rename(deserialize = "Nonce"))]
+    pub nonce: u64,
+    #[serde(rename(deserialize = "Value"))]
+    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
+    pub value: TokenAmount,
+    #[serde(rename(deserialize = "Fee"))]
+    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
+    pub fee: TokenAmount,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "PascalCase")]
 pub struct CheckData {
+    #[serde(rename(deserialize = "Source"))]
     #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
     pub source: SubnetID,
+    #[serde(rename(deserialize = "Checks"))]
     pub checks: Vec<CIDMap>,
+}
+
+impl TryFrom<CheckpointResponse> for Checkpoint {
+    type Error = anyhow::Error;
+
+    fn try_from(checkpoint_response: CheckpointResponse) -> Result<Self, Self::Error> {
+        let prev_check = if let Some(prev_check) = checkpoint_response.data.prev_check {
+            TCid::from(Cid::try_from(prev_check)?)
+        } else {
+            TCid::default()
+        };
+        log::debug!("previous checkpoint: {prev_check:?}");
+
+        let children = if let Some(children) = checkpoint_response.data.children {
+            children
+                .into_iter()
+                .map::<Result<_, Self::Error>, _>(|c| {
+                    let checks: Result<Vec<_>, _> = c
+                        .checks
+                        .into_iter()
+                        .map(|cid_map| Cid::try_from(cid_map).map(TCid::from))
+                        .collect();
+
+                    Ok(ipc_gateway::checkpoint::ChildCheck {
+                        source: c.source,
+                        checks: checks?,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            vec![]
+        };
+        log::debug!("children: {children:?}");
+
+        let cross_msgs = if let Some(cross_msgs) = checkpoint_response.data.cross_msgs {
+            let msgs_cid = if let Some(cid_map) = cross_msgs.msgs_cid {
+                TCid::from(Cid::try_from(cid_map)?)
+            } else {
+                TCid::from(*CHECKPOINT_GENESIS_CID)
+            };
+            Some(ipc_gateway::checkpoint::CrossMsgMeta {
+                msgs_cid,
+                nonce: cross_msgs.nonce,
+                value: cross_msgs.value,
+                fee: cross_msgs.fee,
+            })
+        } else {
+            None
+        };
+        log::debug!("cross_msgs: {cross_msgs:?}");
+
+        let data = ipc_gateway::checkpoint::CheckData {
+            source: checkpoint_response.data.source,
+            proof: checkpoint_response.data.proof.unwrap_or_default(),
+            epoch: checkpoint_response.data.epoch,
+            prev_check,
+            children,
+            cross_msgs,
+        };
+        Ok(Checkpoint {
+            data,
+            sig: checkpoint_response.sig.unwrap_or_default(),
+        })
+    }
 }

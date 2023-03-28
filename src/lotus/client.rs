@@ -285,28 +285,8 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
                 json!([GATEWAY_ACTOR_ADDRESS, epoch]),
             )
             .await?;
-        let ch = Checkpoint::new(r.data.source, r.data.epoch);
 
-        // FIXME: For now we are only picking up from the request
-        // the information that we need from the template,
-        // in the future we may consider including more.
-
-        // // TODO: Deserialize into the right type
-        // ch.data.children = r
-        //     .data
-        //     .children
-        //     .iter()
-        //     .map(|x| {
-        //         // TODO: Deserialize into the right type
-        //         panic!("not implemented");
-        //     })
-        //     .collect();
-
-        // if let Some(cross_msgs) = r.data.cross_msgs {
-        //     ch.data.cross_msgs = cross_msgs;
-        // }
-
-        Ok(ch)
+        Ok(Checkpoint::try_from(r)?)
     }
 
     async fn ipc_get_checkpoint(
@@ -320,11 +300,11 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .to_string();
         let actor = subnet_id.subnet_actor().to_string();
         let params = json!([
-        {
-            "Parent": parent,
-            "Actor": actor
-        },
-        epoch,
+            {
+                "Parent": parent,
+                "Actor": actor
+            },
+            epoch,
         ]);
         let r = self
             .client
@@ -339,17 +319,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
                 e
             })?;
 
-        // FIXME: For now we are only checking if the checkpoint has been
-        // committed without any additional check, so we shouldn't worry
-        // if the deserialization doesn't work for every field as long as it
-        // doesn't fail if there is a checkpoint. But this NEEDS TO BE FIXED and we should transform a CheckpointReponse into a Checkpoint.
-
-        let mut ch = Checkpoint::new(r.data.source, r.data.epoch);
-        if r.data.proof.is_some() {
-            ch.data.proof = r.data.proof.unwrap().into_bytes();
-        }
-
-        Ok(ch)
+        Ok(Checkpoint::try_from(r)?)
     }
 
     async fn ipc_read_gateway_state(&self, tip_set: Cid) -> Result<IPCReadGatewayStateResponse> {
