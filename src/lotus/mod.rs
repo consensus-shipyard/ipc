@@ -24,6 +24,7 @@ use crate::manager::SubnetInfo;
 use self::message::CIDMap;
 
 pub mod client;
+mod json;
 pub mod message;
 #[cfg(test)]
 mod tests;

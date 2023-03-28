@@ -17,6 +17,7 @@ use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
+use crate::lotus::json::ToJson;
 use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
 use crate::lotus::message::mpool::{
@@ -262,13 +263,10 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         &self,
         child_subnet_id: SubnetID,
     ) -> Result<Option<CIDMap>> {
-        let parent = match child_subnet_id.parent() {
-            None => return Err(anyhow!("The child_subnet_id must be a valid child subnet")),
-            Some(parent) => parent,
-        };
-        let subnet_actor = child_subnet_id.subnet_actor().to_string();
-        let params =
-            json!([GATEWAY_ACTOR_ADDRESS, {"Parent": parent.to_string(), "Actor": subnet_actor}]);
+        if child_subnet_id.parent().is_none() {
+            return Err(anyhow!("The child_subnet_id must be a valid child subnet"));
+        }
+        let params = json!([GATEWAY_ACTOR_ADDRESS, child_subnet_id.to_json()]);
 
         let r = self
             .client
@@ -294,18 +292,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<Checkpoint> {
-        let parent = subnet_id
-            .parent()
-            .ok_or_else(|| anyhow!("no parent found"))?
-            .to_string();
-        let actor = subnet_id.subnet_actor().to_string();
-        let params = json!([
-            {
-                "Parent": parent,
-                "Actor": actor
-            },
-            epoch,
-        ]);
+        let params = json!([subnet_id.to_json(), epoch]);
         let r = self
             .client
             .request::<CheckpointResponse>(methods::IPC_GET_CHECKPOINT, params)
@@ -336,18 +323,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         subnet_id: &SubnetID,
         tip_set: Cid,
     ) -> Result<IPCReadSubnetActorStateResponse> {
-        let parent = subnet_id
-            .parent()
-            .ok_or_else(|| anyhow!("no parent found"))?
-            .to_string();
-        let actor = subnet_id.subnet_actor().to_string();
-        let params = json!([
-            {
-                "Parent": parent,
-                "Actor": actor
-            },
-            [CIDMap::from(tip_set)]]
-        );
+        let params = json!([subnet_id.to_json(), [CIDMap::from(tip_set)]]);
         log::debug!("sending {params:?}");
 
         let r = self
