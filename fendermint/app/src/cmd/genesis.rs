@@ -6,10 +6,14 @@ use fvm_shared::address::Address;
 use libsecp256k1::PublicKey;
 use std::path::PathBuf;
 
-use fendermint_vm_genesis::{Account, Actor, ActorAddr, ActorMeta, Genesis, Multisig};
+use fendermint_vm_genesis::{
+    Account, Actor, ActorAddr, ActorMeta, Genesis, Multisig, Power, Validator, ValidatorKey,
+};
 
 use crate::cmd;
-use crate::options::{GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisNewArgs};
+use crate::options::{
+    GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs, GenesisNewArgs,
+};
 
 use super::keygen::b64_to_public;
 
@@ -39,6 +43,12 @@ cmd! {
 cmd! {
   GenesisAddMultisigArgs(self, genesis_file: PathBuf) {
     add_multisig(&genesis_file, self)
+  }
+}
+
+cmd! {
+  GenesisAddValidatorArgs(self, genesis_file: PathBuf) {
+    add_validator(&genesis_file, self)
   }
 }
 
@@ -97,6 +107,22 @@ fn add_multisig(genesis_file: &PathBuf, args: &GenesisAddMultisigArgs) -> anyhow
 
         genesis.accounts.push(actor);
 
+        Ok(genesis)
+    })
+}
+
+fn add_validator(genesis_file: &PathBuf, args: &GenesisAddValidatorArgs) -> anyhow::Result<()> {
+    update_genesis(genesis_file, |mut genesis| {
+        let pk = read_public_key(&args.public_key)?;
+        let vk = ValidatorKey(pk);
+        if genesis.validators.iter().any(|v| v.public_key == vk) {
+            return Err(anyhow!("account already exists in the genesis file"));
+        }
+        let validator = Validator {
+            public_key: vk,
+            power: Power(args.power),
+        };
+        genesis.validators.push(validator);
         Ok(genesis)
     })
 }

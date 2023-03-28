@@ -60,6 +60,8 @@ pub enum GenesisCommands {
     AddAccount(GenesisAddAccountArgs),
     /// Add a multi-sig account to the genesis file.
     AddMultisig(GenesisAddMultisigArgs),
+    /// Add a validator to the genesis file.
+    AddValidator(GenesisAddValidatorArgs),
 }
 
 #[derive(Args, Debug)]
@@ -125,6 +127,16 @@ pub struct GenesisAddMultisigArgs {
     /// Linear unlock start block height.
     #[arg(long, short = 's')]
     pub vesting_start: u64,
+}
+
+#[derive(Args, Debug)]
+pub struct GenesisAddValidatorArgs {
+    /// Path to the Secp256k1 public key exported in base64 format.
+    #[arg(long, short)]
+    pub public_key: PathBuf,
+    /// Voting power.
+    #[arg(long, short = 'v')]
+    pub power: u64,
 }
 
 fn parse_network_version(s: &str) -> Result<NetworkVersion, String> {

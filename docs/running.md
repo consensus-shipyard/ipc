@@ -48,7 +48,9 @@ Next, let's create some cryptographic key pairs we want want to use either for a
 
 ```shell
 mkdir test-network/keys
-for NAME in alice bob charlie dave; do cargo run -p fendermint_app -- keygen --out-dir test-network/keys --name $NAME; done
+for NAME in alice bob charlie dave; do
+  cargo run -p fendermint_app -- keygen --out-dir test-network/keys --name $NAME;
+done
 ```
 
 Check that the keys have been created:
@@ -87,7 +89,8 @@ $ cat test-network/genesis.json | jq .accounts
 ]
 ```
 
-The `owner` we see is an `f1` type address with the hash of the public key.
+The `owner` we see is an `f1` type address with the hash of the public key. Technically it's an `Address` type,
+but it has to be one based on a public key, otherwise we would not be able to validate signatures later.
 
 Let's add an example of the other possible account type, a multi-sig account:
 
@@ -118,3 +121,43 @@ cat test-network/genesis.json | jq .accounts[1]
   "balance": "3000000000000000000"
 }
 ```
+
+### Add validators to the Genesis file
+
+Finally, let's add all validators with equal power to Genesis:
+
+```shell
+for NAME in alice bob charlie dave; do
+  cargo run -p fendermint_app -- \
+        genesis --genesis-file test-network/genesis.json \
+        add-validator --public-key test-network/keys/$NAME.pk --power 25;
+done
+```
+
+Check that all of them are present:
+
+```console
+❯ cat test-network/genesis.json | jq .validators
+[
+  {
+    "public_key": "BE5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkqGC63X6tOBnky31kw7wPqL0tvbPrtLM2O+SooUhiV1Mo=",
+    "power": 25
+  },
+  {
+    "public_key": "BCImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QEy8cVKNuvTU/EOTibo3hIyOQslvSouzIpR24h1kkqCSI=",
+    "power": 25
+  },
+  {
+    "public_key": "BJVVXUBEjwW8DyZIXb2iw7aq6DJF14kdcCYqKdyruQJAOMGlBR5jSGgeM8O+BX+E2+etsm2xIoWAQllZtY4K9is=",
+    "power": 25
+  },
+  {
+    "public_key": "BPcq6nnj38i6fhK7GlRVPLE870QJD88ZwalM3ySDadBAHXSlD5AYAd7JZFjYnDf4WtwEcDfodIuiXchRw9389bM=",
+    "power": 25
+  }
+]
+```
+
+The public keys are spliced in as they were, in base64 format, which is how they would appear in Tendermint's
+own genesis file format. Note that here we don't have the option to use `Address`, because we have to return
+these as actual `PublicKey` types to Tendermint through ABCI, not as a hash of a key.

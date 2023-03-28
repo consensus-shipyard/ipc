@@ -67,6 +67,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
                 GenesisCommands::New(args) => args.exec(genesis_file),
                 GenesisCommands::AddAccount(args) => args.exec(genesis_file),
                 GenesisCommands::AddMultisig(args) => args.exec(genesis_file),
+                GenesisCommands::AddValidator(args) => args.exec(genesis_file),
             }
         }
     };
