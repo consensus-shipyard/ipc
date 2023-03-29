@@ -1,7 +1,11 @@
-data_dir = "~/.fendermint/data"
-builtin_actors_bundle = "~/.fendermint/bundle.car"
+# Data directory relative to the `--home-dir`, unless given as an absolute path.
+data_dir = "data"
+# Builtin actor bunlde path relative to the `--home-dir`, unless given as an absolute path.
+builtin_actors_bundle = "bundle.car"
 
 [abci]
+# Only accept connections from Tendermint, assumed to be running locally.
 host = "127.0.0.1"
+# The default port where Tendermint is going to connect to the application.
 port = 26658
 bound = 1

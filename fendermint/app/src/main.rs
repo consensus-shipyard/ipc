@@ -15,11 +15,12 @@ async fn main() {
     let opts = Options::parse();
 
     // Log events to stdout.
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(opts.tracing_level())
-        .finish();
+    if let Some(level) = opts.tracing_level() {
+        let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
 
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
+    }
 
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);

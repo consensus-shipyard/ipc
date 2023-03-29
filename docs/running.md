@@ -104,7 +104,7 @@ cargo run -p fendermint_app -- \
 Check that all three of the signatories have been added:
 
 ```console
-cat test-network/genesis.json | jq .accounts[1]
+$ cat test-network/genesis.json | jq .accounts[1]
 {
   "meta": {
     "Multisig": {
@@ -137,7 +137,7 @@ done
 Check that all of them are present:
 
 ```console
-❯ cat test-network/genesis.json | jq .validators
+$ cat test-network/genesis.json | jq .validators
 [
   {
     "public_key": "BE5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkqGC63X6tOBnky31kw7wPqL0tvbPrtLM2O+SooUhiV1Mo=",
@@ -161,3 +161,49 @@ Check that all of them are present:
 The public keys are spliced in as they were, in base64 format, which is how they would appear in Tendermint's
 own genesis file format. Note that here we don't have the option to use `Address`, because we have to return
 these as actual `PublicKey` types to Tendermint through ABCI, not as a hash of a key.
+
+
+### Run the application
+
+Now we are ready to start our Fendermint _Application_, which will listen to requests coming from Tendermint
+through the ABCI interface.
+
+First, let's make sure we have put all the necessary files in an easy to remember place under `~/.fendermint`.
+
+```shell
+mkdir -p ~/.fendermint/data
+cp -r ./fendermint/app/config ~/.fendermint/config
+```
+
+We will need the actor bundle to load. We can configure its location via environment variables, but the default
+configuration will look for it at `~/.fendermint/bundle.car`, so we might as well put it there.
+
+```shell
+make actor-bundle
+cp ../builtin-actors/output/bundle.car ~/.fendermint/bundle.car
+```
+
+Now, start the application.
+
+```shell
+cargo run -p fendermint_app -- run
+```
+
+The `-dd` flag enables `INFO` level logging; we can see that the application is listening:
+
+```console
+2023-03-29T09:17:28.548878Z  INFO fendermint::cmd: reading configuration path="/home/aakoshh/.fendermint/config"
+2023-03-29T09:17:28.549700Z  INFO fendermint::cmd::run: opening database path="/home/aakoshh/.fendermint/data/rocksdb"
+2023-03-29T09:17:28.879916Z  INFO tower_abci::server: starting ABCI server addr="127.0.0.1:26658"
+2023-03-29T09:17:28.880023Z  INFO tower_abci::server: bound tcp listener local_addr=127.0.0.1:26658
+```
+
+### Run Tendermint
+
+First, follow the instructions in [getting started with Tendermint](./tendermint.md) to install the binary,
+then initialize a genesis file for Tendermint at `~/.tendermint`.
+
+```shell
+rm -rf ~/.tendermint
+tendermint init
+```

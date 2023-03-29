@@ -3,11 +3,9 @@
 
 //! CLI command implementations.
 
-use std::path::PathBuf;
-
 use crate::{
     options::{Commands, GenesisCommands, Options},
-    settings::{expand_tilde, Settings},
+    settings::Settings,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -76,28 +74,18 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
 
 /// Try to parse the settings in the configuration directory.
 fn settings(opts: &Options) -> anyhow::Result<Settings> {
-    let config_dir = match find_config_dir(opts) {
-        Some(d) if d.is_dir() => d,
-        Some(d) if d.exists() => return Err(anyhow!("config '{d:?}' is a not a directory")),
-        Some(d) => return Err(anyhow!("config '{d:?}' does not exist")),
-        None => return Err(anyhow!("could not find a config directory to use")),
+    let config_dir = match opts.config_dir() {
+        d if !d.exists() => return Err(anyhow!("'{d:?}' does not exist")),
+        d if !d.is_dir() => return Err(anyhow!("'{d:?}' is a not a directory")),
+        d => d,
     };
 
-    let settings = Settings::new(config_dir, &opts.mode).context("error parsing settings")?;
+    tracing::info!(
+        path = config_dir.to_string_lossy().into_owned(),
+        "reading configuration"
+    );
+    let settings =
+        Settings::new(&config_dir, &opts.home_dir, &opts.mode).context("error parsing settings")?;
 
     Ok(settings)
-}
-
-/// Return the configured config directory, or a default, if they exist.
-fn find_config_dir(opts: &Options) -> Option<PathBuf> {
-    if let Some(config_dir) = &opts.config_dir {
-        return Some(config_dir.clone());
-    }
-    for d in &["./config", "~/.fendermint/config"] {
-        let p = expand_tilde(PathBuf::from(d));
-        if p.is_dir() {
-            return Some(p);
-        }
-    }
-    None
 }

@@ -3,42 +3,57 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use num_traits::Num;
-use tracing::Level;
 
 use fvm_shared::{bigint::BigInt, econ::TokenAmount, version::NetworkVersion};
+
+use crate::settings::expand_tilde;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum LogLevel {
+    Off,
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
 
 #[derive(Parser, Debug)]
 #[command(version)]
 pub struct Options {
-    /// Set a custom directory for configuration files.
-    ///
-    /// By default the application will try to find where the config directory is.
-    #[arg(short, long, value_name = "DIR")]
-    pub config_dir: Option<PathBuf>,
+    /// Set a custom directory for data and configuration files.
+    #[arg(short = 'd', long, default_value = "~/.fendermint")]
+    pub home_dir: PathBuf,
 
     /// Optionally override the default configuration.
     #[arg(short, long, default_value = "dev")]
     pub mode: String,
 
-    /// Turn debugging information on.
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    pub debug: u8,
+    /// Set the logging level.
+    #[arg(short, long, default_value = "info", value_enum)]
+    pub log_level: LogLevel,
 
     #[command(subcommand)]
     pub command: Commands,
 }
 
 impl Options {
-    pub fn tracing_level(&self) -> Level {
-        match self.debug {
-            0 => Level::ERROR,
-            1 => Level::WARN,
-            2 => Level::INFO,
-            3 => Level::DEBUG,
-            _ => Level::TRACE,
+    /// Tracing level, unless it's turned off.
+    pub fn tracing_level(&self) -> Option<tracing::Level> {
+        match self.log_level {
+            LogLevel::Off => None,
+            LogLevel::Error => Some(tracing::Level::ERROR),
+            LogLevel::Warn => Some(tracing::Level::WARN),
+            LogLevel::Info => Some(tracing::Level::INFO),
+            LogLevel::Debug => Some(tracing::Level::DEBUG),
+            LogLevel::Trace => Some(tracing::Level::TRACE),
         }
+    }
+
+    pub fn config_dir(&self) -> PathBuf {
+        expand_tilde(self.home_dir.join("config"))
     }
 }
 
