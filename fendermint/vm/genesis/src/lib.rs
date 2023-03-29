@@ -15,6 +15,16 @@ mod encoding;
 
 use encoding::{deserialize_tokens, serialize_tokens};
 
+/// Unix timestamp (in seconds).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Timestamp(pub u64);
+
+impl Timestamp {
+    pub fn as_secs(&self) -> i64 {
+        self.0 as i64
+    }
+}
+
 /// Wrapper around [`Address`] to provide human readable serialization in JSON format.
 ///
 /// An alternative would be the `serde_with` crate.
@@ -97,6 +107,7 @@ pub struct Validator {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
+    pub timestamp: Timestamp,
     pub network_name: String,
     pub network_version: NetworkVersion,
     #[serde(

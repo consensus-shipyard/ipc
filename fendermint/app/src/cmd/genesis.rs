@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
+use fendermint_app::APP_VERSION;
 use fvm_shared::address::Address;
 use libsecp256k1::PublicKey;
 use std::path::PathBuf;
 
 use fendermint_vm_genesis::{
-    Account, Actor, ActorAddr, ActorMeta, Genesis, Multisig, Power, Validator, ValidatorKey,
+    Account, Actor, ActorAddr, ActorMeta, Genesis, Multisig, Power, Timestamp, Validator,
+    ValidatorKey,
 };
 
 use crate::cmd;
 use crate::options::{
-    GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs, GenesisNewArgs,
+    GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs,
+    GenesisIntoTendermintArgs, GenesisNewArgs,
 };
 
 use super::keygen::b64_to_public;
@@ -20,6 +23,7 @@ use super::keygen::b64_to_public;
 cmd! {
   GenesisNewArgs(self, genesis_file: PathBuf) {
     let genesis = Genesis {
+      timestamp: Timestamp(self.timestamp),
       network_name: self.network_name.clone(),
       network_version: self.network_version,
       base_fee: self.base_fee.clone(),
@@ -49,6 +53,12 @@ cmd! {
 cmd! {
   GenesisAddValidatorArgs(self, genesis_file: PathBuf) {
     add_validator(&genesis_file, self)
+  }
+}
+
+cmd! {
+  GenesisIntoTendermintArgs(self, genesis_file: PathBuf) {
+    into_tendermint(&genesis_file, self)
   }
 }
 
@@ -133,14 +143,57 @@ fn read_public_key(public_key: &PathBuf) -> anyhow::Result<PublicKey> {
     Ok(pk)
 }
 
+fn read_genesis(genesis_file: &PathBuf) -> anyhow::Result<Genesis> {
+    let json = std::fs::read_to_string(genesis_file).context("failed to read genesis")?;
+    let genesis = serde_json::from_str::<Genesis>(&json).context("failed to parse genesis")?;
+    Ok(genesis)
+}
+
 fn update_genesis<F>(genesis_file: &PathBuf, f: F) -> anyhow::Result<()>
 where
     F: FnOnce(Genesis) -> anyhow::Result<Genesis>,
 {
-    let json = std::fs::read_to_string(genesis_file).context("failed to read genesis")?;
-    let genesis = serde_json::from_str::<Genesis>(&json).context("failed to parse genesis")?;
+    let genesis = read_genesis(genesis_file)?;
     let genesis = f(genesis)?;
     let json = serde_json::to_string_pretty(&genesis)?;
     std::fs::write(genesis_file, json)?;
+    Ok(())
+}
+
+fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
+    let genesis = read_genesis(genesis_file)?;
+    let genesis_json = serde_json::to_value(&genesis)?;
+    let tmg = tendermint::Genesis {
+        genesis_time: tendermint::time::Time::from_unix_timestamp(genesis.timestamp.as_secs(), 0)?,
+        chain_id: tendermint::chain::Id::try_from(genesis.network_name)?,
+        initial_height: 0,
+        // Values are based on the default produced by `tendermint init`
+        consensus_params: tendermint::consensus::Params {
+            block: tendermint::block::Size {
+                max_bytes: args.block_max_bytes,
+                max_gas: -1,
+                time_iota_ms: tendermint::block::Size::default_time_iota_ms(),
+            },
+            evidence: tendermint::evidence::Params {
+                max_age_num_blocks: 100000,
+                max_age_duration: tendermint::evidence::Duration(std::time::Duration::from_nanos(
+                    172800000000000,
+                )),
+                max_bytes: 1048576,
+            },
+            validator: tendermint::consensus::params::ValidatorParams {
+                pub_key_types: vec![tendermint::public_key::Algorithm::Secp256k1],
+            },
+            version: Some(tendermint::consensus::params::VersionParams { app: APP_VERSION }),
+        },
+        // Validators will be returnd from `init_chain`.
+        validators: Vec::new(),
+        // Hopefully leaving this empty will skip validation,
+        // otherwise we have to run the genesis in memory here and now.
+        app_hash: tendermint::AppHash::default(),
+        app_state: genesis_json,
+    };
+    let tmg_json = serde_json::to_string_pretty(&tmg)?;
+    std::fs::write(&args.out, tmg_json)?;
     Ok(())
 }

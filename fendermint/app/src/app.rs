@@ -29,10 +29,8 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tendermint::block::Height;
 
-use crate::tmconv::*;
-use crate::BlockHeight;
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+use crate::{tmconv::*, VERSION};
+use crate::{BlockHeight, APP_VERSION};
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -260,7 +258,7 @@ where
         response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
-            app_version: 1,
+            app_version: APP_VERSION,
             last_block_height: height,
             last_block_app_hash: state.app_hash(),
         }

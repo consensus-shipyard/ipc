@@ -34,6 +34,7 @@ We can check what the contents look like:
 ```console
 $ cat test-network/genesis.json
 {
+  "timestamp": 1680101412,
   "network_name": "test",
   "network_version": 18,
   "base_fee": "1000",
@@ -189,7 +190,7 @@ Now, start the application.
 cargo run -p fendermint_app -- run
 ```
 
-The `-dd` flag enables `INFO` level logging; we can see that the application is listening:
+With the default `--log-level info` we can see that the application is listening:
 
 ```console
 2023-03-29T09:17:28.548878Z  INFO fendermint::cmd: reading configuration path="/home/aakoshh/.fendermint/config"
@@ -207,3 +208,105 @@ then initialize a genesis file for Tendermint at `~/.tendermint`.
 rm -rf ~/.tendermint
 tendermint init
 ```
+
+The logs show that it created keys and a genesis file:
+
+```console
+I[2023-03-29|09:58:06.324] Found private validator                      module=main keyFile=/home/aakoshh/.tendermint/config/priv_validator_key.json stateFile=/home/aakoshh/.tendermint/data/priv_validator_state.json
+I[2023-03-29|09:58:06.324] Found node key                               module=main path=/home/aakoshh/.tendermint/config/node_key.json
+I[2023-03-29|09:58:06.324] Found genesis file                           module=main path=/home/aakoshh/.tendermint/config/genesis.json
+```
+
+We don't want to use the random values created by Tendermint; instead we need to use some CLI commands to convert the artifacts
+file we created earlier to the format Tendermint accepts. Start with the genesis file:
+
+```shell
+mv ~/.tendermint/config/genesis.json ~/.tendermint/config/genesis.json.orig
+cargo run -p fendermint_app -- \
+  genesis --genesis-file test-network/genesis.json \
+  into-tendermint --out ~/.tendermint/config/genesis.json
+```
+
+Check the contents of the created Tendermint Genesis file:
+
+<details>
+  <summary>~/.tendermint/config/genesis.json</summary>
+
+```console
+$ cat ~/.tendermint/config/genesis.json
+{
+  "genesis_time": "2023-03-29T14:50:12Z",
+  "chain_id": "test",
+  "initial_height": "0",
+  "consensus_params": {
+    "block": {
+      "max_bytes": "22020096",
+      "max_gas": "-1",
+      "time_iota_ms": "1000"
+    },
+    "evidence": {
+      "max_age_num_blocks": "100000",
+      "max_age_duration": "172800000000000",
+      "max_bytes": "1048576"
+    },
+    "validator": {
+      "pub_key_types": [
+        "secp256k1"
+      ]
+    }
+  },
+  "validators": [],
+  "app_hash": "",
+  "app_state": {
+    "accounts": [
+      {
+        "balance": "1000000000000000000",
+        "meta": {
+          "Account": {
+            "owner": "f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y"
+          }
+        }
+      },
+      {
+        "balance": "3000000000000000000",
+        "meta": {
+          "Multisig": {
+            "signers": [
+              "f1kgtzp5nuob3gdccagivcgns7e25be2c2rqozilq",
+              "f1bvdmcbct6vwoh3rvkhoth2fe66p6prpbsziqbfi",
+              "f1hgeqjtadqmyabmy2kij2smn5jiiud75kva6bzny"
+            ],
+            "threshold": 2,
+            "vesting_duration": 1000000,
+            "vesting_start": 0
+          }
+        }
+      }
+    ],
+    "base_fee": "1000",
+    "network_name": "test",
+    "network_version": 18,
+    "timestamp": 1680101412,
+    "validators": [
+      {
+        "power": 25,
+        "public_key": "BE5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkqGC63X6tOBnky31kw7wPqL0tvbPrtLM2O+SooUhiV1Mo="
+      },
+      {
+        "power": 25,
+        "public_key": "BCImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QEy8cVKNuvTU/EOTibo3hIyOQslvSouzIpR24h1kkqCSI="
+      },
+      {
+        "power": 25,
+        "public_key": "BJVVXUBEjwW8DyZIXb2iw7aq6DJF14kdcCYqKdyruQJAOMGlBR5jSGgeM8O+BX+E2+etsm2xIoWAQllZtY4K9is="
+      },
+      {
+        "power": 25,
+        "public_key": "BPcq6nnj38i6fhK7GlRVPLE870QJD88ZwalM3ySDadBAHXSlD5AYAd7JZFjYnDf4WtwEcDfodIuiXchRw9389bM="
+      }
+    ]
+  }
+}
+```
+
+</details>

@@ -77,6 +77,8 @@ pub enum GenesisCommands {
     AddMultisig(GenesisAddMultisigArgs),
     /// Add a validator to the genesis file.
     AddValidator(GenesisAddValidatorArgs),
+    /// Convert the genesis file into the format expected by Tendermint.
+    IntoTendermint(GenesisIntoTendermintArgs),
 }
 
 #[derive(Args, Debug)]
@@ -104,6 +106,9 @@ pub struct GenesisArgs {
 
 #[derive(Args, Debug)]
 pub struct GenesisNewArgs {
+    /// Genesis timestamp as seconds since Unix epoch.
+    #[arg(long, short)]
+    pub timestamp: u64,
     /// Name of the network and chain.
     #[arg(long, short = 'n')]
     pub network_name: String,
@@ -152,6 +157,16 @@ pub struct GenesisAddValidatorArgs {
     /// Voting power.
     #[arg(long, short = 'v')]
     pub power: u64,
+}
+
+#[derive(Args, Debug)]
+pub struct GenesisIntoTendermintArgs {
+    /// Output file name for the Tendermint genesis JSON file.
+    #[arg(long, short)]
+    pub out: PathBuf,
+    /// Maximum block size in bytes.
+    #[arg(long, default_value_t = 22020096)]
+    pub block_max_bytes: u64,
 }
 
 fn parse_network_version(s: &str) -> Result<NetworkVersion, String> {
