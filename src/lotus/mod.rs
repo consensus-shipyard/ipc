@@ -19,7 +19,7 @@ use message::state::{ReadStateResponse, StateWaitMsgResponse};
 use message::wallet::{WalletKeyType, WalletListResponse};
 
 use crate::lotus::message::ipc::{
-    IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, Votes,
+    CheckpointResponse, IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, Votes,
 };
 use crate::manager::SubnetInfo;
 
@@ -113,4 +113,12 @@ pub trait LotusClient {
         subnet: SubnetID,
         checkpoint_cid: Cid,
     ) -> Result<Votes>;
+
+    /// Returns the list of checkpoints from a subnet actor for the given epoch range.
+    async fn ipc_list_checkpoints(
+        &self,
+        subnet_id: SubnetID,
+        from_epoch: ChainEpoch,
+        to_epoch: ChainEpoch,
+    ) -> Result<Vec<CheckpointResponse>>;
 }

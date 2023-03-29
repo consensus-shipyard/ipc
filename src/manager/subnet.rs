@@ -1,16 +1,19 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+///! IPC node-specific traits.
 use std::collections::HashMap;
 
-use crate::lotus::message::{ipc::SubnetInfo, wallet::WalletKeyType};
-///! IPC node-specific traits.
 use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_gateway::Checkpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{ConstructParams, JoinParams};
+
+use crate::lotus::message::ipc::CheckpointResponse;
+use crate::lotus::message::{ipc::SubnetInfo, wallet::WalletKeyType};
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
@@ -84,4 +87,12 @@ pub trait SubnetManager {
 
     ///  Create new wallet in a subnet
     async fn wallet_new(&self, key_type: WalletKeyType) -> Result<Address>;
+
+    /// Returns the list of checkpoints from a subnet actor for the given epoch range.
+    async fn list_checkpoints(
+        &self,
+        subnet_id: SubnetID,
+        from_epoch: ChainEpoch,
+        to_epoch: ChainEpoch,
+    ) -> Result<Vec<CheckpointResponse>>;
 }

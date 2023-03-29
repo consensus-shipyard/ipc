@@ -52,6 +52,7 @@ mod methods {
     pub const IPC_READ_SUBNET_ACTOR_STATE: &str = "Filecoin.IPCReadSubnetActorState";
     pub const IPC_LIST_CHILD_SUBNETS: &str = "Filecoin.IPCListChildSubnets";
     pub const IPC_GET_VOTES_FOR_CHECKPOINT: &str = "Filecoin.IPCGetVotesForCheckpoint";
+    pub const IPC_LIST_CHECKPOINTS: &str = "Filecoin.IPCListCheckpoints";
 }
 
 /// The default gateway actor address
@@ -357,6 +358,32 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         let r = self
             .client
             .request::<Votes>(methods::IPC_GET_VOTES_FOR_CHECKPOINT, params)
+            .await?;
+        Ok(r)
+    }
+
+    async fn ipc_list_checkpoints(
+        &self,
+        subnet_id: SubnetID,
+        from_epoch: ChainEpoch,
+        to_epoch: ChainEpoch,
+    ) -> Result<Vec<CheckpointResponse>> {
+        let parent = subnet_id
+            .parent()
+            .ok_or_else(|| anyhow!("no parent found"))?
+            .to_string();
+        let actor = subnet_id.subnet_actor().to_string();
+        let params = json!([
+            {
+                "Parent": parent,
+                "Actor": actor
+            },
+            from_epoch,
+            to_epoch
+        ]);
+        let r = self
+            .client
+            .request::<Vec<CheckpointResponse>>(methods::IPC_LIST_CHECKPOINTS, params)
             .await?;
         Ok(r)
     }

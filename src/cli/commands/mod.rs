@@ -13,6 +13,7 @@ use crate::cli::commands::manager::fund::{Fund, FundArgs};
 use crate::cli::commands::manager::join::{JoinSubnet, JoinSubnetArgs};
 use crate::cli::commands::manager::kill::{KillSubnet, KillSubnetArgs};
 use crate::cli::commands::manager::leave::{LeaveSubnet, LeaveSubnetArgs};
+use crate::cli::commands::manager::list_checkpoints::{ListCheckpoints, ListCheckpointsArgs};
 use crate::cli::commands::manager::list_subnets::{ListSubnets, ListSubnetsArgs};
 use crate::cli::commands::manager::net_addr::{SetValidatorNetAddr, SetValidatorNetAddrArgs};
 use crate::cli::commands::manager::propagate::{Propagate, PropagateArgs};
@@ -55,6 +56,7 @@ enum Commands {
     SendValue(SendValueArgs),
     WalletNew(WalletNewArgs),
     SetValidatorNetAddr(SetValidatorNetAddrArgs),
+    ListCheckpoints(ListCheckpointsArgs),
 }
 #[derive(Debug, Parser)]
 #[command(
@@ -121,6 +123,7 @@ pub async fn cli() {
         Commands::SendValue(args) => SendValue::handle(global, args).await,
         Commands::WalletNew(args) => WalletNew::handle(global, args).await,
         Commands::SetValidatorNetAddr(args) => SetValidatorNetAddr::handle(global, args).await,
+        Commands::ListCheckpoints(args) => ListCheckpoints::handle(global, args).await,
     };
 
     if let Err(e) = r {

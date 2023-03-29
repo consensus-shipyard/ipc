@@ -3,24 +3,25 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use crate::config::{Subnet, DEFAULT_IPC_GATEWAY_ADDR};
-use crate::lotus::message::wallet::WalletKeyType;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
 use fil_actors_runtime::types::{InitExecParams, InitExecReturn, INIT_EXEC_METHOD_NUM};
 use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use ipc_gateway::{Checkpoint, PropagateParams, WhitelistPropagatorParams};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
+use crate::config::{Subnet, DEFAULT_IPC_GATEWAY_ADDR};
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::ipc::SubnetInfo;
+use crate::lotus::message::ipc::{CheckpointResponse, SubnetInfo};
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
+use crate::lotus::message::wallet::WalletKeyType;
 use crate::lotus::LotusClient;
 
 use super::subnet::SubnetManager;
@@ -293,6 +294,19 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         log::info!("creating new wallet");
         let addr_str = self.lotus_client.wallet_new(key_type).await?;
         Address::from_str(&addr_str).map_err(|_| anyhow!("cannot get address from string output"))
+    }
+
+    async fn list_checkpoints(
+        &self,
+        subnet_id: SubnetID,
+        from_epoch: ChainEpoch,
+        to_epoch: ChainEpoch,
+    ) -> Result<Vec<CheckpointResponse>> {
+        let checkpoints = self
+            .lotus_client
+            .ipc_list_checkpoints(subnet_id, from_epoch, to_epoch)
+            .await?;
+        Ok(checkpoints)
     }
 }
 
