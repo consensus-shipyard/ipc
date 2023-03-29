@@ -29,7 +29,7 @@ impl CommandLineHandler for ListCheckpoints {
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
         let params = ListCheckpointsParams {
-            subnet_id: arguments.subnet_id.clone(),
+            subnet_id: arguments.subnet.clone(),
             from_epoch: arguments.from_epoch,
             to_epoch: arguments.to_epoch,
         };
@@ -62,7 +62,7 @@ pub(crate) struct ListCheckpointsArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The subnet id of the checkpointing subnet")]
-    pub subnet_id: String,
+    pub subnet: String,
     #[arg(long, short, help = "Include checkpoints from this epoch")]
     pub from_epoch: ChainEpoch,
     #[arg(long, short, help = "Include checkpoints up to this epoch")]

@@ -29,7 +29,7 @@ impl CommandLineHandler for ListSubnets {
 
         let params = ListSubnetsParams {
             gateway_address: arguments.gateway_address.clone(),
-            subnet_id: arguments.subnet_id.clone(),
+            subnet_id: arguments.subnet.clone(),
         };
 
         let subnets = json_rpc_client
@@ -53,7 +53,7 @@ pub(crate) struct ListSubnetsArgs {
     #[arg(long, short, help = "The gateway address to query subnets")]
     pub gateway_address: String,
     #[arg(long, short, help = "The subnet id to query child subnets")]
-    pub subnet_id: String,
+    pub subnet: String,
 }
 
 /// A simplified wrapper for Subnet Info response. The SubnetInfo struct is deserialized differently
