@@ -8,7 +8,7 @@ use fvm_shared::{address::Address, error::ExitCode};
 
 use crate::CheckInterpreter;
 
-use super::{FvmCheckState, FvmMessage, FvmMessageInterpreter};
+use super::{state::FvmCheckState, FvmMessage, FvmMessageInterpreter};
 
 /// Transaction check results are expressed by the exit code, so that hopefully
 /// they would result in the same error code if they were applied.

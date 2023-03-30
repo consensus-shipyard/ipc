@@ -10,7 +10,7 @@ use fvm_shared::BLOCK_GAS_LIMIT;
 
 use crate::ExecInterpreter;
 
-use super::{FvmExecState, FvmMessage, FvmMessageInterpreter};
+use super::{state::FvmExecState, FvmMessage, FvmMessageInterpreter};
 
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups

@@ -9,3 +9,7 @@ host = "127.0.0.1"
 # The default port where Tendermint is going to connect to the application.
 port = 26658
 bound = 1
+
+[db]
+# Keep unlimited history by default.
+state_hist_size = 0

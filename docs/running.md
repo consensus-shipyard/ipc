@@ -173,8 +173,11 @@ cp ../builtin-actors/output/bundle.car ~/.fendermint/bundle.car
 Now, start the application.
 
 ```shell
-cargo run -p fendermint_app -- run
+cargo run -p fendermint_app --release -- run
 ```
+
+It is important to use the `--release` option, otherwise it will take too long to load the Wasm actor modules and
+Tendermint will issue a timeout (by default we have 3 seconds to execute requests).
 
 With the default `--log-level info` we can see that the application is listening:
 
@@ -183,6 +186,12 @@ With the default `--log-level info` we can see that the application is listening
 2023-03-29T09:17:28.549700Z  INFO fendermint::cmd::run: opening database path="/home/aakoshh/.fendermint/data/rocksdb"
 2023-03-29T09:17:28.879916Z  INFO tower_abci::server: starting ABCI server addr="127.0.0.1:26658"
 2023-03-29T09:17:28.880023Z  INFO tower_abci::server: bound tcp listener local_addr=127.0.0.1:26658
+```
+
+If we need to restart the application from scratch, we can do so by erasing all RocksDB state:
+
+```shell
+rm -rf ~/.fendermint/data/rocksdb
 ```
 
 ### Run Tendermint
@@ -329,8 +338,80 @@ AiImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QE
 
 #### Start Tendermint
 
+Tendermint can be configured via `~/.tendermint/config/config.toml`; see the default settings [here](https://docs.tendermint.com/v0.34/tendermint-core/configuration.html).
+
 Now we are ready to start Tendermint and let it connect to the Fendermint Application.
 
 ```shell
 tendermint start
 ```
+
+If we need to restart the application from scratch, we can erase all Tendermint state like so:
+
+```shell
+tendermint unsafe-reset-all
+```
+
+If all goes well, we will see block created in the Fendermint Application log as well the Tendermint log:
+
+<details>
+  <summary>Application log</summary>
+
+```console
+$ rm -rf ~/.fendermint/data/rocksdb && cargo run -p fendermint_app --release -- --log-level debug run
+...
+2023-03-30T11:51:34.239909Z DEBUG tower_abci::server: new request request=Info(Info { version: "v0.37.0-rc2", block_version: 11, p2p_version: 8, abci_version: "1.0.0" })
+...
+2023-03-30T11:51:34.240250Z DEBUG tower_abci::server: flushing response response=Ok(Info(Info { data: "fendermint", version: "0.1.0", app_version: 0, last_block_height: block::Height(0), last_block_app_hash: AppHash(0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8) }))
+2023-03-30T11:51:34.240914Z DEBUG tower_abci::server: new request request=InitChain(...)
+...
+2023-03-30T11:51:34.295133Z  INFO fendermint_app::app: init chain state_root="bafy2bzaceaurow7dd2zs2zek7jb44x4jumraubzy5fyjya5edgxnc32nhap76" app_hash="0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF"
+2023-03-30T11:51:34.295665Z DEBUG tower_abci::server: flushing response response=Ok(InitChain(...))
+...
+2023-03-30T11:51:35.365180Z DEBUG tower_abci::server: new request request=BeginBlock(...)
+...
+2023-03-30T11:51:35.365662Z DEBUG fendermint_app::app: begin block height=1
+2023-03-30T11:51:42.552711Z DEBUG fendermint_app::app: initialized exec state
+2023-03-30T11:51:42.553013Z DEBUG tower_abci::server: flushing response response=Ok(BeginBlock(...))
+...
+2023-03-30T11:51:42.560459Z DEBUG tower_abci::server: flushing response response=Ok(Commit(...))
+...
+2023-03-30T11:51:42.606102Z DEBUG tower_abci::server: new request request=BeginBlock(...)
+...
+2023-03-30T11:51:42.606359Z DEBUG fendermint_app::app: begin block height=2
+2023-03-30T11:51:42.606623Z DEBUG fendermint_app::app: initialized exec state
+...
+```
+</details>
+
+
+<details>
+  <summary>Tendermint log</summary>
+
+```console
+$ tendermint unsafe-reset-all && tendermint start
+...
+I[2023-03-30|12:51:34.240] ABCI Handshake App Info                      module=consensus height=0 hash=0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8 software-version=0.1.0 protocol-version=0
+I[2023-03-30|12:51:34.240] ABCI Replay Blocks                           module=consensus appHeight=0 storeHeight=0 stateHeight=0
+I[2023-03-30|12:51:34.299] Completed ABCI Handshake - Tendermint and App are synced module=consensus appHeight=0 appHash=0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8
+...
+I[2023-03-30|12:51:35.335] received proposal                            module=consensus proposal="Proposal{1/0 (9FD634BC038D3CA4FC885E8530CD56B1693739AEBACBF404AAB5DDA5ADC8D180:1:756F1391A4CF, -1) 2BC2F835CBC1 @ 2023-03-30T11:51:35.327328663Z}"
+I[2023-03-30|12:51:35.339] received complete proposal block             module=consensus height=1 hash=9FD634BC038D3CA4FC885E8530CD56B1693739AEBACBF404AAB5DDA5ADC8D180
+I[2023-03-30|12:51:35.357] finalizing commit of block                   module=consensus height=1 hash=9FD634BC038D3CA4FC885E8530CD56B1693739AEBACBF404AAB5DDA5ADC8D180 root=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF num_txs=0
+I[2023-03-30|12:51:38.316] Timed out                                    module=consensus dur=3s height=1 round=0 step=RoundStepPropose
+I[2023-03-30|12:51:42.553] executed block                               module=state height=1 num_valid_txs=0 num_invalid_txs=0
+I[2023-03-30|12:51:42.560] committed state                              module=state height=1 num_txs=0 app_hash=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF
+I[2023-03-30|12:51:42.564] Timed out                                    module=consensus dur=-6.207267593s height=2 round=0 step=RoundStepNewHeight
+I[2023-03-30|12:51:42.567] indexed block                                module=txindex height=1
+I[2023-03-30|12:51:42.577] received proposal                            module=consensus proposal="Proposal{2/0 (5D2D09F6829D7F0481E597CEAE87DCFA5665987B0B7D57C05B302BEB8DB95406:1:4D3E5565CA22, -1) 693D8DF9C36E @ 2023-03-30T11:51:42.570865715Z}"
+I[2023-03-30|12:51:42.581] received complete proposal block             module=consensus height=2 hash=5D2D09F6829D7F0481E597CEAE87DCFA5665987B0B7D57C05B302BEB8DB95406
+I[2023-03-30|12:51:42.598] finalizing commit of block                   module=consensus height=2 hash=5D2D09F6829D7F0481E597CEAE87DCFA5665987B0B7D57C05B302BEB8DB95406 root=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF num_txs=0
+I[2023-03-30|12:51:42.607] executed block                               module=state height=2 num_valid_txs=0 num_invalid_txs=0
+I[2023-03-30|12:51:42.612] committed state                              module=state height=2 num_txs=0 app_hash=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF
+I[2023-03-30|12:51:42.618] indexed block                                module=txindex height=2
+...
+```
+</details>
+
+Note that the first block execution is very slow because we have to load the Wasm engine, as indicated by the first proposal having a timeout,
+but after that the blocks come in fast, one per second.

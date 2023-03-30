@@ -7,7 +7,7 @@ mod exec;
 mod externs;
 mod genesis;
 mod query;
-mod state;
+pub mod state;
 mod store;
 
 #[cfg(any(test, feature = "bundle"))]
@@ -18,7 +18,6 @@ pub use exec::FvmApplyRet;
 pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
 pub use query::FvmQueryRet;
-pub use state::{FvmCheckState, FvmExecState, FvmGenesisState, FvmQueryState};
 
 pub type FvmMessage = fvm_shared::message::Message;
 

@@ -4,16 +4,26 @@
 use cid::Cid;
 use fvm::{
     call_manager::DefaultCallManager,
-    engine::{EngineConfig, EnginePool},
+    engine::MultiEngine,
     executor::{ApplyKind, ApplyRet, DefaultExecutor, Executor},
     machine::{DefaultMachine, Machine, NetworkConfig},
     DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{clock::ChainEpoch, econ::TokenAmount, message::Message, version::NetworkVersion};
+use serde::{Deserialize, Serialize};
 
 use crate::fvm::externs::FendermintExterns;
 use crate::Timestamp;
+
+/// Parts of the state which evolve during the lifetime of the chain.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FvmStateParams {
+    pub state_root: Cid,
+    pub network_version: NetworkVersion,
+    pub base_fee: TokenAmount,
+    pub circ_supply: TokenAmount,
+}
 
 /// A state we create for the execution of all the messages in a block.
 pub struct FvmExecState<DB>
@@ -30,24 +40,25 @@ where
 {
     pub fn new(
         blockstore: DB,
+        multi_engine: &MultiEngine,
         block_height: ChainEpoch,
         block_timestamp: Timestamp,
-        network_version: NetworkVersion,
-        initial_state_root: Cid,
-        base_fee: TokenAmount,
-        circ_supply: TokenAmount,
+        params: FvmStateParams,
     ) -> anyhow::Result<Self> {
-        let nc = NetworkConfig::new(network_version);
+        let nc = NetworkConfig::new(params.network_version);
 
         // TODO: Configure:
         // * circ_supply; by default it's for Filecoin
         // * base_fee; by default it's zero
-        let mut mc = nc.for_epoch(block_height, block_timestamp.0, initial_state_root);
-        mc.set_base_fee(base_fee);
-        mc.set_circulating_supply(circ_supply);
+        let mut mc = nc.for_epoch(block_height, block_timestamp.0, params.state_root);
+        mc.set_base_fee(params.base_fee);
+        mc.set_circulating_supply(params.circ_supply);
 
-        let ec = EngineConfig::from(&nc);
-        let engine = EnginePool::new_default(ec)?;
+        // Creating a new machine every time is prohibitively slow.
+        // let ec = EngineConfig::from(&nc);
+        // let engine = EnginePool::new_default(ec)?;
+
+        let engine = multi_engine.get(&nc)?;
         let machine = DefaultMachine::new(&mc, blockstore, FendermintExterns)?;
         let executor = DefaultExecutor::new(engine, machine)?;
 

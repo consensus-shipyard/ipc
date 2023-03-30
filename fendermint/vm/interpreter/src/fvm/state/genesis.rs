@@ -16,6 +16,12 @@ use fvm_shared::{clock::ChainEpoch, econ::TokenAmount, state::StateTreeVersion, 
 use num_traits::Zero;
 use serde::Serialize;
 
+/// Create an empty state tree.
+pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<DB>> {
+    let state_tree = StateTree::new(store, StateTreeVersion::V5)?;
+    Ok(state_tree)
+}
+
 /// A state we create for the execution of genesis initialisation.
 pub struct FvmGenesisState<DB>
 where
@@ -53,9 +59,7 @@ where
             }
         };
         let manifest = Manifest::load(&store, &manifest_data_cid, manifest_version)?;
-
-        // Create an empty state tree.
-        let state_tree = StateTree::new(store, StateTreeVersion::V5)?;
+        let state_tree = empty_state_tree(store)?;
 
         let state = Self {
             manifest_data_cid,

@@ -28,6 +28,7 @@ cmd! {
             settings.builtin_actors_bundle(),
             ns.app,
             ns.state_hist,
+            settings.db.state_hist_size,
             interpreter,
         );
 
@@ -69,6 +70,14 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
-    let db = RocksDb::open_cf(path, &RocksDbConfig::default(), ns.values().iter())?;
+    let db = RocksDb::open(path, &RocksDbConfig::default())?;
+
+    // Filter names first, then create, which is just a way to catch duplicates.
+    let mut names = ns.values();
+    names.retain(|name| !db.has_cf_handle(name));
+    for name in names {
+        db.new_cf_handle(name)?;
+    }
+
     Ok(db)
 }

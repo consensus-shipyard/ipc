@@ -20,12 +20,21 @@ impl AbciSettings {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DbSettings {
+    /// Length of the app state history to keep in the database before pruning; 0 means unlimited.
+    ///
+    /// This affects how long we can go back in state queries.
+    pub state_hist_size: u64,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
     home_dir: PathBuf,
     data_dir: PathBuf,
     builtin_actors_bundle: PathBuf,
     pub abci: AbciSettings,
+    pub db: DbSettings,
 }
 
 impl Settings {

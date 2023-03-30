@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use rocksdb::{
-    ColumnFamilyDescriptor, OptimisticTransactionDB, Options, WriteBatchWithTransaction,
+    ColumnFamilyDescriptor, ErrorKind, OptimisticTransactionDB, Options, WriteBatchWithTransaction,
 };
 use std::{path::Path, sync::Arc};
 
@@ -34,15 +34,12 @@ impl RocksDb {
     where
         P: AsRef<Path>,
     {
-        let db_opts = config.into();
-        Ok(Self {
-            db: Arc::new(OptimisticTransactionDB::open(&db_opts, path)?),
-            options: db_opts,
-        })
+        let cfs = Self::list_cf(&path, config)?;
+        Self::open_cf(&path, config, cfs.iter())
     }
 
     /// Open all column families with the same config.
-    pub fn open_cf<P, I, N>(path: P, config: &RocksDbConfig, cfs: I) -> Result<Self, Error>
+    fn open_cf<P, I, N>(path: P, config: &RocksDbConfig, cfs: I) -> Result<Self, Error>
     where
         P: AsRef<Path>,
         I: Iterator<Item = N>,
@@ -59,6 +56,22 @@ impl RocksDb {
             db: Arc::new(db),
             options: db_opts,
         })
+    }
+
+    /// List existing column families in a database.
+    ///
+    /// These need to be passed to `open_cf` when we are reopening the database.
+    /// If the database doesn't exist, the method returns an empty list.
+    fn list_cf<P>(path: P, config: &RocksDbConfig) -> Result<Vec<String>, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let db_opts: rocksdb::Options = config.into();
+        match OptimisticTransactionDB::<rocksdb::MultiThreaded>::list_cf(&db_opts, path) {
+            Ok(cfs) => Ok(cfs),
+            Err(e) if e.kind() == ErrorKind::IOError => Ok(Vec::new()),
+            Err(e) => Err(Error::Database(e)),
+        }
     }
 
     pub fn get_statistics(&self) -> Option<String> {
@@ -113,11 +126,16 @@ impl RocksDb {
         self.db.flush().map_err(|e| Error::Other(e.to_string()))
     }
 
+    /// Check if a column family exists
+    pub fn has_cf_handle(&self, name: &str) -> bool {
+        self.db.cf_handle(name).is_some()
+    }
+
     /// Create a new column family, using the default options.
     ///
     /// Returns error if it already exists.
     pub fn new_cf_handle<'a>(&self, name: &'a str) -> Result<&'a str, Error> {
-        if self.db.cf_handle(name).is_some() {
+        if self.has_cf_handle(name) {
             return Err(Error::Other(format!(
                 "column family '{name}' already exists"
             )));

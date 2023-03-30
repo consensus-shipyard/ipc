@@ -7,6 +7,6 @@ mod genesis;
 mod query;
 
 pub use check::FvmCheckState;
-pub use exec::FvmExecState;
-pub use genesis::FvmGenesisState;
+pub use exec::{FvmExecState, FvmStateParams};
+pub use genesis::{empty_state_tree, FvmGenesisState};
 pub use query::FvmQueryState;
