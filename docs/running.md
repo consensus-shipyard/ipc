@@ -315,7 +315,7 @@ $ cat ~/.tendermint/config/priv_validator_key.json
   "address": "66FA0CFB373BD737DBFC7CE70BEF994DD42A3812",
   "priv_key": {
     "type": "tendermint/PrivKeySecp256k1",
-    "value": "04Gsfaw4RHZ5hTbXO/3hz2N567tz5E1yxChM1ZrEi1E"
+    "value": "04Gsfaw4RHZ5hTbXO/3hz2N567tz5E1yxChM1ZrEi1E="
   },
   "pub_key": {
     "type": "tendermint/PubKeySecp256k1",
@@ -326,3 +326,11 @@ $ cat test-network/keys/bob.pk
 AiImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QE
 ```
 </details>
+
+#### Start Tendermint
+
+Now we are ready to start Tendermint and let it connect to the Fendermint Application.
+
+```shell
+tendermint start
+```
