@@ -4,7 +4,6 @@
 use anyhow::{anyhow, Context};
 use fendermint_app::APP_VERSION;
 use fvm_shared::address::Address;
-use libsecp256k1::PublicKey;
 use std::path::PathBuf;
 
 use fendermint_vm_genesis::{
@@ -18,7 +17,7 @@ use crate::options::{
     GenesisIntoTendermintArgs, GenesisNewArgs,
 };
 
-use super::keygen::b64_to_public;
+use super::key::read_public_key;
 
 cmd! {
   GenesisNewArgs(self, genesis_file: PathBuf) {
@@ -135,12 +134,6 @@ fn add_validator(genesis_file: &PathBuf, args: &GenesisAddValidatorArgs) -> anyh
         genesis.validators.push(validator);
         Ok(genesis)
     })
-}
-
-fn read_public_key(public_key: &PathBuf) -> anyhow::Result<PublicKey> {
-    let b64 = std::fs::read_to_string(public_key).context("failed to read public key")?;
-    let pk = b64_to_public(&b64).context("public key from base64")?;
-    Ok(pk)
 }
 
 fn read_genesis(genesis_file: &PathBuf) -> anyhow::Result<Genesis> {

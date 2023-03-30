@@ -4,14 +4,14 @@
 //! CLI command implementations.
 
 use crate::{
-    options::{Commands, GenesisCommands, Options},
+    options::{Commands, GenesisCommands, KeyCommands, Options},
     settings::Settings,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
 pub mod genesis;
-pub mod keygen;
+pub mod key;
 pub mod run;
 
 #[async_trait]
@@ -58,10 +58,13 @@ macro_rules! cmd {
 pub async fn exec(opts: &Options) -> anyhow::Result<()> {
     let fut = match &opts.command {
         Commands::Run(args) => args.exec(settings(opts)?),
-        Commands::Keygen(args) => args.exec(()),
-        Commands::Genesis(gargs) => {
-            let genesis_file = gargs.genesis_file.clone();
-            match &gargs.command {
+        Commands::Key(sub) => match &sub.command {
+            KeyCommands::Gen(args) => args.exec(()),
+            KeyCommands::IntoTendermint(args) => args.exec(()),
+        },
+        Commands::Genesis(sub) => {
+            let genesis_file = sub.genesis_file.clone();
+            match &sub.command {
                 GenesisCommands::New(args) => args.exec(genesis_file),
                 GenesisCommands::AddAccount(args) => args.exec(genesis_file),
                 GenesisCommands::AddMultisig(args) => args.exec(genesis_file),

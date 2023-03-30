@@ -50,7 +50,7 @@ Next, let's create some cryptographic key pairs we want want to use either for a
 ```shell
 mkdir test-network/keys
 for NAME in alice bob charlie dave; do
-  cargo run -p fendermint_app -- keygen --out-dir test-network/keys --name $NAME;
+  cargo run -p fendermint_app -- key gen --out-dir test-network/keys --name $NAME;
 done
 ```
 
@@ -125,41 +125,27 @@ $ cat test-network/genesis.json | jq .accounts[1]
 
 ### Add validators to the Genesis file
 
-Finally, let's add all validators with equal power to Genesis:
+Finally, let's add one validator to the Genesis, with a monopoly on voting power, so we can run a standalone node:
 
 ```shell
-for NAME in alice bob charlie dave; do
-  cargo run -p fendermint_app -- \
-        genesis --genesis-file test-network/genesis.json \
-        add-validator --public-key test-network/keys/$NAME.pk --power 25;
-done
+cargo run -p fendermint_app -- \
+      genesis --genesis-file test-network/genesis.json \
+      add-validator --public-key test-network/keys/bob.pk --power 1;
 ```
 
-Check that all of them are present:
+The value of power doens't matter in this case, as `bob` is our only validator. Check the result:
 
 ```console
 $ cat test-network/genesis.json | jq .validators
 [
   {
-    "public_key": "BE5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkqGC63X6tOBnky31kw7wPqL0tvbPrtLM2O+SooUhiV1Mo=",
-    "power": 25
-  },
-  {
     "public_key": "BCImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QEy8cVKNuvTU/EOTibo3hIyOQslvSouzIpR24h1kkqCSI=",
-    "power": 25
+    "power": 1
   },
-  {
-    "public_key": "BJVVXUBEjwW8DyZIXb2iw7aq6DJF14kdcCYqKdyruQJAOMGlBR5jSGgeM8O+BX+E2+etsm2xIoWAQllZtY4K9is=",
-    "power": 25
-  },
-  {
-    "public_key": "BPcq6nnj38i6fhK7GlRVPLE870QJD88ZwalM3ySDadBAHXSlD5AYAd7JZFjYnDf4WtwEcDfodIuiXchRw9389bM=",
-    "power": 25
-  }
 ]
 ```
 
-The public keys are spliced in as they were, in base64 format, which is how they would appear in Tendermint's
+The public key was spliced in as it was, in base64 format, which is how it would appear in Tendermint's
 own genesis file format. Note that here we don't have the option to use `Address`, because we have to return
 these as actual `PublicKey` types to Tendermint through ABCI, not as a hash of a key.
 
@@ -216,6 +202,8 @@ I[2023-03-29|09:58:06.324] Found private validator                      module=m
 I[2023-03-29|09:58:06.324] Found node key                               module=main path=/home/aakoshh/.tendermint/config/node_key.json
 I[2023-03-29|09:58:06.324] Found genesis file                           module=main path=/home/aakoshh/.tendermint/config/genesis.json
 ```
+
+#### Convert the Genesis file
 
 We don't want to use the random values created by Tendermint; instead we need to use some CLI commands to convert the artifacts
 file we created earlier to the format Tendermint accepts. Start with the genesis file:
@@ -289,24 +277,52 @@ $ cat ~/.tendermint/config/genesis.json
     "timestamp": 1680101412,
     "validators": [
       {
-        "power": 25,
-        "public_key": "BE5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkqGC63X6tOBnky31kw7wPqL0tvbPrtLM2O+SooUhiV1Mo="
-      },
-      {
-        "power": 25,
+        "power": 1,
         "public_key": "BCImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QEy8cVKNuvTU/EOTibo3hIyOQslvSouzIpR24h1kkqCSI="
-      },
-      {
-        "power": 25,
-        "public_key": "BJVVXUBEjwW8DyZIXb2iw7aq6DJF14kdcCYqKdyruQJAOMGlBR5jSGgeM8O+BX+E2+etsm2xIoWAQllZtY4K9is="
-      },
-      {
-        "power": 25,
-        "public_key": "BPcq6nnj38i6fhK7GlRVPLE870QJD88ZwalM3ySDadBAHXSlD5AYAd7JZFjYnDf4WtwEcDfodIuiXchRw9389bM="
       }
     ]
   }
 }
 ```
 
+</details>
+
+We can see that our original `genesis.json` has been made part of Tendermint's version under `app_state`,
+and that the top level `validators` are empty, to be filled out by the application during the `init_chain` ABCI call.
+
+
+#### Convert the private key
+
+By default Tendermint uses Ed25519 validator keys, but in theory it can use anything that looks like a key.
+
+We can run the following command to replace the default `priv_validator_key.json` file with one based on
+one of the validators we created.
+
+```shell
+mv ~/.tendermint/config/priv_validator_key.json ~/.tendermint/config/priv_validator_key.json.orig
+cargo run -p fendermint_app -- \
+  key into-tendermint --secret-key test-network/keys/bob.sk --out ~/.tendermint/config/priv_validator_key.json
+```
+
+See if it looks reasonable:
+
+<details>
+<summary>~/.tendermint/config/priv_validator_key.json</summary>
+
+```console
+$ cat ~/.tendermint/config/priv_validator_key.json
+{
+  "address": "66FA0CFB373BD737DBFC7CE70BEF994DD42A3812",
+  "priv_key": {
+    "type": "tendermint/PrivKeySecp256k1",
+    "value": "04Gsfaw4RHZ5hTbXO/3hz2N567tz5E1yxChM1ZrEi1E"
+  },
+  "pub_key": {
+    "type": "tendermint/PubKeySecp256k1",
+    "value": "AiImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QE"
+  }
+}
+$ cat test-network/keys/bob.pk
+AiImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QE
+```
 </details>
