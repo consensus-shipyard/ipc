@@ -1370,6 +1370,7 @@ dependencies = [
  "quickcheck 1.0.3",
  "quickcheck_macros",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

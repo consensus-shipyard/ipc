@@ -2,4 +2,4 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 mod application;
 
-pub use application::{Application, ApplicationService};
+pub use application::{AbciResult, Application, ApplicationService};

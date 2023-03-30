@@ -4,9 +4,10 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use cid::Cid;
-use fendermint_abci::Application;
+use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
@@ -119,7 +120,7 @@ where
         state_hist_namespace: S::Namespace,
         state_hist_size: u64,
         interpreter: I,
-    ) -> Self {
+    ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
             multi_engine: Arc::new(MultiEngine::new(1)),
@@ -131,8 +132,8 @@ where
             exec_state: Arc::new(Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
         };
-        app.init_committed_state();
-        app
+        app.init_committed_state()?;
+        Ok(app)
     }
 }
 
@@ -147,11 +148,11 @@ where
     }
 
     /// Ensure the store has some initial state.
-    fn init_committed_state(&self) {
-        if self.get_committed_state().is_none() {
+    fn init_committed_state(&self) -> Result<()> {
+        if self.get_committed_state()?.is_none() {
             let mut state_tree =
-                empty_state_tree(self.clone_db()).expect("failed to create empty state tree");
-            let state_root = state_tree.flush().expect("failed to flush state tree");
+                empty_state_tree(self.clone_db()).context("failed to create empty state tree")?;
+            let state_root = state_tree.flush()?;
             let state = AppState {
                 block_height: 0,
                 oldest_state_height: 0,
@@ -162,24 +163,28 @@ where
                     circ_supply: TokenAmount::zero(),
                 },
             };
-            self.set_committed_state(state);
+            self.set_committed_state(state)?;
         }
+        Ok(())
     }
 
     /// Get the last committed state, if exists.
-    fn get_committed_state(&self) -> Option<AppState> {
+    fn get_committed_state(&self) -> Result<Option<AppState>> {
         let tx = self.db.read();
         tx.get(&self.namespace, &AppStoreKey::State)
-            .expect("get failed")
+            .context("get failed")
     }
 
-    /// Get the last committed state; panic if it doesn't exist.
-    fn committed_state(&self) -> AppState {
-        self.get_committed_state().expect("app state not found")
+    /// Get the last committed state; return error if it doesn't exist.
+    fn committed_state(&self) -> Result<AppState> {
+        match self.get_committed_state()? {
+            Some(state) => Ok(state),
+            None => Err(anyhow!("app state not found")),
+        }
     }
 
     /// Set the last committed state.
-    fn set_committed_state(&self, mut state: AppState) {
+    fn set_committed_state(&self, mut state: AppState) -> Result<()> {
         self.db
             .with_write(|tx| {
                 // Insert latest state history point.
@@ -200,7 +205,7 @@ where
 
                 Ok(())
             })
-            .expect("commit failed");
+            .context("commit failed")
     }
 
     /// Put the execution state during block execution. Has to be empty.
@@ -217,10 +222,10 @@ where
     }
 
     /// Take the execution state, update it, put it back, return the output.
-    async fn modify_exec_state<T, F, R>(&self, f: F) -> anyhow::Result<T>
+    async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
         F: FnOnce(FvmExecState<DB>) -> R,
-        R: Future<Output = anyhow::Result<(FvmExecState<DB>, T)>>,
+        R: Future<Output = Result<(FvmExecState<DB>, T)>>,
     {
         let state = self.take_exec_state();
         let (state, ret) = f(state).await?;
@@ -233,21 +238,21 @@ where
     /// wants the latest height.
     ///
     /// Returns the CID and the height of the block which committed it.
-    fn state_root_at_height(&self, height: Height) -> (Cid, BlockHeight) {
+    fn state_root_at_height(&self, height: Height) -> Result<(Cid, BlockHeight)> {
         if height.value() > 0 {
             let h = height.value() - 1;
             let tx = self.db.read();
             let sh = self
                 .state_hist
                 .get(&tx, &h)
-                .expect("error looking up history");
+                .context("error looking up history")?;
 
             if let Some(cid) = sh {
-                return (cid, h);
+                return Ok((cid, h));
             }
         }
-        let state = self.committed_state();
-        (state.state_root(), state.block_height)
+        let state = self.committed_state()?;
+        Ok((state.state_root(), state.block_height))
     }
 }
 
@@ -286,41 +291,41 @@ where
     >,
 {
     /// Provide information about the ABCI application.
-    async fn info(&self, _request: request::Info) -> response::Info {
-        let state = self.committed_state();
+    async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
+        let state = self.committed_state()?;
 
-        let height =
-            tendermint::block::Height::try_from(state.block_height).expect("height too big");
+        let height = tendermint::block::Height::try_from(state.block_height)?;
 
-        response::Info {
+        let info = response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
             app_version: APP_VERSION,
             last_block_height: height,
             last_block_app_hash: state.app_hash(),
-        }
+        };
+        Ok(info)
     }
 
     /// Called once upon genesis.
-    async fn init_chain(&self, request: request::InitChain) -> response::InitChain {
+    async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
         let bundle_path = &self.actor_bundle_path;
         let bundle = std::fs::read(bundle_path)
             .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
 
         let state = FvmGenesisState::new(self.clone_db(), &bundle)
             .await
-            .expect("error creating state");
+            .context("error creating state")?;
 
         let (state, out) = self
             .interpreter
             .init(state, request.app_state_bytes.to_vec())
             .await
-            .expect("failed to init from genesis");
+            .context("failed to init from genesis")?;
 
-        let state_root = state.commit().expect("failed to commit state");
+        let state_root = state.commit().context("failed to commit state")?;
         let height = request.initial_height.into();
         let validators =
-            to_validator_updates(out.validators).expect("failed to convert validators");
+            to_validator_updates(out.validators).context("failed to convert validators")?;
 
         let app_state = AppState {
             block_height: height,
@@ -345,40 +350,44 @@ where
             "init chain"
         );
 
-        self.set_committed_state(app_state);
+        self.set_committed_state(app_state)?;
 
-        response
+        Ok(response)
     }
 
     /// Query the application for data at the current or past height.
-    async fn query(&self, request: request::Query) -> response::Query {
+    async fn query(&self, request: request::Query) -> AbciResult<response::Query> {
         let db = self.clone_db();
-        let (state_root, block_height) = self.state_root_at_height(request.height);
-        let state = FvmQueryState::new(db, state_root).expect("error creating query state");
+        let (state_root, block_height) = self.state_root_at_height(request.height)?;
+        let state = FvmQueryState::new(db, state_root).context("error creating query state")?;
         let qry = (request.path, request.data.to_vec());
 
         let (_, result) = self
             .interpreter
             .query(state, qry)
             .await
-            .expect("error running query");
+            .context("error running query")?;
 
-        match result {
+        let response = match result {
             Err(e) => invalid_query(AppError::InvalidEncoding, e.description),
             Ok(result) => to_query(result, block_height),
-        }
+        };
+        Ok(response)
     }
 
     /// Check the given transaction before putting it into the local mempool.
-    async fn check_tx(&self, request: request::CheckTx) -> response::CheckTx {
+    async fn check_tx(&self, request: request::CheckTx) -> AbciResult<response::CheckTx> {
         // Keep the guard through the check, so there can be only one at a time.
         let mut guard = self.check_state.lock().await;
 
-        let state = guard.take().unwrap_or_else(|| {
-            let db = self.clone_db();
-            let state = self.committed_state();
-            FvmCheckState::new(db, state.state_root()).expect("error creating check state")
-        });
+        let state = match guard.take() {
+            Some(state) => state,
+            None => {
+                let db = self.clone_db();
+                let state = self.committed_state()?;
+                FvmCheckState::new(db, state.state_root()).context("error creating check state")?
+            }
+        };
 
         let (state, result) = self
             .interpreter
@@ -388,12 +397,12 @@ where
                 request.kind == CheckTxKind::Recheck,
             )
             .await
-            .expect("error running check");
+            .context("error running check")?;
 
         // Update the check state.
         *guard = Some(state);
 
-        match result {
+        let response = match result {
             Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
             Ok(result) => match result {
                 Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
@@ -402,13 +411,15 @@ where
                     Ok(ret) => to_check_tx(ret),
                 },
             },
-        }
+        };
+
+        Ok(response)
     }
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
-    async fn begin_block(&self, request: request::BeginBlock) -> response::BeginBlock {
+    async fn begin_block(&self, request: request::BeginBlock) -> AbciResult<response::BeginBlock> {
         let db = self.clone_db();
-        let state = self.committed_state();
+        let state = self.committed_state()?;
         let height = request.header.height.into();
         let timestamp = to_timestamp(request.header.time);
 
@@ -421,7 +432,7 @@ where
             timestamp,
             state.state_params,
         )
-        .expect("error creating new state");
+        .context("error creating new state")?;
 
         tracing::debug!("initialized exec state");
 
@@ -430,20 +441,20 @@ where
         let ret = self
             .modify_exec_state(|s| self.interpreter.begin(s))
             .await
-            .expect("begin failed");
+            .context("begin failed")?;
 
-        to_begin_block(ret)
+        Ok(to_begin_block(ret))
     }
 
     /// Apply a transaction to the application's state.
-    async fn deliver_tx(&self, request: request::DeliverTx) -> response::DeliverTx {
+    async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
         let msg = request.tx.to_vec();
         let result = self
             .modify_exec_state(|s| self.interpreter.deliver(s, msg))
             .await
-            .expect("deliver failed");
+            .context("deliver failed")?;
 
-        match result {
+        let response = match result {
             Err(e) => invalid_deliver_tx(AppError::InvalidEncoding, e.description),
             Ok(ret) => match ret {
                 ChainMessageApplyRet::Signed(Err(InvalidSignature(d))) => {
@@ -451,34 +462,36 @@ where
                 }
                 ChainMessageApplyRet::Signed(Ok(ret)) => to_deliver_tx(ret),
             },
-        }
+        };
+
+        Ok(response)
     }
 
     /// Signals the end of a block.
-    async fn end_block(&self, request: request::EndBlock) -> response::EndBlock {
+    async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
         tracing::debug!(height = request.height, "end block");
 
         // TODO: Return events from epoch transitions.
         let ret = self
             .modify_exec_state(|s| self.interpreter.end(s))
             .await
-            .expect("end failed");
+            .context("end failed")?;
 
-        to_end_block(ret)
+        Ok(to_end_block(ret))
     }
 
     /// Commit the current state at the current height.
-    async fn commit(&self) -> response::Commit {
+    async fn commit(&self) -> AbciResult<response::Commit> {
         let exec_state = self.take_exec_state();
         let block_height = exec_state.block_height();
-        let state_root = exec_state.commit().expect("failed to commit FVM");
+        let state_root = exec_state.commit().context("failed to commit FVM")?;
 
         tracing::debug!(state_root = format!("{}", state_root), "commit state");
 
-        let mut state = self.committed_state();
+        let mut state = self.committed_state()?;
         state.state_params.state_root = state_root;
-        state.block_height = block_height.try_into().expect("negative height");
-        self.set_committed_state(state);
+        state.block_height = block_height.try_into()?;
+        self.set_committed_state(state)?;
 
         // Reset check state.
         let mut guard = self.check_state.lock().await;
@@ -486,10 +499,11 @@ where
 
         tracing::debug!("committed state");
 
-        response::Commit {
+        let response = response::Commit {
             data: state_root.to_bytes().into(),
             // We have to retain blocks until we can support Snapshots.
             retain_height: Default::default(),
-        }
+        };
+        Ok(response)
     }
 }

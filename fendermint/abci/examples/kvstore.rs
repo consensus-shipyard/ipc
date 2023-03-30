@@ -4,7 +4,7 @@
 
 use async_stm::{atomically, TVar};
 use async_trait::async_trait;
-use fendermint_abci::{Application, ApplicationService};
+use fendermint_abci::{AbciResult as Result, Application, ApplicationService};
 use structopt::StructOpt;
 use tendermint::abci::{request, response, Event, EventAttributeIndexExt};
 use tower_abci::{split, Server};
@@ -32,7 +32,7 @@ impl KVStore {
 
 #[async_trait]
 impl Application for KVStore {
-    async fn info(&self, _request: request::Info) -> response::Info {
+    async fn info(&self, _request: request::Info) -> Result<response::Info> {
         let (height, app_hash) = atomically(|| {
             let height = self.height.read_clone()?.into();
             let app_hash = self.app_hash.read()?.to_vec().try_into().unwrap();
@@ -40,16 +40,16 @@ impl Application for KVStore {
         })
         .await;
 
-        response::Info {
+        Ok(response::Info {
             data: "kvstore-example".to_string(),
             version: "0.1.0".to_string(),
             app_version: 1,
             last_block_height: height,
             last_block_app_hash: app_hash,
-        }
+        })
     }
 
-    async fn query(&self, request: request::Query) -> response::Query {
+    async fn query(&self, request: request::Query) -> Result<response::Query> {
         let key = String::from_utf8(request.data.to_vec()).unwrap();
         let (value, log) = atomically(|| match self.store.read()?.get(&key) {
             Some(v) => Ok((v.clone(), "exists".to_string())),
@@ -57,15 +57,15 @@ impl Application for KVStore {
         })
         .await;
 
-        response::Query {
+        Ok(response::Query {
             log,
             key: key.into_bytes().into(),
             value: value.into_bytes().into(),
             ..Default::default()
-        }
+        })
     }
 
-    async fn deliver_tx(&self, request: request::DeliverTx) -> response::DeliverTx {
+    async fn deliver_tx(&self, request: request::DeliverTx) -> Result<response::DeliverTx> {
         let tx = String::from_utf8(request.tx.to_vec()).unwrap();
         let (key, value) = match tx.split('=').collect::<Vec<_>>() {
             k if k.len() == 1 => (k[0], k[0]),
@@ -82,7 +82,7 @@ impl Application for KVStore {
 
         info!(?key, ?value, "update");
 
-        response::DeliverTx {
+        Ok(response::DeliverTx {
             events: vec![Event::new(
                 "app",
                 vec![
@@ -92,10 +92,10 @@ impl Application for KVStore {
                 ],
             )],
             ..Default::default()
-        }
+        })
     }
 
-    async fn commit(&self) -> response::Commit {
+    async fn commit(&self) -> Result<response::Commit> {
         let (retain_height, app_hash) = atomically(|| {
             // As in the other kvstore examples, just use store.len() as the "hash"
             let app_hash = (self.store.read()?.len() as u64).to_be_bytes();
@@ -107,10 +107,10 @@ impl Application for KVStore {
 
         info!(?retain_height, "commit");
 
-        response::Commit {
+        Ok(response::Commit {
             data: app_hash,
             retain_height,
-        }
+        })
     }
 }
 

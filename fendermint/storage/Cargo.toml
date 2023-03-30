@@ -11,6 +11,7 @@ license.workspace = true
 [dependencies]
 im = { version = "15.1.0", optional = true }
 quickcheck = { workspace = true, optional = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 quickcheck_macros = { workspace = true }

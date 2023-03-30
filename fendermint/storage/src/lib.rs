@@ -15,16 +15,15 @@ pub mod im;
 pub mod testing;
 
 /// Possible errors during key-value operations.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum KVError {
-    /// The operation failed because there was a write conflict.
+    #[error("operation failed because there was a write conflict")]
     Conflict,
-    /// KV transaction was aborted due to some business rule violation.
+    #[error("transaction was aborted due to some business rule violation: {0}")]
     Abort(Box<dyn Error + Send + Sync>),
-    /// An error occurred during serializing or deserializing the data.
+    #[error("data serialization error: {0}")]
     Codec(Box<dyn Error + Send + Sync>),
-    /// Some unexpected error occurred in the underlying implementation,
-    /// e.g. some IO error with a database.
+    #[error("unexpected error: {0}")]
     Unexpected(Box<dyn Error + Send + Sync>),
 }
 

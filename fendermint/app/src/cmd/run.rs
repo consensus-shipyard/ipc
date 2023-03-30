@@ -15,46 +15,50 @@ use crate::{cmd, options::RunArgs, settings::Settings};
 
 cmd! {
   RunArgs(self, settings) {
-        let interpreter = FvmMessageInterpreter::<RocksDb>::new();
-        let interpreter = SignedMessageInterpreter::new(interpreter);
-        let interpreter = ChainMessageInterpreter::new(interpreter);
-        let interpreter = BytesMessageInterpreter::new(interpreter);
+    run(settings).await
+  }
+}
 
-        let ns = Namespaces::default();
-        let db = open_db(&settings, &ns).expect("error opening DB");
+async fn run(settings: Settings) -> anyhow::Result<()> {
+    let interpreter = FvmMessageInterpreter::<RocksDb>::new();
+    let interpreter = SignedMessageInterpreter::new(interpreter);
+    let interpreter = ChainMessageInterpreter::new(interpreter);
+    let interpreter = BytesMessageInterpreter::new(interpreter);
 
-        let app = App::<_, AppStore, _>::new(
-            db,
-            settings.builtin_actors_bundle(),
-            ns.app,
-            ns.state_hist,
-            settings.db.state_hist_size,
-            interpreter,
-        );
+    let ns = Namespaces::default();
+    let db = open_db(&settings, &ns).context("error opening DB")?;
 
-        let service = ApplicationService(app);
+    let app: App<_, AppStore, _> = App::new(
+        db,
+        settings.builtin_actors_bundle(),
+        ns.app,
+        ns.state_hist,
+        settings.db.state_hist_size,
+        interpreter,
+    )?;
 
-        // Split it into components.
-        let (consensus, mempool, snapshot, info) =
-            tower_abci::split::service(service, settings.abci.bound);
+    let service = ApplicationService(app);
 
-        // Hand those components to the ABCI server. This is where tower layers could be added.
-        let server = tower_abci::Server::builder()
-            .consensus(consensus)
-            .snapshot(snapshot)
-            .mempool(mempool)
-            .info(info)
-            .finish()
-            .context("error creating ABCI server")?;
+    // Split it into components.
+    let (consensus, mempool, snapshot, info) =
+        tower_abci::split::service(service, settings.abci.bound);
 
-        // Run the ABCI server.
-        server
-            .listen(settings.abci.listen_addr())
-            .await
-            .map_err(|e| anyhow!("error listening: {e}"))?;
+    // Hand those components to the ABCI server. This is where tower layers could be added.
+    let server = tower_abci::Server::builder()
+        .consensus(consensus)
+        .snapshot(snapshot)
+        .mempool(mempool)
+        .info(info)
+        .finish()
+        .context("error creating ABCI server")?;
 
-        Ok(())
-    }
+    // Run the ABCI server.
+    server
+        .listen(settings.abci.listen_addr())
+        .await
+        .map_err(|e| anyhow!("error listening: {e}"))?;
+
+    Ok(())
 }
 
 namespaces! {

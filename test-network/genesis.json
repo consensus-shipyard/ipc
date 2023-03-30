@@ -1,0 +1,37 @@
+{
+  "timestamp": 1680101412,
+  "network_name": "test",
+  "network_version": 18,
+  "base_fee": "1000",
+  "validators": [
+    {
+      "public_key": "BCImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QEy8cVKNuvTU/EOTibo3hIyOQslvSouzIpR24h1kkqCSI=",
+      "power": 1
+    }
+  ],
+  "accounts": [
+    {
+      "meta": {
+        "Account": {
+          "owner": "f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y"
+        }
+      },
+      "balance": "1000000000000000000"
+    },
+    {
+      "meta": {
+        "Multisig": {
+          "signers": [
+            "f1kgtzp5nuob3gdccagivcgns7e25be2c2rqozilq",
+            "f1bvdmcbct6vwoh3rvkhoth2fe66p6prpbsziqbfi",
+            "f1hgeqjtadqmyabmy2kij2smn5jiiud75kva6bzny"
+          ],
+          "threshold": 2,
+          "vesting_duration": 1000000,
+          "vesting_start": 0
+        }
+      },
+      "balance": "3000000000000000000"
+    }
+  ]
+}

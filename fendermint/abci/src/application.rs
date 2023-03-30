@@ -11,6 +11,15 @@ use tendermint::abci::{request, response, Request, Response};
 use tower::Service;
 use tower_abci::BoxError;
 
+/// Allow returning a result from the methods, so the [`Application`]
+/// implementation doesn't have to be full of `.expect("failed...")`
+/// or `.unwrap()` calls. It is still good practice to use for example
+/// `anyhow::Context` to provide better error feedback.
+///
+/// If an error is returned, the [`tower_abci::Service`] will handle
+/// it by crashing at the moment.
+pub type AbciResult<T> = std::result::Result<T, BoxError>;
+
 /// Asynchronous equivalent of of [tendermint_abci::Application].
 ///
 /// See the [spec](https://github.com/tendermint/tendermint/blob/v0.37.0-rc2/spec/abci) for the expected behaviour.
@@ -18,30 +27,30 @@ use tower_abci::BoxError;
 #[async_trait]
 pub trait Application {
     /// Echo back the same message as provided in the request.
-    async fn echo(&self, request: request::Echo) -> response::Echo {
-        response::Echo {
+    async fn echo(&self, request: request::Echo) -> AbciResult<response::Echo> {
+        Ok(response::Echo {
             message: request.message,
-        }
+        })
     }
 
     /// Provide information about the ABCI application.
-    async fn info(&self, request: request::Info) -> response::Info {
-        Default::default()
+    async fn info(&self, request: request::Info) -> AbciResult<response::Info> {
+        Ok(Default::default())
     }
 
     /// Called once upon genesis.
-    async fn init_chain(&self, request: request::InitChain) -> response::InitChain {
-        Default::default()
+    async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
+        Ok(Default::default())
     }
 
     /// Query the application for data at the current or past height.
-    async fn query(&self, request: request::Query) -> response::Query {
-        Default::default()
+    async fn query(&self, request: request::Query) -> AbciResult<response::Query> {
+        Ok(Default::default())
     }
 
     /// Check the given transaction before putting it into the local mempool.
-    async fn check_tx(&self, request: request::CheckTx) -> response::CheckTx {
-        Default::default()
+    async fn check_tx(&self, request: request::CheckTx) -> AbciResult<response::CheckTx> {
+        Ok(Default::default())
     }
 
     /// Opportunity for the application to modify the proposed transactions.
@@ -52,7 +61,7 @@ pub trait Application {
     async fn prepare_proposal(
         &self,
         request: request::PrepareProposal,
-    ) -> response::PrepareProposal {
+    ) -> AbciResult<response::PrepareProposal> {
         let max_tx_bytes: usize = request.max_tx_bytes.try_into().unwrap();
         let mut size: usize = 0;
         let mut txs = Vec::new();
@@ -63,7 +72,7 @@ pub trait Application {
             size += tx.len();
             txs.push(tx);
         }
-        response::PrepareProposal { txs }
+        Ok(response::PrepareProposal { txs })
     }
 
     /// Opporunity for the application to inspect the proposal before voting on it.
@@ -74,54 +83,57 @@ pub trait Application {
     async fn process_proposal(
         &self,
         request: request::ProcessProposal,
-    ) -> response::ProcessProposal {
-        response::ProcessProposal::Accept
+    ) -> AbciResult<response::ProcessProposal> {
+        Ok(response::ProcessProposal::Accept)
     }
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
-    async fn begin_block(&self, request: request::BeginBlock) -> response::BeginBlock {
-        Default::default()
+    async fn begin_block(&self, request: request::BeginBlock) -> AbciResult<response::BeginBlock> {
+        Ok(Default::default())
     }
 
     /// Apply a transaction to the application's state.
-    async fn deliver_tx(&self, request: request::DeliverTx) -> response::DeliverTx {
-        Default::default()
+    async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
+        Ok(Default::default())
     }
 
     /// Signals the end of a block.
-    async fn end_block(&self, request: request::EndBlock) -> response::EndBlock {
-        Default::default()
+    async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
+        Ok(Default::default())
     }
 
     /// Commit the current state at the current height.
-    async fn commit(&self) -> response::Commit {
-        Default::default()
+    async fn commit(&self) -> AbciResult<response::Commit> {
+        Ok(Default::default())
     }
 
     /// Used during state sync to discover available snapshots on peers.
-    async fn list_snapshots(&self) -> response::ListSnapshots {
-        Default::default()
+    async fn list_snapshots(&self) -> AbciResult<response::ListSnapshots> {
+        Ok(Default::default())
     }
 
     /// Called when bootstrapping the node using state sync.
-    async fn offer_snapshot(&self, request: request::OfferSnapshot) -> response::OfferSnapshot {
-        Default::default()
+    async fn offer_snapshot(
+        &self,
+        request: request::OfferSnapshot,
+    ) -> AbciResult<response::OfferSnapshot> {
+        Ok(Default::default())
     }
 
     /// Used during state sync to retrieve chunks of snapshots from peers.
     async fn load_snapshot_chunk(
         &self,
         request: request::LoadSnapshotChunk,
-    ) -> response::LoadSnapshotChunk {
-        Default::default()
+    ) -> AbciResult<response::LoadSnapshotChunk> {
+        Ok(Default::default())
     }
 
     /// Apply the given snapshot chunk to the application's state.
     async fn apply_snapshot_chunk(
         &self,
         request: request::ApplySnapshotChunk,
-    ) -> response::ApplySnapshotChunk {
-        Default::default()
+    ) -> AbciResult<response::ApplySnapshotChunk> {
+        Ok(Default::default())
     }
 }
 
@@ -151,28 +163,28 @@ where
         let app = self.0.clone();
         let res = async move {
             let res = match req {
-                Request::Echo(r) => Response::Echo(app.echo(r).await),
-                Request::Info(r) => Response::Info(app.info(r).await),
-                Request::InitChain(r) => Response::InitChain(app.init_chain(r).await),
-                Request::Query(r) => Response::Query(app.query(r).await),
-                Request::CheckTx(r) => Response::CheckTx(app.check_tx(r).await),
+                Request::Echo(r) => Response::Echo(app.echo(r).await?),
+                Request::Info(r) => Response::Info(app.info(r).await?),
+                Request::InitChain(r) => Response::InitChain(app.init_chain(r).await?),
+                Request::Query(r) => Response::Query(app.query(r).await?),
+                Request::CheckTx(r) => Response::CheckTx(app.check_tx(r).await?),
                 Request::PrepareProposal(r) => {
-                    Response::PrepareProposal(app.prepare_proposal(r).await)
+                    Response::PrepareProposal(app.prepare_proposal(r).await?)
                 }
                 Request::ProcessProposal(r) => {
-                    Response::ProcessProposal(app.process_proposal(r).await)
+                    Response::ProcessProposal(app.process_proposal(r).await?)
                 }
-                Request::BeginBlock(r) => Response::BeginBlock(app.begin_block(r).await),
-                Request::DeliverTx(r) => Response::DeliverTx(app.deliver_tx(r).await),
-                Request::EndBlock(r) => Response::EndBlock(app.end_block(r).await),
-                Request::Commit => Response::Commit(app.commit().await),
-                Request::ListSnapshots => Response::ListSnapshots(app.list_snapshots().await),
-                Request::OfferSnapshot(r) => Response::OfferSnapshot(app.offer_snapshot(r).await),
+                Request::BeginBlock(r) => Response::BeginBlock(app.begin_block(r).await?),
+                Request::DeliverTx(r) => Response::DeliverTx(app.deliver_tx(r).await?),
+                Request::EndBlock(r) => Response::EndBlock(app.end_block(r).await?),
+                Request::Commit => Response::Commit(app.commit().await?),
+                Request::ListSnapshots => Response::ListSnapshots(app.list_snapshots().await?),
+                Request::OfferSnapshot(r) => Response::OfferSnapshot(app.offer_snapshot(r).await?),
                 Request::LoadSnapshotChunk(r) => {
-                    Response::LoadSnapshotChunk(app.load_snapshot_chunk(r).await)
+                    Response::LoadSnapshotChunk(app.load_snapshot_chunk(r).await?)
                 }
                 Request::ApplySnapshotChunk(r) => {
-                    Response::ApplySnapshotChunk(app.apply_snapshot_chunk(r).await)
+                    Response::ApplySnapshotChunk(app.apply_snapshot_chunk(r).await?)
                 }
                 Request::Flush => panic!("Flush should be handled by the Server!"),
             };
