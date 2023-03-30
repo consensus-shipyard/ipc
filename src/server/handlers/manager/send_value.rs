@@ -10,6 +10,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
+use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -39,7 +40,8 @@ impl JsonRPCRequestHandler for SendValueHandler {
     type Response = ();
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let conn = match self.pool.get(&request.subnet) {
+        let subnet = SubnetID::from_str(&request.subnet)?;
+        let conn = match self.pool.get(&subnet) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };

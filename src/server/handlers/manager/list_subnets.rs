@@ -10,6 +10,7 @@ use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
+use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -38,7 +39,8 @@ impl JsonRPCRequestHandler for ListSubnetsHandler {
     type Response = HashMap<String, SubnetInfo>;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let conn = match self.pool.get(&request.subnet_id) {
+        let subnet = SubnetID::from_str(&request.subnet_id)?;
+        let conn = match self.pool.get(&subnet) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };

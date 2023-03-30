@@ -38,10 +38,7 @@ impl JsonRPCRequestHandler for FundHandler {
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let subnet = SubnetID::from_str(&request.subnet)?;
-        let parent = subnet
-            .parent()
-            .ok_or_else(|| anyhow!("no parent found"))?
-            .to_string();
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.pool.get(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
@@ -53,6 +50,8 @@ impl JsonRPCRequestHandler for FundHandler {
         let from = parse_from(subnet_config, request.from)?;
         let amount = TokenAmount::from_whole(request.amount);
 
-        conn.manager().fund(subnet, from, amount).await
+        conn.manager()
+            .fund(subnet, subnet_config.gateway_addr, from, amount)
+            .await
     }
 }

@@ -37,7 +37,8 @@ impl JsonRPCRequestHandler for ReleaseHandler {
     type Response = ();
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let conn = match self.pool.get(&request.subnet) {
+        let subnet = SubnetID::from_str(&request.subnet)?;
+        let conn = match self.pool.get(&subnet) {
             None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
         };
@@ -45,11 +46,11 @@ impl JsonRPCRequestHandler for ReleaseHandler {
         let subnet_config = conn.subnet();
         check_subnet(subnet_config)?;
 
-        let subnet = SubnetID::from_str(&request.subnet)?;
         let amount = TokenAmount::from_whole(request.amount);
-
         let from = parse_from(subnet_config, request.from)?;
 
-        conn.manager().release(subnet, from, amount).await
+        conn.manager()
+            .release(subnet, subnet_config.gateway_addr, from, amount)
+            .await
     }
 }

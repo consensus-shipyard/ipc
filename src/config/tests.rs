@@ -17,6 +17,7 @@ use crate::config::{Config, ReloadableConfig};
 const SERVER_JSON_RPC_ADDR: &str = "127.0.0.1:3030";
 const ROOT_ID: &str = "/root";
 const CHILD_ID: &str = "/root/t0100";
+const GATEWAY_ADDR: &str = "t064";
 const ROOT_AUTH_TOKEN: &str = "ROOT_AUTH_TOKEN";
 const CHILD_AUTH_TOKEN: &str = "CHILD_AUTH_TOKEN";
 const JSONRPC_API_HTTP: &str = "https://example.org/rpc/v0";
@@ -96,8 +97,10 @@ fn check_server_config() {
 fn check_subnets_config() {
     let config = read_config().subnets;
 
-    let root = &config["root"];
+    let root = &config[&ROOTNET_ID];
     assert_eq!(root.id, *ROOTNET_ID);
+    assert_eq!(root.network_name, "root");
+    assert_eq!(root.gateway_addr, Address::from_str(GATEWAY_ADDR).unwrap());
     assert_eq!(
         root.jsonrpc_api_http,
         Url::from_str(JSONRPC_API_HTTP).unwrap()
@@ -108,8 +111,11 @@ fn check_subnets_config() {
     );
     assert_eq!(root.auth_token.as_ref().unwrap(), ROOT_AUTH_TOKEN);
 
-    let child = &config["child"];
-    assert_eq!(child.id, SubnetID::from_str(CHILD_ID).unwrap(),);
+    let child_id = SubnetID::from_str(CHILD_ID).unwrap();
+    let child = &config[&child_id];
+    assert_eq!(child.id, child_id);
+    assert_eq!(child.network_name, "child");
+    assert_eq!(child.gateway_addr, Address::from_str(GATEWAY_ADDR).unwrap());
     assert_eq!(
         child.jsonrpc_api_http,
         Url::from_str(JSONRPC_API_HTTP).unwrap(),
@@ -127,14 +133,18 @@ fn config_str() -> String {
             [server]
             json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
 
-            [subnets]
-            [subnets.root]
+            [[subnets]]
             id = "{ROOT_ID}"
+            gateway_addr = "{GATEWAY_ADDR}"
+            network_name = "root"
             jsonrpc_api_http = "{JSONRPC_API_HTTP}"
             jsonrpc_api_ws = "{JSONRPC_API_WS}"
             auth_token = "{ROOT_AUTH_TOKEN}"
-            [subnets.child]
+
+            [[subnets]]
             id = "{CHILD_ID}"
+            network_name = "child"
+            gateway_addr = "{GATEWAY_ADDR}"
             jsonrpc_api_http = "{JSONRPC_API_HTTP}"
             auth_token = "{CHILD_AUTH_TOKEN}"
             accounts = ["{ACCOUNT_ADDRESS}"]
@@ -148,14 +158,18 @@ fn config_str_diff_addr() -> String {
             [server]
             json_rpc_address = "127.0.0.1:3031"
 
-            [subnets]
-            [subnets.root]
+            [[subnets]]
             id = "{ROOT_ID}"
+            network_name = "root"
+            gateway_addr = "{GATEWAY_ADDR}"
             jsonrpc_api_http = "{JSONRPC_API_HTTP}"
             jsonrpc_api_ws = "{JSONRPC_API_WS}"
             auth_token = "{ROOT_AUTH_TOKEN}"
-            [subnets.child]
+
+            [[subnets]]
             id = "{CHILD_ID}"
+            network_name = "child"
+            gateway_addr = "{GATEWAY_ADDR}"
             jsonrpc_api_http = "{JSONRPC_API_HTTP}"
             auth_token = "{CHILD_AUTH_TOKEN}"
             accounts = ["{ACCOUNT_ADDRESS}"]
@@ -169,16 +183,18 @@ fn read_config() -> Config {
             [server]
             json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
 
-            [subnets]
-
-            [subnets.root]
+            [[subnets]]
             id = "{ROOT_ID}"
+            network_name = "root"
+            gateway_addr = "{GATEWAY_ADDR}"
             jsonrpc_api_http = "{JSONRPC_API_HTTP}"
             jsonrpc_api_ws = "{JSONRPC_API_WS}"
             auth_token = "{ROOT_AUTH_TOKEN}"
 
-            [subnets.child]
+            [[subnets]]
             id = "{CHILD_ID}"
+            network_name = "child"
+            gateway_addr = "{GATEWAY_ADDR}"
             jsonrpc_api_http = "{JSONRPC_API_HTTP}"
             auth_token = "{CHILD_AUTH_TOKEN}"
             accounts = ["{ACCOUNT_ADDRESS}"]

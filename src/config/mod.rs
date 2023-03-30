@@ -18,6 +18,8 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use deserialize::deserialize_subnets_from_vec;
+use ipc_sdk::subnet_id::SubnetID;
 pub use reload::ReloadableConfig;
 use serde::Deserialize;
 pub use server::JSON_RPC_ENDPOINT;
@@ -25,24 +27,25 @@ pub use server::{json_rpc_methods, Server};
 pub use subnet::Subnet;
 
 pub const JSON_RPC_VERSION: &str = "2.0";
-pub const DEFAULT_IPC_GATEWAY_ADDR: u64 = 64;
 
 /// Default config template
 pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
 [server]
 json_rpc_address = "127.0.0.1:3030"
 
-[subnets]
-
-[subnets."/root"]
+[[subnets]]
 id = "/root"
+gateway_addr = "t064"
+network_name = "root"
 jsonrpc_api_http = "http://127.0.0.1:1235/rpc/v1"
 jsonrpc_api_ws = "wss://example.org/rpc/v0"
 auth_token = "YOUR TOKEN"
 accounts = ["t01"]
 
-[subnets."/root/t01"]
+[[subnets]]
 id = "/root/t01"
+gateway_addr = "t064"
+network_name = "child"
 jsonrpc_api_http = "http://127.0.0.1:1235/rpc/v1"
 auth_token = "YOUR TOKEN"
 accounts = ["t01"]
@@ -53,7 +56,8 @@ accounts = ["t01"]
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub server: Server,
-    pub subnets: HashMap<String, Subnet>,
+    #[serde(deserialize_with = "deserialize_subnets_from_vec")]
+    pub subnets: HashMap<SubnetID, Subnet>,
 }
 
 impl Config {

@@ -37,11 +37,7 @@ impl JsonRPCRequestHandler for LeaveSubnetHandler {
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let subnet = SubnetID::from_str(&request.subnet)?;
-        let parent = subnet
-            .parent()
-            .ok_or_else(|| anyhow!("no parent found"))?
-            .to_string();
-
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.pool.get(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,

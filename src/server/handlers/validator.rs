@@ -48,11 +48,9 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
         let subnet_id = SubnetID::from_str(&request.subnet)?;
         let parent = subnet_id
             .parent()
-            .ok_or_else(|| anyhow!("cannot get for root"))?
-            .to_string();
+            .ok_or_else(|| anyhow!("cannot get for root"))?;
 
         let config = self.config.get_config();
-        // TODO: once get_by_subnet_id is merged, will use parent subnet id directly.
         let subnet = match config.subnets.get(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(s) => s,
