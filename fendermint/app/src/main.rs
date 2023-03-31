@@ -30,9 +30,12 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use cid::Cid;
     use fendermint_rocksdb::{RocksDb, RocksDbConfig};
     use fendermint_vm_interpreter::fvm::bundle::bundle_path;
+    use fvm::machine::Manifest;
     use fvm_ipld_car::load_car_unchecked;
+    use fvm_ipld_encoding::CborStore;
 
     #[tokio::test]
     async fn load_car() {
@@ -50,11 +53,27 @@ mod tests {
             .tempdir()
             .expect("error creating temporary path for db");
         let path = dir.path().join("rocksdb");
-        let db =
-            RocksDb::open(path.clone(), &RocksDbConfig::default()).expect("error creating RocksDB");
 
-        let _cids = load_car_unchecked(&db, bundle_car.as_slice())
+        let open_db = || {
+            RocksDb::open(path.clone(), &RocksDbConfig::default()).expect("error creating RocksDB")
+        };
+        let db = open_db();
+
+        let cids = load_car_unchecked(&db, bundle_car.as_slice())
             .await
             .expect("error loading bundle CAR");
+
+        let bundle_root = cids.first().expect("there should be 1 CID");
+
+        // Close and reopen.
+        drop(db);
+        let db = open_db();
+
+        let (manifest_version, manifest_data_cid): (u32, Cid) = db
+            .get_cbor(bundle_root)
+            .expect("error getting bundle root")
+            .expect("bundle root was not in store");
+
+        Manifest::load(&db, &manifest_data_cid, manifest_version).expect("error loading manifest");
     }
 }

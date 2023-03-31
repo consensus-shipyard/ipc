@@ -310,11 +310,16 @@ where
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
         let bundle_path = &self.actor_bundle_path;
         let bundle = std::fs::read(bundle_path)
-            .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
+            .map_err(|e| anyhow!("failed to load bundle CAR from {bundle_path:?}: {e}"))?;
 
         let state = FvmGenesisState::new(self.clone_db(), &bundle)
             .await
-            .context("error creating state")?;
+            .context("failed to create genesis state")?;
+
+        tracing::info!(
+            manifest_root = format!("{}", state.manifest_data_cid),
+            "pre-genesis state created"
+        );
 
         let (state, out) = self
             .interpreter
@@ -322,7 +327,7 @@ where
             .await
             .context("failed to init from genesis")?;
 
-        let state_root = state.commit().context("failed to commit state")?;
+        let state_root = state.commit().context("failed to commit genesis state")?;
         let height = request.initial_height.into();
         let validators =
             to_validator_updates(out.validators).context("failed to convert validators")?;
