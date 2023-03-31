@@ -4,7 +4,7 @@
 //! CLI command implementations.
 
 use crate::{
-    options::{Commands, GenesisCommands, KeyCommands, Options},
+    options::{genesis::GenesisCommands, key::KeyCommands, Commands, Options},
     settings::Settings,
 };
 use anyhow::{anyhow, Context};

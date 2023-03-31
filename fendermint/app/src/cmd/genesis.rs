@@ -12,7 +12,7 @@ use fendermint_vm_genesis::{
 };
 
 use crate::cmd;
-use crate::options::{
+use crate::options::genesis::{
     GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs,
     GenesisIntoTendermintArgs, GenesisNewArgs,
 };

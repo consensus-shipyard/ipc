@@ -11,7 +11,7 @@ use fendermint_vm_interpreter::{
 };
 use tracing::info;
 
-use crate::{cmd, options::RunArgs, settings::Settings};
+use crate::{cmd, options::run::RunArgs, settings::Settings};
 
 cmd! {
   RunArgs(self, settings) {

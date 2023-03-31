@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     cmd,
-    options::{KeyGenArgs, KeyIntoTendermintArgs},
+    options::key::{KeyGenArgs, KeyIntoTendermintArgs},
 };
 
 /// A [`GeneralPurpose`] engine using the [`alphabet::STANDARD`] base64 alphabet
