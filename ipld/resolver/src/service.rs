@@ -89,6 +89,7 @@ pub(crate) enum Request {
     AddProvidedSubnet(SubnetID),
     RemoveProvidedSubnet(SubnetID),
     PublishVote(Box<SignedVoteRecord>),
+    PublishPreemptive(SubnetID, Vec<u8>),
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
@@ -102,6 +103,8 @@ pub(crate) enum Request {
 pub enum Event {
     /// Received a vote about in a subnet about a CID.
     ReceivedVote(Box<VoteRecord>),
+    /// Received raw pre-emptive data published to a pinned subnet.
+    ReceivedPreemptive(SubnetID, Vec<u8>),
 }
 
 /// The `Service` handles P2P communication to resolve IPLD content by wrapping and driving a number of `libp2p` behaviours.
@@ -360,6 +363,12 @@ impl<P: StoreParams> Service<P> {
                     debug!("dropped received vote because there are no subscribers")
                 }
             }
+            membership::Event::ReceivedPreemptive(subnet_id, data) => {
+                let event = Event::ReceivedPreemptive(subnet_id, data);
+                if self.event_tx.send(event).is_err() {
+                    debug!("dropped received preemptive data because there are no subscribers")
+                }
+            }
         }
     }
 
@@ -415,9 +424,21 @@ impl<P: StoreParams> Service<P> {
                     warn!("failed to publish vote: {e}")
                 }
             }
-            Request::PinSubnet(id) => self.membership_mut().pin_subnet(id),
-            Request::UnpinSubnet(id) => self.membership_mut().unpin_subnet(&id),
-
+            Request::PublishPreemptive(subnet_id, data) => {
+                if let Err(e) = self.membership_mut().publish_preemptive(subnet_id, data) {
+                    warn!("failed to publish pre-emptive data: {e}")
+                }
+            }
+            Request::PinSubnet(id) => {
+                if let Err(e) = self.membership_mut().pin_subnet(id) {
+                    warn!("error pinning subnet: {e}")
+                }
+            }
+            Request::UnpinSubnet(id) => {
+                if let Err(e) = self.membership_mut().unpin_subnet(&id) {
+                    warn!("error unpinning subnet: {e}")
+                }
+            }
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
