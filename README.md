@@ -3,7 +3,9 @@
 
 The IPC Agent is the entrypoint to interacting with IPC. It is a client application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.
 
-See the [docs](docs) for a conceptual overview.
+See the [docs](docs) for a conceptual overview. 
+
+If you meet any obstacles or need help, please join us in **#ipc-help** in the [Filecoin Slack workspace](https://filecoin.io/slack).
 
 ## Installation
 ### Build requirements
