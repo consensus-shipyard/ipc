@@ -25,8 +25,8 @@ RUN --mount=type=cache,target=$RUSTUP_HOME,from=rust,source=$RUSTUP_HOME \
 # Main stage
 FROM debian:bullseye-slim
 
-COPY --from=builder /app/output/bin/ipc_agent /usr/local/bin/ipc_agent
+COPY --from=builder /app/output/bin/ipc-agent /usr/local/bin/ipc-agent
 
-ENTRYPOINT ["ipc_agent"]
+ENTRYPOINT ["ipc-agent"]
 
 EXPOSE 3030

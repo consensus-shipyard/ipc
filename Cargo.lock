@@ -2427,6 +2427,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipc-agent"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-channel",
+ "async-trait",
+ "base64 0.21.0",
+ "bytes",
+ "cid",
+ "clap",
+ "derive_builder 0.12.0",
+ "env_logger 0.10.0",
+ "fil_actors_runtime",
+ "futures-util",
+ "fvm_ipld_encoding 0.3.3",
+ "fvm_shared 3.0.0-alpha.17",
+ "indoc",
+ "ipc-gateway",
+ "ipc-sdk",
+ "ipc-subnet-actor",
+ "log",
+ "num-derive",
+ "num-traits",
+ "primitives",
+ "reqwest",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "serde_tuple",
+ "strum",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-graceful-shutdown",
+ "tokio-tungstenite 0.18.0",
+ "toml 0.7.3",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "ipc-gateway"
 version = "0.0.1"
 source = "git+https://github.com/consensus-shipyard/ipc-actors.git#186a7cb1e6b1745d9013b4556a14e5ffc0c09929"
@@ -2500,47 +2541,6 @@ dependencies = [
  "unsigned-varint",
  "wasm-builder",
  "wasmtime",
-]
-
-[[package]]
-name = "ipc_agent"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-channel",
- "async-trait",
- "base64 0.21.0",
- "bytes",
- "cid",
- "clap",
- "derive_builder 0.12.0",
- "env_logger 0.10.0",
- "fil_actors_runtime",
- "futures-util",
- "fvm_ipld_encoding 0.3.3",
- "fvm_shared 3.0.0-alpha.17",
- "indoc",
- "ipc-gateway",
- "ipc-sdk",
- "ipc-subnet-actor",
- "log",
- "num-derive",
- "num-traits",
- "primitives",
- "reqwest",
- "serde",
- "serde_bytes",
- "serde_json",
- "serde_tuple",
- "strum",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-graceful-shutdown",
- "tokio-tungstenite 0.18.0",
- "toml 0.7.3",
- "url",
- "warp",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@ mod commands;
 use crate::config::Config;
 pub use commands::cli;
 
-const DEFAULT_CONFIG_PATH: &str = ".ipc_agent/config.toml";
+const DEFAULT_CONFIG_PATH: &str = ".ipc-agent/config.toml";
 
 /// The trait that represents the abstraction of a command line handler. To implement a new command
 /// line operation, implement this trait and register it.
@@ -35,7 +35,7 @@ pub struct GlobalArguments {
     #[arg(
         short,
         long,
-        help = "The toml config file path for IPC Agent, default to ${HOME}/.ipc_agent/config.toml"
+        help = "The toml config file path for IPC Agent, default to ${HOME}/.ipc-agent/config.toml"
     )]
     config_path: Option<String>,
 }

@@ -4,8 +4,11 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::bigint::BigInt;
+use fvm_shared::econ::TokenAmount;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::str::FromStr;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
@@ -39,7 +42,19 @@ impl CommandLineHandler for ListSubnets {
             )
             .await?;
 
-        log::info!("found child subnets: {subnets:?}");
+        for (_, s) in subnets.iter() {
+            let u = BigInt::from_str(&s.stake).unwrap();
+            let stake = TokenAmount::from_atto(u);
+            let u = BigInt::from_str(&s.circ_supply).unwrap();
+            let supply = TokenAmount::from_atto(u);
+            log::info!(
+                "{} - status: {}, collateral: {} FIL, circ.supply: {} FIL",
+                s.id,
+                s.status,
+                stake,
+                supply,
+            );
+        }
 
         Ok(())
     }

@@ -58,7 +58,10 @@ mod methods {
 /// The default gateway actor address
 const GATEWAY_ACTOR_ADDRESS: &str = "t064";
 /// The default state wait confidence value
-const STATE_WAIT_CONFIDENCE: u8 = 5;
+/// TODO: we can afford 2 epochs confidence (and even one)
+/// with Mir, but with Filecoin mainnet this should be increased
+/// in case there are reorgs.
+const STATE_WAIT_CONFIDENCE: u8 = 2;
 /// We dont set a limit on the look back epoch, i.e. check against latest block
 const STATE_WAIT_LOOK_BACK_NO_LIMIT: i8 = -1;
 /// We are not replacing any previous messages.
