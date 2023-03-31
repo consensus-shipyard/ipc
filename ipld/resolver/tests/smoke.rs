@@ -238,8 +238,63 @@ async fn single_bootstrap_publish_receive_vote() {
         .expect("timeout receiving vote")
         .expect("error receiving vote");
 
-    let Event::ReceivedVote(v) = event;
-    assert_eq!(&*v, vote.record());
+    if let Event::ReceivedVote(v) = event {
+        assert_eq!(&*v, vote.record());
+    } else {
+        panic!("unexpected {event:?}")
+    }
+}
+
+/// Start two agents, pin a subnet, publish preemptively and receive.
+#[tokio::test]
+async fn single_bootstrap_publish_receive_preemptive() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    // TODO: Get the seed from QuickCheck
+    let mut builder = ClusterBuilder::new(2);
+
+    // Build a cluster of nodes.
+    for i in 0..builder.size {
+        builder.add_node(if i == 0 { None } else { Some(0) });
+    }
+
+    // Start the swarms.
+    let mut cluster = builder.run();
+
+    // Wait a little for the cluster to connect.
+    // TODO: Wait on some condition instead of sleep.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Pin a subnet on the bootstrap node.
+    let subnet_id = make_subnet_id(1001);
+
+    cluster.agents[0]
+        .client
+        .pin_subnet(subnet_id.clone())
+        .expect("failed to pin subnet");
+
+    // TODO: Wait on some condition instead of sleep.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Publish some content from the other agent.
+    let data = vec![1, 2, 3];
+    cluster.agents[1]
+        .client
+        .publish_preemptive(subnet_id.clone(), data.clone())
+        .expect("failed to send vote");
+
+    // Receive pre-emptive data..
+    let event = timeout(Duration::from_secs(2), cluster.agents[0].events.recv())
+        .await
+        .expect("timeout receiving data")
+        .expect("error receiving data");
+
+    if let Event::ReceivedPreemptive(s, d) = event {
+        assert_eq!(s, subnet_id);
+        assert_eq!(d, data);
+    } else {
+        panic!("unexpected {event:?}")
+    }
 }
 
 fn make_service(config: Config) -> (Service<TestStoreParams>, TestBlockstore) {

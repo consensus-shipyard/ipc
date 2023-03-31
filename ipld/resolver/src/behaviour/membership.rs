@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -36,6 +36,8 @@ use super::NetworkConfig;
 const PUBSUB_MEMBERSHIP: &str = "/ipc/membership";
 /// `Gossipsub` topic identifier for voting about content.
 const PUBSUB_VOTES: &str = "/ipc/ipld/votes";
+/// `Gossipsub` topic identifier for pre-emptively published blocks of data.
+const PUBSUB_PREEMPTIVE: &str = "/ipc/ipld/pre-emptive";
 
 /// Events emitted by the [`membership::Behaviour`] behaviour.
 #[derive(Debug)]
@@ -53,6 +55,9 @@ pub enum Event {
 
     /// We received a [`VoteRecord`] in one of the subnets we are providing data for.
     ReceivedVote(Box<VoteRecord>),
+
+    /// We received preemptive data published in a subnet we were interested in.
+    ReceivedPreemptive(SubnetID, Vec<u8>),
 }
 
 /// Configuration for [`membership::Behaviour`].
@@ -97,6 +102,8 @@ pub struct Behaviour {
     subnet_ids: Vec<SubnetID>,
     /// Voting topics we are currently subscribed to.
     voting_topics: HashSet<TopicHash>,
+    /// Remember which subnet a topic was about.
+    preemptive_topics: HashMap<TopicHash, SubnetID>,
     /// Caching the latest state of subnet providers.
     provider_cache: SubnetProviderCache,
     /// Interval between publishing the currently supported subnets.
@@ -153,7 +160,10 @@ impl Behaviour {
         let mut interval = tokio::time::interval(mc.publish_interval);
         interval.reset();
 
-        Ok(Self {
+        // Not passing static subnets here; using pinning below instead so it subscribes as well
+        let provider_cache = SubnetProviderCache::new(mc.max_subnets, vec![]);
+
+        let mut membership = Self {
             inner: gossipsub,
             outbox: Default::default(),
             local_key: nc.local_key,
@@ -161,13 +171,48 @@ impl Behaviour {
             membership_topic,
             subnet_ids: Default::default(),
             voting_topics: Default::default(),
-            provider_cache: SubnetProviderCache::new(mc.max_subnets, mc.static_subnets),
+            preemptive_topics: Default::default(),
+            provider_cache,
             publish_interval: interval,
             min_time_between_publish: mc.min_time_between_publish,
             last_publish_timestamp: Timestamp::default(),
             next_publish_timestamp: Timestamp::now() + mc.publish_interval,
             max_provider_age: mc.max_provider_age,
-        })
+        };
+
+        for subnet_id in mc.static_subnets {
+            membership.pin_subnet(subnet_id)?;
+        }
+
+        Ok(membership)
+    }
+
+    /// Construct the topic used to gossip about pre-emptively published data.
+    ///
+    /// Replaces "/" with "_" to avoid clashes from prefix/suffix overlap.
+    fn preemptive_topic(&self, subnet_id: &SubnetID) -> Sha256Topic {
+        Topic::new(format!(
+            "{}/{}/{}",
+            PUBSUB_PREEMPTIVE,
+            self.network_name.replace('/', "_"),
+            subnet_id.to_string().replace('/', "_")
+        ))
+    }
+
+    /// Subscribe to a preemptive topic.
+    fn preemptive_subscribe(&mut self, subnet_id: SubnetID) -> Result<(), SubscriptionError> {
+        let topic = self.preemptive_topic(&subnet_id);
+        self.inner.subscribe(&topic)?;
+        self.preemptive_topics.insert(topic.hash(), subnet_id);
+        Ok(())
+    }
+
+    /// Subscribe to a preemptive topic.
+    fn preemptive_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
+        let topic = self.preemptive_topic(subnet_id);
+        self.inner.unsubscribe(&topic)?;
+        self.preemptive_topics.remove(&topic.hash());
+        Ok(())
     }
 
     /// Construct the topic used to gossip about votes.
@@ -183,18 +228,18 @@ impl Behaviour {
     }
 
     /// Subscribe to a voting topic.
-    fn voting_subscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
+    fn voting_subscribe(&mut self, subnet_id: &SubnetID) -> Result<(), SubscriptionError> {
         let topic = self.voting_topic(subnet_id);
-        self.voting_topics.insert(topic.hash());
         self.inner.subscribe(&topic)?;
+        self.voting_topics.insert(topic.hash());
         Ok(())
     }
 
     /// Unsubscribe from a voting topic.
     fn voting_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
         let topic = self.voting_topic(subnet_id);
-        self.voting_topics.remove(&topic.hash());
         self.inner.unsubscribe(&topic)?;
+        self.voting_topics.remove(&topic.hash());
         Ok(())
     }
 
@@ -237,18 +282,23 @@ impl Behaviour {
         self.publish_membership()
     }
 
-    /// Make sure a subnet is not pruned.
+    /// Make sure a subnet is not pruned, so we always track its providers.
+    /// Also subscribe to pre-emptively published blocks of data.
     ///
     /// This method could be called in a parent subnet when the ledger indicates
     /// there is a known child subnet, so we make sure this subnet cannot be
     /// crowded out during the initial phase of bootstrapping the network.
-    pub fn pin_subnet(&mut self, subnet_id: SubnetID) {
-        self.provider_cache.pin_subnet(subnet_id)
+    pub fn pin_subnet(&mut self, subnet_id: SubnetID) -> Result<(), SubscriptionError> {
+        self.preemptive_subscribe(subnet_id.clone())?;
+        self.provider_cache.pin_subnet(subnet_id);
+        Ok(())
     }
 
-    /// Make a subnet pruneable.
-    pub fn unpin_subnet(&mut self, subnet_id: &SubnetID) {
-        self.provider_cache.unpin_subnet(subnet_id)
+    /// Make a subnet pruneable and unsubscribe from pre-emptive data.
+    pub fn unpin_subnet(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
+        self.preemptive_unsubscribe(subnet_id)?;
+        self.provider_cache.unpin_subnet(subnet_id);
+        Ok(())
     }
 
     /// Send a message through Gossipsub to let everyone know about the current configuration.
@@ -275,6 +325,23 @@ impl Behaviour {
     pub fn publish_vote(&mut self, vote: SignedVoteRecord) -> anyhow::Result<()> {
         let topic = self.voting_topic(&vote.record().subnet_id);
         let data = vote.into_envelope().into_protobuf_encoding();
+        match self.inner.publish(topic, data) {
+            Err(e) => {
+                stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
+                Err(anyhow!(e))
+            }
+            Ok(_msg_id) => {
+                stats::MEMBERSHIP_PUBLISH_SUCCESS.inc();
+                Ok(())
+            }
+        }
+    }
+
+    /// Publish arbitrary data to the pre-emptive topic of a subnet.
+    ///
+    /// We are not expected to be subscribed to this topic, only agents on the parent subnet are.
+    pub fn publish_preemptive(&mut self, subnet_id: SubnetID, data: Vec<u8>) -> anyhow::Result<()> {
+        let topic = self.preemptive_topic(&subnet_id);
         match self.inner.publish(topic, data) {
             Err(e) => {
                 stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
@@ -339,6 +406,8 @@ impl Behaviour {
                     );
                 }
             }
+        } else if let Some(subnet_id) = self.preemptive_topics.get(&msg.topic) {
+            self.handle_preemptive_data(subnet_id.clone(), msg.data)
         } else {
             stats::MEMBERSHIP_UNKNOWN_TOPIC.inc();
             warn!(
@@ -378,6 +447,11 @@ impl Behaviour {
     /// Raise an event to tell we received a new vote.
     fn handle_vote_record(&mut self, record: VoteRecord) {
         self.outbox.push_back(Event::ReceivedVote(Box::new(record)))
+    }
+
+    fn handle_preemptive_data(&mut self, subnet_id: SubnetID, data: Vec<u8>) {
+        self.outbox
+            .push_back(Event::ReceivedPreemptive(subnet_id, data))
     }
 
     /// Handle new subscribers to the membership topic.

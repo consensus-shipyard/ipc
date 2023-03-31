@@ -81,8 +81,17 @@ impl Client {
         self.send_request(req)
     }
 
+    /// Publish a signed vote into a topic based on its subnet.
     pub fn publish_vote(&self, vote: SignedVoteRecord) -> anyhow::Result<()> {
         let req = Request::PublishVote(Box::new(vote));
+        self.send_request(req)
+    }
+
+    /// Publish pre-emptively to a subnet that agents in the parent subnet
+    /// would be subscribed to if they are interested in receiving data
+    /// before they would have to use [`Client::resolve`] instead.
+    pub fn publish_preemptive(&self, subnet_id: SubnetID, data: Vec<u8>) -> anyhow::Result<()> {
+        let req = Request::PublishPreemptive(subnet_id, data);
         self.send_request(req)
     }
 }
