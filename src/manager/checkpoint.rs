@@ -163,10 +163,6 @@ async fn manage_subnet((child, parent): (Subnet, Subnet), stop_notify: Arc<Notif
             })?;
         let period = state.check_period;
 
-        // We should have a way of knowing whether the validator has voted in the current open
-        // checkpoint epoch.
-        // TODO: Hook this up to the new IPC methods.
-
         // We can now start looping. In each loop we read the child subnet's chain head and check if
         // it's a checkpoint epoch. If it is, we construct and submit a checkpoint.
         loop {
@@ -372,9 +368,14 @@ async fn submit_checkpoint<T: JsonRpcClient + Send + Sync>(
     // wait for the checkpoint to be committed before moving on.
     let message_cid = mem_push_response.cid()?;
     log::debug!("checkpoint message published with cid: {message_cid:?}");
-    log::info!("waiting for checkpoint for epoch {epoch:} to be committed");
-    parent_client.state_wait_msg(message_cid).await?;
-    log::info!("successfully published checkpoint submission for epoch {epoch:}");
+
+    // TODO: Waiting for checkpoints to be committed may take too long for slow parent,
+    // making the checkpoint manager to fall behind. For now we are not going to
+    // wait for commitment. We can check with list-checkpoints the commitment state.
+    // This may be refactored in the future.
+    // log::info!("waiting for checkpoint for epoch {epoch:} to be committed");
+    // parent_client.state_wait_msg(message_cid).await?;
+    // log::info!("successfully published checkpoint submission for epoch {epoch:}");
 
     Ok(())
 }
