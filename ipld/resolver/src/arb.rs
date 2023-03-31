@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::{SubnetID, ROOTNET_ID};
+use libipld::{Cid, Multihash};
 use quickcheck::Arbitrary;
 
 /// Unfortunately an arbitrary `DelegatedAddress` can be inconsistent
@@ -31,5 +32,26 @@ impl Arbitrary for ArbSubnetID {
             parent = SubnetID::new_from_parent(&parent, addr);
         }
         Self(parent)
+    }
+}
+
+/// Unfortunately ref-fvm depends on cid:0.8.6, which depends on quickcheck:0.9
+/// whereas here we use quickcheck:1.0. This causes conflicts and the `Arbitrary`
+/// implementations for `Cid` are not usable to us, nor can we patch all `cid`
+/// dependencies to use 0.9 because then the IPLD and other FVM traits don't work.
+///
+/// TODO: Remove this module when the `cid` dependency is updated.
+///
+/// NOTE: This is based on the [simpler version](https://github.com/ChainSafe/forest/blob/v0.6.0/blockchain/blocks/src/lib.rs) in Forest.
+///       The original uses weighted distributions to generate more plausible CIDs.
+#[derive(Clone)]
+pub struct ArbCid(pub Cid);
+
+impl Arbitrary for ArbCid {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self(Cid::new_v1(
+            u64::arbitrary(g),
+            Multihash::wrap(u64::arbitrary(g), &[u8::arbitrary(g)]).unwrap(),
+        ))
     }
 }

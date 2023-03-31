@@ -19,17 +19,21 @@ use libp2p::{
 };
 use libp2p::{identify, ping};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use prometheus::Registry;
 use rand::seq::SliceRandom;
 use tokio::select;
+use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use tokio::sync::oneshot::{self, Sender};
 
 use crate::behaviour::{
     self, content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
     DiscoveryConfig, MembershipConfig, NetworkConfig,
 };
+use crate::client::Client;
 use crate::stats;
+use crate::vote_record::{SignedVoteRecord, VoteRecord};
 
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
@@ -65,6 +69,9 @@ pub struct ConnectionConfig {
     pub expected_peer_count: u32,
     /// Maximum number of peers to send Bitswap requests to in a single attempt.
     pub max_peers_per_query: u32,
+    /// Maximum number of events in the push-based broadcast channel before a slow
+    /// consumer gets an error because it's falling behind.
+    pub event_buffer_capacity: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -77,82 +84,24 @@ pub struct Config {
 }
 
 /// Internal requests to enqueue to the [`Service`]
-enum Request {
+pub(crate) enum Request {
     SetProvidedSubnets(Vec<SubnetID>),
     AddProvidedSubnet(SubnetID),
     RemoveProvidedSubnet(SubnetID),
+    PublishVote(Box<SignedVoteRecord>),
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
-    Resolve(Cid, SubnetID, oneshot::Sender<ResolveResult>),
+    Resolve(Cid, SubnetID, ResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
 
-/// A facade to the [`Service`] to provide a nicer interface than message passing would allow on its own.
-#[derive(Clone)]
-pub struct Client {
-    request_tx: tokio::sync::mpsc::UnboundedSender<Request>,
-}
-
-impl Client {
-    /// Send a request to the [`Service`], unless it has stopped listening.
-    fn send_request(&self, req: Request) -> anyhow::Result<()> {
-        self.request_tx
-            .send(req)
-            .map_err(|_| anyhow!("disconnected"))
-    }
-
-    /// Set the complete list of subnets currently supported by this node.
-    pub fn set_provided_subnets(&self, subnet_ids: Vec<SubnetID>) -> anyhow::Result<()> {
-        let req = Request::SetProvidedSubnets(subnet_ids);
-        self.send_request(req)
-    }
-
-    /// Add a subnet supported by this node.
-    pub fn add_provided_subnet(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
-        let req = Request::AddProvidedSubnet(subnet_id);
-        self.send_request(req)
-    }
-
-    /// Remove a subnet no longer supported by this node.
-    pub fn remove_provided_subnet(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
-        let req = Request::RemoveProvidedSubnet(subnet_id);
-        self.send_request(req)
-    }
-
-    /// Add a subnet we know really exist and we are interested in them.
-    pub fn pin_subnet(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
-        let req = Request::PinSubnet(subnet_id);
-        self.send_request(req)
-    }
-
-    /// Unpin a we are no longer interested in.
-    pub fn unpin_subnet(&self, subnet_id: SubnetID) -> anyhow::Result<()> {
-        let req = Request::UnpinSubnet(subnet_id);
-        self.send_request(req)
-    }
-
-    /// Send a CID for resolution from a specific subnet, await its completion,
-    /// then return the result, to be inspected by the caller.
-    ///
-    /// Upon success, the data should be found in the store.
-    pub async fn resolve(&self, cid: Cid, subnet_id: SubnetID) -> anyhow::Result<ResolveResult> {
-        let (tx, rx) = oneshot::channel();
-        let req = Request::Resolve(cid, subnet_id, tx);
-        self.send_request(req)?;
-        let res = rx.await?;
-        Ok(res)
-    }
-
-    /// Update the rate limit based on new projections for the same timeframe
-    /// the `content::Behaviour` was originally configured with. This can be
-    /// used if we can't come up with a good estimate for the amount of data
-    /// we have to serve from the subnets we participate in, but we can adjust
-    /// them on the fly based on what we observe on chain.
-    pub fn update_rate_limit(&self, bytes: u32) -> anyhow::Result<()> {
-        let req = Request::UpdateRateLimit(bytes);
-        self.send_request(req)
-    }
+/// Events that arise from the subnets, pushed to the clients,
+/// not part of a request-response action.
+#[derive(Clone, Debug)]
+pub enum Event {
+    /// Received a vote about in a subnet about a CID.
+    ReceivedVote(Box<VoteRecord>),
 }
 
 /// The `Service` handles P2P communication to resolve IPLD content by wrapping and driving a number of `libp2p` behaviours.
@@ -160,16 +109,23 @@ pub struct Service<P: StoreParams> {
     peer_id: PeerId,
     listen_addr: Multiaddr,
     swarm: Swarm<Behaviour<P>>,
+    /// To match finished queries to response channels.
     queries: QueryMap,
-    request_rx: tokio::sync::mpsc::UnboundedReceiver<Request>,
-    request_tx: tokio::sync::mpsc::UnboundedSender<Request>,
+    /// For receiving requests from the clients and self.
+    request_rx: mpsc::UnboundedReceiver<Request>,
+    /// For creating new clients and sending messages to self.
+    request_tx: mpsc::UnboundedSender<Request>,
+    /// For broadcasting events to all clients.
+    event_tx: broadcast::Sender<Event>,
+    /// To avoid looking up the same peer over and over.
     background_lookup_filter: BloomFilter,
+    /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
 }
 
 impl<P: StoreParams> Service<P> {
     /// Build a [`Service`] and a [`Client`] with the default `tokio` transport.
-    pub fn new<S>(config: Config, store: S) -> Result<(Self, Client), ConfigError>
+    pub fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
     where
         S: BitswapStore<Params = P>,
     {
@@ -183,7 +139,7 @@ impl<P: StoreParams> Service<P> {
         config: Config,
         store: S,
         transport: F,
-    ) -> Result<(Self, Client), ConfigError>
+    ) -> Result<Self, ConfigError>
     where
         S: BitswapStore<Params = P>,
         F: FnOnce(Keypair) -> Boxed<(PeerId, StreamMuxerBox)>,
@@ -213,29 +169,66 @@ impl<P: StoreParams> Service<P> {
             .connection_event_buffer_size(64)
             .build();
 
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let (request_tx, request_rx) = mpsc::unbounded_channel();
+        let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
         let service = Self {
             peer_id,
             listen_addr: config.connection.listen_addr,
             swarm,
             queries: Default::default(),
-            request_rx: rx,
-            request_tx: tx.clone(),
+            request_rx,
+            request_tx,
+            event_tx,
             background_lookup_filter: BloomFilter::with_rate(
                 0.1,
                 config.connection.expected_peer_count,
             ),
-            max_peers_per_query: config
-                .connection
-                .max_peers_per_query
-                .try_into()
-                .expect("u32 should be usize"),
+            max_peers_per_query: config.connection.max_peers_per_query as usize,
         };
 
-        let client = Client { request_tx: tx };
+        Ok(service)
+    }
 
-        Ok((service, client))
+    /// Create a new [`Client`] instance bound to this `Service`.
+    ///
+    /// The [`Client`] is geared towards request-response interactions,
+    /// while the `Receiver` returned by `subscribe` is used for events
+    /// which weren't initiated by the `Client`.
+    pub fn client(&self) -> Client {
+        Client::new(self.request_tx.clone())
+    }
+
+    /// Create a new [`broadcast::Receiver`] instance bound to this `Service`,
+    /// which will be notified upon each event coming from any of the subnets
+    /// the `Service` is subscribed to.
+    ///
+    /// The consumers are expected to process events quick enough to be within
+    /// the configured capacity of the broadcast channel, or otherwise be able
+    /// to deal with message loss if they fall behind.
+    ///
+    /// # Notes
+    ///
+    /// This is not part of the [`Client`] because `Receiver::recv` takes
+    /// a mutable reference and it would prevent the [`Client`] being used
+    /// for anything else.
+    ///
+    /// One alternative design would be to accept an interface similar to
+    /// [`BitswapStore`] that we can pass events to. In that case we would
+    /// have to create an internal event queue to stand in front of it,
+    /// and because these events arrive from the outside, it would still
+    /// have to have limited capacity.
+    ///
+    /// Because the channel has limited capacity, we have to take care not
+    /// to use it for signaling critical events that we want to await upon.
+    /// For example if we used this to signal the readiness of bootstrapping,
+    /// we should make sure we have not yet subscribed to external events
+    /// which could drown it out.
+    ///
+    /// One way to achieve this is for the consumer of the events to redistribute
+    /// them into priorities event queues, some bounded, some unbounded.
+    pub fn subscribe(&self) -> broadcast::Receiver<Event> {
+        self.event_tx.subscribe()
     }
 
     /// Register Prometheus metrics.
@@ -248,6 +241,7 @@ impl<P: StoreParams> Service<P> {
     /// Start the swarm listening for incoming connections and drive the events forward.
     pub async fn run(mut self) -> anyhow::Result<()> {
         // Start the swarm.
+        info!("running service on {}", self.listen_addr);
         Swarm::listen_on(&mut self.swarm, self.listen_addr.clone())?;
 
         loop {
@@ -360,6 +354,12 @@ impl<P: StoreParams> Service<P> {
             }
             membership::Event::Updated(_, _) => {}
             membership::Event::Removed(_) => {}
+            membership::Event::ReceivedVote(vote) => {
+                let event = Event::ReceivedVote(vote);
+                if self.event_tx.send(event).is_err() {
+                    debug!("dropped received vote because there are no subscribers")
+                }
+            }
         }
     }
 
@@ -408,6 +408,11 @@ impl<P: StoreParams> Service<P> {
             Request::RemoveProvidedSubnet(id) => {
                 if let Err(e) = self.membership_mut().remove_provided_subnet(id) {
                     warn!("failed to publish removed provided subnet: {e}")
+                }
+            }
+            Request::PublishVote(vote) => {
+                if let Err(e) = self.membership_mut().publish_vote(*vote) {
+                    warn!("failed to publish vote: {e}")
                 }
             }
             Request::PinSubnet(id) => self.membership_mut().pin_subnet(id),

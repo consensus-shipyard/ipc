@@ -5,7 +5,7 @@
 //!
 //! Run the tests as follows:
 //! ```ignore
-//! cargo test -p ipc_ipld_resolver --test smoke
+//! RUST_LOG=debug cargo test -p ipc_ipld_resolver --test smoke resolve
 //! ```
 
 // For inspiration on testing libp2p look at:
@@ -17,17 +17,24 @@
 // so we can leave the polling to the `Service` running in a `Task`, rather than do it from the test
 // (although these might be orthogonal).
 
-use std::time::Duration;
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use anyhow::anyhow;
+use fvm_ipld_encoding::IPLD_RAW;
 use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID};
 use ipc_ipld_resolver::{
-    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig,
-    NetworkConfig, Service,
+    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
+    NetworkConfig, Service, VoteRecord,
 };
 use ipc_sdk::subnet_id::{SubnetID, ROOTNET_ID};
-use libipld::Cid;
+use libipld::{
+    multihash::{Code, MultihashDigest},
+    Cid,
+};
 use libp2p::{
     core::{
         muxing::StreamMuxerBox,
@@ -43,15 +50,23 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 mod store;
 use store::*;
+use tokio::{sync::broadcast, time::timeout};
 
 struct Agent {
     config: Config,
     client: Client,
+    events: broadcast::Receiver<Event>,
     store: TestBlockstore,
 }
 
 struct Cluster {
     agents: Vec<Agent>,
+}
+
+impl Cluster {
+    pub fn size(&self) -> usize {
+        self.agents.len()
+    }
 }
 
 struct ClusterBuilder {
@@ -62,7 +77,15 @@ struct ClusterBuilder {
 }
 
 impl ClusterBuilder {
-    fn new(size: u32, seed: u64) -> Self {
+    fn new(size: u32) -> Self {
+        // Each port has to be unique, so each test must use a different seed.
+        // This is shared between all instances.
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let seed = COUNTER.fetch_add(1, Ordering::Relaxed);
+        Self::new_with_seed(size, seed)
+    }
+
+    fn new_with_seed(size: u32, seed: u64) -> Self {
         Self {
             size,
             rng: rand::rngs::StdRng::seed_from_u64(seed),
@@ -81,11 +104,14 @@ impl ClusterBuilder {
             addr
         });
         let config = make_config(&mut self.rng, self.size, bootstrap_addr);
-        let (service, client, store) = make_service(config.clone());
+        let (service, store) = make_service(config.clone());
+        let client = service.client();
+        let events = service.subscribe();
         self.services.push(service);
         self.agents.push(Agent {
             config,
             client,
+            events,
             store,
         });
     }
@@ -115,7 +141,7 @@ async fn single_bootstrap_single_provider_resolve_one() {
     let resolver_idx = 2;
 
     // TODO: Get the seed from QuickCheck
-    let mut builder = ClusterBuilder::new(cluster_size, 123456u64);
+    let mut builder = ClusterBuilder::new(cluster_size);
 
     // Build a cluster of nodes.
     for i in 0..builder.size {
@@ -159,10 +185,67 @@ async fn single_bootstrap_single_provider_resolve_one() {
     check_test_data(&mut cluster.agents[resolver_idx], &cid).expect("failed to resolve from store");
 }
 
-fn make_service(config: Config) -> (Service<TestStoreParams>, Client, TestBlockstore) {
+/// Start two agents, subscribe to the same subnet, publish and receive a vote.
+#[tokio::test]
+async fn single_bootstrap_publish_receive_vote() {
+    let _ = env_logger::builder().is_test(true).try_init();
+    //env_logger::init();
+
+    // TODO: Get the seed from QuickCheck
+    let mut builder = ClusterBuilder::new(2);
+
+    // Build a cluster of nodes.
+    for i in 0..builder.size {
+        builder.add_node(if i == 0 { None } else { Some(0) });
+    }
+
+    // Start the swarms.
+    let mut cluster = builder.run();
+
+    // Wait a little for the cluster to connect.
+    // TODO: Wait on some condition instead of sleep.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Announce the support of some subnet.
+    let subnet_id = make_subnet_id(1001);
+
+    for i in 0..cluster.size() {
+        cluster.agents[i]
+            .client
+            .add_provided_subnet(subnet_id.clone())
+            .expect("failed to add provided subnet");
+    }
+
+    // Wait a little for the gossip to spread and peer lookups to happen, then another round of gossip.
+    // TODO: Wait on some condition instead of sleep.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Vote on some random CID.
+    let validator_key = Keypair::generate_secp256k1();
+    let cid = Cid::new_v1(IPLD_RAW, Code::Sha2_256.digest(b"foo"));
+    let vote = VoteRecord::signed(&validator_key, subnet_id, cid, "finalized".into())
+        .expect("failed to sign vote");
+
+    // Pubilish vote
+    cluster.agents[0]
+        .client
+        .publish_vote(vote.clone())
+        .expect("failed to send vote");
+
+    // Receive vote.
+    let event = timeout(Duration::from_secs(2), cluster.agents[1].events.recv())
+        .await
+        .expect("timeout receiving vote")
+        .expect("error receiving vote");
+
+    let Event::ReceivedVote(v) = event;
+    assert_eq!(&*v, vote.record());
+}
+
+fn make_service(config: Config) -> (Service<TestStoreParams>, TestBlockstore) {
     let store = TestBlockstore::default();
-    let (svc, cli) = Service::new_with_transport(config, store.clone(), build_transport).unwrap();
-    (svc, cli, store)
+    let svc = Service::new_with_transport(config, store.clone(), build_transport).unwrap();
+    (svc, store)
 }
 
 fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multiaddr>) -> Config {
@@ -172,6 +255,7 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
             expected_peer_count: cluster_size,
             max_incoming: cluster_size,
             max_peers_per_query: cluster_size,
+            event_buffer_capacity: cluster_size,
         },
         network: NetworkConfig {
             local_key: Keypair::generate_secp256k1(),

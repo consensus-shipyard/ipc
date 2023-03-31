@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use ipc_sdk::subnet_id::SubnetID;
 use libp2p::PeerId;
 
-use crate::provider_record::{ProviderRecord, Timestamp};
+use crate::{provider_record::ProviderRecord, Timestamp};
 
 /// Change in the supported subnets of a peer.
 #[derive(Debug)]
@@ -215,10 +215,7 @@ mod tests {
     use quickcheck::Arbitrary;
     use quickcheck_macros::quickcheck;
 
-    use crate::{
-        arb::ArbSubnetID,
-        provider_record::{ProviderRecord, Timestamp},
-    };
+    use crate::{arb::ArbSubnetID, provider_record::ProviderRecord, Timestamp};
 
     use super::SubnetProviderCache;
 
