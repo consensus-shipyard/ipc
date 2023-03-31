@@ -5,7 +5,7 @@
 use crate::config::Subnet;
 use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
-use serde::de::{Error, SeqAccess};
+use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::fmt::Formatter;
@@ -84,25 +84,9 @@ pub(crate) fn deserialize_accounts<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    struct AddressSeqVisitor;
-    impl<'de> serde::de::Visitor<'de> for AddressSeqVisitor {
-        type Value = Vec<Address>;
-
-        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-            formatter.write_str("a sequence of strings")
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-        {
-            let mut vec: Vec<Address> = Vec::new();
-            while let Some(value) = seq.next_element::<String>()? {
-                let a = Address::from_str(value.as_str()).map_err(Error::custom)?;
-                vec.push(a);
-            }
-            Ok(vec)
-        }
-    }
-    deserializer.deserialize_str(AddressSeqVisitor)
+    let addrs: Result<Vec<Address>, _> = <Vec<String>>::deserialize(deserializer)?
+        .iter()
+        .map(|raw_addr| Address::from_str(raw_addr))
+        .collect();
+    addrs.map_err(D::Error::custom)
 }

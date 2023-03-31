@@ -123,7 +123,10 @@ fn check_subnets_config() {
     assert_eq!(child.auth_token.as_ref().unwrap(), CHILD_AUTH_TOKEN,);
     assert_eq!(
         child.accounts.as_ref(),
-        vec![Address::from_str(ACCOUNT_ADDRESS).unwrap()],
+        vec![
+            Address::from_str(ACCOUNT_ADDRESS).unwrap(),
+            Address::from_str(ACCOUNT_ADDRESS).unwrap()
+        ],
     );
 }
 
@@ -197,7 +200,7 @@ fn read_config() -> Config {
             gateway_addr = "{GATEWAY_ADDR}"
             jsonrpc_api_http = "{JSONRPC_API_HTTP}"
             auth_token = "{CHILD_AUTH_TOKEN}"
-            accounts = ["{ACCOUNT_ADDRESS}"]
+            accounts = ["{ACCOUNT_ADDRESS}", "{ACCOUNT_ADDRESS}"]
         "#
     );
 
