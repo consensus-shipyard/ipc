@@ -18,6 +18,7 @@ async fn main() {
           expected_peer_count: 1000,
           max_incoming: 25,
           max_peers_per_query: 10,
+          event_buffer_capacity: 100,
       },
       network: NetworkConfig {
           local_key: Keypair::generate_secp256k1(),
@@ -39,7 +40,8 @@ async fn main() {
 
   let store = todo!("implement BitswapStore and a Blockstore");
 
-  let (service, client) = Service::new(config, store.clone());
+  let service = Service::new(config, store.clone());
+  let client = service.client();
 
   tokio::task::spawn(async move { service.run().await });
 

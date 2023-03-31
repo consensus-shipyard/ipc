@@ -1,54 +1,15 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use std::ops::{Add, Sub};
-use std::time::{Duration, SystemTime};
 
-use fvm_ipld_encoding::serde::{Deserialize, Serialize};
 use ipc_sdk::subnet_id::SubnetID;
-use libipld::multihash;
-use libp2p::core::{signed_envelope, SignedEnvelope};
 use libp2p::identity::Keypair;
 use libp2p::PeerId;
+use serde::{Deserialize, Serialize};
 
-const DOMAIN_SEP: &str = "ipc-membership";
-const PAYLOAD_TYPE: &str = "/ipc/provider-record";
-
-/// Unix timestamp in seconds since epoch, which we can use to select the
-/// more recent message during gossiping.
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Debug, Serialize, Deserialize, Default)]
-pub struct Timestamp(u64);
-
-impl Timestamp {
-    /// Current timestamp.
-    pub fn now() -> Self {
-        let secs = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .expect("now() is never before UNIX_EPOCH")
-            .as_secs();
-        Self(secs)
-    }
-
-    /// Seconds elapsed since Unix epoch.
-    pub fn as_secs(&self) -> u64 {
-        self.0
-    }
-}
-
-impl Sub<Duration> for Timestamp {
-    type Output = Self;
-
-    fn sub(self, rhs: Duration) -> Self {
-        Self(self.as_secs().saturating_sub(rhs.as_secs()))
-    }
-}
-
-impl Add<Duration> for Timestamp {
-    type Output = Self;
-
-    fn add(self, rhs: Duration) -> Self {
-        Self(self.as_secs().saturating_add(rhs.as_secs()))
-    }
-}
+use crate::{
+    signed_record::{Record, SignedRecord},
+    Timestamp,
+};
 
 /// Record of the ability to provide data from a list of subnets.
 ///
@@ -76,21 +37,25 @@ pub struct ProviderRecord {
     pub timestamp: Timestamp,
 }
 
-/// A [`ProviderRecord`] with a [`SignedEnvelope`] proving that the
-/// peer indeed is ready to provide the data for the listed subnets.
-#[derive(Debug, Clone)]
-pub struct SignedProviderRecord {
-    /// The deserialized and validated [`ProviderRecord`].
-    record: ProviderRecord,
-    /// The [`SignedEnvelope`] from which the record was deserialized from.
-    envelope: SignedEnvelope,
+impl Record for ProviderRecord {
+    fn payload_type() -> &'static str {
+        "/ipc/provider-record"
+    }
+
+    fn check_signing_key(&self, key: &libp2p::identity::PublicKey) -> bool {
+        self.peer_id == key.to_peer_id()
+    }
 }
 
-// Based on `libp2p_core::peer_record::PeerRecord`
-impl SignedProviderRecord {
+pub type SignedProviderRecord = SignedRecord<ProviderRecord>;
+
+impl ProviderRecord {
     /// Create a new [`SignedProviderRecord`] with the current timestamp
     /// and a signed envelope which can be shared with others.
-    pub fn new(key: &Keypair, subnet_ids: Vec<SubnetID>) -> anyhow::Result<Self> {
+    pub fn signed(
+        key: &Keypair,
+        subnet_ids: Vec<SubnetID>,
+    ) -> anyhow::Result<SignedProviderRecord> {
         let timestamp = Timestamp::now();
         let peer_id = key.public().to_peer_id();
         let record = ProviderRecord {
@@ -98,59 +63,9 @@ impl SignedProviderRecord {
             subnet_ids,
             timestamp,
         };
-        let payload = fvm_ipld_encoding::to_vec(&record)?;
-        let envelope = SignedEnvelope::new(
-            key,
-            DOMAIN_SEP.to_owned(),
-            PAYLOAD_TYPE.as_bytes().to_vec(),
-            payload,
-        )?;
-        Ok(Self { record, envelope })
+        let signed = SignedRecord::new(key, record)?;
+        Ok(signed)
     }
-
-    pub fn from_signed_envelope(envelope: SignedEnvelope) -> Result<Self, FromEnvelopeError> {
-        let (payload, signing_key) =
-            envelope.payload_and_signing_key(DOMAIN_SEP.to_owned(), PAYLOAD_TYPE.as_bytes())?;
-
-        let record = fvm_ipld_encoding::from_slice::<ProviderRecord>(payload)?;
-
-        if record.peer_id != signing_key.to_peer_id() {
-            return Err(FromEnvelopeError::MismatchedSignature);
-        }
-
-        Ok(Self { record, envelope })
-    }
-
-    /// Deserialize then check the domain tags and the signature.
-    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
-        let envelope = SignedEnvelope::from_protobuf_encoding(bytes)?;
-        let signed_record = Self::from_signed_envelope(envelope)?;
-        Ok(signed_record)
-    }
-
-    pub fn into_record(self) -> ProviderRecord {
-        self.record
-    }
-
-    pub fn into_envelope(self) -> SignedEnvelope {
-        self.envelope
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum FromEnvelopeError {
-    /// Failed to extract the payload from the envelope.
-    #[error("Failed to extract payload from envelope")]
-    BadPayload(#[from] signed_envelope::ReadPayloadError),
-    /// Failed to decode the provided bytes as a [`ProviderRecord`].
-    #[error("Failed to decode bytes as ProviderRecord")]
-    InvalidProviderRecord(#[from] fvm_ipld_encoding::Error),
-    /// Failed to decode the peer ID.
-    #[error("Failed to decode bytes as PeerId")]
-    InvalidPeerId(#[from] multihash::Error),
-    /// The signer of the envelope is different than the peer id in the record.
-    #[error("The signer of the envelope is different than the peer id in the record")]
-    MismatchedSignature,
 }
 
 #[cfg(any(test, feature = "arb"))]
@@ -160,13 +75,7 @@ mod arb {
 
     use crate::arb::ArbSubnetID;
 
-    use super::{SignedProviderRecord, Timestamp};
-
-    impl Arbitrary for Timestamp {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            Self(u64::arbitrary(g).saturating_add(1))
-        }
-    }
+    use super::{ProviderRecord, SignedProviderRecord};
 
     /// Create a valid [`SignedProviderRecord`] with a random key.
     impl Arbitrary for SignedProviderRecord {
@@ -184,7 +93,7 @@ mod arb {
                 subnet_ids.push(subnet_id.0)
             }
 
-            Self::new(&key, subnet_ids).expect("error creating signed envelope")
+            ProviderRecord::signed(&key, subnet_ids).expect("error creating signed envelope")
         }
     }
 }
@@ -198,20 +107,12 @@ mod tests {
 
     #[quickcheck]
     fn prop_roundtrip(signed_record: SignedProviderRecord) -> bool {
-        let envelope_bytes = signed_record.envelope.into_protobuf_encoding();
-
-        let envelope =
-            SignedEnvelope::from_protobuf_encoding(&envelope_bytes).expect("envelope roundtrip");
-
-        let signed_record2 =
-            SignedProviderRecord::from_signed_envelope(envelope).expect("record roundtrip");
-
-        signed_record2.record == signed_record.record
+        crate::signed_record::tests::prop_roundtrip(signed_record)
     }
 
     #[quickcheck]
     fn prop_tamper_proof(signed_record: SignedProviderRecord, idx: usize) -> bool {
-        let mut envelope_bytes = signed_record.envelope.into_protobuf_encoding();
+        let mut envelope_bytes = signed_record.into_envelope().into_protobuf_encoding();
         // Do some kind of mutation to a random byte in the envelope; after that it should not validate.
         let idx = idx % envelope_bytes.len();
         envelope_bytes[idx] = u8::MAX - envelope_bytes[idx];

@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -10,7 +10,7 @@ use libp2p::core::connection::ConnectionId;
 use libp2p::gossipsub::error::SubscriptionError;
 use libp2p::gossipsub::{
     GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, IdentTopic, MessageAuthenticity,
-    MessageId, Topic, TopicHash,
+    MessageId, Sha256Topic, Topic, TopicHash,
 };
 use libp2p::identity::Keypair;
 use libp2p::swarm::derive_prelude::FromSwarm;
@@ -26,13 +26,16 @@ use tokio::time::{Instant, Interval};
 
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
-use crate::provider_record::{ProviderRecord, SignedProviderRecord, Timestamp};
-use crate::stats;
+use crate::provider_record::{ProviderRecord, SignedProviderRecord};
+use crate::vote_record::{SignedVoteRecord, VoteRecord};
+use crate::{stats, Timestamp};
 
 use super::NetworkConfig;
 
-/// `Gossipsub` subnet membership topic identifier.
+/// `Gossipsub` topic identifier for subnet membership.
 const PUBSUB_MEMBERSHIP: &str = "/ipc/membership";
+/// `Gossipsub` topic identifier for voting about content.
+const PUBSUB_VOTES: &str = "/ipc/ipld/votes";
 
 /// Events emitted by the [`membership::Behaviour`] behaviour.
 #[derive(Debug)]
@@ -47,6 +50,9 @@ pub enum Event {
     /// been told yet that the provider peer is routable. This event can be used
     /// to trigger a lookup by the discovery module to learn the address.
     Skipped(PeerId),
+
+    /// We received a [`VoteRecord`] in one of the subnets we are providing data for.
+    ReceivedVote(Box<VoteRecord>),
 }
 
 /// Configuration for [`membership::Behaviour`].
@@ -83,10 +89,14 @@ pub struct Behaviour {
     outbox: VecDeque<Event>,
     /// [`Keypair`] used to sign [`SignedProviderRecord`] instances.
     local_key: Keypair,
+    /// Name of the P2P network, used to separate `Gossipsub` topics.
+    network_name: String,
     /// Name of the [`Gossipsub`] topic where subnet memberships are published.
     membership_topic: IdentTopic,
     /// List of subnet IDs this agent is providing data for.
     subnet_ids: Vec<SubnetID>,
+    /// Voting topics we are currently subscribed to.
+    voting_topics: HashSet<TopicHash>,
     /// Caching the latest state of subnet providers.
     provider_cache: SubnetProviderCache,
     /// Interval between publishing the currently supported subnets.
@@ -147,8 +157,10 @@ impl Behaviour {
             inner: gossipsub,
             outbox: Default::default(),
             local_key: nc.local_key,
+            network_name: nc.network_name,
             membership_topic,
             subnet_ids: Default::default(),
+            voting_topics: Default::default(),
             provider_cache: SubnetProviderCache::new(mc.max_subnets, mc.static_subnets),
             publish_interval: interval,
             min_time_between_publish: mc.min_time_between_publish,
@@ -158,8 +170,49 @@ impl Behaviour {
         })
     }
 
+    /// Construct the topic used to gossip about votes.
+    ///
+    /// Replaces "/" with "_" to avoid clashes from prefix/suffix overlap.
+    fn voting_topic(&self, subnet_id: &SubnetID) -> Sha256Topic {
+        Topic::new(format!(
+            "{}/{}/{}",
+            PUBSUB_VOTES,
+            self.network_name.replace('/', "_"),
+            subnet_id.to_string().replace('/', "_")
+        ))
+    }
+
+    /// Subscribe to a voting topic.
+    fn voting_subscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
+        let topic = self.voting_topic(subnet_id);
+        self.voting_topics.insert(topic.hash());
+        self.inner.subscribe(&topic)?;
+        Ok(())
+    }
+
+    /// Unsubscribe from a voting topic.
+    fn voting_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
+        let topic = self.voting_topic(subnet_id);
+        self.voting_topics.remove(&topic.hash());
+        self.inner.unsubscribe(&topic)?;
+        Ok(())
+    }
+
     /// Set all the currently supported subnet IDs, then publish the updated list.
     pub fn set_provided_subnets(&mut self, subnet_ids: Vec<SubnetID>) -> anyhow::Result<()> {
+        let old_subnet_ids = std::mem::take(&mut self.subnet_ids);
+        // Unsubscribe from removed.
+        for subnet_id in old_subnet_ids.iter() {
+            if !subnet_ids.contains(subnet_id) {
+                self.voting_unsubscribe(subnet_id)?;
+            }
+        }
+        // Subscribe to added.
+        for subnet_id in subnet_ids.iter() {
+            if !old_subnet_ids.contains(subnet_id) {
+                self.voting_subscribe(subnet_id)?;
+            }
+        }
         self.subnet_ids = subnet_ids;
         self.publish_membership()
     }
@@ -169,6 +222,7 @@ impl Behaviour {
         if self.subnet_ids.contains(&subnet_id) {
             return Ok(());
         }
+        self.voting_subscribe(&subnet_id)?;
         self.subnet_ids.push(subnet_id);
         self.publish_membership()
     }
@@ -178,6 +232,7 @@ impl Behaviour {
         if !self.subnet_ids.contains(&subnet_id) {
             return Ok(());
         }
+        self.voting_unsubscribe(&subnet_id)?;
         self.subnet_ids.retain(|id| id != &subnet_id);
         self.publish_membership()
     }
@@ -198,7 +253,7 @@ impl Behaviour {
 
     /// Send a message through Gossipsub to let everyone know about the current configuration.
     fn publish_membership(&mut self) -> anyhow::Result<()> {
-        let record = SignedProviderRecord::new(&self.local_key, self.subnet_ids.clone())?;
+        let record = ProviderRecord::signed(&self.local_key, self.subnet_ids.clone())?;
         let data = record.into_envelope().into_protobuf_encoding();
         match self.inner.publish(self.membership_topic.clone(), data) {
             Err(e) => {
@@ -211,6 +266,22 @@ impl Behaviour {
                 self.next_publish_timestamp =
                     self.last_publish_timestamp + self.publish_interval.period();
                 self.publish_interval.reset(); // In case the change wasn't tiggered by the schedule.
+                Ok(())
+            }
+        }
+    }
+
+    /// Publish the vote of the validator running the agent about a CID to a subnet.
+    pub fn publish_vote(&mut self, vote: SignedVoteRecord) -> anyhow::Result<()> {
+        let topic = self.voting_topic(&vote.record().subnet_id);
+        let data = vote.into_envelope().into_protobuf_encoding();
+        match self.inner.publish(topic, data) {
+            Err(e) => {
+                stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
+                Err(anyhow!(e))
+            }
+            Ok(_msg_id) => {
+                stats::MEMBERSHIP_PUBLISH_SUCCESS.inc();
                 Ok(())
             }
         }
@@ -252,7 +323,18 @@ impl Behaviour {
                 Err(e) => {
                     stats::MEMBERSHIP_INVALID_MESSAGE.inc();
                     warn!(
-                        "Gossip message from peer {:?} could not be deserialized: {e}",
+                        "Gossip message from peer {:?} could not be deserialized as ProviderRecord: {e}",
+                        msg.source
+                    );
+                }
+            }
+        } else if self.voting_topics.contains(&msg.topic) {
+            match SignedVoteRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
+                Ok(record) => self.handle_vote_record(record),
+                Err(e) => {
+                    stats::MEMBERSHIP_INVALID_MESSAGE.inc();
+                    warn!(
+                        "Gossip message from peer {:?} could not be deserialized as VoteRecord: {e}",
                         msg.source
                     );
                 }
@@ -293,16 +375,15 @@ impl Behaviour {
         }
     }
 
+    /// Raise an event to tell we received a new vote.
+    fn handle_vote_record(&mut self, record: VoteRecord) {
+        self.outbox.push_back(Event::ReceivedVote(Box::new(record)))
+    }
+
     /// Handle new subscribers to the membership topic.
     fn handle_subscriber(&mut self, peer_id: PeerId, topic: TopicHash) {
         if topic == self.membership_topic.hash() {
             self.publish_for_new_peer(peer_id)
-        } else {
-            stats::MEMBERSHIP_UNKNOWN_TOPIC.inc();
-            warn!(
-                "unknown gossipsub topic in subscription from {}: {}",
-                peer_id, topic
-            )
         }
     }
 
