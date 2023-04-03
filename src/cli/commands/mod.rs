@@ -8,11 +8,11 @@ mod manager;
 
 use crate::cli::commands::config::{InitConfig, InitConfigArgs, ReloadConfig, ReloadConfigArgs};
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
-use crate::cli::commands::manager::create::{CreateSubnet, CreateSubnetArgs};
+pub use crate::cli::commands::manager::create::{CreateSubnet, CreateSubnetArgs};
 use crate::cli::commands::manager::fund::{Fund, FundArgs};
-use crate::cli::commands::manager::join::{JoinSubnet, JoinSubnetArgs};
-use crate::cli::commands::manager::kill::{KillSubnet, KillSubnetArgs};
-use crate::cli::commands::manager::leave::{LeaveSubnet, LeaveSubnetArgs};
+pub use crate::cli::commands::manager::join::{JoinSubnet, JoinSubnetArgs};
+pub use crate::cli::commands::manager::kill::{KillSubnet, KillSubnetArgs};
+pub use crate::cli::commands::manager::leave::{LeaveSubnet, LeaveSubnetArgs};
 use crate::cli::commands::manager::list_checkpoints::{ListCheckpoints, ListCheckpointsArgs};
 use crate::cli::commands::manager::list_subnets::{ListSubnets, ListSubnetsArgs};
 use crate::cli::commands::manager::net_addr::{SetValidatorNetAddr, SetValidatorNetAddrArgs};

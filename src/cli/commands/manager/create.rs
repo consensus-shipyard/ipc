@@ -14,15 +14,13 @@ use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::create::{CreateSubnetParams, CreateSubnetResponse};
 
 /// The command to create a new subnet actor.
-pub(crate) struct CreateSubnet;
+pub struct CreateSubnet;
 
-#[async_trait]
-impl CommandLineHandler for CreateSubnet {
-    type Arguments = CreateSubnetArgs;
-
-    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        log::debug!("create subnet with args: {:?}", arguments);
-
+impl CreateSubnet {
+    pub async fn create(
+        global: &GlobalArguments,
+        arguments: &CreateSubnetArgs,
+    ) -> anyhow::Result<String> {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
@@ -36,13 +34,24 @@ impl CommandLineHandler for CreateSubnet {
             check_period: arguments.check_period,
         };
 
-        let address = json_rpc_client
+        Ok(json_rpc_client
             .request::<CreateSubnetResponse>(
                 json_rpc_methods::CREATE_SUBNET,
                 serde_json::to_value(params)?,
             )
             .await?
-            .address;
+            .address)
+    }
+}
+
+#[async_trait]
+impl CommandLineHandler for CreateSubnet {
+    type Arguments = CreateSubnetArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("create subnet with args: {:?}", arguments);
+
+        let address = CreateSubnet::create(global, arguments).await?;
 
         log::info!(
             "created subnet actor with id: {}/{}",
@@ -56,7 +65,7 @@ impl CommandLineHandler for CreateSubnet {
 
 #[derive(Debug, Args)]
 #[command(about = "Create a new subnet actor")]
-pub(crate) struct CreateSubnetArgs {
+pub struct CreateSubnetArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that creates the subnet")]

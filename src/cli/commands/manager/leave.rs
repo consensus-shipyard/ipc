@@ -13,7 +13,7 @@ use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::leave::LeaveSubnetParams;
 
 /// The command to leave a new subnet.
-pub(crate) struct LeaveSubnet;
+pub struct LeaveSubnet;
 
 #[async_trait]
 impl CommandLineHandler for LeaveSubnet {
@@ -45,7 +45,7 @@ impl CommandLineHandler for LeaveSubnet {
 
 #[derive(Debug, Args)]
 #[command(about = "Leaving a subnet")]
-pub(crate) struct LeaveSubnetArgs {
+pub struct LeaveSubnetArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that leaves the subnet")]

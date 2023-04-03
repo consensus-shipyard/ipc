@@ -7,7 +7,7 @@ use clap::Args;
 mod commands;
 
 use crate::config::Config;
-pub use commands::cli;
+pub use commands::*;
 
 const DEFAULT_CONFIG_PATH: &str = ".ipc-agent/config.toml";
 
@@ -30,7 +30,7 @@ pub trait CommandLineHandler {
 }
 
 /// The global arguments that will be shared by all cli commands.
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Args, Clone, Default)]
 pub struct GlobalArguments {
     #[arg(
         short,

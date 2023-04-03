@@ -13,7 +13,7 @@ use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::kill::KillSubnetParams;
 
 /// The command to kill an existing subnet.
-pub(crate) struct KillSubnet;
+pub struct KillSubnet;
 
 #[async_trait]
 impl CommandLineHandler for KillSubnet {
@@ -42,7 +42,7 @@ impl CommandLineHandler for KillSubnet {
 
 #[derive(Debug, Args)]
 #[command(about = "Kill an existing subnet")]
-pub(crate) struct KillSubnetArgs {
+pub struct KillSubnetArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that kills the subnet")]

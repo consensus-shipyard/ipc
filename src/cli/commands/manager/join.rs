@@ -13,7 +13,7 @@ use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::join::JoinSubnetParams;
 
 /// The command to join a subnet
-pub(crate) struct JoinSubnet;
+pub struct JoinSubnet;
 
 #[async_trait]
 impl CommandLineHandler for JoinSubnet {
@@ -46,7 +46,7 @@ impl CommandLineHandler for JoinSubnet {
 
 #[derive(Debug, Args)]
 #[command(about = "Join a subnet")]
-pub(crate) struct JoinSubnetArgs {
+pub struct JoinSubnetArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that joins the subnet")]
