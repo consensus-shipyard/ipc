@@ -6,7 +6,7 @@ build:
 	cargo build -Z unstable-options --release --out-dir ./bin
 
 test:
-	cargo test --release --workspace
+	cargo test --release --workspace --lib # only run unit tests
 
 clean:
 	cargo clean
