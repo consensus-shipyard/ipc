@@ -149,52 +149,7 @@ The public key was spliced in as it was, in base64 format, which is how it would
 own genesis file format. Note that here we don't have the option to use `Address`, because we have to return
 these as actual `PublicKey` types to Tendermint through ABCI, not as a hash of a key.
 
-
-### Run the application
-
-Now we are ready to start our Fendermint _Application_, which will listen to requests coming from Tendermint
-through the ABCI interface.
-
-First, let's make sure we have put all the necessary files in an easy to remember place under `~/.fendermint`.
-
-```shell
-mkdir -p ~/.fendermint/data
-cp -r ./fendermint/app/config ~/.fendermint/config
-```
-
-We will need the actor bundle to load. We can configure its location via environment variables, but the default
-configuration will look for it at `~/.fendermint/bundle.car`, so we might as well put it there.
-
-```shell
-make actor-bundle
-cp ../builtin-actors/output/bundle.car ~/.fendermint/bundle.car
-```
-
-Now, start the application.
-
-```shell
-cargo run -p fendermint_app --release -- run
-```
-
-It is important to use the `--release` option, otherwise it will take too long to load the Wasm actor modules and
-Tendermint will issue a timeout (by default we have 3 seconds to execute requests).
-
-With the default `--log-level info` we can see that the application is listening:
-
-```console
-2023-03-29T09:17:28.548878Z  INFO fendermint::cmd: reading configuration path="/home/aakoshh/.fendermint/config"
-2023-03-29T09:17:28.549700Z  INFO fendermint::cmd::run: opening database path="/home/aakoshh/.fendermint/data/rocksdb"
-2023-03-29T09:17:28.879916Z  INFO tower_abci::server: starting ABCI server addr="127.0.0.1:26658"
-2023-03-29T09:17:28.880023Z  INFO tower_abci::server: bound tcp listener local_addr=127.0.0.1:26658
-```
-
-If we need to restart the application from scratch, we can do so by erasing all RocksDB state:
-
-```shell
-rm -rf ~/.fendermint/data/rocksdb
-```
-
-### Run Tendermint
+### Configure Tendermint
 
 First, follow the instructions in [getting started with Tendermint](./tendermint.md) to install the binary,
 then initialize a genesis file for Tendermint at `~/.tendermint`.
@@ -336,7 +291,55 @@ AiImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QE
 ```
 </details>
 
-#### Start Tendermint
+## Run processes
+
+The Fendermint Application and Tendermint Core will run as separate processes.
+
+### Run the Application
+
+Now we are ready to start our Fendermint Application, which will listen to requests coming from Tendermint
+through the ABCI interface.
+
+First, let's make sure we have put all the necessary files in an easy to remember place under `~/.fendermint`.
+
+```shell
+mkdir -p ~/.fendermint/data
+cp -r ./fendermint/app/config ~/.fendermint/config
+```
+
+We will need the actor bundle to load. We can configure its location via environment variables, but the default
+configuration will look for it at `~/.fendermint/bundle.car`, so we might as well put it there.
+
+```shell
+make actor-bundle
+cp ../builtin-actors/output/bundle.car ~/.fendermint/bundle.car
+```
+
+Now, start the application.
+
+```shell
+cargo run -p fendermint_app --release -- run
+```
+
+It is important to use the `--release` option, otherwise it will take too long to load the Wasm actor modules and
+Tendermint will issue a timeout (by default we have 3 seconds to execute requests).
+
+With the default `--log-level info` we can see that the application is listening:
+
+```console
+2023-03-29T09:17:28.548878Z  INFO fendermint::cmd: reading configuration path="/home/aakoshh/.fendermint/config"
+2023-03-29T09:17:28.549700Z  INFO fendermint::cmd::run: opening database path="/home/aakoshh/.fendermint/data/rocksdb"
+2023-03-29T09:17:28.879916Z  INFO tower_abci::server: starting ABCI server addr="127.0.0.1:26658"
+2023-03-29T09:17:28.880023Z  INFO tower_abci::server: bound tcp listener local_addr=127.0.0.1:26658
+```
+
+If we need to restart the application from scratch, we can do so by erasing all RocksDB state:
+
+```shell
+rm -rf ~/.fendermint/data/rocksdb
+```
+
+### Run Tendermint
 
 Tendermint can be configured via `~/.tendermint/config/config.toml`; see the default settings [here](https://docs.tendermint.com/v0.34/tendermint-core/configuration.html).
 
@@ -415,3 +418,49 @@ I[2023-03-30|12:51:42.618] indexed block                                module=t
 
 Note that the first block execution is very slow because we have to load the Wasm engine, as indicated by the first proposal having a timeout,
 but after that the blocks come in fast, one per second.
+
+
+## Query the state
+
+The Fendermint binary has some commands to support querying state. Behind the scenes it uses the `tendermint_rpc` crate to talk
+to the Tendermint JSON-RPC endpoints, which forward the requests to the Application through ABCI.
+
+Assuming both processes have been started, see if we can query the state of one of our actors. For this we need the actor address,
+which we saw in the `genesis.json` file earlier.
+
+```shell
+cargo run -p fendermint_app --release -- \
+  rpc query actor-state --address f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y
+```
+
+The state is printed to STDOUT as JSON:
+
+```console
+{
+  "id": 100,
+  "state": {
+    "balance": "1000000000000000000",
+    "code": "bafk2bzaceaqi73ey2grdtwgmnl22yj37l6pttsmrqnoc44o6wdqtt5rmpam6y",
+    "delegated_address": null,
+    "sequence": 0,
+    "state": "bafy2bzaceaayg22rmfjw5di7obchf2cdz3yydo32njavenej5uluf7hfatosi"
+  }
+}
+```
+
+What we see here is the general `ActorState` which contains the balance, the nonce, the Wasm code CID, and the state root hash of the
+actual actor implementation, which in this case is an `Account` actor.
+
+We can retrieve the raw state of the account with the `ipld` command:
+
+```shell
+cargo run -p fendermint_app --release -- \
+        rpc query ipld --cid bafy2bzaceaayg22rmfjw5di7obchf2cdz3yydo32njavenej5uluf7hfatosi
+```
+
+The binary contents are printed with Base64 encoding, which we could pipe to a file. It would be more useful to run this query
+programmatically and parse it to the appropriate data structure from the `builtin-actors` library.
+
+```console
+gVUBTCC2x6HvotYLfMWf9/0aWbf541s=
+```

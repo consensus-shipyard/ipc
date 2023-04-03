@@ -9,10 +9,32 @@ use crate::{
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
+use base64::engine::GeneralPurpose;
+use base64::engine::{DecodePaddingMode, GeneralPurposeConfig};
+use base64::{alphabet, Engine};
 
 pub mod genesis;
 pub mod key;
+pub mod rpc;
 pub mod run;
+
+/// A [`GeneralPurpose`] engine using the [`alphabet::STANDARD`] base64 alphabet
+/// padding bytes when writing but requireing no padding when reading.
+const B64_ENGINE: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::STANDARD,
+    GeneralPurposeConfig::new()
+        .with_encode_padding(true)
+        .with_decode_padding_mode(DecodePaddingMode::Indifferent),
+);
+
+/// Encode bytes in a format that the Genesis deserializer can handle.
+pub fn to_b64(bz: &[u8]) -> String {
+    B64_ENGINE.encode(bz)
+}
+
+pub fn from_b64(b64: &str) -> anyhow::Result<Vec<u8>> {
+    Ok(B64_ENGINE.decode(b64)?)
+}
 
 #[async_trait]
 pub trait Cmd {
@@ -72,6 +94,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
                 GenesisCommands::IntoTendermint(args) => args.exec(genesis_file),
             }
         }
+        Commands::Rpc(args) => args.exec(()),
     };
     fut.await
 }

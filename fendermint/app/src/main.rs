@@ -16,7 +16,11 @@ async fn main() {
 
     // Log events to stdout.
     if let Some(level) = opts.tracing_level() {
-        let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
+        // Writing to stderr so if we have output like JSON then we can pipe it to something else.
+        let subscriber = FmtSubscriber::builder()
+            .with_max_level(level)
+            .with_writer(std::io::stderr)
+            .finish();
 
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");

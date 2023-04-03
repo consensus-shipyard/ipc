@@ -2,27 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use base64::engine::GeneralPurpose;
-use base64::engine::{DecodePaddingMode, GeneralPurposeConfig};
-use base64::{alphabet, Engine};
 use libsecp256k1::{PublicKey, SecretKey};
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
+use super::{from_b64, to_b64};
 use crate::{
     cmd,
     options::key::{KeyGenArgs, KeyIntoTendermintArgs},
 };
-
-/// A [`GeneralPurpose`] engine using the [`alphabet::STANDARD`] base64 alphabet
-/// padding bytes when writing but requireing no padding when reading.
-pub const B64_ENGINE: GeneralPurpose = GeneralPurpose::new(
-    &alphabet::STANDARD,
-    GeneralPurposeConfig::new()
-        .with_encode_padding(true)
-        .with_decode_padding_mode(DecodePaddingMode::Indifferent),
-);
 
 cmd! {
   KeyGenArgs(self) {
@@ -65,11 +54,6 @@ cmd! {
   }
 }
 
-/// Encode bytes in a format that the Genesis deserializer can handle.
-fn to_b64(bz: &[u8]) -> String {
-    B64_ENGINE.encode(bz)
-}
-
 fn secret_to_b64(sk: &SecretKey) -> String {
     to_b64(&sk.serialize())
 }
@@ -85,7 +69,7 @@ fn b64_to_public(b64: &str) -> anyhow::Result<PublicKey> {
 }
 
 fn b64_to_secret(b64: &str) -> anyhow::Result<SecretKey> {
-    let bz = B64_ENGINE.decode(b64)?;
+    let bz = from_b64(b64)?;
     let sk = SecretKey::parse_slice(&bz)?;
     Ok(sk)
 }

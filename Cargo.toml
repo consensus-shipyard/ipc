@@ -16,7 +16,7 @@ async-trait = "0.1"
 async-stm = "0.2"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
-clap = { version = "4.1", features = ["derive"] }
+clap = { version = "4.1", features = ["derive", "env"] }
 config = "0.13"
 dirs = "5.0"
 futures = "0.3"
@@ -57,3 +57,4 @@ fvm_shared = { version = "3.1", features = ["crypto"] }
 # Tendermint dependencies are forked because we are building against 0.37 release candidates.
 tower-abci = { git = "https://github.com/consensus-shipyard/tower-abci.git", branch = "tendermint-v0.37" }
 tendermint = { git = "https://github.com/aakoshh/tendermint-rs.git", branch = "mikhail/multi-tc-version-support", features = ["secp256k1"] }
+tendermint-rpc = { git = "https://github.com/aakoshh/tendermint-rs.git", branch = "mikhail/multi-tc-version-support", features = ["secp256k1", "http-client"] }

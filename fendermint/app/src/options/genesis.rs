@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 
-use super::parse::*;
+use super::parse::{parse_network_version, parse_token_amount};
 use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
 
 #[derive(Subcommand, Debug)]

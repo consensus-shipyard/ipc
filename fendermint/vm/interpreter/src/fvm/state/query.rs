@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use anyhow::{anyhow, Context};
 
 use cid::Cid;
-use fendermint_vm_message::query::ActorState;
+use fendermint_vm_message::query::{ActorAddr, ActorState};
 use fvm::state_tree::StateTree;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID};
@@ -78,7 +78,7 @@ where
                         state: st.state,
                         sequence: st.sequence,
                         balance: st.balance,
-                        delegated_address: st.delegated_address,
+                        delegated_address: st.delegated_address.map(ActorAddr),
                     };
                     (id, st)
                 }))

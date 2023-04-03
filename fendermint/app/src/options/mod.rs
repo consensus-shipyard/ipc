@@ -7,10 +7,11 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::settings::expand_tilde;
 
-use self::{genesis::GenesisArgs, key::KeyArgs, run::RunArgs};
+use self::{genesis::GenesisArgs, key::KeyArgs, rpc::RpcArgs, run::RunArgs};
 
 pub mod genesis;
 pub mod key;
+pub mod rpc;
 pub mod run;
 
 mod parse;
@@ -62,6 +63,7 @@ impl Options {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Run the [`App`], listening to ABCI requests from Tendermint.
@@ -70,4 +72,6 @@ pub enum Commands {
     Key(KeyArgs),
     /// Subcommands related to the construction of Genesis files.
     Genesis(GenesisArgs),
+    /// Subcommands related to sending JSON-RPC commands/queries to Tendermint.
+    Rpc(RpcArgs),
 }
