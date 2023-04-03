@@ -4,7 +4,7 @@
 //! CLI command implementations.
 
 use crate::{
-    options::{genesis::GenesisCommands, key::KeyCommands, Commands, Options},
+    options::{Commands, Options},
     settings::Settings,
 };
 use anyhow::{anyhow, Context};
@@ -78,25 +78,12 @@ macro_rules! cmd {
 
 /// Execute the command specified in the options.
 pub async fn exec(opts: &Options) -> anyhow::Result<()> {
-    let fut = match &opts.command {
-        Commands::Run(args) => args.exec(settings(opts)?),
-        Commands::Key(sub) => match &sub.command {
-            KeyCommands::Gen(args) => args.exec(()),
-            KeyCommands::IntoTendermint(args) => args.exec(()),
-        },
-        Commands::Genesis(sub) => {
-            let genesis_file = sub.genesis_file.clone();
-            match &sub.command {
-                GenesisCommands::New(args) => args.exec(genesis_file),
-                GenesisCommands::AddAccount(args) => args.exec(genesis_file),
-                GenesisCommands::AddMultisig(args) => args.exec(genesis_file),
-                GenesisCommands::AddValidator(args) => args.exec(genesis_file),
-                GenesisCommands::IntoTendermint(args) => args.exec(genesis_file),
-            }
-        }
-        Commands::Rpc(args) => args.exec(()),
-    };
-    fut.await
+    match &opts.command {
+        Commands::Run(args) => args.exec(settings(opts)?).await,
+        Commands::Key(args) => args.exec(()).await,
+        Commands::Genesis(args) => args.exec(()).await,
+        Commands::Rpc(args) => args.exec(()).await,
+    }
 }
 
 /// Try to parse the settings in the configuration directory.

@@ -13,11 +13,24 @@ use fendermint_vm_genesis::{
 
 use crate::cmd;
 use crate::options::genesis::{
-    GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs,
-    GenesisIntoTendermintArgs, GenesisNewArgs,
+    GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs, GenesisArgs,
+    GenesisCommands, GenesisIntoTendermintArgs, GenesisNewArgs,
 };
 
 use super::key::read_public_key;
+
+cmd! {
+  GenesisArgs(self) {
+    let genesis_file = self.genesis_file.clone();
+    match &self.command {
+        GenesisCommands::New(args) => args.exec(genesis_file).await,
+        GenesisCommands::AddAccount(args) => args.exec(genesis_file).await,
+        GenesisCommands::AddMultisig(args) => args.exec(genesis_file).await,
+        GenesisCommands::AddValidator(args) => args.exec(genesis_file).await,
+        GenesisCommands::IntoTendermint(args) => args.exec(genesis_file).await,
+    }
+  }
+}
 
 cmd! {
   GenesisNewArgs(self, genesis_file: PathBuf) {

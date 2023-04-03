@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
+use fvm_shared::address::Address;
 use libsecp256k1::{PublicKey, SecretKey};
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use serde_json::json;
@@ -10,8 +11,18 @@ use std::path::{Path, PathBuf};
 use super::{from_b64, to_b64};
 use crate::{
     cmd,
-    options::key::{KeyGenArgs, KeyIntoTendermintArgs},
+    options::key::{KeyAddressArgs, KeyArgs, KeyCommands, KeyGenArgs, KeyIntoTendermintArgs},
 };
+
+cmd! {
+  KeyArgs(self) {
+    match &self.command {
+        KeyCommands::Gen(args) => args.exec(()).await,
+        KeyCommands::IntoTendermint(args) => args.exec(()).await,
+        KeyCommands::Address(args) => args.exec(()).await,
+    }
+  }
+}
 
 cmd! {
   KeyGenArgs(self) {
@@ -50,6 +61,15 @@ cmd! {
 
     std::fs::write(&self.out, json)?;
 
+    Ok(())
+  }
+}
+
+cmd! {
+  KeyAddressArgs(self) {
+    let pk = read_public_key(&self.public_key)?;
+    let addr = Address::new_secp256k1(&pk.serialize())?;
+    println!("{}", addr);
     Ok(())
   }
 }

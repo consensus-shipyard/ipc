@@ -448,7 +448,7 @@ The state is printed to STDOUT as JSON:
 }
 ```
 
-What we see here is the general `ActorState` which contains the balance, the nonce, the Wasm code CID, and the state root hash of the
+What we see here is the general [ActorState](https://github.com/filecoin-project/builtin-actors/blob/v10.0.0/actors/account/src/state.rs) which contains the balance, the nonce, the Wasm code CID, and the state root hash of the
 actual actor implementation, which in this case is an `Account` actor.
 
 We can retrieve the raw state of the account with the `ipld` command:
@@ -459,8 +459,70 @@ cargo run -p fendermint_app --release -- \
 ```
 
 The binary contents are printed with Base64 encoding, which we could pipe to a file. It would be more useful to run this query
-programmatically and parse it to the appropriate data structure from the `builtin-actors` library.
+programmatically and parse it to the appropriate data structure from [builtin-actors](https://github.com/filecoin-project/builtin-actors).
 
 ```console
 gVUBTCC2x6HvotYLfMWf9/0aWbf541s=
 ```
+
+## Transfer tokens
+
+The simplest transaction we can do is to transfer tokens from one account to another.
+
+For example we can send 1000 tokens from Alice to Bob:
+
+```shell
+BOB_ADDR=$(cargo run -p fendermint_app -- key address --public-key test-network/keys/bob.pk)
+cargo run -p fendermint_app -- \
+  rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 | jq
+```
+
+The `transfer` command waits for the commit results of the transaction:
+
+```console
+$ cargo run -p fendermint_app -- rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 | jq
+    Finished dev [unoptimized + debuginfo] target(s) in 0.40s
+     Running `target/debug/fendermint rpc transfer --secret-key test-network/keys/alice.sk --to f1kgtzp5nuob3gdccagivcgns7e25be2c2rqozilq --sequence 0 --value 1000`
+{
+  "check_tx": {
+    "code": 0,
+    "data": null,
+    "log": "",
+    "info": "",
+    "gas_wanted": "10000000000",
+    "gas_used": "0",
+    "events": [],
+    "codespace": "",
+    "sender": "f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y",
+    "priority": "0",
+    "mempool_error": ""
+  },
+  "deliver_tx": {
+    "code": 0,
+    "data": null,
+    "log": "",
+    "info": "",
+    "gas_wanted": "10000000000",
+    "gas_used": "1124863",
+    "events": [],
+    "codespace": ""
+  },
+  "hash": "01828E0A350445ED3E8028D045EE99B5547B6834DB7296B799B95707EB546EC2",
+  "height": "1107"
+}
+```
+
+The `code: 0` parts indicate that both check and delivery were successful. Let's check the resulting states:
+
+```
+$ target/release/fendermint rpc query actor-state --address $BOB_ADDR | jq .state.balance
+"1000"
+
+$ target/release/fendermint rpc query actor-state --address $(target/release/fendermint key address --public-key test-network/keys/alice.pk) | jq "{balance: .state.balance, sequence: .state.sequence}"
+{
+  "balance": "999999999999999000",
+  "sequence": 1
+}
+```
+
+Great, Alice's nonce was correctly increased as well.

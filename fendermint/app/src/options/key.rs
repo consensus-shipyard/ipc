@@ -11,6 +11,8 @@ pub enum KeyCommands {
     Gen(KeyGenArgs),
     /// Convert a secret key file from base64 into the format expected by Tendermint.
     IntoTendermint(KeyIntoTendermintArgs),
+    /// Convert a public key file from base64 into an f1 Address format an print it to STDOUT.
+    Address(KeyAddressArgs),
 }
 
 #[derive(Args, Debug)]
@@ -37,4 +39,11 @@ pub struct KeyIntoTendermintArgs {
     /// Output file name for the Tendermint private validator key JSON file.
     #[arg(long, short)]
     pub out: PathBuf,
+}
+
+#[derive(Args, Debug)]
+pub struct KeyAddressArgs {
+    /// Path to the public key we want to convert to f1 format.
+    #[arg(long, short)]
+    pub public_key: PathBuf,
 }
