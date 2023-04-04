@@ -7,8 +7,6 @@ use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::ActorState;
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_shared::address::Address;
-use fvm_shared::crypto::signature::SECP_SIG_LEN;
-use fvm_shared::crypto::signature::{Signature, SignatureType};
 use fvm_shared::{ActorID, METHOD_SEND};
 use libsecp256k1::PublicKey;
 use serde::Serialize;
@@ -130,12 +128,7 @@ fn transaction_payload(
         gas_fee_cap: args.gas_fee_cap.clone(),
         gas_premium: args.gas_premium.clone(),
     };
-    let cid = SignedMessage::cid(&message)?;
-    let signature = Signature {
-        sig_type: SignatureType::Secp256k1,
-        bytes: secp_sign(&sk, &cid.to_bytes()).to_vec(),
-    };
-    let signed = SignedMessage { message, signature };
+    let signed = SignedMessage::new_secp256k1(message, &sk)?;
     let chain = ChainMessage::Signed(Box::new(signed));
     let data = fvm_ipld_encoding::to_vec(&chain)?;
     Ok(data)
@@ -207,22 +200,4 @@ fn http_client(url: Url, proxy_url: Option<Url>) -> anyhow::Result<HttpClient> {
         }
     };
     Ok(client)
-}
-
-fn secp_sign(sk: &libsecp256k1::SecretKey, data: &[u8]) -> [u8; SECP_SIG_LEN] {
-    let hash: [u8; 32] = blake2b_simd::Params::new()
-        .hash_length(32)
-        .to_state()
-        .update(data)
-        .finalize()
-        .as_bytes()
-        .try_into()
-        .unwrap();
-
-    let (sig, recovery_id) = libsecp256k1::sign(&libsecp256k1::Message::parse(&hash), sk);
-
-    let mut signature = [0u8; SECP_SIG_LEN];
-    signature[..64].copy_from_slice(&sig.serialize());
-    signature[64] = recovery_id.serialize();
-    signature
 }

@@ -49,6 +49,20 @@ impl SignedMessage {
         Ok(SignedMessage { message, signature })
     }
 
+    /// Create a signed message.
+    #[cfg(feature = "secp256k1")]
+    pub fn new_secp256k1(
+        message: Message,
+        sk: &libsecp256k1::SecretKey,
+    ) -> Result<Self, fvm_ipld_encoding::Error> {
+        let cid = Self::cid(&message)?;
+        let signature = Signature {
+            sig_type: SignatureType::Secp256k1,
+            bytes: sign_secp256k1(sk, &cid.to_bytes()).to_vec(),
+        };
+        Ok(Self { message, signature })
+    }
+
     /// Calculate the CID of an FVM message.
     pub fn cid(message: &Message) -> Result<Cid, fvm_ipld_encoding::Error> {
         crate::cid(message)
@@ -94,6 +108,28 @@ impl SignedMessage {
     pub fn is_secp256k1(&self) -> bool {
         self.signature.signature_type() == SignatureType::Secp256k1
     }
+}
+
+#[cfg(feature = "secp256k1")]
+fn sign_secp256k1(
+    sk: &libsecp256k1::SecretKey,
+    data: &[u8],
+) -> [u8; fvm_shared::crypto::signature::SECP_SIG_LEN] {
+    let hash: [u8; 32] = blake2b_simd::Params::new()
+        .hash_length(32)
+        .to_state()
+        .update(data)
+        .finalize()
+        .as_bytes()
+        .try_into()
+        .unwrap();
+
+    let (sig, recovery_id) = libsecp256k1::sign(&libsecp256k1::Message::parse(&hash), sk);
+
+    let mut signature = [0u8; fvm_shared::crypto::signature::SECP_SIG_LEN];
+    signature[..64].copy_from_slice(&sig.serialize());
+    signature[64] = recovery_id.serialize();
+    signature
 }
 
 /// Signed message with an invalid random signature.

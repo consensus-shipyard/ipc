@@ -1337,7 +1337,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.21.0",
- "blake2b_simd",
  "cid",
  "clap 4.1.13",
  "config 0.13.3",
@@ -1478,12 +1477,14 @@ name = "fendermint_vm_message"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "blake2b_simd",
  "cid",
  "fendermint_testing",
  "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
+ "libsecp256k1",
  "num-traits",
  "quickcheck 1.0.3",
  "quickcheck_macros",

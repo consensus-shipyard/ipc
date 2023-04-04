@@ -16,6 +16,9 @@ cid = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 
+libsecp256k1 = { workspace = true, optional = true }
+blake2b_simd = { workspace = true, optional = true }
+
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
@@ -35,5 +38,6 @@ fendermint_vm_message = { path = ".", features = ["arb"] }
 fendermint_testing = { path = "../../testing", features = ["golden"] }
 
 [features]
-default = []
+default = ["secp256k1"]
 arb = ["arbitrary", "quickcheck", "fvm_shared/arb", "cid/arb", "rand", "fendermint_testing/arb"]
+secp256k1 = ["libsecp256k1", "blake2b_simd"]
