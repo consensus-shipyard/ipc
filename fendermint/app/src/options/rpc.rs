@@ -43,19 +43,32 @@ pub enum RpcCommands {
     },
     /// Transfer tokens between accounts.
     Transfer {
+        /// Address of the actor to send the message to.
+        #[arg(long, short, value_parser = parse_address)]
+        to: Address,
         #[command(flatten)]
         args: TransArgs,
     },
     /// Send a message (a.k.a. transaction) to an actor.
     Transact {
-        #[command(flatten)]
-        args: TransArgs,
+        /// Address of the actor to send the message to.
+        #[arg(long, short, value_parser = parse_address)]
+        to: Address,
         /// Method number to invoke on the actor.
         #[arg(long, short)]
         method_number: MethodNum,
         /// Raw IPLD byte parameters to pass to the method, in hexadecimal format.
         #[arg(long, short, value_parser = parse_raw_bytes)]
         params: RawBytes,
+        #[command(flatten)]
+        args: TransArgs,
+    },
+    /// Subcommands related to FEVM.
+    Fevm {
+        #[command(subcommand)]
+        command: RpcFevmCommands,
+        #[command(flatten)]
+        args: TransArgs,
     },
 }
 
@@ -75,18 +88,28 @@ pub enum RpcQueryCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+pub enum RpcFevmCommands {
+    /// Deploy an EVM contract from source; print the results as JSON.
+    Create {
+        /// Path to a compiled Solidity contract, expected to be in hexadecimal format.
+        #[arg(long, short)]
+        contract: PathBuf,
+        /// ABI encoded constructor arguments passed to the EVM, expected to be in hexadecimal format.
+        #[arg(long, short, value_parser = parse_raw_bytes, default_value = "")]
+        constructor_args: RawBytes,
+    },
+}
+
 /// Arguments common to transactions and transfers.
 #[derive(Args, Debug)]
 pub struct TransArgs {
-    /// Path to the secret key of the sender to sign the transaction.
-    #[arg(long, short)]
-    pub secret_key: PathBuf,
-    /// Address of the actor to send the message to.
-    #[arg(long, short, value_parser = parse_address)]
-    pub to: Address,
     /// Amount of tokens to send, in atto.
     #[arg(long, short, value_parser = parse_token_amount, default_value = "0")]
     pub value: TokenAmount,
+    /// Path to the secret key of the sender to sign the transaction.
+    #[arg(long, short)]
+    pub secret_key: PathBuf,
     /// Sender account nonce.
     #[arg(long, short = 'n')]
     pub sequence: u64,

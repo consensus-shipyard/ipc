@@ -1409,6 +1409,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.21.0",
+ "bytes",
  "cid",
  "clap 4.2.1",
  "config 0.13.3",
@@ -1416,6 +1417,7 @@ dependencies = [
  "fendermint_abci",
  "fendermint_rocksdb",
  "fendermint_storage",
+ "fendermint_vm_actor_interface",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
@@ -1501,6 +1503,7 @@ dependencies = [
  "fvm_shared",
  "paste",
  "serde",
+ "serde_tuple",
 ]
 
 [[package]]

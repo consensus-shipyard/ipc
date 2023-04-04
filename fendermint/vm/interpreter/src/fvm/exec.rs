@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use fendermint_vm_actor_interface::{cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::BLOCK_GAS_LIMIT;
+use fvm_shared::{address::Address, MethodNum, BLOCK_GAS_LIMIT};
 
 use crate::ExecInterpreter;
 
@@ -18,6 +18,9 @@ use super::{state::FvmExecState, FvmMessage, FvmMessageInterpreter};
 /// a field, we might just have a CID.
 pub struct FvmApplyRet {
     pub apply_ret: ApplyRet,
+    pub from: Address,
+    pub to: Address,
+    pub method_num: MethodNum,
     pub gas_limit: u64,
 }
 
@@ -47,13 +50,16 @@ where
         // Arbitrarily large gas limit for cron (matching how Forest does it, which matches Lotus).
         // XXX: Our blocks are not necessarily expected to be 30 seconds apart, so the gas limit might be wrong.
         let gas_limit = BLOCK_GAS_LIMIT * 10000;
+        let from = system::SYSTEM_ACTOR_ADDR;
+        let to = cron::CRON_ACTOR_ADDR;
+        let method_num = cron::Method::EpochTick as u64;
         // Cron.
         let msg = FvmMessage {
-            from: system::SYSTEM_ACTOR_ADDR,
-            to: cron::CRON_ACTOR_ADDR,
+            from,
+            to,
             sequence: height as u64,
             gas_limit,
-            method_num: cron::Method::EpochTick as u64,
+            method_num,
             params: Default::default(),
             value: Default::default(),
             version: Default::default(),
@@ -70,6 +76,9 @@ where
 
         let ret = FvmApplyRet {
             apply_ret,
+            from,
+            to,
+            method_num,
             gas_limit,
         };
 
@@ -81,12 +90,18 @@ where
         mut state: Self::State,
         msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
+        let from = msg.from;
+        let to = msg.to;
+        let method_num = msg.method_num;
         let gas_limit = msg.gas_limit;
 
         let apply_ret = state.execute_explicit(msg)?;
 
         let ret = FvmApplyRet {
             apply_ret,
+            from,
+            to,
+            method_num,
             gas_limit,
         };
 

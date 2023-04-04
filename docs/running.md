@@ -514,7 +514,7 @@ $ cargo run -p fendermint_app -- rpc transfer --secret-key test-network/keys/ali
 
 The `code: 0` parts indicate that both check and delivery were successful. Let's check the resulting states:
 
-```
+```console
 $ target/release/fendermint rpc query actor-state --address $BOB_ADDR | jq .state.balance
 "1000"
 
@@ -526,3 +526,36 @@ $ target/release/fendermint rpc query actor-state --address $(target/release/fen
 ```
 
 Great, Alice's nonce was correctly increased as well.
+
+
+## Deploy FEVM Contract
+
+When we want to deploy a smart contract to the FVM, the currently supported way is by deploying EVM contracts to FEVM.
+
+First, we need the `solc` compiler to produce the binaries we want deployed; take a look at the [test contracts](https://github.com/filecoin-project/builtin-actors/tree/next/actors/evm/tests/contracts) in the `builtin-actors` repo for example.
+
+Say we want to deploy the `SimpleCoin` contract from that directory.
+
+```shell
+CONTRACT=../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin
+cargo run -p fendermint_app --release -- \
+  rpc fevm --secret-key test-network/keys/alice.sk --sequence 0 \
+    create --contract $CONTRACT
+```
+
+The output shows what addresses have been assigned to the created contract,
+which we can use to call the contract.
+
+```console
+$ cargo run -p fendermint_app --release -- \
+        rpc fevm --secret-key test-network/keys/alice.sk --sequence 0 \
+          create --contract $CONTRACT | jq .return_data
+{
+  "actor_address": "f0105",
+  "actor_id": 105,
+  "actor_id_as_eth_address": "ff00000000000000000000000000000000000069",
+  "delegated_address": "f410fsho763qmlcfi6ufnim7sujmbaqyc64b3pzpa7bq",
+  "eth_address": "91ddff6e0c588a8f50ad433f2a258104302f703b",
+  "robust_address": "f2rd3cu2jokusukudmbwotuu4rvoebm45qnze7e6q"
+}
+```

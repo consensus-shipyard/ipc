@@ -76,6 +76,7 @@ where
     }
 
     pub fn execute_message(&mut self, msg: Message, kind: ApplyKind) -> anyhow::Result<ApplyRet> {
+        // TODO: We could preserve the message length by changing the input type.
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
         self.executor.execute_message(msg, kind, raw_length)
     }

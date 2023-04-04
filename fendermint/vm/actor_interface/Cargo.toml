@@ -12,6 +12,7 @@ license.workspace = true
 anyhow = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
+serde_tuple = { workspace = true }
 
 cid = { workspace = true }
 fvm_shared = { workspace = true }

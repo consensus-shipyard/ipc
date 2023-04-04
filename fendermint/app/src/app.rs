@@ -465,7 +465,15 @@ where
                 ChainMessageApplyRet::Signed(Err(InvalidSignature(d))) => {
                     invalid_deliver_tx(AppError::InvalidSignature, d)
                 }
-                ChainMessageApplyRet::Signed(Ok(ret)) => to_deliver_tx(ret),
+                ChainMessageApplyRet::Signed(Ok(ret)) => {
+                    tracing::info!(
+                        from = ret.from.to_string(),
+                        to = ret.to.to_string(),
+                        method_num = ret.method_num,
+                        "tx delivered"
+                    );
+                    to_deliver_tx(ret)
+                }
             },
         };
 

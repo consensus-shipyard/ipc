@@ -60,14 +60,18 @@ pub fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     let gas_wanted: i64 = ret.gas_limit.try_into().unwrap_or(i64::MAX);
     let gas_used: i64 = receipt.gas_used.try_into().unwrap_or(i64::MAX);
 
-    let data = receipt.return_data.to_vec().into();
+    let data: bytes::Bytes = receipt.return_data.to_vec().into();
     let events = to_events("message", ret.apply_ret.events);
 
     response::DeliverTx {
         code,
         data,
         log: Default::default(),
-        info: Default::default(),
+        info: ret
+            .apply_ret
+            .failure_info
+            .map(|i| i.to_string())
+            .unwrap_or_default(),
         gas_wanted,
         gas_used,
         events,
