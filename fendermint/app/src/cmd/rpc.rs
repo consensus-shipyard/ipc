@@ -6,8 +6,9 @@ use fendermint_vm_interpreter::fvm::{FvmMessage, FvmQuery};
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::ActorState;
 use fendermint_vm_message::signed::SignedMessage;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
-use fvm_shared::{ActorID, METHOD_SEND};
+use fvm_shared::{ActorID, MethodNum, METHOD_SEND};
 use libsecp256k1::PublicKey;
 use serde::Serialize;
 use serde_json::json;
@@ -36,6 +37,9 @@ cmd! {
       },
       RpcCommands::Transfer { args } => {
         transfer(client, args).await
+      },
+      RpcCommands::Transact { args, method_number, params } => {
+        transact(client, args, *method_number, params.clone()).await
       }
     }
   }
@@ -81,6 +85,17 @@ async fn transfer(client: HttpClient, args: &TransArgs) -> anyhow::Result<()> {
     broadcast_and_print(client, data, args.broadcast_mode).await
 }
 
+/// Execute a transaction through RPC and print the response to STDOUT as JSON.
+async fn transact(
+    client: HttpClient,
+    args: &TransArgs,
+    method_num: MethodNum,
+    params: RawBytes,
+) -> anyhow::Result<()> {
+    let data = transaction_payload(args, method_num, params)?;
+    broadcast_and_print(client, data, args.broadcast_mode).await
+}
+
 /// Broadcast a transaction to tendermint and print the results to STDOUT as JSON.
 async fn broadcast_and_print(
     client: HttpClient,
@@ -110,7 +125,7 @@ fn transfer_payload(args: &TransArgs) -> anyhow::Result<Vec<u8>> {
 /// Construct transaction payload.
 fn transaction_payload(
     args: &TransArgs,
-    method_num: u64,
+    method_num: MethodNum,
     params: fvm_ipld_encoding::RawBytes,
 ) -> anyhow::Result<Vec<u8>> {
     let sk = read_secret_key(&args.secret_key)?;

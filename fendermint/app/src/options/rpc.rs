@@ -5,10 +5,11 @@ use std::path::PathBuf;
 
 use cid::Cid;
 use clap::{Args, Subcommand, ValueEnum};
-use fvm_shared::{address::Address, econ::TokenAmount};
+use fvm_ipld_encoding::RawBytes;
+use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use tendermint_rpc::Url;
 
-use crate::options::parse::{parse_address, parse_cid, parse_token_amount};
+use crate::options::parse::{parse_address, parse_cid, parse_raw_bytes, parse_token_amount};
 
 #[derive(Args, Debug)]
 pub struct RpcArgs {
@@ -44,6 +45,17 @@ pub enum RpcCommands {
     Transfer {
         #[command(flatten)]
         args: TransArgs,
+    },
+    /// Send a message (a.k.a. transaction) to an actor.
+    Transact {
+        #[command(flatten)]
+        args: TransArgs,
+        /// Method number to invoke on the actor.
+        #[arg(long, short)]
+        method_number: MethodNum,
+        /// Raw IPLD byte parameters to pass to the method, in hexadecimal format.
+        #[arg(long, short, value_parser = parse_raw_bytes)]
+        params: RawBytes,
     },
 }
 

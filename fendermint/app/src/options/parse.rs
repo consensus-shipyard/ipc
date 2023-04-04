@@ -4,6 +4,7 @@
 use std::str::FromStr;
 
 use cid::Cid;
+use fvm_ipld_encoding::RawBytes;
 use num_traits::Num;
 
 use fvm_shared::{
@@ -41,4 +42,11 @@ pub fn parse_address(s: &str) -> Result<Address, String> {
         _ => (),
     }
     Address::from_str(s).map_err(|e| format!("error parsing address: {e}"))
+}
+
+pub fn parse_raw_bytes(s: &str) -> Result<RawBytes, String> {
+    match hex::decode(s) {
+        Ok(bz) => Ok(RawBytes::from(bz)),
+        Err(e) => Err(format!("error parsing raw bytes as hex: {e}")),
+    }
 }
