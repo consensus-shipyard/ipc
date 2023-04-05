@@ -528,7 +528,7 @@ $ target/release/fendermint rpc query actor-state --address $(target/release/fen
 Great, Alice's nonce was correctly increased as well.
 
 
-## Deploy FEVM Contract
+## Create FEVM Contract
 
 When we want to deploy a smart contract to the FVM, the currently supported way is by deploying EVM contracts to FEVM.
 
@@ -558,4 +558,17 @@ $ cargo run -p fendermint_app --release -- \
   "eth_address": "91ddff6e0c588a8f50ad433f2a258104302f703b",
   "robust_address": "f2rd3cu2jokusukudmbwotuu4rvoebm45qnze7e6q"
 }
+```
+
+## Invoke FEVM Contract
+
+Now taht we have a contract deployed, we can call it. The following is just based on on the example in [fvm-bench](https://github.com/filecoin-project/fvm-bench). Normally we'd try to
+
+```console
+$ cargo run -p fendermint_app --release -- \
+              rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
+                invoke --contract f410fsho763qmlcfi6ufnim7sujmbaqyc64b3pzpa7bq  \
+                       --method f8b2cb4f --method-args 000000000000000000000000ff00000000000000000000000000000000000064 \
+          | jq .return_data
+"0000000000000000000000000000000000000000000000000000000000002710"
 ```

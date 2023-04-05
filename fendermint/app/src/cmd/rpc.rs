@@ -7,11 +7,12 @@ use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn};
+use fendermint_vm_actor_interface::evm;
 use fendermint_vm_interpreter::fvm::{FvmMessage, FvmQuery};
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::ActorState;
 use fendermint_vm_message::signed::SignedMessage;
-use fvm_ipld_encoding::{BytesSer, RawBytes};
+use fvm_ipld_encoding::{BytesDe, BytesSer, RawBytes};
 use fvm_shared::address::Address;
 use fvm_shared::{ActorID, MethodNum, METHOD_SEND};
 use libsecp256k1::PublicKey;
@@ -50,6 +51,9 @@ cmd! {
       RpcCommands::Fevm { args, command } => match command {
         RpcFevmCommands::Create { contract, constructor_args } => {
             fevm_create(client, args, contract, constructor_args).await
+        }
+        RpcFevmCommands::Invoke { contract, method, method_args } => {
+            fevm_invoke(client, args, contract, method, method_args).await
         }
       }
     }
@@ -130,6 +134,31 @@ async fn fevm_create(
             parse_data(data)
                 .and_then(parse_create_return)
                 .map(create_return_to_json),
+        )
+    })
+    .await
+}
+
+/// Deploy an EVM contract through RPC and print the response to STDOUT as JSON.
+async fn fevm_invoke(
+    client: HttpClient,
+    args: &TransArgs,
+    contract: &Address,
+    method: &RawBytes,
+    method_args: &RawBytes,
+) -> anyhow::Result<()> {
+    let calldata = [method.to_vec(), method_args.to_vec()].concat();
+    let calldata = RawBytes::serialize(BytesSer(&calldata))?;
+    let data = transaction_payload(args, contract, evm::Method::InvokeContract as u64, calldata)?;
+    broadcast_and_print(client, data, args.broadcast_mode, |data| {
+        Some(
+            parse_data(data)
+                .and_then(|data| {
+                    fvm_ipld_encoding::from_slice::<BytesDe>(&data)
+                        .map(|bz| bz.0)
+                        .map_err(|e| anyhow!("failed to deserialize bytes: {e}"))
+                })
+                .map(|bz| serde_json::Value::String(hex::encode(bz))),
         )
     })
     .await

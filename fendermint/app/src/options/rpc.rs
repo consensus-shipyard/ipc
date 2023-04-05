@@ -99,6 +99,18 @@ pub enum RpcFevmCommands {
         #[arg(long, short, value_parser = parse_raw_bytes, default_value = "")]
         constructor_args: RawBytes,
     },
+    /// Call an EVM contract; print the results as JSON with the return data rendered in hexadecimal format.
+    Invoke {
+        /// Either the actor ID based or the EAM delegated address of the contract to call.
+        #[arg(long, short)]
+        contract: Address,
+        /// ABI encoded method hash, expected to be in hexadecimal format.
+        #[arg(long, short, value_parser = parse_raw_bytes)]
+        method: RawBytes,
+        /// ABI encoded call arguments passed to the EVM, expected to be in hexadecimal format.
+        #[arg(long, short, value_parser = parse_raw_bytes, default_value = "")]
+        method_args: RawBytes,
+    },
 }
 
 /// Arguments common to transactions and transfers.

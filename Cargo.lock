@@ -1497,6 +1497,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fendermint_vm_genesis",
+ "frc42_dispatch",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_ipld_hamt",
@@ -1721,6 +1722,44 @@ dependencies = [
  "byteorder",
  "ff",
  "thiserror",
+]
+
+[[package]]
+name = "frc42_dispatch"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4dc594c941eba1d5a9474f595c6d0f9d752fa333b672755bbe7c23d30f64282"
+dependencies = [
+ "frc42_hasher",
+ "frc42_macros",
+ "fvm_ipld_encoding",
+ "fvm_sdk",
+ "fvm_shared",
+ "thiserror",
+]
+
+[[package]]
+name = "frc42_hasher"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6caf7fa3028536d11b1ff94a63bd1d60926ff7366b25b2a94d07bd23190f459"
+dependencies = [
+ "fvm_sdk",
+ "fvm_shared",
+ "thiserror",
+]
+
+[[package]]
+name = "frc42_macros"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c57201a8c3c26b41c4234a0f68b123ec2c33c958d31d09a3a780c345256e7928"
+dependencies = [
+ "blake2b_simd",
+ "frc42_hasher",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -1957,6 +1996,21 @@ dependencies = [
  "once_cell",
  "serde",
  "sha2 0.10.6",
+ "thiserror",
+]
+
+[[package]]
+name = "fvm_sdk"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fef17308967cceb1d22f05003d60adb0d5b9ba53e34ace4ae04701eb7e6af02"
+dependencies = [
+ "cid",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "lazy_static",
+ "log",
+ "num-traits",
  "thiserror",
 ]
 

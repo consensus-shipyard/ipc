@@ -36,6 +36,7 @@ macro_rules! define_singleton {
 pub mod account;
 pub mod cron;
 pub mod eam;
+pub mod evm;
 pub mod init;
 pub mod multisig;
 pub mod system;
