@@ -182,4 +182,123 @@ contract SubnetIDHelperTest is Test {
 
         require(SubnetID(route).isRoot() == true);
     }
+
+    function test_Down_Some_1() public pure {
+        address[] memory subnetRoute1 = new address[](4);
+        subnetRoute1[0] = address(100);
+        subnetRoute1[1] = address(101);
+        subnetRoute1[2] = address(102);
+        subnetRoute1[3] = address(103);
+
+        address[] memory subnetRoute2 = new address[](2);
+        subnetRoute2[0] = address(100);
+        subnetRoute2[1] = address(101);
+
+        SubnetID memory subnetId1 = SubnetID(subnetRoute1);
+        SubnetID memory subnetId2 = SubnetID(subnetRoute2);
+
+        SubnetID memory subnetId = subnetId1.down(subnetId2);
+
+        address[] memory expectedRoute = new address[](3);
+        expectedRoute[0] = address(100);
+        expectedRoute[1] = address(101);
+        expectedRoute[2] = address(102);
+
+        require(subnetId.toHash() == SubnetID(expectedRoute).toHash());
+    }
+
+    function test_Down_Some_2() public pure {
+        address[] memory subnetRoute1 = new address[](4);
+        subnetRoute1[0] = address(100);
+        subnetRoute1[1] = address(101);
+        subnetRoute1[2] = address(102);
+        subnetRoute1[3] = address(103);
+
+        address[] memory subnetRoute2 = new address[](3);
+        subnetRoute2[0] = address(100);
+        subnetRoute2[1] = address(101);
+        subnetRoute2[2] = address(102);
+
+        SubnetID memory subnetId1 = SubnetID(subnetRoute1);
+        SubnetID memory subnetId2 = SubnetID(subnetRoute2);
+
+        SubnetID memory subnetId = subnetId1.down(subnetId2);
+
+        address[] memory expectedRoute = new address[](4);
+        expectedRoute[0] = address(100);
+        expectedRoute[1] = address(101);
+        expectedRoute[2] = address(102);
+        expectedRoute[3] = address(103);
+
+        require(subnetId.toHash() == SubnetID(expectedRoute).toHash());
+    }
+
+    function test_Down_None_1() public pure {
+        address[] memory subnetRoute1 = new address[](1);
+        subnetRoute1[0] = address(100);
+
+        address[] memory subnetRoute2 = new address[](2);
+        subnetRoute2[0] = address(100);
+        subnetRoute2[1] = address(101);
+
+        SubnetID memory subnetId1 = SubnetID(subnetRoute1);
+        SubnetID memory subnetId2 = SubnetID(subnetRoute2);
+
+        SubnetID memory subnetId = subnetId1.down(subnetId2);
+
+        require(subnetId.toHash() == EMPTY_SUBNET_ID_HASH);
+    }
+
+    function test_Down_None_2() public pure {
+        address[] memory subnetRoute1 = new address[](2);
+        subnetRoute1[0] = address(100);
+        subnetRoute1[1] = address(101);
+
+        address[] memory subnetRoute2 = new address[](2);
+        subnetRoute2[0] = address(100);
+        subnetRoute2[1] = address(101);
+
+        SubnetID memory subnetId1 = SubnetID(subnetRoute1);
+        SubnetID memory subnetId2 = SubnetID(subnetRoute2);
+
+        SubnetID memory subnetId = subnetId1.down(subnetId2);
+
+        require(subnetId.toHash() == EMPTY_SUBNET_ID_HASH);
+    }
+
+    function test_Down_None_3() public pure {
+        address[] memory subnetRoute1 = new address[](3);
+        subnetRoute1[0] = address(100);
+        subnetRoute1[1] = address(101);
+        subnetRoute1[2] = address(102);
+
+        address[] memory subnetRoute2 = new address[](4);
+        subnetRoute2[0] = address(100);
+        subnetRoute2[1] = address(101);
+        subnetRoute2[2] = address(102);
+        subnetRoute2[3] = address(103);
+
+        SubnetID memory subnetId1 = SubnetID(subnetRoute1);
+        SubnetID memory subnetId2 = SubnetID(subnetRoute2);
+
+        SubnetID memory subnetId = subnetId1.down(subnetId2);
+
+        require(subnetId.toHash() == EMPTY_SUBNET_ID_HASH);
+    }
+
+    function test_Down_None_4() public pure {
+        address[] memory subnetRoute1 = new address[](2);
+        subnetRoute1[0] = address(101);
+        subnetRoute1[1] = address(100);
+
+        address[] memory subnetRoute2 = new address[](1);
+        subnetRoute2[0] = address(100);
+
+        SubnetID memory subnetId1 = SubnetID(subnetRoute1);
+        SubnetID memory subnetId2 = SubnetID(subnetRoute2);
+
+        SubnetID memory subnetId = subnetId1.down(subnetId2);
+
+        require(subnetId.toHash() == EMPTY_SUBNET_ID_HASH);
+    }
 }

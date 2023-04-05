@@ -32,7 +32,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
     ConsensusType public consensus;
     /// @notice The minimum stake required to be a validator in this subnet
     uint256 public minValidatorStake;
-    /// @notice Total collateral currently deposited in the SCA from the subnet
+    /// @notice Total collateral currently deposited in the GW from the subnet
     uint256 public totalStake;
     /// @notice validator address to stake amount
     mapping(address => uint256) public stake;

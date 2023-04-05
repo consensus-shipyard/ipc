@@ -5,31 +5,57 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import "../src/Gateway.sol";
+import "../src/SubnetActor.sol";
 import "../src/lib/SubnetIDHelper.sol";
 import "../src/lib/CheckpointHelper.sol";
+import "../src/lib/CrossMsgHelper.sol";
 
 contract GatewayDeploymentTest is Test {
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for Checkpoint;
+    using CrossMsgHelper for CrossMsg;
 
     int64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
     uint64 constant MIN_COLLATERAL_AMOUNT = 1 ether;
     uint64 constant MAX_NONCE = type(uint64).max;
     address constant PAYABLE_SUBNET_ADDRESS = address(10);
+    address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
+    string private constant DEFAULT_NETWORK_NAME = "test";
+    uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
+    uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
+    int64 private constant DEFAULT_FINALITY_TRESHOLD = 1;
+    int64 private constant DEFAULT_CHECK_PERIOD = 50;
+    bytes private constant GENESIS = EMPTY_BYTES;
+    uint256 constant CROSS_MSG_FEE = 10 gwei;
 
     Gateway gw;
+    SubnetActor sa;
 
     function setUp() public {
         address[] memory path = new address[](1);
         path[0] = address(0);
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD);
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
+
+        path[0] = address(gw);
+        SubnetID memory parentId = SubnetID(path);
+        sa = new SubnetActor(
+            parentId,
+            DEFAULT_NETWORK_NAME,
+            address(gw),
+            ConsensusType.Dummy,
+            DEFAULT_MIN_VALIDATOR_STAKE,
+            DEFAULT_MIN_VALIDATORS,
+            DEFAULT_FINALITY_TRESHOLD,
+            DEFAULT_CHECK_PERIOD,
+            GENESIS
+        );
     }
 
     function testDeployment(int64 checkpointPeriod) public {
         vm.assume(checkpointPeriod >= DEFAULT_CHECKPOINT_PERIOD);
         address[] memory path = new address[](1);
         path[0] = address(0);
-        gw = new Gateway(path, checkpointPeriod);
+        gw = new Gateway(path, checkpointPeriod, CROSS_MSG_FEE);
 
         SubnetID memory networkName = gw.getNetworkName();
 
@@ -267,8 +293,24 @@ contract GatewayDeploymentTest is Test {
         gw.kill();
     }
 
-    function test_Kill_Fail_CircSupplyMoreThanZero() public {
-        // TODO: implement once cross msg is implemented
+    function test_Kill_Fail_CircSupplyMoreThanZero() public {address validatorAddress = address(100);
+        address funderAddress = address(101);
+        uint fundAmount = 1 ether;
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(funderAddress);
+        vm.deal(funderAddress, fundAmount + 1);
+
+        fund(funderAddress, fundAmount);
+
+        vm.stopPrank();
+        vm.startPrank(address(sa));
+        vm.expectRevert("cannot kill a subnet that still holds user funds in its circ. supply");
+
+        gw.kill();
     }
 
     function test_CommitChildCheck_Works(uint64 blockNumber) public {
@@ -460,6 +502,232 @@ contract GatewayDeploymentTest is Test {
         gw.commitChildCheck(checkpoint);
     }
 
+    function test_Fund_Works_EthAccountSingleFunding() public {
+        address validatorAddress = address(100);
+        address funderAddress = address(101);
+        uint fundAmount = 1 ether;
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(funderAddress);
+        vm.deal(funderAddress, fundAmount + 1);
+        
+        fund(funderAddress, fundAmount);
+    }
+
+    function test_Fund_Works_BLSAccountSingleFunding() public {
+        address validatorAddress = address(100);
+        uint fundAmount = 1 ether;
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(BLS_ACCOUNT_ADDREESS);
+        vm.deal(BLS_ACCOUNT_ADDREESS, fundAmount + 1);
+        
+        fund(BLS_ACCOUNT_ADDREESS, fundAmount);
+    }
+
+    function test_Fund_Works_MultisigSingleFunding() public {
+        address validatorAddress = address(100);
+        uint fundAmount = 1 ether;
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(MULTISIG_ACTOR);
+        vm.deal(MULTISIG_ACTOR, fundAmount + 1);
+        
+        fund(MULTISIG_ACTOR, fundAmount);
+    }
+
+    function test_Fund_Works_MultipleFundings() public {
+        uint8 numberOfFunds = 10;
+        uint fundAmount = 1 ether;
+        
+        address validatorAddress = address(100);
+        address funderAddress = address(101);
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(funderAddress);
+        for (uint i = 0; i < numberOfFunds; i++) {
+            vm.deal(funderAddress, fundAmount + 1);
+
+            fund(funderAddress, fundAmount);   
+        }
+    }
+    
+    function test_Fund_Fails_WrongSubnet() public {
+        address validatorAddress = address(100);
+        address funderAddress = address(101);
+        uint fundAmount = 1 ether;
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(funderAddress);
+        vm.deal(funderAddress, fundAmount + 1);
+
+        address[] memory wrongPath = new address[](3);
+        wrongPath[0] = address(1);
+        wrongPath[1] = address(2);
+
+        vm.expectRevert("couldn't compute the next subnet in route");
+
+        gw.fund{value: fundAmount}(SubnetID(wrongPath));
+    }
+
+    function test_Fund_Fails_InvalidAccount() public {
+        address validatorAddress = address(100);
+        address invalidAccount = address(sa);
+        uint fundAmount = 1 ether;
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(invalidAccount);
+        vm.deal(invalidAccount, fundAmount + 1);
+
+        (SubnetID memory subnetId, , , ,) = getSubnet(address(sa));
+
+        vm.expectRevert("the caller is not an account nor a multi-sig");
+
+        gw.fund{value: fundAmount}(subnetId);
+    }
+
+    function test_Fund_Fails_InsufficientAmount() public {
+        address validatorAddress = address(100);
+        address funderAddress = address(101);
+
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        vm.startPrank(funderAddress);
+        vm.deal(funderAddress, 1 ether);
+
+        (SubnetID memory subnetId, , , ,) = getSubnet(address(sa));
+
+        vm.expectRevert("not enough gas to pay cross-message");
+
+        gw.fund{value: 0}(subnetId);
+    }
+
+    function test_Release_Fails_InsufficientAmount() public {
+        address[] memory path = new address[](2);
+        path[0] = address(1);
+        path[1] = address(2);
+        
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
+
+        address callerAddress = address(100);
+
+        vm.startPrank(callerAddress);
+        vm.deal(callerAddress, 1 ether);
+        vm.expectRevert("not enough gas to pay cross-message");
+
+        gw.release{value: 0}();
+    }
+
+    function test_Release_Fails_InvalidAccount() public {
+        address[] memory path = new address[](2);
+        path[0] = address(1);
+        path[1] = address(2);
+        
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
+
+        address invalidAccount = address(sa);
+
+        vm.startPrank(invalidAccount);
+        vm.deal(invalidAccount, 1 ether);
+        vm.expectRevert("the caller is not an account nor a multi-sig");
+
+        gw.release{value: 1 ether}();
+    }
+
+    function test_Release_Works_BLSAccount(uint256 releaseAmount, uint256 crossMsgFee) public {
+        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max);
+        vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
+
+        address[] memory path = new address[](2);
+        path[0] = makeAddr("root");
+        path[1] = makeAddr("subnet_one");
+        
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
+
+        vm.roll(0);
+        vm.startPrank(BLS_ACCOUNT_ADDREESS);
+        vm.deal(BLS_ACCOUNT_ADDREESS, releaseAmount + 1);
+
+        release(BLS_ACCOUNT_ADDREESS, releaseAmount, crossMsgFee, 0);
+    }
+
+    function test_Release_Works_Multisig(uint256 releaseAmount, uint256 crossMsgFee) public {
+        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max);
+        vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
+
+        address[] memory path = new address[](2);
+        path[0] = makeAddr("root");
+        path[1] = makeAddr("subnet_one");
+        
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
+
+        vm.roll(0);
+        vm.startPrank(MULTISIG_ACTOR);
+        vm.deal(MULTISIG_ACTOR, releaseAmount + 1);
+
+        release(MULTISIG_ACTOR, releaseAmount, crossMsgFee, 0);
+    }
+
+    function test_Release_Works_EmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
+        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max);
+        vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
+
+        address[] memory path = new address[](2);
+        path[0] = makeAddr("root");
+        path[1] = makeAddr("subnet_one");
+        
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
+
+        address callerAddress = address(100);
+
+        vm.roll(0);
+        vm.startPrank(callerAddress);
+        vm.deal(callerAddress, releaseAmount + 1);
+
+        release(callerAddress, releaseAmount, crossMsgFee, 0);
+    }
+
+    function test_Release_Works_NonEmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
+        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max / 2);
+        vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
+
+        address[] memory path = new address[](2);
+        path[0] = makeAddr("root");
+        path[1] = makeAddr("subnet_one");
+        
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
+
+        address callerAddress = address(100);
+
+        vm.roll(0);
+        vm.startPrank(callerAddress);
+        vm.deal(callerAddress, 2 * releaseAmount + 1);
+
+        release(callerAddress, releaseAmount, crossMsgFee, 0);
+        
+        release(callerAddress, releaseAmount, crossMsgFee, 0);
+    }
+
     function commitChildCheck(Checkpoint memory commit) internal returns(Checkpoint memory){
         gw.commitChildCheck(commit);
 
@@ -484,15 +752,91 @@ contract GatewayDeploymentTest is Test {
         return Checkpoint(data, signature);
     }
 
+    function fund(address funderAddress, uint256 fundAmount) internal {
+        uint fundAmountWithSubtractedFee = fundAmount - gw.crossMsgFee();
+
+        (SubnetID memory subnetId, , uint nonceBefore, uint circSupplyBefore,) = getSubnet(address(sa));
+
+        uint expectedTopDownMsgsLenght = gw.getSubnetTopDownMsgsLength(subnetId) + 1;
+        uint expectedNonce = nonceBefore + 1;
+        uint expectedCircSupply = circSupplyBefore + fundAmountWithSubtractedFee;
+
+        vm.expectCall(address(sa), abi.encodeWithSelector(sa.reward.selector));
+
+        gw.fund{value: fundAmount}(subnetId);
+
+        (, , uint nonce, uint circSupply,) = getSubnet(address(sa));
+
+        require(gw.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLenght);
+
+        require(nonce == expectedNonce);
+        require(circSupply == expectedCircSupply);
+
+        for (uint msgIndex = 0; msgIndex < expectedTopDownMsgsLenght; msgIndex++) {
+            CrossMsg memory topDownMsg = gw.getSubnetTopDownMsg(subnetId, msgIndex);
+
+            require(topDownMsg.message.nonce == msgIndex);
+            require(topDownMsg.message.value == fundAmountWithSubtractedFee);
+            require(
+                keccak256(abi.encode(topDownMsg.message.to)) ==
+                keccak256(abi.encode(IPCAddress({subnetId: subnetId, rawAddress: funderAddress})))
+            );
+            require(
+                keccak256(abi.encode(topDownMsg.message.from)) ==
+                keccak256(abi.encode(IPCAddress({subnetId: subnetId.getParentSubnet(), rawAddress: funderAddress})))
+            );
+        }
+    }
+
+    function release(address callerAddress, uint256 releaseAmount, uint256 crossMsgFee, int64 epoch) internal {
+        (CheckData memory cpDataBefore, ) = gw.checkpoints(epoch);
+
+        uint releaseAmountWithSubtractedFee = releaseAmount - crossMsgFee;
+
+        uint expectedNonce = gw.nonce() + 1;
+        uint expectedBurntBalance = BURNT_FUNDS_ACTOR.balance + releaseAmountWithSubtractedFee;
+        uint expectedCheckpointDataFee = cpDataBefore.crossMsgs.fee + crossMsgFee;
+        uint expectedCheckpointDataValue = cpDataBefore.crossMsgs.value + releaseAmount;
+        uint expectedRegistryLength = gw.getCrossMsgsLength(cpDataBefore.crossMsgs.msgsHash) + 1;
+
+        gw.release{value: releaseAmount}();
+
+        (CheckData memory cpDataAfter, ) = gw.checkpoints(epoch);
+
+        require(cpDataAfter.crossMsgs.fee == expectedCheckpointDataFee);
+        require(cpDataAfter.crossMsgs.value == expectedCheckpointDataValue);
+
+        int64 _epoch = epoch;
+        address _callerAddress = callerAddress;
+
+        for (uint i = 0; i < expectedRegistryLength; i++) {
+            (StorableMsg memory storableMsg, bool wrapped) = gw.crossMsgRegistry(epoch, i);
+            CrossMsg memory crossMsg = gw.getCrossMsg(cpDataAfter.crossMsgs.msgsHash, i);
+
+            require(storableMsg.nonce == i);
+            require(storableMsg.value == releaseAmountWithSubtractedFee);
+            require(keccak256(abi.encode(storableMsg.from)) == keccak256(abi.encode(IPCAddress({subnetId: gw.getNetworkName(), rawAddress: BURNT_FUNDS_ACTOR}))));
+            require(keccak256(abi.encode(storableMsg.to)) == keccak256(abi.encode(IPCAddress({subnetId: gw.getNetworkName().getParentSubnet(), rawAddress: _callerAddress}))));
+            require(gw.crossMsgExistInRegistry(_epoch, CrossMsg(storableMsg, wrapped).toHash()) == true);
+            require(crossMsg.toHash() == CrossMsg(storableMsg, wrapped).toHash());
+        }
+
+        require(gw.nonce() == expectedNonce);
+        require(gw.getCrossMsgsLength(cpDataBefore.crossMsgs.msgsHash) == 0);
+        require(gw.getCrossMsgsLength(cpDataAfter.crossMsgs.msgsHash) == expectedRegistryLength);
+        require(gw.crossMsgCidRegistry(epoch) == cpDataAfter.crossMsgs.msgsHash);
+        require(gw.crossMsgEpochRegistry(cpDataAfter.crossMsgs.msgsHash) == epoch);
+        require(BURNT_FUNDS_ACTOR.balance == expectedBurntBalance);
+    }
+
     function createCheckpoint(address subnetAddress, uint64 blockNumber) internal view returns(Checkpoint memory) {
         SubnetID memory subnetId = gw.getNetworkName().createSubnetId(subnetAddress);
 
-        CrossMsg[] memory crossMsgs = new CrossMsg[](0);
         ChildCheck[] memory children = new ChildCheck[](0);
 
-        CrossMsgMeta memory crossMsgMeta = CrossMsgMeta({value: 0, nonce: 0, fee: 0, msgs: crossMsgs});
-        CheckData memory data = CheckData({source: subnetId, tipSet: new bytes(0), epoch: int64(blockNumber), prevHash: bytes32(0), children: children, crossMsgs: crossMsgMeta });
-        Checkpoint memory checkpoint = Checkpoint({data: data, signature: new bytes(0)});
+        CrossMsgMeta memory crossMsgMeta = CrossMsgMeta({msgsHash: EMPTY_HASH, value: 0, nonce: 0, fee: 0});
+        CheckData memory data = CheckData({source: subnetId, tipSet: EMPTY_BYTES, epoch: int64(blockNumber), prevHash: EMPTY_HASH, children: children, crossMsgs: crossMsgMeta });
+        Checkpoint memory checkpoint = Checkpoint({data: data, signature: EMPTY_BYTES});
 
         return checkpoint;
     }

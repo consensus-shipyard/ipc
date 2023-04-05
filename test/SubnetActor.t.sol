@@ -26,13 +26,14 @@ contract SubnetActorTest is Test {
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     int64 private constant DEFAULT_FINALITY_TRESHOLD = 1;
     int64 private constant DEFAULT_CHECK_PERIOD = 50;
-    bytes private constant GENESIS = new bytes(0);
+    bytes private constant GENESIS = EMPTY_BYTES;
+    uint256 constant CROSS_MSG_FEE = 10 gwei;
 
     function setUp() public
     {
         address[] memory path = new address[](1);
         path[0] = address(0);
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD);
+        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
 
         path[0] = address(gw);
         SubnetID memory parentId = SubnetID(path);
@@ -217,11 +218,9 @@ contract SubnetActorTest is Test {
         address validator3 = vm.addr(102);
         _join(validator3);
 
-
         CheckData memory data = _createCheckData(100);
         
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(100, keccak256(abi.encode(data)));
-        Checkpoint memory checkpoint1 = Checkpoint({data: data, signature: abi.encodePacked(r, s, v)});
+        Checkpoint memory checkpoint1 = signCheckpoint(100, data);
 
         vm.prank(validator);
         sa.submitCheckpoint(checkpoint1);
@@ -231,8 +230,7 @@ contract SubnetActorTest is Test {
         require(sa.windowCheckCount(checkpointHash) == 1);
         require(sa.windowCheckAt(checkpointHash, 0) == validator);
 
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(101, keccak256(abi.encode(data)));
-        Checkpoint memory checkpoint2 = Checkpoint({data: data, signature: abi.encodePacked(r2, s2, v2)});
+        Checkpoint memory checkpoint2 = signCheckpoint(101, data);
 
         vm.prank(validator2);
         sa.submitCheckpoint(checkpoint2);
@@ -240,14 +238,18 @@ contract SubnetActorTest is Test {
         require(sa.windowCheckCount(checkpointHash) == 2);
         require(sa.windowCheckAt(checkpointHash, 1) == validator2);
 
-        (uint8 v3, bytes32 r3, bytes32 s3) = vm.sign(102, keccak256(abi.encode(data)));
-        Checkpoint memory checkpoint3 = Checkpoint({data: data, signature: abi.encodePacked(r3, s3, v3)});
+        Checkpoint memory checkpoint3 = signCheckpoint(102, data);
 
         vm.prank(validator3);
         vm.expectCall(address(gw), abi.encodeWithSelector(gw.commitChildCheck.selector, checkpoint3));
         sa.submitCheckpoint(checkpoint3);
 
         require(sa.windowCheckCount(checkpointHash) == 0);
+    }
+
+    function signCheckpoint(uint pk, CheckData memory data) internal pure returns(Checkpoint memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, keccak256(abi.encode(data)));
+        return Checkpoint({data: data, signature: abi.encodePacked(r, s, v)});
     }
 
     function test_SubmitCheckpoint_AddsVoter() public  {
@@ -366,23 +368,15 @@ contract SubnetActorTest is Test {
 
 
     function _createCheckData(int64 epoch) internal view returns (CheckData memory data){
-         SubnetID memory subnet = sa.getParent().createSubnetId(address(sa));
+        SubnetID memory subnet = sa.getParent().createSubnetId(address(sa));
 
-        IPCAddress memory from = IPCAddress({subnetId: subnet, rawAddress: address(1)});
-        IPCAddress memory to = IPCAddress({subnetId: subnet, rawAddress: address(2)});
-        
-        StorableMsg memory storableMsg = StorableMsg({from: from, to: to, method: 0, value: 0, nonce: 0, params: bytes("")});
-
-        CrossMsg[] memory crossMsgs = new CrossMsg[](1);
-        crossMsgs[0] = CrossMsg({wrapped: false, message: storableMsg});
-
-        CrossMsgMeta memory crossMsgMeta = CrossMsgMeta({value: 0, nonce: 0, fee: 0, msgs: crossMsgs});
+        CrossMsgMeta memory crossMsgMeta = CrossMsgMeta({msgsHash: EMPTY_HASH, value: 0, nonce: 0, fee: 0});
 
         ChildCheck[] memory children = new ChildCheck[](1);
         bytes32[] memory checks = new bytes32[](0);
         children[0] = ChildCheck({source: subnet, checks: checks});
 
-        data = CheckData({source: subnet, tipSet: new bytes(0), epoch: epoch, prevHash: CheckpointHelper.EMPTY_CHECKPOINT_DATA_HASH, children: children, crossMsgs: crossMsgMeta });
+        data = CheckData({source: subnet, tipSet: EMPTY_BYTES, epoch: epoch, prevHash: CheckpointHelper.EMPTY_CHECKPOINT_DATA_HASH, children: children, crossMsgs: crossMsgMeta });
     }
 
     function _join(address _validator) internal {

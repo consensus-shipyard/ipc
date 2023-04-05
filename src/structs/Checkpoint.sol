@@ -25,10 +25,10 @@ struct ChildCheck {
 }
 
 struct CrossMsgMeta {
+    bytes32 msgsHash;
     uint64 nonce;
     uint256 value;
     uint256 fee;
-    CrossMsg[] msgs;
 }
 
 struct CrossMsg {
