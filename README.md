@@ -97,7 +97,10 @@ The RPC server of the daemon will be listening to the endpoint determined in the
 
 
 ### Interacting with a rootnet
-#### Spacenet
+
+You can deploy an IPC hierarchy from any compatible rootnet. At this time, your options are to use the public Spacenet testnet or to deploy or your own rootnet. Instructions are provided for both below, but we recommend using Spacenet if possible.
+
+#### Option 1: Spacenet
 For more information about the Spacenet testnet have a look at the [Spacenet repo](https://github.com/consensus-shipyard/spacenet). In this section we will guide you through how to connect your IPC agent to a running instance of Spacenet. Spacenet hosts all the IPC actors and can be used as a rootnet to deploy new subnets from. 
 
 In order to use the IPC agent with Spacenet we need to have access to a full-node syncing with the network. The easiest way to achieve this is to run your own Spacenet node. Running you own Spacenet node is as simple as [installing the dependencies](https://github.com/consensus-shipyard/lotus#basic-build-instructions), cloning the Eudico repo, and compiling and running it:
@@ -145,7 +148,7 @@ auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3Jpd
 accounts = ["t1xbevqterae2tanmh2kaqksnoacflrv6w2dflq4i"]
 ```
 
-You can now start your IPC agent daemon with `./bin/ipc-agent daemon`.
+You can now start your IPC agent daemon with `./bin/ipc-agent daemon` .If you are already running the daemon, changes in the config file are only picked up after running `./bin/ipc-agent reload-config` so be sure to run it after editing your config.
 
 > In the current implementation of Spacenet, the gateway is always deployed in the `t064` address. This should be the address always reflected on your config for the gateway. In the future, this will change, and the gateway may be deployed in different addresses.
 
@@ -158,7 +161,7 @@ To check if the agent has been connected to Spacenet successfully you can try cr
 
 Finally, to be able to interact with Spacenet and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some Spacenet FIL for your address through the [Spacenet Faucet](https://spacenet.consensus.ninja/).
 
-#### Local deployment
+#### Option 2: Local deployment
 To deploy sample rootnet locally for testing you can use the IPC scripts installed in `./bin/ipc-infra` (refer to the [installation of infrastructure](#Installation-infrastructure-scripts)) by running:
 ```bash
 $ ./bin/ipc-infra/run-root-docker-1val.sh <lotus-api-port> <validator-libp2p-port>
@@ -192,6 +195,8 @@ Finally, to test if the connection to the rootnet has been successful, we can fo
 
 ### Running a subnet
 To spawn a new subnet, our IPC agent should be connected to at least the subnet of the parent we want to spawn the subnet from. You can refer to the previous section for information on how to run or connect to a rootnet. This instructions will assume the deployment of a subnet from `/root`, but the steps are equivalent for any other parent subnet. 
+
+This section provides instructions for spawning a simple subnet with a single validator. If you'd like to spawn a subnet with multiple validators in a Docker setup, be sure to also read on till the [corresponding section](#running-a-subnet-with-several-validators). 
 
 #### Spawn subnet actor
 To run a subnet the first thing is to configure and create the subnet actor that will govern the subnet's operation:
@@ -251,7 +256,10 @@ The end of the log of the execution of this script provides a bit more of inform
 >>> Token to /root/t01002 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.TnoDqZJ1fqdkr_oCHFEXvdwU6kYR7Va_ALyEuoPnksA
 >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq
 >>> Subnet subnet validator info:
-t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/172.17.0.3/udp/1348/quic/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmS t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/127.0.0.1/udp/1348/quic/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmS t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/172.17.0.3/tcp/1347/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmSw3Fb t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/127.0.0.1/tcp/1347/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmSw3FbaVcL
+t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/172.17.0.3/udp/1348/quic/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmS
+t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/127.0.0.1/udp/1348/quic/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmS
+t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/172.17.0.3/tcp/1347/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmSw3Fb
+t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/127.0.0.1/tcp/1347/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmSw3FbaVcL
 >>> API listening in host port 1239
 >>> Validator listening in host port 1349
 ```
@@ -291,6 +299,7 @@ $ ./bin/ipc-agent list-subnets --gateway-address=t064 --subnet=/root
 
 [2023-03-30T17:00:25Z INFO  ipc_agent::cli::commands::manager::list_subnets] /root/t01003 - status: 0, collateral: 2 FIL, circ.supply: 0.0 FIL
 ```
+This command only shows subnets that have been registered to the gateway, i.e. that have provided enough collateral to participate in the IPC protocol and haven't been killed. It is not an exhaustive list of all of the subnet actors deployed over the network.
 
 > Note: In the current implementation of IPC the gateway actor is deployed as a system actor on the default addres `t064`, so whenever one of the IPC commands requests the address of the gateway actor you can use that value.
 
@@ -303,7 +312,7 @@ $  ./bin/ipc-infra/mine-subnet.sh <node-container-id>
 $  ./bin/ipc-infra/mine-subnet.sh 84711d67cf162e30747c4525d69728c4dea8c6b4b35cd89f6d0947fee14bf908
 ```
 
-> TODO: The mining process is currently run in the foreground in interactive mode. Update infra scripts so they can be run detached and the logs are directed to a file.
+The mining process is currently run in the foreground in interactive mode. Consider using `nohup ./bin/ipc-infra/mine-subnet.sh` or tmux to run the process in the background and redirect the logs to some file.
 
 #### Changing subnet validator network address
 It may be the case that while joining the subnet, you didn't set the multiaddress for your validator correctly and you need to update it. You'll realize that the network address of your validator is not configured correctly, because your agent throws an error when trying to connect to your subnet node, or starting the validator in your subnet throws a network-related error.
@@ -323,7 +332,7 @@ Subnets are periodically committing checkpoints to their parent every `check-per
 [2023-03-29T09:52:55Z INFO  ipc_agent::manager::checkpoint] successfully published checkpoint submission for epoch 50
 ```
 
-It is common for the checkpointing process to fail if while configuring a child subnet: either because the auth token is not correct, or because no wallet addresses have been configured in the subnet, etc. If this happens, running `./bin/ipc-agent reload-config` will restart the checkpoint manager and pick up the latest config values. Whenever you see an error in the checkpointing process, check that your subnet's configuration is correct and `reload-config` to restart the process.
+It is common for the checkpointing process to fail while configuring a child subnet: either because the auth token is not correct, or because no wallet addresses have been configured in the subnet, etc. If this happens, running `./bin/ipc-agent reload-config` will restart the checkpoint manager and pick up the latest config values. Whenever you see an error in the checkpointing process, check that your subnet's configuration is correct and `reload-config` to restart the process.
 
 Finally, if you want to inspect the information of a range of checkpoints committed in the parent for a subnet, you can use the `list-checkpoints` command provided by the agent as follows: 
 ```bash
@@ -338,7 +347,7 @@ root/t01002
 [2023-03-29T12:43:42Z INFO  ipc_agent::cli::commands::manager::list_checkpoints] epoch 30 - prev_check={"/":"bafy2bzaceauzdx22hna4e4cqf55jqmd64a4fx72sxprzj72qhrwuxhdl7zexu"}, cross_msgs=null, child_checks=null
 ```
 
-#### Exchaing funds in a subnet
+#### Sending funds in a subnet
 The agent provides a command to conveniently exchange funds between addresses of the same subnet. This can be achieved through the following command:
 ```bash
 $ ./bin/ipc-agent send-value --subnet=<subnet-id> --to=<to-addr> <value>
@@ -358,7 +367,97 @@ $ ./bin/ipc-agent leave-subnet --subnet=/root/t01002
 
 Leaving a subnet will release the collateral for the validator and remove all the validation rights from its account. This means that if you have a validator running in that subnet, its validation process will immediately terminate.
 
-### Running a several nodes subnet
+#### Importing a wallet to a subnet node
+Depending on whether the subnet is running inside a docker container or not, we can use the following commands to import a wallet to a subnet node: 
+```bash
+# Importing directly into the node
+$ eudico wallet import --lotus-json <wallet-key-file-path>
+
+# Copy the wallet key into the container
+$ docker cp <wallet-key-path> <container-id>:<target-file-in-container>
+# Import the key into eudico
+$ docker exec -it <container-id> eudico wallet import --format=json-lotus <target-file-in-container>
+# Sample execution
+$ docker cp ~/.ipc-agent/t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy.key 91d2af805346:/input.key && docker exec -it 91d2af805346 eudico wallet import --format=json-lotus input.key
+```
+
+### Running a subnet with several validators
+In this section, we will deploy a subnet where the IPC agent is responsible for handling more than one validator in the subnet. Throughout this guide, we use the `ipc-infra` scripts to deploy the nodes in Docker containers, but a similar steps could be used to deploy the nodes on bare-metal or any other runtime.
+
+For the rest of this tutorial, we'll assume that you have your agent already configured and interacting with a rootnet. For more information on how to connect to a rootnet [revisit this section](#Interacting-with-a-rootnet). We are going to deploy a subnet with 5 validators. The first thing we'll need to do is creating a new wallet for every validator we want to run. We can do this directly through the agent with the following command:
+```bash
+$ ./bin/ipc-agent wallet-new --key-type=secp256k1 --subnet=/root
+```
+We also need to provide with some funds our wallets so they can put collateral to join the subnet. According to the rootnet you are connected to, you may need to get some funds from the faucet, or send some from your main wallet. Funds can be send from your main wallet also through the agent with: 
+```bash
+$ ./bin/ipc-agent send-value --subnet=/root --to=<target-wallet> <amount_FIL>
+```
+With this, we can already create the subnet with `/root` as its parent. We are going to set the `--min-validators 5` so no new blocks can be created without this number of validators in the subnet.
+```bash
+# Creating a sample subnet with 5 as the minimum number of validators.
+./bin/ipc-agent create-subnet -p /root -n test --min-validator-stake 1 --min-validators 5 --finality-threshold 10 --check-period 10
+```
+
+#### Deploying the infrastructure
+In order to deploy the 5 validators for the subnet, we will have to first export the keys from our root node so we can import them to our validators. Depending on how you are running your rootnet node you'll have to make a call to the docker container, or your nodes API. More information about exporting keys from your node can be found under [this section](#Exporting-wallet-keys).
+
+With the five keys conveniently exported, we can deploy the subnet nodes using the `infra-scripts`. The following code snippet showcases the deployment of five sample nodes. Note that each node should be importing a different wallet key for their validator, and should be exposing different ports for their API and validators:
+```bash
+$ ./bin/ipc-infra/run-subnet-docker.sh 1251 1351 /root/t01002 ~/.ipc-agent/wallet1.key
+$ ./bin/ipc-infra/run-subnet-docker.sh 1252 1352 /root/t01002 ~/.ipc-agent/wallet2.key
+$ ./bin/ipc-infra/run-subnet-docker.sh 1253 1353 /root/t01002 ~/.ipc-agent/wallet3.key
+$ ./bin/ipc-infra/run-subnet-docker.sh 1254 1354 /root/t01002 ~/.ipc-agent/wallet4.key
+$ ./bin/ipc-infra/run-subnet-docker.sh 1255 1355 /root/t01002 ~/.ipc-agent/wallet5.key
+```
+If the deployment is successful each of these nodes should return the following output at the end of their logs. Note down this information somewhere as we will need it to conveniently join our validators to the subnet.
+```
+>>> Subnet /root/t01002 daemon running in container: 91d2af80534665a8d9a20127e480c16136d352a79563e74ee3c5497d50b9eda8 (friendly name: ipc_root_t01002_1240)
+>>> Token to /root/t01002 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.JTiumQwFIutkTb0gUC5JWTATs-lUvDaopEDE0ewgzLk
+>>> Default wallet: t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy
+>>> Subnet subnet validator info:
+t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy@/ip4/172.17.0.4/udp/1348/quic/p2p/12D3KooWEJXcSPw6Yv4jDk52xvp2rdeG3J6jCPX9AgBJE2mRCVoR
+t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy@/ip4/127.0.0.1/udp/1348/quic/p2p/12D3KooWEJXcSPw6Yv4jDk52xvp2rdeG3J6jCPX9AgBJE2mRCVoR
+t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy@/ip4/172.17.0.4/tcp/1347/p2p/12D3KooWEJXcSPw6Yv4jDk52xvp2rdeG3J6jCPX9AgBJE2mRCVoR
+t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy@/ip4/127.0.0.1/tcp/1347/p2p/12D3KooWEJXcSPw6Yv4jDk52xvp2rdeG3J6jCPX9AgBJE2mRCVoR
+>>> API listening in host port 1240
+>>> Validator listening in host port 1359
+```
+
+#### Configuring the agent
+To configure the agent for its use with all the validators, we need to connect to the RPC API of one of the validators, and import all of the wallets of the validators in that node, so the agent is able through the same API to act on behalf of any validator. More information about importing [keys can be found in this section](#Importing-a-wallet-to-a-subnet-node).
+
+Here's an example of the configuration connecting to the RPC of the first validator, and configuring all the wallets for the validators in the subnet.
+```toml
+[[subnets]]
+id = "/root/t01002"
+gateway_addr = "t064"
+network_name = "test"
+jsonrpc_api_http = "http://127.0.0.1:1240/rpc/v1"
+auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.JTiumQwFIutkTb0gUC5JWTATs-lUvDaopEDE0ewgzLk"
+accounts = ["t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy", "t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq", "t1nv5jrdxk4ljzndaecfjgmu35k6iz54pkufktvua", "t1pr3qzqieikp33pfdaygwkwt5v35a5ljsxsu64xq", "t1pmxk3nhg2u2ge7ioilrk7c5rmdmmbgpazipvzyy"]
+```
+Remember to run `./bin/ipc-agent reload-config` for your agent to pick up the latest changes for the config.
+
+#### Joining the subnet
+All the infrastructure for the subnet is now deployed, and we can join our validators to the subnet. For this, we need to send a `join` command from each of our validators from their validator wallet addresses providing the validators multiaddress. We can get the validator multiaddress from the output of the script we ran to deploy the infrastructure (or by running `eudico mir validator config validator-addr`). These scripts expose through docker the port for the TPC port of the libp2p host of the validator (if there is interest to use the UDP-based multiaddress drop an issue and we can update them accordingly). Hence, we need to choose from the available multiaddresses one that exposes a TCP connection. Finally, our validators are configured so their docker containers interact with each other through ports in the host machine, so instead of exposing an IP address for the multiaddress, the following DNS-based multiaddress needs to be used for all validators: `/dns/host.docker.internal/`.
+
+This is the command that needs to be executed for every validator to join the subnet:
+```bash
+$ ./bin/ipc-agent join-subnet --from=<validator-wallet> --subnet=/root/t01002 --collateral=<amount-collateral> --validator-net-addr="/dns/host.docker.internal/tcp/<VALIDATOR_PORT>/p2p/<VALIDATOR_MULTIADDR>"
+
+# Sample execution for the validator whose logs where shared above for 2FIL collateral
+$ ./bin/ipc-agent join-subnet --from=t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy --subnet=/root/t01002 --collateral=2 --validator-net-addr="/dns/host.docker.internal/tcp/1359/p2p/12D3KooWEJXcSPw6Yv4jDk52xvp2rdeG3J6jCPX9AgBJE2mRCVoR"
+```
+Remember doing the above step for the five validators.
+
+#### Mining in subnet
+We have everything in place now to start mining. Mining is as simple as running the following script for each of the validators, passing the container id/name:
+```bash
+$  ./bin/ipc-infra/mine-subnet.sh <node-container-id>
+```
+
+The mining process is currently run in the foreground in interactive mode. Consider using `nohup ./bin/ipc-infra/mine-subnet.sh` or tmux to run the process in the background and redirect the logs to some file as handling the mining process of the five validators in the foreground may be quite cumbersome.
+
 
 ## Troubleshooting
 #### I need to upgrade my IPC agent
@@ -376,3 +475,22 @@ $ ./bin/ipc-agent daemon
 `make install-infra` may fail and not build the `eudico` image if your system is not configured correctly. If this happens, you can always try to build the image yourself to have a finer-grain report of the issues to help you debug them. For this you can [follow these instructions](https://github.com/consensus-shipyard/lotus/blob/spacenet/scripts/ipc/README.md).
 
 High-level you just need to clone the [eudico repo](https://github.com/consensus-shipyard/lotus), and run `docker build -t eudico .` in the root of the repo.
+
+#### My subnet node doesn't start
+Either because the dockerized subnet node after running `./bin/ipc-infra/run-subnet-docker.sh` gets stuck waiting for the API to be started with the following message: 
+```
+Not online yet... (could not get API info for FullNode: could not get api endpoint: API not running (no endpoint))
+```
+Or because when the script finishes no validator address has been reported as expected by the logs, the best way to debug this situation is to attach to the docker container and check the logs with the following command:
+```bash
+$ docker exec -it <container_name/id> bash
+
+# Inside the container
+tmux a
+```
+Generally, the issue is that:
+- You haven't passed the validator key correctly and it couldn't be imported.
+- There was some network instability, and lotus params couldn't be downloaded successfully.
+
+#### My agent is not submitting checkpoints after an error
+Try running `./bin/ipc-agent reload-config`, this should pick up the latest config and restart all checkpointing processes. If the error has been fixed or it was an network instability between the agent and your subnet daemon, checkpoints should start being committed again seamlessly.

@@ -61,7 +61,9 @@ impl CommandLineHandler for ListSubnets {
 }
 
 #[derive(Debug, Args)]
-#[command(about = "List child subnets")]
+#[command(
+    about = "List all child subnets registered in the gateway (i.e. that have provided enough collateral)"
+)]
 pub(crate) struct ListSubnetsArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
