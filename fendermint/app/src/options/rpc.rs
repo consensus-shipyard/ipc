@@ -31,7 +31,7 @@ pub struct RpcArgs {
     pub command: RpcCommands,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum RpcCommands {
     /// Send an ABCI query.
     Query {
@@ -50,7 +50,7 @@ pub enum RpcCommands {
         args: TransArgs,
     },
     /// Send a message (a.k.a. transaction) to an actor.
-    Transact {
+    Transaction {
         /// Address of the actor to send the message to.
         #[arg(long, short, value_parser = parse_address)]
         to: Address,
@@ -72,7 +72,7 @@ pub enum RpcCommands {
     },
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum RpcQueryCommands {
     /// Get raw IPLD content; print it as base64 string.
     Ipld {
@@ -88,7 +88,7 @@ pub enum RpcQueryCommands {
     },
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum RpcFevmCommands {
     /// Deploy an EVM contract from source; print the results as JSON.
     Create {
@@ -114,7 +114,7 @@ pub enum RpcFevmCommands {
 }
 
 /// Arguments common to transactions and transfers.
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct TransArgs {
     /// Amount of tokens to send, in atto.
     #[arg(long, short, value_parser = parse_token_amount, default_value = "0")]

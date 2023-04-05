@@ -430,7 +430,7 @@ which we saw in the `genesis.json` file earlier.
 
 ```shell
 cargo run -p fendermint_app --release -- \
-  rpc query actor-state --address f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y
+  rpc query actor-state --address f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y | jq
 ```
 
 The state is printed to STDOUT as JSON:
@@ -472,53 +472,58 @@ The simplest transaction we can do is to transfer tokens from one account to ano
 For example we can send 1000 tokens from Alice to Bob:
 
 ```shell
-BOB_ADDR=$(cargo run -p fendermint_app -- key address --public-key test-network/keys/bob.pk)
-cargo run -p fendermint_app -- \
+BOB_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key test-network/keys/bob.pk)
+cargo run -p fendermint_app --release -- \
   rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 | jq
 ```
 
 The `transfer` command waits for the commit results of the transaction:
 
 ```console
-$ cargo run -p fendermint_app -- rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 | jq
+$ cargo run -p fendermint_app --release -- rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 | jq
     Finished dev [unoptimized + debuginfo] target(s) in 0.40s
      Running `target/debug/fendermint rpc transfer --secret-key test-network/keys/alice.sk --to f1kgtzp5nuob3gdccagivcgns7e25be2c2rqozilq --sequence 0 --value 1000`
 {
-  "check_tx": {
-    "code": 0,
-    "data": null,
-    "log": "",
-    "info": "",
-    "gas_wanted": "10000000000",
-    "gas_used": "0",
-    "events": [],
-    "codespace": "",
-    "sender": "f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y",
-    "priority": "0",
-    "mempool_error": ""
+  "response": {
+    "check_tx": {
+      "code": 0,
+      "codespace": "",
+      "data": null,
+      "events": [],
+      "gas_used": "0",
+      "gas_wanted": "10000000000",
+      "info": "",
+      "log": "",
+      "mempool_error": "",
+      "priority": "0",
+      "sender": "f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y"
+    },
+    "deliver_tx": {
+      "code": 0,
+      "codespace": "",
+      "data": null,
+      "events": [],
+      "gas_used": "1124863",
+      "gas_wanted": "10000000000",
+      "info": "",
+      "log": ""
+    },
+    "hash": "01828E0A350445ED3E8028D045EE99B5547B6834DB7296B799B95707EB546EC2",
+    "height": "46"
   },
-  "deliver_tx": {
-    "code": 0,
-    "data": null,
-    "log": "",
-    "info": "",
-    "gas_wanted": "10000000000",
-    "gas_used": "1124863",
-    "events": [],
-    "codespace": ""
-  },
-  "hash": "01828E0A350445ED3E8028D045EE99B5547B6834DB7296B799B95707EB546EC2",
-  "height": "1107"
+  "return_data": null
 }
 ```
 
 The `code: 0` parts indicate that both check and delivery were successful. Let's check the resulting states:
 
 ```console
-$ target/release/fendermint rpc query actor-state --address $BOB_ADDR | jq .state.balance
+$ cargo run -p fendermint_app --release -- rpc query actor-state --address $BOB_ADDR | jq .state.balance
 "1000"
 
-$ target/release/fendermint rpc query actor-state --address $(target/release/fendermint key address --public-key test-network/keys/alice.pk) | jq "{balance: .state.balance, sequence: .state.sequence}"
+$ ALICE_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key test-network/keys/alice.pk)
+
+$ cargo run -p fendermint_app --release -- rpc query actor-state --address $ALICE_ADDR | jq "{balance: .state.balance, sequence: .state.sequence}"
 {
   "balance": "999999999999999000",
   "sequence": 1
@@ -540,7 +545,7 @@ Say we want to deploy the `SimpleCoin` contract from that directory.
 CONTRACT=../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin
 cargo run -p fendermint_app --release -- \
   rpc fevm --secret-key test-network/keys/alice.sk --sequence 0 \
-    create --contract $CONTRACT
+    create --contract $CONTRACT | jq
 ```
 
 The output shows what addresses have been assigned to the created contract,

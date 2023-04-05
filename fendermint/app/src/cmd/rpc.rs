@@ -1,26 +1,29 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 
 use anyhow::Context;
-use base64::Engine;
-use bytes::Bytes;
-use fendermint_vm_actor_interface::eam::{self, CreateReturn};
-use fendermint_vm_actor_interface::evm;
-use fendermint_vm_interpreter::fvm::{FvmMessage, FvmQuery};
+use async_trait::async_trait;
+use fendermint_rpc::client::BoundFendermintClient;
+use fendermint_rpc::tx::{
+    AsyncResponse, BoundClient, CommitResponse, SyncResponse, TxAsync, TxClient, TxCommit, TxSync,
+};
 use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::query::ActorState;
-use fendermint_vm_message::signed::SignedMessage;
-use fvm_ipld_encoding::{BytesDe, BytesSer, RawBytes};
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
-use fvm_shared::{ActorID, MethodNum, METHOD_SEND};
-use libsecp256k1::PublicKey;
-use serde::Serialize;
+use fvm_shared::econ::TokenAmount;
+use fvm_shared::MethodNum;
 use serde_json::json;
+use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
-use tendermint_rpc::endpoint::broadcast;
-use tendermint_rpc::{endpoint::abci_query::AbciQuery, v0_37::Client, HttpClient, Scheme, Url};
+use tendermint_rpc::HttpClient;
+
+use fendermint_rpc::message::{GasParams, MessageFactory};
+use fendermint_rpc::{client::FendermintClient, query::QueryClient};
+use fendermint_vm_actor_interface::eam::{self, CreateReturn};
 
 use crate::cmd;
 use crate::options::rpc::{BroadcastMode, RpcFevmCommands, TransArgs};
@@ -28,25 +31,22 @@ use crate::{
     cmd::to_b64,
     options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands},
 };
-use anyhow::anyhow;
 
 use super::key::read_secret_key;
 
-// TODO: We should probably make a client interface for the operations we commonly do.
-
 cmd! {
   RpcArgs(self) {
-    let client = http_client(self.url.clone(), self.proxy_url.clone())?;
-    match &self.command {
+    let client = FendermintClient::new_http(self.url.clone(), self.proxy_url.clone())?;
+    match self.command.clone() {
       RpcCommands::Query { height, command } => {
-        let height = Height::try_from(*height)?;
+        let height = Height::try_from(height)?;
         query(client, height, command).await
       },
       RpcCommands::Transfer { args, to } => {
         transfer(client, args, to).await
       },
-      RpcCommands::Transact { args, to, method_number, params } => {
-        transact(client, args, to, *method_number, params.clone()).await
+      RpcCommands::Transaction { args, to, method_number, params } => {
+        transact(client, args, to, method_number, params.clone()).await
       },
       RpcCommands::Fevm { args, command } => match command {
         RpcFevmCommands::Create { contract, constructor_args } => {
@@ -60,285 +60,168 @@ cmd! {
   }
 }
 
+/// Run an ABCI query and print the results on STDOUT.
 async fn query(
-    client: HttpClient,
+    client: FendermintClient,
     height: Height,
-    command: &RpcQueryCommands,
+    command: RpcQueryCommands,
 ) -> anyhow::Result<()> {
     match command {
-        RpcQueryCommands::Ipld { cid } => {
-            abci_query_print(client, height, FvmQuery::Ipld(*cid), |res| {
-                Ok(to_b64(&res.value))
-            })
-            .await
-        }
+        RpcQueryCommands::Ipld { cid } => match client.ipld(&cid).await? {
+            Some(data) => println!("{}", to_b64(&data)),
+            None => eprintln!("CID not found"),
+        },
         RpcQueryCommands::ActorState { address } => {
-            abci_query_print(client, height, FvmQuery::ActorState(*address), |res| {
-                let state: ActorState =
-                    fvm_ipld_encoding::from_slice(&res.value).context("failed to decode state")?;
-                let id: ActorID =
-                    fvm_ipld_encoding::from_slice(&res.key).context("failed to decode ID")?;
+            match client.actor_state(&address, height).await? {
+                Some((id, state)) => {
+                    let out = json! ({
+                      "id": id,
+                      "state": state,
+                    });
 
-                let out = json! ({
-                  "id": id,
-                  "state": state,
-                });
+                    // Print JSON as a single line - we can display it nicer with `jq` if needed.
+                    let json = serde_json::to_string(&out)?;
 
-                // Print JSON as a single line - we can display it nicer with `jq` if needed.
-                let json = serde_json::to_string(&out)?;
-
-                Ok(json)
-            })
-            .await
+                    println!("{}", json)
+                }
+                None => {
+                    eprintln!("actor not found")
+                }
+            }
         }
-    }
+    };
+    Ok(())
+}
+
+/// Create a client, make a call to Tendermint with a closure, then maybe extract some JSON
+/// depending on the return value, finally print the result in JSON.
+async fn broadcast_and_print<F, T, G>(
+    client: FendermintClient,
+    args: TransArgs,
+    f: F,
+    g: G,
+) -> anyhow::Result<()>
+where
+    F: FnOnce(
+        TransClient,
+        TokenAmount,
+        GasParams,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<BroadcastResponse<T>>> + Send>>,
+    G: FnOnce(T) -> serde_json::Value,
+    T: Sync + Send,
+{
+    let client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let res = f(client, args.value, gas_params).await?;
+    let json = match res {
+        BroadcastResponse::Async(res) => json!({"response": res.response}),
+        BroadcastResponse::Sync(res) => json!({"response": res.response}),
+        BroadcastResponse::Commit(res) => {
+            let return_data = res.return_data.map(g).unwrap_or(serde_json::Value::Null);
+            json!({"response": res.response, "return_data": return_data})
+        }
+    };
+    print_json(json)
 }
 
 /// Execute token transfer through RPC and print the response to STDOUT as JSON.
-async fn transfer(client: HttpClient, args: &TransArgs, to: &Address) -> anyhow::Result<()> {
-    let data = transfer_payload(args, to)?;
-    broadcast_and_print(client, data, args.broadcast_mode, |_| None).await
+async fn transfer(client: FendermintClient, args: TransArgs, to: Address) -> anyhow::Result<()> {
+    broadcast_and_print(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move { client.transfer(to, value, gas_params).await })
+        },
+        |_| serde_json::Value::Null,
+    )
+    .await
 }
 
 /// Execute a transaction through RPC and print the response to STDOUT as JSON.
+///
+/// If there was any data returned it's rendered in hexadecimal format.
 async fn transact(
-    client: HttpClient,
-    args: &TransArgs,
-    to: &Address,
+    client: FendermintClient,
+    args: TransArgs,
+    to: Address,
     method_num: MethodNum,
     params: RawBytes,
 ) -> anyhow::Result<()> {
-    let data = transaction_payload(args, to, method_num, params)?;
-    broadcast_and_print(client, data, args.broadcast_mode, |_| None).await
+    broadcast_and_print(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move {
+                client
+                    .transaction(to, method_num, params, value, gas_params)
+                    .await
+            })
+        },
+        |data| serde_json::Value::String(hex::encode(&data)),
+    )
+    .await
 }
 
 /// Deploy an EVM contract through RPC and print the response to STDOUT as JSON.
+///
+/// The returned EVM contract addresses are included as a JSON object.
 async fn fevm_create(
-    client: HttpClient,
-    args: &TransArgs,
-    contract: &PathBuf,
-    constructor_args: &RawBytes,
+    client: FendermintClient,
+    args: TransArgs,
+    contract: PathBuf,
+    constructor_args: RawBytes,
 ) -> anyhow::Result<()> {
     let contract_hex = std::fs::read_to_string(contract).context("failed to read contract")?;
     let contract_bytes = hex::decode(contract_hex).context("failed to parse contract from hex")?;
-    let initcode = [contract_bytes, constructor_args.to_vec()].concat();
-    let initcode = RawBytes::serialize(BytesSer(&initcode))?;
-    let data = transaction_payload(
+    let contract_bytes = RawBytes::from(contract_bytes);
+
+    broadcast_and_print(
+        client,
         args,
-        &eam::EAM_ACTOR_ADDR,
-        eam::Method::CreateExternal as u64,
-        initcode,
-    )?;
-    broadcast_and_print(client, data, args.broadcast_mode, |data| {
-        Some(
-            parse_data(data)
-                .and_then(parse_create_return)
-                .map(create_return_to_json),
-        )
-    })
+        |mut client, value, gas_params| {
+            Box::pin(async move {
+                client
+                    .fevm_create(contract_bytes, constructor_args, value, gas_params)
+                    .await
+            })
+        },
+        create_return_to_json,
+    )
     .await
 }
 
 /// Deploy an EVM contract through RPC and print the response to STDOUT as JSON.
 async fn fevm_invoke(
-    client: HttpClient,
-    args: &TransArgs,
-    contract: &Address,
-    method: &RawBytes,
-    method_args: &RawBytes,
+    client: FendermintClient,
+    args: TransArgs,
+    contract: Address,
+    method: RawBytes,
+    method_args: RawBytes,
 ) -> anyhow::Result<()> {
-    let calldata = [method.to_vec(), method_args.to_vec()].concat();
-    let calldata = RawBytes::serialize(BytesSer(&calldata))?;
-    let data = transaction_payload(args, contract, evm::Method::InvokeContract as u64, calldata)?;
-    broadcast_and_print(client, data, args.broadcast_mode, |data| {
-        Some(
-            parse_data(data)
-                .and_then(|data| {
-                    fvm_ipld_encoding::from_slice::<BytesDe>(&data)
-                        .map(|bz| bz.0)
-                        .map_err(|e| anyhow!("failed to deserialize bytes: {e}"))
-                })
-                .map(|bz| serde_json::Value::String(hex::encode(bz))),
-        )
-    })
+    broadcast_and_print(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move {
+                client
+                    .fevm_invoke(contract, method, method_args, value, gas_params)
+                    .await
+            })
+        },
+        |data| serde_json::Value::String(hex::encode(&data)),
+    )
     .await
 }
 
-/// Broadcast a transaction to tendermint and print the results to STDOUT as JSON.
-async fn broadcast_and_print<F>(
-    client: HttpClient,
-    data: Vec<u8>,
-    mode: BroadcastMode,
-    parse_data: F,
-) -> anyhow::Result<()>
-where
-    F: FnOnce(&Bytes) -> Option<anyhow::Result<serde_json::Value>>,
-{
-    match mode {
-        BroadcastMode::Async => {
-            print_json(client.broadcast_tx_async(data).await?, |_| None, parse_data)
-        }
-        BroadcastMode::Sync => {
-            print_json(client.broadcast_tx_async(data).await?, |_| None, parse_data)
-        }
-        BroadcastMode::Commit => print_json(
-            client.broadcast_tx_commit(data).await?,
-            |r: &broadcast::tx_commit::Response| Some(&r.deliver_tx.data),
-            parse_data,
-        ),
-    }
-}
-
-/// Display some value as JSON.
-fn print_json<T, G, F>(value: T, get_data: G, parse_data: F) -> anyhow::Result<()>
-where
-    T: Serialize,
-    G: FnOnce(&T) -> Option<&Bytes>,
-    F: FnOnce(&Bytes) -> Option<anyhow::Result<serde_json::Value>>,
-{
-    let response = serde_json::to_value(&value)?;
-    let output = {
-        let return_data = match get_data(&value) {
-            None => None,
-            Some(bz) if bz.is_empty() => None,
-            Some(bz) => match parse_data(bz) {
-                None => None,
-                Some(Ok(return_json)) => Some(return_json),
-                Some(Err(e)) => Some(json!({
-                    "error": format!("error parsing return data: {e}")
-                })),
-            },
-        };
-        match return_data {
-            Some(return_data) => json!({"response": response, "return_data": return_data}),
-            None => json!({ "response": response }),
-        }
-    };
-    // Using "jsonline"; use `jq` to format.
-    let json = serde_json::to_string(&output)?;
+/// Print JSON as "jsonline"; use `jq` to format.
+fn print_json(value: serde_json::Value) -> anyhow::Result<()> {
+    let json = serde_json::to_string(&value)?;
     println!("{}", json);
     Ok(())
 }
 
-/// Construct transfer payload.
-fn transfer_payload(args: &TransArgs, to: &Address) -> anyhow::Result<Vec<u8>> {
-    transaction_payload(args, to, METHOD_SEND, Default::default())
-}
-
-/// Construct transaction payload.
-fn transaction_payload(
-    args: &TransArgs,
-    to: &Address,
-    method_num: MethodNum,
-    params: fvm_ipld_encoding::RawBytes,
-) -> anyhow::Result<Vec<u8>> {
-    let sk = read_secret_key(&args.secret_key)?;
-    let pk = PublicKey::from_secret_key(&sk);
-    let from = Address::new_secp256k1(&pk.serialize())?;
-    let message = FvmMessage {
-        version: Default::default(), // TODO: What does this do?
-        from,
-        to: *to,
-        sequence: args.sequence,
-        value: args.value.clone(),
-        method_num,
-        params,
-        gas_limit: args.gas_limit,
-        gas_fee_cap: args.gas_fee_cap.clone(),
-        gas_premium: args.gas_premium.clone(),
-    };
-    let signed = SignedMessage::new_secp256k1(message, &sk)?;
-    let chain = ChainMessage::Signed(Box::new(signed));
-    let data = fvm_ipld_encoding::to_vec(&chain)?;
-    Ok(data)
-}
-
-/// Fetch the query result from the server and print something to STDOUT.
-async fn abci_query_print<F>(
-    client: HttpClient,
-    height: Height,
-    query: FvmQuery,
-    render: F,
-) -> anyhow::Result<()>
-where
-    F: FnOnce(AbciQuery) -> anyhow::Result<String>,
-{
-    let data = fvm_ipld_encoding::to_vec(&query).context("failed to encode query")?;
-    let res: AbciQuery = client.abci_query(None, data, Some(height), false).await?;
-    if res.code.is_ok() {
-        let output = render(res)?;
-        println!("{}", output);
-    } else {
-        eprintln!("query returned non-zero exit code: {}", res.code.value());
-    }
-    Ok(())
-}
-
-// Retrieve the proxy URL with precedence:
-// 1. If supplied, that's the proxy URL used.
-// 2. If not supplied, but environment variable HTTP_PROXY or HTTPS_PROXY are
-//    supplied, then use the appropriate variable for the URL in question.
-//
-// Copied from `tendermint_rpc`.
-fn get_http_proxy_url(url_scheme: Scheme, proxy_url: Option<Url>) -> anyhow::Result<Option<Url>> {
-    match proxy_url {
-        Some(u) => Ok(Some(u)),
-        None => match url_scheme {
-            Scheme::Http => std::env::var("HTTP_PROXY").ok(),
-            Scheme::Https => std::env::var("HTTPS_PROXY")
-                .ok()
-                .or_else(|| std::env::var("HTTP_PROXY").ok()),
-            _ => {
-                if std::env::var("HTTP_PROXY").is_ok() || std::env::var("HTTPS_PROXY").is_ok() {
-                    tracing::warn!(
-                        "Ignoring HTTP proxy environment variables for non-HTTP client connection"
-                    );
-                }
-                None
-            }
-        }
-        .map(|u| u.parse::<Url>().map_err(|e| anyhow!(e)))
-        .transpose(),
-    }
-}
-
-fn http_client(url: Url, proxy_url: Option<Url>) -> anyhow::Result<HttpClient> {
-    let proxy_url = get_http_proxy_url(url.scheme(), proxy_url)?;
-    let client = match proxy_url {
-        Some(proxy_url) => {
-            tracing::debug!(
-                "Using HTTP client with proxy {} to submit request to {}",
-                proxy_url,
-                url
-            );
-            HttpClient::new_with_proxy(url, proxy_url)?
-        }
-        None => {
-            tracing::debug!("Using HTTP client to submit request to: {}", url);
-            HttpClient::new(url)?
-        }
-    };
-    Ok(client)
-}
-
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] into bytes.
-/// It looks like somewhere along the way it replaces them with the bytes of a Base64 encoded string.
-fn parse_data(data: &Bytes) -> anyhow::Result<Vec<u8>> {
-    let b64 = String::from_utf8(data.to_vec()).context("error parsing data as base64 string")?;
-    let data = base64::engine::general_purpose::STANDARD
-        .decode(&b64)
-        .context("error parsing base64 to bytes")?;
-    Ok(data)
-}
-
-/// Parse what Tendermint returns in the `data` field of `DeliverTx` as `CreateReturn`.
-fn parse_create_return(data: Vec<u8>) -> anyhow::Result<CreateReturn> {
-    fvm_ipld_encoding::from_slice::<eam::CreateReturn>(&data)
-        .map_err(|e| anyhow!("error parsing as CreateReturn: {e}"))
-}
-
+/// Print all the various addresses we can use to refer to an EVM contract.
 fn create_return_to_json(ret: CreateReturn) -> serde_json::Value {
-    // Print all the various addresses we can use to refer to an EVM contract.
     // The only reference I can point to about how to use them are the integration tests:
     // https://github.com/filecoin-project/ref-fvm/pull/1507
     // IIRC to call the contract we need to use the `actor_address` or the `delegated_address` in `to`.
@@ -350,4 +233,70 @@ fn create_return_to_json(ret: CreateReturn) -> serde_json::Value {
         "delegated_address": Address::new_delegated(eam::EAM_ACTOR_ID, &ret.eth_address.0).ok().map(|a| a.to_string()),
         "robust_address": ret.robust_address.map(|a| a.to_string())
     })
+}
+
+pub enum BroadcastResponse<T> {
+    Async(AsyncResponse<T>),
+    Sync(SyncResponse<T>),
+    Commit(CommitResponse<T>),
+}
+
+impl fendermint_rpc::tx::BroadcastMode for BroadcastMode {
+    type Response<T> = BroadcastResponse<T>;
+}
+
+struct TransClient {
+    inner: BoundFendermintClient<HttpClient>,
+    broadcast_mode: BroadcastMode,
+}
+
+impl TransClient {
+    pub fn new(client: FendermintClient, args: &TransArgs) -> anyhow::Result<Self> {
+        let sk = read_secret_key(&args.secret_key)?;
+        let mf = MessageFactory::new(sk, args.sequence)?;
+        let client = client.bind(mf);
+        let client = Self {
+            inner: client,
+            broadcast_mode: args.broadcast_mode,
+        };
+        Ok(client)
+    }
+}
+
+impl BoundClient for TransClient {
+    fn message_factory_mut(&mut self) -> &mut MessageFactory {
+        self.inner.message_factory_mut()
+    }
+}
+
+#[async_trait]
+impl TxClient<BroadcastMode> for TransClient {
+    async fn perform<F, T>(&self, msg: ChainMessage, f: F) -> anyhow::Result<BroadcastResponse<T>>
+    where
+        F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
+        T: Sync + Send,
+    {
+        match self.broadcast_mode {
+            BroadcastMode::Async => {
+                let res = TxClient::<TxAsync>::perform(&self.inner, msg, f).await?;
+                Ok(BroadcastResponse::Async(res))
+            }
+            BroadcastMode::Sync => {
+                let res = TxClient::<TxSync>::perform(&self.inner, msg, f).await?;
+                Ok(BroadcastResponse::Sync(res))
+            }
+            BroadcastMode::Commit => {
+                let res = TxClient::<TxCommit>::perform(&self.inner, msg, f).await?;
+                Ok(BroadcastResponse::Commit(res))
+            }
+        }
+    }
+}
+
+fn gas_params(args: &TransArgs) -> GasParams {
+    GasParams {
+        gas_limit: args.gas_limit,
+        gas_fee_cap: args.gas_fee_cap.clone(),
+        gas_premium: args.gas_premium.clone(),
+    }
 }
