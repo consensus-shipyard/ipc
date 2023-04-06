@@ -25,6 +25,7 @@ dirs = "5.0"
 futures = "0.3"
 hex = "0.4"
 k256 = "0.11"                                                       # Same as tendermint-rs
+lazy_static = "1.4"
 libsecp256k1 = "0.7"
 multihash = { version = "0.16.1", default-features = false }
 num-traits = "0.2"

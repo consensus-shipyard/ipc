@@ -12,7 +12,7 @@ use options::Options;
 
 #[tokio::main]
 async fn main() {
-    let opts = Options::parse();
+    let opts: Options = Options::parse();
 
     // Log events to stdout.
     if let Some(level) = opts.tracing_level() {

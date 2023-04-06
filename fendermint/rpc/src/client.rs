@@ -68,7 +68,7 @@ pub fn http_client(url: Url, proxy_url: Option<Url>) -> anyhow::Result<HttpClien
 }
 
 /// Unauthenticated Fendermint client.
-pub struct FendermintClient<C: Client = HttpClient> {
+pub struct FendermintClient<C = HttpClient> {
     inner: C,
 }
 
@@ -76,16 +76,10 @@ impl<C: Client> FendermintClient<C> {
     pub fn new(inner: C) -> Self {
         Self { inner }
     }
-    pub fn inner(&self) -> &C {
-        &self.inner
-    }
 
     /// Attach a message factory to the client.
     pub fn bind(self, message_factory: MessageFactory) -> BoundFendermintClient<C> {
-        BoundFendermintClient {
-            inner: self,
-            message_factory,
-        }
+        BoundFendermintClient::new(self.inner, message_factory)
     }
 }
 
@@ -96,29 +90,58 @@ impl FendermintClient<HttpClient> {
     }
 }
 
+/// Get to the underlying Tendermint client if necessary, for example to query the state of transactions.
+pub trait TendermintClient<C: Client> {
+    /// The underlying Tendermint client.
+    fn underlying(&self) -> &C;
+}
+
+impl<C: Client> TendermintClient<C> for FendermintClient<C> {
+    fn underlying(&self) -> &C {
+        &self.inner
+    }
+}
+
 #[async_trait]
 impl<C> QueryClient for FendermintClient<C>
 where
     C: Client + Sync + Send,
 {
     async fn perform(&self, query: FvmQuery, height: Option<Height>) -> anyhow::Result<AbciQuery> {
-        let data = fvm_ipld_encoding::to_vec(&query).context("failed to encode query")?;
-
-        let res = self.inner.abci_query(None, data, height, false).await?;
-
-        Ok(res)
+        perform_query(&self.inner, query, height).await
     }
 }
 
 /// Fendermint client capable of signing transactions.
-pub struct BoundFendermintClient<C: Client> {
-    inner: FendermintClient<C>,
+pub struct BoundFendermintClient<C = HttpClient> {
+    inner: C,
     message_factory: MessageFactory,
 }
 
-impl<C: Client> BoundClient for BoundFendermintClient<C> {
+impl<C> BoundFendermintClient<C>
+where
+    C: Client,
+{
+    pub fn new(inner: C, message_factory: MessageFactory) -> Self {
+        Self {
+            inner,
+            message_factory,
+        }
+    }
+}
+
+impl<C> BoundClient for BoundFendermintClient<C> {
     fn message_factory_mut(&mut self) -> &mut MessageFactory {
         &mut self.message_factory
+    }
+}
+
+impl<C> TendermintClient<C> for BoundFendermintClient<C>
+where
+    C: Client,
+{
+    fn underlying(&self) -> &C {
+        &self.inner
     }
 }
 
@@ -128,7 +151,7 @@ where
     C: Client + Sync + Send,
 {
     async fn perform(&self, query: FvmQuery, height: Option<Height>) -> anyhow::Result<AbciQuery> {
-        self.inner.perform(query, height).await
+        perform_query(&self.inner, query, height).await
     }
 }
 
@@ -142,7 +165,7 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = MessageFactory::serialize(&msg)?;
-        let response = self.inner.inner.broadcast_tx_async(data).await?;
+        let response = self.inner.broadcast_tx_async(data).await?;
         let response = AsyncResponse {
             response,
             return_data: PhantomData,
@@ -165,7 +188,7 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = MessageFactory::serialize(&msg)?;
-        let response = self.inner.inner.broadcast_tx_sync(data).await?;
+        let response = self.inner.broadcast_tx_sync(data).await?;
         let response = SyncResponse {
             response,
             return_data: PhantomData,
@@ -188,7 +211,7 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = MessageFactory::serialize(&msg)?;
-        let response = self.inner.inner.broadcast_tx_commit(data).await?;
+        let response = self.inner.broadcast_tx_commit(data).await?;
         let return_data = if response.deliver_tx.code.is_err() {
             None
         } else {
@@ -201,4 +224,19 @@ where
         };
         Ok(response)
     }
+}
+
+async fn perform_query<C>(
+    client: &C,
+    query: FvmQuery,
+    height: Option<Height>,
+) -> anyhow::Result<AbciQuery>
+where
+    C: Client + Sync + Send,
+{
+    let data = fvm_ipld_encoding::to_vec(&query).context("failed to encode query")?;
+
+    let res = client.abci_query(None, data, height, false).await?;
+
+    Ok(res)
 }

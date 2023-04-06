@@ -3,13 +3,14 @@
 
 use std::path::PathBuf;
 
+use bytes::Bytes;
 use cid::Cid;
 use clap::{Args, Subcommand, ValueEnum};
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use tendermint_rpc::Url;
 
-use crate::options::parse::{parse_address, parse_cid, parse_raw_bytes, parse_token_amount};
+use crate::options::parse::{parse_address, parse_bytes, parse_cid, parse_token_amount};
 
 #[derive(Args, Debug)]
 pub struct RpcArgs {
@@ -58,7 +59,7 @@ pub enum RpcCommands {
         #[arg(long, short)]
         method_number: MethodNum,
         /// Raw IPLD byte parameters to pass to the method, in hexadecimal format.
-        #[arg(long, short, value_parser = parse_raw_bytes)]
+        #[arg(long, short, value_parser = parse_bytes)]
         params: RawBytes,
         #[command(flatten)]
         args: TransArgs,
@@ -96,8 +97,8 @@ pub enum RpcFevmCommands {
         #[arg(long, short)]
         contract: PathBuf,
         /// ABI encoded constructor arguments passed to the EVM, expected to be in hexadecimal format.
-        #[arg(long, short, value_parser = parse_raw_bytes, default_value = "")]
-        constructor_args: RawBytes,
+        #[arg(long, short, value_parser = parse_bytes, default_value = "")]
+        constructor_args: Bytes,
     },
     /// Call an EVM contract; print the results as JSON with the return data rendered in hexadecimal format.
     Invoke {
@@ -105,11 +106,11 @@ pub enum RpcFevmCommands {
         #[arg(long, short)]
         contract: Address,
         /// ABI encoded method hash, expected to be in hexadecimal format.
-        #[arg(long, short, value_parser = parse_raw_bytes)]
-        method: RawBytes,
+        #[arg(long, short, value_parser = parse_bytes)]
+        method: Bytes,
         /// ABI encoded call arguments passed to the EVM, expected to be in hexadecimal format.
-        #[arg(long, short, value_parser = parse_raw_bytes, default_value = "")]
-        method_args: RawBytes,
+        #[arg(long, short, value_parser = parse_bytes, default_value = "")]
+        method_args: Bytes,
     },
 }
 

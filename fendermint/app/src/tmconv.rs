@@ -162,9 +162,8 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
         }
     };
 
-    // The height here is the height of the block that was committed, not in which the app hash appeared,
-    // so according to Tendermint docstrings we need to return plus one.
-    let height = tendermint::block::Height::try_from(block_height + 1).expect("height too big");
+    // The height here is the height of the block that was committed, not in which the app hash appeared.
+    let height = tendermint::block::Height::try_from(block_height).expect("height too big");
 
     response::Query {
         code: to_code(exit_code),

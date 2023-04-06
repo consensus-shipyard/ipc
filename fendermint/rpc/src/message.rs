@@ -1,11 +1,18 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::path::Path;
+
+use anyhow::Context;
+use base64::Engine;
+use bytes::Bytes;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum, METHOD_SEND};
 use libsecp256k1::{PublicKey, SecretKey};
+
+use crate::B64_ENGINE;
 
 /// Factory methods for signed transaction payload construction.
 pub struct MessageFactory {
@@ -21,9 +28,24 @@ impl MessageFactory {
         Ok(Self { sk, addr, sequence })
     }
 
-    /// Serialize a [`ChainMessage`] for inclusion in a Tendermint transaction.
+    /// Convenience method to read the secret key from a file, expected to be in Base64 format.
+    pub fn read_secret_key(sk: &Path) -> anyhow::Result<SecretKey> {
+        let b64 = std::fs::read_to_string(sk).context("failed to read secret key")?;
+        let bz: Vec<u8> = B64_ENGINE
+            .decode(&b64)
+            .context("failed to parse base64 string")?;
+        let sk = SecretKey::parse_slice(&bz)?;
+        Ok(sk)
+    }
+
+    /// Convenience method to serialize a [`ChainMessage`] for inclusion in a Tendermint transaction.
     pub fn serialize(message: &ChainMessage) -> anyhow::Result<Vec<u8>> {
         Ok(fvm_ipld_encoding::to_vec(message)?)
+    }
+
+    /// Actor address.
+    pub fn address(&self) -> &Address {
+        &self.addr
     }
 
     /// Transfer tokens to another account.
@@ -66,8 +88,8 @@ impl MessageFactory {
     /// Deploy a FEVM contract.
     pub fn fevm_create(
         &mut self,
-        contract: RawBytes,
-        constructor_args: RawBytes,
+        contract: Bytes,
+        constructor_args: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
@@ -87,12 +109,10 @@ impl MessageFactory {
     pub fn fevm_invoke(
         &mut self,
         contract: Address,
-        method: RawBytes,
-        method_args: RawBytes,
+        calldata: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let calldata = [method.to_vec(), method_args.to_vec()].concat();
         let calldata = RawBytes::serialize(BytesSer(&calldata))?;
         let message = self.transaction(
             contract,
@@ -105,6 +125,7 @@ impl MessageFactory {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct GasParams {
     /// Maximum amount of gas that can be charged.
     pub gas_limit: u64,

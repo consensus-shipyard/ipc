@@ -7,6 +7,7 @@ use std::pin::Pin;
 
 use anyhow::Context;
 use async_trait::async_trait;
+use bytes::Bytes;
 use fendermint_rpc::client::BoundFendermintClient;
 use fendermint_rpc::tx::{
     AsyncResponse, BoundClient, CommitResponse, SyncResponse, TxAsync, TxClient, TxCommit, TxSync,
@@ -46,7 +47,7 @@ cmd! {
         transfer(client, args, to).await
       },
       RpcCommands::Transaction { args, to, method_number, params } => {
-        transact(client, args, to, method_number, params.clone()).await
+        transaction(client, args, to, method_number, params.clone()).await
       },
       RpcCommands::Fevm { args, command } => match command {
         RpcFevmCommands::Create { contract, constructor_args } => {
@@ -72,7 +73,7 @@ async fn query(
             None => eprintln!("CID not found"),
         },
         RpcQueryCommands::ActorState { address } => {
-            match client.actor_state(&address, height).await? {
+            match client.actor_state(&address, Some(height)).await? {
                 Some((id, state)) => {
                     let out = json! ({
                       "id": id,
@@ -140,7 +141,7 @@ async fn transfer(client: FendermintClient, args: TransArgs, to: Address) -> any
 /// Execute a transaction through RPC and print the response to STDOUT as JSON.
 ///
 /// If there was any data returned it's rendered in hexadecimal format.
-async fn transact(
+async fn transaction(
     client: FendermintClient,
     args: TransArgs,
     to: Address,
@@ -169,11 +170,11 @@ async fn fevm_create(
     client: FendermintClient,
     args: TransArgs,
     contract: PathBuf,
-    constructor_args: RawBytes,
+    constructor_args: Bytes,
 ) -> anyhow::Result<()> {
     let contract_hex = std::fs::read_to_string(contract).context("failed to read contract")?;
     let contract_bytes = hex::decode(contract_hex).context("failed to parse contract from hex")?;
-    let contract_bytes = RawBytes::from(contract_bytes);
+    let contract_bytes = Bytes::from(contract_bytes);
 
     broadcast_and_print(
         client,
@@ -195,16 +196,17 @@ async fn fevm_invoke(
     client: FendermintClient,
     args: TransArgs,
     contract: Address,
-    method: RawBytes,
-    method_args: RawBytes,
+    method: Bytes,
+    method_args: Bytes,
 ) -> anyhow::Result<()> {
+    let calldata = Bytes::from([method, method_args].concat());
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
             Box::pin(async move {
                 client
-                    .fevm_invoke(contract, method, method_args, value, gas_params)
+                    .fevm_invoke(contract, calldata, value, gas_params)
                     .await
             })
         },
@@ -230,7 +232,7 @@ fn create_return_to_json(ret: CreateReturn) -> serde_json::Value {
         "actor_address": Address::new_id(ret.actor_id).to_string(),
         "actor_id_as_eth_address": hex::encode(eam::EthAddress::from_id(ret.actor_id).0),
         "eth_address": hex::encode(ret.eth_address.0),
-        "delegated_address": Address::new_delegated(eam::EAM_ACTOR_ID, &ret.eth_address.0).ok().map(|a| a.to_string()),
+        "delegated_address": ret.delegated_address().to_string(),
         "robust_address": ret.robust_address.map(|a| a.to_string())
     })
 }

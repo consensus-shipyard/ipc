@@ -51,6 +51,8 @@ pub enum AppError {
     InvalidSignature = 52,
     /// User sent a message they should not construct.
     IllegalMessage = 53,
+    /// The genesis block hasn't been initialized yet.
+    NotInitialized = 54,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -150,6 +152,7 @@ where
     /// Ensure the store has some initial state.
     fn init_committed_state(&self) -> Result<()> {
         if self.get_committed_state()?.is_none() {
+            // We need to be careful never to run a query on this.
             let mut state_tree =
                 empty_state_tree(self.clone_db()).context("failed to create empty state tree")?;
             let state_root = state_tree.flush()?;
@@ -233,14 +236,15 @@ where
         Ok(ret)
     }
 
-    /// Look up a past state hash at a particular height Tendermint Core is looking for,
-    /// which will be +1 shifted from what we saved. If the height is zero, it means it
-    /// wants the latest height.
+    /// Look up a past state hash at a particular height Tendermint Core is looking for.
+    /// A height of zero means we are looking for the latest state.
+    /// The genesis block state is saved under height 1.
+    /// Under height 0 we saved the empty state, which we must not query.
     ///
     /// Returns the CID and the height of the block which committed it.
     fn state_root_at_height(&self, height: Height) -> Result<(Cid, BlockHeight)> {
-        if height.value() > 0 {
-            let h = height.value() - 1;
+        let h = height.value();
+        if h > 0 {
             let tx = self.db.read();
             let sh = self
                 .state_hist
@@ -364,6 +368,22 @@ where
     async fn query(&self, request: request::Query) -> AbciResult<response::Query> {
         let db = self.clone_db();
         let (state_root, block_height) = self.state_root_at_height(request.height)?;
+
+        tracing::info!(
+            query_height = request.height.value(),
+            block_height,
+            state_root = state_root.to_string(),
+            "running query"
+        );
+
+        // Don't run queries on the empty state, they won't work.
+        if block_height == 0 {
+            return Ok(invalid_query(
+                AppError::NotInitialized,
+                "The app hasn't been initialized yet.".to_owned(),
+            ));
+        }
+
         let state = FvmQueryState::new(db, state_root).context("error creating query state")?;
         let qry = (request.path, request.data.to_vec());
 
