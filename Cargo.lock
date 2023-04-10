@@ -2470,7 +2470,7 @@ dependencies = [
 [[package]]
 name = "ipc-gateway"
 version = "0.0.1"
-source = "git+https://github.com/consensus-shipyard/ipc-actors.git#186a7cb1e6b1745d9013b4556a14e5ffc0c09929"
+source = "git+https://github.com/consensus-shipyard/ipc-actors.git?tag=v0.1.0#186a7cb1e6b1745d9013b4556a14e5ffc0c09929"
 dependencies = [
  "anyhow",
  "cid",
@@ -2499,7 +2499,7 @@ dependencies = [
 [[package]]
 name = "ipc-sdk"
 version = "0.0.1"
-source = "git+https://github.com/consensus-shipyard/ipc-actors.git#186a7cb1e6b1745d9013b4556a14e5ffc0c09929"
+source = "git+https://github.com/consensus-shipyard/ipc-actors.git?tag=v0.1.0#186a7cb1e6b1745d9013b4556a14e5ffc0c09929"
 dependencies = [
  "fil_actors_runtime",
  "fvm_ipld_encoding 0.3.3",
@@ -2515,7 +2515,7 @@ dependencies = [
 [[package]]
 name = "ipc-subnet-actor"
 version = "0.0.1"
-source = "git+https://github.com/consensus-shipyard/ipc-actors.git#186a7cb1e6b1745d9013b4556a14e5ffc0c09929"
+source = "git+https://github.com/consensus-shipyard/ipc-actors.git?tag=v0.1.0#186a7cb1e6b1745d9013b4556a14e5ffc0c09929"
 dependencies = [
  "anyhow",
  "cid",
