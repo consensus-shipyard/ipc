@@ -45,7 +45,7 @@ impl CommandLineHandler for JoinSubnet {
 }
 
 #[derive(Debug, Args)]
-#[command(about = "Join a subnet")]
+#[command(name = "join", about = "Join a subnet")]
 pub struct JoinSubnetArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,

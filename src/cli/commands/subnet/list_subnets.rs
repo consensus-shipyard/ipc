@@ -62,6 +62,7 @@ impl CommandLineHandler for ListSubnets {
 
 #[derive(Debug, Args)]
 #[command(
+    name = "list",
     about = "List all child subnets registered in the gateway (i.e. that have provided enough collateral)"
 )]
 pub(crate) struct ListSubnetsArgs {
