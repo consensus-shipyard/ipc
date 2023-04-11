@@ -8,12 +8,12 @@ use fvm_shared::{address::Address, econ::TokenAmount};
 use libsecp256k1::curve::Affine;
 use libsecp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+
+use fendermint_vm_encoding::IsHumanReadable;
 
 #[cfg(feature = "arb")]
 mod arb;
-mod encoding;
-
-use encoding::{deserialize_tokens, serialize_tokens};
 
 /// Unix timestamp (in seconds).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -31,17 +31,18 @@ impl Timestamp {
 ///
 /// TODO: This is based on [Lotus](https://github.com/filecoin-project/lotus/blob/v1.20.4/genesis/types.go).
 ///       Not sure if anything but public key addresses make sense here. Consider using `PublicKey` instead of `Address`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ActorAddr(pub Address);
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignerAddr(#[serde_as(as = "IsHumanReadable")] pub Address);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Account {
-    pub owner: ActorAddr,
+    pub owner: SignerAddr,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Multisig {
-    pub signers: Vec<ActorAddr>,
+    pub signers: Vec<SignerAddr>,
     pub threshold: u64,
     pub vesting_duration: u64,
     pub vesting_start: u64,
@@ -53,13 +54,11 @@ pub enum ActorMeta {
     Multisig(Multisig),
 }
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Actor {
     pub meta: ActorMeta,
-    #[serde(
-        serialize_with = "serialize_tokens",
-        deserialize_with = "deserialize_tokens"
-    )]
+    #[serde_as(as = "IsHumanReadable")]
     pub balance: TokenAmount,
 }
 
@@ -105,15 +104,13 @@ pub struct Validator {
     pub power: Power,
 }
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
     pub timestamp: Timestamp,
     pub network_name: String,
     pub network_version: NetworkVersion,
-    #[serde(
-        serialize_with = "serialize_tokens",
-        deserialize_with = "deserialize_tokens"
-    )]
+    #[serde_as(as = "IsHumanReadable")]
     pub base_fee: TokenAmount,
     pub validators: Vec<Validator>,
     pub accounts: Vec<Actor>,

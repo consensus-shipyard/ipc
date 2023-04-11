@@ -7,7 +7,7 @@ use fvm_shared::address::Address;
 use std::path::PathBuf;
 
 use fendermint_vm_genesis::{
-    Account, Actor, ActorAddr, ActorMeta, Genesis, Multisig, Power, Timestamp, Validator,
+    Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Timestamp, Validator,
     ValidatorKey,
 };
 
@@ -79,7 +79,7 @@ fn add_account(genesis_file: &PathBuf, args: &GenesisAddAccountArgs) -> anyhow::
         let pk = read_public_key(&args.public_key)?;
         let addr = Address::new_secp256k1(&pk.serialize())?;
         let meta = ActorMeta::Account(Account {
-            owner: ActorAddr(addr),
+            owner: SignerAddr(addr),
         });
         if genesis.accounts.iter().any(|a| a.meta == meta) {
             return Err(anyhow!("account already exists in the genesis file"));
@@ -98,7 +98,7 @@ fn add_multisig(genesis_file: &PathBuf, args: &GenesisAddMultisigArgs) -> anyhow
         let mut signers = Vec::new();
         for p in &args.public_key {
             let pk = read_public_key(p)?;
-            let addr = ActorAddr(Address::new_secp256k1(&pk.serialize())?);
+            let addr = SignerAddr(Address::new_secp256k1(&pk.serialize())?);
             if signers.contains(&addr) {
                 return Err(anyhow!("duplicated signer: {}", p.to_string_lossy()));
             }

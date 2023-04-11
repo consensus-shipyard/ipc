@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::{
-    Account, Actor, ActorAddr, ActorMeta, Genesis, Multisig, Power, Timestamp, Validator,
+    Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Timestamp, Validator,
     ValidatorKey,
 };
 use fendermint_testing::arb::{ArbAddress, ArbTokenAmount};
@@ -11,14 +11,15 @@ use rand::{rngs::StdRng, SeedableRng};
 
 impl Arbitrary for ActorMeta {
     fn arbitrary(g: &mut Gen) -> Self {
+        // NOTE: Signer addresses are probably only valid with public keys, but here we don't care.
         if bool::arbitrary(g) {
             ActorMeta::Account(Account {
-                owner: ActorAddr(ArbAddress::arbitrary(g).0),
+                owner: SignerAddr(ArbAddress::arbitrary(g).0),
             })
         } else {
             let n = u64::arbitrary(g) % 4 + 2;
             let signers = (0..n)
-                .map(|_| ActorAddr(ArbAddress::arbitrary(g).0))
+                .map(|_| SignerAddr(ArbAddress::arbitrary(g).0))
                 .collect();
             let threshold = u64::arbitrary(g) % n + 1;
             ActorMeta::Multisig(Multisig {
