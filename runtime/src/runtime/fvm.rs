@@ -23,6 +23,10 @@ use crate::runtime::{ActorCode, MessageInfo, Primitives};
 use crate::{actor_error, deserialize_block, ActorError, Runtime, Type};
 
 pub const PUBKEY_ADDRESS_METHOD: u64 = 2;
+// The original method is `2`, but we have a custom account actor
+// with a public function for public address resolution so it can be
+// called from non-builtin actors
+pub const PUBLIC_RESOLVE_ADDRESS_METHOD: u64 = frc42_dispatch::method_hash!("ResolvePubKeyAddress");
 
 lazy_static! {
     /// Cid of the empty array Cbor bytes (`EMPTY_ARR_BYTES`).
@@ -435,7 +439,12 @@ pub fn resolve_secp_bls(rt: &mut impl Runtime, addr: &Address) -> Result<Address
             )))
         }
     };
-    let ret = rt.send(&resolved, PUBKEY_ADDRESS_METHOD, None, TokenAmount::zero())?;
+    let ret = rt.send(
+        &resolved,
+        PUBLIC_RESOLVE_ADDRESS_METHOD,
+        None,
+        TokenAmount::zero(),
+    )?;
 
     deserialize_block(ret)
 }
