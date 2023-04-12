@@ -8,5 +8,6 @@ cd ./lotus
 docker build -t eudico .
 cd ..
 mkdir -p ./bin
+mkdir -p ./bin/ipc-infra
 cp -rf ./lotus/scripts/ipc/* ./bin/ipc-infra
 rm -rf ./lotus
