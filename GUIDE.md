@@ -146,7 +146,7 @@ $ ./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1251 1351 /root/<SUBNET_ID> ~/.
 $ ./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1252 1352 /root/<SUBNET_ID> ~/.ipc-agent/wallet2.key
 $ ./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1253 1353 /root/<SUBNET_ID> ~/.ipc-agent/wallet3.key
 ```
-* If the deployment is successful, each of these nodes should return the following output at the end of their logs. You will need it in the next step.
+* If the deployment is successful, each of these nodes should return the following output at the end of their logs. Save the information for the next step.
 ```
 >>> Subnet /root/<SUBNET_ID> daemon running in container: <CONTAINER_ID_#> (friendly name: <CONTAINER_NAME_#>)
 >>> Token to /root/<SUBNET_ID> daemon: <AUTH_TOKEN_#>
