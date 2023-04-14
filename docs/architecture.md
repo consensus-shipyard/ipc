@@ -1,4 +1,4 @@
-# IPC Agent
+# IPC Agent Architecture
 
 The IPC Agent is a process faciliting the participation of Filecoin clients like Lotus in the InterPlanetary Consensus (formerly Hierarchical Consensus).
 
