@@ -56,7 +56,7 @@ $ (cd ipc-agent && make build && make install-infra)
 ```
 * Download and compile eudico (might take a while)
 ```bash
-$ git clone https://github.com/consensus-shipyard/lotus
+$ git clone https://github.com/consensus-shipyard/lotus.git
 $ (cd lotus && make spacenet)
 ```
 
