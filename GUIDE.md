@@ -162,7 +162,7 @@ $ ./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1253 1353 /root/<SUBNET_ID> ~/.
 
 For ease of use, we'll import the remaining keys into the first validator, via which the IPC Agent will act on behalf of all.
 
-* Copy the wallets into the docker containers and import them
+* Copy the wallet keys into the docker container and import them
 ```bash
 $ docker cp ~/.ipc-agent/wallet2.key <CONTAINER_NAME_1>:/input.key && docker exec -it <CONTAINER_NAME_1> eudico wallet import --format=json-lotus input.key
 $ docker cp ~/.ipc-agent/wallet3.key <CONTAINER_NAME_1>:/input.key && docker exec -it <CONTAINER_NAME_1> eudico wallet import --format=json-lotus input.key
