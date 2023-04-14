@@ -107,7 +107,7 @@ $ nohup ./ipc-agent/bin/ipc-agent daemon &
 
 * The next step is to create a subnet under `/root`
 ```bash
-$ ./ipc-agent/bin/ipc-agent subnet create -p /root -n test --min-validator-stake 1 --min-validators 2 --finality-threshold 10 --check-period 10
+$ ./ipc-agent/bin/ipc-agent subnet create -p /root -n andromeda --min-validator-stake 1 --min-validators 2 --finality-threshold 10 --check-period 10
 ```
 * Make a note of the address of the subnet you created (`/root/<SUBNET_ID>`)
 
@@ -177,7 +177,7 @@ $ nano ~/.ipc-agent/config.toml
 [[subnets]]
 id = "/root/<SUBNET_ID>"
 gateway_addr = "t064"
-network_name = "Andromeda"
+network_name = "andromeda"
 jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
 auth_token = "<AUTH_TOKEN_1>"
 accounts = ["<WALLET_1>", "<WALLET_2>", "<WALLET_3>"]
