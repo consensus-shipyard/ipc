@@ -1,4 +1,4 @@
-# Deploying your first subnet
+# IPC101: Deploying your first subnet
 
 Ready to test the waters with your first subnet? This guide will deploy a subnet with multiple local validators orchestrated by the same IPC agent. This subnet will be anchored to the public Spacenet. This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
 
