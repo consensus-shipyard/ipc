@@ -38,3 +38,15 @@ Generally, the issue is that:
 ## My agent is not submitting checkpoints after an error
 
 Try running `./bin/ipc-agent config reload`, this should pick up the latest config and restart all checkpointing processes. If the error has been fixed or it was an network instability between the agent and your subnet daemon, checkpoints should start being committed again seamlessly.
+
+### I set the wrong validator address or need to change it
+
+It may be the case that while joining the subnet, you didn't set the multiaddress for your validator correctly and you need to update it. You'll realize that the network address of your validator is not configured correctly, because your agent throws an error when trying to connect to your subnet node, or starting the validator in your subnet throws a network-related error.
+
+Changing the validator is as simple as running the following command:
+```bash
+$ ./bin/ipc-agent subnet set-validator-net-addr --subnet <subnet-id> --validator-net-addr <new-validator-addr>
+
+# Example execution
+$ ./bin/ipc-agent subnet set-validator-net-addr --subnet /root/t01002 --validator-net-addr "/dns/host.docker.internal/tcp/1349/p2p/12D3KooWDeN3bTvZEH11s9Gq5bDeZZLKgRZiMDcy2KmA6mUaT9KE"
+```
