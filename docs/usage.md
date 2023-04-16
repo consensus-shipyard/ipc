@@ -1,8 +1,22 @@
 # Using the IPC Agent
 
+## Listing active subnets
+
+As a sanity-check that we have joined the subnet successfully and that we provided enough collateral to register the subnet to IPC, we can list the child subnets of our parent with the following command:
+
+```bash
+$ ./bin/ipc-agent list-subnets --gateway-address=<gateway-addr> --subnet=<parent-subnet-id>
+
+# Sample execution
+$ ./bin/ipc-agent list-subnets --gateway-address=t064 --subnet=/root
+[2023-03-30T17:00:25Z INFO  ipc_agent::cli::commands::manager::list_subnets] /root/t01003 - status: 0, collateral: 2 FIL, circ.supply: 0.0 FIL
+```
+
+This command only shows subnets that have been registered to the gateway, i.e. that have provided enough collateral to participate in the IPC protocol and haven't been killed. It is not an exhaustive list of all of the subnet actors deployed over the network.
+
 ## Joining a subnet
 
-With the daemon for a subnet deployed, we can join the subnet:
+With the daemon for a subnet deployed (see [instructions](/docs/subnet.md)), one can join the subnet:
 ```bash
 $ ./bin/ipc-agent subnet join --subnet <subnet-id> --collateral <collateral_amount> --validator-net-addr <libp2p-add-validator>
 
@@ -32,31 +46,6 @@ $ ./bin/ipc-agent subnet leave --subnet /root/t01002
 ```
 Leaving a subnet will release the collateral for the validator and remove all the validation rights from its account. This means that if you have a validator running in that subnet, its validation process will immediately terminate.
 
-### Listing active subnets
-
-As a sanity-check that we have joined the subnet successfully and that we provided enough collateral to register the subnet to IPC, we can list the child subnets of our parent with the following command:
-
-```bash
-$ ./bin/ipc-agent list-subnets --gateway-address=<gateway-addr> --subnet=<parent-subnet-id>
-
-# Sample execution
-$ ./bin/ipc-agent list-subnets --gateway-address=t064 --subnet=/root
-[2023-03-30T17:00:25Z INFO  ipc_agent::cli::commands::manager::list_subnets] /root/t01003 - status: 0, collateral: 2 FIL, circ.supply: 0.0 FIL
-```
-
-This command only shows subnets that have been registered to the gateway, i.e. that have provided enough collateral to participate in the IPC protocol and haven't been killed. It is not an exhaustive list of all of the subnet actors deployed over the network.
-
-### Changing subnet validator network address
-
-It may be the case that while joining the subnet, you didn't set the multiaddress for your validator correctly and you need to update it. You'll realize that the network address of your validator is not configured correctly, because your agent throws an error when trying to connect to your subnet node, or starting the validator in your subnet throws a network-related error.
-
-Changing the validator is as simple as running the following command:
-```bash
-$ ./bin/ipc-agent subnet set-validator-net-addr --subnet <subnet-id> --validator-net-addr <new-validator-addr>
-
-# Example execution
-$ ./bin/ipc-agent subnet set-validator-net-addr --subnet /root/t01002 --validator-net-addr "/dns/host.docker.internal/tcp/1349/p2p/12D3KooWDeN3bTvZEH11s9Gq5bDeZZLKgRZiMDcy2KmA6mUaT9KE"
-```
 
 ### Listing checkpoints from a subnet
 
