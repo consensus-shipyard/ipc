@@ -34,8 +34,7 @@ See:
 - [docs/usage.md](docs/usage.md) for instructions on how to use the IPC Agent to interact with subnets
 - [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions
 
-High level documentation on IPC is available on docs.filecoin.io [TODO: link to section].
-
+For a detailed overview of the entire IPC stack design, please check the up-to-date [IPC Design Reference](https://github.com/consensus-shipyard/IPC-design-reference-spec/blob/main/main.pdf) doc.
 
 ## Building
 
