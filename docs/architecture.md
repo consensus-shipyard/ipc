@@ -4,9 +4,6 @@
 
 The IPC Agent is a process faciliting the participation of Filecoin clients like Lotus in the InterPlanetary Consensus (formerly Hierarchical Consensus).
 
-Please refer to the [IPC Agent Design](https://docs.google.com/document/d/14lkRRv6MQYnuEfp2GoGngdD8Q5YgfE38D8HTZWKgKf4) document for details on the agent.
-
-
 # IPLD Resolver
 
 The [IPLD Resolver](../ipld/resolver) is a library that IPC Agents can use to exchange data between subnets in IPLD format.
