@@ -1,14 +1,14 @@
 # IPC Quick Start: zero-to-subnet
 
+>💡 Background and detailed are available in the [README](/README.md).
+
 Ready to test the waters with your first subnet? This guide will deploy a subnet with multiple local validators orchestrated by the same IPC agent. This subnet will be anchored to the public Spacenet. This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
 
 Several steps in this guide involve running long-lived processes. These commands are usually prefaced with `nohup` so that they run in the background. For improved usability, we recommend instead using a `screen` session and spawning a new window for each of these commands. In that case, you should omit `nohup` and `&`.
 
->💡 For more background and information, make sure to start with the [README](/README.md).
-
 ## Step 0: Prepare your system
 
-We assume a Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. More details on IPC-specific requirements can also be found in the [IPC Agent readme](https://github.com/consensus-shipyard/ipc-agent).
+We assume a Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. Details on IPC-specific requirements can also be found in the [README](/README.md).
 
 * Install basic dependencies [Ubuntu/Debian] ([details](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms))
 ```bash
