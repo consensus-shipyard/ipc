@@ -6,7 +6,7 @@ The IPC Agent is a process faciliting the participation of Filecoin clients like
 
 # IPLD Resolver
 
-The [IPLD Resolver](../ipld/resolver) is a library that IPC Agents can use to exchange data between subnets in IPLD format.
+The [IPLD Resolver](/ipld/resolver) is a library that IPC Agents can use to exchange data between subnets in IPLD format.
 
 ## Checkpointing
 

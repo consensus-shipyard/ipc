@@ -1,4 +1,4 @@
-# Deploying an IPC subnet
+# Deploying IPC subnet infrastructure
 
 >💡 For background and setup information, make sure to start with the [README](/README.md).
 
