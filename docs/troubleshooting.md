@@ -1,4 +1,6 @@
-# Troubleshooting
+# Troubleshooting IPC
+
+>💡 For background and setup information, make sure to start with the [README](/README.md).
 
 ## I need to upgrade my IPC agent
 

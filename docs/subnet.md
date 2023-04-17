@@ -1,6 +1,8 @@
-# Deploying a subnet
+# Deploying an IPC subnet
 
-To spawn a new subnet, our IPC agent should be connected to at least the subnet of the parent we want to spawn the subnet from. You can refer to the [readme](/readme) for information on how to run or connect to a rootnet. This instructions will assume the deployment of a subnet from `/root`, but the steps are equivalent for any other parent subnet. 
+>💡 For background and setup information, make sure to start with the [README](/README.md).
+
+To spawn a new subnet, our IPC agent should be connected to at least the subnet of the parent we want to spawn the subnet from. You can refer to the [readme](/README.md) for information on how to run or connect to a rootnet. This instructions will assume the deployment of a subnet from `/root`, but the steps are equivalent for any other parent subnet. 
 
 ## Preliminaries
 
