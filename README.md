@@ -26,6 +26,8 @@ Options:
 
 The IPC Agent is the entry point to interacting with IPC. It is a client application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.
 
+>💡 **We've prepared a [quick start guide](/docs/quickstart.md) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
+
 See:
 - [docs/architecture.md](docs/architecture.md) for a conceptual overview of the tool
 - [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture
@@ -34,7 +36,6 @@ See:
 
 High level documentation on IPC is available on docs.filecoin.io [TODO: link to section].
 
->💡 **We also provide a quick start guide [TODO: link to page] that will have you running and validating on your own subnet in a matter of minutes!**
 
 ## Building
 
