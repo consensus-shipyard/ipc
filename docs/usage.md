@@ -1,5 +1,7 @@
 # Using the IPC Agent
 
+>💡 For background and setup information, make sure to start with the [README](/README.md).
+
 ## Listing active subnets
 
 As a sanity-check that we have joined the subnet successfully and that we provided enough collateral to register the subnet to IPC, we can list the child subnets of our parent with the following command:
