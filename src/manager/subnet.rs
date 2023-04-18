@@ -8,11 +8,10 @@ use async_trait::async_trait;
 use cid::Cid;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_gateway::Checkpoint;
+use ipc_gateway::BottomUpCheckpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{ConstructParams, JoinParams};
 
-use crate::lotus::message::ipc::CheckpointResponse;
 use crate::lotus::message::{ipc::SubnetInfo, wallet::WalletKeyType};
 
 /// Trait to interact with a subnet and handle its lifecycle.
@@ -41,14 +40,6 @@ pub trait SubnetManager {
 
     /// Sends a signal to kill a subnet
     async fn kill_subnet(&self, subnet: SubnetID, from: Address) -> Result<()>;
-
-    /// Submits a checkpoint for a subnet from a wallet address.
-    async fn submit_checkpoint(
-        &self,
-        subnet: SubnetID,
-        from: Address,
-        ch: Checkpoint,
-    ) -> Result<()>;
 
     /// Lists all the registered children in a gateway.
     async fn list_child_subnets(
@@ -107,11 +98,14 @@ pub trait SubnetManager {
     ///  Create new wallet in a subnet
     async fn wallet_new(&self, key_type: WalletKeyType) -> Result<Address>;
 
+    /// Returns the epoch of the latest top-down checkpoint executed
+    async fn last_topdown_executed(&self) -> Result<ChainEpoch>;
+
     /// Returns the list of checkpoints from a subnet actor for the given epoch range.
     async fn list_checkpoints(
         &self,
         subnet_id: SubnetID,
         from_epoch: ChainEpoch,
         to_epoch: ChainEpoch,
-    ) -> Result<Vec<CheckpointResponse>>;
+    ) -> Result<Vec<BottomUpCheckpoint>>;
 }

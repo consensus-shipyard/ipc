@@ -5,11 +5,33 @@
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
+use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::de::{Error, MapAccess};
-use serde::Deserializer;
+use serde::{Deserialize, Deserializer};
 use std::fmt::Formatter;
 use std::str::FromStr;
+
+/// A serde deserialization method to deserialize a ipc address from map
+pub fn deserialize_ipc_address_from_map<'de, D>(
+    deserializer: D,
+) -> anyhow::Result<IPCAddress, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    struct IPCAddressInner {
+        #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
+        pub subnet_id: SubnetID,
+        #[serde(deserialize_with = "deserialize_address_from_str")]
+        pub raw_address: Address,
+    }
+
+    let inner = IPCAddressInner::deserialize(deserializer)?;
+    let ipc = IPCAddress::new(&inner.subnet_id, &inner.raw_address).map_err(D::Error::custom)?;
+    Ok(ipc)
+}
 
 /// A serde deserialization method to deserialize a subnet id from map
 pub fn deserialize_subnet_id_from_map<'de, D>(deserializer: D) -> anyhow::Result<SubnetID, D::Error>
@@ -93,4 +115,27 @@ where
         }
     }
     deserializer.deserialize_str(TokenAmountVisitor)
+}
+
+/// A serde deserialization method to deserialize an address from string
+pub fn deserialize_address_from_str<'de, D>(deserializer: D) -> anyhow::Result<Address, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct AddressVisitor;
+    impl<'de> serde::de::Visitor<'de> for AddressVisitor {
+        type Value = Address;
+
+        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+            formatter.write_str("a string")
+        }
+
+        fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: Error,
+        {
+            Address::from_str(v).map_err(E::custom)
+        }
+    }
+    deserializer.deserialize_str(AddressVisitor)
 }

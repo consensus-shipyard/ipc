@@ -1,17 +1,21 @@
-use cid::Cid;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use fvm_shared::address::Address;
+use cid::Cid;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use ipc_gateway::{Checkpoint, Status, CHECKPOINT_GENESIS_CID};
+use fvm_shared::MethodNum;
+use ipc_gateway::checkpoint::BatchCrossMsgs;
+use ipc_gateway::{BottomUpCheckpoint, CrossMsg, Status, StorableMsg};
+use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
 use primitives::TCid;
 use serde::{Deserialize, Serialize};
 
 use crate::lotus::message::deserialize::{
-    deserialize_subnet_id_from_map, deserialize_token_amount_from_str,
+    deserialize_ipc_address_from_map, deserialize_subnet_id_from_map,
+    deserialize_token_amount_from_str,
 };
 use crate::lotus::message::serialize::{
     serialize_subnet_id_to_str, serialize_token_amount_to_atto,
@@ -30,7 +34,11 @@ pub struct IPCGetPrevCheckpointForChildResponse {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct IPCReadGatewayStateResponse {
-    pub check_period: ChainEpoch,
+    pub bottom_up_check_period: ChainEpoch,
+    pub top_down_check_period: ChainEpoch,
+    pub applied_topdown_nonce: u64,
+    pub top_down_checkpoint_voting: Voting,
+    pub initialized: bool,
 }
 
 /// The state of a subnet actor. The struct omits all fields that are not relevant for the
@@ -38,9 +46,19 @@ pub struct IPCReadGatewayStateResponse {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct IPCReadSubnetActorStateResponse {
-    pub check_period: ChainEpoch,
+    pub bottom_up_check_period: ChainEpoch,
     pub validator_set: ValidatorSet,
     pub min_validators: u64,
+    pub bottom_up_checkpoint_voting: Voting,
+}
+
+/// A subset of the voting structure with information
+/// about a checkpoint voting
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct Voting {
+    pub genesis_epoch: i64,
+    pub last_voting_executed: i64,
 }
 
 /// SubnetInfo is an auxiliary struct that collects relevant information about the state of a subnet
@@ -88,20 +106,20 @@ pub struct Validator {
     pub weight: String,
 }
 
-/// This deserializes from the `gateway::Checkpoint`, we need to redefine
+/// This deserializes from the `gateway::BottomUpCheckpoint`, we need to redefine
 /// here because the Lotus API json serializes and the cbor tuple deserializer is not
 /// able to pick it up automatically
 #[derive(Deserialize, Serialize, Debug)]
-pub struct CheckpointResponse {
+pub struct BottomUpCheckpointWrapper {
     #[serde(rename(deserialize = "Data"))]
-    pub data: CheckpointData,
+    pub data: CheckDataWrapper,
     #[serde(rename(deserialize = "Sig"))]
     #[serde(with = "serde_bytes")]
     pub sig: Option<Vec<u8>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct CheckpointData {
+pub struct CheckDataWrapper {
     #[serde(rename(deserialize = "Source"))]
     #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
     pub source: SubnetID,
@@ -110,26 +128,41 @@ pub struct CheckpointData {
     pub proof: Option<Vec<u8>>,
     #[serde(rename(deserialize = "Epoch"))]
     pub epoch: i64,
-    #[serde(rename(deserialize = "Children"))]
-    pub children: Option<Vec<CheckData>>,
     #[serde(rename(deserialize = "PrevCheck"))]
     pub prev_check: Option<CIDMap>,
+    #[serde(rename(deserialize = "Children"))]
+    pub children: Option<Vec<CheckData>>,
     #[serde(rename(deserialize = "CrossMsgs"))]
-    pub cross_msgs: Option<CrossMsgMetaWrapper>,
+    pub cross_msgs: Option<BatchCrossMsgsWrapper>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Default, Deserialize, Serialize)]
-pub struct CrossMsgMetaWrapper {
-    #[serde(rename(deserialize = "MsgsCid"))]
-    pub msgs_cid: Option<CIDMap>,
-    #[serde(rename(deserialize = "Nonce"))]
-    pub nonce: u64,
-    #[serde(rename(deserialize = "Value"))]
-    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
-    pub value: TokenAmount,
+pub struct BatchCrossMsgsWrapper {
+    #[serde(rename(deserialize = "CrossMsgs"))]
+    pub cross_msgs: Option<Vec<CrossMsgsWrapper>>,
     #[serde(rename(deserialize = "Fee"))]
     #[serde(deserialize_with = "deserialize_token_amount_from_str")]
     pub fee: TokenAmount,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct CrossMsgsWrapper {
+    pub msg: StorableMsgsWrapper,
+    pub wrapped: bool,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct StorableMsgsWrapper {
+    #[serde(deserialize_with = "deserialize_ipc_address_from_map")]
+    pub from: IPCAddress,
+    #[serde(deserialize_with = "deserialize_ipc_address_from_map")]
+    pub to: IPCAddress,
+    pub method: MethodNum,
+    pub params: RawBytes,
+    pub value: TokenAmount,
+    pub nonce: u64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -141,16 +174,36 @@ pub struct CheckData {
     pub checks: Vec<CIDMap>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "PascalCase")]
-pub struct Votes {
-    pub validators: Vec<Address>,
+impl From<BatchCrossMsgsWrapper> for BatchCrossMsgs {
+    fn from(wrapper: BatchCrossMsgsWrapper) -> Self {
+        let cross_msgs = wrapper.cross_msgs.map(|cross_msgs| {
+            cross_msgs
+                .into_iter()
+                .map(|cross_wrapper| CrossMsg {
+                    msg: StorableMsg {
+                        from: cross_wrapper.msg.from,
+                        to: cross_wrapper.msg.to,
+                        method: cross_wrapper.msg.method,
+                        params: cross_wrapper.msg.params,
+                        value: cross_wrapper.msg.value,
+                        nonce: cross_wrapper.msg.nonce,
+                    },
+                    wrapped: cross_wrapper.wrapped,
+                })
+                .collect::<Vec<_>>()
+        });
+
+        BatchCrossMsgs {
+            cross_msgs,
+            fee: wrapper.fee,
+        }
+    }
 }
 
-impl TryFrom<CheckpointResponse> for Checkpoint {
+impl TryFrom<BottomUpCheckpointWrapper> for BottomUpCheckpoint {
     type Error = anyhow::Error;
 
-    fn try_from(checkpoint_response: CheckpointResponse) -> Result<Self, Self::Error> {
+    fn try_from(checkpoint_response: BottomUpCheckpointWrapper) -> Result<Self, Self::Error> {
         let prev_check = if let Some(prev_check) = checkpoint_response.data.prev_check {
             TCid::from(Cid::try_from(prev_check)?)
         } else {
@@ -180,19 +233,9 @@ impl TryFrom<CheckpointResponse> for Checkpoint {
         log::debug!("children: {children:?}");
 
         let cross_msgs = if let Some(cross_msgs) = checkpoint_response.data.cross_msgs {
-            let msgs_cid = if let Some(cid_map) = cross_msgs.msgs_cid {
-                TCid::from(Cid::try_from(cid_map)?)
-            } else {
-                TCid::from(*CHECKPOINT_GENESIS_CID)
-            };
-            Some(ipc_gateway::checkpoint::CrossMsgMeta {
-                msgs_cid,
-                nonce: cross_msgs.nonce,
-                value: cross_msgs.value,
-                fee: cross_msgs.fee,
-            })
+            BatchCrossMsgs::from(cross_msgs)
         } else {
-            None
+            BatchCrossMsgs::default()
         };
         log::debug!("cross_msgs: {cross_msgs:?}");
 
@@ -204,9 +247,24 @@ impl TryFrom<CheckpointResponse> for Checkpoint {
             children,
             cross_msgs,
         };
-        Ok(Checkpoint {
+        Ok(BottomUpCheckpoint {
             data,
             sig: checkpoint_response.sig.unwrap_or_default(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lotus::message::ipc::IPCReadSubnetActorStateResponse;
+
+    #[test]
+    fn deserialize_ipc_subnet_state() {
+        let raw = r#"
+        {"Name":"test2","ParentID":{"Parent":"/root","Actor":"t00"},"IPCGatewayAddr":"t064","Consensus":3,"MinValidatorStake":"1000000000000000000","TotalStake":"10000000000000000000","Stake":{"/":"bafy2bzacebentzoqaapingrxwknlxqcusl23rqaa7cwb42u76fgvb25nxpmhq"},"Status":1,"Genesis":null,"BottomUpCheckPeriod":10,"TopDownCheckPeriod":10,"GenesisEpoch":0,"CommittedCheckpoints":{"/":"bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay"},"ValidatorSet":{"validators":[{"addr":"t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq","net_addr":"test","weight":"10000000000000000000"}],"configuration_number":1},"MinValidators":1,"PreviousExecutedCheckpoint":{"/":"bafy2bzacedkoa623kvi5gfis2yks7xxjl73vg7xwbojz4tpq63dd5jpfz757i"},"BottomUpCheckpointVoting":{"GenesisEpoch":0,"SubmissionPeriod":10,"LastVotingExecuted":0,"ExecutableEpochQueue":null,"EpochVoteSubmission":{"/":"bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay"},"Ratio":{"Num":2,"Denom":3}}}
+        "#;
+
+        let r = serde_json::from_str::<IPCReadSubnetActorStateResponse>(raw);
+        assert!(r.is_ok());
     }
 }

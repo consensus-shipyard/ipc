@@ -1,15 +1,55 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+use fvm_shared::address::Address;
 use std::str::FromStr;
 
 use crate::lotus::message::deserialize::{
-    deserialize_subnet_id_from_map, deserialize_token_amount_from_str,
+    deserialize_ipc_address_from_map, deserialize_subnet_id_from_map,
+    deserialize_token_amount_from_str,
 };
-use crate::lotus::message::ipc::CheckpointResponse;
+use crate::lotus::message::ipc::BottomUpCheckpointWrapper;
 use crate::manager::SubnetInfo;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::Status;
+use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
+
+#[test]
+fn test_ipc_address_from_map() {
+    use serde::Deserialize;
+
+    #[derive(Deserialize, Debug)]
+    #[serde(rename_all = "PascalCase")]
+    struct IPCAddressWrapper {
+        #[allow(dead_code)]
+        #[serde(rename = "From")]
+        #[serde(deserialize_with = "deserialize_ipc_address_from_map")]
+        from: IPCAddress,
+    }
+
+    let raw_str = r#"
+    {
+        "From": {
+            "SubnetId": {
+                "Parent": "/root/t01",
+                "Actor": "t064"
+            },
+            "RawAddress": "t064"
+        }
+    }"#;
+
+    let w: Result<IPCAddressWrapper, _> = serde_json::from_str(raw_str);
+    assert!(w.is_ok());
+
+    assert_eq!(
+        w.unwrap().from,
+        IPCAddress::new(
+            &SubnetID::from_str("/root/t01/t064").unwrap(),
+            &Address::from_str("t064").unwrap()
+        )
+        .unwrap()
+    )
+}
 
 #[test]
 fn test_subnet_from_map() {
@@ -139,6 +179,6 @@ fn test_checkpoint_template_from_str() {
     }
     "#;
 
-    let w: CheckpointResponse = serde_json::from_str(raw_str).unwrap();
+    let w: BottomUpCheckpointWrapper = serde_json::from_str(raw_str).unwrap();
     assert_eq!(w.data.source, SubnetID::from_str("/root/t01002").unwrap());
 }

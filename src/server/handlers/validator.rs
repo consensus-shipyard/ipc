@@ -26,6 +26,8 @@ pub struct QueryValidatorSetResponse {
     pub validator_set: ValidatorSet,
     /// Minimum number of validators required by the subnet
     pub min_validators: u64,
+    /// Genesis epoch at which the subnet was registered
+    pub genesis_epoch: i64,
 }
 
 /// The create subnet json rpc method handler.
@@ -69,9 +71,14 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
             .ipc_read_subnet_actor_state(&subnet_id, tip_set)
             .await?;
 
+        let genesis_epoch = lotus
+            .ipc_get_genesis_epoch_for_subnet(&subnet_id, subnet.gateway_addr)
+            .await?;
+
         Ok(QueryValidatorSetResponse {
             validator_set: response.validator_set,
             min_validators: response.min_validators,
+            genesis_epoch,
         })
     }
 }

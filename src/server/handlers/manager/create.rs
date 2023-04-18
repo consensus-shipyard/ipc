@@ -23,8 +23,8 @@ pub struct CreateSubnetParams {
     pub name: String,
     pub min_validator_stake: u64,
     pub min_validators: u64,
-    pub finality_threshold: ChainEpoch,
-    pub check_period: ChainEpoch,
+    pub bottomup_check_period: ChainEpoch,
+    pub topdown_check_period: ChainEpoch,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -66,8 +66,8 @@ impl JsonRPCRequestHandler for CreateSubnetHandler {
             consensus: ConsensusType::Mir,
             min_validator_stake: TokenAmount::from_whole(request.min_validator_stake), // In FIL
             min_validators: request.min_validators,
-            finality_threshold: request.finality_threshold,
-            check_period: request.check_period,
+            bottomup_check_period: request.bottomup_check_period,
+            topdown_check_period: request.topdown_check_period,
             genesis: vec![],
         };
 

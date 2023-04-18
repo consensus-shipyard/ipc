@@ -141,7 +141,7 @@ async fn handle_request(
         )));
     }
 
-    log::info!("received method = {method:?} and params = {params:?}");
+    log::debug!("received method = {method:?} and params = {params:?}");
     match handlers.handle(method, params).await {
         Ok(response) => Ok(warp::reply::json(&JSONRPCResultResponse::new(id, response))),
         Err(e) => {

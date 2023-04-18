@@ -11,14 +11,14 @@ use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
-use ipc_gateway::{Checkpoint, PropagateParams, WhitelistPropagatorParams};
+use ipc_gateway::{BottomUpCheckpoint, PropagateParams, WhitelistPropagatorParams};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
 use crate::config::Subnet;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::ipc::{CheckpointResponse, SubnetInfo};
+use crate::lotus::message::ipc::SubnetInfo;
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
 use crate::lotus::message::wallet::WalletKeyType;
@@ -123,15 +123,6 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         log::info!("left subnet: {subnet:}");
 
         Ok(())
-    }
-
-    async fn submit_checkpoint(
-        &self,
-        _subnet: SubnetID,
-        _from: Address,
-        _ch: Checkpoint,
-    ) -> Result<()> {
-        panic!("not implemented")
     }
 
     async fn list_child_subnets(
@@ -320,12 +311,21 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         subnet_id: SubnetID,
         from_epoch: ChainEpoch,
         to_epoch: ChainEpoch,
-    ) -> Result<Vec<CheckpointResponse>> {
+    ) -> Result<Vec<BottomUpCheckpoint>> {
         let checkpoints = self
             .lotus_client
             .ipc_list_checkpoints(subnet_id, from_epoch, to_epoch)
             .await?;
         Ok(checkpoints)
+    }
+
+    async fn last_topdown_executed(&self) -> Result<ChainEpoch> {
+        let head = self.lotus_client.chain_head().await?;
+        let cid_map = head.cids.first().unwrap().clone();
+        let tip_set = Cid::try_from(cid_map)?;
+        let gw_state = self.lotus_client.ipc_read_gateway_state(tip_set).await?;
+
+        Ok(gw_state.top_down_checkpoint_voting.last_voting_executed)
     }
 }
 

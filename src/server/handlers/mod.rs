@@ -27,10 +27,11 @@ use crate::server::handlers::manager::release::ReleaseHandler;
 use crate::server::handlers::manager::whitelist::WhitelistPropagatorHandler;
 use crate::server::handlers::send_value::SendValueHandler;
 use crate::server::handlers::validator::QueryValidatorSetHandler;
-use crate::server::list_checkpoints::ListCheckpointsHandler;
+use crate::server::list_checkpoints::ListBottomUpCheckpointsHandler;
 use crate::server::net_addr::SetValidatorNetAddrHandler;
 use crate::server::JsonRPCRequestHandler;
 
+use self::topdown_executed::LastTopDownExecHandler;
 use self::wallet::WalletNewHandler;
 
 mod config;
@@ -113,8 +114,12 @@ impl Handlers {
         let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);
 
-        let h: Box<dyn HandlerWrapper> = Box::new(ListCheckpointsHandler::new(pool));
-        handlers.insert(String::from(json_rpc_methods::LIST_CHECKPOINTS), h);
+        let h: Box<dyn HandlerWrapper> =
+            Box::new(ListBottomUpCheckpointsHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::LIST_BOTTOMUP_CHECKPOINTS), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(LastTopDownExecHandler::new(pool));
+        handlers.insert(String::from(json_rpc_methods::LAST_TOPDOWN_EXECUTED), h);
 
         // query validator
         let h: Box<dyn HandlerWrapper> = Box::new(QueryValidatorSetHandler::new(config));

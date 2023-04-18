@@ -26,8 +26,8 @@ impl TestClient {
             name: "test".to_string(),
             min_validator_stake: 1,
             min_validators: 0,
-            finality_threshold: 2,
-            check_period: 10,
+            bottomup_check_period: 10,
+            topdown_check_period: 10,
         };
 
         let raw = CreateSubnet::create(&global, &args).await?;

@@ -13,14 +13,14 @@ use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::list_checkpoints::ListCheckpointsParams;
+use crate::server::list_checkpoints::ListBottomUpCheckpointsParams;
 
 /// The command to list checkpoints committed in a subnet actor.
-pub(crate) struct ListCheckpoints;
+pub(crate) struct ListBottomUpCheckpoints;
 
 #[async_trait]
-impl CommandLineHandler for ListCheckpoints {
-    type Arguments = ListCheckpointsArgs;
+impl CommandLineHandler for ListBottomUpCheckpoints {
+    type Arguments = ListBottomUpCheckpointsArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("list checkpoints with args: {:?}", arguments);
@@ -28,7 +28,7 @@ impl CommandLineHandler for ListCheckpoints {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
-        let params = ListCheckpointsParams {
+        let params = ListBottomUpCheckpointsParams {
             subnet_id: arguments.subnet.clone(),
             from_epoch: arguments.from_epoch,
             to_epoch: arguments.to_epoch,
@@ -36,7 +36,7 @@ impl CommandLineHandler for ListCheckpoints {
 
         let checkpoints = json_rpc_client
             .request::<Value>(
-                json_rpc_methods::LIST_CHECKPOINTS,
+                json_rpc_methods::LIST_BOTTOMUP_CHECKPOINTS,
                 serde_json::to_value(params)?,
             )
             .await?;
@@ -57,8 +57,8 @@ impl CommandLineHandler for ListCheckpoints {
 }
 
 #[derive(Debug, Args)]
-#[command(about = "List checkpoints")]
-pub(crate) struct ListCheckpointsArgs {
+#[command(about = "List bottom-up checkpoints")]
+pub(crate) struct ListBottomUpCheckpointsArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The subnet id of the checkpointing subnet")]

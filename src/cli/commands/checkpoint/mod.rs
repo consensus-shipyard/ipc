@@ -1,11 +1,15 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::cli::commands::checkpoint::list_checkpoints::{ListCheckpoints, ListCheckpointsArgs};
+use crate::cli::commands::checkpoint::list_checkpoints::{
+    ListBottomUpCheckpoints, ListBottomUpCheckpointsArgs,
+};
 use crate::cli::{CommandLineHandler, GlobalArguments};
-
 use clap::{Args, Subcommand};
 
+use self::topdown_executed::{LastTopDownExec, LastTopDownExecArgs};
+
 mod list_checkpoints;
+mod topdown_executed;
 
 #[derive(Debug, Args)]
 #[command(name = "checkpoint", about = "checkpoint related commands")]
@@ -18,12 +22,14 @@ pub(crate) struct CheckpointCommandsArgs {
 impl CheckpointCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
-            Commands::List(args) => ListCheckpoints::handle(global, args).await,
+            Commands::List(args) => ListBottomUpCheckpoints::handle(global, args).await,
+            Commands::LastTopdown(args) => LastTopDownExec::handle(global, args).await,
         }
     }
 }
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
-    List(ListCheckpointsArgs),
+    List(ListBottomUpCheckpointsArgs),
+    LastTopdown(LastTopDownExecArgs),
 }

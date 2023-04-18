@@ -30,8 +30,8 @@ impl CreateSubnet {
             name: arguments.name.clone(),
             min_validator_stake: arguments.min_validator_stake,
             min_validators: arguments.min_validators,
-            finality_threshold: arguments.finality_threshold,
-            check_period: arguments.check_period,
+            bottomup_check_period: arguments.bottomup_check_period,
+            topdown_check_period: arguments.topdown_check_period,
         };
 
         Ok(json_rpc_client
@@ -78,8 +78,8 @@ pub struct CreateSubnetArgs {
     pub min_validator_stake: u64,
     #[arg(long, help = "The minimal number of validators")]
     pub min_validators: u64,
-    #[arg(long, help = "The finality threshold for MIR")]
-    pub finality_threshold: ChainEpoch,
-    #[arg(long, help = "The checkpoint period")]
-    pub check_period: ChainEpoch,
+    #[arg(long, help = "The bottom up checkpoint period")]
+    pub bottomup_check_period: ChainEpoch,
+    #[arg(long, help = "The top down checkpoint period")]
+    pub topdown_check_period: ChainEpoch,
 }
