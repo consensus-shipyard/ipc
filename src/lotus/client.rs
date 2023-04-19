@@ -11,6 +11,7 @@ use cid::Cid;
 use fil_actors_runtime::cbor;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
+use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::{BottomUpCheckpoint, CrossMsg};
@@ -42,6 +43,7 @@ mod methods {
     pub const STATE_ACTOR_CODE_CIDS: &str = "Filecoin.StateActorCodeCIDs";
     pub const WALLET_NEW: &str = "Filecoin.WalletNew";
     pub const WALLET_LIST: &str = "Filecoin.WalletList";
+    pub const WALLET_BALANCE: &str = "Filecoin.WalletBalance";
     pub const WALLET_DEFAULT_ADDRESS: &str = "Filecoin.WalletDefaultAddress";
     pub const STATE_READ_STATE: &str = "Filecoin.StateReadState";
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
@@ -240,6 +242,18 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .await?;
         log::debug!("received wallet_new response: {r:?}");
         Ok(r)
+    }
+
+    async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount> {
+        // refer to: https://lotus.filecoin.io/reference/lotus/wallet/#walletbalance
+        let r = self
+            .client
+            .request::<String>(methods::WALLET_BALANCE, json!([address.to_string()]))
+            .await?;
+        log::debug!("received wallet_balance response: {r:?}");
+
+        let v = BigInt::from_str(&r)?;
+        Ok(TokenAmount::from_atto(v))
     }
 
     async fn read_state<State: DeserializeOwned + Debug>(

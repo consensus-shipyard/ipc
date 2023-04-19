@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use ipc_gateway::{BottomUpCheckpoint, CrossMsg};
 use ipc_sdk::subnet_id::SubnetID;
 use serde::de::DeserializeOwned;
@@ -65,6 +66,9 @@ pub trait LotusClient {
 
     /// Create a new wallet, see: https://lotus.filecoin.io/reference/lotus/wallet/#walletnew
     async fn wallet_new(&self, key_type: WalletKeyType) -> Result<String>;
+
+    /// Get the balance of an address
+    async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount>;
 
     /// Read the state of the address at tipset, see: https://lotus.filecoin.io/reference/lotus/state/#statereadstate
     async fn read_state<State: DeserializeOwned + Debug>(

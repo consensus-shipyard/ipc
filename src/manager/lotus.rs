@@ -306,6 +306,21 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         Address::from_str(&addr_str).map_err(|_| anyhow!("cannot get address from string output"))
     }
 
+    async fn wallet_list(&self) -> Result<Vec<Address>> {
+        log::info!("list wallet in subnet");
+        self.lotus_client
+            .wallet_list()
+            .await?
+            .iter()
+            .map(|raw| Address::from_str(raw).map_err(|_| anyhow!("invalid addr: {raw:}")))
+            .collect::<Result<_>>()
+    }
+
+    async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount> {
+        log::info!("get the balance of an address");
+        self.lotus_client.wallet_balance(address).await
+    }
+
     async fn list_checkpoints(
         &self,
         subnet_id: SubnetID,

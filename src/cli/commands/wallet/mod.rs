@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT
 use crate::cli::{CommandLineHandler, GlobalArguments};
 
+use crate::cli::commands::wallet::list::{WalletList, WalletListArgs};
 use crate::cli::commands::wallet::new::{WalletNew, WalletNewArgs};
 use clap::{Args, Subcommand};
 
+mod list;
 mod new;
 
 #[derive(Debug, Args)]
@@ -19,6 +21,7 @@ impl WalletCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
             Commands::New(args) => WalletNew::handle(global, args).await,
+            Commands::List(args) => WalletList::handle(global, args).await,
         }
     }
 }
@@ -26,4 +29,5 @@ impl WalletCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     New(WalletNewArgs),
+    List(WalletListArgs),
 }
