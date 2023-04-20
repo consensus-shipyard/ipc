@@ -131,7 +131,7 @@ With our subnet daemon deployed, and having joined the network, as the minimum n
 $  ./bin/ipc-infra/mine-subnet.sh 84711d67cf162e30747c4525d69728c4dea8c6b4b35cd89f6d0947fee14bf908
 ```
 
-The mining process is currently run in the foreground in interactive mode. Consider using screen, tmux, or nohup so as to not block your terminal.
+The mining process is currently run in the foreground in interactive mode. Consider using screen or tmux so as to not block your terminal.
 
 ## Running a subnet with several validators
 
@@ -211,5 +211,5 @@ We have everything in place now to start mining. Mining is as simple as running 
 ./bin/ipc-infra/mine-subnet.sh <node-container-id>
 ```
 
-The mining process is currently run in the foreground in interactive mode. The mining process is currently run in the foreground in interactive mode. Consider using screen, tmux, or nohup so as to not block your terminal.
+The mining process is currently run in the foreground in interactive mode. Consider using screen or tmux so as to not block your terminal.
 
