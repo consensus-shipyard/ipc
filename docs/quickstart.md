@@ -101,7 +101,7 @@ nohup ./ipc-agent/bin/ipc-agent daemon &
 
 ## Step 3: Fund your account
 
-* Obtain some Spacenet FIL by requesting it from the [faucet](https://spacenet.consensus.ninja/), using your wallet address. 
+* Obtain some Spacenet FIL by requesting it from the [faucet](https://faucet.spacenet.ipc.space/), using your wallet address. 
 
 
 ## Step 4: Create the subnet
