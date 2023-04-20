@@ -28,7 +28,7 @@ Not online yet... (could not get API info for FullNode: could not get api endpoi
 ```
 Or because when the script finishes no validator address has been reported as expected by the logs, the best way to debug this situation is to attach to the docker container and check the logs with the following command:
 ```bash
-$ docker exec -it <container_name/id> bash
+$ docker exec -it <container_name> bash
 
 # Inside the container
 tmux a
