@@ -6,7 +6,10 @@ build:
 	cargo build -Z unstable-options --release --out-dir ./bin
 
 test:
-	cargo test --release --workspace --lib # only run unit tests
+	cargo test --release --workspace --exclude ipc_e2e
+
+e2e:
+	cargo test --release -p ipc_e2e
 
 clean:
 	cargo clean
