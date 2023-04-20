@@ -62,7 +62,7 @@ With Docker installed, you can then `make install-infra` in the root of the `ipc
 
 In Unix-based systems, it is highly recommended to include your user in the `docker` group to avoid having to run many of the commands from this tutorial using `sudo`. You can achieve this running:
 ```bash
-$ sudo usermod -aG docker $USER
+sudo usermod -aG docker $USER
 newgrp docker
 ```
 

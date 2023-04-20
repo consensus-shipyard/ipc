@@ -160,9 +160,9 @@ With the keys conveniently exported, we can deploy the subnet nodes using the `i
 ```
 ```console
 # Example execution
-./bin/ipc-infra/run-subnet-docker.sh 1251 1351 /root/t01002 ~/.ipc-agent/wallet1.key
-./bin/ipc-infra/run-subnet-docker.sh 1252 1352 /root/t01002 ~/.ipc-agent/wallet2.key
-./bin/ipc-infra/run-subnet-docker.sh 1253 1353 /root/t01002 ~/.ipc-agent/wallet3.key
+$ ./bin/ipc-infra/run-subnet-docker.sh 1251 1351 /root/t01002 ~/.ipc-agent/wallet1.key
+$ ./bin/ipc-infra/run-subnet-docker.sh 1252 1352 /root/t01002 ~/.ipc-agent/wallet2.key
+$ ./bin/ipc-infra/run-subnet-docker.sh 1253 1353 /root/t01002 ~/.ipc-agent/wallet3.key
 ```
 If the deployment is successful, each of these nodes should return the following output at the end of their logs. Note down this information somewhere as we will need it to conveniently join our validators to the subnet.
 
