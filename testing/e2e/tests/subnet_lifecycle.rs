@@ -1,10 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use crate::common::TestClient;
 use ipc_sdk::subnet_id::{SubnetID, ROOTNET_ID};
 
-mod common;
+use ipc_e2e::TestClient;
 
 const IPC_AGENT_JSON_RPC_URL_ENV: &str = "IPC_AGENT_JSON_RPC_URL";
 

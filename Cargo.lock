@@ -2617,6 +2617,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipc_e2e"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fvm_shared 3.0.0-alpha.17",
+ "ipc-agent",
+ "ipc-sdk",
+ "log",
+ "tokio",
+]
+
+[[package]]
 name = "ipc_ipld_resolver"
 version = "0.1.0"
 dependencies = [
