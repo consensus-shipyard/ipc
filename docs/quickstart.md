@@ -4,7 +4,7 @@
 
 Ready to test the waters with your first subnet? This guide will deploy a subnet with multiple local validators orchestrated by the same IPC agent. This subnet will be anchored to the public Spacenet. This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
 
-Several steps in this guide involve running long-lived processes. These commands are usually prefaced with `nohup` so that they run in the background. For improved usability, we recommend instead using a `screen` session and spawning a new window for each of these commands. In that case, you should omit `nohup` and `&`.
+Several steps in this guide involve running long-lived processes. These commands are usually prefaced with `nohup` so that they run in the background. For improved usability, we recommend instead using a `screen` session and spawning a new window for each of these commands. In that case, you should omit `nohup` and `&`. Alternatively, open a new terminal and `tail -f nohup.out` to track the combined output of the different daemons. 
 
 ## Step 0: Prepare your system
 
