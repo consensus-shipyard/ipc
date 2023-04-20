@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.7;
+
 import "./enums/ConsensusType.sol";
 import "./enums/Status.sol";
 import "./structs/Checkpoint.sol";
@@ -54,6 +55,8 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
     // to be able to validate new blocks.
     uint64 public minValidators;
 
+    uint8 public majorityPercentage;
+
     modifier onlyGateway() {
         require(
             msg.sender == ipcGatewayAddr,
@@ -86,13 +89,15 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
         uint64 _minValidators,
         int64 _finalityThreshold,
         int64 _checkPeriod,
-        bytes memory _genesis
+        bytes memory _genesis,
+        uint8 _majorityPercentage
     ) {
         require(
             _minValidatorStake > 0,
             "minValidatorStake must be greater than 0"
         );
         require(_minValidators > 0, "minValidators must be greater than 0");
+        require(_majorityPercentage <= 100, "majorityPercentage must be <= 100");
         parentId = _parentId;
         name = _name;
         ipcGatewayAddr = _ipcGatewayAddr;
@@ -102,9 +107,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
         finalityThreshold = _finalityThreshold;
         checkPeriod = _checkPeriod;
         genesis = _genesis;
+        majorityPercentage = _majorityPercentage;
         status = Status.Instantiated;
     }
-
     receive() external payable onlyGateway {}
 
     function join() external payable mutateState {
@@ -200,7 +205,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
         );
 
         bytes32 messageHash = checkpoint.toHash();
-
+        
         require(
             _recoverSigner(messageHash, checkpoint.signature) == msg.sender,
             "invalid signature"
@@ -222,7 +227,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
             }
         }
 
-        bool hasMajority = sum > (totalStake * 2 / 3);
+        bool hasMajority = sum > totalStake * majorityPercentage / 100;
         if (hasMajority == false) return;
 
         // store the commitment on vote majority
@@ -247,10 +252,8 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
     function reward() public payable onlyGateway nonReentrant {
         uint validatorLength = validators.length();
         require(validatorLength != 0, "no validators in subnet");
-        require(
-            address(this).balance >= validatorLength,
-            "we need to distribute at least one wei to each validator"
-        );
+
+        require(address(this).balance >= validatorLength, "we neeed to distribute at least one wei to each validator");
 
         uint rewardAmount = address(this).balance / validatorLength;
 
@@ -264,14 +267,6 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
 
     function getParent() external view returns (SubnetID memory) {
         return parentId;
-    }
-
-    function validatorCount() external view returns (uint) {
-        return validators.length();
-    }
-
-    function validatorAt(uint index) external view returns (address) {
-        return validators.at(index);
     }
 
     function windowCheckCount(bytes32 checkpointHash)
@@ -290,6 +285,14 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
         return windowChecks[checkpointHash].at(index);
     }
 
+    function validatorCount() external view returns (uint) {
+        return validators.length();
+    }
+
+    function validatorAt(uint index) external view returns (address) {
+        return validators.at(index);
+    }
+
     function _recoverSigner(
         bytes32 _ethSignedMessageHash,
         bytes memory _signature
@@ -299,9 +302,15 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
         return ecrecover(_ethSignedMessageHash, v, r, s);
     }
 
-    function _splitSignature(
-        bytes memory sig
-    ) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
+    function _splitSignature(bytes memory sig)
+        internal
+        pure
+        returns (
+            bytes32 r,
+            bytes32 s,
+            uint8 v
+        )
+    {
         require(sig.length == 65, "invalid signature length");
 
         assembly {
@@ -324,4 +333,5 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
 
         // implicitly return (r, s, v)
     }
+
 }

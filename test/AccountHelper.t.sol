@@ -2,7 +2,6 @@
 pragma solidity ^0.8.7;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import "../src/lib/AccountHelper.sol";
 
@@ -52,14 +51,6 @@ contract AccountHelperTest is Test {
         activateAccount(BLS_ADDREESS);
 
         require(BLS_ADDREESS.isAccount() == true);
-    }
-
-    function test_IsMultisig_Works() public pure {
-        require(MULTISIG_ACTOR.isMultisig() == true);
-    }
-
-    function test_IsMultisig_Fails_EthAccount() public pure {
-        require(ETH_ADDRESS.isMultisig() == false);
     }
 
     function activateAccount(address account) internal {

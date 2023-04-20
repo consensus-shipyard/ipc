@@ -28,6 +28,7 @@ contract SubnetActorTest is Test {
     int64 private constant DEFAULT_CHECK_PERIOD = 50;
     bytes private constant GENESIS = EMPTY_BYTES;
     uint256 constant CROSS_MSG_FEE = 10 gwei;
+    uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
 
     function setUp() public
     {
@@ -37,20 +38,21 @@ contract SubnetActorTest is Test {
 
         path[0] = address(gw);
         SubnetID memory parentId = SubnetID(path);
-        sa = new SubnetActor(parentId, DEFAULT_NETWORK_NAME, address(gw), ConsensusType.Dummy, DEFAULT_MIN_VALIDATOR_STAKE, DEFAULT_MIN_VALIDATORS, DEFAULT_FINALITY_TRESHOLD, DEFAULT_CHECK_PERIOD, GENESIS);
+        sa = new SubnetActor(parentId, DEFAULT_NETWORK_NAME, address(gw), ConsensusType.Dummy, DEFAULT_MIN_VALIDATOR_STAKE, DEFAULT_MIN_VALIDATORS, DEFAULT_FINALITY_TRESHOLD, DEFAULT_CHECK_PERIOD, GENESIS, DEFAULT_MAJORITY_PERCENTAGE);
     
     }
 
-    function testDeployment(string calldata _networkName, address _ipcGatewayAddr, uint256 _minValidatorStake, uint64 _minValidators, int64 _finalityTreshold, int64 _checkPeriod, bytes calldata _genesis) public {
+    function testDeployment(address _ipcGatewayAddr, uint256 _minValidatorStake, uint64 _minValidators, int64 _finalityTreshold, int64 _checkPeriod, bytes calldata _genesis, uint8 _majorityPercentage) public {
         vm.assume(_minValidatorStake > 0);
         vm.assume(_minValidators > 0);
+        vm.assume(_majorityPercentage <= 100);
 
         address[] memory path = new address[](1);
         path[0] = address(_ipcGatewayAddr);
         SubnetID memory parentId = SubnetID(path);
-        sa = new SubnetActor(parentId, _networkName, _ipcGatewayAddr, ConsensusType.Dummy, _minValidatorStake, _minValidators, _finalityTreshold, _checkPeriod, _genesis);
+        sa = new SubnetActor(parentId, DEFAULT_NETWORK_NAME, _ipcGatewayAddr, ConsensusType.Dummy, _minValidatorStake, _minValidators, _finalityTreshold, _checkPeriod, _genesis, _majorityPercentage);
     
-        require(keccak256(abi.encodePacked(sa.name())) == keccak256(abi.encodePacked(_networkName)));
+        require(keccak256(abi.encodePacked(sa.name())) == keccak256(abi.encodePacked(DEFAULT_NETWORK_NAME)));
         require(sa.ipcGatewayAddr() == _ipcGatewayAddr);
         require(sa.consensus() == ConsensusType.Dummy);
         require(sa.minValidatorStake() == _minValidatorStake);
@@ -58,10 +60,18 @@ contract SubnetActorTest is Test {
         require(sa.finalityThreshold() == _finalityTreshold);
         require(sa.checkPeriod() == _checkPeriod);
         require(keccak256(sa.genesis()) == keccak256(_genesis));
+        require(sa.majorityPercentage() == _majorityPercentage);
 
         SubnetID memory subnet = sa.getParent();
         require(subnet.isRoot());
         require(subnet.toHash() == parentId.toHash());
+    }
+
+    function test_Join_Fail_NoMinColalteral() public payable {
+        address validator = vm.addr(100);
+        vm.prank(validator);
+        vm.expectRevert("a minimum collateral is required to join the subnet");
+        sa.join();
     }
 
     function test_Join_Works(uint256 amount) public payable {
@@ -102,14 +112,6 @@ contract SubnetActorTest is Test {
         require(success);
     }
 
-
-    function test_Join_Fail_NoMinColalteral() public payable {
-        address validator = vm.addr(100);
-        vm.prank(validator);
-        vm.expectRevert("a minimum collateral is required to join the subnet");
-        sa.join();
-    }
-
     function test_Join_NoNewValidator_ValueLowerThanMinStake() public {
         address validator = vm.addr(1235);
         vm.prank(validator);
@@ -135,7 +137,7 @@ contract SubnetActorTest is Test {
         address[] memory path = new address[](1);
         path[0] = address(gw);
         SubnetID memory parentId = SubnetID(path);
-        sa = new SubnetActor(parentId, DEFAULT_NETWORK_NAME, address(gw), ConsensusType.Delegated, DEFAULT_MIN_VALIDATOR_STAKE, DEFAULT_MIN_VALIDATORS, DEFAULT_FINALITY_TRESHOLD, DEFAULT_CHECK_PERIOD, GENESIS);
+        sa = new SubnetActor(parentId, DEFAULT_NETWORK_NAME, address(gw), ConsensusType.Delegated, DEFAULT_MIN_VALIDATOR_STAKE, DEFAULT_MIN_VALIDATORS, DEFAULT_FINALITY_TRESHOLD, DEFAULT_CHECK_PERIOD, GENESIS, DEFAULT_MAJORITY_PERCENTAGE);
     
         address validator = vm.addr(1235);
         _join(validator);
@@ -219,13 +221,14 @@ contract SubnetActorTest is Test {
         _join(validator3);
 
         CheckData memory data = _createCheckData(100);
+        Checkpoint memory checkpoint = Checkpoint({data: data, signature: bytes("")});
+        bytes32 checkpointHash = checkpoint.toHash();
         
         Checkpoint memory checkpoint1 = signCheckpoint(100, data);
 
         vm.prank(validator);
         sa.submitCheckpoint(checkpoint1);
 
-        bytes32 checkpointHash = checkpoint1.toHash();
 
         require(sa.windowCheckCount(checkpointHash) == 1);
         require(sa.windowCheckAt(checkpointHash, 0) == validator);
@@ -335,8 +338,12 @@ contract SubnetActorTest is Test {
     function test_SubmitCheckpoint_Fails_OutsideOfSigningWindow() public {
         address validator = vm.addr(100);
         _join(validator);
+        address validator2 = vm.addr(101);
+        _join(validator2);
+        address validator3 = vm.addr(102);
+        _join(validator3);
 
-        CheckData memory data = _createCheckData(125); 
+        CheckData memory data = _createCheckData(125);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(100, keccak256(abi.encode(data)));
         
         Checkpoint memory checkpoint = Checkpoint({data: data, signature: abi.encodePacked(r, s, v)});

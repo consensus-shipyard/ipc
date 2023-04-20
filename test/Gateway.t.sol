@@ -2,7 +2,6 @@
 pragma solidity ^0.8.7;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import "../src/Gateway.sol";
 import "../src/SubnetActor.sol";
@@ -14,29 +13,42 @@ contract GatewayDeploymentTest is Test {
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for Checkpoint;
     using CrossMsgHelper for CrossMsg;
+    using StorableMsgHelper for StorableMsg;
 
     int64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
     uint64 constant MIN_COLLATERAL_AMOUNT = 1 ether;
     uint64 constant MAX_NONCE = type(uint64).max;
-    address constant PAYABLE_SUBNET_ADDRESS = address(10);
     address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
     string private constant DEFAULT_NETWORK_NAME = "test";
     uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     int64 private constant DEFAULT_FINALITY_TRESHOLD = 1;
     int64 private constant DEFAULT_CHECK_PERIOD = 50;
+    uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     bytes private constant GENESIS = EMPTY_BYTES;
     uint256 constant CROSS_MSG_FEE = 10 gwei;
+    address constant CHILD_NETWORK_ADDRESS = address(10);
+    address constant CHILD_NETWORK_ADDRESS_2 = address(11);
 
     Gateway gw;
+    Gateway gw2;
     SubnetActor sa;
 
+    address public constant ROOTNET_ADDRESS = address(1);
+
     function setUp() public {
+    
+
+        address[] memory path2 = new address[](2);
+        path2[0] = ROOTNET_ADDRESS;
+        path2[1] = CHILD_NETWORK_ADDRESS;
+        gw2 = new Gateway(path2, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
+
         address[] memory path = new address[](1);
-        path[0] = address(0);
+        path[0] = ROOTNET_ADDRESS;
+        
         gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
 
-        path[0] = address(gw);
         SubnetID memory parentId = SubnetID(path);
         sa = new SubnetActor(
             parentId,
@@ -47,7 +59,8 @@ contract GatewayDeploymentTest is Test {
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_FINALITY_TRESHOLD,
             DEFAULT_CHECK_PERIOD,
-            GENESIS
+            GENESIS,
+            DEFAULT_MAJORITY_PERCENTAGE
         );
     }
 
@@ -110,7 +123,7 @@ contract GatewayDeploymentTest is Test {
         gw.register{value: MIN_COLLATERAL_AMOUNT}();
     }
 
-    function test_AddStake_Works_SingleStaking(
+    function testAddStake_Works_SingleStaking(
         uint256 stakeAmount,
         uint256 registerAmount,
         address subnetAddress
@@ -133,7 +146,7 @@ contract GatewayDeploymentTest is Test {
         require(totalStaked == totalAmount);
     }
 
-    function test_AddStake_Works_MultipleStakings(uint8 numberOfStakes) public {
+    function testAddStake_Works_MultipleStakings(uint8 numberOfStakes) public {
         vm.assume(numberOfStakes > 0);
 
         address subnetAddress = address(1);
@@ -160,7 +173,8 @@ contract GatewayDeploymentTest is Test {
         require(totalStake == expectedStakedAmount);
     }
 
-    function test_AddStake_Fail_ZeroAmount() public {
+
+    function testAddStake_Fail_ZeroAmount() public {
         registerSubnet(MIN_COLLATERAL_AMOUNT, address(this));
 
         vm.expectRevert("no stake to add");
@@ -168,14 +182,14 @@ contract GatewayDeploymentTest is Test {
         gw.addStake{value: 0}();
     }
 
-    function test_AddStake_Fail_SubnetNotExists() public {
+    function testAddStake_Fail_SubnetNotExists() public {
         vm.expectRevert("subnet is not registered");
 
         gw.addStake{value: 1}();
     }
 
     function test_ReleaseStake_Works_FullAmount(uint256 stakeAmount) public {
-        address subnetAddress = PAYABLE_SUBNET_ADDRESS;
+        address subnetAddress = CHILD_NETWORK_ADDRESS;
         uint256 registerAmount = MIN_COLLATERAL_AMOUNT;
 
         vm.assume(
@@ -202,7 +216,7 @@ contract GatewayDeploymentTest is Test {
     function test_ReleaseStake_Works_PartialAmount(
         uint256 partialAmount
     ) public {
-        address subnetAddress = PAYABLE_SUBNET_ADDRESS;
+        address subnetAddress = CHILD_NETWORK_ADDRESS;
         uint256 registerAmount = MIN_COLLATERAL_AMOUNT;
 
         vm.assume(
@@ -259,7 +273,7 @@ contract GatewayDeploymentTest is Test {
     }
 
     function test_Kill_Works() public {
-        address subnetAddress = PAYABLE_SUBNET_ADDRESS;
+        address subnetAddress = CHILD_NETWORK_ADDRESS;
 
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
@@ -313,7 +327,7 @@ contract GatewayDeploymentTest is Test {
         gw.kill();
     }
 
-    function test_CommitChildCheck_Works(uint64 blockNumber) public {
+    function testCommitChildCheck_Works(uint64 blockNumber) public {
         address subnetAddress = address(100);
         vm.assume(blockNumber < type(uint64).max / 2 - 9);
 
@@ -334,16 +348,19 @@ contract GatewayDeploymentTest is Test {
         require(child.checks[0] == checkpoint.toHash());
     }
 
-    function test_CommitChildCheck_Works_SameSubnet(uint64 blockNumber) public {
+    function testCommitChildCheck_Works_SameSubnet(uint64 blockNumber) public {
         address subnetAddress = address(100);
         vm.assume(blockNumber < type(uint64).max / 2 - 11);
         vm.roll(blockNumber);
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        
+
         registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
 
-        Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
+        Checkpoint memory checkpoint = createCheckpoint(
+            subnetAddress,
+            blockNumber + 9
+        );
         Checkpoint memory commit = commitChildCheck(checkpoint);
 
         ChildCheck memory child = commit.data.children[0];
@@ -353,18 +370,24 @@ contract GatewayDeploymentTest is Test {
 
         vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
 
-        Checkpoint memory checkpoint2 = createCheckpoint(subnetAddress, blockNumber + 11);
+        Checkpoint memory checkpoint2 = createCheckpoint(
+            subnetAddress,
+            blockNumber + 11
+        );
 
         checkpoint2.data.prevHash = checkpoint.toHash();
+        
         Checkpoint memory commit2 = commitChildCheck(checkpoint2);
-        
+
         ChildCheck memory child2 = commit2.data.children[0];
-        
+
         require(child2.checks.length == 2);
         require(child2.checks[1] == checkpoint2.toHash());
     }
-    
-    function test_CommitChildCheck_Works_SecondSubnet(uint64 blockNumber) public {
+
+    function testCommitChildCheck_Works_SecondSubnet(
+        uint64 blockNumber
+    ) public {
         address firstSubnetAddress = address(100);
         address secondSubnetAddress = address(101);
         vm.assume(blockNumber < type(uint64).max / 2 - 9);
@@ -375,7 +398,10 @@ contract GatewayDeploymentTest is Test {
 
         registerSubnet(MIN_COLLATERAL_AMOUNT, firstSubnetAddress);
 
-        Checkpoint memory checkpoint = createCheckpoint(firstSubnetAddress, blockNumber + 9);
+        Checkpoint memory checkpoint = createCheckpoint(
+            firstSubnetAddress,
+            blockNumber + 9
+        );
         Checkpoint memory commit = commitChildCheck(checkpoint);
 
         ChildCheck memory child = commit.data.children[0];
@@ -389,7 +415,10 @@ contract GatewayDeploymentTest is Test {
 
         registerSubnet(MIN_COLLATERAL_AMOUNT, secondSubnetAddress);
 
-        Checkpoint memory checkpoint2 = createCheckpoint(secondSubnetAddress, blockNumber + 9);
+        Checkpoint memory checkpoint2 = createCheckpoint(
+            secondSubnetAddress,
+            blockNumber + 9
+        );
         Checkpoint memory commit2 = commitChildCheck(checkpoint2);
 
         require(commit2.data.children.length == 2);
@@ -400,8 +429,9 @@ contract GatewayDeploymentTest is Test {
         require(child2.checks[0] == checkpoint2.toHash());
     }
 
-
-    function test_CommitChildCheck_Fail_NotConsistentWithPrevOne(uint64 blockNumber) public {
+    function testCommitChildCheck_Fail_NotConsistentWithPrevOne(
+        uint64 blockNumber
+    ) public {
         address subnetAddress = address(100);
         vm.assume(blockNumber < type(uint64).max / 2 - 9);
         vm.roll(blockNumber);
@@ -409,8 +439,11 @@ contract GatewayDeploymentTest is Test {
         vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
 
         registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-        
-        Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
+
+        Checkpoint memory checkpoint = createCheckpoint(
+            subnetAddress,
+            blockNumber + 9
+        );
         Checkpoint memory commit = commitChildCheck(checkpoint);
 
         ChildCheck memory child = commit.data.children[0];
@@ -424,16 +457,21 @@ contract GatewayDeploymentTest is Test {
         gw.commitChildCheck(checkpoint);
     }
 
-    function test_CommitChildCheck_Fail_CheckpointAlreadyExists(uint64 blockNumber) public {
+    function testCommitChildCheck_Fail_CheckpointAlreadyExists(
+        uint64 blockNumber
+    ) public {
         address subnetAddress = address(100);
         vm.assume(blockNumber < type(uint64).max / 2 - 9);
         vm.roll(blockNumber);
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        
+
         registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
 
-        Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
+        Checkpoint memory checkpoint = createCheckpoint(
+            subnetAddress,
+            blockNumber + 9
+        );
         Checkpoint memory commit = commitChildCheck(checkpoint);
 
         ChildCheck memory child = commit.data.children[0];
@@ -446,7 +484,9 @@ contract GatewayDeploymentTest is Test {
         gw.commitChildCheck(checkpoint);
     }
 
-    function test_CommitChildCheck_Fail_InactiveSubnet(uint64 blockNumber) public {
+    function testCommitChildCheck_Fail_InactiveSubnet(
+        uint64 blockNumber
+    ) public {
         address subnetAddress = address(100);
         vm.assume(blockNumber < type(uint64).max / 2 - 9);
         vm.roll(blockNumber);
@@ -457,13 +497,18 @@ contract GatewayDeploymentTest is Test {
 
         gw.releaseStake(MIN_COLLATERAL_AMOUNT);
 
-        Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
-        
+        Checkpoint memory checkpoint = createCheckpoint(
+            subnetAddress,
+            blockNumber + 9
+        );
+
         vm.expectRevert("can't commit checkpoint for an inactive subnet");
         gw.commitChildCheck(checkpoint);
     }
 
-    function test_CommitChildCheck_Fail_BelongsToThePast(uint64 blockNumber) public {
+    function testCommitChildCheck_Fail_BelongsToThePast(
+        uint64 blockNumber
+    ) public {
         address subnetAddress = address(100);
         vm.assume(blockNumber < type(uint64).max / 2 - 9);
         vm.roll(blockNumber);
@@ -473,32 +518,34 @@ contract GatewayDeploymentTest is Test {
         registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
 
         Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
+
         commitChildCheck(checkpoint);
 
-        Checkpoint memory pastCheckpoint = createCheckpoint(subnetAddress, blockNumber + 8);
+        Checkpoint memory pastCheckpoint = createCheckpoint(
+            subnetAddress,
+            blockNumber + 8
+        );
 
         vm.expectRevert("checkpoint being committed belongs to the past");
         gw.commitChildCheck(pastCheckpoint);
     }
 
-    function test_CommitChildCheck_Fails_WrongSubnet(uint64 blockNumber) public {
-        address subnetAddress = address(100);
+    function testCommitChildCheck_Fails_WrongSubnet(uint64 blockNumber) public {
+        address subnetAddress = vm.addr(100);
         vm.assume(blockNumber < type(uint64).max / 2 - 9);
         vm.roll(blockNumber);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
+        Checkpoint memory checkpoint = createCheckpoint(
+            subnetAddress,
+            blockNumber + 9
+        );
 
-        Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
-        
-        address subnetAddressInvalid = address(101);
-
-        vm.stopPrank();
+        address subnetAddressInvalid = vm.addr(101);
         vm.startPrank(subnetAddressInvalid);
+        vm.deal(subnetAddressInvalid, MIN_COLLATERAL_AMOUNT);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddressInvalid);
 
         vm.expectRevert("source in checkpoint doesn't belong to subnet");
-        
+
         gw.commitChildCheck(checkpoint);
     }
 
@@ -529,20 +576,6 @@ contract GatewayDeploymentTest is Test {
         vm.deal(BLS_ACCOUNT_ADDREESS, fundAmount + 1);
         
         fund(BLS_ACCOUNT_ADDREESS, fundAmount);
-    }
-
-    function test_Fund_Works_MultisigSingleFunding() public {
-        address validatorAddress = address(100);
-        uint fundAmount = 1 ether;
-
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
-
-        vm.startPrank(MULTISIG_ACTOR);
-        vm.deal(MULTISIG_ACTOR, fundAmount + 1);
-        
-        fund(MULTISIG_ACTOR, fundAmount);
     }
 
     function test_Fund_Works_MultipleFundings() public {
@@ -599,7 +632,7 @@ contract GatewayDeploymentTest is Test {
 
         (SubnetID memory subnetId, , , ,) = getSubnet(address(sa));
 
-        vm.expectRevert("the caller is not an account nor a multi-sig");
+        vm.expectRevert("the caller is not an account");
 
         gw.fund{value: fundAmount}(subnetId);
     }
@@ -649,7 +682,7 @@ contract GatewayDeploymentTest is Test {
 
         vm.startPrank(invalidAccount);
         vm.deal(invalidAccount, 1 ether);
-        vm.expectRevert("the caller is not an account nor a multi-sig");
+        vm.expectRevert("the caller is not an account");
 
         gw.release{value: 1 ether}();
     }
@@ -665,27 +698,11 @@ contract GatewayDeploymentTest is Test {
         gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
 
         vm.roll(0);
+        vm.warp(0);
         vm.startPrank(BLS_ACCOUNT_ADDREESS);
         vm.deal(BLS_ACCOUNT_ADDREESS, releaseAmount + 1);
 
         release(BLS_ACCOUNT_ADDREESS, releaseAmount, crossMsgFee, 0);
-    }
-
-    function test_Release_Works_Multisig(uint256 releaseAmount, uint256 crossMsgFee) public {
-        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max);
-        vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
-
-        address[] memory path = new address[](2);
-        path[0] = makeAddr("root");
-        path[1] = makeAddr("subnet_one");
-        
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
-
-        vm.roll(0);
-        vm.startPrank(MULTISIG_ACTOR);
-        vm.deal(MULTISIG_ACTOR, releaseAmount + 1);
-
-        release(MULTISIG_ACTOR, releaseAmount, crossMsgFee, 0);
     }
 
     function test_Release_Works_EmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
@@ -701,6 +718,7 @@ contract GatewayDeploymentTest is Test {
         address callerAddress = address(100);
 
         vm.roll(0);
+        vm.warp(0);
         vm.startPrank(callerAddress);
         vm.deal(callerAddress, releaseAmount + 1);
 
@@ -720,6 +738,7 @@ contract GatewayDeploymentTest is Test {
         address callerAddress = address(100);
 
         vm.roll(0);
+        vm.warp(0);
         vm.startPrank(callerAddress);
         vm.deal(callerAddress, 2 * releaseAmount + 1);
 
@@ -728,14 +747,308 @@ contract GatewayDeploymentTest is Test {
         release(callerAddress, releaseAmount, crossMsgFee, 0);
     }
 
-    function commitChildCheck(Checkpoint memory commit) internal returns(Checkpoint memory){
+    function test_SendCross_Fails_NoDestination() public {
+        address caller = vm.addr(100);
+        vm.startPrank(caller);
+        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
+        vm.expectRevert("error getting subnet from msg");
+        gw.sendCross{value: CROSS_MSG_FEE + 1}(
+            SubnetID({route: new address[](0)}),
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    value: CROSS_MSG_FEE + 1,
+                    nonce: 0,
+                    method: 0,
+                    params: new bytes(0)
+                }),
+                wrapped: false
+            })
+        );
+    }
+
+    function test_SendCross_Fails_NoCurrentNetwork() public {
+        address caller = vm.addr(100);
+        vm.startPrank(caller);
+        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
+        SubnetID memory destination = gw.getNetworkName();
+        vm.expectRevert(
+            "destination is the current network, you are better off with a good ol' message, no cross needed"
+        );
+        gw.sendCross{value: CROSS_MSG_FEE + 1}(
+            destination,
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    value: CROSS_MSG_FEE + 1,
+                    nonce: 0,
+                    method: 0,
+                    params: new bytes(0)
+                }),
+                wrapped: true
+            })
+        );
+    }
+
+    function test_SendCross_Fails_DifferentMessageValue() public {
+        address caller = vm.addr(100);
+        vm.startPrank(caller);
+        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
+        SubnetID memory destination = gw.getNetworkName().createSubnetId(
+            caller
+        );
+        vm.expectRevert(
+            "the funds in cross-msg params are not equal to the ones sent in the message"
+        );
+        gw.sendCross{value: CROSS_MSG_FEE + 1}(
+            destination,
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    value: 5,
+                    nonce: 0,
+                    method: 0,
+                    params: new bytes(0)
+                }),
+                wrapped: true
+            })
+        );
+    }
+
+    function test_SendCross_Fails_InvalidToAddr() public {
+        address caller = vm.addr(100);
+        vm.startPrank(caller);
+        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
+        SubnetID memory destination = gw.getNetworkName().createSubnetId(
+            caller
+        );
+        vm.expectRevert("invalid to addr");
+        gw.sendCross{value: CROSS_MSG_FEE + 1}(
+            destination,
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: address(0)
+                    }),
+                    value: CROSS_MSG_FEE + 1,
+                    nonce: 0,
+                    method: 0,
+                    params: new bytes(0)
+                }),
+                wrapped: true
+            })
+        );
+    }
+
+    function test_SendCross_Fails_NotEnoughGas() public {
+        address caller = vm.addr(100);
+        vm.startPrank(caller);
+        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 1);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
+        SubnetID memory destination = gw.getNetworkName().createSubnetId(
+            caller
+        );
+        vm.expectRevert("not enough gas to pay cross-message");
+        gw.sendCross{value: CROSS_MSG_FEE}(
+            destination,
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: caller
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: address(0)
+                    }),
+                    value: CROSS_MSG_FEE,
+                    nonce: 0,
+                    method: 0,
+                    params: new bytes(0)
+                }),
+                wrapped: true
+            })
+        );
+    }
+
+    function test_SendCross_Works_TopDown_SameSubnet() public {
+        address caller = vm.addr(100);
+        vm.prank(caller);
+        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
+
+        address receiver = address(101);
+        vm.prank(receiver);
+        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+
+        SubnetID memory destination = gw.getNetworkName().createSubnetId(address(sa));
+        SubnetID memory from = gw.getNetworkName().createSubnetId(caller);
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: caller
+                }),
+                to: IPCAddress({
+                    subnetId: destination,
+                    rawAddress: receiver
+                }),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: 0,
+                params: new bytes(0)
+            }),
+            wrapped: true
+        });
+
+        vm.prank(caller);
+        gw.sendCross{value: CROSS_MSG_FEE + 1}(destination, crossMsg);
+        
+        (
+            SubnetID memory id,
+            ,
+            uint nonce,
+            uint circSupply,
+            
+        ) = getSubnet(address(sa));
+
+        require(receiver.balance > 0);
+        require(crossMsg.message.applyType(gw.getNetworkName()) == IPCMsgType.TopDown);
+        require(id.equals(destination));
+        require(nonce == 1);
+        require(circSupply == CROSS_MSG_FEE + 1);
+        require(gw.getNetworkName().equals(destination.commonParent(from)));
+        require(gw.appliedTopDownNonce() == 1);
+    }
+
+
+    function test_SendCross_Works_BottomUp_CurrentNetworkNotCommonParent() public {
+        address receiver = vm.addr(101);
+        address caller = vm.addr(100);
+
+
+        vm.prank(receiver);
+        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
+        registerSubnetGW(MIN_COLLATERAL_AMOUNT, receiver, gw2);
+
+        vm.prank(caller);
+        vm.deal(caller, CROSS_MSG_FEE + 2);
+
+        SubnetID memory network2 = gw2.getNetworkName();
+        address[] memory destinationPath = new address[](1);
+        destinationPath[0] = ROOTNET_ADDRESS;
+        SubnetID memory destination = SubnetID({
+            route: destinationPath
+        });
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: network2,
+                    rawAddress: caller
+                }),
+                to: IPCAddress({
+                    subnetId: destination,
+                    rawAddress: receiver
+                }),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: 0,
+                params: new bytes(0)
+            }),
+            wrapped: true
+        });
+
+
+        vm.prank(caller);
+        gw2.sendCross{value: CROSS_MSG_FEE + 1}(destination, crossMsg);
+
+        require(crossMsg.message.applyType(gw2.getNetworkName()) == IPCMsgType.BottomUp);
+        require(gw2.appliedTopDownNonce() == 0);
+    }
+
+    function test_SendCross_Works_BottomUp_CurrentNetworkCommonParent() public {
+        // the receiver is a network 1 address, but we are declaring it is network2 so we can use it in the tests
+        address receiver = vm.addr(101);
+        address caller = vm.addr(100);
+
+        vm.prank(caller);
+        vm.deal(caller, CROSS_MSG_FEE + 2);
+        SubnetID memory network2 = gw2.getNetworkName();
+        address[] memory rootnetPath = new address[](1);
+        rootnetPath[0] = ROOTNET_ADDRESS;
+        SubnetID memory destination = SubnetID({
+            route: rootnetPath
+        });
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: network2,
+                    rawAddress: caller
+                }),
+                to: IPCAddress({
+                    subnetId: destination,
+                    rawAddress: receiver
+                }),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: 0,
+                params: new bytes(0)
+            }),
+            wrapped: true
+        });
+
+        require(crossMsg.message.applyType(gw2.getNetworkName()) == IPCMsgType.BottomUp);
+
+        vm.prank(caller);
+        gw2.sendCross{value: CROSS_MSG_FEE + 1}(destination, crossMsg);
+
+        require(gw2.appliedTopDownNonce() == 0);
+    }
+
+    function commitChildCheck(
+        Checkpoint memory commit
+    ) internal returns (Checkpoint memory) {
         gw.commitChildCheck(commit);
 
         int64 epoch = (int64(uint64(block.number)) / gw.checkPeriod()) *
             gw.checkPeriod();
 
         (CheckData memory data, bytes memory signature) = gw.checkpoints(epoch);
-        
+
         require(data.epoch == epoch);
 
         bool matchedSubnetId;
@@ -854,11 +1167,11 @@ contract GatewayDeploymentTest is Test {
         require(stakedAfter == stakedBefore + stakeAmount);
     }
 
-    function registerSubnet(
+     function registerSubnetGW(
         uint256 collateral,
-        address subnetAddress
+        address subnetAddress, Gateway gateway
     ) internal {
-        gw.register{value: collateral}();
+        gateway.register{value: collateral}();
 
         (
             SubnetID memory id,
@@ -866,9 +1179,9 @@ contract GatewayDeploymentTest is Test {
             uint nonce,
             uint circSupply,
             Status status
-        ) = getSubnet(subnetAddress);
+        ) = getSubnetGW(subnetAddress, gateway);
 
-        SubnetID memory parentNetwork = gw.getNetworkName();
+        SubnetID memory parentNetwork = gateway.getNetworkName();
 
         require(id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash());
         require(stake == collateral);
@@ -877,10 +1190,17 @@ contract GatewayDeploymentTest is Test {
         require(status == Status.Active);
     }
 
-    function getSubnet(
+    function registerSubnet(
+        uint256 collateral,
         address subnetAddress
+    ) internal {
+        registerSubnetGW(collateral, subnetAddress, gw);
+    }
+
+    function getSubnetGW(
+        address subnetAddress, Gateway gateway
     ) internal view returns (SubnetID memory, uint, uint, uint, Status) {
-        SubnetID memory subnetId = gw.getNetworkName().createSubnetId(subnetAddress);
+        SubnetID memory subnetId = gateway.getNetworkName().createSubnetId(subnetAddress);
 
         (
             SubnetID memory id,
@@ -888,8 +1208,14 @@ contract GatewayDeploymentTest is Test {
             uint256 nonce,
             uint256 circSupply,
             Status status,
-        ) = gw.subnets(subnetId.toHash());
+
+        ) = gateway.subnets(subnetId.toHash());
 
         return (id, stake, nonce, circSupply, status);
+    }
+    function getSubnet(
+        address subnetAddress
+    ) internal view returns (SubnetID memory, uint, uint, uint, Status) {
+        return getSubnetGW(subnetAddress, gw);
     }
 }

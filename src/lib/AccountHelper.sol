@@ -18,8 +18,4 @@ library AccountHelper {
             ADDRESS_CODEHASH == _address.codehash &&
             ADDRESS_CODEHASH == keccak256(_address.code);
     }
-
-    function isMultisig(address _address) internal pure returns (bool) {
-        return _address == MULTISIG_ACTOR;
-    }
 }
