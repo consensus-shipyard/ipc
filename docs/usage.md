@@ -108,7 +108,7 @@ In order to check the health of top-down checkpointing in a subnet, the followin
 ```
 ```console
 # Example execution
-$./bin/ipc-agent checkpoint last-topdown --subnet /root/t01002
+$ ./bin/ipc-agent checkpoint last-topdown --subnet /root/t01002
 [2023-04-18T17:11:34Z INFO  ipc_agent::cli::commands::checkpoint::topdown_executed] Last top-down checkpoint executed in epoch: 9866
 ```
 
