@@ -100,26 +100,30 @@ pub async fn manage_topdown_checkpoints(
                     if validator_set.contains(account) {
                         // check if the validator already voted the top-down checkpoint
                         // in the child.
-                        let has_voted = child_client
-                            .ipc_validator_has_voted_topdown(
-                                // FIXME: Do not use the default, use the one configured
-                                // for the subnet
-                                &Address::from_str(GATEWAY_ACTOR_ADDRESS)?,
-                                submission_epoch,
-                                account,
-                            )
-                            .await
-                            .map_err(|e| {
-                                log::error!(
-                                    "error checking if validator has voted in subnet: {:?}",
-                                    &child.id
-                                );
-                                e
-                            })?;
+                        // let has_voted = child_client
+                        //     .ipc_validator_has_voted_topdown(
+                        //         // FIXME: Do not use the default, use the one configured
+                        //         // for the subnet
+                        //         &Address::from_str(GATEWAY_ACTOR_ADDRESS)?,
+                        //         submission_epoch,
+                        //         account,
+                        //     )
+                        //     .await
+                        //     .map_err(|e| {
+                        //         log::error!(
+                        //             "error checking if validator has voted in subnet: {:?}",
+                        //             &child.id
+                        //         );
+                        //         e
+                        //     })?;
+                        // FIXME: There is a nasty bug in the de-serialization of EpochVoteSubmissions in
+                        // the actor due to the fact that we are using Cids and nodes can't be load.
+                        // commenting for now, but needs to be fixed in actors.
+                        let has_voted = false;
 
                         if !has_voted {
                             // submitting the checkpoint synchronously and waiting to be committed.
-                            submit_topdown_checkpoint(
+                            let r = submit_topdown_checkpoint(
                                 submission_epoch,
                                 parent_tip_set,
                                 child_tip_set,
@@ -128,7 +132,16 @@ pub async fn manage_topdown_checkpoints(
                                 &child_client,
                                 &parent_client,
                             )
-                            .await?;
+                            .await;
+                            if r.is_err() {
+                                log::warn!("error submitting top-down checkpoint, waiting to next iteration: {:?}", r);
+                                if !wait_next_iteration(&stop_notify, CHAIN_HEAD_REQUEST_PERIOD)
+                                    .await?
+                                {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
 
                             // loop to submit the lagging checkpoints as many as possible
                             loop {
@@ -152,7 +165,7 @@ pub async fn manage_topdown_checkpoints(
                                     .last_voting_executed;
                                 let submission_epoch = last_exec + period;
                                 if curr_epoch >= submission_epoch {
-                                    submit_topdown_checkpoint(
+                                    let r = submit_topdown_checkpoint(
                                         submission_epoch,
                                         parent_tip_set,
                                         child_tip_set,
@@ -161,7 +174,19 @@ pub async fn manage_topdown_checkpoints(
                                         &child_client,
                                         &parent_client,
                                     )
-                                    .await?;
+                                    .await;
+                                    if r.is_err() {
+                                        log::warn!("error submitting top-down checkpoint, waiting to next iteration: {:?}", r);
+                                        if !wait_next_iteration(
+                                            &stop_notify,
+                                            CHAIN_HEAD_REQUEST_PERIOD,
+                                        )
+                                        .await?
+                                        {
+                                            return Ok(());
+                                        }
+                                        break;
+                                    }
                                 } else {
                                     // if no checkpoint lagging we can wait for the
                                     // next iteration.

@@ -105,19 +105,23 @@ pub async fn manage_bottomup_checkpoints(
                 for account in child.accounts.iter() {
                     if validator_set.contains(account) {
                         // check if the validator already voted
-                        let has_voted = parent_client
-                            .ipc_validator_has_voted_bottomup(&child.id, submission_epoch, account)
-                            .await
-                            .map_err(|e| {
-                                log::error!(
-                                    "error checking if validator has voted in subnet: {:?}",
-                                    &child.id
-                                );
-                                e
-                            })?;
+                        // let has_voted = parent_client
+                        //     .ipc_validator_has_voted_bottomup(&child.id, submission_epoch, account)
+                        //     .await
+                        //     .map_err(|e| {
+                        //         log::error!(
+                        //             "error checking if validator has voted in subnet: {:?}",
+                        //             &child.id
+                        //         );
+                        //         e
+                        //     })?;
+                        // FIXME: There is a nasty bug in the de-serialization of EpochVoteSubmissions in
+                        // the actor due to the fact that we are using Cids and nodes can't be load.
+                        // commenting for now, but needs to be fixed in actors.
+                        let has_voted = false;
                         if !has_voted {
                             // submitting the checkpoint synchronously and waiting to be committed.
-                            submit_checkpoint(
+                            let r = submit_checkpoint(
                                 child_tip_set,
                                 submission_epoch,
                                 account,
@@ -125,11 +129,16 @@ pub async fn manage_bottomup_checkpoints(
                                 &child_client,
                                 &parent_client,
                             )
-                            .await
-                            .map_err(|e| {
-                                log::error!("cannot submit checkpoint due to {:?}", e);
-                                e
-                            })?;
+                            .await;
+                            if r.is_err() {
+                                log::warn!("error submitting bottom-up checkpoint, waiting to next iteration: {:?}", r);
+                                if !wait_next_iteration(&stop_notify, CHAIN_HEAD_REQUEST_PERIOD)
+                                    .await?
+                                {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
 
                             loop {
                                 // check if by any chance we have the opportunity to submit any outstanding checkpoint we may be
@@ -151,7 +160,7 @@ pub async fn manage_bottomup_checkpoints(
                                     .last_voting_executed;
                                 let submission_epoch = last_exec + period;
                                 if curr_epoch >= submission_epoch {
-                                    submit_checkpoint(
+                                    let r = submit_checkpoint(
                                         child_tip_set,
                                         submission_epoch,
                                         account,
@@ -159,11 +168,19 @@ pub async fn manage_bottomup_checkpoints(
                                         &child_client,
                                         &parent_client,
                                     )
-                                    .await
-                                    .map_err(|e| {
-                                        log::error!("cannot submit checkpoint due to {:?}", e);
-                                        e
-                                    })?;
+                                    .await;
+                                    if r.is_err() {
+                                        log::warn!("error submitting bottom-up checkpoint, waiting to next iteration: {:?}", r);
+                                        if !wait_next_iteration(
+                                            &stop_notify,
+                                            CHAIN_HEAD_REQUEST_PERIOD,
+                                        )
+                                        .await?
+                                        {
+                                            return Ok(());
+                                        }
+                                        break;
+                                    }
                                 } else {
                                     // if no checkpoint lagging we can wait for the
                                     // next iteration.
