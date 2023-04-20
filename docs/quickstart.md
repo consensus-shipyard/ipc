@@ -6,6 +6,8 @@ Ready to test the waters with your first subnet? This guide will deploy a subnet
 
 Several steps in this guide involve running long-lived processes. In each of these cases, the guide advises starting a new *session*. Depending on your set-up, you may do this using tools like `screen` or `tmux`, or, if using a graphical environment, by opening a new terminal tab, pane, or window.
 
+>💡A video walkthrough of this guide is also [available](https://www.youtube.com/watch?v=J9Y4_bzGue4). We still encourage you to try it for yourself!
+
 ## Step 0: Prepare your system
 
 We assume a Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. Details on IPC-specific requirements can also be found in the [README](/README.md).
