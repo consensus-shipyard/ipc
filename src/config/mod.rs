@@ -37,7 +37,7 @@ json_rpc_address = "127.0.0.1:3030"
 id = "/root"
 gateway_addr = "t064"
 network_name = "root"
-jsonrpc_api_http = "http://127.0.0.1:1235/rpc/v1"
+jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 jsonrpc_api_ws = "wss://example.org/rpc/v0"
 auth_token = "YOUR TOKEN"
 accounts = ["t01"]
@@ -46,7 +46,7 @@ accounts = ["t01"]
 id = "/root/t01"
 gateway_addr = "t064"
 network_name = "child"
-jsonrpc_api_http = "http://127.0.0.1:1235/rpc/v1"
+jsonrpc_api_http = "http://127.0.0.1:1250/rpc/v1"
 auth_token = "YOUR TOKEN"
 accounts = ["t01"]
 "#;

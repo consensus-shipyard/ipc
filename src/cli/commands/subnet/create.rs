@@ -78,8 +78,8 @@ pub struct CreateSubnetArgs {
     pub min_validator_stake: u64,
     #[arg(long, help = "The minimal number of validators")]
     pub min_validators: u64,
-    #[arg(long, help = "The bottom up checkpoint period")]
+    #[arg(long, help = "The bottom up checkpoint period in number of blocks")]
     pub bottomup_check_period: ChainEpoch,
-    #[arg(long, help = "The top down checkpoint period")]
+    #[arg(long, help = "The top down checkpoint period in number of blocks")]
     pub topdown_check_period: ChainEpoch,
 }

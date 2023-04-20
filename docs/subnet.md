@@ -25,7 +25,7 @@ If your daemon is running on a docker container, you can get the container id or
 $ docker exec -it <container-id> eudico wallet export --lotus-json <adress-to-export> > ~/.ipc-agent/wallet.key
 
 # Example execution
-$ docker exec -it 84711d67cf162e30747c4525d69728c4dea8c6b4b35cd89f6d0947fee14bf908 eudico wallet export --lotus-json t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq > ~/.ipc-agent/wallet.key
+$ docker exec -it ipc_root_1234 eudico wallet export --lotus-json t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq > ~/.ipc-agent/wallet.key
 ```
 
 ### Importing wallet keys
@@ -37,7 +37,7 @@ Depending on whether the subnet is running inside a docker container or not, you
 $ ./eudico wallet import --lotus-json <wallet-key-file-path>
 
 # Example execution
-$ ./eudico wallet import --lotus-json ~/.ipc-agent/t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy.key
+$ ./eudico wallet import --lotus-json ~/.ipc-agent/wallet.key
 ```
 
 ```bash
@@ -45,7 +45,7 @@ $ ./eudico wallet import --lotus-json ~/.ipc-agent/t1ivy6mo2ofxw4fdmft22nel66w63
 $ docker cp <wallet-key-path> <container-id>:<target-file-in-container> && docker exec -it <container-id> eudico wallet import --format=json-lotus <target-file-in-container>
 
 # Example execution
-$ docker cp ~/.ipc-agent/t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy.key 91d2af805346:/input.key && docker exec -it 91d2af805346 eudico wallet import --format=json-lotus input.key
+$ docker cp ~/.ipc-agent/wallet.key ipc_root_t01002_1250:/input.key && docker exec -it ipc_root_t01002_1250 eudico wallet import --format=json-lotus input.key
 ```
 
 ## Running a simple subnet with a single validator
@@ -57,22 +57,17 @@ This section provides instructions for spawning a simple subnet with a single va
 To run a subnet the first thing is to configure and create the subnet actor that will govern the subnet's operation.
 
 ```bash
-$ ./bin/ipc-agent subnet create -p <parent-id> -n <subnet-name> --min-validator-stake 1 --min-validators <num-validators> --finality-threshold <number-epochs> --check-period <epochs-between-checks>
+$ ./bin/ipc-agent subnet create --parent <parent> --name <name> --min-validator-stake <min_validator_stake> --min-validators <min-validators> --bottomup-check-period <bottomup-check-period> --topdown-check-period <topdown-check-period>
 
 # Example execution
-$ ./bin/ipc-agent subnet create -p /root -n test --min-validator-stake 1 --min-validators 0 --finality-threshold 10 --check-period 10
+$ ./bin/ipc-agent subnet create --parent /root --name test --min-validator-stake 1 --min-validators 0 --bottomup-check-period 30 --topdown-check-period 30
 [2023-03-21T09:32:58Z INFO  ipc_agent::cli::commands::manager::create] created subnet actor with id: /root/t01002
 ```
-This command deploys a subnet actor for a new subnet from the `root`, with a human-readable name `test`, that requires at least `1` validator to join the subnet to be able to mine new blocks, and with a checkpointing period to the parent of `10` blocks. We can see that the output of this command is the ID of the new subnet.
+This command deploys a subnet actor for a new subnet from the `root`, with a human-readable name `test`, that requires at least `1` validator to join the subnet to be able to mine new blocks, and with a checkpointing period (both bottom-up and top-down) of `30` blocks. We can see that the output of this command is the ID of the new subnet.
 
 ### Exporting your wallet
 
-Let's export the default wallet (or other wallet you'd like to use) for use in the subnet validator.
-```bash
-$ ./eudico wallet export --lotus-json `./eudico wallet default` > ~/.ipc-agent/wallet.key
-```
-
-Make sure that your wallet has enough funds to put up the collateral to join the subnet.
+We will need to export the wallet key from our root node so that we can import them to our validators. Depending on how you are running your rootnet node you'll have to make a call to the docker container, or your nodes API. More information about exporting keys from your node can be found under [this section](#Exporting-wallet-keys). Make sure that the wallet holds enough funds to meet the subnet collateral requirements.
 
 ### Deploying a subnet node
 
@@ -144,7 +139,7 @@ $ ./bin/ipc-agent subnet send-value --subnet /root --to <target-wallet> <amount_
 
 With this, we can already create the subnet with `/root` as its parent. We are going to set the `--min-validators 2` so no new blocks can be created without this number of validators in the subnet.
 ```bash
-./bin/ipc-agent subnet create -p /root -n test --min-validator-stake 1 --min-validators 2 --finality-threshold 10 --check-period 10
+./bin/ipc-agent subnet create --parent /root --name test --min-validator-stake 1 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
 ```
 ### Deploying the infrastructure
 

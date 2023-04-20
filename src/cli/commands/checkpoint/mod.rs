@@ -22,7 +22,7 @@ pub(crate) struct CheckpointCommandsArgs {
 impl CheckpointCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
-            Commands::List(args) => ListBottomUpCheckpoints::handle(global, args).await,
+            Commands::ListBottomup(args) => ListBottomUpCheckpoints::handle(global, args).await,
             Commands::LastTopdown(args) => LastTopDownExec::handle(global, args).await,
         }
     }
@@ -30,6 +30,6 @@ impl CheckpointCommandsArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
-    List(ListBottomUpCheckpointsArgs),
+    ListBottomup(ListBottomUpCheckpointsArgs),
     LastTopdown(LastTopDownExecArgs),
 }

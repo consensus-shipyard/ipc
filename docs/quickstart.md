@@ -108,7 +108,7 @@ $ nohup ./ipc-agent/bin/ipc-agent daemon &
 
 * The next step is to create a subnet under `/root`
 ```bash
-$ ./ipc-agent/bin/ipc-agent subnet create -p /root -n andromeda --min-validator-stake 1 --min-validators 2 --finality-threshold 10 --check-period 10
+$ ./ipc-agent/bin/ipc-agent subnet create --parent /root --name andromeda --min-validator-stake 1 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
 ```
 * Make a note of the address of the subnet you created (`/root/<SUBNET_ID>`)
 
