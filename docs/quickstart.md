@@ -4,7 +4,7 @@
 
 Ready to test the waters with your first subnet? This guide will deploy a subnet with multiple local validators orchestrated by the same IPC agent. This subnet will be anchored to the public Spacenet. This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
 
-Several steps in this guide involve running long-lived processes. These commands are usually prefaced with `nohup` so that they run in the background. For improved usability, we recommend instead using a `screen` session and spawning a new window for each of these commands. In that case, you should omit `nohup` and `&`. Alternatively, open a new terminal and `tail -f nohup.out` to track the combined output of the different daemons. 
+Several steps in this guide involve running long-lived processes. In each of these cases, the guide advises starting a new *session*. Depending on your set-up, you may do this using tools like `screen` or `tmux`, or, if using a graphical environment, by opening a new terminal tab, pane, or window.
 
 ## Step 0: Prepare your system
 
@@ -66,9 +66,9 @@ git clone https://github.com/consensus-shipyard/lotus.git
 
 Let's deploy a eudico instance on Spacenet and configure the IPC Agent to interact with it.
 
-* Start your eudico instance (might take a while to sync the chain)
+* [**In a new session**] Start your eudico instance (might take a while to sync the chain)
 ```bash
-nohup ./lotus/eudico mir daemon --bootstrap &
+./lotus/eudico mir daemon --bootstrap
 ```
 * Get configuration parameters
 ```bash
@@ -93,9 +93,9 @@ jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 auth_token = "<AUTH_TOKEN_0>"
 accounts = ["<WALLET_0>"]
 ```
-* Start your IPC Agent
+* [**In a new session**] Start your IPC Agent
 ```bash
-nohup ./ipc-agent/bin/ipc-agent daemon &
+./ipc-agent/bin/ipc-agent daemon
 ```
 
 
@@ -202,11 +202,11 @@ All the infrastructure for the subnet is now deployed, and we can join our valid
 
 ## Step 9: Start validating! 
 
-We have everything in place now to start validating. This is as simple as running the following script for each of the validators, passing the container name (or id):
+We have everything in place now to start validating. Run the following script for each of the validators [**each in a new session**], passing the container names:
 ```bash
-nohup ./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_1> &
-nohup ./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_2> &
-nohup ./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_3> &
+./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_1> 
+./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_2> 
+./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_3> 
 ```
 
 
