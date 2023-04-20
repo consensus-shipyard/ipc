@@ -7,11 +7,11 @@
 Sometimes, things break, and we'll need to push a quick path to fix some bug. If this happens, and you need to upgrade your agent version, kill you agent daemon if you have any running, pull the latest changes from this repo, build the binary, and start your daemon again. This should pick up the latest version for the agent. In the future, we will provide a better way to upgrade your agent.
 ```bash
 # Pull latest changes
-$ git pull
+git pull
 # Build the agent
-$ make build
+make build
 # Restart the daemon
-$ ./bin/ipc-agent daemon
+./bin/ipc-agent daemon
 ```
 
 ## The eudico image is not building successful 
@@ -26,11 +26,12 @@ Either because the dockerized subnet node after running `./bin/ipc-infra/run-sub
 ```
 Not online yet... (could not get API info for FullNode: could not get api endpoint: API not running (no endpoint))
 ```
-Or because when the script finishes no validator address has been reported as expected by the logs, the best way to debug this situation is to attach to the docker container and check the logs with the following command:
+Or because when the script finishes no validator address has been reported as expected by the logs, the best way to debug this situation is to attach to the docker container:
 ```bash
-$ docker exec -it <container_name> bash
-
-# Inside the container
+docker exec -it <container_name> bash
+```
+ And check the logs with the following command, inside the container
+```bash
 tmux a
 ```
 Generally, the issue is that:
@@ -47,8 +48,9 @@ It may be the case that while joining the subnet, you didn't set the multiaddres
 
 Changing the validator is as simple as running the following command:
 ```bash
-$ ./bin/ipc-agent subnet set-validator-net-addr --subnet <subnet-id> --validator-net-addr <new-validator-addr>
-
+./bin/ipc-agent subnet set-validator-net-addr --subnet <subnet-id> --validator-net-addr <new-validator-addr>
+```
+```console
 # Example execution
 $ ./bin/ipc-agent subnet set-validator-net-addr --subnet /root/t01002 --validator-net-addr "/dns/host.docker.internal/tcp/1349/p2p/12D3KooWDeN3bTvZEH11s9Gq5bDeZZLKgRZiMDcy2KmA6mUaT9KE"
 ```

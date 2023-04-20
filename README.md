@@ -2,7 +2,7 @@
 
 > The InterPlanetary Consensus (IPC) orchestrator.
 
-```bash
+```console
 $ ./bin/ipc-agent --help
 
 The IPC agent command line tool
@@ -44,10 +44,10 @@ To build the IPC Agent you need to have Rust installed in your environment. The 
 
 To build the binary for the IPC agent you need to build the requirements in your environment, clone this repo, and build the binary following these steps:
 ```bash
-$ git clone https://github.com/consensus-shipyard/ipc-agent.git
-$ cd ipc-agent
-$ rustup target add wasm32-unknown-unknown
-$ make build
+git clone https://github.com/consensus-shipyard/ipc-agent.git
+cd ipc-agent
+rustup target add wasm32-unknown-unknown
+make build
 ```
 
 This builds the binary of the IPC agent in the `./bin` folder of your repo. If you want to make the command available everywhere, add this folder to the binary `PATH` of your system. To see if the installation was successfully you can run the following command: 
@@ -62,8 +62,8 @@ With Docker installed, you can then `make install-infra` in the root of the `ipc
 
 In Unix-based systems, it is highly recommended to include your user in the `docker` group to avoid having to run many of the commands from this tutorial using `sudo`. You can achieve this running:
 ```bash
-$ sudo usermod -aG docker $USER
-$ newgrp docker
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
 ## Connecting to a rootnet
@@ -78,7 +78,7 @@ In order to use the IPC agent with Spacenet we need to have access to a full nod
 With the node running, you are ready to connect the IPC agent to Spacenet. For this, you'll need to get an authentication token for your node and create a wallet for the interaction.
 
 *Example*:
-```bash
+```console
 # Generate auth token to node
 $ ./eudico auth token create --perm admin
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.8vIV7pCrWx-nxOBAAw_IayDzrGf22kMjagRYmj_8Qqw
@@ -95,14 +95,14 @@ To be able to interact with Spacenet and run new subnets, some FIL should be pro
 ### Option 2: Local deployment
 To deploy a Example rootnet locally for testing you can use the IPC scripts installed in `./bin/ipc-infra` by running:
 ```bash
-$ ./bin/ipc-infra/run-root-docker-1val.sh <lotus-api-port> <validator-libp2p-port>
+./bin/ipc-infra/run-root-docker-1val.sh <lotus-api-port> <validator-libp2p-port>
 ```
 
 For instance, running `./bin/ipc-infra/run-root-docker-1val.sh 1234 1235` will run a rootnet daemon listening at `localhost:1234`, and a single validator mining in the rootnet listening through its libp2p host in `localhost:1235`.
 
 *Example*:
-```bash
-./bin/ipc-infra/run-root-docker-1val.sh 1234 1235
+```console
+$ ./bin/ipc-infra/run-root-docker-1val.sh 1234 1235
 (...)
 >>> Root daemon running in container: 84711d67cf162e30747c4525d69728c4dea8c6b4b35cd89f6d0947fee14bf908
 >>> Token to /root daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0
@@ -114,7 +114,7 @@ This information will be relevant to configure our agent to connect to this root
 
 The default config path for the agent is `~/.ipc-agent/config.toml`. The agent will always try to pick up the config from this path unless told otherwise. To populate a Example config file in the default path, you can run the following command:
 ```bash
-$ ./bin/ipc-agent config init
+./bin/ipc-agent config init
 ```
 
 The `/root` section of the agent's `config.toml` must be updated to connect to your node. In the examples above, we need to set the endpoint of our rootnet node to be `127.0.0.1:1234`, and replace the `auth_token` and `account` with the ones provided by our node.
@@ -139,7 +139,7 @@ The IPC agent runs as a foreground daemon process that spawns a new JSON RPC ser
 
 Alternatively, the agent can also be used as a CLI to interact with IPC. Under the hood, this cli sends new commands to the RPC server of the daemon. To run the IPC agent daemon you can run:
 ```bash
-$ ./bin/ipc-agent daemon
+./bin/ipc-agent daemon
 ```
 
 The RPC server of the daemon will be listening to the endpoint determined in the `json_rpc_address` field of the config. If you are looking for your agent to be accessible from Docker or externally, remember to listen on `0.0.0.0` instead of `127.0.0.1` as specified in the default config. 
@@ -147,7 +147,7 @@ The RPC server of the daemon will be listening to the endpoint determined in the
 To check if the agent has connected to the rootnet successfully, you can try using it to create a new wallet.
 
 *Example*:
-```bash
+```console
 $ ./bin/ipc-agent wallet new --key-type bls --subnet /root
 2023-03-30T12:01:11Z INFO  ipc_agent::cli::commands::manager::wallet] created new wallet with address WalletNewResponse { address: "t1om5pijjq5dqic4ccnqqrvv6zgzwrlxf6bh2apvi" } in subnet "/root"
 ```
