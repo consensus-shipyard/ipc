@@ -194,7 +194,7 @@ accounts = ["<WALLET_1>", "<WALLET_2>", "<WALLET_3>"]
 
 All the infrastructure for the subnet is now deployed, and we can join our validators to the subnet. For this, we need to send a `join` command from each of our validators from their validator wallet addresses providing the validators multiaddress. 
 
-* Join the subnet with each validators
+* Join the subnet with each validator
 ```bash
 ./ipc-agent/bin/ipc-agent subnet join --from <WALLET_1> --subnet /root/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_1>
 ./ipc-agent/bin/ipc-agent subnet join --from <WALLET_2> --subnet /root/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_2>
