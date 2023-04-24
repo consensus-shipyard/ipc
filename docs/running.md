@@ -430,7 +430,7 @@ which we saw in the `genesis.json` file earlier.
 
 ```shell
 cargo run -p fendermint_app --release -- \
-  rpc query actor-state --address f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y | jq
+  rpc query actor-state --address f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y
 ```
 
 The state is printed to STDOUT as JSON:
@@ -474,13 +474,13 @@ For example we can send 1000 tokens from Alice to Bob:
 ```shell
 BOB_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key test-network/keys/bob.pk)
 cargo run -p fendermint_app --release -- \
-  rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 | jq
+  rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000
 ```
 
 The `transfer` command waits for the commit results of the transaction:
 
 ```console
-$ cargo run -p fendermint_app --release -- rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 | jq
+$ cargo run -p fendermint_app --release -- rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000
     Finished dev [unoptimized + debuginfo] target(s) in 0.40s
      Running `target/debug/fendermint rpc transfer --secret-key test-network/keys/alice.sk --to f1kgtzp5nuob3gdccagivcgns7e25be2c2rqozilq --sequence 0 --value 1000`
 {
@@ -545,7 +545,7 @@ Say we want to deploy the `SimpleCoin` contract from that directory.
 CONTRACT=../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin
 cargo run -p fendermint_app --release -- \
   rpc fevm --secret-key test-network/keys/alice.sk --sequence 0 \
-    create --contract $CONTRACT | jq
+    create --contract $CONTRACT
 ```
 
 The output shows what addresses have been assigned to the created contract,

@@ -17,6 +17,7 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
+use serde::Serialize;
 use serde_json::json;
 use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
@@ -79,11 +80,7 @@ async fn query(
                       "id": id,
                       "state": state,
                     });
-
-                    // Print JSON as a single line - we can display it nicer with `jq` if needed.
-                    let json = serde_json::to_string(&out)?;
-
-                    println!("{}", json)
+                    print_json(&out)?;
                 }
                 None => {
                     eprintln!("actor not found")
@@ -122,7 +119,7 @@ where
             json!({"response": res.response, "return_data": return_data})
         }
     };
-    print_json(json)
+    print_json(&json)
 }
 
 /// Execute token transfer through RPC and print the response to STDOUT as JSON.
@@ -215,9 +212,12 @@ async fn fevm_invoke(
     .await
 }
 
-/// Print JSON as "jsonline"; use `jq` to format.
-fn print_json(value: serde_json::Value) -> anyhow::Result<()> {
-    let json = serde_json::to_string(&value)?;
+/// Print out pretty-printed JSON.
+///
+/// People can use `jq` to turn it into compact form if they want to save the results to a `.jsonline`
+/// file, but the default of having human readable output seems more useful.
+fn print_json<T: Serialize>(value: &T) -> anyhow::Result<()> {
+    let json = serde_json::to_string_pretty(&value)?;
     println!("{}", json);
     Ok(())
 }
