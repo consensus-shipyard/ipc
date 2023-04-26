@@ -58,4 +58,13 @@ interface IGateway {
         external
         payable;
 
+    /// ApplyMessage triggers the execution of a cross-subnet message validated through the consensus.
+    ///
+    /// This function can only be triggered using `ApplyImplicitMessage`, and the source needs to
+    /// be the SystemActor. Cross messages are applied similarly to how rewards are applied once
+    /// a block has been validated. This function:
+    /// - Determines the type of cross-message.
+    /// - Performs the corresponding state changes.
+    /// - And updated the latest nonce applied for future checks.
+    function applyMsg(CrossMsg calldata crossMsg) external returns (bytes memory);
 }

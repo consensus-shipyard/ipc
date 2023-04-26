@@ -20,7 +20,7 @@ library CheckpointHelper {
             abi.encode(
                 CheckData({
                     source: SubnetID(new address[](0)),
-                    tipSet: new bytes(0),
+                    tipSet: EMPTY_BYTES,
                     epoch: 0,
                     prevHash: EMPTY_HASH,
                     children: new ChildCheck[](0),

@@ -253,7 +253,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard {
         uint validatorLength = validators.length();
         require(validatorLength != 0, "no validators in subnet");
 
-        require(address(this).balance >= validatorLength, "we neeed to distribute at least one wei to each validator");
+        require(address(this).balance >= validatorLength, "we need to distribute at least one wei to each validator");
 
         uint rewardAmount = address(this).balance / validatorLength;
 

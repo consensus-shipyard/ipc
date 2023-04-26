@@ -4,11 +4,14 @@ pragma solidity ^0.8.7;
 import "../structs/Checkpoint.sol";
 import "../constants/Constants.sol";
 import "../lib/SubnetIDHelper.sol";
+import "openzeppelin-contracts/utils/Address.sol";
+import "fevmate/utils/FilAddress.sol";
 
 /// @title Helper library for manipulating StorableMsg struct
 /// @author LimeChain team
 library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
+    using FilAddress for address;
 
     function createReleaseMsg(
         SubnetID calldata subnet,
@@ -29,7 +32,7 @@ library CrossMsgHelper {
                     }),
                     value: value,
                     nonce: nonce,
-                    method: 0,
+                    method: METHOD_SEND,
                     params: EMPTY_BYTES
                 }),
                 wrapped: false
@@ -51,7 +54,7 @@ library CrossMsgHelper {
                     to: IPCAddress({subnetId: subnet, rawAddress: signer}),
                     value: value,
                     nonce: 0,
-                    method: 0,
+                    method: METHOD_SEND,
                     params: EMPTY_BYTES
                 }),
                 wrapped: false
@@ -66,5 +69,30 @@ library CrossMsgHelper {
         CrossMsg[] memory crossMsgs
     ) internal pure returns (bytes32) {
         return keccak256(abi.encode(crossMsgs));
+    }
+
+    function execute(
+        CrossMsg calldata crossMsg
+    ) public returns (bytes memory) {
+        uint256 value = crossMsg.message.value;
+        address recipient = crossMsg.message.to.rawAddress.normalize();
+
+        if (crossMsg.message.method == METHOD_SEND) {
+            Address.sendValue(payable(recipient), value);
+            return EMPTY_BYTES;
+        }
+
+        bytes memory params = crossMsg.message.params;
+
+        if (crossMsg.wrapped) {
+            params = abi.encode(crossMsg);
+        }
+
+        bytes memory data = abi.encodeWithSelector(crossMsg.message.method, params);
+
+        if(value > 0)
+            return Address.functionCallWithValue(recipient, data, value);
+
+        return Address.functionCall(recipient, data);
     }
 }

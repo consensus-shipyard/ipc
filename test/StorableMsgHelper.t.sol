@@ -20,7 +20,7 @@ contract StorableMsgHelperTest is Test {
         }),
         value: 0,
         nonce: 0,
-        method: 0,
+        method: METHOD_SEND,
         params: bytes("")
     });
 
@@ -40,7 +40,7 @@ contract StorableMsgHelperTest is Test {
             }),
             value: 1,
             nonce: 1,
-            method: 1,
+            method: METHOD_SEND,
             params: bytes("dfasfgsd")
         });
         bytes32 expectedHash = keccak256(abi.encode(storableMsg));
@@ -67,7 +67,7 @@ contract StorableMsgHelperTest is Test {
             }),
             value: 1,
             nonce: 1,
-            method: 1,
+            method: METHOD_SEND,
             params: bytes("dfasfgsd")
         });
 
@@ -107,7 +107,7 @@ contract StorableMsgHelperTest is Test {
             }),
             value: 1,
             nonce: 1,
-            method: 1,
+            method: METHOD_SEND,
             params: bytes("dfasfgsd")
         });
 

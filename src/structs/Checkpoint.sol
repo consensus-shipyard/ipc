@@ -41,7 +41,7 @@ struct StorableMsg {
     IPCAddress to;
     uint256 value;
     uint64 nonce;
-    uint64 method;
+    bytes4 method;
     bytes params;
 }
 

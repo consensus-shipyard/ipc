@@ -2,7 +2,6 @@
 pragma solidity ^0.8.7;
 
 import "./structs/Checkpoint.sol";
-import "./structs/Postbox.sol";
 import "./enums/Status.sol";
 import "./interfaces/IGateway.sol";
 import "./interfaces/ISubnetActor.sol";
@@ -23,15 +22,21 @@ contract Gateway is IGateway, ReentrancyGuard {
     using FilAddress for address payable;
     using AccountHelper for address;
     using SubnetIDHelper for SubnetID;
+    using CrossMsgHelper for CrossMsg;
     using CheckpointHelper for Checkpoint;
     using CheckpointMappingHelper for mapping(int64 => Checkpoint);
     using StorableMsgHelper for StorableMsg;
 
+    /// @notice default period in number of blocks between checkpoint submissions
     int64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
+
+    /// @notice minimum amount of wei to register a subnet
     uint64 constant MIN_COLLATERAL_AMOUNT = 1 ether;
+
+    /// @notice maximum possible value for nonce
     uint64 constant MAX_NONCE = type(uint64).max;
 
-    /// @notice ID of the current network
+    /// @notice path to the current network
     SubnetID private networkName;
 
     /// @notice Number of active subnets spawned from this one
@@ -62,11 +67,12 @@ contract Gateway is IGateway, ReentrancyGuard {
     /// @notice Stores an epoch for the given pointer to CrossMsg[]
     mapping(bytes32 => int64) public crossMsgEpochRegistry;
 
-    uint256 public lastPostboxId;
-    /// @notice Postbox keeps track for an EOA of all the cross-net messages triggered by
+    /// @notice Postbox keeps track of all the cross-net messages triggered by
     /// an actor that need to be propagated further through the hierarchy.
-    /// postbox id => PostBoxItem
-    mapping(uint64 => PostBoxItem) private postbox;
+    /// cross-net message id => CrossMsg
+    mapping(bytes32 => CrossMsg) public postbox;
+    /// @notice cross-net message id => set of owners
+    mapping(bytes32 => mapping(address => bool)) public postboxHasOwner;
 
     /// @notice Latest nonce of a cross message sent from subnet.
     uint64 public nonce;
@@ -89,15 +95,14 @@ contract Gateway is IGateway, ReentrancyGuard {
     /// @notice fee amount charged per cross message
     uint256 public crossMsgFee;
 
-    /// epoch => SubnetID => [childIndex, exists(0 - no, 1 - yes)]
+    /// @notice epoch => SubnetID => [childIndex, exists(0 - no, 1 - yes)]
     mapping(int64 => mapping(bytes32 => uint256[2])) internal children;
-    /// epoch => SubnetID => check => exists
+    /// @notice epoch => SubnetID => check => exists
     mapping(int64 => mapping(bytes32 => mapping(bytes32 => bool)))
         internal checks;
 
     modifier signableOnly() {
         require(msg.sender.isAccount(), "the caller is not an account");
-
         _;
     }
 
@@ -134,7 +139,7 @@ contract Gateway is IGateway, ReentrancyGuard {
     function getSubnetTopDownMsgsLength(
         SubnetID memory subnetId
     ) external view returns (uint) {
-        (, Subnet memory subnet) = _getSubnet(subnetId);
+        (, Subnet storage subnet) = _getSubnet(subnetId);
 
         return subnet.topDownMsgs.length;
     }
@@ -143,7 +148,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         SubnetID memory subnetId,
         uint index
     ) external view returns (CrossMsg memory) {
-        (, Subnet memory subnet) = _getSubnet(subnetId);
+        (, Subnet storage subnet) = _getSubnet(subnetId);
 
         return subnet.topDownMsgs[index];
     }
@@ -152,6 +157,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         return networkName;
     }
 
+    /// @notice register a subnet in the gateway. called by a subnet when it reaches the treshold stake
     function register() external payable {
         require(
             msg.value >= minStake,
@@ -171,6 +177,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         totalSubnets += 1;
     }
 
+    /// @notice addStake - add collateral for an existing subnet
     function addStake() external payable {
         require(msg.value > 0, "no stake to add");
 
@@ -181,6 +188,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         subnet.stake += msg.value;
     }
 
+    /// @notice release collateral for an existing subnet
     function releaseStake(uint amount) external nonReentrant {
         require(amount > 0, "no funds to release in params");
 
@@ -206,6 +214,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         payable(subnet.id.getActor()).sendValue(amount);
     }
 
+    /// @notice kill an existing subnet. It's balance must be empty
     function kill() external {
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
 
@@ -229,6 +238,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         payable(msg.sender).sendValue(stake);
     }
 
+    /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
     function commitChildCheck(
         Checkpoint calldata commit
     ) external returns (uint fee) {
@@ -323,6 +333,8 @@ contract Gateway is IGateway, ReentrancyGuard {
         }
     }
 
+    /// @notice fund - commit a top-down message releasing funds in a child subnet. There is an associated fee that gets distributed to validators in the subnet as well
+    /// @param subnetId - subnet to fund
     function fund(
         SubnetID calldata subnetId
     ) external payable signableOnly hasFee {
@@ -338,6 +350,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         distributeRewards(subnetId.getActor(), crossMsgFee);
     }
 
+    /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds
     function release() external payable signableOnly hasFee {
         uint256 releaseAmount = msg.value - crossMsgFee;
 
@@ -353,6 +366,9 @@ contract Gateway is IGateway, ReentrancyGuard {
         payable(BURNT_FUNDS_ACTOR).sendValue(releaseAmount);
     }
 
+    /// @notice sends an arbitrary cross message from the current subnet to a destination subnet.
+    /// @param destination - destination subnet
+    /// @param crossMsg - message to send
     function sendCross(
         SubnetID memory destination,
         CrossMsg memory crossMsg
@@ -383,7 +399,82 @@ contract Gateway is IGateway, ReentrancyGuard {
         _crossMsgSideEffects(crossMsg, shouldBurn, shouldDistributeRewards);
     }
 
-    /// Commit the cross message to storage. It outputs a flag signaling
+    /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
+    function applyMsg(
+        CrossMsg calldata crossMsg
+    ) external returns (bytes memory) {
+        require(msg.sender.isSystemActor(), "caller not the system actor");
+        require(
+            crossMsg.message.to.rawAddress != address(0),
+            "error getting raw address from msg"
+        );
+        require(
+            crossMsg.message.to.subnetId.route.length > 0,
+            "error getting subnet from msg"
+        );
+        if (crossMsg.message.method == METHOD_SEND) {
+            require(
+                address(this).balance >= crossMsg.message.value,
+                "not enough balance to mint new tokens as part of the cross-message"
+            );
+        }
+
+        IPCMsgType applyType = crossMsg.message.applyType(networkName);
+
+        // If the cross-message destination is the current network.
+        if (crossMsg.message.to.subnetId.equals(networkName)) {
+            if (applyType == IPCMsgType.BottomUp) {
+                _bottomUpStateTransition(crossMsg.message);
+            }
+
+            if (applyType == IPCMsgType.TopDown) {
+                _topDownStateTransition(crossMsg.message);
+            }
+
+            return crossMsg.execute();
+        }
+
+        // when the destination is not the current network we add it to the postbox for further propagation
+        bytes32 cid = crossMsg.toHash();
+
+        postbox[cid] = crossMsg;
+        postboxHasOwner[cid][crossMsg.message.from.rawAddress] = true;
+
+        return abi.encode(cid);
+    }
+
+    function _bottomUpStateTransition(
+        StorableMsg calldata storableMsg
+    ) internal {
+        if (
+            storableMsg.nonce > appliedBottomUpNonce &&
+            storableMsg.nonce == appliedBottomUpNonce + 1
+        ) {
+            appliedBottomUpNonce += 1;
+        } else if (
+            appliedBottomUpNonce == MAX_NONCE && storableMsg.nonce == 0
+        ) {
+            appliedBottomUpNonce = 0;
+        }
+
+        require(
+            appliedBottomUpNonce == storableMsg.nonce,
+            "the bottom-up message being applied doesn't hold the subsequent nonce"
+        );
+    }
+
+    function _topDownStateTransition(
+        StorableMsg calldata storableMsg
+    ) internal {
+        require(
+            appliedTopDownNonce == storableMsg.nonce,
+            "the top-down message being applied doesn't hold the subsequent nonce"
+        );
+
+        appliedTopDownNonce += 1;
+    }
+
+    /// @notice Commit the cross message to storage. It outputs a flag signaling
     /// if the committed messages was bottom-up and some funds need to be
     /// burnt or if a top-down message fee needs to be distributed.
     function _commitCrossMessage(
@@ -406,7 +497,7 @@ contract Gateway is IGateway, ReentrancyGuard {
 
         if (shouldCommitBottomUp) {
             _commitBottomUpMsg(crossMessage);
-            
+
             return (
                 shouldBurn = crossMessage.message.value > 0,
                 shouldDistributeRewards = false
@@ -419,7 +510,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         return (shouldBurn = false, shouldDistributeRewards = true);
     }
 
-    /// transaction side-effects from the commitment of a cross-net message. It burns funds
+    /// @notice transaction side-effects from the commitment of a cross-net message. It burns funds
     /// and propagates the corresponding rewards.
     function _crossMsgSideEffects(
         CrossMsg memory crossMsg,
@@ -443,7 +534,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         }
     }
 
-    /// commit topdown messages for their execution in the subnet
+    /// @notice commit topdown messages for their execution in the subnet
     function _commitTopDownMsg(CrossMsg memory crossMessage) internal {
         SubnetID memory subnetId = crossMessage.message.to.subnetId.down(
             networkName
@@ -459,7 +550,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         subnet.topDownMsgs.push(crossMessage);
     }
 
-    /// commit bottomup messages for their execution in the subnet
+    /// @notice commit bottomup messages for their execution in the subnet
     function _commitBottomUpMsg(CrossMsg memory crossMessage) internal {
         (, int64 epoch, Checkpoint storage checkpoint) = checkpoints
             .getCheckpointPerEpoch(block.number, checkPeriod);
@@ -507,6 +598,7 @@ contract Gateway is IGateway, ReentrancyGuard {
         found = subnet.id.route.length > 0;
     }
 
+    /// @notice distribute rewards to validators in child subnet
     function distributeRewards(address to, uint256 amount) internal {
         Address.functionCallWithValue(
             to.normalize(),
