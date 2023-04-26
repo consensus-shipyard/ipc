@@ -44,6 +44,16 @@ contract CrossMsgHelperTest is Test {
         require(crossMsgs.toHash() == crossMsgsExpected.toHash());
     }
 
+    function test_IsEmpty_Works_EmptyCrossMsg() public view {
+        require(crossMsg.isEmpty() == true);
+    }
+
+    function test_IsEmpty_Works_NonEmptyCrossMsg() public {
+        crossMsg.message.nonce = 10;
+
+        require(crossMsg.isEmpty() == false);
+    }
+
     function test_CreateReleaseMsg_Works(
         uint256 releaseAmount,
         uint64 nonce,

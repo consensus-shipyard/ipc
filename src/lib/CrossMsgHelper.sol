@@ -13,6 +13,29 @@ library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
 
+    bytes32 public constant EMPTY_CROSS_MSG =
+        keccak256(
+            abi.encode(
+                CrossMsg({
+                    message: StorableMsg({
+                        from: IPCAddress({
+                            subnetId: SubnetID(new address[](0)),
+                            rawAddress: address(0)
+                        }),
+                        to: IPCAddress({
+                            subnetId: SubnetID(new address[](0)),
+                            rawAddress: address(0)
+                        }),
+                        value: 0,
+                        nonce: 0,
+                        method: METHOD_SEND,
+                        params: EMPTY_BYTES
+                    }),
+                    wrapped: false
+                })
+            )
+        );
+
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
@@ -71,9 +94,11 @@ library CrossMsgHelper {
         return keccak256(abi.encode(crossMsgs));
     }
 
-    function execute(
-        CrossMsg calldata crossMsg
-    ) public returns (bytes memory) {
+    function isEmpty(CrossMsg memory crossMsg) internal pure returns (bool) {
+        return toHash(crossMsg) == EMPTY_CROSS_MSG;
+    }
+
+    function execute(CrossMsg calldata crossMsg) public returns (bytes memory) {
         uint256 value = crossMsg.message.value;
         address recipient = crossMsg.message.to.rawAddress.normalize();
 
@@ -88,9 +113,12 @@ library CrossMsgHelper {
             params = abi.encode(crossMsg);
         }
 
-        bytes memory data = abi.encodeWithSelector(crossMsg.message.method, params);
+        bytes memory data = abi.encodeWithSelector(
+            crossMsg.message.method,
+            params
+        );
 
-        if(value > 0)
+        if (value > 0)
             return Address.functionCallWithValue(recipient, data, value);
 
         return Address.functionCall(recipient, data);

@@ -443,6 +443,60 @@ contract Gateway is IGateway, ReentrancyGuard {
         return abi.encode(cid);
     }
 
+    /// @notice whitelist a series of addresses as propagator of a cross net message
+    /// @param msgCid - the cid of the cross-net message
+    /// @param owners - list of addresses to be added as owners
+    function whitelistPropagator(
+        bytes32 msgCid,
+        address[] calldata owners
+    ) external {
+        require(postboxHasOwner[msgCid][msg.sender], "not owner");
+
+        CrossMsg storage crossMsg = postbox[msgCid];
+
+        require(crossMsg.isEmpty() == false, "postbox item does not exist");
+
+        // update postbox with the new owners
+        for (uint256 i = 0; i < owners.length; ) {
+            address owner = owners[i];
+
+            if (postboxHasOwner[msgCid][owner] == false) {
+                postboxHasOwner[msgCid][owner] = true;
+            }
+            unchecked {
+                i++;
+            }
+        }
+    }
+
+    /// @notice propagates the populated cross net message for the given cid
+    /// @param msgCid - the cid of the cross-net message
+    function propagate(bytes32 msgCid) external payable {
+        require(
+            msg.value >= crossMsgFee,
+            "not enough gas to pay cross-message"
+        );
+        require(postboxHasOwner[msgCid][msg.sender], "not owner");
+
+        CrossMsg storage crossMsg = postbox[msgCid];
+
+        require(crossMsg.isEmpty() == false, "postbox item does not exist");
+
+        (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(
+            crossMsg
+        );
+
+        _crossMsgSideEffects(crossMsg, shouldBurn, shouldDistributeRewards);
+
+        delete postbox[msgCid];
+
+        uint256 feeReminder = msg.value - crossMsgFee;
+
+        if (feeReminder > 0) {
+            payable(msg.sender).sendValue(feeReminder);
+        }
+    }
+
     function _bottomUpStateTransition(
         StorableMsg calldata storableMsg
     ) internal {
