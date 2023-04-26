@@ -56,7 +56,7 @@ accounts = ["t01"]
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub server: Server,
-    #[serde(deserialize_with = "deserialize_subnets_from_vec")]
+    #[serde(deserialize_with = "deserialize_subnets_from_vec", default)]
     pub subnets: HashMap<SubnetID, Subnet>,
 }
 

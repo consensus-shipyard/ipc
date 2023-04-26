@@ -50,7 +50,7 @@ rustup target add wasm32-unknown-unknown
 make build
 ```
 
-This builds the binary of the IPC agent in the `./bin` folder of your repo. If you want to make the command available everywhere, add this folder to the binary `PATH` of your system. To see if the installation was successfully you can run the following command: 
+This builds the binary of the IPC agent in the `./bin` folder of your repo. If you want to make the command available everywhere, add this folder to the binary `PATH` of your system. To see if the installation was successfully you can run the following command:
 
 ## Eudico
 
@@ -58,7 +58,7 @@ IPC uses [a fork of Lotus](https://github.com/consensus-shipyard/lotus), which w
 
 >💡 Some users have reported some issues trying to build the required images using Docker Desktop. Consider installing a version of [Docker engine](https://docs.docker.com/engine/install/#server) supported by your system.
 
-With Docker installed, you can then `make install-infra` in the root of the `ipc-agent` repo. This will clone the eudico repo, build the docker image that you need to run subnets, and install the infrastructure scripts in the `./bin` folder. 
+With Docker installed, you can then `make install-infra` in the root of the `ipc-agent` repo. This will clone the eudico repo, build the docker image that you need to run subnets, and install the infrastructure scripts in the `./bin` folder.
 
 In Unix-based systems, it is highly recommended to include your user in the `docker` group to avoid having to run many of the commands from this tutorial using `sudo`. You can achieve this running:
 ```bash
@@ -135,14 +135,14 @@ accounts = ["t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq"]
 > 💡 If you are already running the daemon, then run `./bin/ipc-agent config reload` to pick up the config changes.
 
 ## Running
-The IPC agent runs as a foreground daemon process that spawns a new JSON RPC server to interact with it, and all the processes to automatically handle checkpoints and the execution of cross-net messages for the subnets our agent is participating in. The agent determines the list of subnets it should interact with from its config file. 
+The IPC agent runs as a foreground daemon process that spawns a new JSON RPC server to interact with it, and all the processes to automatically handle checkpoints and the execution of cross-net messages for the subnets our agent is participating in. The agent determines the list of subnets it should interact with from its config file.
 
 Alternatively, the agent can also be used as a CLI to interact with IPC. Under the hood, this cli sends new commands to the RPC server of the daemon. To run the IPC agent daemon you can run:
 ```bash
 ./bin/ipc-agent daemon
 ```
 
-The RPC server of the daemon will be listening to the endpoint determined in the `json_rpc_address` field of the config. If you are looking for your agent to be accessible from Docker or externally, remember to listen on `0.0.0.0` instead of `127.0.0.1` as specified in the default config. 
+The RPC server of the daemon will be listening to the endpoint determined in the `json_rpc_address` field of the config. If you are looking for your agent to be accessible from Docker or externally, remember to listen on `0.0.0.0` instead of `127.0.0.1` as specified in the default config.
 
 To check if the agent has connected to the rootnet successfully, you can try using it to create a new wallet.
 
@@ -155,4 +155,3 @@ $ ./bin/ipc-agent wallet new --key-type bls --subnet /root
 ## Help
 
 If you meet any obstacles, please check [docs/troubleshooting.md](docs/troubleshooting.md) or join us in **#ipc-help** in the [Filecoin Slack workspace](https://filecoin.io/slack).
-
