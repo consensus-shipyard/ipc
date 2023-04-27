@@ -13,7 +13,7 @@ use crate::cli::commands::checkpoint::CheckpointCommandsArgs;
 use crate::cli::commands::crossmsg::CrossMsgsCommandsArgs;
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::fmt::Debug;
 use subnet::SubnetCommandsArgs;
@@ -82,7 +82,7 @@ struct IPCAgentCliCommands {
 ///     NewCommand(NewCommandArgs),
 /// }
 /// ```
-pub async fn cli() {
+pub async fn cli() -> anyhow::Result<()> {
     // parse the arguments
     let args = IPCAgentCliCommands::parse();
 
@@ -96,13 +96,7 @@ pub async fn cli() {
         Commands::Checkpoint(args) => args.handle(global).await,
     };
 
-    if let Err(e) = r {
-        log::error!(
-            "process command: {:?} failed due to error: {:?}",
-            args.command,
-            e
-        )
-    }
+    r.with_context(|| format!("error processing command {:?}", args.command))
 }
 
 pub(crate) fn get_ipc_agent_url(

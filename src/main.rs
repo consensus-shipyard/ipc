@@ -18,5 +18,8 @@ async fn main() {
     log::debug!("using network: {network:?}");
     set_current_network(network);
 
-    cli::cli().await;
+    if let Err(e) = cli::cli().await {
+        log::error!("main process failed: {e:#}");
+        std::process::exit(1);
+    }
 }

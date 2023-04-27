@@ -13,8 +13,8 @@ fi
 IPC_AGENT_DIR=$1
 IPC_NODE_DIR=$2
 
-source $IPC_AGENT_DIR/.env
 source $IPC_NODE_DIR/.env
+source $IPC_AGENT_DIR/.env
 
 # This just looks like some kind of human readable name for the subnet.
 if [ -z "${IPC_SUBNET_NAME}" ]; then
@@ -36,13 +36,15 @@ write_subnet_config() {
   # The JSON-API URL is from the perspective of one container connecting to another,
   # e.g. the agent container to the eudico daemon. It needs to mach the settings in
   # the compose file.
+  # XXX: The current JSON-RPC URL schem and expectation only works with Lotus.
   cat <<EOF > $SUBNET_CONFIG
 
 [[subnets]]
 id = "${IPC_SUBNET_ID}"
 gateway_addr = "t064"
 network_name = "${IPC_SUBNET_NAME}"
-jsonrpc_api_http = "http://${IPC_NODE_TYPE}-${IPC_NODE_NR}:1234/rpc/v1"
+# node_type = "${IPC_NODE_TYPE}"
+jsonrpc_api_http = "http://node-${IPC_NODE_NR}:1234/rpc/v1"
 auth_token = "${TOKEN}"
 accounts = ["${WALLET}"]
 
@@ -61,12 +63,27 @@ if [ "${IPC_NODE_TYPE}" == "eudico" ]; then
   echo "[*] Creating admin token"
   TOKEN=$(docker exec -it $DAEMON_ID eudico auth create-token --perm admin)
 
-  echo "[*] Getting default wallet"
-  WALLET=$(docker exec -it $DAEMON_ID  eudico wallet default)
+  # This command often fails for the first time for some reason.
+  set +e
+  n=0
+  until [ "$n" -ge 5 ]
+  do
+    echo "[*] Getting default wallet"
+    WALLET=$(docker exec -it $DAEMON_ID eudico wallet default) && break
+    echo "[*] Failed; retrying a bit later"
+    n=$((n+1))
+    sleep 10
+  done
+  set -e
+
+  if [[ "$WALLET" =~ ^ERROR.* ]]; then
+    echo $WALLET
+    exit 1
+  fi
 
   write_subnet_config $TOKEN $WALLET
 
 else
-  echo "Don't know how to connect node type $IPC_NODE_TYPE";
+  echo "Don't know how to connect node type: $IPC_NODE_TYPE";
   exit 1;
 fi

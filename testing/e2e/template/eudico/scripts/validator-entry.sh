@@ -14,10 +14,5 @@ API_TOKEN=$(cat $LOTUS_PATH/token)
 # Set the env var that Lotus is looking for.
 export FULLNODE_API_INFO=${API_TOKEN}:/dns/${DAEMON_HOSTNAME}/tcp/1234/http
 
-if [ "${IPC_SUBNET_ID}" == "/root" ]; then
-  echo "Running as root net..."
-  exec /scripts/root-single-validator.sh
-else
-  echo "Running as subnet..."
-  exec /scripts/subnet-validator.sh
-fi
+echo "Running as subnet ${IPC_SUBNET_ID}"
+exec /scripts/subnet-validator.sh

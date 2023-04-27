@@ -2,13 +2,6 @@
 
 set -e
 
-if [ $# -ne 1 ]
-then
-    echo "Provide the subnet ID as first argument for the script"
-    exit 1
-fi
-
-SUBNETID=$1
 echo "[*] Populating config"
 
 echo '
@@ -19,6 +12,10 @@ echo '
 ' > $LOTUS_PATH/config.toml
 
 echo "[*] Generate genesis for subnet deterministically"
-eudico genesis new --subnet-id=$SUBNETID --template=/genesis.json --out=subnet.car
+if [[ "$IPC_SUBNET_ID" == "/root" ]]; then
+    eudico genesis new --subnet-id=$IPC_SUBNET_ID --template=/genesis-test.json --out=subnet.car
+else
+    eudico genesis new --subnet-id=$IPC_SUBNET_ID --template=/genesis.json --out=subnet.car
+fi
 echo "[*] Starting daemon"
 eudico mir daemon --genesis=subnet.car --bootstrap=false

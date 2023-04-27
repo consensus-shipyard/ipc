@@ -54,3 +54,9 @@ The main targets of the `Makefile` are:
 * `make node`, `make node/up`, `make node/down`: same as for the agent
 * `make down`: stop and remove all agents and nodes
 * `make connect`: connect `$IPC_AGENT_NR` to `$IPC_NODE_NR` and reload the agent configuration
+* `make wallet`: creates a new wallet for `$IPC_WALLET_NR` under `$IPC_NODE_NR` which we are then free to assign to anyone
+* `make subnet`: creates a new subnet named `$IPC_SUBNET_NAME` under `$IPC_NODE_NR` which we can then create nodes to run
+* `make setup/<topology-name>`: compile and execute the setup script for `topologies/<topology-name>.yaml`
+
+The recommended way to set up a test environment is to use a topology. See [example.yaml](./topologies/example.yaml) for comments.
+The makefile targets are constructed in a way that it is safe to re-run the setup, perhaps after the topology has been extended (without altering existing nodes in it). You can run the steps one-by-one by running `make topologies/<name>.sh` first to get a script you can execute line by line as well.

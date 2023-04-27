@@ -17,8 +17,7 @@ services:
     # The container name could contain the ${IPC_NODE_TYPE} but that would suggest that type and number are unique together,
     # whereas with the current setup the node number is unique on its own. Look at the image to tell what kind we are talking to.
     container_name: ipc-node-${IPC_NODE_NR}-daemon
-    # Indicate the type in the host name, makes URLs more intuitive.
-    hostname: ${IPC_NODE_TYPE}-${IPC_NODE_NR}
+    hostname: node-${IPC_NODE_NR}
     # Ports don't really need to be exposed as all containers should just talk to each other.
     ports:
       # Lotus port - 1234 hardcoded in subnet-daemon.sh
@@ -30,6 +29,7 @@ services:
       - repo_directory:/var/lib/lotus
       # Modified versions of the infra scripts. Mounted from templates so they can be edited between restarts.
       - ${IPC_PROJECT_ROOT}/testing/e2e/template/${IPC_NODE_TYPE}/scripts:/scripts
+      - ${IPC_PROJECT_ROOT}/testing/e2e/template/${IPC_NODE_TYPE}/genesis:/genesis
     networks:
       - ipc
     environment:
@@ -39,7 +39,6 @@ services:
       - .env
     entrypoint:
       - /scripts/subnet-daemon.sh
-      - ${IPC_SUBNET_ID}
 
   # Run the validator, which the `eudico-root-single.sh` script ran in the second tmux window.
   validator:
@@ -52,14 +51,15 @@ services:
       - repo_directory:/var/lib/lotus
       # Modified versions of the infra scripts. Mounted from templates so they can be edited between restarts.
       - ${IPC_PROJECT_ROOT}/testing/e2e/template/${IPC_NODE_TYPE}/scripts:/scripts
-      # TODO: The key will have to come from a different place for non-root validators.
-      - ${IPC_PROJECT_ROOT}/bin/ipc-infra/src/wallet.key:/wallet.key
+      # Key to be imported as default
+      - ${IPC_WALLET_KEY}:/wallet.key
     networks:
       - ipc
     environment:
       HOME: /root
       LOTUS_PATH: /var/lib/lotus
-      DAEMON_HOSTNAME: ${IPC_NODE_TYPE}-${IPC_NODE_NR}
+      DAEMON_HOSTNAME: node-${IPC_NODE_NR}
+      AGENT_HOSTNAME: agent-${IPC_AGENT_NR}
     env_file:
       - .env
     entrypoint:
