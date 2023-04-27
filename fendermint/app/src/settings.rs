@@ -49,8 +49,12 @@ impl Settings {
             // Optional local overrides, not checked into git.
             .add_source(File::from(config_dir.join("local")).required(false))
             // Add in settings from the environment (with a prefix of FM)
-            // e.g. `FM_DB_DATA_DIR=./foo/bar ./target/app` would set the database location.
-            .add_source(Environment::with_prefix("fm"))
+            // e.g. `FM_DB__DATA_DIR=./foo/bar ./target/app` would set the database location.
+            .add_source(
+                Environment::with_prefix("fm")
+                    .prefix_separator("_")
+                    .separator("__"),
+            )
             // Set the home directory based on what was passed to the CLI,
             // so everything in the config can be relative to it.
             // The `home_dir` key is not added to `default.toml` so there is no confusion

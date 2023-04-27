@@ -38,7 +38,7 @@ pub struct Options {
     pub mode: String,
 
     /// Set the logging level.
-    #[arg(short, long, default_value = "info", value_enum)]
+    #[arg(short, long, default_value = "info", value_enum, env = "LOG_LEVEL")]
     pub log_level: LogLevel,
 
     #[command(subcommand)]
