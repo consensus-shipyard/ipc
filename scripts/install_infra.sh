@@ -8,7 +8,13 @@ set -e
 rm -rf ./lotus
 git clone https://github.com/consensus-shipyard/lotus.git
 cd ./lotus
-docker build -t eudico .
+
+uname=$(uname);
+case "$uname" in
+    (*Darwin*) docker build -t eudico --build-arg FFI_BUILD_FROM_SOURCE=1 . ;;
+    (*) docker build -t eudico . ;;
+esac;
+
 cd ..
 mkdir -p ./bin/ipc-infra
 cp -rf ./lotus/scripts/ipc/* ./bin/ipc-infra
