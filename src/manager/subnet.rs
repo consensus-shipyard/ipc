@@ -54,7 +54,7 @@ pub trait SubnetManager {
         gateway_addr: Address,
         from: Address,
         amount: TokenAmount,
-    ) -> Result<()>;
+    ) -> Result<ChainEpoch>;
 
     /// Release creates a new check message to release funds in parent chain
     async fn release(
@@ -63,7 +63,7 @@ pub trait SubnetManager {
         gateway_addr: Address,
         from: Address,
         amount: TokenAmount,
-    ) -> Result<()>;
+    ) -> Result<ChainEpoch>;
 
     /// Propagate a cross-net message forward
     async fn propagate(

@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::clock::ChainEpoch;
 use std::fmt::Debug;
 
 use crate::cli::commands::get_ipc_agent_url;
@@ -30,11 +31,11 @@ impl CommandLineHandler for Fund {
             from: arguments.from.clone(),
             amount: arguments.amount,
         };
-        json_rpc_client
-            .request::<()>(json_rpc_methods::FUND, serde_json::to_value(params)?)
+        let epoch = json_rpc_client
+            .request::<ChainEpoch>(json_rpc_methods::FUND, serde_json::to_value(params)?)
             .await?;
 
-        log::info!("funded subnet: {:}", arguments.subnet);
+        log::info!("funded subnet: {:} at epoch: {epoch:?}", arguments.subnet);
 
         Ok(())
     }

@@ -152,7 +152,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         gateway_addr: Address,
         from: Address,
         amount: TokenAmount,
-    ) -> Result<()> {
+    ) -> Result<ChainEpoch> {
         // When we perform the fund, we should send to the gateway of the subnet's parent
         let parent = subnet.parent().ok_or_else(|| anyhow!("cannot fund root"))?;
         if !self.is_network_match(&parent).await? {
@@ -170,8 +170,8 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         );
         message.value = amount;
 
-        self.mpool_push_and_wait(message).await?;
-        Ok(())
+        let r = self.mpool_push_and_wait(message).await?;
+        Ok(r.height as ChainEpoch)
     }
 
     async fn release(
@@ -180,7 +180,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         gateway_addr: Address,
         from: Address,
         amount: TokenAmount,
-    ) -> Result<()> {
+    ) -> Result<ChainEpoch> {
         // When we perform the release, we should send to the gateway of the subnet
         if !self.is_network_match(&subnet).await? {
             return Err(anyhow!(
@@ -196,8 +196,8 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         );
         message.value = amount;
 
-        self.mpool_push_and_wait(message).await?;
-        Ok(())
+        let r = self.mpool_push_and_wait(message).await?;
+        Ok(r.height as ChainEpoch)
     }
 
     async fn propagate(

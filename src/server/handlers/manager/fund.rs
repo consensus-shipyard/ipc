@@ -7,6 +7,7 @@ use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::{check_subnet, parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
@@ -34,7 +35,7 @@ impl FundHandler {
 #[async_trait]
 impl JsonRPCRequestHandler for FundHandler {
     type Request = FundParams;
-    type Response = ();
+    type Response = ChainEpoch;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let subnet = SubnetID::from_str(&request.subnet)?;
