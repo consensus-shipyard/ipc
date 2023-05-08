@@ -5,10 +5,9 @@
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::handlers::manager::{check_subnet, parse_from};
-use crate::server::JsonRPCRequestHandler;
+use crate::server::{handlers, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::JoinParams;
 use serde::{Deserialize, Serialize};
@@ -19,7 +18,8 @@ use std::sync::Arc;
 pub struct JoinSubnetParams {
     pub subnet: String,
     pub from: Option<String>,
-    pub collateral: u64,
+    /// In whole FIL
+    pub collateral: f64,
     pub validator_net_addr: String,
 }
 
@@ -50,7 +50,7 @@ impl JsonRPCRequestHandler for JoinSubnetHandler {
         let join_params = JoinParams {
             validator_net_addr: request.validator_net_addr,
         };
-        let collateral = TokenAmount::from_whole(request.collateral); // In FIL, not atto
+        let collateral = handlers::f64_to_token_amount(request.collateral)?;
 
         let subnet_config = conn.subnet();
         check_subnet(subnet_config)?;

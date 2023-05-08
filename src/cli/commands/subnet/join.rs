@@ -58,7 +58,7 @@ pub struct JoinSubnetArgs {
         short,
         help = "The collateral to stake in the subnet (in whole FIL units)"
     )]
-    pub collateral: u64,
+    pub collateral: f64,
     #[arg(long, short, help = "The validator net address")]
     pub validator_net_addr: String,
 }

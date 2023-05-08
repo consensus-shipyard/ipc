@@ -5,11 +5,10 @@
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::handlers::manager::{check_subnet, parse_from};
-use crate::server::JsonRPCRequestHandler;
+use crate::server::{handlers, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{ConsensusType, ConstructParams};
 use serde::{Deserialize, Serialize};
@@ -21,7 +20,8 @@ pub struct CreateSubnetParams {
     pub from: Option<String>,
     pub parent: String,
     pub name: String,
-    pub min_validator_stake: u64,
+    /// In whole FIL
+    pub min_validator_stake: f64,
     pub min_validators: u64,
     pub bottomup_check_period: ChainEpoch,
     pub topdown_check_period: ChainEpoch,
@@ -64,7 +64,7 @@ impl JsonRPCRequestHandler for CreateSubnetHandler {
             name: request.name,
             ipc_gateway_addr: subnet_config.gateway_addr.id()?,
             consensus: ConsensusType::Mir,
-            min_validator_stake: TokenAmount::from_whole(request.min_validator_stake), // In FIL
+            min_validator_stake: handlers::f64_to_token_amount(request.min_validator_stake)?,
             min_validators: request.min_validators,
             bottomup_check_period: request.bottomup_check_period,
             topdown_check_period: request.topdown_check_period,

@@ -4,11 +4,10 @@
 
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
-use crate::server::{check_subnet, parse_from, JsonRPCRequestHandler};
+use crate::server::{check_subnet, handlers, parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -18,7 +17,8 @@ use std::sync::Arc;
 pub struct ReleaseParams {
     pub subnet: String,
     pub from: Option<String>,
-    pub amount: u64,
+    /// In whole FIL
+    pub amount: f64,
 }
 
 /// The Release json rpc method handler.
@@ -47,7 +47,7 @@ impl JsonRPCRequestHandler for ReleaseHandler {
         let subnet_config = conn.subnet();
         check_subnet(subnet_config)?;
 
-        let amount = TokenAmount::from_whole(request.amount);
+        let amount = handlers::f64_to_token_amount(request.amount)?;
         let from = parse_from(subnet_config, request.from)?;
 
         conn.manager()

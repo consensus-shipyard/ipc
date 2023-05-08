@@ -5,11 +5,10 @@
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::handlers::manager::{check_subnet, parse_from};
-use crate::server::JsonRPCRequestHandler;
+use crate::server::{handlers, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
-use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -20,7 +19,8 @@ pub struct SendValueParams {
     pub subnet: String,
     pub from: Option<String>,
     pub to: String,
-    pub amount: u64,
+    /// In FIL, not atto
+    pub amount: f64,
 }
 
 /// Send value between two addresses within a subnet
@@ -46,15 +46,17 @@ impl JsonRPCRequestHandler for SendValueHandler {
             Some(conn) => conn,
         };
 
-        let amount = TokenAmount::from_whole(request.amount); // In FIL, not atto
-
+        let amount = handlers::f64_to_token_amount(request.amount)?;
         let subnet_config = conn.subnet();
         check_subnet(subnet_config)?;
 
         let from = parse_from(subnet_config, request.from)?;
         let to = Address::from_str(&request.to)?;
 
+        log::debug!("json rpc: received request to send amount: {amount:} from {from:} to {to:}");
+
         conn.manager().send_value(from, to, amount).await?;
+
         Ok(())
     }
 }

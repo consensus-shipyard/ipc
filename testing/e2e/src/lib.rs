@@ -24,7 +24,7 @@ impl TestClient {
             from: None,
             parent: String::from(parent),
             name: "test".to_string(),
-            min_validator_stake: 1,
+            min_validator_stake: 1.0,
             min_validators: 0,
             bottomup_check_period: 10,
             topdown_check_period: 10,
@@ -45,7 +45,7 @@ impl TestClient {
                 ipc_agent_url: self.json_rpc_url.clone(),
                 from: None,
                 subnet: subnet_id.to_string(),
-                collateral: 10,
+                collateral: 10.0,
                 validator_net_addr,
             },
         )

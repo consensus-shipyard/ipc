@@ -55,5 +55,5 @@ pub(crate) struct SendValueArgs {
     #[arg(long, short, help = "The subnet of the addresses")]
     pub subnet: String,
     #[arg(help = "The amount to send (in whole FIL units)")]
-    pub amount: u64,
+    pub amount: f64,
 }
