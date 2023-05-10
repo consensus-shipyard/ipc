@@ -155,7 +155,7 @@ async fn transaction(
                     .await
             })
         },
-        |data| serde_json::Value::String(hex::encode(&data)),
+        |data| serde_json::Value::String(hex::encode(data)),
     )
     .await
 }
@@ -207,7 +207,7 @@ async fn fevm_invoke(
                     .await
             })
         },
-        |data| serde_json::Value::String(hex::encode(&data)),
+        |data| serde_json::Value::String(hex::encode(data)),
     )
     .await
 }

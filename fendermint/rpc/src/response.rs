@@ -13,7 +13,7 @@ use tendermint::abci::response::DeliverTx;
 pub fn decode_data(data: &Bytes) -> anyhow::Result<Vec<u8>> {
     let b64 = String::from_utf8(data.to_vec()).context("error parsing data as base64 string")?;
     let data = base64::engine::general_purpose::STANDARD
-        .decode(&b64)
+        .decode(b64)
         .context("error parsing base64 to bytes")?;
     Ok(data)
 }

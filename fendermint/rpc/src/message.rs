@@ -32,7 +32,7 @@ impl MessageFactory {
     pub fn read_secret_key(sk: &Path) -> anyhow::Result<SecretKey> {
         let b64 = std::fs::read_to_string(sk).context("failed to read secret key")?;
         let bz: Vec<u8> = B64_ENGINE
-            .decode(&b64)
+            .decode(b64)
             .context("failed to parse base64 string")?;
         let sk = SecretKey::parse_slice(&bz)?;
         Ok(sk)
