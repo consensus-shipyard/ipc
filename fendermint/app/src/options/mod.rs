@@ -30,7 +30,12 @@ pub enum LogLevel {
 #[command(version)]
 pub struct Options {
     /// Set a custom directory for data and configuration files.
-    #[arg(short = 'd', long, default_value = "~/.fendermint")]
+    #[arg(
+        short = 'd',
+        long,
+        default_value = "~/.fendermint",
+        env = "FM_HOME_DIR"
+    )]
     pub home_dir: PathBuf,
 
     /// Optionally override the default configuration.

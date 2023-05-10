@@ -1,0 +1,161 @@
+[env]
+NETWORK_NAME = "smoke"
+TM_CONTAINER_NAME = "smoke-tendermint"
+FM_CONTAINER_NAME = "smoke-fendermint"
+TM_DOCKER_IMAGE = "tendermint/tendermint:v0.37.0-rc2"
+FM_DOCKER_IMAGE = "fendermint:latest"
+TEST_DATA_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/test-data"
+TEST_SCRIPTS_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/scripts"
+ACTORS_BUNDLE = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/../builtin-actors/output/bundle.car"
+HOST_RPC_PORT = 26657
+CARGO_MAKE_WAIT_MILLISECONDS = 5000
+
+# smoke-test infrastructure:
+# cargo install cargo-make
+# cargo make
+
+[tasks.default]
+clear = true
+run_task = { name = [
+  "setup",
+  "test",
+], fork = true, cleanup_task = "teardown" }
+
+
+[tasks.setup]
+dependencies = [
+  "test-data-dir",
+  "network-create",
+  "tendermint-init",
+  "fendermint-init",
+  "fendermint-start",
+  "tendermint-start",
+  "wait",
+]
+
+[tasks.test]
+dependencies = ["simplecoin-example"]
+
+[tasks.teardown]
+# `dependencies` doesn't seem to work with `cleanup_task`.
+run_task = { name = [
+  "tendermint-stop",
+  "tendermint-rm",
+  "fendermint-stop",
+  "fendermint-rm",
+  "network-rm",
+  "test-data-dir-rm",
+] }
+
+
+[tasks.simplecoin-example]
+script = """
+cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
+cargo run -p fendermint_rpc --release --example simplecoin -- \
+  --secret-key fendermint/testing/smoke-test/test-data/fendermint/keys/alice.sk
+"""
+
+
+[tasks.test-data-dir]
+script = """
+mkdir -p ${TEST_DATA_DIR}/fendermint;
+mkdir -p ${TEST_DATA_DIR}/tendermint;
+"""
+
+[tasks.test-data-dir-rm]
+script = """
+rm -rf ${TEST_DATA_DIR}
+"""
+
+
+[tasks.tendermint-pull]
+command = "docker"
+args = ["pull", "${TM_DOCKER_IMAGE}"]
+
+[tasks.tendermint-init]
+extend = "tendermint-run"
+env = { "CMD" = "init", "FLAGS" = "-a STDOUT -a STDERR" }
+
+[tasks.tendermint-start]
+extend = "tendermint-run"
+env = { "CMD" = "start", "FLAGS" = "-d" }
+
+[tasks.tendermint-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --rm \
+  --name ${TM_CONTAINER_NAME} \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish 26657:${HOST_RPC_PORT} \
+  --volume ${TEST_DATA_DIR}/tendermint:/tendermint \
+  --env TM_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
+  --env TM_PEX=false \
+  ${TM_DOCKER_IMAGE} \
+  ${CMD}
+"""
+dependencies = ["tendermint-pull", "test-data-dir", "network-create"]
+
+
+[tasks.fendermint-init]
+extend = "fendermint-run"
+env = { "ENTRY" = "/scripts/init.sh", "FLAGS" = "-a STDOUT -a STDERR" }
+
+[tasks.fendermint-start]
+extend = "fendermint-run"
+env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+
+[tasks.fendermint-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --rm \
+  --name ${FM_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${TEST_DATA_DIR}:/data \
+  --volume ${TEST_SCRIPTS_DIR}:/scripts \
+  --env FM_DATA_DIR=/data/fendermint/data \
+  --entrypoint ${ENTRY} \
+  ${FM_DOCKER_IMAGE} \
+  ${CMD}
+"""
+dependencies = ["test-data-dir", "network-create"]
+
+[tasks.network-create]
+command = "docker"
+args = ["network", "create", "${NETWORK_NAME}"]
+ignore_errors = true
+
+[tasks.network-rm]
+command = "docker"
+args = ["network", "rm", "${NETWORK_NAME}"]
+ignore_errors = true
+
+[tasks.tendermint-rm]
+extend = "docker-rm"
+env = { "CONTAINER_NAME" = "${TM_CONTAINER_NAME}" }
+
+[tasks.tendermint-stop]
+extend = "docker-stop"
+env = { "CONTAINER_NAME" = "${TM_CONTAINER_NAME}" }
+
+[tasks.fendermint-rm]
+extend = "docker-rm"
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+
+[tasks.fendermint-stop]
+extend = "docker-stop"
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+
+[tasks.docker-stop]
+command = "docker"
+args = ["stop", "${CONTAINER_NAME}"]
+ignore_errors = true
+
+[tasks.docker-rm]
+command = "docker"
+args = ["rm", "--force", "${CONTAINER_NAME}"]
+ignore_errors = true

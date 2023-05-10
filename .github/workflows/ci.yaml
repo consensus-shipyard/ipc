@@ -42,10 +42,15 @@ jobs:
             task: lint
           - name: Test
             task: test
+          - name: End-to-End
+            task: e2e
         exclude:
           - rust: nightly
             make:
               name: Lint
+          - rust: nightly
+            make:
+              name: End-to-end
 
     env:
       RUST_BACKTRACE: full
@@ -66,6 +71,9 @@ jobs:
           target: wasm32-unknown-unknown
           toolchain: ${{ matrix.rust }}
           components: rustfmt,clippy
+
+      - name: Install Cargo Make
+        uses: davidB/rust-cargo-make@v1
 
       # Protobuf compiler required by libp2p-core
       - name: Install Protoc

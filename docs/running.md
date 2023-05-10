@@ -1,9 +1,10 @@
 # Running Fendermint
 
 The commands are all executed by the `fendermint` binary, which is produced from the `fendermint_app` crate,
-so we have two ways to run the program:
-* `./target/debug/fendermint <args>` (or wherever it's been installed)
-* `cargo run -p fendermint_app -- <args>`
+so we have many ways to run the program:
+* `fendermint <args>`, after running `cargo install fendermint_app`
+* `./target/debug/fendermint <args>`, after running `cargo build --release`
+* `cargo run -p fendermint_app --release -- <args>`
 
 ## Genesis
 
@@ -26,7 +27,7 @@ mkdir test-network
 First, create a new `genesis.json` file devoid of accounts and validators. The `--base-fee` here is completely arbitrary.
 
 ```shell
-cargo run -p fendermint_app -- genesis --genesis-file test-network/genesis.json new --network-name test --base-fee 1000
+cargo run -p fendermint_app -- genesis --genesis-file test-network/genesis.json new --network-name test --base-fee 1000 --timestamp 1680101412
 ```
 
 We can check what the contents look like:

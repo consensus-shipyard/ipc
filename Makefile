@@ -12,7 +12,10 @@ build:
 
 # Using --release for testing because wasm can otherwise be slow.
 test: $(BUILTIN_ACTORS_BUNDLE)
-	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) cargo test --release
+	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) cargo test --release --workspace --exclude smoke-test
+
+e2e: docker-build
+	cd fendermint/testing/smoke-test && cargo make
 
 clean:
 	cargo clean
@@ -35,6 +38,7 @@ check-clippy:
 
 docker-build: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE)
 	cp $(BUILTIN_ACTORS_BUNDLE) ./bundle.car
+	DOCKER_BUILDKIT=1 \
 	docker build \
 		--build-arg BUILTIN_ACTORS_BUNDLE=bundle.car \
 		-t fendermint:latest .
