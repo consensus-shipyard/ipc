@@ -405,8 +405,13 @@ where
             ));
         }
 
-        let state = FvmQueryState::new(db, state_params.state_root)
-            .context("error creating query state")?;
+        let state = FvmQueryState::new(
+            db,
+            self.multi_engine.clone(),
+            block_height.try_into()?,
+            state_params,
+        )
+        .context("error creating query state")?;
 
         let qry = (request.path, request.data.to_vec());
 

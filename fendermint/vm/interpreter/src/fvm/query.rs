@@ -7,7 +7,7 @@ use fvm_shared::ActorID;
 
 use crate::QueryInterpreter;
 
-use super::{state::FvmQueryState, FvmMessageInterpreter};
+use super::{state::FvmQueryState, FvmApplyRet, FvmMessageInterpreter};
 
 /// Internal return type for queries. It will never be serialized
 /// and sent over the wire as it is, only its internal parts are
@@ -18,6 +18,8 @@ pub enum FvmQueryRet {
     Ipld(Option<Vec<u8>>),
     /// The full state of an actor, if found.
     ActorState(Option<Box<(ActorID, ActorState)>>),
+    /// The results of a read-only message application.
+    Call(FvmApplyRet),
 }
 
 #[async_trait]
@@ -38,6 +40,24 @@ where
             FvmQuery::Ipld(cid) => FvmQueryRet::Ipld(state.store_get(&cid)?),
             FvmQuery::ActorState(addr) => {
                 FvmQueryRet::ActorState(state.actor_state(&addr)?.map(Box::new))
+            }
+            FvmQuery::Call(msg) => {
+                let from = msg.from;
+                let to = msg.to;
+                let method_num = msg.method_num;
+                let gas_limit = msg.gas_limit;
+
+                let apply_ret = state.call(*msg)?;
+
+                let ret = FvmApplyRet {
+                    apply_ret,
+                    from,
+                    to,
+                    method_num,
+                    gas_limit,
+                };
+
+                FvmQueryRet::Call(ret)
             }
         };
         Ok((state, res))

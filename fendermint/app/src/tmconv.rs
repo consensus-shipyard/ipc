@@ -145,6 +145,9 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
     let exit_code = match ret {
         FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => ExitCode::USR_NOT_FOUND,
         FvmQueryRet::Ipld(_) | FvmQueryRet::ActorState(_) => ExitCode::OK,
+        // For calls, the caller needs to look into the `value` field to see the real exit code;
+        // the query itself is successful, even if the value represents a failure.
+        FvmQueryRet::Call(_) => ExitCode::OK,
     };
 
     // The return value has a `key` field which is supposed to be set to the data matched.
@@ -159,6 +162,14 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
             let k = must_encode!(id);
             let v = must_encode!(st);
             (k, v)
+        }
+        FvmQueryRet::Call(ret) => {
+            // Send back an entire Tendermint deliver_tx response, encoded as IPLD.
+            // This is so there is a single representation of a call result, instead
+            // of a normal delivery being one way and a query exposing `FvmApplyRet`.
+            let r = to_deliver_tx(ret);
+            let v = must_encode!(r);
+            (Vec::new(), v)
         }
     };
 

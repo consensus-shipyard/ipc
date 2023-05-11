@@ -1,49 +1,70 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::cell::RefCell;
+use std::{cell::RefCell, sync::Arc};
 
 use anyhow::{anyhow, Context};
 
 use cid::Cid;
 use fendermint_vm_message::query::ActorState;
-use fvm::state_tree::StateTree;
+use fvm::{engine::MultiEngine, executor::ApplyRet, state_tree::StateTree};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, ActorID};
+use fvm_shared::{address::Address, clock::ChainEpoch, ActorID};
 
-use crate::fvm::store::ReadOnlyBlockstore;
+use crate::fvm::{store::ReadOnlyBlockstore, FvmMessage};
+
+use super::{FvmExecState, FvmStateParams};
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
 where
     DB: Blockstore + 'static,
 {
+    /// A read-only wrapper around the blockstore, to make sure we aren't
+    /// accidentally committing any state. Any writes by the FVM will be
+    /// buffered; as long as we don't call `flush()` we should be fine.
     store: ReadOnlyBlockstore<DB>,
-    state_root: Cid,
+    /// Multi-engine for potential message execution.
+    multi_engine: Arc<MultiEngine>,
+    /// Height of block at which we are executing the queries.
+    block_height: ChainEpoch,
+    /// State at the height we want to query.
+    state_params: FvmStateParams,
+    /// Lazy loaded state tree.
     state_tree: RefCell<Option<StateTree<ReadOnlyBlockstore<DB>>>>,
+    /// Lazy loaded execution state.
+    exec_state: RefCell<Option<FvmExecState<ReadOnlyBlockstore<DB>>>>,
 }
 
 impl<DB> FvmQueryState<DB>
 where
     DB: Blockstore + Clone + 'static,
 {
-    pub fn new(blockstore: DB, state_root: Cid) -> anyhow::Result<Self> {
+    pub fn new(
+        blockstore: DB,
+        multi_engine: Arc<MultiEngine>,
+        block_height: ChainEpoch,
+        state_params: FvmStateParams,
+    ) -> anyhow::Result<Self> {
         // Sanity check that the blockstore contains the supplied state root.
         if !blockstore
-            .has(&state_root)
+            .has(&state_params.state_root)
             .context("failed to load state-root")?
         {
             return Err(anyhow!(
                 "blockstore doesn't have the state-root {}",
-                state_root
+                state_params.state_root
             ));
         }
 
         let state = Self {
             store: ReadOnlyBlockstore::new(blockstore),
-            state_root,
+            multi_engine,
+            block_height,
+            state_params,
             // NOTE: Not loading a state tree in case it's not needed; it would initialize the HAMT.
             state_tree: RefCell::new(None),
+            exec_state: RefCell::new(None),
         };
 
         Ok(state)
@@ -58,9 +79,35 @@ where
         if let Some(state_tree) = cache.as_ref() {
             return f(state_tree);
         }
-        let state_tree = StateTree::new_from_root(self.store.clone(), &self.state_root)?;
+
+        let state_tree =
+            StateTree::new_from_root(self.store.clone(), &self.state_params.state_root)?;
+
         let res = f(&state_tree);
         *cache = Some(state_tree);
+        res
+    }
+
+    /// If we know the query is over the state, cache the state tree.
+    fn with_exec_state<T, F>(&self, f: F) -> anyhow::Result<T>
+    where
+        F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
+    {
+        let mut cache = self.exec_state.borrow_mut();
+        if let Some(exec_state) = cache.as_mut() {
+            return f(exec_state);
+        }
+
+        let mut exec_state = FvmExecState::new(
+            self.store.clone(),
+            self.multi_engine.as_ref(),
+            self.block_height,
+            self.state_params.clone(),
+        )
+        .context("error creating execution state")?;
+
+        let res = f(&mut exec_state);
+        *cache = Some(exec_state);
         res
     }
 
@@ -69,6 +116,7 @@ where
         self.store.get(key)
     }
 
+    /// Get the state of an actor, if it exists.
     pub fn actor_state(&self, addr: &Address) -> anyhow::Result<Option<(ActorID, ActorState)>> {
         self.with_state_tree(|state_tree| {
             if let Some(id) = state_tree.lookup_id(addr)? {
@@ -86,5 +134,14 @@ where
                 Ok(None)
             }
         })
+    }
+
+    /// Run a "read-only" message.
+    ///
+    /// The results are never going to be flushed, so it's semantically read-only,
+    /// but it might write into the buffered block store the FVM creates. Running
+    /// multiple such messages results in their buffered effects stacking up.
+    pub fn call(&self, msg: FvmMessage) -> anyhow::Result<ApplyRet> {
+        self.with_exec_state(|s| s.execute_explicit(msg))
     }
 }

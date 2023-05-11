@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use cid::Cid;
-use fvm_shared::{address::Address, econ::TokenAmount};
+use fvm_shared::{address::Address, econ::TokenAmount, message::Message as FvmMessage};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -21,6 +21,10 @@ pub enum FvmQuery {
     ///
     /// The response is IPLD encoded `ActorState`.
     ActorState(Address),
+    /// Immediately execute an FVM message, without adding it to the blockchain.
+    ///
+    /// The main motivation for this method is to facilitate `eth_call`.
+    Call(Box<FvmMessage>),
 }
 
 /// State of all actor implementations.
@@ -56,13 +60,16 @@ pub struct ActorState {
 mod arb {
     use fendermint_testing::arb::{ArbAddress, ArbCid, ArbTokenAmount};
 
+    use crate::signed::SignedMessage;
+
     use super::{ActorState, FvmQuery};
 
     impl quickcheck::Arbitrary for FvmQuery {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            match u8::arbitrary(g) % 2 {
+            match u8::arbitrary(g) % 3 {
                 0 => FvmQuery::Ipld(ArbCid::arbitrary(g).0),
-                _ => FvmQuery::ActorState(ArbAddress::arbitrary(g).0),
+                1 => FvmQuery::ActorState(ArbAddress::arbitrary(g).0),
+                _ => FvmQuery::Call(Box::new(SignedMessage::arbitrary(g).into_message())),
             }
         }
     }
