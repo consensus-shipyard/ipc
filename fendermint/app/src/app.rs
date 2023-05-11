@@ -11,6 +11,7 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
+use fendermint_vm_genesis::Timestamp;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRet, BytesMessageCheckRet, BytesMessageQuery, BytesMessageQueryRet,
 };
@@ -91,13 +92,17 @@ where
     actor_bundle_path: PathBuf,
     /// Namespace to store app state.
     namespace: S::Namespace,
-    /// Collection of past state hashes.
+    /// Collection of past state parameters.
     ///
     /// We store the state hash for the height of the block where it was committed,
     /// which is different from how Tendermint Core will refer to it in queries,
-    /// shifte by one, because Tendermint Core will use the height where the hash
+    /// shifted by one, because Tendermint Core will use the height where the hash
     /// *appeared*, which is in the block *after* the one which was committed.
-    state_hist: KVCollection<S, BlockHeight, Cid>,
+    ///
+    /// The state also contains things like timestamp and the network version,
+    /// so that we can retrospectively execute FVM messages at past block heights
+    /// in read-only mode.
+    state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
     /// State accumulating changes during block execution.
@@ -112,7 +117,11 @@ where
 
 impl<DB, S, I> App<DB, S, I>
 where
-    S: KVStore + Codec<AppState> + Encode<AppStoreKey> + Encode<BlockHeight> + Codec<Cid>,
+    S: KVStore
+        + Codec<AppState>
+        + Encode<AppStoreKey>
+        + Encode<BlockHeight>
+        + Codec<FvmStateParams>,
     DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + 'static,
 {
     pub fn new(
@@ -141,7 +150,11 @@ where
 
 impl<DB, S, I> App<DB, S, I>
 where
-    S: KVStore + Codec<AppState> + Encode<AppStoreKey> + Encode<BlockHeight> + Codec<Cid>,
+    S: KVStore
+        + Codec<AppState>
+        + Encode<AppStoreKey>
+        + Encode<BlockHeight>
+        + Codec<FvmStateParams>,
     DB: Blockstore + KVWritable<S> + KVReadable<S> + 'static + Clone,
 {
     /// Get an owned clone of the database.
@@ -160,6 +173,7 @@ where
                 block_height: 0,
                 oldest_state_height: 0,
                 state_params: FvmStateParams {
+                    timestamp: Timestamp(0),
                     state_root,
                     network_version: NetworkVersion::MAX,
                     base_fee: TokenAmount::zero(),
@@ -192,7 +206,7 @@ where
             .with_write(|tx| {
                 // Insert latest state history point.
                 self.state_hist
-                    .put(tx, &state.block_height, &state.state_root())?;
+                    .put(tx, &state.block_height, &state.state_params)?;
 
                 // Prune state history.
                 if self.state_hist_size > 0 && state.block_height >= self.state_hist_size {
@@ -236,13 +250,15 @@ where
         Ok(ret)
     }
 
-    /// Look up a past state hash at a particular height Tendermint Core is looking for.
+    /// Look up a past state at a particular height Tendermint Core is looking for.
+    ///
     /// A height of zero means we are looking for the latest state.
     /// The genesis block state is saved under height 1.
-    /// Under height 0 we saved the empty state, which we must not query.
+    /// Under height 0 we saved the empty state, which we must not query,
+    /// because it doesn't contain any initialized state for the actors.
     ///
-    /// Returns the CID and the height of the block which committed it.
-    fn state_root_at_height(&self, height: Height) -> Result<(Cid, BlockHeight)> {
+    /// Returns the state params and the height of the block which committed it.
+    fn state_params_at_height(&self, height: Height) -> Result<(FvmStateParams, BlockHeight)> {
         let h = height.value();
         if h > 0 {
             let tx = self.db.read();
@@ -251,12 +267,12 @@ where
                 .get(&tx, &h)
                 .context("error looking up history")?;
 
-            if let Some(cid) = sh {
-                return Ok((cid, h));
+            if let Some(p) = sh {
+                return Ok((p, h));
             }
         }
         let state = self.committed_state()?;
-        Ok((state.state_root(), state.block_height))
+        Ok((state.state_params, state.block_height))
     }
 }
 
@@ -268,7 +284,11 @@ where
 #[async_trait]
 impl<DB, S, I> Application for App<DB, S, I>
 where
-    S: KVStore + Codec<AppState> + Encode<AppStoreKey> + Encode<BlockHeight> + Codec<Cid>,
+    S: KVStore
+        + Codec<AppState>
+        + Encode<AppStoreKey>
+        + Encode<BlockHeight>
+        + Codec<FvmStateParams>,
     S::Namespace: Sync + Send,
     DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     I: ExecInterpreter<
@@ -341,6 +361,7 @@ where
             oldest_state_height: height,
             state_params: FvmStateParams {
                 state_root,
+                timestamp: out.timestamp,
                 network_version: out.network_version,
                 base_fee: out.base_fee,
                 circ_supply: out.circ_supply,
@@ -367,12 +388,12 @@ where
     /// Query the application for data at the current or past height.
     async fn query(&self, request: request::Query) -> AbciResult<response::Query> {
         let db = self.clone_db();
-        let (state_root, block_height) = self.state_root_at_height(request.height)?;
+        let (state_params, block_height) = self.state_params_at_height(request.height)?;
 
         tracing::info!(
             query_height = request.height.value(),
             block_height,
-            state_root = state_root.to_string(),
+            state_root = state_params.state_root.to_string(),
             "running query"
         );
 
@@ -384,7 +405,9 @@ where
             ));
         }
 
-        let state = FvmQueryState::new(db, state_root).context("error creating query state")?;
+        let state = FvmQueryState::new(db, state_params.state_root)
+            .context("error creating query state")?;
+
         let qry = (request.path, request.data.to_vec());
 
         let (_, result) = self
@@ -444,20 +467,15 @@ where
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
     async fn begin_block(&self, request: request::BeginBlock) -> AbciResult<response::BeginBlock> {
         let db = self.clone_db();
-        let state = self.committed_state()?;
         let height = request.header.height.into();
-        let timestamp = to_timestamp(request.header.time);
+        let state = self.committed_state()?;
+        let mut state_params = state.state_params.clone();
+        state_params.timestamp = to_timestamp(request.header.time);
 
         tracing::debug!(height, "begin block");
 
-        let state = FvmExecState::new(
-            db,
-            self.multi_engine.as_ref(),
-            height,
-            timestamp,
-            state.state_params,
-        )
-        .context("error creating new state")?;
+        let state = FvmExecState::new(db, self.multi_engine.as_ref(), height, state_params)
+            .context("error creating new state")?;
 
         tracing::debug!("initialized exec state");
 
@@ -516,14 +534,20 @@ where
     /// Commit the current state at the current height.
     async fn commit(&self) -> AbciResult<response::Commit> {
         let exec_state = self.take_exec_state();
-        let block_height = exec_state.block_height();
-        let state_root = exec_state.commit().context("failed to commit FVM")?;
-
-        tracing::debug!(state_root = format!("{}", state_root), "commit state");
 
         let mut state = self.committed_state()?;
-        state.state_params.state_root = state_root;
-        state.block_height = block_height.try_into()?;
+        state.block_height = exec_state.block_height().try_into()?;
+        state.state_params.timestamp = exec_state.timestamp();
+        state.state_params.state_root = exec_state.commit().context("failed to commit FVM")?;
+
+        let state_root = state.state_root();
+
+        tracing::debug!(
+            state_root = state_root.to_string(),
+            timestamp = state.state_params.timestamp.0,
+            "commit state"
+        );
+
         self.set_committed_state(state)?;
 
         // Reset check state.

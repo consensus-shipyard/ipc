@@ -20,6 +20,7 @@ use crate::Timestamp;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FvmStateParams {
     pub state_root: Cid,
+    pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
     pub base_fee: TokenAmount,
     pub circ_supply: TokenAmount,
@@ -42,7 +43,6 @@ where
         blockstore: DB,
         multi_engine: &MultiEngine,
         block_height: ChainEpoch,
-        block_timestamp: Timestamp,
         params: FvmStateParams,
     ) -> anyhow::Result<Self> {
         let nc = NetworkConfig::new(params.network_version);
@@ -50,7 +50,7 @@ where
         // TODO: Configure:
         // * circ_supply; by default it's for Filecoin
         // * base_fee; by default it's zero
-        let mut mc = nc.for_epoch(block_height, block_timestamp.0, params.state_root);
+        let mut mc = nc.for_epoch(block_height, params.timestamp.0, params.state_root);
         mc.set_base_fee(params.base_fee);
         mc.set_circulating_supply(params.circ_supply);
 
@@ -92,8 +92,13 @@ where
         self.executor.flush()
     }
 
-    /// The currently executing block height.
+    /// The height of the currently executing block.
     pub fn block_height(&self) -> ChainEpoch {
         self.executor.context().epoch
+    }
+
+    /// The timestamp of the currently executing block.
+    pub fn timestamp(&self) -> Timestamp {
+        Timestamp(self.executor.context().timestamp)
     }
 }

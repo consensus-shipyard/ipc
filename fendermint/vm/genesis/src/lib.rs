@@ -16,7 +16,7 @@ use fendermint_vm_encoding::IsHumanReadable;
 mod arb;
 
 /// Unix timestamp (in seconds).
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Timestamp(pub u64);
 
 impl Timestamp {

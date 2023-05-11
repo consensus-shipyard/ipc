@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use fendermint_vm_actor_interface::{cron, eam, init, system};
-use fendermint_vm_genesis::{ActorMeta, Genesis, Validator};
+use fendermint_vm_genesis::{ActorMeta, Genesis, Timestamp, Validator};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
@@ -15,6 +15,7 @@ use super::state::FvmGenesisState;
 use super::FvmMessageInterpreter;
 
 pub struct FvmGenesisOutput {
+    pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
     pub base_fee: TokenAmount,
     pub circ_supply: TokenAmount,
@@ -57,6 +58,7 @@ where
         // store them in the IPC actors; or in case of a snapshot restore them
         // from the state.
         let output = FvmGenesisOutput {
+            timestamp: genesis.timestamp,
             network_version: genesis.network_version,
             circ_supply: circ_supply(&genesis),
             base_fee: genesis.base_fee,
