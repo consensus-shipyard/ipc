@@ -37,12 +37,23 @@ check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
 
 docker-build: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE)
-	cp $(BUILTIN_ACTORS_BUNDLE) ./bundle.car
+	mkdir -p docker/.artifacts
+
+	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
+
+	if [ -z "$${GITHUB_ACTIONS}" ]; then \
+		DOCKER_FILE=local ; \
+	else \
+		$(MAKE) --no-print-directory build && \
+		cp ./target/release/fendermint docker/.artifacts && \
+		DOCKER_FILE=ci ; \
+	fi && \
 	DOCKER_BUILDKIT=1 \
 	docker build \
-		--build-arg BUILTIN_ACTORS_BUNDLE=bundle.car \
-		-t fendermint:latest .
-	rm ./bundle.car
+		-f docker/$${DOCKER_FILE}.Dockerfile \
+		-t fendermint:latest $(PWD)
+
+	rm -rf docker/.artifacts
 
 
 # Build a bundle CAR; this is so we don't have to have a project reference,

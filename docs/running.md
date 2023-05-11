@@ -2,8 +2,8 @@
 
 The commands are all executed by the `fendermint` binary, which is produced from the `fendermint_app` crate,
 so we have many ways to run the program:
-* `fendermint <args>`, after running `cargo install fendermint_app`
-* `./target/debug/fendermint <args>`, after running `cargo build --release`
+* `fendermint <args>`, after running `cargo install --path fendermint/app`
+* `./target/release/fendermint <args>`, after running `cargo build --release`
 * `cargo run -p fendermint_app --release -- <args>`
 
 ## Genesis
