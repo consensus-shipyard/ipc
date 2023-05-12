@@ -100,18 +100,33 @@ pub enum RpcFevmCommands {
         #[arg(long, short, value_parser = parse_bytes, default_value = "")]
         constructor_args: Bytes,
     },
-    /// Call an EVM contract; print the results as JSON with the return data rendered in hexadecimal format.
+    /// Invoke an EVM contract; print the results as JSON with the return data rendered in hexadecimal format.
     Invoke {
-        /// Either the actor ID based or the EAM delegated address of the contract to call.
-        #[arg(long, short)]
-        contract: Address,
-        /// ABI encoded method hash, expected to be in hexadecimal format.
-        #[arg(long, short, value_parser = parse_bytes)]
-        method: Bytes,
-        /// ABI encoded call arguments passed to the EVM, expected to be in hexadecimal format.
-        #[arg(long, short, value_parser = parse_bytes, default_value = "")]
-        method_args: Bytes,
+        #[command(flatten)]
+        args: FevmArgs,
     },
+    /// Call an EVM contract without a transaction; print the results as JSON with the return data rendered in hexadecimal format.
+    Call {
+        #[command(flatten)]
+        args: FevmArgs,
+        /// Block height to query; 0 means latest.
+        #[arg(long, short = 'b', default_value_t = 0)]
+        height: u64,
+    },
+}
+
+/// Arguments common to FEVM method calls.
+#[derive(Args, Debug, Clone)]
+pub struct FevmArgs {
+    /// Either the actor ID based or the EAM delegated address of the contract to call.
+    #[arg(long, short)]
+    pub contract: Address,
+    /// ABI encoded method hash, expected to be in hexadecimal format.
+    #[arg(long, short, value_parser = parse_bytes)]
+    pub method: Bytes,
+    /// ABI encoded call arguments passed to the EVM, expected to be in hexadecimal format.
+    #[arg(long, short, value_parser = parse_bytes, default_value = "")]
+    pub method_args: Bytes,
 }
 
 /// Arguments common to transactions and transfers.

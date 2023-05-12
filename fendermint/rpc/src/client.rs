@@ -215,7 +215,8 @@ where
         let return_data = if response.deliver_tx.code.is_err() {
             None
         } else {
-            let return_data = f(&response.deliver_tx).context("error decoding deliver_tx")?;
+            let return_data =
+                f(&response.deliver_tx).context("error decoding data from deliver_tx in commit")?;
             Some(return_data)
         };
         let response = CommitResponse {

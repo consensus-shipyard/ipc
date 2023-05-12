@@ -3,7 +3,10 @@
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
+use fvm_ipld_encoding::serde::Serialize;
+use fvm_shared::message::Message;
 use tendermint::block::Height;
+use tendermint::v0_37::abci::response;
 use tendermint_rpc::endpoint::abci_query::AbciQuery;
 
 use cid::Cid;
@@ -12,13 +15,22 @@ use fvm_shared::{address::Address, error::ExitCode};
 
 use fendermint_vm_message::query::{ActorState, FvmQuery};
 
+use crate::response::encode_data;
+
+#[derive(Serialize, Debug, Clone)]
+/// The parsed value from a query, along with the height at which the query was performed.
+pub struct QueryResponse<T> {
+    pub height: Height,
+    pub value: T,
+}
+
 /// Fendermint client for submitting queries.
 #[async_trait]
 pub trait QueryClient: Send + Sync {
     /// Query the contents of a CID from the IPLD store.
     async fn ipld(&self, cid: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
         let res = self.perform(FvmQuery::Ipld(*cid), None).await?;
-        extract(res, |res| Ok(res.value))
+        extract_opt(res, |res| Ok(res.value))
     }
 
     /// Query the the state of an actor.
@@ -26,10 +38,10 @@ pub trait QueryClient: Send + Sync {
         &self,
         address: &Address,
         height: Option<Height>,
-    ) -> anyhow::Result<Option<(ActorID, ActorState)>> {
+    ) -> anyhow::Result<QueryResponse<Option<(ActorID, ActorState)>>> {
         let res = self.perform(FvmQuery::ActorState(*address), height).await?;
-
-        extract(res, |res| {
+        let height = res.height;
+        let value = extract_opt(res, |res| {
             let state: ActorState =
                 fvm_ipld_encoding::from_slice(&res.value).context("failed to decode state")?;
 
@@ -37,7 +49,30 @@ pub trait QueryClient: Send + Sync {
                 fvm_ipld_encoding::from_slice(&res.key).context("failed to decode ID")?;
 
             Ok((id, state))
-        })
+        })?;
+        Ok(QueryResponse { height, value })
+    }
+
+    /// Run a message in a read-only fashion.
+    async fn call(
+        &self,
+        message: Message,
+        height: Option<Height>,
+    ) -> anyhow::Result<QueryResponse<response::DeliverTx>> {
+        let res = self
+            .perform(FvmQuery::Call(Box::new(message)), height)
+            .await?;
+        let height = res.height;
+        let value = extract(res, |res| {
+            let mut deliver_tx: response::DeliverTx = fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode call result as DeliverTx")?;
+
+            // Mimic the Base64 encoding of the value that Tendermint does.
+            deliver_tx.data = encode_data(&deliver_tx.data);
+
+            Ok(deliver_tx)
+        })?;
+        Ok(QueryResponse { height, value })
     }
 
     /// Run an ABCI query.
@@ -45,19 +80,29 @@ pub trait QueryClient: Send + Sync {
 }
 
 /// Extract some value from the query result, unless it's not found or other error.
-fn extract<T, F>(res: AbciQuery, f: F) -> anyhow::Result<Option<T>>
+fn extract_opt<T, F>(res: AbciQuery, f: F) -> anyhow::Result<Option<T>>
 where
     F: FnOnce(AbciQuery) -> anyhow::Result<T>,
 {
     if is_not_found(&res) {
         Ok(None)
-    } else if res.code.is_err() {
+    } else {
+        extract(res, f).map(Some)
+    }
+}
+
+/// Extract some value from the query result, unless there was an error.
+fn extract<T, F>(res: AbciQuery, f: F) -> anyhow::Result<T>
+where
+    F: FnOnce(AbciQuery) -> anyhow::Result<T>,
+{
+    if res.code.is_err() {
         Err(anyhow!(
             "query returned non-zero exit code: {}",
             res.code.value()
         ))
     } else {
-        f(res).map(Some)
+        f(res)
     }
 }
 

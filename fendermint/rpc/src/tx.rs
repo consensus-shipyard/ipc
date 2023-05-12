@@ -3,9 +3,11 @@
 
 use std::marker::PhantomData;
 
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
 use tendermint::abci::response::DeliverTx;
+use tendermint::block::Height;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
 use fvm_ipld_encoding::RawBytes;
@@ -17,6 +19,7 @@ use fendermint_vm_actor_interface::eam::CreateReturn;
 use fendermint_vm_message::chain::ChainMessage;
 
 use crate::message::{GasParams, MessageFactory};
+use crate::query::{QueryClient, QueryResponse};
 use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke};
 
 /// Abstracting away what the return value is based on whether
@@ -102,6 +105,52 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         T: Sync + Send;
 }
 
+/// Convenience trait to call FEVM methods in read-only mode, without doing a transaction.
+#[async_trait]
+pub trait CallClient: QueryClient + BoundClient + Send + Sync {
+    /// Call a method on a FEVM contract without including a transaction on the blockchain.
+    async fn fevm_call(
+        &mut self,
+        contract: Address,
+        calldata: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: Option<Height>,
+    ) -> anyhow::Result<CallResponse<Vec<u8>>> {
+        let mf = self.message_factory_mut();
+        let msg: ChainMessage = mf.fevm_invoke(contract, calldata, value, gas_params)?;
+
+        let msg = if let ChainMessage::Signed(signed) = msg {
+            signed.into_message()
+        } else {
+            return Err(anyhow!("unexpected message type: {msg:?}"));
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        mf.set_sequence(msg.sequence);
+
+        let response = self.call(msg, height).await?;
+
+        let return_data = if response.value.code.is_err() {
+            None
+        } else {
+            let return_data = decode_fevm_invoke(&response.value)
+                .context("error decoding data from deliver_tx in query")?;
+            Some(return_data)
+        };
+
+        let response = CallResponse {
+            response,
+            return_data,
+        };
+
+        Ok(response)
+    }
+}
+
+/// Auto-implement this trait for anything that satisfies the bounds.
+impl<C> CallClient for C where C: QueryClient + BoundClient {}
+
 /// Return immediately after the transaction is broadcasted without waiting for check results.
 pub struct TxAsync;
 /// Wait for the check results before returning from broadcast.
@@ -124,6 +173,13 @@ pub struct SyncResponse<T> {
 pub struct CommitResponse<T> {
     /// Response from Tendermint.
     pub response: tx_commit::Response,
+    /// Parsed return data, if the response indicates success.
+    pub return_data: Option<T>,
+}
+
+pub struct CallResponse<T> {
+    /// Response from Tendermint.
+    pub response: QueryResponse<tendermint::abci::response::DeliverTx>,
     /// Parsed return data, if the response indicates success.
     pub return_data: Option<T>,
 }

@@ -2308,6 +2308,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "libsecp256k1",
+ "serde",
  "tendermint",
  "tendermint-rpc",
  "tokio",

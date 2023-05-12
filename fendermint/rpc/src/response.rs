@@ -18,6 +18,13 @@ pub fn decode_data(data: &Bytes) -> anyhow::Result<Vec<u8>> {
     Ok(data)
 }
 
+/// Apply the encoding that Tendermint does to the bytes inside [`DeliverTx`].
+pub fn encode_data(data: &[u8]) -> Bytes {
+    let b64 = base64::engine::general_purpose::STANDARD.encode(data);
+    let bz = b64.as_bytes();
+    Bytes::copy_from_slice(bz)
+}
+
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as raw bytes.
 pub fn decode_bytes(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
     decode_data(&deliver_tx.data)

@@ -49,6 +49,7 @@ run_task = { name = [
 
 
 [tasks.simplecoin-example]
+# Using --release in the hope that it can reuse artifacts compiled earlier for the docker build.
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
 cargo run -p fendermint_rpc --release --example simplecoin -- \

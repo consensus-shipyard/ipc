@@ -10,7 +10,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fendermint_rpc::client::BoundFendermintClient;
 use fendermint_rpc::tx::{
-    AsyncResponse, BoundClient, CommitResponse, SyncResponse, TxAsync, TxClient, TxCommit, TxSync,
+    AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
+    TxCommit, TxSync,
 };
 use fendermint_vm_message::chain::ChainMessage;
 use fvm_ipld_encoding::RawBytes;
@@ -28,7 +29,7 @@ use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn};
 
 use crate::cmd;
-use crate::options::rpc::{BroadcastMode, RpcFevmCommands, TransArgs};
+use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
 use crate::{
     cmd::to_b64,
     options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands},
@@ -54,8 +55,12 @@ cmd! {
         RpcFevmCommands::Create { contract, constructor_args } => {
             fevm_create(client, args, contract, constructor_args).await
         }
-        RpcFevmCommands::Invoke { contract, method, method_args } => {
+        RpcFevmCommands::Invoke { args: FevmArgs { contract, method, method_args }} => {
             fevm_invoke(client, args, contract, method, method_args).await
+        }
+        RpcFevmCommands::Call { args: FevmArgs { contract, method, method_args }, height} => {
+        let height = Height::try_from(height)?;
+            fevm_call(client, args, contract, method, method_args, height).await
         }
       }
     }
@@ -74,7 +79,7 @@ async fn query(
             None => eprintln!("CID not found"),
         },
         RpcQueryCommands::ActorState { address } => {
-            match client.actor_state(&address, Some(height)).await? {
+            match client.actor_state(&address, Some(height)).await?.value {
                 Some((id, state)) => {
                     let out = json! ({
                       "id": id,
@@ -188,7 +193,7 @@ async fn fevm_create(
     .await
 }
 
-/// Deploy an EVM contract through RPC and print the response to STDOUT as JSON.
+/// Invoke an EVM contract through RPC and print the response to STDOUT as JSON.
 async fn fevm_invoke(
     client: FendermintClient,
     args: TransArgs,
@@ -210,6 +215,35 @@ async fn fevm_invoke(
         |data| serde_json::Value::String(hex::encode(data)),
     )
     .await
+}
+
+/// Call an EVM contract through RPC and print the response to STDOUT as JSON.
+async fn fevm_call(
+    client: FendermintClient,
+    args: TransArgs,
+    contract: Address,
+    method: Bytes,
+    method_args: Bytes,
+    height: Height,
+) -> anyhow::Result<()> {
+    let calldata = Bytes::from([method, method_args].concat());
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let value = args.value;
+
+    let res = client
+        .inner
+        .fevm_call(contract, calldata, value, gas_params, Some(height))
+        .await?;
+
+    let return_data = res
+        .return_data
+        .map(|bz| serde_json::Value::String(hex::encode(bz)))
+        .unwrap_or(serde_json::Value::Null);
+
+    let json = json!({"response": res.response, "return_data": return_data});
+
+    print_json(&json)
 }
 
 /// Print out pretty-printed JSON.

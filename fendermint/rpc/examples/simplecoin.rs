@@ -31,7 +31,7 @@ use fvm_shared::econ::TokenAmount;
 
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::{GasParams, MessageFactory};
-use fendermint_rpc::tx::{TxClient, TxCommit};
+use fendermint_rpc::tx::{CallClient, TxClient, TxCommit};
 
 type MockProvider = ethers::providers::Provider<ethers::providers::MockProvider>;
 type MockContractCall<T> = ethers::prelude::ContractCall<MockProvider, T>;
@@ -121,8 +121,10 @@ async fn main() {
     run(&mut client).await.unwrap();
 }
 
-async fn run(client: &mut (impl TxClient<TxCommit> + QueryClient)) -> anyhow::Result<()> {
-    let create_return = coin_deploy(client).await?;
+async fn run(
+    client: &mut (impl TxClient<TxCommit> + QueryClient + CallClient),
+) -> anyhow::Result<()> {
+    let create_return = deploy_contract(client).await?;
     let contract_addr = create_return.delegated_address();
 
     tracing::info!(
@@ -135,10 +137,18 @@ async fn run(client: &mut (impl TxClient<TxCommit> + QueryClient)) -> anyhow::Re
     let owner_id = actor_id(client, &owner_addr).await?;
     let owner_eth_addr = EthAddress::from_id(owner_id);
 
-    let balance = coin_balance(client, &create_return.eth_address, &owner_eth_addr).await?;
+    let balance_call =
+        get_balance(client, &create_return.eth_address, &owner_eth_addr, false).await?;
+
+    let balance_tx = get_balance(client, &create_return.eth_address, &owner_eth_addr, true).await?;
+
+    assert_eq!(
+        balance_call, balance_tx,
+        "balance read with or without a transaction should be the same"
+    );
 
     tracing::info!(
-        balance = format!("{}", balance),
+        balance = format!("{}", balance_call),
         owner_eth_addr = hex::encode(&owner_eth_addr.0),
         "owner balance"
     );
@@ -151,7 +161,7 @@ async fn sequence(client: &impl QueryClient, sk: &SecretKey) -> anyhow::Result<u
     let pk = PublicKey::from_secret_key(sk);
     let addr = Address::new_secp256k1(&pk.serialize()).unwrap();
     let state = client.actor_state(&addr, None).await?;
-    match state {
+    match state.value {
         Some((_id, state)) => Ok(state.sequence),
         None => Err(anyhow!("cannot find actor {addr}")),
     }
@@ -159,14 +169,14 @@ async fn sequence(client: &impl QueryClient, sk: &SecretKey) -> anyhow::Result<u
 
 async fn actor_id(client: &impl QueryClient, addr: &Address) -> anyhow::Result<u64> {
     let state = client.actor_state(addr, None).await?;
-    match state {
+    match state.value {
         Some((id, _state)) => Ok(id),
         None => Err(anyhow!("cannot find actor {addr}")),
     }
 }
 
 /// Deploy SimpleCoin.
-async fn coin_deploy(client: &mut impl TxClient<TxCommit>) -> anyhow::Result<CreateReturn> {
+async fn deploy_contract(client: &mut impl TxClient<TxCommit>) -> anyhow::Result<CreateReturn> {
     let contract = hex::decode(&CONTRACT_HEX).context("error parsing contract")?;
 
     let res = client
@@ -184,24 +194,26 @@ async fn coin_deploy(client: &mut impl TxClient<TxCommit>) -> anyhow::Result<Cre
     Ok(ret)
 }
 
-/// Call SimpleCoin to query the balance of an account.
-async fn coin_balance(
-    client: &mut impl TxClient<TxCommit>,
+/// Invoke or call SimpleCoin to query the balance of an account.
+async fn get_balance(
+    client: &mut (impl TxClient<TxCommit> + CallClient),
     contract_eth_addr: &EthAddress,
     owner_eth_addr: &EthAddress,
+    in_transaction: bool,
 ) -> anyhow::Result<ethers::types::U256> {
     let contract = coin_contract(contract_eth_addr);
     let owner_h160_addr = eth_addr_to_h160(owner_eth_addr);
     let call = contract.get_balance(owner_h160_addr);
-    let balance = call_contract(client, contract_eth_addr, call).await?;
+    let balance = invoke_or_call_contract(client, contract_eth_addr, call, in_transaction).await?;
     Ok(balance)
 }
 
-/// Call FEVM through Tendermint with the calldata encoded by ethers, decoding the result into the expected type.
-async fn call_contract<T: Tokenizable>(
-    client: &mut impl TxClient<TxCommit>,
+/// Invoke FEVM through Tendermint with the calldata encoded by ethers, decoding the result into the expected type.
+async fn invoke_or_call_contract<T: Tokenizable>(
+    client: &mut (impl TxClient<TxCommit> + CallClient),
     contract_eth_addr: &EthAddress,
     call: MockContractCall<T>,
+    in_transaction: bool,
 ) -> anyhow::Result<T> {
     let calldata: ethers::types::Bytes = call
         .calldata()
@@ -209,25 +221,42 @@ async fn call_contract<T: Tokenizable>(
 
     let contract_addr = eth_addr_to_eam(contract_eth_addr);
 
-    let res = client
-        .fevm_invoke(
-            contract_addr,
-            calldata.0,
-            TokenAmount::default(),
-            GAS_PARAMS.clone(),
-        )
-        .await?;
+    // We can perform the read as a distributed transaction (if we don't trust any particular node to give the right answer),
+    // or we can send a query with the same message and get a result without involving a transaction.
+    let return_data = if in_transaction {
+        let res = client
+            .fevm_invoke(
+                contract_addr,
+                calldata.0,
+                TokenAmount::default(),
+                GAS_PARAMS.clone(),
+            )
+            .await?;
 
-    let ret = res
-        .return_data
-        .ok_or(anyhow!("the contract did not return any data"))?;
+        res.return_data
+    } else {
+        let res = client
+            .fevm_call(
+                contract_addr,
+                calldata.0,
+                TokenAmount::default(),
+                GAS_PARAMS.clone(),
+                None,
+            )
+            .await?;
 
-    let res = decode_function_data(&call.function, ret, false)
+        res.return_data
+    };
+
+    let bytes = return_data.ok_or(anyhow!("the contract did not return any data"))?;
+
+    let res = decode_function_data(&call.function, bytes, false)
         .context("error deserializing return data")?;
 
     Ok(res)
 }
 
+/// Create an instance of the statically typed contract client.
 fn coin_contract(contract_eth_addr: &EthAddress) -> SimpleCoin<MockProvider> {
     // A dummy client that we don't intend to use to call the contract or send transactions.
     let (client, _mock) = ethers::providers::Provider::mocked();

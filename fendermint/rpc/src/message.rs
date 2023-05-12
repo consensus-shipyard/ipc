@@ -48,6 +48,11 @@ impl MessageFactory {
         &self.addr
     }
 
+    /// Set the sequence to an arbitrary value.
+    pub fn set_sequence(&mut self, sequence: u64) {
+        self.sequence = sequence;
+    }
+
     /// Transfer tokens to another account.
     pub fn transfer(
         &mut self,
