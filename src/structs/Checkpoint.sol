@@ -3,32 +3,25 @@ pragma solidity ^0.8.7;
 
 import "./Subnet.sol";
 
-/// @title Checkpoint struct and related structs
+/// @title BottomUpCheckpoint struct
 /// @author LimeChain team
-struct Checkpoint {
-    CheckData data;
-    bytes signature;
+struct BottomUpCheckpoint {
+    SubnetID source;
+    uint64 epoch;
+    uint256 fee;
+    CrossMsg[] crossMsgs;
+    ChildCheck[] children;
+    bytes32 prevHash;
 }
 
-struct CheckData {
-    SubnetID source;
-    bytes tipSet;
-    int64 epoch;
-    bytes32 prevHash;
-    ChildCheck[] children;
-    CrossMsgMeta crossMsgs;
+struct TopDownCheckpoint {
+    uint64 epoch;
+    CrossMsg[] topDownMsgs;
 }
 
 struct ChildCheck {
     SubnetID source;
     bytes32[] checks;
-}
-
-struct CrossMsgMeta {
-    bytes32 msgsHash;
-    uint64 nonce;
-    uint256 value;
-    uint256 fee;
 }
 
 struct CrossMsg {

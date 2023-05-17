@@ -3,6 +3,7 @@ pragma solidity ^0.8.7;
 
 import "forge-std/Test.sol";
 
+import "fevmate/utils/FilAddress.sol";
 import "../src/lib/AccountHelper.sol";
 
 contract DummyContract {
@@ -51,6 +52,14 @@ contract AccountHelperTest is Test {
         activateAccount(BLS_ADDREESS);
 
         require(BLS_ADDREESS.isAccount() == true);
+    }
+
+    function test_IsSystemActor_True() public pure {
+        require(FilAddress.SYSTEM_ACTOR.isSystemActor() == true);
+    }
+
+    function test_IsSystemActor_False() public pure {
+        require(vm.addr(1234).isSystemActor() == false);
     }
 
     function activateAccount(address account) internal {

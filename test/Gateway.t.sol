@@ -11,74 +11,91 @@ import "../src/lib/CrossMsgHelper.sol";
 
 contract GatewayDeploymentTest is Test {
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for Checkpoint;
+    using CheckpointHelper for BottomUpCheckpoint;
     using CrossMsgHelper for CrossMsg;
     using StorableMsgHelper for StorableMsg;
 
-    int64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
     uint64 constant MIN_COLLATERAL_AMOUNT = 1 ether;
     uint64 constant MAX_NONCE = type(uint64).max;
     address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
     string private constant DEFAULT_NETWORK_NAME = "test";
-    uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
-    int64 private constant DEFAULT_FINALITY_TRESHOLD = 1;
-    int64 private constant DEFAULT_CHECK_PERIOD = 50;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
+    uint64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
     bytes private constant GENESIS = EMPTY_BYTES;
     uint256 constant CROSS_MSG_FEE = 10 gwei;
     address constant CHILD_NETWORK_ADDRESS = address(10);
     address constant CHILD_NETWORK_ADDRESS_2 = address(11);
-    address constant SYSTEM_ACTOR = 0xfF00000000000000000000000000000000000000;
+    uint64 constant EPOCH_ONE = 1 * DEFAULT_CHECKPOINT_PERIOD;
     
-
     Gateway gw;
     Gateway gw2;
     SubnetActor sa;
 
     address public constant ROOTNET_ADDRESS = address(1);
 
+    address TOPDOWN_VALIDATOR_1 = address(12);
+
     function setUp() public {
-    
+        address[] memory path = new address[](1);
+        path[0] = ROOTNET_ADDRESS;
 
         address[] memory path2 = new address[](2);
         path2[0] = ROOTNET_ADDRESS;
         path2[1] = CHILD_NETWORK_ADDRESS;
-        gw2 = new Gateway(path2, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
 
-        address[] memory path = new address[](1);
-        path[0] = ROOTNET_ADDRESS;
-        
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
+        Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
+            networkName: SubnetID({route: path}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: CROSS_MSG_FEE,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+        gw = new Gateway(constructorParams);
 
-        SubnetID memory parentId = SubnetID(path);
-        sa = new SubnetActor(
-            parentId,
-            DEFAULT_NETWORK_NAME,
-            address(gw),
-            ConsensusType.Dummy,
-            DEFAULT_MIN_VALIDATOR_STAKE,
-            DEFAULT_MIN_VALIDATORS,
-            DEFAULT_FINALITY_TRESHOLD,
-            DEFAULT_CHECK_PERIOD,
-            GENESIS,
-            DEFAULT_MAJORITY_PERCENTAGE
-        );
+        addValidator(TOPDOWN_VALIDATOR_1, 100);
+
+        constructorParams.networkName = SubnetID({route: path2});
+        gw2 = new Gateway(constructorParams);
+
+    
+        SubnetActor.ConstructParams memory subnetConstructorParams = SubnetActor.ConstructParams({
+            parentId: SubnetID({route: path}),
+            name: DEFAULT_NETWORK_NAME,
+            ipcGatewayAddr: address(gw),
+            consensus: ConsensusType.Dummy,
+            minActivationCollateral: MIN_COLLATERAL_AMOUNT,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesis: GENESIS
+        });
+        sa = new SubnetActor(subnetConstructorParams);
     }
 
-    function testDeployment(int64 checkpointPeriod) public {
+    function testDeployment(uint64 checkpointPeriod) public {
         vm.assume(checkpointPeriod >= DEFAULT_CHECKPOINT_PERIOD);
         address[] memory path = new address[](1);
         path[0] = address(0);
-        gw = new Gateway(path, checkpointPeriod, CROSS_MSG_FEE);
+
+        Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
+            networkName: SubnetID({route: path}),
+            bottomUpCheckPeriod: checkpointPeriod,
+            topDownCheckPeriod: checkpointPeriod,
+            msgFee: CROSS_MSG_FEE,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+        gw = new Gateway(constructorParams);
 
         SubnetID memory networkName = gw.getNetworkName();
 
         require(networkName.isRoot());
 
         require(gw.minStake() == MIN_COLLATERAL_AMOUNT);
-        require(gw.checkPeriod() == checkpointPeriod);
-        require(gw.appliedBottomUpNonce() == MAX_NONCE);
+        require(gw.bottomUpCheckPeriod() == checkpointPeriod);
+        require(gw.topDownCheckPeriod() == checkpointPeriod);
+        require(gw.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE);
     }
 
     function test_Register_Works_SingleSubnet(
@@ -251,6 +268,23 @@ contract GatewayDeploymentTest is Test {
         gw.releaseStake(0);
     }
 
+    function test_ReleaseStake_Fail_InsufficientSubnetBalance(
+        uint256 releaseAmount,
+        uint256 subnetBalance,
+        address subnetAddress
+    ) public {
+        vm.assume(subnetBalance > MIN_COLLATERAL_AMOUNT);
+        vm.assume(releaseAmount > subnetBalance);
+        vm.startPrank(subnetAddress);
+        vm.deal(subnetAddress, releaseAmount);
+
+        registerSubnet(subnetBalance, subnetAddress);
+
+        vm.expectRevert();
+
+        gw.releaseStake(releaseAmount);
+    }
+
     function test_Kill_Works() public {
         address subnetAddress = CHILD_NETWORK_ADDRESS;
 
@@ -280,13 +314,19 @@ contract GatewayDeploymentTest is Test {
         require(subnetAddress.balance == MIN_COLLATERAL_AMOUNT);
     }
 
-    function test_Kill_Fail_CircSupplyMoreThanZero() public {address validatorAddress = address(100);
+    function test_Kill_Fail_SubnetNotExists() public {
+        vm.expectRevert("subnet is not registered");
+
+        gw.kill();
+    }
+
+    function test_Kill_Fail_CircSupplyMoreThanZero() public 
+    {
+        address validatorAddress = address(100);
+        _join(validatorAddress);
+
         address funderAddress = address(101);
         uint fundAmount = 1 ether;
-
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
 
         vm.startPrank(funderAddress);
         vm.deal(funderAddress, fundAmount + 1);
@@ -300,25 +340,18 @@ contract GatewayDeploymentTest is Test {
         gw.kill();
     }
 
-    function testCommitChildCheck_Works(uint64 blockNumber) public {
-        address subnetAddress = address(100);
-        vm.assume(blockNumber < type(uint64).max / 2 - 9);
 
-        vm.roll(blockNumber);
+    function testCommitChildCheck_Works() public {
+        address subnetAddress = address(100);
 
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
 
         registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
         
-        Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
+        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
 
-        Checkpoint memory commit = commitChildCheck(checkpoint);
-
-        ChildCheck memory child = commit.data.children[0];
-
-        require(child.checks.length == 1);
-        require(child.checks[0] == checkpoint.toHash());
+        gw.commitChildCheck(checkpoint);
     }
 
     function testCommitChildCheck_Works_SameSubnet(uint64 blockNumber) public {
@@ -330,206 +363,29 @@ contract GatewayDeploymentTest is Test {
 
         registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
 
-        Checkpoint memory checkpoint = createCheckpoint(
+        BottomUpCheckpoint memory checkpoint = createCheckpoint(
             subnetAddress,
-            blockNumber + 9
+            DEFAULT_CHECKPOINT_PERIOD
         );
-        Checkpoint memory commit = commitChildCheck(checkpoint);
-
-        ChildCheck memory child = commit.data.children[0];
-
-        require(child.checks.length == 1);
-        require(child.checks[0] == checkpoint.toHash());
+        gw.commitChildCheck(checkpoint);
 
         vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
 
-        Checkpoint memory checkpoint2 = createCheckpoint(
+        BottomUpCheckpoint memory checkpoint2 = createCheckpoint(
             subnetAddress,
-            blockNumber + 11
+            2 * DEFAULT_CHECKPOINT_PERIOD
         );
-
-        checkpoint2.data.prevHash = checkpoint.toHash();
         
-        Checkpoint memory commit2 = commitChildCheck(checkpoint2);
-
-        ChildCheck memory child2 = commit2.data.children[0];
-
-        require(child2.checks.length == 2);
-        require(child2.checks[1] == checkpoint2.toHash());
-    }
-
-    function testCommitChildCheck_Works_SecondSubnet(
-        uint64 blockNumber
-    ) public {
-        address firstSubnetAddress = address(100);
-        address secondSubnetAddress = address(101);
-        vm.assume(blockNumber < type(uint64).max / 2 - 9);
-
-        vm.roll(blockNumber);
-        vm.startPrank(firstSubnetAddress);
-        vm.deal(firstSubnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, firstSubnetAddress);
-
-        Checkpoint memory checkpoint = createCheckpoint(
-            firstSubnetAddress,
-            blockNumber + 9
-        );
-        Checkpoint memory commit = commitChildCheck(checkpoint);
-
-        ChildCheck memory child = commit.data.children[0];
-
-        require(child.checks.length == 1);
-        require(child.checks[0] == checkpoint.toHash());
-
-        vm.stopPrank();
-        vm.startPrank(secondSubnetAddress);
-        vm.deal(secondSubnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, secondSubnetAddress);
-
-        Checkpoint memory checkpoint2 = createCheckpoint(
-            secondSubnetAddress,
-            blockNumber + 9
-        );
-        Checkpoint memory commit2 = commitChildCheck(checkpoint2);
-
-        require(commit2.data.children.length == 2);
-
-        ChildCheck memory child2 = commit2.data.children[1];
-
-        require(child2.checks.length == 1);
-        require(child2.checks[0] == checkpoint2.toHash());
-    }
-
-    function testCommitChildCheck_Fail_NotConsistentWithPrevOne(
-        uint64 blockNumber
-    ) public {
-        address subnetAddress = address(100);
-        vm.assume(blockNumber < type(uint64).max / 2 - 9);
-        vm.roll(blockNumber);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        Checkpoint memory checkpoint = createCheckpoint(
-            subnetAddress,
-            blockNumber + 9
-        );
-        Checkpoint memory commit = commitChildCheck(checkpoint);
-
-        ChildCheck memory child = commit.data.children[0];
-
-        require(child.checks.length == 1);
-        require(child.checks[0] == checkpoint.toHash());
-        
-        vm.expectRevert("previous checkpoint not consistent with previous one");
-
-        checkpoint.data.prevHash = bytes32("0x1");
-        gw.commitChildCheck(checkpoint);
-    }
-
-    function testCommitChildCheck_Fail_CheckpointAlreadyExists(
-        uint64 blockNumber
-    ) public {
-        address subnetAddress = address(100);
-        vm.assume(blockNumber < type(uint64).max / 2 - 9);
-        vm.roll(blockNumber);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        Checkpoint memory checkpoint = createCheckpoint(
-            subnetAddress,
-            blockNumber + 9
-        );
-        Checkpoint memory commit = commitChildCheck(checkpoint);
-
-        ChildCheck memory child = commit.data.children[0];
-
-        require(child.checks.length == 1);
-        require(child.checks[0] == checkpoint.toHash());
-
-        vm.expectRevert("child checkpoint being committed already exists");
-
-        gw.commitChildCheck(checkpoint);
-    }
-
-    function testCommitChildCheck_Fail_InactiveSubnet(
-        uint64 blockNumber
-    ) public {
-        address subnetAddress = address(100);
-        vm.assume(blockNumber < type(uint64).max / 2 - 9);
-        vm.roll(blockNumber);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        gw.releaseStake(MIN_COLLATERAL_AMOUNT);
-
-        Checkpoint memory checkpoint = createCheckpoint(
-            subnetAddress,
-            blockNumber + 9
-        );
-
-        vm.expectRevert("can't commit checkpoint for an inactive subnet");
-        gw.commitChildCheck(checkpoint);
-    }
-
-    function testCommitChildCheck_Fail_BelongsToThePast(
-        uint64 blockNumber
-    ) public {
-        address subnetAddress = address(100);
-        vm.assume(blockNumber < type(uint64).max / 2 - 9);
-        vm.roll(blockNumber);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        Checkpoint memory checkpoint = createCheckpoint(subnetAddress, blockNumber + 9);
-
-        commitChildCheck(checkpoint);
-
-        Checkpoint memory pastCheckpoint = createCheckpoint(
-            subnetAddress,
-            blockNumber + 8
-        );
-
-        vm.expectRevert("checkpoint being committed belongs to the past");
-        gw.commitChildCheck(pastCheckpoint);
-    }
-
-    function testCommitChildCheck_Fails_WrongSubnet(uint64 blockNumber) public {
-        address subnetAddress = vm.addr(100);
-        vm.assume(blockNumber < type(uint64).max / 2 - 9);
-        vm.roll(blockNumber);
-        Checkpoint memory checkpoint = createCheckpoint(
-            subnetAddress,
-            blockNumber + 9
-        );
-
-        address subnetAddressInvalid = vm.addr(101);
-        vm.startPrank(subnetAddressInvalid);
-        vm.deal(subnetAddressInvalid, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddressInvalid);
-
-        vm.expectRevert("source in checkpoint doesn't belong to subnet");
-
-        gw.commitChildCheck(checkpoint);
+        gw.commitChildCheck(checkpoint2);
     }
 
     function test_Fund_Works_EthAccountSingleFunding() public {
         address validatorAddress = address(100);
+
+        _join(validatorAddress);
+
         address funderAddress = address(101);
         uint fundAmount = 1 ether;
-
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
 
         vm.startPrank(funderAddress);
         vm.deal(funderAddress, fundAmount + 1);
@@ -539,12 +395,9 @@ contract GatewayDeploymentTest is Test {
 
     function test_Fund_Works_BLSAccountSingleFunding() public {
         address validatorAddress = address(100);
+        _join(validatorAddress);
+
         uint fundAmount = 1 ether;
-
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
-
         vm.startPrank(BLS_ACCOUNT_ADDREESS);
         vm.deal(BLS_ACCOUNT_ADDREESS, fundAmount + 1);
         
@@ -552,21 +405,21 @@ contract GatewayDeploymentTest is Test {
     }
 
     function test_Fund_Works_MultipleFundings() public {
-        uint8 numberOfFunds = 10;
+        uint8 numberOfFunds = 5;
         uint fundAmount = 1 ether;
         
         address validatorAddress = address(100);
         address funderAddress = address(101);
 
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+        _join(validatorAddress);
 
-        vm.startPrank(funderAddress);
+        vm.startPrank(funderAddress);        
+        vm.expectCall(address(sa), gw.crossMsgFee(), abi.encodeWithSelector(sa.reward.selector), 5);
+        
         for (uint i = 0; i < numberOfFunds; i++) {
             vm.deal(funderAddress, fundAmount + 1);
-
-            fund(funderAddress, fundAmount);   
+            
+            fund(funderAddress, fundAmount);
         }
     }
     
@@ -575,9 +428,7 @@ contract GatewayDeploymentTest is Test {
         address funderAddress = address(101);
         uint fundAmount = 1 ether;
 
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+        _join(validatorAddress);
 
         vm.startPrank(funderAddress);
         vm.deal(funderAddress, fundAmount + 1);
@@ -596,9 +447,7 @@ contract GatewayDeploymentTest is Test {
         address invalidAccount = address(sa);
         uint fundAmount = 1 ether;
 
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+        _join(validatorAddress);
 
         vm.startPrank(invalidAccount);
         vm.deal(invalidAccount, fundAmount + 1);
@@ -614,9 +463,7 @@ contract GatewayDeploymentTest is Test {
         address validatorAddress = address(100);
         address funderAddress = address(101);
 
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+        _join(validatorAddress);
 
         vm.startPrank(funderAddress);
         vm.deal(funderAddress, 1 ether);
@@ -632,8 +479,15 @@ contract GatewayDeploymentTest is Test {
         address[] memory path = new address[](2);
         path[0] = address(1);
         path[1] = address(2);
-        
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
+                
+        Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
+            networkName: SubnetID({route: path}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: CROSS_MSG_FEE,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+        gw = new Gateway(constructorParams);
 
         address callerAddress = address(100);
 
@@ -649,7 +503,14 @@ contract GatewayDeploymentTest is Test {
         path[0] = address(1);
         path[1] = address(2);
         
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, CROSS_MSG_FEE);
+        Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
+            networkName: SubnetID({route: path}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: CROSS_MSG_FEE,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+        gw = new Gateway(constructorParams);
 
         address invalidAccount = address(sa);
 
@@ -668,14 +529,21 @@ contract GatewayDeploymentTest is Test {
         path[0] = makeAddr("root");
         path[1] = makeAddr("subnet_one");
         
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
+        Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
+            networkName: SubnetID({route: path}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: crossMsgFee,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+        gw = new Gateway(constructorParams);
 
         vm.roll(0);
         vm.warp(0);
         vm.startPrank(BLS_ACCOUNT_ADDREESS);
         vm.deal(BLS_ACCOUNT_ADDREESS, releaseAmount + 1);
 
-        release(BLS_ACCOUNT_ADDREESS, releaseAmount, crossMsgFee, 0);
+        release(releaseAmount, crossMsgFee, EPOCH_ONE);
     }
 
     function test_Release_Works_EmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
@@ -686,7 +554,14 @@ contract GatewayDeploymentTest is Test {
         path[0] = makeAddr("root");
         path[1] = makeAddr("subnet_one");
         
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
+        Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
+            networkName: SubnetID({route: path}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: crossMsgFee,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+        gw = new Gateway(constructorParams);
 
         address callerAddress = address(100);
 
@@ -695,7 +570,7 @@ contract GatewayDeploymentTest is Test {
         vm.startPrank(callerAddress);
         vm.deal(callerAddress, releaseAmount + 1);
 
-        release(callerAddress, releaseAmount, crossMsgFee, 0);
+        release(releaseAmount, crossMsgFee, EPOCH_ONE);
     }
 
     function test_Release_Works_NonEmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
@@ -706,7 +581,14 @@ contract GatewayDeploymentTest is Test {
         path[0] = makeAddr("root");
         path[1] = makeAddr("subnet_one");
         
-        gw = new Gateway(path, DEFAULT_CHECKPOINT_PERIOD, crossMsgFee);
+        Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
+            networkName: SubnetID({route: path}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: crossMsgFee,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+        gw = new Gateway(constructorParams);
 
         address callerAddress = address(100);
 
@@ -715,9 +597,9 @@ contract GatewayDeploymentTest is Test {
         vm.startPrank(callerAddress);
         vm.deal(callerAddress, 2 * releaseAmount + 1);
 
-        release(callerAddress, releaseAmount, crossMsgFee, 0);
+        release(releaseAmount, crossMsgFee, EPOCH_ONE);
         
-        release(callerAddress, releaseAmount, crossMsgFee, 0);
+        release(releaseAmount, crossMsgFee, EPOCH_ONE);
     }
 
     function test_SendCross_Fails_NoDestination() public {
@@ -725,8 +607,8 @@ contract GatewayDeploymentTest is Test {
         vm.startPrank(caller);
         vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
-        vm.expectRevert("error getting subnet from msg");
 
+        vm.expectRevert("error getting subnet from msg");
         gw.sendCross{value: CROSS_MSG_FEE + 1}(
             SubnetID({route: new address[](0)}),
             CrossMsg({
@@ -875,18 +757,19 @@ contract GatewayDeploymentTest is Test {
         );
     }
 
-    function test_SendCross_Works_TopDown_SameSubnet() public {
+        function test_SendCross_Works_TopDown_SameSubnet() public {
         address caller = vm.addr(100);
         vm.prank(caller);
         vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
 
-        address receiver = address(101);
+        address receiver =  address(this); // callback to reward() method
         vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+        vm.deal(receiver, MIN_COLLATERAL_AMOUNT + 1);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
 
-        SubnetID memory destination = gw.getNetworkName().createSubnetId(address(sa));
+
+        SubnetID memory destination = gw.getNetworkName().createSubnetId(receiver);
         SubnetID memory from = gw.getNetworkName().createSubnetId(caller);
 
         CrossMsg memory crossMsg = CrossMsg({
@@ -916,9 +799,8 @@ contract GatewayDeploymentTest is Test {
             uint nonce,
             uint circSupply,
             
-        ) = getSubnet(address(sa));
+        ) = getSubnet(address(this));
 
-        require(receiver.balance > 0);
         require(crossMsg.message.applyType(gw.getNetworkName()) == IPCMsgType.TopDown);
         require(id.equals(destination));
         require(nonce == 1);
@@ -927,6 +809,9 @@ contract GatewayDeploymentTest is Test {
         require(gw.appliedTopDownNonce() == 1);
     }
 
+    function reward() external payable {
+        console.log("reward method called");
+    }
 
     function test_SendCross_Works_BottomUp_CurrentNetworkNotCommonParent() public {
         address receiver = vm.addr(101);
@@ -1014,336 +899,12 @@ contract GatewayDeploymentTest is Test {
         require(gw2.appliedTopDownNonce() == 0);
     }
 
-    function test_ApplyMsg_Fails_NotSystemActor() public {
-        address nonSystemActor = address(100);
-        vm.startPrank(nonSystemActor);
-        vm.deal(nonSystemActor, 1 ether);
-
-        vm.expectRevert("caller not the system actor");
-
-        gw.applyMsg(CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: SubnetID(new address[](0)),
-                    rawAddress: address(0)
-                }),
-                to: IPCAddress({
-                    subnetId: SubnetID(new address[](0)),
-                    rawAddress: address(0)
-                }),
-                value: CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: true
-        }));
-    }
-
-    function test_ApplyMsg_Fails_NoDestinationAddress() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.expectRevert("error getting raw address from msg");
-
-        gw.applyMsg(CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: SubnetID(new address[](0)),
-                    rawAddress: address(0)
-                }),
-                to: IPCAddress({
-                    subnetId: SubnetID(new address[](0)),
-                    rawAddress: address(0)
-                }),
-                value: CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: true
-        }));
-    }
-
-    function test_ApplyMsg_Fails_SenderHasNoBalance() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-
-        SubnetID memory toSubnet = gw2.getNetworkName();
-        vm.expectRevert("not enough balance to mint new tokens as part of the cross-message");
-
-        gw.applyMsg(CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: SubnetID(new address[](0)),
-                    rawAddress: address(0)
-                }),
-                to: IPCAddress({
-                    subnetId: toSubnet,
-                    rawAddress: address(1)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: true
-        }));
-    }
-
-
-    function test_ApplyMsg_Fails_NoDestinationSubnet() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.expectRevert("error getting subnet from msg");
-
-        gw.applyMsg(CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: SubnetID(new address[](0)),
-                    rawAddress: address(0)
-                }),
-                to: IPCAddress({
-                    subnetId: SubnetID(new address[](0)),
-                    rawAddress: address(1)
-                }),
-                value: CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: true
-        }));
-    }
-
-    function test_ApplyMsg_Fails_BottomUpInvalidNonce() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.deal(address(gw), 1 ether);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: address(1)
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(2)
-                }),
-                value: 1,
-                nonce: 10,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        vm.expectRevert("the bottom-up message being applied doesn't hold the subsequent nonce");
-        gw.applyMsg(crossMsg);
-    }
-
-    function test_ApplyMsg_Works_BottomUpTargetSubnet_ZeroNonce() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.deal(address(gw), 1 ether);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: address(0)
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(1)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        vm.expectCall(crossMsg.message.to.rawAddress, crossMsg.message.value, EMPTY_BYTES);
-
-        bytes memory result = gw.applyMsg(crossMsg);
-
-        require(keccak256(result) == keccak256(EMPTY_BYTES));
-        require(crossMsg.message.to.rawAddress.balance == crossMsg.message.value);
-        require(gw.appliedBottomUpNonce() == 0);
-    }
-
-    function test_ApplyMsg_Works_BottomUpTargetSubnet_IncrementNonce() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.deal(address(gw), 1 ether);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: address(0)
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(1)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        gw.applyMsg(crossMsg);
-
-        crossMsg.message.nonce = 1;
-
-        gw.applyMsg(crossMsg);
-
-        require(gw.appliedBottomUpNonce() == 1);
-    }
-
-    function test_ApplyMsg_Works_BottomUpNotTargetSubnet() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.deal(address(gw2), 1 ether);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: address(0)
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(1)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: false
-        });
-
-        bytes memory result = gw2.applyMsg(crossMsg);
-        bytes32 postboxId = abi.decode(result, (bytes32));
-
-        (StorableMsg memory message, bool wrapped) = gw2.postbox(postboxId);
-
-        require(gw2.postboxHasOwner(postboxId, crossMsg.message.from.rawAddress) == true);
-        require(CrossMsg(message, wrapped).toHash() == crossMsg.toHash());
-    }
-
-    function test_ApplyMsg_Works_TopDownTargetSubnet() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.deal(address(gw2), 1 ether);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(1)
-                }),
-                to: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: address(2)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        vm.expectCall(crossMsg.message.to.rawAddress, crossMsg.message.value, EMPTY_BYTES);
-
-        bytes memory result = gw2.applyMsg(crossMsg);
-
-        require(gw2.appliedTopDownNonce() == 1);
-        require(keccak256(result) == keccak256(EMPTY_BYTES));
-        require(crossMsg.message.to.rawAddress.balance == crossMsg.message.value);
-    }
-
-    function test_ApplyMsg_Works_TopDownNotTargetSubnet() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.deal(address(gw2), 1 ether);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(1)
-                }),
-                to: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: address(2)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        vm.expectCall(crossMsg.message.to.rawAddress, crossMsg.message.value, EMPTY_BYTES);
-
-        bytes memory result = gw2.applyMsg(crossMsg);
-
-        require(gw2.appliedTopDownNonce() == 1);
-        require(keccak256(result) == keccak256(EMPTY_BYTES));
-        require(crossMsg.message.to.rawAddress.balance == crossMsg.message.value);
-    }
-
-    function setupWhiteListMethod(address receiver, address caller) internal returns (bytes32) {
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: caller
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName().createSubnetId(receiver),
-                    rawAddress: receiver
-                }),
-                value: CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: bytes4("2"),
-                params: new bytes(0)
-            }),
-            wrapped: false
-        });
-
-        vm.deal(caller, CROSS_MSG_FEE + 2);
-        vm.prank(SYSTEM_ACTOR);
-        gw.applyMsg(crossMsg);
-
-        return crossMsg.toHash();
-    }
-
     function test_WhitelistPropagator_Fails_NotOwner() public {
         address caller = vm.addr(100);
+        vm.deal(caller, 1 ether);
         address receiver = vm.addr(101);
 
-        bytes32 postBoxItemId = setupWhiteListMethod(receiver, caller);
+        bytes32 postBoxItemId = setupWhiteListMethod(caller);
         
         address[] memory owners = new address[](1);
         owners[0] = caller;
@@ -1355,9 +916,8 @@ contract GatewayDeploymentTest is Test {
 
     function test_WhitelistPropagator_Fails_PostboxItemDoesNotExist() public {
         address caller = vm.addr(100);
-        address receiver = vm.addr(101);
- 
-        setupWhiteListMethod(receiver, caller);
+        vm.deal(caller, 1 ether);
+        setupWhiteListMethod(caller);
 
         address[] memory owners = new address[](1);
         owners[0] = caller;
@@ -1367,140 +927,41 @@ contract GatewayDeploymentTest is Test {
         gw.whitelistPropagator(bytes32(0), owners);
     }
 
-    function test_WhitelistPropagator_Works() public {
-        address caller = vm.addr(100);
-        address receiver = vm.addr(101);
+    function test_Propagate_Works_WithFeeRemainder() external {
+        address[] memory validators = setupValidators();
+        address caller = validators[0];
 
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
+        bytes32 postboxId = setupWhiteListMethod(caller);
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: caller
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName().createSubnetId(receiver),
-                    rawAddress: receiver
-                }),
-                value: CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: bytes4("2"),
-                params: new bytes(0)
-            }),
-            wrapped: false
-        });
-
-        vm.deal(caller, CROSS_MSG_FEE + 2);
-        vm.prank(SYSTEM_ACTOR);
-        gw.applyMsg(crossMsg);
-
-        bytes32 postboxId = crossMsg.toHash();
-
-        address[] memory ownersToAdd = new address[](1);
-        ownersToAdd[0] = receiver;
+        vm.deal(caller, 1 ether);
+        vm.expectCall(caller, 1 ether - gw.crossMsgFee(), new bytes(0));
 
         vm.prank(caller);
-        gw.whitelistPropagator(postboxId, ownersToAdd);
-        
-        (StorableMsg memory message, bool wrapped) = gw.postbox(postboxId);
-        require(CrossMsg(message, wrapped).toHash() == crossMsg.toHash());
+        gw.propagate{value: 1 ether}(postboxId);
 
-        for (uint i = 0; i < ownersToAdd.length; i++) {
-            require(gw.postboxHasOwner(postboxId, ownersToAdd[i]) == true);
-        }
-    }
-
-    function test_Propagate_Works_WithFeeReminder() external {
-        address owner = address(1);
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
-
-        vm.deal(address(gw2), 1 ether);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: owner
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(2)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: false
-        });
-
-        bytes memory result = gw2.applyMsg(crossMsg);
-        bytes32 postboxId = abi.decode(result, (bytes32));
-
-        (StorableMsg memory message, bool wrapped) = gw2.postbox(postboxId);
-        require(CrossMsg(message, wrapped).toHash() == crossMsg.toHash());
-
-        vm.stopPrank();
-        vm.startPrank(owner);
-        vm.deal(owner, 1 ether);
-
-        vm.expectCall(owner, 1 ether - gw2.crossMsgFee(), new bytes(0));
-
-        gw2.propagate{value: 1 ether}(postboxId);
-
-        require(owner.balance == 1 ether - gw2.crossMsgFee());
+        require(caller.balance == 1 ether - gw.crossMsgFee());
     }
 
     function test_Propagate_Works_NoFeeReminder() external {
-        address owner = address(1);
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.deal(FilAddress.SYSTEM_ACTOR, 1 ether);
+        address[] memory validators = setupValidators();
+        address caller = validators[0];
 
-        vm.deal(address(gw2), 1 ether);
+        uint fee = gw.crossMsgFee();
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gw2.getNetworkName(),
-                    rawAddress: owner
-                }),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName(),
-                    rawAddress: address(2)
-                }),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: false
-        });
-
-        bytes memory result = gw2.applyMsg(crossMsg);
-        bytes32 postboxId = abi.decode(result, (bytes32));
-
-        (StorableMsg memory message, bool wrapped) = gw2.postbox(postboxId);
-        require(CrossMsg(message, wrapped).toHash() == crossMsg.toHash());
-
-        vm.stopPrank();
-        vm.startPrank(owner);
-        vm.deal(owner, 1 ether);
-
-        gw2.propagate{value: gw2.crossMsgFee()}(postboxId);
-
-        require(owner.balance == 1 ether - gw2.crossMsgFee());
+        bytes32 postboxId = setupWhiteListMethod(caller);
+        
+        vm.deal(caller, fee);
+        vm.prank(caller);
+        gw.propagate{value: fee}(postboxId);
+        require(caller.balance == 0, "caller.balance == 0");
     }
 
     function test_Propagate_Fails_NotOwner() public {
         address caller = vm.addr(100);
-        address receiver = vm.addr(101);
+        vm.deal(caller, 1 ether);
         address notOwner = vm.addr(102);
 
-        bytes32 postboxItemCid = setupWhiteListMethod(receiver, caller);
+        bytes32 postboxItemCid = setupWhiteListMethod(caller);
         
         address[] memory owners = new address[](1);
         owners[0] = caller;
@@ -1518,30 +979,480 @@ contract GatewayDeploymentTest is Test {
         gw.propagate{value: 1 ether}(bytes32(0));
     }
 
-    function commitChildCheck(
-        Checkpoint memory commit
-    ) internal returns (Checkpoint memory) {
-        gw.commitChildCheck(commit);
+    function setupWhiteListMethod(address caller) internal returns (bytes32) {
+        address[] memory validators = setupValidators();
 
-        int64 epoch = (int64(uint64(block.number)) / gw.checkPeriod()) *
-            gw.checkPeriod();
+        registerSubnet(MIN_COLLATERAL_AMOUNT, address(this));
 
-        (CheckData memory data, bytes memory signature) = gw.checkpoints(epoch);
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName().createSubnetId(caller),
+                    rawAddress: caller
+                }),
+                to: IPCAddress({
+                    subnetId: gw.getNetworkName().createSubnetId(address(this)),
+                    rawAddress: address(this)
+                }),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: new bytes(0)
+            }),
+            wrapped: false
+        });
 
-        require(data.epoch == epoch);
+        // we add a validator with 10 times as much weight as the default validator. 
+        // This way we have 10/11 votes and we reach majority, setting the message in postbox
+        // addValidator(caller, 1000);
 
-        bool matchedSubnetId;
-        for (uint childIndex = 0; childIndex < data.children.length; childIndex++) {
-            if(
-                data.children[childIndex].source.toHash() ==
-                commit.data.source.toHash()
-            ) {
-                matchedSubnetId = true;
-            }
-        }
-        require(matchedSubnetId == true);
+        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
+        topDownMsgs[0] = crossMsg;
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: topDownMsgs});
+        
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(checkpoint);
 
-        return Checkpoint(data, signature);
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+        vm.prank(validators[2]);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+        return crossMsg.toHash();
+    }
+
+    function test_WhitelistPropagator_Works() public {
+        address caller = vm.addr(100);
+        address receiver = vm.addr(101);
+
+
+        vm.prank(receiver);
+        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: caller
+                }),
+                to: IPCAddress({
+                    subnetId: gw.getNetworkName().createSubnetId(receiver),
+                    rawAddress: receiver
+                }),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: new bytes(0)
+            }),
+            wrapped: false
+        });
+
+        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
+        topDownMsgs[0] = crossMsg;
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: topDownMsgs});
+        vm.prank(TOPDOWN_VALIDATOR_1);
+        vm.deal(TOPDOWN_VALIDATOR_1, 1);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+        bytes32 postboxItemId = crossMsg.toHash();
+        address[] memory ownersToAdd = new address[](1);
+        ownersToAdd[0] = receiver;
+
+        vm.prank(caller);
+        vm.deal(caller, CROSS_MSG_FEE + 2);
+        gw.whitelistPropagator(postboxItemId, ownersToAdd);
+
+        require(gw.postboxHasOwner(postboxItemId, caller), "gw.postboxHasOwner(postboxItemId, caller)");
+        require(gw.postboxHasOwner(postboxItemId, receiver), "gw.postboxHasOwner(postboxItemId, receiver)");
+
+        (StorableMsg memory storableMsg, bool wrapped) = gw.postbox(postboxItemId);
+        CrossMsg memory msgFrompostbox = CrossMsg(storableMsg, wrapped);
+        require(msgFrompostbox.toHash() == crossMsg.toHash());
+
+    }
+
+    function test_SetMembership_Fails_NotSystemActor() public {
+        address caller = vm.addr(100);
+        
+        address[] memory validators = new address[](1);
+        validators[0] = caller;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = 100;
+
+        vm.prank(caller);
+        vm.expectRevert("caller not the system actor");
+        gw.setMembership(validators, weights);
+    }
+
+    function test_SetMembership_Fails_ValidatorsAndWeightsNotEqual() public {
+        address[] memory validators = new address[](1);
+        validators[0] = vm.addr(100);
+        uint256[] memory weights = new uint256[](2);
+        weights[0] = 100;
+        weights[1] = 130;
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert("number of validators is not equal to the number of validator weights");
+        gw.setMembership(validators, weights);
+    }    
+    
+    function test_SetMembership_Fails_ZeroWeight() public {
+        address[] memory validators = new address[](1);
+        validators[0] = vm.addr(100);
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = 0;
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert("validator's weight cannot be zero");
+        gw.setMembership(validators, weights);
+    }
+
+    function test_SetMembership_Works_MultipleValidators() public {
+        address[] memory validators = new address[](2);
+        validators[0] = vm.addr(100);
+        validators[1] = vm.addr(101);
+        uint256[] memory weights = new uint256[](2);
+        weights[0] = 100;
+        weights[1] = 150;
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gw.setMembership(validators, weights);
+
+        require(gw.totalWeight() == 250);
+    }
+
+    function test_SetMembership_Works_NewValidators() public {
+        addValidator(vm.addr(100), 100);
+
+        require(gw.totalWeight() == 100);
+
+        addValidator(vm.addr(101), 1000);
+        
+        require(gw.totalWeight() == 1000);
+    }
+
+    function test_SubmitTopDownCheckpoint_Fails_NotValidator() public {
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: new CrossMsg[](0)});
+
+        address nonValidator = vm.addr(400);
+        vm.prank(nonValidator);
+        vm.deal(nonValidator, 1);
+        vm.expectRevert("not validator");
+        gw.submitTopDownCheckpoint(checkpoint);
+    }
+
+    function test_SubmitTopDownCheckpoint_Fails_EpochNotVotable() public {
+        address validator = vm.addr(100);
+
+        addValidator(validator);
+
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD + 1, topDownMsgs: new CrossMsg[](0)});
+
+        vm.prank(validator);
+        vm.expectRevert("epoch not votable");
+        gw.submitTopDownCheckpoint(checkpoint);
+    }
+
+    function test_SubmitTopDownCheckpoint_Fails_ValidatorAlreadyVoted() public {
+        address[] memory validators = setupValidators();
+
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: new CrossMsg[](0)});
+
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+        vm.prank(validators[0]);
+        vm.expectRevert("validator has already voted");
+        gw.submitTopDownCheckpoint(checkpoint);
+    }
+
+    function test_SubmitTopDownCheckpoint_Works_ConsensusReachedAndExecuted() public {
+        address[] memory validators = setupValidators();
+
+        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
+        topDownMsgs[0] = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                value: 0,
+                nonce: 0,
+                method: this.callback.selector,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: topDownMsgs});
+
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+
+        vm.prank(validators[2]);
+        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector));
+        gw.submitTopDownCheckpoint(checkpoint);
+
+        (, uint256 first, uint256 last) = gw.executableQueue();
+        
+        require(gw.lastVotingExecutedEpoch() == checkpoint.epoch);
+        require(first == 0);
+        require(last == 0);
+    }
+
+    function test_SubmitTopDownCheckpoint_Works_ConsensusReachedAndAddedToQueue() public {
+        address[] memory validators = setupValidators();
+
+        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
+        topDownMsgs[0] = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                value: 0,
+                nonce: 0,
+                method: this.callback.selector,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
+        uint64 nextEpoch = DEFAULT_CHECKPOINT_PERIOD + 10;
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: nextEpoch, topDownMsgs: topDownMsgs});
+
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+
+        vm.prank(validators[2]);
+        // should not call
+        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector), 0);
+        gw.submitTopDownCheckpoint(checkpoint);
+
+        (, uint256 first, uint256 last) = gw.executableQueue();
+        
+        require(gw.lastVotingExecutedEpoch() == 0);
+        require(first == nextEpoch);
+        require(last == nextEpoch);
+    }
+
+    function test_SubmitTopDownCheckpoint_Works_ConsensusReachedAndExecuteNext() public {
+        address[] memory validators = setupValidators();
+
+        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
+        topDownMsgs[0] = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                value: 0,
+                nonce: 0,
+                method: this.callback.selector,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
+
+        TopDownCheckpoint memory currentCheckpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: new CrossMsg[](0)});
+        TopDownCheckpoint memory futureCheckpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD + 10, topDownMsgs: topDownMsgs});
+
+        // reaching consensus for the future checkpoint, so it should be added to the queue
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(futureCheckpoint);
+
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(futureCheckpoint);
+
+        vm.prank(validators[2]);
+        gw.submitTopDownCheckpoint(futureCheckpoint);
+
+        // reaching consensus for the current checkpoint, but since it contains 0 cross msgs
+        // it should execute the first checkpoint from the queue
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(currentCheckpoint);
+
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(currentCheckpoint);
+
+        vm.prank(validators[2]);
+        // should not call
+        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector), 1);
+        gw.submitTopDownCheckpoint(currentCheckpoint);
+
+        
+        (, uint256 first, uint256 last) = gw.executableQueue();
+        
+        require(gw.lastVotingExecutedEpoch() == futureCheckpoint.epoch);
+        require(first == 0);
+        require(last == 0);
+    }
+
+    function test_SubmitTopDownCheckpoint_Works_ConsensusReachedButNextEpochInFuture() public {
+        address[] memory validators = setupValidators();
+
+        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
+        topDownMsgs[0] = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                value: 0,
+                nonce: 0,
+                method: this.callback.selector,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
+
+        uint64 nextEpoch = DEFAULT_CHECKPOINT_PERIOD + 50;
+        TopDownCheckpoint memory currentCheckpoint = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: new CrossMsg[](0)});
+        TopDownCheckpoint memory futureCheckpoint = TopDownCheckpoint({epoch: nextEpoch, topDownMsgs: topDownMsgs});
+
+        // reaching consensus for the future checkpoint, so it should be added to the queue
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(futureCheckpoint);
+
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(futureCheckpoint);
+
+        vm.prank(validators[2]);
+        gw.submitTopDownCheckpoint(futureCheckpoint);
+
+        // reaching consensus for the current checkpoint, but since it contains 0 cross msgs
+        // it should execute the first checkpoint from the queue, but since it's far in the future
+        // it should not execute anything
+
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(currentCheckpoint);
+
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(currentCheckpoint);
+
+        vm.prank(validators[2]);
+        // should not call
+        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector), 0);
+        gw.submitTopDownCheckpoint(currentCheckpoint);
+
+        (, uint256 first, uint256 last) = gw.executableQueue();
+        
+        require(gw.lastVotingExecutedEpoch() == DEFAULT_CHECKPOINT_PERIOD);
+        require(first == nextEpoch);
+        require(last == nextEpoch);
+    }
+
+    function test_SubmitTopDownCheckpoint_Works_RoundAbort() public {
+        address[] memory validators = setupValidators();
+
+        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
+        topDownMsgs[0] = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({
+                    subnetId: gw.getNetworkName(),
+                    rawAddress: address(this)
+                }),
+                value: 0,
+                nonce: 0,
+                method: this.callback.selector,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
+
+        TopDownCheckpoint memory checkpoint1 = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: new CrossMsg[](0)});
+        TopDownCheckpoint memory checkpoint2 = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: topDownMsgs});
+        topDownMsgs[0].wrapped = true;
+        TopDownCheckpoint memory checkpoint3 = TopDownCheckpoint({epoch: DEFAULT_CHECKPOINT_PERIOD, topDownMsgs: topDownMsgs});
+
+        vm.prank(validators[0]);
+        gw.submitTopDownCheckpoint(checkpoint1);
+
+        vm.prank(validators[1]);
+        gw.submitTopDownCheckpoint(checkpoint2);
+
+        vm.prank(validators[2]);
+        gw.submitTopDownCheckpoint(checkpoint3);
+
+        (, uint256 first, uint256 last) = gw.executableQueue();
+        
+        require(gw.lastVotingExecutedEpoch() == 0);
+        require(first == 0);
+        require(last == 0);
+    }
+
+    function setupValidators() internal returns(address[] memory) {
+        address validator1 = vm.addr(100);
+        address validator2 = vm.addr(200);
+        address validator3 = vm.addr(300);
+        address[] memory validators = new address[](3);
+        uint256[] memory weights = new uint256[](3);
+
+        vm.deal(validator1, 1);
+        vm.deal(validator2, 1);
+        vm.deal(validator3, 1);
+
+        validators[0] = validator1;
+        validators[1] = validator2;
+        validators[2] = validator3;
+
+        weights[0] = 100;
+        weights[1] = 100;
+        weights[2] = 100;
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gw.setMembership(validators, weights);
+
+        return validators;
+    }
+
+    function addValidator(address validator) internal {
+        addValidator(validator, 100);
+    }
+
+    function addValidator(address validator, uint256 weigth) internal{
+        address[] memory validators = new address[](1);
+        validators[0] = validator;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = weigth;
+
+        vm.deal(validator, 1);
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gw.setMembership(validators, weights);
+    }
+
+    function callback() public view {
+        console.log("callback called");
     }
 
     function fund(address funderAddress, uint256 fundAmount) internal {
@@ -1553,10 +1464,12 @@ contract GatewayDeploymentTest is Test {
         uint expectedNonce = nonceBefore + 1;
         uint expectedCircSupply = circSupplyBefore + fundAmountWithSubtractedFee;
 
-        vm.expectCall(address(sa), abi.encodeWithSelector(sa.reward.selector));
+        require(gw.crossMsgFee() > 0, "crossMsgFee is 0");
+
+        // vm.expectCall(address(sa), gw.crossMsgFee(), abi.encodeWithSelector(sa.reward.selector), 1);
 
         gw.fund{value: fundAmount}(subnetId);
-
+        
         (, , uint nonce, uint circSupply,) = getSubnet(address(sa));
 
         require(gw.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLenght);
@@ -1580,55 +1493,31 @@ contract GatewayDeploymentTest is Test {
         }
     }
 
-    function release(address callerAddress, uint256 releaseAmount, uint256 crossMsgFee, int64 epoch) internal {
-        (CheckData memory cpDataBefore, ) = gw.checkpoints(epoch);
+    function _join(address validatorAddress) internal {
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT + 1);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}();
+    }
 
-        uint releaseAmountWithSubtractedFee = releaseAmount - crossMsgFee;
+    function release(uint256 releaseAmount, uint256 crossMsgFee, uint64 epoch) internal {
+        (,,uint256 feeBefore,) = gw.bottomUpCheckpoints(epoch);
 
-        uint expectedNonce = gw.nonce() + 1;
-        uint expectedBurntBalance = BURNT_FUNDS_ACTOR.balance + releaseAmountWithSubtractedFee;
-        uint expectedCheckpointDataFee = cpDataBefore.crossMsgs.fee + crossMsgFee;
-        uint expectedCheckpointDataValue = cpDataBefore.crossMsgs.value + releaseAmount;
-        uint expectedRegistryLength = gw.getCrossMsgsLength(cpDataBefore.crossMsgs.msgsHash) + 1;
+        uint expectedNonce = gw.bottomUpNonce() + 1;
+        uint expectedCheckpointDataFee = feeBefore + crossMsgFee;
 
         gw.release{value: releaseAmount}();
 
-        (CheckData memory cpDataAfter, ) = gw.checkpoints(epoch);
+        (,,uint256 fee,) = gw.bottomUpCheckpoints(epoch);
+        console.log("fee %d", fee);
+        console.log("expectedCheckpointDataFee: %d", expectedCheckpointDataFee);
 
-        require(cpDataAfter.crossMsgs.fee == expectedCheckpointDataFee);
-        require(cpDataAfter.crossMsgs.value == expectedCheckpointDataValue);
-
-        int64 _epoch = epoch;
-        address _callerAddress = callerAddress;
-
-        for (uint i = 0; i < expectedRegistryLength; i++) {
-            (StorableMsg memory storableMsg, bool wrapped) = gw.crossMsgRegistry(epoch, i);
-            CrossMsg memory crossMsg = gw.getCrossMsg(cpDataAfter.crossMsgs.msgsHash, i);
-
-            require(storableMsg.nonce == i);
-            require(storableMsg.value == releaseAmountWithSubtractedFee);
-            require(keccak256(abi.encode(storableMsg.from)) == keccak256(abi.encode(IPCAddress({subnetId: gw.getNetworkName(), rawAddress: BURNT_FUNDS_ACTOR}))));
-            require(keccak256(abi.encode(storableMsg.to)) == keccak256(abi.encode(IPCAddress({subnetId: gw.getNetworkName().getParentSubnet(), rawAddress: _callerAddress}))));
-            require(gw.crossMsgExistInRegistry(_epoch, CrossMsg(storableMsg, wrapped).toHash()) == true);
-            require(crossMsg.toHash() == CrossMsg(storableMsg, wrapped).toHash());
-        }
-
-        require(gw.nonce() == expectedNonce);
-        require(gw.getCrossMsgsLength(cpDataBefore.crossMsgs.msgsHash) == 0);
-        require(gw.getCrossMsgsLength(cpDataAfter.crossMsgs.msgsHash) == expectedRegistryLength);
-        require(gw.crossMsgCidRegistry(epoch) == cpDataAfter.crossMsgs.msgsHash);
-        require(gw.crossMsgEpochRegistry(cpDataAfter.crossMsgs.msgsHash) == epoch);
-        require(BURNT_FUNDS_ACTOR.balance == expectedBurntBalance);
+        require(fee == expectedCheckpointDataFee, "cpDataAfter.fee == expectedCheckpointDataFee");
+        require(gw.bottomUpNonce() == expectedNonce, "gw.bottomUpNonce() == expectedNonce");
     }
 
-    function createCheckpoint(address subnetAddress, uint64 blockNumber) internal view returns(Checkpoint memory) {
+    function createCheckpoint(address subnetAddress, uint64 blockNumber) internal view returns(BottomUpCheckpoint memory) {
         SubnetID memory subnetId = gw.getNetworkName().createSubnetId(subnetAddress);
-
-        ChildCheck[] memory children = new ChildCheck[](0);
-
-        CrossMsgMeta memory crossMsgMeta = CrossMsgMeta({msgsHash: EMPTY_HASH, value: 0, nonce: 0, fee: 0});
-        CheckData memory data = CheckData({source: subnetId, tipSet: EMPTY_BYTES, epoch: int64(blockNumber), prevHash: EMPTY_HASH, children: children, crossMsgs: crossMsgMeta });
-        Checkpoint memory checkpoint = Checkpoint({data: data, signature: EMPTY_BYTES});
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({source: subnetId, epoch: blockNumber, fee: 0, crossMsgs: new CrossMsg[](0), prevHash: EMPTY_HASH, children: new ChildCheck[](0)});
 
         return checkpoint;
     }
@@ -1682,15 +1571,17 @@ contract GatewayDeploymentTest is Test {
         SubnetID memory subnetId = gateway.getNetworkName().createSubnetId(subnetAddress);
 
         (
-            SubnetID memory id,
-            uint256 stake,
-            uint256 nonce,
-            uint256 circSupply,
             Status status,
-
+            uint64 topDownNonce,
+            ,
+            uint256 stake,
+            ,
+            uint256 circSupply,
+            SubnetID memory id,
+            
         ) = gateway.subnets(subnetId.toHash());
 
-        return (id, stake, nonce, circSupply, status);
+        return (id, stake, topDownNonce, circSupply, status);
     }
     function getSubnet(
         address subnetAddress

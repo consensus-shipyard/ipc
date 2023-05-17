@@ -57,7 +57,7 @@ contract StdCheatsTest is Test {
         test.bar(address(this));
     }
 
-    function testChangePrank() public {
+    function testChangePrankMsgSender() public {
         vm.startPrank(address(1337));
         test.bar(address(1337));
         changePrank(address(0xdead));
@@ -65,6 +65,23 @@ contract StdCheatsTest is Test {
         changePrank(address(1337));
         test.bar(address(1337));
         vm.stopPrank();
+    }
+
+    function testChangePrankMsgSenderAndTxOrigin() public {
+        vm.startPrank(address(1337), address(1338));
+        test.origin(address(1337), address(1338));
+        changePrank(address(0xdead), address(0xbeef));
+        test.origin(address(0xdead), address(0xbeef));
+        changePrank(address(1337), address(1338));
+        test.origin(address(1337), address(1338));
+        vm.stopPrank();
+    }
+
+    function testMakeAccountEquivalence() public {
+        Account memory account = makeAccount("1337");
+        (address addr, uint256 key) = makeAddrAndKey("1337");
+        assertEq(account.addr, addr);
+        assertEq(account.key, key);
     }
 
     function testMakeAddrEquivalence() public {
@@ -92,7 +109,7 @@ contract StdCheatsTest is Test {
         assertEq(barToken.balanceOf(address(this)), 10000e18);
     }
 
-    function testDealTokenAdjustTS() public {
+    function testDealTokenAdjustTotalSupply() public {
         Bar barToken = new Bar();
         address bar = address(barToken);
         deal(bar, address(this), 10000e18, true);
@@ -101,6 +118,35 @@ contract StdCheatsTest is Test {
         deal(bar, address(this), 0, true);
         assertEq(barToken.balanceOf(address(this)), 0);
         assertEq(barToken.totalSupply(), 10000e18);
+    }
+
+    function testDealERC1155Token() public {
+        BarERC1155 barToken = new BarERC1155();
+        address bar = address(barToken);
+        dealERC1155(bar, address(this), 0, 10000e18, false);
+        assertEq(barToken.balanceOf(address(this), 0), 10000e18);
+    }
+
+    function testDealERC1155TokenAdjustTotalSupply() public {
+        BarERC1155 barToken = new BarERC1155();
+        address bar = address(barToken);
+        dealERC1155(bar, address(this), 0, 10000e18, true);
+        assertEq(barToken.balanceOf(address(this), 0), 10000e18);
+        assertEq(barToken.totalSupply(0), 20000e18);
+        dealERC1155(bar, address(this), 0, 0, true);
+        assertEq(barToken.balanceOf(address(this), 0), 0);
+        assertEq(barToken.totalSupply(0), 10000e18);
+    }
+
+    function testDealERC721Token() public {
+        BarERC721 barToken = new BarERC721();
+        address bar = address(barToken);
+        dealERC721(bar, address(2), 1);
+        assertEq(barToken.balanceOf(address(2)), 1);
+        assertEq(barToken.balanceOf(address(1)), 0);
+        dealERC721(bar, address(1), 2);
+        assertEq(barToken.balanceOf(address(1)), 1);
+        assertEq(barToken.balanceOf(bar), 1);
     }
 
     function testDeployCode() public {
@@ -302,7 +348,7 @@ contract Bar {
         balanceOf[address(this)] = totalSupply;
     }
 
-    /// `HOAX` STDCHEATS
+    /// `HOAX` and `CHANGEPRANK` STDCHEATS
     function bar(address expectedSender) public payable {
         require(msg.sender == expectedSender, "!prank");
     }
@@ -320,6 +366,49 @@ contract Bar {
     /// `DEAL` STDCHEAT
     mapping(address => uint256) public balanceOf;
     uint256 public totalSupply;
+}
+
+contract BarERC1155 {
+    constructor() payable {
+        /// `DEALERC1155` STDCHEAT
+        _totalSupply[0] = 10000e18;
+        _balances[0][address(this)] = _totalSupply[0];
+    }
+
+    function balanceOf(address account, uint256 id) public view virtual returns (uint256) {
+        return _balances[id][account];
+    }
+
+    function totalSupply(uint256 id) public view virtual returns (uint256) {
+        return _totalSupply[id];
+    }
+
+    /// `DEALERC1155` STDCHEAT
+    mapping(uint256 => mapping(address => uint256)) private _balances;
+    mapping(uint256 => uint256) private _totalSupply;
+}
+
+contract BarERC721 {
+    constructor() payable {
+        /// `DEALERC721` STDCHEAT
+        _owners[1] = address(1);
+        _balances[address(1)] = 1;
+        _owners[2] = address(this);
+        _owners[3] = address(this);
+        _balances[address(this)] = 2;
+    }
+
+    function balanceOf(address owner) public view virtual returns (uint256) {
+        return _balances[owner];
+    }
+
+    function ownerOf(uint256 tokenId) public view virtual returns (address) {
+        address owner = _owners[tokenId];
+        return owner;
+    }
+
+    mapping(uint256 => address) private _owners;
+    mapping(address => uint256) private _balances;
 }
 
 contract RevertingContract {

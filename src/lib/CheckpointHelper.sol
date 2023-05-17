@@ -8,43 +8,48 @@ import "../constants/Constants.sol";
 /// @title Helper library for manipulating Checkpoint struct
 /// @author LimeChain team
 library CheckpointHelper {
-    bytes32 private constant EMPTY_CROSSMSG_HASH =
+    bytes32 constant EMPTY_TOPDOWNCHECKPOINT_HASH =
         keccak256(
             abi.encode(
-                CrossMsgMeta({msgsHash: EMPTY_HASH, nonce: 0, value: 0, fee: 0})
+                TopDownCheckpoint({epoch: 0, topDownMsgs: new CrossMsg[](0)})
             )
         );
 
-    bytes32 public constant EMPTY_CHECKPOINT_DATA_HASH =
+    bytes32 constant EMPTY_BOTTOMUPCHECKPOINT_HASH =
         keccak256(
             abi.encode(
-                CheckData({
-                    source: SubnetID(new address[](0)),
-                    tipSet: EMPTY_BYTES,
+                BottomUpCheckpoint({
+                    source: SubnetID(new address[](0)), 
                     epoch: 0,
-                    prevHash: EMPTY_HASH,
+                    fee: 0,
+                    crossMsgs: new CrossMsg[](0),
                     children: new ChildCheck[](0),
-                    crossMsgs: CrossMsgMeta({
-                        msgsHash: EMPTY_HASH,
-                        nonce: 0,
-                        value: 0,
-                        fee: 0
-                    })
+                    prevHash: EMPTY_HASH
                 })
             )
         );
 
     function toHash(
-        Checkpoint memory checkpoint
+        BottomUpCheckpoint memory bottomupCheckpoint
     ) public pure returns (bytes32) {
-        return keccak256(abi.encode(checkpoint.data));
+        return keccak256(abi.encode(bottomupCheckpoint));
     }
 
-    function hasCrossMsgMeta(
-        Checkpoint memory checkpoint
+    function toHash(
+        TopDownCheckpoint memory topdownCheckpoint
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(topdownCheckpoint));
+    }
+
+    function isEmpty(
+        TopDownCheckpoint memory topdownCheckpoint
     ) public pure returns (bool) {
-        return
-            keccak256(abi.encode(checkpoint.data.crossMsgs)) !=
-            EMPTY_CROSSMSG_HASH;
+        return toHash(topdownCheckpoint) == EMPTY_TOPDOWNCHECKPOINT_HASH;
+    }
+
+    function isEmpty(
+        BottomUpCheckpoint memory bottomUpCheckpoint
+    ) public pure returns (bool) {
+        return toHash(bottomUpCheckpoint) == EMPTY_BOTTOMUPCHECKPOINT_HASH;
     }
 }

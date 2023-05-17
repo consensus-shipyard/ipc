@@ -56,7 +56,6 @@ contract CrossMsgHelperTest is Test {
 
     function test_CreateReleaseMsg_Works(
         uint256 releaseAmount,
-        uint64 nonce,
         address sender
     ) public {
         address[] memory route = new address[](2);
@@ -69,8 +68,7 @@ contract CrossMsgHelperTest is Test {
         CrossMsg memory releaseMsg = CrossMsgHelper.createReleaseMsg(
             subnetId,
             sender,
-            releaseAmount,
-            nonce
+            releaseAmount
         );
 
         address[] memory parentRoute = new address[](1);
@@ -84,7 +82,7 @@ contract CrossMsgHelperTest is Test {
         );
         require(releaseMsg.message.to.rawAddress == sender);
         require(releaseMsg.message.value == releaseAmount);
-        require(releaseMsg.message.nonce == nonce);
+        require(releaseMsg.message.nonce == 0);
         require(releaseMsg.message.method == METHOD_SEND);
         require(keccak256(releaseMsg.message.params) == keccak256(EMPTY_BYTES));
         require(releaseMsg.wrapped == false);
@@ -92,7 +90,6 @@ contract CrossMsgHelperTest is Test {
 
     function test_CreateReleaseMsg_Fails_SubnetNoParent(
         uint256 releaseAmount,
-        uint64 nonce,
         address sender
     ) public {
         address[] memory route = new address[](1);
@@ -101,7 +98,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert("error getting parent for subnet addr");
 
-        CrossMsgHelper.createReleaseMsg(subnetId, sender, releaseAmount, nonce);
+        CrossMsgHelper.createReleaseMsg(subnetId, sender, releaseAmount);
     }
 
     function test_CreateFundMsg_Works(
@@ -232,6 +229,34 @@ contract CrossMsgHelperTest is Test {
         return params;
     }
 
+    function test_IsSorted_Works_SingleMsg() public {
+        addCrossMsg(0);
+
+        require(CrossMsgHelper.isSorted(crossMsgs));
+    }
+
+    function test_IsSorted_Works_MultipleMsgsSorted() public {
+        addCrossMsg(0);
+        addCrossMsg(1);
+
+        require(CrossMsgHelper.isSorted(crossMsgs));
+    }
+
+    function test_IsSorted_Works_MultipleMsgsNotSorted() public {
+        addCrossMsg(0);
+        addCrossMsg(2);
+        addCrossMsg(1);
+
+        require(CrossMsgHelper.isSorted(crossMsgs) == false);
+    }
+
+    function test_IsSorted_Works_MultipleMsgsZeroNonces() public {
+        addCrossMsg(0);
+        addCrossMsg(0);
+
+        require(CrossMsgHelper.isSorted(crossMsgs) == false);
+    }
+
     function createCrossMsg(
         uint64 nonce
     ) internal pure returns (CrossMsg memory) {
@@ -264,5 +289,11 @@ contract CrossMsgHelperTest is Test {
         for (uint i = 0; i < length; i++) {
             _crossMsgs[i] = createCrossMsg(nonce);
         }
+    }
+
+    function addCrossMsg(uint64 nonce) internal {
+        crossMsg.message.nonce = nonce;
+
+        crossMsgs.push(crossMsg);
     }
 }

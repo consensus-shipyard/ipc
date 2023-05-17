@@ -21,6 +21,14 @@ interface VmSafe {
         string url;
     }
 
+    struct DirEntry {
+        string errorMessage;
+        string path;
+        uint64 depth;
+        bool isDir;
+        bool isSymlink;
+    }
+
     struct FsMetadata {
         bool isDir;
         bool isSymlink;
@@ -113,30 +121,66 @@ interface VmSafe {
     function startBroadcast(uint256 privateKey) external;
     // Stops collecting onchain transactions
     function stopBroadcast() external;
-    // Reads the entire content of file to string
-    function readFile(string calldata path) external view returns (string memory data);
-    // Reads the entire content of file as binary. Path is relative to the project root.
-    function readFileBinary(string calldata path) external view returns (bytes memory data);
-    // Get the path of the current project root
+
+    // Get the path of the current project root.
     function projectRoot() external view returns (string memory path);
-    // Get the metadata for a file/directory
-    function fsMetadata(string calldata fileOrDir) external returns (FsMetadata memory metadata);
-    // Reads next line of file to string
+    // Reads the entire content of file to string. `path` is relative to the project root.
+    function readFile(string calldata path) external view returns (string memory data);
+    // Reads the entire content of file as binary. `path` is relative to the project root.
+    function readFileBinary(string calldata path) external view returns (bytes memory data);
+    // Reads next line of file to string.
     function readLine(string calldata path) external view returns (string memory line);
     // Writes data to file, creating a file if it does not exist, and entirely replacing its contents if it does.
+    // `path` is relative to the project root.
     function writeFile(string calldata path, string calldata data) external;
     // Writes binary data to a file, creating a file if it does not exist, and entirely replacing its contents if it does.
-    // Path is relative to the project root.
+    // `path` is relative to the project root.
     function writeFileBinary(string calldata path, bytes calldata data) external;
     // Writes line to file, creating a file if it does not exist.
+    // `path` is relative to the project root.
     function writeLine(string calldata path, string calldata data) external;
     // Closes file for reading, resetting the offset and allowing to read it from beginning with readLine.
+    // `path` is relative to the project root.
     function closeFile(string calldata path) external;
-    // Removes file. This cheatcode will revert in the following situations, but is not limited to just these cases:
-    // - Path points to a directory.
+    // Removes a file from the filesystem.
+    // This cheatcode will revert in the following situations, but is not limited to just these cases:
+    // - `path` points to a directory.
     // - The file doesn't exist.
     // - The user lacks permissions to remove the file.
+    // `path` is relative to the project root.
     function removeFile(string calldata path) external;
+    // Creates a new, empty directory at the provided path.
+    // This cheatcode will revert in the following situations, but is not limited to just these cases:
+    // - User lacks permissions to modify `path`.
+    // - A parent of the given path doesn't exist and `recursive` is false.
+    // - `path` already exists and `recursive` is false.
+    // `path` is relative to the project root.
+    function createDir(string calldata path, bool recursive) external;
+    // Removes a directory at the provided path.
+    // This cheatcode will revert in the following situations, but is not limited to just these cases:
+    // - `path` doesn't exist.
+    // - `path` isn't a directory.
+    // - User lacks permissions to modify `path`.
+    // - The directory is not empty and `recursive` is false.
+    // `path` is relative to the project root.
+    function removeDir(string calldata path, bool recursive) external;
+    // Reads the directory at the given path recursively, up to `max_depth`.
+    // `max_depth` defaults to 1, meaning only the direct children of the given directory will be returned.
+    // Follows symbolic links if `follow_links` is true.
+    function readDir(string calldata path) external view returns (DirEntry[] memory entries);
+    function readDir(string calldata path, uint64 maxDepth) external view returns (DirEntry[] memory entries);
+    function readDir(string calldata path, uint64 maxDepth, bool followLinks)
+        external
+        view
+        returns (DirEntry[] memory entries);
+    // Reads a symbolic link, returning the path that the link points to.
+    // This cheatcode will revert in the following situations, but is not limited to just these cases:
+    // - `path` is not a symbolic link.
+    // - `path` does not exist.
+    function readLink(string calldata linkPath) external view returns (string memory targetPath);
+    // Given a path, query the file system to get information about a file, directory, etc.
+    function fsMetadata(string calldata path) external view returns (FsMetadata memory metadata);
+
     // Convert values to a string
     function toString(address value) external pure returns (string memory stringifiedValue);
     function toString(bytes calldata value) external pure returns (string memory stringifiedValue);
@@ -291,6 +335,10 @@ interface VmSafe {
     function pauseGasMetering() external;
     // Resumes gas metering (i.e. gas usage is counted again). Noop if already on.
     function resumeGasMetering() external;
+    // Writes a breakpoint to jump to in the debugger
+    function breakpoint(string calldata char) external;
+    // Writes a conditional breakpoint to jump to in the debugger
+    function breakpoint(string calldata char, bool value) external;
 }
 
 interface Vm is VmSafe {
@@ -304,6 +352,8 @@ interface Vm is VmSafe {
     function difficulty(uint256 newDifficulty) external;
     // Sets block.chainid
     function chainId(uint256 newChainId) external;
+    // Sets tx.gasprice
+    function txGasPrice(uint256 newGasPrice) external;
     // Stores a value to an address' storage slot.
     function store(address target, bytes32 slot, bytes32 value) external;
     // Sets the nonce of an account; must be higher than the current nonce of the account
@@ -326,12 +376,22 @@ interface Vm is VmSafe {
     function expectRevert(bytes calldata revertData) external;
     function expectRevert(bytes4 revertData) external;
     function expectRevert() external;
+
+    // Prepare an expected log with all four checks enabled.
+    // Call this function, then emit an event, then call a function. Internally after the call, we check if
+    // logs were emitted in the expected order with the expected topics and data.
+    // Second form also checks supplied address against emitting contract.
+    function expectEmit() external;
+    function expectEmit(address emitter) external;
+
     // Prepare an expected log with (bool checkTopic1, bool checkTopic2, bool checkTopic3, bool checkData).
     // Call this function, then emit an event, then call a function. Internally after the call, we check if
-    // logs were emitted in the expected order with the expected topics and data (as specified by the booleans)
+    // logs were emitted in the expected order with the expected topics and data (as specified by the booleans).
+    // Second form also checks supplied address against emitting contract.
     function expectEmit(bool checkTopic1, bool checkTopic2, bool checkTopic3, bool checkData) external;
     function expectEmit(bool checkTopic1, bool checkTopic2, bool checkTopic3, bool checkData, address emitter)
         external;
+
     // Mocks a call to an address, returning specified data.
     // Calldata can either be strict or a partial match, e.g. if you only
     // pass a Solidity selector to the expected calldata, then the entire Solidity
@@ -340,13 +400,38 @@ interface Vm is VmSafe {
     // Mocks a call to an address with a specific msg.value, returning specified data.
     // Calldata match takes precedence over msg.value in case of ambiguity.
     function mockCall(address callee, uint256 msgValue, bytes calldata data, bytes calldata returnData) external;
+    // Reverts a call to an address with specified revert data.
+    function mockCallRevert(address callee, bytes calldata data, bytes calldata revertData) external;
+    // Reverts a call to an address with a specific msg.value, with specified revert data.
+    function mockCallRevert(address callee, uint256 msgValue, bytes calldata data, bytes calldata revertData)
+        external;
     // Clears all mocked calls
     function clearMockedCalls() external;
     // Expects a call to an address with the specified calldata.
     // Calldata can either be a strict or a partial match
     function expectCall(address callee, bytes calldata data) external;
+    // Expects given number of calls to an address with the specified calldata.
+    function expectCall(address callee, bytes calldata data, uint64 count) external;
     // Expects a call to an address with the specified msg.value and calldata
     function expectCall(address callee, uint256 msgValue, bytes calldata data) external;
+    // Expects given number of calls to an address with the specified msg.value and calldata
+    function expectCall(address callee, uint256 msgValue, bytes calldata data, uint64 count) external;
+    // Expect a call to an address with the specified msg.value, gas, and calldata.
+    function expectCall(address callee, uint256 msgValue, uint64 gas, bytes calldata data) external;
+    // Expects given number of calls to an address with the specified msg.value, gas, and calldata.
+    function expectCall(address callee, uint256 msgValue, uint64 gas, bytes calldata data, uint64 count) external;
+    // Expect a call to an address with the specified msg.value and calldata, and a *minimum* amount of gas.
+    function expectCallMinGas(address callee, uint256 msgValue, uint64 minGas, bytes calldata data) external;
+    // Expect given number of calls to an address with the specified msg.value and calldata, and a *minimum* amount of gas.
+    function expectCallMinGas(address callee, uint256 msgValue, uint64 minGas, bytes calldata data, uint64 count)
+        external;
+    // Only allows memory writes to offsets [0x00, 0x60) ∪ [min, max) in the current subcontext. If any other
+    // memory is written to, the test will fail. Can be called multiple times to add more ranges to the set.
+    function expectSafeMemory(uint64 min, uint64 max) external;
+    // Only allows memory writes to offsets [0x00, 0x60) ∪ [min, max) in the next created subcontext.
+    // If any other memory is written to, the test will fail. Can be called multiple times to add more ranges
+    // to the set.
+    function expectSafeMemoryCall(uint64 min, uint64 max) external;
     // Sets block.coinbase
     function coinbase(address newCoinbase) external;
     // Snapshot the current state of the evm.

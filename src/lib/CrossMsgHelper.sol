@@ -39,8 +39,7 @@ library CrossMsgHelper {
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
-        uint256 value,
-        uint64 nonce
+        uint256 value
     ) public pure returns (CrossMsg memory) {
         return
             CrossMsg({
@@ -54,7 +53,7 @@ library CrossMsgHelper {
                         rawAddress: signer
                     }),
                     value: value,
-                    nonce: nonce,
+                    nonce: 0,
                     method: METHOD_SEND,
                     params: EMPTY_BYTES
                 }),
@@ -122,5 +121,22 @@ library CrossMsgHelper {
             return Address.functionCallWithValue(recipient, data, value);
 
         return Address.functionCall(recipient, data);
+    }
+
+    // checks whether the cross messages are sorted in ascending order or not
+    function isSorted(CrossMsg[] calldata crossMsgs) external pure returns(bool) {
+        uint256 prevNonce = 0;
+        for (uint256 i = 0; i < crossMsgs.length; ) {
+            uint256 nonce = crossMsgs[i].message.nonce;
+
+            if (prevNonce >= nonce && i > 0) return false;
+
+            prevNonce = nonce;
+            unchecked {
+                ++i;
+            }
+        }
+
+        return true;
     }
 }

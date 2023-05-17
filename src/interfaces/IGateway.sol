@@ -24,8 +24,8 @@ interface IGateway {
     /// CommitChildCheck propagates the commitment of a checkpoint from a child subnet,
     /// process the cross-messages directed to the subnet.
     function commitChildCheck(
-        Checkpoint calldata checkpoint
-    ) external returns (uint);
+        BottomUpCheckpoint calldata bottomupCheckpoint
+    ) external;
     
     /// Fund injects new funds from an account of the parent chain to a subnet.
     ///
@@ -57,16 +57,6 @@ interface IGateway {
     function sendCross(SubnetID memory destination, CrossMsg memory crossMsg)
         external
         payable;
-
-    /// ApplyMessage triggers the execution of a cross-subnet message validated through the consensus.
-    ///
-    /// This function can only be triggered using `ApplyImplicitMessage`, and the source needs to
-    /// be the SystemActor. Cross messages are applied similarly to how rewards are applied once
-    /// a block has been validated. This function:
-    /// - Determines the type of cross-message.
-    /// - Performs the corresponding state changes.
-    /// - And updated the latest nonce applied for future checks.
-    function applyMsg(CrossMsg calldata crossMsg) external returns (bytes memory);
     
     /// Whitelist a series of addresses as propagator of a cross net message.
     /// This is basically adding this list of addresses to the `PostBoxItem::owners`.
@@ -76,4 +66,9 @@ interface IGateway {
 
     /// Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;
+
+    function submitTopDownCheckpoint(TopDownCheckpoint calldata topdownCheckpoint) external;
+
+    function setMembership(address[] memory validatorsToSet, uint256[] memory weights) external;
+
 }

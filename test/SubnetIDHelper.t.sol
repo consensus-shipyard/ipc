@@ -361,6 +361,53 @@ contract SubnetIDHelperTest is Test {
 
         require(subnetId.toHash() == EMPTY_SUBNET_ID_HASH);
     }
+
+    function test_IsBottomUp_False() public view {
+        address[] memory sub1 = new address[](2);
+        sub1[0] = ROOT_ADDRESS;
+        sub1[1] = SUBNET_ONE_ADDRESS;
+        SubnetID memory sub1Id = SubnetID({route: sub1});
+
+        address[] memory sub2 = new address[](3);
+        sub2[0] = ROOT_ADDRESS;
+        sub2[1] = SUBNET_ONE_ADDRESS;
+        sub2[2] = SUBNET_TWO_ADDRESS;
+        SubnetID memory sub2Id = SubnetID({route: sub2});
+
+        require(isBottomUp(sub1Id,sub2Id) == false);
+        require(isBottomUp(sub2Id,sub2Id) == false);
+
+        address[] memory sub3 = new address[](4);
+        sub3[0] = ROOT_ADDRESS;
+        sub3[1] = SUBNET_ONE_ADDRESS;
+        sub3[2] = SUBNET_TWO_ADDRESS;
+        sub3[3] = SUBNET_THREE_ADDRESS;
+        SubnetID memory sub3Id = SubnetID({route: sub3});
+
+        require(isBottomUp(sub2Id, sub3Id) == false);
+    }
+
+
+    function test_IsBottomUp_True() public view {
+        address[] memory sub1 = new address[](2);
+        sub1[0] = ROOT_ADDRESS;
+        sub1[1] = SUBNET_ONE_ADDRESS;
+        SubnetID memory sub1Id = SubnetID({route: sub1});
+
+        address[] memory sub2 = new address[](1);
+        sub2[0] = ROOT_ADDRESS;
+        SubnetID memory sub2Id = SubnetID({route: sub2});
+
+        require(isBottomUp(sub1Id,sub2Id) == true);
+
+        address[] memory sub3 = new address[](3);
+        sub3[0] = ROOT_ADDRESS;
+        sub3[1] = SUBNET_TWO_ADDRESS;
+        sub3[2] = SUBNET_THREE_ADDRESS;
+        SubnetID memory sub3Id = SubnetID({route: sub3});
+
+        require(isBottomUp(sub1Id,sub3Id) == true);
+    }
  
     function test_Equals_Works_Empty() public view {
         require(EMPTY_SUBNET_ID.equals(EMPTY_SUBNET_ID) == true);
@@ -381,5 +428,11 @@ contract SubnetIDHelperTest is Test {
 
         require(SubnetID({route: route}).equals(SubnetID({route: route})) == true);
         require(SubnetID({route: route}).equals(SubnetID({route: route2})) == false);
+    }
+
+    function isBottomUp(SubnetID memory from, SubnetID memory to) public pure returns (bool){
+        SubnetID memory parent = from.commonParent(to);
+        if(parent.route.length == 0) return false;
+        return from.route.length > parent.route.length;
     }
 }

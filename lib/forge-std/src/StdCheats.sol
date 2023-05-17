@@ -188,6 +188,11 @@ abstract contract StdCheatsSafe {
         string value;
     }
 
+    struct Account {
+        address addr;
+        uint256 key;
+    }
+
     function assumeNoPrecompiles(address addr) internal virtual {
         // Assembly required since `block.chainid` was introduced in 0.8.0.
         uint256 chainId;
@@ -411,6 +416,11 @@ abstract contract StdCheatsSafe {
         (addr,) = makeAddrAndKey(name);
     }
 
+    // creates a struct containing both a labeled address and the corresponding private key
+    function makeAccount(string memory name) internal virtual returns (Account memory account) {
+        (account.addr, account.key) = makeAddrAndKey(name);
+    }
+
     function deriveRememberKey(string memory mnemonic, uint32 index)
         internal
         virtual
@@ -537,6 +547,11 @@ abstract contract StdCheats is StdCheatsSafe {
         vm.startPrank(msgSender);
     }
 
+    function changePrank(address msgSender, address txOrigin) internal virtual {
+        vm.stopPrank();
+        vm.startPrank(msgSender, txOrigin);
+    }
+
     // The same as Vm's `deal`
     // Use the alternative signature for ERC20 tokens
     function deal(address to, uint256 give) internal virtual {
@@ -547,6 +562,12 @@ abstract contract StdCheats is StdCheatsSafe {
     // Use the alternative signature to update `totalSupply`
     function deal(address token, address to, uint256 give) internal virtual {
         deal(token, to, give, false);
+    }
+
+    // Set the balance of an account for any ERC1155 token
+    // Use the alternative signature to update `totalSupply`
+    function dealERC1155(address token, address to, uint256 id, uint256 give) internal virtual {
+        dealERC1155(token, to, id, give, false);
     }
 
     function deal(address token, address to, uint256 give, bool adjust) internal virtual {
@@ -568,5 +589,51 @@ abstract contract StdCheats is StdCheatsSafe {
             }
             stdstore.target(token).sig(0x18160ddd).checked_write(totSup);
         }
+    }
+
+    function dealERC1155(address token, address to, uint256 id, uint256 give, bool adjust) internal virtual {
+        // get current balance
+        (, bytes memory balData) = token.call(abi.encodeWithSelector(0x00fdd58e, to, id));
+        uint256 prevBal = abi.decode(balData, (uint256));
+
+        // update balance
+        stdstore.target(token).sig(0x00fdd58e).with_key(to).with_key(id).checked_write(give);
+
+        // update total supply
+        if (adjust) {
+            (, bytes memory totSupData) = token.call(abi.encodeWithSelector(0xbd85b039, id));
+            require(
+                totSupData.length != 0,
+                "StdCheats deal(address,address,uint,uint,bool): target contract is not ERC1155Supply."
+            );
+            uint256 totSup = abi.decode(totSupData, (uint256));
+            if (give < prevBal) {
+                totSup -= (prevBal - give);
+            } else {
+                totSup += (give - prevBal);
+            }
+            stdstore.target(token).sig(0xbd85b039).with_key(id).checked_write(totSup);
+        }
+    }
+
+    function dealERC721(address token, address to, uint256 id) internal virtual {
+        // check if token id is already minted and the actual owner.
+        (bool successMinted, bytes memory ownerData) = token.staticcall(abi.encodeWithSelector(0x6352211e, id));
+        require(successMinted, "StdCheats deal(address,address,uint,bool): id not minted.");
+
+        // get owner current balance
+        (, bytes memory fromBalData) = token.call(abi.encodeWithSelector(0x70a08231, abi.decode(ownerData, (address))));
+        uint256 fromPrevBal = abi.decode(fromBalData, (uint256));
+
+        // get new user current balance
+        (, bytes memory toBalData) = token.call(abi.encodeWithSelector(0x70a08231, to));
+        uint256 toPrevBal = abi.decode(toBalData, (uint256));
+
+        // update balances
+        stdstore.target(token).sig(0x70a08231).with_key(abi.decode(ownerData, (address))).checked_write(--fromPrevBal);
+        stdstore.target(token).sig(0x70a08231).with_key(to).checked_write(++toPrevBal);
+
+        // update owner
+        stdstore.target(token).sig(0x6352211e).with_key(id).checked_write(to);
     }
 }

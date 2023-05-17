@@ -2,53 +2,82 @@
 pragma solidity ^0.8.7;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import "../src/structs/Checkpoint.sol";
 import "../src/lib/CheckpointHelper.sol";
 
 contract CheckpointHelperTest is Test {
-    using CheckpointHelper for Checkpoint;
+    using CheckpointHelper for BottomUpCheckpoint;
+    using CheckpointHelper for TopDownCheckpoint;
 
-    Checkpoint public checkpoint;
+    BottomUpCheckpoint public checkpoint;
+    TopDownCheckpoint public topDownCheckpoint;
+    CrossMsg public crossMsg;
 
-    function test_ToHash_Works_EmptyCheckpoint() public view {
-        require(
-            CheckpointHelper.EMPTY_CHECKPOINT_DATA_HASH == checkpoint.toHash()
-        );
-    }
-
-    function test_ToHash_Works_NonEmptyCheckpoint() public {
-        checkpoint.data.epoch = 10;
+    function test_ToHash_Works_BottomUpCheckpoint() public {
+        checkpoint.epoch = 10;
         
         require(
-            Checkpoint({
-                data: CheckData({
-                    source: SubnetID(new address[](0)),
-                    tipSet: new bytes(0),
-                    epoch: 10,
-                    prevHash: EMPTY_HASH,
-                    children: new ChildCheck[](0),
-                    crossMsgs: CrossMsgMeta({
-                        msgsHash: EMPTY_HASH,
-                        nonce: 0,
-                        value: 0,
-                        fee: 0
-                    })
-                }),
-                signature: EMPTY_BYTES
+            BottomUpCheckpoint({
+                source: SubnetID(new address[](0)),
+                epoch: 10,
+                crossMsgs: new CrossMsg[](0),
+                fee: 0,
+                prevHash: EMPTY_HASH,
+                children: new ChildCheck[](0)
             }).toHash() == checkpoint.toHash()
         );
     }
 
-    function test_HasCrossMsgMeta_Works_True() public {
-        checkpoint.data.crossMsgs.nonce = 1;
-        checkpoint.data.crossMsgs.value = 1;
-
-        require(checkpoint.hasCrossMsgMeta() == true);
+    function test_ToHash_Works_TopDownCheckpoint() public {
+        topDownCheckpoint.epoch = 10;
+        require(TopDownCheckpoint({
+            epoch: 10,
+            topDownMsgs: new CrossMsg[](0)
+        }).toHash() == topDownCheckpoint.toHash());
     }
 
-    function test_HasCrossMsgMeta_Works_False() public view {
-        require(checkpoint.hasCrossMsgMeta() == false);
+    function test_Sorted_SingleElement() public {
+        crossMsg.message.nonce = 10;
+        checkpoint.crossMsgs.push(crossMsg);
+        require(isSorted(checkpoint));
     }
+
+    function test_Sorted_True() public {
+        crossMsg.message.nonce = 10;
+        checkpoint.crossMsgs.push(crossMsg);
+        crossMsg.message.nonce  = 20;
+        checkpoint.crossMsgs.push(crossMsg);
+        crossMsg.message.nonce  = 30;
+        checkpoint.crossMsgs.push(crossMsg);
+        require(isSorted(checkpoint));
+    }
+
+    function test_Sorted_False() public {
+        crossMsg.message.nonce = 10;
+        checkpoint.crossMsgs.push(crossMsg);
+        crossMsg.message.nonce  = 20;
+        checkpoint.crossMsgs.push(crossMsg);
+        crossMsg.message.nonce  = 10;
+        checkpoint.crossMsgs.push(crossMsg);
+        require(isSorted(checkpoint) == false);
+    }
+
+    function isSorted(
+        BottomUpCheckpoint memory _checkpoint
+    ) public pure returns (bool) {
+        if (_checkpoint.crossMsgs.length < 2) return true;
+        for (uint i = 1; i < _checkpoint.crossMsgs.length; ) {
+            if (
+                _checkpoint.crossMsgs[i].message.nonce <=
+                _checkpoint.crossMsgs[i - 1].message.nonce
+            ) return false;
+
+            unchecked {
+                ++i;
+            }
+        }
+        return true;
+    }
+
 }

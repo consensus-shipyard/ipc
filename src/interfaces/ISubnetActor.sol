@@ -21,7 +21,9 @@ interface ISubnetActor {
     /// This functions verifies that the checkpoint is valid before
     /// propagating it for commitment to the IPC gateway. It expects at least
     /// votes from 2/3 of miners with collateral.
-    function submitCheckpoint(Checkpoint calldata checkpoint) external;
+    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external;
+
+    // function setValidatorNetAddr(string calldata validatorNetAddr) external;
 
     /// Distributes the rewards for the subnet to validators.
     function reward() external payable;

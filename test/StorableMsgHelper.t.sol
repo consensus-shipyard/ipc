@@ -21,7 +21,7 @@ contract StorableMsgHelperTest is Test {
         value: 0,
         nonce: 0,
         method: METHOD_SEND,
-        params: bytes("")
+        params: EMPTY_BYTES
     });
 
     function test_ToHash_Works_EmptyMessage() public view {
@@ -41,7 +41,7 @@ contract StorableMsgHelperTest is Test {
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
-            params: bytes("dfasfgsd")
+            params: EMPTY_BYTES
         });
         bytes32 expectedHash = keccak256(abi.encode(storableMsg));
         require(storableMsg.toHash() == expectedHash, "Hashes should be equal");
@@ -68,7 +68,7 @@ contract StorableMsgHelperTest is Test {
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
-            params: bytes("dfasfgsd")
+            params: EMPTY_BYTES
         });
 
         require(storableMsg.applyType(SubnetID({route: from})) == IPCMsgType.TopDown, "Should be TopDown");
@@ -108,7 +108,7 @@ contract StorableMsgHelperTest is Test {
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
-            params: bytes("dfasfgsd")
+            params: EMPTY_BYTES
         });
 
         require(storableMsg.applyType(SubnetID({route: from})) == IPCMsgType.BottomUp, "Should be BottomUp");
