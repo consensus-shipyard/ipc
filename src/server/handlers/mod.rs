@@ -38,6 +38,7 @@ use ipc_identity::Wallet;
 
 use self::config::new_keystore_from_config;
 pub use self::config::new_keystore_from_path;
+use self::rpc::RPCSubnetHandler;
 use self::topdown_executed::LastTopDownExecHandler;
 use self::wallet::export::WalletExportHandler;
 use self::wallet::import::WalletImportHandler;
@@ -103,6 +104,9 @@ impl Handlers {
 
         let h: Box<dyn HandlerWrapper> = Box::new(JoinSubnetHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::JOIN_SUBNET), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(RPCSubnetHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::RPC_SUBNET), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(FundHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::FUND), h);

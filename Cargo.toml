@@ -82,3 +82,8 @@ ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git
 ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [],  tag = "v0.2.0"  }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
 primitives = { git = "https://github.com/consensus-shipyard/fvm-utils" }
+
+# Uncomment to point to you local versions
+# [patch."https://github.com/consensus-shipyard/fvm-utils"]
+# primitives = { path = "../fvm-utils/primitives" }
+# fil_actors_runtime = { path = "../fvm-utils/runtime" }

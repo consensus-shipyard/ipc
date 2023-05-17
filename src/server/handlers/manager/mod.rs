@@ -18,6 +18,7 @@ pub mod list_subnets;
 pub mod net_addr;
 pub mod propagate;
 pub mod release;
+pub mod rpc;
 pub mod send_value;
 pub mod subnet;
 pub mod topdown_executed;

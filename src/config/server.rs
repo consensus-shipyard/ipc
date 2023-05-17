@@ -13,6 +13,7 @@ pub struct Server {
 pub mod json_rpc_methods {
     pub const CREATE_SUBNET: &str = "ipc_createSubnet";
     pub const JOIN_SUBNET: &str = "ipc_joinSubnet";
+    pub const RPC_SUBNET: &str = "ipc_rpcSubnet";
     pub const LEAVE_SUBNET: &str = "ipc_leaveSubnet";
     pub const KILL_SUBNET: &str = "ipc_killSubnet";
     pub const FUND: &str = "ipc_fund";

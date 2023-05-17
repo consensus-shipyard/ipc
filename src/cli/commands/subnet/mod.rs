@@ -11,12 +11,15 @@ use crate::cli::commands::subnet::send_value::{SendValue, SendValueArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
+use self::rpc::{RPCSubnet, RPCSubnetArgs};
+
 pub mod create;
 pub mod join;
 pub mod kill;
 pub mod leave;
 pub mod list_subnets;
 pub mod net_addr;
+pub mod rpc;
 pub mod send_value;
 
 #[derive(Debug, Args)]
@@ -36,6 +39,7 @@ impl SubnetCommandsArgs {
             Commands::Create(args) => CreateSubnet::handle(global, args).await,
             Commands::List(args) => ListSubnets::handle(global, args).await,
             Commands::Join(args) => JoinSubnet::handle(global, args).await,
+            Commands::Rpc(args) => RPCSubnet::handle(global, args).await,
             Commands::Leave(args) => LeaveSubnet::handle(global, args).await,
             Commands::Kill(args) => KillSubnet::handle(global, args).await,
             Commands::SendValue(args) => SendValue::handle(global, args).await,
@@ -49,6 +53,7 @@ pub(crate) enum Commands {
     Create(CreateSubnetArgs),
     List(ListSubnetsArgs),
     Join(JoinSubnetArgs),
+    Rpc(RPCSubnetArgs),
     Leave(LeaveSubnetArgs),
     Kill(KillSubnetArgs),
     SendValue(SendValueArgs),

@@ -7,11 +7,13 @@ mod config;
 mod crossmsg;
 mod daemon;
 mod subnet;
+mod util;
 mod wallet;
 
 use crate::cli::commands::checkpoint::CheckpointCommandsArgs;
 use crate::cli::commands::crossmsg::CrossMsgsCommandsArgs;
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
+use crate::cli::commands::util::UtilCommandsArgs;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::server::new_keystore_from_path;
 use anyhow::{Context, Result};
@@ -43,6 +45,7 @@ enum Commands {
     Wallet(WalletCommandsArgs),
     CrossMsg(CrossMsgsCommandsArgs),
     Checkpoint(CheckpointCommandsArgs),
+    Util(UtilCommandsArgs),
 }
 #[derive(Debug, Parser)]
 #[command(
@@ -98,6 +101,7 @@ pub async fn cli() -> anyhow::Result<()> {
         Commands::CrossMsg(args) => args.handle(global).await,
         Commands::Wallet(args) => args.handle(global).await,
         Commands::Checkpoint(args) => args.handle(global).await,
+        Commands::Util(args) => args.handle(global).await,
     };
 
     r.with_context(|| format!("error processing command {:?}", args.command))
