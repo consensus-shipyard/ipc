@@ -20,3 +20,5 @@ integer-encoding = { version = "3.0.3", default-features = false }
 lazy_static = "1.4.0"
 serde = { version = "1.0.136", features = ["derive"] }
 anyhow = "1.0.56"
+hex = "0.4.3"
+uint = { version = "0.9.3", default-features = false }

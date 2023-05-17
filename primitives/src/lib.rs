@@ -3,11 +3,14 @@ use std::{fmt::Display, marker::PhantomData};
 use cid::{multihash::Code, Cid};
 
 mod amt;
+mod ethaddr;
 mod hamt;
 mod link;
 mod taddress;
+mod uints;
 
 pub use amt::TAmt;
+pub use ethaddr::*;
 pub use hamt::THamt;
 pub use link::TLink;
 pub use taddress::*;
