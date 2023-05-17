@@ -13,8 +13,10 @@ use crate::cli::commands::checkpoint::CheckpointCommandsArgs;
 use crate::cli::commands::crossmsg::CrossMsgsCommandsArgs;
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::server::new_keystore_from_path;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use ipc_identity::KeyStore;
 use std::fmt::Debug;
 use subnet::SubnetCommandsArgs;
 use url::Url;
@@ -23,6 +25,8 @@ use crate::cli::commands::config::ConfigCommandsArgs;
 use crate::cli::commands::wallet::WalletCommandsArgs;
 
 pub use subnet::*;
+
+use super::DEFAULT_CONFIG_PATH;
 
 /// The collection of all subcommands to be called, see clap's documentation for usage. Internal
 /// to the current mode. Register a new command accordingly.
@@ -115,4 +119,12 @@ pub(crate) fn get_ipc_agent_url(
         }
     };
     Ok(url)
+}
+
+pub(crate) fn get_keystore(path: &Option<String>) -> Result<KeyStore> {
+    let path = match path {
+        Some(p) => p,
+        None => DEFAULT_CONFIG_PATH,
+    };
+    new_keystore_from_path(path)
 }

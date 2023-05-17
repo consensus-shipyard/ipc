@@ -5,6 +5,7 @@
 use crate::config::Config;
 use anyhow::Result;
 use std::ops::DerefMut;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 
@@ -46,6 +47,13 @@ impl ReloadableConfig {
     pub fn set_path(&self, path: String) {
         let mut p = self.path.write().unwrap();
         *p = Arc::new(path);
+    }
+
+    /// Returns the current path where the config is stored.
+    pub fn get_config_repo(&self) -> Option<String> {
+        let p = self.path.read().unwrap().clone();
+        let parent = Path::new(p.as_ref()).parent()?;
+        Some(parent.to_str()?.to_string())
     }
 
     /// Triggers a reload of the config.

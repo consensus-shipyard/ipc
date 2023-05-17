@@ -1,3 +1,4 @@
+use ipc_identity::Wallet;
 use std::collections::HashMap;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
@@ -12,31 +13,32 @@ use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WalletListParams {
+pub struct WalletBalancesParams {
     pub subnet: String,
 }
 
 /// Key is the address as string and value is the token amount as string
-pub type WalletListResponse = HashMap<String, String>;
+pub type WalletBalancesResponse = HashMap<String, String>;
 
 /// Send value between two addresses within a subnet
-pub(crate) struct WalletListHandler {
+pub(crate) struct WalletBalancesHandler {
     pool: Arc<SubnetManagerPool>,
+    wallet: Arc<RwLock<Wallet>>,
 }
 
-impl WalletListHandler {
-    pub(crate) fn new(pool: Arc<SubnetManagerPool>) -> Self {
-        Self { pool }
+impl WalletBalancesHandler {
+    pub(crate) fn new(pool: Arc<SubnetManagerPool>, wallet: Arc<RwLock<Wallet>>) -> Self {
+        Self { pool, wallet }
     }
 }
 
 #[async_trait]
-impl JsonRPCRequestHandler for WalletListHandler {
-    type Request = WalletListParams;
-    type Response = WalletListResponse;
+impl JsonRPCRequestHandler for WalletBalancesHandler {
+    type Request = WalletBalancesParams;
+    type Response = WalletBalancesResponse;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let subnet = SubnetID::from_str(&request.subnet)?;
@@ -46,7 +48,11 @@ impl JsonRPCRequestHandler for WalletListHandler {
         };
 
         let manager = conn.manager();
-        let addresses = manager.wallet_list().await?;
+
+        let addresses = self.wallet.read().unwrap().list_addrs()?;
+        // Create a new Arc for wallet so it is pulled in the async block
+        // from below.
+        let _arc_wallet = Arc::clone(&self.wallet);
 
         let r = addresses
             .iter()

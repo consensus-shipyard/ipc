@@ -3,19 +3,17 @@
 //! wallet handlers and parameters
 
 use crate::lotus::message::wallet::WalletKeyType;
-use crate::manager::SubnetManager;
-use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use ipc_sdk::subnet_id::SubnetID;
+use fvm_shared::crypto::signature::SignatureType;
+use ipc_identity::Wallet;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletNewParams {
-    pub subnet: String,
     pub key_type: String,
 }
 
@@ -26,12 +24,12 @@ pub struct WalletNewResponse {
 
 /// Send value between two addresses within a subnet
 pub(crate) struct WalletNewHandler {
-    pool: Arc<SubnetManagerPool>,
+    wallet: Arc<RwLock<Wallet>>,
 }
 
 impl WalletNewHandler {
-    pub(crate) fn new(pool: Arc<SubnetManagerPool>) -> Self {
-        Self { pool }
+    pub(crate) fn new(wallet: Arc<RwLock<Wallet>>) -> Self {
+        Self { wallet }
     }
 }
 
@@ -41,16 +39,14 @@ impl JsonRPCRequestHandler for WalletNewHandler {
     type Response = WalletNewResponse;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let subnet = SubnetID::from_str(&request.subnet)?;
-        let conn = match self.pool.get(&subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
+        let tp = match WalletKeyType::from_str(&request.key_type)? {
+            WalletKeyType::BLS => SignatureType::BLS,
+            WalletKeyType::Secp256k1 => SignatureType::Secp256k1,
+            WalletKeyType::Secp256k1Ledger => return Err(anyhow!("ledger key type not supported")),
         };
+        let mut wallet = self.wallet.write().unwrap();
+        let address = wallet.generate_addr(tp)?;
 
-        let address = conn
-            .manager()
-            .wallet_new(WalletKeyType::from_str(&request.key_type)?)
-            .await?;
         Ok(WalletNewResponse {
             address: address.to_string(),
         })

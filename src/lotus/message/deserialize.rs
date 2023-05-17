@@ -117,6 +117,51 @@ where
     deserializer.deserialize_str(TokenAmountVisitor)
 }
 
+/// A serde deserialization method to deserialize a token amount from string
+pub fn deserialize_some_token_amount_from_str<'de, D>(
+    deserializer: D,
+) -> anyhow::Result<Option<TokenAmount>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct TokenAmountVisitor;
+    impl<'de> serde::de::Visitor<'de> for TokenAmountVisitor {
+        type Value = Option<TokenAmount>;
+
+        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+            formatter.write_str("a string")
+        }
+
+        fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: Error,
+        {
+            let u = BigInt::from_str(v).map_err(E::custom)?;
+            Ok(Some(TokenAmount::from_atto(u)))
+        }
+    }
+    deserializer.deserialize_str(TokenAmountVisitor)
+}
+
+/// A serde deserialization method to deserialize a token amount from i64
+pub fn deserialize_some_token_amount_from_num<'de, D>(
+    deserializer: D,
+) -> anyhow::Result<Option<TokenAmount>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let val: serde_json::Value = serde::Deserialize::deserialize(deserializer)?;
+    match val {
+        serde_json::Value::Number(n) => {
+            let u = n
+                .as_u64()
+                .ok_or_else(|| D::Error::custom("cannot parse to u64"))?;
+            Ok(Some(TokenAmount::from_atto(u)))
+        }
+        _ => Err(D::Error::custom("unknown type: {val:?}")),
+    }
+}
+
 /// A serde deserialization method to deserialize an address from string
 pub fn deserialize_address_from_str<'de, D>(deserializer: D) -> anyhow::Result<Address, D::Error>
 where

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -12,6 +13,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use ipc_gateway::{BottomUpCheckpoint, PropagateParams, WhitelistPropagatorParams};
+use ipc_identity::Wallet;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
@@ -321,6 +323,15 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         self.lotus_client.wallet_balance(address).await
     }
 
+    async fn last_topdown_executed(&self) -> Result<ChainEpoch> {
+        let head = self.lotus_client.chain_head().await?;
+        let cid_map = head.cids.first().unwrap().clone();
+        let tip_set = Cid::try_from(cid_map)?;
+        let gw_state = self.lotus_client.ipc_read_gateway_state(tip_set).await?;
+
+        Ok(gw_state.top_down_checkpoint_voting.last_voting_executed)
+    }
+
     async fn list_checkpoints(
         &self,
         subnet_id: SubnetID,
@@ -333,15 +344,6 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             .await?;
         Ok(checkpoints)
     }
-
-    async fn last_topdown_executed(&self) -> Result<ChainEpoch> {
-        let head = self.lotus_client.chain_head().await?;
-        let cid_map = head.cids.first().unwrap().clone();
-        let tip_set = Cid::try_from(cid_map)?;
-        let gw_state = self.lotus_client.ipc_read_gateway_state(tip_set).await?;
-
-        Ok(gw_state.top_down_checkpoint_voting.last_voting_executed)
-    }
 }
 
 impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
@@ -351,9 +353,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
 
     /// Publish the message to memory pool and wait for the response
     async fn mpool_push_and_wait(&self, message: MpoolPushMessage) -> Result<StateWaitMsgResponse> {
-        let mem_push_response = self.lotus_client.mpool_push_message(message).await?;
-
-        let message_cid = mem_push_response.cid()?;
+        let message_cid = self.lotus_client.mpool_push(message).await?;
         log::debug!("message published with cid: {message_cid:?}");
 
         self.lotus_client.state_wait_msg(message_cid).await
@@ -390,6 +390,11 @@ impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
 impl LotusSubnetManager<JsonRpcClientImpl> {
     pub fn from_subnet(subnet: &Subnet) -> Self {
         let client = LotusJsonRPCClient::from_subnet(subnet);
+        LotusSubnetManager::new(client)
+    }
+
+    pub fn from_subnet_with_wallet_store(subnet: &Subnet, wallet: Arc<RwLock<Wallet>>) -> Self {
+        let client = LotusJsonRPCClient::from_subnet_with_wallet_store(subnet, wallet);
         LotusSubnetManager::new(client)
     }
 }

@@ -43,6 +43,11 @@ pub trait LotusClient {
         msg: MpoolPushMessage,
     ) -> Result<MpoolPushMessageResponseInner>;
 
+    /// Push the unsigned message to memory pool. This will ask the local key store to sign the message.
+    /// In this case, make sure `from` is actually present in the local key store.
+    /// See: https://lotus.filecoin.io/reference/lotus/mpool/#mpoolpush
+    async fn mpool_push(&self, mut msg: MpoolPushMessage) -> Result<Cid>;
+
     /// Wait for the message cid of a particular nonce, see: https://lotus.filecoin.io/reference/lotus/state/#statewaitmsg
     async fn state_wait_msg(&self, cid: Cid) -> Result<StateWaitMsgResponse>;
 

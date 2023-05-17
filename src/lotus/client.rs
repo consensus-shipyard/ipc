@@ -3,18 +3,22 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
+use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use base64::Engine;
+use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fil_actors_runtime::cbor;
-use fvm_ipld_encoding::RawBytes;
+use fvm_ipld_encoding::{to_vec, RawBytes};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::{BottomUpCheckpoint, CrossMsg};
+use ipc_identity::Wallet;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
@@ -26,7 +30,7 @@ use crate::lotus::json::ToJson;
 use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
 use crate::lotus::message::mpool::{
-    MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
+    EstimateGasResponse, MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
 use crate::lotus::message::state::{ReadStateResponse, StateWaitMsgResponse};
 use crate::lotus::message::wallet::{WalletKeyType, WalletListResponse};
@@ -37,6 +41,8 @@ use crate::manager::SubnetInfo;
 // RPC methods
 mod methods {
     pub const MPOOL_PUSH_MESSAGE: &str = "Filecoin.MpoolPushMessage";
+    pub const MPOOL_PUSH: &str = "Filecoin.MpoolPush";
+    pub const MPOOL_GET_NONCE: &str = "Filecoin.MpoolGetNonce";
     pub const STATE_WAIT_MSG: &str = "Filecoin.StateWaitMsg";
     pub const STATE_NETWORK_NAME: &str = "Filecoin.StateNetworkName";
     pub const STATE_NETWORK_VERSION: &str = "Filecoin.StateNetworkVersion";
@@ -48,6 +54,7 @@ mod methods {
     pub const STATE_READ_STATE: &str = "Filecoin.StateReadState";
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
+    pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
     pub const IPC_GET_PREV_CHECKPOINT_FOR_CHILD: &str = "Filecoin.IPCGetPrevCheckpointForChild";
     pub const IPC_GET_CHECKPOINT_TEMPLATE: &str = "Filecoin.IPCGetCheckpointTemplateSerialized";
     pub const IPC_GET_CHECKPOINT: &str = "Filecoin.IPCGetCheckpointSerialized";
@@ -91,11 +98,22 @@ const STATE_WAIT_ALLOW_REPLACE: bool = true;
 /// ```
 pub struct LotusJsonRPCClient<T: JsonRpcClient> {
     client: T,
+    wallet_store: Option<Arc<RwLock<Wallet>>>,
 }
 
 impl<T: JsonRpcClient> LotusJsonRPCClient<T> {
     pub fn new(client: T) -> Self {
-        Self { client }
+        Self {
+            client,
+            wallet_store: None,
+        }
+    }
+
+    pub fn new_with_wallet_store(client: T, wallet_store: Arc<RwLock<Wallet>>) -> Self {
+        Self {
+            client,
+            wallet_store: Some(wallet_store),
+        }
     }
 }
 
@@ -148,6 +166,34 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         log::debug!("received mpool_push_message response: {r:?}");
 
         Ok(r.message)
+    }
+
+    async fn mpool_push(&self, mut msg: MpoolPushMessage) -> Result<Cid> {
+        if msg.nonce.is_none() {
+            let nonce = self.mpool_nonce(&msg.from).await?;
+            log::info!("sender: {:} with nonce: {nonce:}", msg.from);
+            msg.nonce = Some(nonce);
+        }
+
+        if msg.version.is_none() {
+            msg.version = Some(0);
+        }
+
+        self.estimate_message_gas(&mut msg).await?;
+        log::debug!("estimated gas for message: {msg:?}");
+
+        let signature = self.sign_mpool_message(&msg)?;
+
+        let params = create_signed_message_params(msg, signature);
+        log::debug!("message to push to mpool: {params:?}");
+
+        let r = self
+            .client
+            .request::<CIDMap>(methods::MPOOL_PUSH, params)
+            .await?;
+        log::debug!("received mpool_push_message response: {r:?}");
+
+        Cid::try_from(r)
     }
 
     async fn state_wait_msg(&self, cid: Cid) -> Result<StateWaitMsgResponse> {
@@ -491,6 +537,100 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     }
 }
 
+impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
+    fn sign_mpool_message(&self, msg: &MpoolPushMessage) -> anyhow::Result<Signature> {
+        if self.wallet_store.is_none() {
+            return Err(anyhow!("key store not set, function not supported"));
+        }
+
+        let message = fvm_shared::message::Message {
+            version: msg
+                .version
+                .ok_or_else(|| anyhow!("version should not be empty"))? as i64,
+            from: msg.from,
+            to: msg.to,
+            sequence: msg
+                .nonce
+                .ok_or_else(|| anyhow!("nonce should not be empty"))?,
+            value: msg.value.clone(),
+            method_num: msg.method,
+            params: RawBytes::from(msg.params.clone()),
+            gas_limit: msg
+                .gas_limit
+                .as_ref()
+                .ok_or_else(|| anyhow!("gas_limit should not be empty"))?
+                .atto()
+                .to_u64()
+                .unwrap() as i64,
+            gas_fee_cap: msg
+                .gas_fee_cap
+                .as_ref()
+                .ok_or_else(|| anyhow!("gas_fee_cap should not be empty"))?
+                .clone(),
+            gas_premium: msg
+                .gas_premium
+                .as_ref()
+                .ok_or_else(|| anyhow!("gas_premium should not be empty"))?
+                .clone(),
+        };
+
+        let hash = cid::multihash::Code::Blake2b256.digest(&to_vec(&message)?);
+        let msg_cid = Cid::new_v1(fvm_ipld_encoding::DAG_CBOR, hash).to_bytes();
+
+        let mut wallet_store = self.wallet_store.as_ref().unwrap().write().unwrap();
+        Ok(wallet_store.sign(&msg.from, &msg_cid)?)
+    }
+
+    async fn estimate_message_gas(&self, msg: &mut MpoolPushMessage) -> anyhow::Result<()> {
+        let params = json!([
+            {
+                "Version": msg.version.unwrap_or(0),
+                "To": msg.to.to_string(),
+                "From": msg.from.to_string(),
+                "Value": msg.value.atto().to_string(),
+                "Method": msg.method,
+                "Params": msg.params,
+                "Nonce": msg.nonce,
+
+                "GasLimit": 0,
+                "GasFeeCap": "0",
+                "GasPremium": "0",
+
+                "CID": CIDMap::from(msg.cid),
+            },
+            {},
+            []
+        ]);
+
+        let gas = self
+            .client
+            .request::<EstimateGasResponse>(methods::ESTIMATE_MESSAGE_GAS, params)
+            .await?;
+
+        msg.gas_fee_cap = gas.gas_fee_cap;
+        msg.gas_limit = gas.gas_limit;
+        msg.gas_premium = gas.gas_premium;
+
+        Ok(())
+    }
+
+    async fn mpool_nonce(&self, address: &Address) -> anyhow::Result<u64> {
+        let params = json!([address.to_string()]);
+        let r = self
+            .client
+            .request::<u64>(methods::MPOOL_GET_NONCE, params)
+            .await;
+        if r.is_err() {
+            let e = r.unwrap_err();
+            if e.to_string().contains("resolution lookup failed") {
+                return Ok(0);
+            }
+            return Err(e);
+        }
+        Ok(r.unwrap())
+    }
+}
+
 impl LotusJsonRPCClient<JsonRpcClientImpl> {
     /// A constructor that returns a `LotusJsonRPCClient` from a `Subnet`. The returned
     /// `LotusJsonRPCClient` makes requests to the URL defined in the `Subnet`.
@@ -500,4 +640,63 @@ impl LotusJsonRPCClient<JsonRpcClientImpl> {
         let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token);
         LotusJsonRPCClient::new(jsonrpc_client)
     }
+
+    pub fn from_subnet_with_wallet_store(
+        subnet: &crate::config::Subnet,
+        wallet_store: Arc<RwLock<Wallet>>,
+    ) -> Self {
+        let url = subnet.jsonrpc_api_http.clone();
+        let auth_token = subnet.auth_token.as_deref();
+        let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token);
+        LotusJsonRPCClient::new_with_wallet_store(jsonrpc_client, wallet_store)
+    }
+}
+
+fn create_signed_message_params(msg: MpoolPushMessage, signature: Signature) -> serde_json::Value {
+    let nonce = msg
+        .nonce
+        .map(|n| serde_json::Value::Number(n.into()))
+        .unwrap_or(serde_json::Value::Null);
+
+    let to_value_str = |t: Option<TokenAmount>| {
+        t.map(|n| serde_json::Value::String(n.atto().to_u64().unwrap().to_string()))
+            .unwrap_or(serde_json::Value::Null)
+    };
+    let to_value = |t: Option<TokenAmount>| {
+        t.map(|n| serde_json::Value::Number(n.atto().to_u64().unwrap().into()))
+            .unwrap_or(serde_json::Value::Null)
+    };
+
+    let gas_limit = to_value(msg.gas_limit);
+    let gas_premium = to_value_str(msg.gas_premium);
+    let gas_fee_cap = to_value_str(msg.gas_fee_cap);
+
+    let Signature { sig_type, bytes } = signature;
+    let sig_encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+
+    let params_encoded = base64::engine::general_purpose::STANDARD.encode(msg.params);
+    // refer to: https://lotus.filecoin.io/reference/lotus/mpool/#mpoolpush
+    json!([
+        {
+            "Message": {
+                "Version": msg.version.unwrap_or(0),
+                "To": msg.to.to_string(),
+                "From": msg.from.to_string(),
+                "Value": msg.value.atto().to_string(),
+                "Method": msg.method,
+                "Params": params_encoded,
+
+                // THESE ALL WILL AUTO POPULATE if null
+                "Nonce": nonce,
+                "GasLimit": gas_limit,
+                "GasFeeCap": gas_fee_cap,
+                "GasPremium": gas_premium,
+                "CID": CIDMap::from(msg.cid),
+            },
+            "Signature": {
+                "Type": sig_type as u8,
+                "Data": sig_encoded,
+            }
+        }
+    ])
 }

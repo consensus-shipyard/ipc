@@ -10,13 +10,13 @@ use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::wallet::list::{WalletListParams, WalletListResponse};
+use crate::server::wallet::balances::{WalletBalancesParams, WalletBalancesResponse};
 
-pub(crate) struct WalletList;
+pub(crate) struct WalletBalances;
 
 #[async_trait]
-impl CommandLineHandler for WalletList {
-    type Arguments = WalletListArgs;
+impl CommandLineHandler for WalletBalances {
+    type Arguments = WalletBalancesArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("list wallets with args: {:?}", arguments);
@@ -24,13 +24,13 @@ impl CommandLineHandler for WalletList {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
-        let params = WalletListParams {
+        let params = WalletBalancesParams {
             subnet: arguments.subnet.clone(),
         };
 
         let addrs = json_rpc_client
-            .request::<WalletListResponse>(
-                json_rpc_methods::WALLET_LIST,
+            .request::<WalletBalancesResponse>(
+                json_rpc_methods::WALLET_BALANCES,
                 serde_json::to_value(params)?,
             )
             .await?;
@@ -42,8 +42,8 @@ impl CommandLineHandler for WalletList {
 }
 
 #[derive(Debug, Args)]
-#[command(about = "List wallets in a subnet")]
-pub(crate) struct WalletListArgs {
+#[command(about = "List balance of wallets in a subnet")]
+pub(crate) struct WalletBalancesArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The subnet to list wallets from")]

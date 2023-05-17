@@ -25,7 +25,6 @@ impl CommandLineHandler for WalletNew {
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
         let params = WalletNewParams {
-            subnet: arguments.subnet.clone(),
             key_type: arguments.key_type.clone(),
         };
 
@@ -36,11 +35,7 @@ impl CommandLineHandler for WalletNew {
             )
             .await?;
 
-        log::info!(
-            "created new wallet with address {:?} in subnet {:?}",
-            addr,
-            arguments.subnet
-        );
+        log::info!("created new wallet with address {:?}", addr,);
 
         Ok(())
     }
@@ -51,8 +46,6 @@ impl CommandLineHandler for WalletNew {
 pub(crate) struct WalletNewArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(long, short, help = "The subnetwhere the wallet will be created")]
-    pub subnet: String,
     #[arg(
         long,
         short,
