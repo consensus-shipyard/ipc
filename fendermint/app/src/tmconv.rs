@@ -145,9 +145,9 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
     let exit_code = match ret {
         FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => ExitCode::USR_NOT_FOUND,
         FvmQueryRet::Ipld(_) | FvmQueryRet::ActorState(_) => ExitCode::OK,
-        // For calls, the caller needs to look into the `value` field to see the real exit code;
+        // For calls and estimates, the caller needs to look into the `value` field to see the real exit code;
         // the query itself is successful, even if the value represents a failure.
-        FvmQueryRet::Call(_) => ExitCode::OK,
+        FvmQueryRet::Call(_) | FvmQueryRet::EstimateGas(_) => ExitCode::OK,
     };
 
     // The return value has a `key` field which is supposed to be set to the data matched.
@@ -169,6 +169,10 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
             // of a normal delivery being one way and a query exposing `FvmApplyRet`.
             let r = to_deliver_tx(ret);
             let v = must_encode!(r);
+            (Vec::new(), v)
+        }
+        FvmQueryRet::EstimateGas(est) => {
+            let v = must_encode!(est);
             (Vec::new(), v)
         }
     };

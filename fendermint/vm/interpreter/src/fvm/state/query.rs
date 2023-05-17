@@ -10,6 +10,7 @@ use fendermint_vm_message::query::ActorState;
 use fvm::{engine::MultiEngine, executor::ApplyRet, state_tree::StateTree};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, clock::ChainEpoch, ActorID};
+use num_traits::Zero;
 
 use crate::fvm::{store::ReadOnlyBlockstore, FvmMessage};
 
@@ -141,7 +142,13 @@ where
     /// The results are never going to be flushed, so it's semantically read-only,
     /// but it might write into the buffered block store the FVM creates. Running
     /// multiple such messages results in their buffered effects stacking up.
-    pub fn call(&self, msg: FvmMessage) -> anyhow::Result<ApplyRet> {
+    pub fn call(&self, mut msg: FvmMessage) -> anyhow::Result<ApplyRet> {
+        // If the sequence is zero, treat it as a signal to use whatever is in the state.
+        if msg.sequence.is_zero() {
+            if let Some((_, state)) = self.actor_state(&msg.from)? {
+                msg.sequence = state.sequence;
+            }
+        }
         self.with_exec_state(|s| s.execute_explicit(msg))
     }
 }

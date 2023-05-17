@@ -1,9 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
-use fendermint_vm_message::query::{ActorState, FvmQuery};
+use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::ActorID;
+use fvm_shared::{ActorID, BLOCK_GAS_LIMIT};
 
 use crate::QueryInterpreter;
 
@@ -20,6 +20,8 @@ pub enum FvmQueryRet {
     ActorState(Option<Box<(ActorID, ActorState)>>),
     /// The results of a read-only message application.
     Call(FvmApplyRet),
+    /// The estimated gas limit.
+    EstimateGas(GasEstimate),
 }
 
 #[async_trait]
@@ -58,6 +60,22 @@ where
                 };
 
                 FvmQueryRet::Call(ret)
+            }
+            FvmQuery::EstimateGas(mut msg) => {
+                // TODO: Figure out how to relate the token balance to a gas limit.
+                //       Do we look at `state.state_params.base_fee`? What about `gas_premium` and `gas_limit`?
+
+                // XXX: This value is for Filecoin, and it's not even used by the FVM, but at least it should not have a problem with it.
+                msg.gas_limit = BLOCK_GAS_LIMIT;
+
+                let apply_ret = state.call(*msg)?;
+
+                let est = GasEstimate {
+                    exit_code: apply_ret.msg_receipt.exit_code,
+                    gas_limit: apply_ret.msg_receipt.gas_used,
+                };
+
+                FvmQueryRet::EstimateGas(est)
             }
         };
         Ok((state, res))

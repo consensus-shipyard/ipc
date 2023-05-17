@@ -9,7 +9,7 @@ use bytes::Bytes;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
-use fvm_shared::{address::Address, econ::TokenAmount, MethodNum, METHOD_SEND};
+use fvm_shared::{address::Address, econ::TokenAmount, message::Message, MethodNum, METHOD_SEND};
 use libsecp256k1::{PublicKey, SecretKey};
 
 use crate::B64_ENGINE;
@@ -127,6 +127,28 @@ impl MessageFactory {
             gas_params,
         )?;
         Ok(message)
+    }
+
+    /// Create a message for a read-only operation.
+    pub fn fevm_call(
+        &mut self,
+        contract: Address,
+        calldata: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let msg = self.fevm_invoke(contract, calldata, value, gas_params)?;
+
+        let msg = if let ChainMessage::Signed(signed) = msg {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {msg:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.set_sequence(msg.sequence);
+
+        Ok(msg)
     }
 }
 

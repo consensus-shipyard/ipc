@@ -3,9 +3,10 @@
 
 use std::marker::PhantomData;
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
+use fendermint_vm_message::query::GasEstimate;
 use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
@@ -117,17 +118,9 @@ pub trait CallClient: QueryClient + BoundClient + Send + Sync {
         gas_params: GasParams,
         height: Option<Height>,
     ) -> anyhow::Result<CallResponse<Vec<u8>>> {
-        let mf = self.message_factory_mut();
-        let msg: ChainMessage = mf.fevm_invoke(contract, calldata, value, gas_params)?;
-
-        let msg = if let ChainMessage::Signed(signed) = msg {
-            signed.into_message()
-        } else {
-            return Err(anyhow!("unexpected message type: {msg:?}"));
-        };
-
-        // Roll back the sequence, we don't really want to invoke anything.
-        mf.set_sequence(msg.sequence);
+        let msg = self
+            .message_factory_mut()
+            .fevm_call(contract, calldata, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
 
@@ -145,6 +138,22 @@ pub trait CallClient: QueryClient + BoundClient + Send + Sync {
         };
 
         Ok(response)
+    }
+
+    /// Estimate the gas limit of a FEVM call.
+    async fn fevm_estmiate_gas(
+        &mut self,
+        contract: Address,
+        calldata: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: Option<Height>,
+    ) -> anyhow::Result<QueryResponse<GasEstimate>> {
+        let msg = self
+            .message_factory_mut()
+            .fevm_call(contract, calldata, value, gas_params)?;
+
+        self.estimate_gas(msg, height).await
     }
 }
 

@@ -113,6 +113,14 @@ pub enum RpcFevmCommands {
         #[arg(long, short = 'b', default_value_t = 0)]
         height: u64,
     },
+    /// Estimate the gas required to execute a FEVM invocation.
+    EstimateGas {
+        #[command(flatten)]
+        args: FevmArgs,
+        /// Block height to query; 0 means latest.
+        #[arg(long, short = 'b', default_value_t = 0)]
+        height: u64,
+    },
 }
 
 /// Arguments common to FEVM method calls.

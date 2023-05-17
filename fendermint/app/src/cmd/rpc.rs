@@ -59,8 +59,12 @@ cmd! {
             fevm_invoke(client, args, contract, method, method_args).await
         }
         RpcFevmCommands::Call { args: FevmArgs { contract, method, method_args }, height} => {
-        let height = Height::try_from(height)?;
+            let height = Height::try_from(height)?;
             fevm_call(client, args, contract, method, method_args, height).await
+        }
+        RpcFevmCommands::EstimateGas { args: FevmArgs { contract, method, method_args }, height} => {
+            let height = Height::try_from(height)?;
+            fevm_estimate_gas(client, args, contract, method, method_args, height).await
         }
       }
     }
@@ -242,6 +246,30 @@ async fn fevm_call(
         .unwrap_or(serde_json::Value::Null);
 
     let json = json!({"response": res.response, "return_data": return_data});
+
+    print_json(&json)
+}
+
+/// Estimate the gas of an EVM call through RPC and print the response to STDOUT as JSON.
+async fn fevm_estimate_gas(
+    client: FendermintClient,
+    args: TransArgs,
+    contract: Address,
+    method: Bytes,
+    method_args: Bytes,
+    height: Height,
+) -> anyhow::Result<()> {
+    let calldata = Bytes::from([method, method_args].concat());
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let value = args.value;
+
+    let res = client
+        .inner
+        .fevm_estmiate_gas(contract, calldata, value, gas_params, Some(height))
+        .await?;
+
+    let json = json!({ "response": res });
 
     print_json(&json)
 }

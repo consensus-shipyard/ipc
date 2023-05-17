@@ -13,7 +13,7 @@ use cid::Cid;
 use fvm_shared::ActorID;
 use fvm_shared::{address::Address, error::ExitCode};
 
-use fendermint_vm_message::query::{ActorState, FvmQuery};
+use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate};
 
 use crate::response::encode_data;
 
@@ -71,6 +71,23 @@ pub trait QueryClient: Send + Sync {
             deliver_tx.data = encode_data(&deliver_tx.data);
 
             Ok(deliver_tx)
+        })?;
+        Ok(QueryResponse { height, value })
+    }
+
+    /// Estimate the gas limit of a message.
+    async fn estimate_gas(
+        &self,
+        message: Message,
+        height: Option<Height>,
+    ) -> anyhow::Result<QueryResponse<GasEstimate>> {
+        let res = self
+            .perform(FvmQuery::EstimateGas(Box::new(message)), height)
+            .await?;
+        let height = res.height;
+        let value = extract(res, |res| {
+            fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode GasEstimate from query")
         })?;
         Ok(QueryResponse { height, value })
     }

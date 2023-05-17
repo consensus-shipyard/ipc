@@ -1,7 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use cid::Cid;
-use fvm_shared::{address::Address, econ::TokenAmount, message::Message as FvmMessage};
+use fvm_shared::{
+    address::Address, econ::TokenAmount, error::ExitCode, message::Message as FvmMessage,
+};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -25,6 +27,11 @@ pub enum FvmQuery {
     ///
     /// The main motivation for this method is to facilitate `eth_call`.
     Call(Box<FvmMessage>),
+    /// Estimate the gas required to execute a message.
+    ///
+    /// This is effectively a [`Call`], but it's included so that in the future
+    /// it can do more sophisticated things with premiums, caps and over estimation.
+    EstimateGas(Box<FvmMessage>),
 }
 
 /// State of all actor implementations.
@@ -54,6 +61,17 @@ pub struct ActorState {
     /// This field is set on actor creation and never modified.
     #[serde_as(as = "Option<IsHumanReadable>")]
     pub delegated_address: Option<Address>,
+}
+
+/// Result of gas estimation.
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct GasEstimate {
+    /// Exit code, potentially signalling out-of-gas errors, or that the actor was not found.
+    pub exit_code: ExitCode,
+    /// Gas used during the probing.
+    ///
+    /// Potentially contains an over-estimate, but it should be within the account balance limit.
+    pub gas_limit: u64,
 }
 
 #[cfg(feature = "arb")]
