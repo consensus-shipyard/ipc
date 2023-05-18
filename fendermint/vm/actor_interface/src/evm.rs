@@ -13,5 +13,9 @@ pub enum Method {
     GetBytecodeHash = 4,
     GetStorageAt = 5,
     InvokeContractDelegate = 6,
-    InvokeContract = frc42_dispatch::method_hash!("InvokeEVM"),
+    // This hardcoded value is taken from https://github.com/filecoin-project/ref-fvm/blob/f4f3f340ba29b3800cd8272e34023606def23855/testing/integration/src/testkit/fevm.rs#L88-L89
+    // where it's used because of a ciruclar dependency (frc42_dispatch needs fvm_shared).
+    // Here we can use it if we want, however the release cycle is a bit lagging, preventing us from using the latest ref-fvm at the moment.
+    //InvokeContract = frc42_dispatch::method_hash!("InvokeEVM"),
+    InvokeContract = 3844450837,
 }
