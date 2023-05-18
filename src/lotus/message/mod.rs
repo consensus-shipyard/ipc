@@ -36,6 +36,18 @@ impl TryFrom<CIDMap> for Cid {
     }
 }
 
+impl TryFrom<&CIDMap> for Cid {
+    type Error = anyhow::Error;
+
+    fn try_from(cid_map: &CIDMap) -> Result<Self, Self::Error> {
+        let cid_option = cid_map
+            .cid
+            .as_ref()
+            .map(|cid| Cid::from_str(cid).expect("invalid cid str"));
+        cid_option.ok_or_else(|| anyhow!("cid not found"))
+    }
+}
+
 impl From<CIDMap> for Option<Cid> {
     fn from(m: CIDMap) -> Self {
         m.cid

@@ -35,7 +35,7 @@ impl CommandLineHandler for Fund {
             .request::<ChainEpoch>(json_rpc_methods::FUND, serde_json::to_value(params)?)
             .await?;
 
-        log::info!("funded subnet: {:} at epoch: {epoch:?}", arguments.subnet);
+        log::info!("funded subnet: {:} at epoch: {epoch:}", arguments.subnet);
 
         Ok(())
     }

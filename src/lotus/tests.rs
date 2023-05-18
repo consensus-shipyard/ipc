@@ -11,7 +11,7 @@ const HTTP_ENDPOINT: &str = "https://api.node.glif.io/rpc/v0";
 fn get_lotus_client() -> LotusJsonRPCClient<JsonRpcClientImpl> {
     let url = Url::parse(HTTP_ENDPOINT).unwrap();
     let client = JsonRpcClientImpl::new(url, None);
-    LotusJsonRPCClient::new(client)
+    LotusJsonRPCClient::new(client, Default::default())
 }
 
 #[tokio::test]

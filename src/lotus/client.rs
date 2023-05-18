@@ -24,10 +24,9 @@ use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
-use crate::constants::GATEWAY_ACTOR_ADDRESS;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 use crate::lotus::json::ToJson;
-use crate::lotus::message::chain::ChainHeadResponse;
+use crate::lotus::message::chain::{ChainHeadResponse, GetTipSetByHeightResponse};
 use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
 use crate::lotus::message::mpool::{
     EstimateGasResponse, MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
@@ -37,6 +36,8 @@ use crate::lotus::message::wallet::{WalletKeyType, WalletListResponse};
 use crate::lotus::message::CIDMap;
 use crate::lotus::{LotusClient, NetworkVersion};
 use crate::manager::SubnetInfo;
+
+pub type DefaultLotusJsonRPCClient = LotusJsonRPCClient<JsonRpcClientImpl>;
 
 // RPC methods
 mod methods {
@@ -85,11 +86,12 @@ const STATE_WAIT_ALLOW_REPLACE: bool = true;
 /// # Examples
 /// ```no_run
 /// use ipc_agent::{jsonrpc::JsonRpcClientImpl, lotus::LotusClient, lotus::client::LotusJsonRPCClient};
+/// use ipc_sdk::subnet_id::SubnetID;
 ///
 /// #[tokio::main]
 /// async fn main() {
 ///     let h = JsonRpcClientImpl::new("<DEFINE YOUR URL HERE>".parse().unwrap(), None);
-///     let n = LotusJsonRPCClient::new(h);
+///     let n = LotusJsonRPCClient::new(h, SubnetID::default());
 ///     println!(
 ///         "wallets: {:?}",
 ///         n.wallet_new(ipc_agent::lotus::message::wallet::WalletKeyType::Secp256k1).await
@@ -98,20 +100,27 @@ const STATE_WAIT_ALLOW_REPLACE: bool = true;
 /// ```
 pub struct LotusJsonRPCClient<T: JsonRpcClient> {
     client: T,
+    subnet: SubnetID,
     wallet_store: Option<Arc<RwLock<Wallet>>>,
 }
 
 impl<T: JsonRpcClient> LotusJsonRPCClient<T> {
-    pub fn new(client: T) -> Self {
+    pub fn new(client: T, subnet: SubnetID) -> Self {
         Self {
             client,
+            subnet,
             wallet_store: None,
         }
     }
 
-    pub fn new_with_wallet_store(client: T, wallet_store: Arc<RwLock<Wallet>>) -> Self {
+    pub fn new_with_wallet_store(
+        client: T,
+        subnet: SubnetID,
+        wallet_store: Arc<RwLock<Wallet>>,
+    ) -> Self {
         Self {
             client,
+            subnet,
             wallet_store: Some(wallet_store),
         }
     }
@@ -171,7 +180,11 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     async fn mpool_push(&self, mut msg: MpoolPushMessage) -> Result<Cid> {
         if msg.nonce.is_none() {
             let nonce = self.mpool_nonce(&msg.from).await?;
-            log::info!("sender: {:} with nonce: {nonce:}", msg.from);
+            log::info!(
+                "sender: {:} with nonce: {nonce:} in subnet: {:}",
+                msg.from,
+                self.subnet
+            );
             msg.nonce = Some(nonce);
         }
 
@@ -185,7 +198,10 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         let signature = self.sign_mpool_message(&msg)?;
 
         let params = create_signed_message_params(msg, signature);
-        log::debug!("message to push to mpool: {params:?}");
+        log::debug!(
+            "message to push to mpool: {params:?} in subnet: {:?}",
+            self.subnet
+        );
 
         let r = self
             .client
@@ -328,14 +344,18 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         Ok(r)
     }
 
+    async fn current_epoch(&self) -> Result<ChainEpoch> {
+        Ok(self.chain_head().await?.height as ChainEpoch)
+    }
+
     async fn get_tipset_by_height(
         &self,
         epoch: ChainEpoch,
         tip_set: Cid,
-    ) -> Result<ChainHeadResponse> {
+    ) -> Result<GetTipSetByHeightResponse> {
         let r = self
             .client
-            .request::<ChainHeadResponse>(
+            .request::<GetTipSetByHeightResponse>(
                 methods::GET_TIPSET_BY_HEIGHT,
                 json!([epoch, [CIDMap::from(tip_set)]]),
             )
@@ -346,12 +366,13 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
 
     async fn ipc_get_prev_checkpoint_for_child(
         &self,
-        child_subnet_id: SubnetID,
+        gateway_addr: &Address,
+        child_subnet_id: &SubnetID,
     ) -> Result<Option<CIDMap>> {
         if child_subnet_id.parent().is_none() {
             return Err(anyhow!("The child_subnet_id must be a valid child subnet"));
         }
-        let params = json!([GATEWAY_ACTOR_ADDRESS, child_subnet_id.to_json()]);
+        let params = json!([gateway_addr.to_string(), child_subnet_id.to_json()]);
 
         let r = self
             .client
@@ -360,12 +381,16 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         Ok(r)
     }
 
-    async fn ipc_get_checkpoint_template(&self, epoch: ChainEpoch) -> Result<BottomUpCheckpoint> {
+    async fn ipc_get_checkpoint_template(
+        &self,
+        gateway_addr: &Address,
+        epoch: ChainEpoch,
+    ) -> Result<BottomUpCheckpoint> {
         let r = self
             .client
             .request::<String>(
                 methods::IPC_GET_CHECKPOINT_TEMPLATE,
-                json!([GATEWAY_ACTOR_ADDRESS, epoch]),
+                json!([gateway_addr.to_string(), epoch]),
             )
             .await?;
 
@@ -399,8 +424,12 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         Ok(checkpoint)
     }
 
-    async fn ipc_read_gateway_state(&self, tip_set: Cid) -> Result<IPCReadGatewayStateResponse> {
-        let params = json!([GATEWAY_ACTOR_ADDRESS, [CIDMap::from(tip_set)]]);
+    async fn ipc_read_gateway_state(
+        &self,
+        gateway_addr: &Address,
+        tip_set: Cid,
+    ) -> Result<IPCReadGatewayStateResponse> {
+        let params = json!([gateway_addr.to_string(), [CIDMap::from(tip_set)]]);
         let r = self
             .client
             .request::<IPCReadGatewayStateResponse>(methods::IPC_READ_GATEWAY_STATE, params)
@@ -466,7 +495,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     async fn ipc_get_topdown_msgs(
         &self,
         subnet_id: &SubnetID,
-        gateway_addr: Address,
+        gateway_addr: &Address,
         tip_set: Cid,
         nonce: u64,
     ) -> Result<Vec<CrossMsg>> {
@@ -638,7 +667,7 @@ impl LotusJsonRPCClient<JsonRpcClientImpl> {
         let url = subnet.jsonrpc_api_http.clone();
         let auth_token = subnet.auth_token.as_deref();
         let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token);
-        LotusJsonRPCClient::new(jsonrpc_client)
+        LotusJsonRPCClient::new(jsonrpc_client, subnet.id.clone())
     }
 
     pub fn from_subnet_with_wallet_store(
@@ -648,7 +677,7 @@ impl LotusJsonRPCClient<JsonRpcClientImpl> {
         let url = subnet.jsonrpc_api_http.clone();
         let auth_token = subnet.auth_token.as_deref();
         let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token);
-        LotusJsonRPCClient::new_with_wallet_store(jsonrpc_client, wallet_store)
+        LotusJsonRPCClient::new_with_wallet_store(jsonrpc_client, subnet.id.clone(), wallet_store)
     }
 }
 

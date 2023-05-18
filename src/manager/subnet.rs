@@ -47,7 +47,8 @@ pub trait SubnetManager {
         gateway_addr: Address,
     ) -> Result<HashMap<SubnetID, SubnetInfo>>;
 
-    /// Fund injects new funds from an account of the parent chain to a subnet
+    /// Fund injects new funds from an account of the parent chain to a subnet.
+    /// Returns the epoch that the fund is executed in the parent.
     async fn fund(
         &self,
         subnet: SubnetID,
@@ -57,6 +58,7 @@ pub trait SubnetManager {
     ) -> Result<ChainEpoch>;
 
     /// Release creates a new check message to release funds in parent chain
+    /// Returns the epoch that the released is executed in the child.
     async fn release(
         &self,
         subnet: SubnetID,
@@ -105,7 +107,7 @@ pub trait SubnetManager {
     async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount>;
 
     /// Returns the epoch of the latest top-down checkpoint executed
-    async fn last_topdown_executed(&self) -> Result<ChainEpoch>;
+    async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch>;
 
     /// Returns the list of checkpoints from a subnet actor for the given epoch range.
     async fn list_checkpoints(

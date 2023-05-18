@@ -14,6 +14,7 @@ use ipc_gateway::{BottomUpCheckpoint, CrossMsg};
 use ipc_sdk::subnet_id::SubnetID;
 use serde::de::DeserializeOwned;
 
+use crate::lotus::message::chain::GetTipSetByHeightResponse;
 use message::chain::ChainHeadResponse;
 use message::mpool::{MpoolPushMessage, MpoolPushMessageResponseInner};
 use message::state::{ReadStateResponse, StateWaitMsgResponse};
@@ -86,20 +87,28 @@ pub trait LotusClient {
     /// See: https://lotus.filecoin.io/reference/lotus/chain/#chainhead
     async fn chain_head(&self) -> Result<ChainHeadResponse>;
 
+    /// Returns the heaviest epoch for the chain
+    async fn current_epoch(&self) -> Result<ChainEpoch>;
+
     /// GetTipsetByHeight from the underlying chain
     async fn get_tipset_by_height(
         &self,
         epoch: ChainEpoch,
         tip_set: Cid,
-    ) -> Result<ChainHeadResponse>;
+    ) -> Result<GetTipSetByHeightResponse>;
 
     async fn ipc_get_prev_checkpoint_for_child(
         &self,
-        child_subnet_id: SubnetID,
+        gateway_addr: &Address,
+        child_subnet_id: &SubnetID,
     ) -> Result<Option<CIDMap>>;
 
     /// Returns the checkpoint template at `epoch`.
-    async fn ipc_get_checkpoint_template(&self, epoch: ChainEpoch) -> Result<BottomUpCheckpoint>;
+    async fn ipc_get_checkpoint_template(
+        &self,
+        gateway_addr: &Address,
+        epoch: ChainEpoch,
+    ) -> Result<BottomUpCheckpoint>;
 
     /// Returns the checkpoint committed for an epoch in a child subnet.
     async fn ipc_get_checkpoint(
@@ -109,7 +118,11 @@ pub trait LotusClient {
     ) -> Result<BottomUpCheckpoint>;
 
     /// Returns the state of the gateway actor at `tip_set`.
-    async fn ipc_read_gateway_state(&self, tip_set: Cid) -> Result<IPCReadGatewayStateResponse>;
+    async fn ipc_read_gateway_state(
+        &self,
+        gateway_addr: &Address,
+        tip_set: Cid,
+    ) -> Result<IPCReadGatewayStateResponse>;
 
     /// Returns the state of the subnet actor at `tip_set`.
     async fn ipc_read_subnet_actor_state(
@@ -144,7 +157,7 @@ pub trait LotusClient {
     async fn ipc_get_topdown_msgs(
         &self,
         subnet_id: &SubnetID,
-        gateway_addr: Address,
+        gateway_addr: &Address,
         tip_set: Cid,
         nonce: u64,
     ) -> Result<Vec<CrossMsg>>;

@@ -323,11 +323,14 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         self.lotus_client.wallet_balance(address).await
     }
 
-    async fn last_topdown_executed(&self) -> Result<ChainEpoch> {
+    async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch> {
         let head = self.lotus_client.chain_head().await?;
         let cid_map = head.cids.first().unwrap().clone();
         let tip_set = Cid::try_from(cid_map)?;
-        let gw_state = self.lotus_client.ipc_read_gateway_state(tip_set).await?;
+        let gw_state = self
+            .lotus_client
+            .ipc_read_gateway_state(gateway_addr, tip_set)
+            .await?;
 
         Ok(gw_state.top_down_checkpoint_voting.last_voting_executed)
     }

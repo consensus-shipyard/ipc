@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::clock::ChainEpoch;
 use std::fmt::Debug;
 
 use crate::cli::commands::get_ipc_agent_url;
@@ -31,10 +32,10 @@ impl CommandLineHandler for Release {
             amount: arguments.amount,
         };
         let epoch = json_rpc_client
-            .request::<()>(json_rpc_methods::RELEASE, serde_json::to_value(params)?)
+            .request::<ChainEpoch>(json_rpc_methods::RELEASE, serde_json::to_value(params)?)
             .await?;
 
-        log::info!("released subnet: {:} at epoch: {epoch:?}", arguments.subnet);
+        log::info!("released subnet: {:} at epoch {epoch:}", arguments.subnet);
 
         Ok(())
     }

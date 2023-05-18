@@ -36,7 +36,7 @@ use crate::server::net_addr::SetValidatorNetAddrHandler;
 use crate::server::JsonRPCRequestHandler;
 use ipc_identity::Wallet;
 
-use self::config::new_keystore_from_config;
+pub use self::config::new_keystore_from_config;
 pub use self::config::new_keystore_from_path;
 use self::rpc::RPCSubnetHandler;
 use self::topdown_executed::LastTopDownExecHandler;
@@ -80,16 +80,11 @@ impl Handlers {
         }
     }
 
-    pub fn new(config: Arc<ReloadableConfig>) -> Result<Self> {
+    pub fn new(config: Arc<ReloadableConfig>, wallet: Arc<RwLock<Wallet>>) -> Result<Self> {
         let mut handlers = HashMap::new();
 
         let h: Box<dyn HandlerWrapper> = Box::new(ReloadConfigHandler::new(config.clone()));
         handlers.insert(String::from(json_rpc_methods::RELOAD_CONFIG), h);
-
-        // Load the wallet manager from keystore
-        let wallet = Arc::new(RwLock::new(Wallet::new(new_keystore_from_config(
-            config.clone(),
-        )?)));
 
         // subnet manager methods
         let pool = Arc::new(SubnetManagerPool::new(config.clone(), wallet.clone()));
