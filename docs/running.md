@@ -6,6 +6,10 @@ so we have many ways to run the program:
 * `./target/release/fendermint <args>`, after running `cargo build --release`
 * `cargo run -p fendermint_app --release -- <args>`
 
+The same is also available for step-by-step execution in the [Milestone-1 demo](./demos/milestone-1/README.md).
+
+> TIP: If something goes wrong with the RPC commands, try to run them with `fendermint --log-level debug rpc ...` to see the JSON-RPC requests and responses.
+
 ## Genesis
 
 The first step we need to do is create a Genesis file which we'll pass to Tendermint,
@@ -452,7 +456,7 @@ The state is printed to STDOUT as JSON:
 What we see here is the general [ActorState](https://github.com/filecoin-project/builtin-actors/blob/v10.0.0/actors/account/src/state.rs) which contains the balance, the nonce, the Wasm code CID, and the state root hash of the
 actual actor implementation, which in this case is an `Account` actor.
 
-We can retrieve the raw state of the account with the `ipld` command:
+We can retrieve the raw state of the account with the `ipld` command by using the `state.state` from above as the `--cid` argument:
 
 ```shell
 cargo run -p fendermint_app --release -- \
@@ -477,6 +481,8 @@ BOB_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key tes
 cargo run -p fendermint_app --release -- \
   rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000
 ```
+
+Note that we are using `--sequence 0` because this is the first transaction we make using Alice's key.
 
 The `transfer` command waits for the commit results of the transaction:
 
@@ -545,16 +551,18 @@ Say we want to deploy the `SimpleCoin` contract from that directory.
 ```shell
 CONTRACT=../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin
 cargo run -p fendermint_app --release -- \
-  rpc fevm --secret-key test-network/keys/alice.sk --sequence 0 \
+  rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
     create --contract $CONTRACT
 ```
+
+Note that now we are using `--sequence 1` because this is the second transaction sent by Alice.
 
 The output shows what addresses have been assigned to the created contract,
 which we can use to call the contract.
 
 ```console
 $ cargo run -p fendermint_app --release -- \
-        rpc fevm --secret-key test-network/keys/alice.sk --sequence 0 \
+        rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
           create --contract $CONTRACT | jq .return_data
 {
   "actor_address": "f0105",
@@ -568,18 +576,20 @@ $ cargo run -p fendermint_app --release -- \
 
 ## Invoke FEVM Contract
 
-Now that we have a contract deployed, we can call it. The arguments in the followign example are taken from [fvm-bench](https://github.com/filecoin-project/fvm-bench).
+Now that we have a contract deployed, we can call it. The arguments in the followign example are taken from [fvm-bench](https://github.com/filecoin-project/fvm-bench). We need to increment the `--sequence` again.
 
 ```console
 $ cargo run -p fendermint_app --release -- \
-              rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
+              rpc fevm --secret-key test-network/keys/alice.sk --sequence 2 \
                 invoke --contract f410fsho763qmlcfi6ufnim7sujmbaqyc64b3pzpa7bq  \
                        --method f8b2cb4f --method-args 000000000000000000000000ff00000000000000000000000000000000000064 \
           | jq .return_data
 "0000000000000000000000000000000000000000000000000000000000002710"
 ```
 
-To avoid having to come up with ABI encoded arguments in hexadecimal format, we can use the RPC client in combination with [ethers](https://docs.rs/crate/ethers/latest) excellent `abigen` functionality. Here's an [example](../fendermint/rpc/examples/simplecoin.rs) of doing that with the `SimpleCoin` contract.
+To avoid having to come up with ABI encoded arguments in hexadecimal format, we can use the RPC client in combination with [ethers](https://docs.rs/crate/ethers/latest) excellent `abigen` functionality.
+
+Here's an [example](../fendermint/rpc/examples/simplecoin.rs) of doing that with the [SimpleCoin](https://github.com/filecoin-project/builtin-actors/blob/v10.0.0/actors/evm/tests/contracts/simplecoin.sol) contract.
 
 ```console
 $ cargo run -p fendermint_rpc --release --example simplecoin -- --secret-key test-network/keys/alice.sk --verbose
@@ -589,3 +599,5 @@ $ cargo run -p fendermint_rpc --release --example simplecoin -- --secret-key tes
 ...
 2023-04-06T11:00:19.581317Z  INFO simplecoin: owner balance balance="10000" owner_eth_addr="ff00000000000000000000000000000000000064"
 ```
+
+Note that the script figures out the Alice's nonce on its own, so we don't have to pass it in. It also has an example of running an EVM view method (which is read-only) either as as a distributed read-transaction (which is included on the chain and costs gas) or a query anwered by our node without involving the blockchain. Both have their uses, depending on our level of trust.

@@ -4,8 +4,18 @@ Fendermint is an effort to implement [IPC with Tendermint Core](https://docs.goo
 
 ## Docs
 
-The following documentation should help with getting oriented:
+Please have a look in the [docs](./docs/README.md) to see an overview of the project, how to run the components, and previous demos.
 
-* [Architecture Overview](./docs/architecture.md)
-* [Getting started with Tendermint](./docs/tendermint.md)
-* [Running Fendermint](./docs/running.md)
+## Testing
+
+The following command runs unit and integration tests:
+
+```bash
+make test
+```
+
+while the next command builds docker images and runs an end-to-end test using the [SimpleCoin](./fendermint/rpc/examples/simplecoin.rs) example:
+
+```bash
+make e2e
+```

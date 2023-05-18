@@ -51,7 +51,6 @@ pub fn invalid_query(err: AppError, description: String) -> response::Query {
 
 pub fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     let receipt = ret.apply_ret.msg_receipt;
-    let code = to_code(receipt.exit_code);
 
     // Based on the sanity check in the `DefaultExecutor`.
     // gas_cost = gas_fee_cap * gas_limit; this is how much the account is charged up front.
@@ -64,14 +63,14 @@ pub fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     let events = to_events("message", ret.apply_ret.events);
 
     response::DeliverTx {
-        code,
+        code: to_code(receipt.exit_code),
         data,
         log: Default::default(),
         info: ret
             .apply_ret
             .failure_info
             .map(|i| i.to_string())
-            .unwrap_or_default(),
+            .unwrap_or_else(|| to_error_msg(receipt.exit_code).to_owned()),
         gas_wanted,
         gas_used,
         events,
@@ -82,17 +81,10 @@ pub fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
 pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
     response::CheckTx {
         code: to_code(ret.exit_code),
+        info: to_error_msg(ret.exit_code).to_owned(),
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
         ..Default::default()
-    }
-}
-
-pub fn to_code(exit_code: ExitCode) -> Code {
-    if exit_code.is_success() {
-        Code::Ok
-    } else {
-        Code::Err(NonZeroU32::try_from(exit_code.value()).expect("error codes are non-zero"))
     }
 }
 
@@ -182,6 +174,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
 
     response::Query {
         code: to_code(exit_code),
+        info: to_error_msg(exit_code).to_owned(),
         key: key.into(),
         value: value.into(),
         height,
@@ -211,4 +204,55 @@ pub fn to_timestamp(time: tendermint::time::Time) -> Timestamp {
             .try_into()
             .expect("negative timestamp"),
     )
+}
+
+pub fn to_code(exit_code: ExitCode) -> Code {
+    if exit_code.is_success() {
+        Code::Ok
+    } else {
+        Code::Err(NonZeroU32::try_from(exit_code.value()).expect("error codes are non-zero"))
+    }
+}
+
+pub fn to_error_msg(exit_code: ExitCode) -> &'static str {
+    match exit_code {
+        ExitCode::OK => "",
+        ExitCode::SYS_SENDER_INVALID => "The message sender doesn't exist.",
+        ExitCode::SYS_SENDER_STATE_INVALID => "The message sender was not in a valid state to send this message. Either the nonce didn't match, or the sender didn't have funds to cover the message gas.",
+        ExitCode::SYS_ILLEGAL_INSTRUCTION => "The message receiver trapped (panicked).",
+        ExitCode::SYS_INVALID_RECEIVER => "The message receiver doesn't exist and can't be automatically created",
+        ExitCode::SYS_INSUFFICIENT_FUNDS => "The message sender didn't have the requisite funds.",
+        ExitCode::SYS_OUT_OF_GAS => "Message execution (including subcalls) used more gas than the specified limit.",
+        ExitCode::SYS_ILLEGAL_EXIT_CODE => "The message receiver aborted with a reserved exit code.",
+        ExitCode::SYS_ASSERTION_FAILED => "An internal VM assertion failed.",
+        ExitCode::SYS_MISSING_RETURN => "The actor returned a block handle that doesn't exist",
+        ExitCode::USR_ILLEGAL_ARGUMENT => "The method parameters are invalid.",
+        ExitCode::USR_NOT_FOUND => "The requested resource does not exist.",
+        ExitCode::USR_FORBIDDEN => "The requested operation is forbidden.",
+        ExitCode::USR_INSUFFICIENT_FUNDS => "The actor has insufficient funds to perform the requested operation.",
+        ExitCode::USR_ILLEGAL_STATE => "The actor's internal state is invalid.",
+        ExitCode::USR_SERIALIZATION => "There was a de/serialization failure within actor code.",
+        ExitCode::USR_UNHANDLED_MESSAGE => "The message cannot be handled (usually indicates an unhandled method number).",
+        ExitCode::USR_UNSPECIFIED => "The actor failed with an unspecified error.",
+        ExitCode::USR_ASSERTION_FAILED => "The actor failed a user-level assertion.",
+        ExitCode::USR_READ_ONLY => "The requested operation cannot be performed in 'read-only' mode.",
+        ExitCode::USR_NOT_PAYABLE => "The method cannot handle a transfer of value.",
+        _ => ""
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fvm_shared::error::ExitCode;
+
+    use crate::tmconv::to_error_msg;
+
+    #[test]
+    fn code_error_message() {
+        assert_eq!(to_error_msg(ExitCode::OK), "");
+        assert_eq!(
+            to_error_msg(ExitCode::SYS_SENDER_INVALID),
+            "The message sender doesn't exist."
+        );
+    }
 }

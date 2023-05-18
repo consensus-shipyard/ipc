@@ -212,7 +212,8 @@ where
     {
         let data = MessageFactory::serialize(&msg)?;
         let response = self.inner.broadcast_tx_commit(data).await?;
-        let return_data = if response.deliver_tx.code.is_err() {
+        // We have a fully `DeliverTx` with default fields even if `CheckTx` indicates failure.
+        let return_data = if response.check_tx.code.is_err() || response.deliver_tx.code.is_err() {
             None
         } else {
             let return_data =

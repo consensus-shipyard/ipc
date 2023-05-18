@@ -26,6 +26,8 @@ pub fn encode_data(data: &[u8]) -> Bytes {
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as raw bytes.
+///
+/// Only call this after the `code` of both [`DeliverTx`] and [`CheckTx`] have been inspected!
 pub fn decode_bytes(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
     decode_data(&deliver_tx.data)
 }
@@ -39,10 +41,6 @@ pub fn decode_fevm_create(deliver_tx: &DeliverTx) -> anyhow::Result<CreateReturn
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as raw ABI return value.
 pub fn decode_fevm_invoke(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
-    if deliver_tx.data.is_empty() {
-        // I'm not sure when it happens that the code indicates success but the data is empty, but it does.
-        return Ok(Vec::new());
-    }
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<BytesDe>(&data)
         .map(|bz| bz.0)
