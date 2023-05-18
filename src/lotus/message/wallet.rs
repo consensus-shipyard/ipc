@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+use fvm_shared::crypto::signature::SignatureType;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use serde::{Deserialize, Serialize};
@@ -5,12 +7,24 @@ use strum::{AsRefStr, Display, EnumString};
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Display, EnumString, AsRefStr)]
 pub enum WalletKeyType {
-    #[strum(serialize = "bls")]
+    #[strum(serialize = "bls", ascii_case_insensitive)]
     BLS,
-    #[strum(serialize = "secp256k1")]
+    #[strum(serialize = "secp256k1", ascii_case_insensitive)]
     Secp256k1,
-    #[strum(serialize = "secp256k1-ledger")]
+    #[strum(serialize = "secp256k1-ledger", ascii_case_insensitive)]
     Secp256k1Ledger,
+}
+
+impl TryFrom<WalletKeyType> for SignatureType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: WalletKeyType) -> Result<Self, Self::Error> {
+        match value {
+            WalletKeyType::BLS => Ok(SignatureType::BLS),
+            WalletKeyType::Secp256k1 => Ok(SignatureType::Secp256k1),
+            WalletKeyType::Secp256k1Ledger => Err(anyhow!("type not supported")),
+        }
+    }
 }
 
 pub type WalletListResponse = Vec<String>;

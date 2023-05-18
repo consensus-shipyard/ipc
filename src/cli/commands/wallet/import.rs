@@ -4,12 +4,16 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::crypto::signature::SignatureType;
+use serde::Deserialize;
 use std::fmt::Debug;
+use std::str::FromStr;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
+use crate::lotus::message::wallet::WalletKeyType;
 use crate::server::wallet::import::{WalletImportParams, WalletImportResponse};
 
 pub(crate) struct WalletImport;
@@ -32,12 +36,15 @@ impl CommandLineHandler for WalletImport {
             return Err(anyhow::anyhow!("stdin not supported yet"));
         };
 
-        let params: WalletImportParams = serde_json::from_str(&keyinfo)?;
-
+        let params: LotusJsonKeyType = serde_json::from_str(&keyinfo)?;
         let addr = json_rpc_client
             .request::<WalletImportResponse>(
                 json_rpc_methods::WALLET_IMPORT,
-                serde_json::to_value(params)?,
+                serde_json::to_value(WalletImportParams {
+                    key_type: SignatureType::try_from(WalletKeyType::from_str(&params.r#type)?)?
+                        as u8,
+                    private_key: params.private_key,
+                })?,
             )
             .await?;
 
@@ -54,4 +61,11 @@ pub(crate) struct WalletImportArgs {
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "Path of keyinfo file for the key to import")]
     pub path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct LotusJsonKeyType {
+    r#type: String,
+    private_key: String,
 }
