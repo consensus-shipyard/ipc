@@ -44,7 +44,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tower_abci::split::service(service, settings.abci.bound);
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
-    let server = tower_abci::Server::builder()
+    let server = tower_abci::v037::Server::builder()
         .consensus(consensus)
         .snapshot(snapshot)
         .mempool(mempool)

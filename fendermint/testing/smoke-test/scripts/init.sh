@@ -2,8 +2,11 @@
 
 # Create test artifacts, which is basically the Tendermint genesis file.
 
-KEYS_DIR=/data/fendermint/keys
-GENESIS_FILE=/data/fendermint/genesis.json
+CMT_DIR=/data/cometbft
+FM_DIR=/data/fendermint
+
+KEYS_DIR=$FM_DIR/keys
+GENESIS_FILE=$FM_DIR/genesis.json
 
 # Create a genesis file
 fendermint genesis --genesis-file $GENESIS_FILE new --network-name smoke --base-fee 1000  --timestamp 1680101412
@@ -34,12 +37,12 @@ fendermint \
   genesis --genesis-file $GENESIS_FILE \
   add-validator --public-key $KEYS_DIR/bob.pk --power 1
 
-# Convert FM genesis to TM
+# Convert FM genesis to CMT
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
-  into-tendermint --out /data/tendermint/config/genesis.json
+  into-tendermint --out $CMT_DIR/config/genesis.json
 
-# Convert FM validator key to TM
+# Convert FM validator key to CMT
 fendermint \
   key into-tendermint --secret-key $KEYS_DIR/bob.sk \
-    --out /data/tendermint/config/priv_validator_key.json
+    --out $CMT_DIR/config/priv_validator_key.json

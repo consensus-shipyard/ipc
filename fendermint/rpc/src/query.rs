@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use fvm_ipld_encoding::serde::Serialize;
 use fvm_shared::message::Message;
+use prost::Message as ProstMessage;
 use tendermint::block::Height;
 use tendermint::v0_37::abci::response;
 use tendermint_rpc::endpoint::abci_query::AbciQuery;
@@ -64,8 +65,14 @@ pub trait QueryClient: Send + Sync {
             .await?;
         let height = res.height;
         let value = extract(res, |res| {
-            let mut deliver_tx: response::DeliverTx = fvm_ipld_encoding::from_slice(&res.value)
-                .context("failed to decode call result as DeliverTx")?;
+            let bz: Vec<u8> = fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode IPLD as bytes")?;
+
+            let deliver_tx = tendermint_proto::abci::ResponseDeliverTx::decode(bz.as_ref())
+                .context("failed to deserialize ResponseDeliverTx from proto bytes")?;
+
+            let mut deliver_tx = tendermint::abci::response::DeliverTx::try_from(deliver_tx)
+                .context("failed to create DeliverTx from proto response")?;
 
             // Mimic the Base64 encoding of the value that Tendermint does.
             deliver_tx.data = encode_data(&deliver_tx.data);

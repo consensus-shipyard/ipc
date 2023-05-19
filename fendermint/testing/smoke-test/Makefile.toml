@@ -1,8 +1,8 @@
 [env]
 NETWORK_NAME = "smoke"
-TM_CONTAINER_NAME = "smoke-tendermint"
+CMT_CONTAINER_NAME = "smoke-cometbft"
 FM_CONTAINER_NAME = "smoke-fendermint"
-TM_DOCKER_IMAGE = "tendermint/tendermint:v0.37.0-rc2"
+CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_IMAGE = "fendermint:latest"
 TEST_DATA_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/test-data"
 TEST_SCRIPTS_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/scripts"
@@ -26,10 +26,10 @@ run_task = { name = [
 dependencies = [
   "test-data-dir",
   "network-create",
-  "tendermint-init",
+  "cometbft-init",
   "fendermint-init",
   "fendermint-start",
-  "tendermint-start",
+  "cometbft-start",
   "wait",
 ]
 
@@ -39,8 +39,8 @@ dependencies = ["simplecoin-example"]
 [tasks.teardown]
 # `dependencies` doesn't seem to work with `cleanup_task`.
 run_task = { name = [
-  "tendermint-stop",
-  "tendermint-rm",
+  "cometbft-stop",
+  "cometbft-rm",
   "fendermint-stop",
   "fendermint-rm",
   "network-rm",
@@ -60,7 +60,7 @@ cargo run -p fendermint_rpc --release --example simplecoin -- \
 [tasks.test-data-dir]
 script = """
 mkdir -p ${TEST_DATA_DIR}/fendermint;
-mkdir -p ${TEST_DATA_DIR}/tendermint;
+mkdir -p ${TEST_DATA_DIR}/cometbft;
 """
 
 [tasks.test-data-dir-rm]
@@ -69,34 +69,34 @@ rm -rf ${TEST_DATA_DIR}
 """
 
 
-[tasks.tendermint-pull]
+[tasks.cometbft-pull]
 command = "docker"
-args = ["pull", "${TM_DOCKER_IMAGE}"]
+args = ["pull", "${CMT_DOCKER_IMAGE}"]
 
-[tasks.tendermint-init]
-extend = "tendermint-run"
+[tasks.cometbft-init]
+extend = "cometbft-run"
 env = { "CMD" = "init", "FLAGS" = "-a STDOUT -a STDERR" }
 
-[tasks.tendermint-start]
-extend = "tendermint-run"
+[tasks.cometbft-start]
+extend = "cometbft-run"
 env = { "CMD" = "start", "FLAGS" = "-d" }
 
-[tasks.tendermint-run]
+[tasks.cometbft-run]
 script = """
 docker run \
   ${FLAGS} \
   --rm \
-  --name ${TM_CONTAINER_NAME} \
+  --name ${CMT_CONTAINER_NAME} \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --publish 26657:${HOST_RPC_PORT} \
-  --volume ${TEST_DATA_DIR}/tendermint:/tendermint \
-  --env TM_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
-  --env TM_PEX=false \
-  ${TM_DOCKER_IMAGE} \
+  --volume ${TEST_DATA_DIR}/cometbft:/cometbft \
+  --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
+  --env CMT_PEX=false \
+  ${CMT_DOCKER_IMAGE} \
   ${CMD}
 """
-dependencies = ["tendermint-pull", "test-data-dir", "network-create"]
+dependencies = ["cometbft-pull", "test-data-dir", "network-create"]
 
 
 [tasks.fendermint-init]
@@ -135,13 +135,13 @@ command = "docker"
 args = ["network", "rm", "${NETWORK_NAME}"]
 ignore_errors = true
 
-[tasks.tendermint-rm]
+[tasks.cometbft-rm]
 extend = "docker-rm"
-env = { "CONTAINER_NAME" = "${TM_CONTAINER_NAME}" }
+env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
 
-[tasks.tendermint-stop]
+[tasks.cometbft-stop]
 extend = "docker-stop"
-env = { "CONTAINER_NAME" = "${TM_CONTAINER_NAME}" }
+env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
 
 [tasks.fendermint-rm]
 extend = "docker-rm"

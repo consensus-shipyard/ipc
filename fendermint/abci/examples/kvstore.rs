@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use fendermint_abci::{AbciResult as Result, Application, ApplicationService};
 use structopt::StructOpt;
 use tendermint::abci::{request, response, Event, EventAttributeIndexExt};
-use tower_abci::{split, Server};
+use tower_abci::{split, v037::Server};
 use tracing::{info, Level};
 
 /// In-memory, hashmap-backed key-value store ABCI application.

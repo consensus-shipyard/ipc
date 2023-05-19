@@ -18,11 +18,13 @@ hex = { workspace = true }
 k256 = { workspace = true }
 libsecp256k1 = { workspace = true }
 num-traits = { workspace = true }
+prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
+tendermint-proto = { workspace = true }
 tokio = { workspace = true }
 tower-abci = { workspace = true }
 tracing = { workspace = true }

@@ -423,7 +423,7 @@ where
 
         let response = match result {
             Err(e) => invalid_query(AppError::InvalidEncoding, e.description),
-            Ok(result) => to_query(result, block_height),
+            Ok(result) => to_query(result, block_height)?,
         };
         Ok(response)
     }

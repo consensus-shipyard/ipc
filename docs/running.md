@@ -154,22 +154,22 @@ The public key was spliced in as it was, in base64 format, which is how it would
 own genesis file format. Note that here we don't have the option to use `Address`, because we have to return
 these as actual `PublicKey` types to Tendermint through ABCI, not as a hash of a key.
 
-### Configure Tendermint
+### Configure CometBFT
 
-First, follow the instructions in [getting started with Tendermint](./tendermint.md) to install the binary,
-then initialize a genesis file for Tendermint at `~/.tendermint`.
+First, follow the instructions in [getting started with CometBFT](./tendermint.md) to install the binary,
+then initialize a genesis file for CometBFT at `~/.cometbft`.
 
 ```shell
-rm -rf ~/.tendermint
-tendermint init
+rm -rf ~/.cometbft
+cometbft init
 ```
 
 The logs show that it created keys and a genesis file:
 
 ```console
-I[2023-03-29|09:58:06.324] Found private validator                      module=main keyFile=/home/aakoshh/.tendermint/config/priv_validator_key.json stateFile=/home/aakoshh/.tendermint/data/priv_validator_state.json
-I[2023-03-29|09:58:06.324] Found node key                               module=main path=/home/aakoshh/.tendermint/config/node_key.json
-I[2023-03-29|09:58:06.324] Found genesis file                           module=main path=/home/aakoshh/.tendermint/config/genesis.json
+I[2023-03-29|09:58:06.324] Found private validator                      module=main keyFile=/home/aakoshh/.cometbft/config/priv_validator_key.json stateFile=/home/aakoshh/.cometbft/data/priv_validator_state.json
+I[2023-03-29|09:58:06.324] Found node key                               module=main path=/home/aakoshh/.cometbft/config/node_key.json
+I[2023-03-29|09:58:06.324] Found genesis file                           module=main path=/home/aakoshh/.cometbft/config/genesis.json
 ```
 
 #### Convert the Genesis file
@@ -178,19 +178,19 @@ We don't want to use the random values created by Tendermint; instead we need to
 file we created earlier to the format Tendermint accepts. Start with the genesis file:
 
 ```shell
-mv ~/.tendermint/config/genesis.json ~/.tendermint/config/genesis.json.orig
+mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig
 cargo run -p fendermint_app -- \
   genesis --genesis-file test-network/genesis.json \
-  into-tendermint --out ~/.tendermint/config/genesis.json
+  into-tendermint --out ~/.cometbft/config/genesis.json
 ```
 
 Check the contents of the created Tendermint Genesis file:
 
 <details>
-  <summary>~/.tendermint/config/genesis.json</summary>
+  <summary>~/.cometbft/config/genesis.json</summary>
 
 ```console
-$ cat ~/.tendermint/config/genesis.json
+$ cat ~/.cometbft/config/genesis.json
 {
   "genesis_time": "2023-03-29T14:50:12Z",
   "chain_id": "test",
@@ -268,18 +268,18 @@ We can run the following command to replace the default `priv_validator_key.json
 one of the validators we created.
 
 ```shell
-mv ~/.tendermint/config/priv_validator_key.json ~/.tendermint/config/priv_validator_key.json.orig
+mv ~/.cometbft/config/priv_validator_key.json ~/.cometbft/config/priv_validator_key.json.orig
 cargo run -p fendermint_app -- \
-  key into-tendermint --secret-key test-network/keys/bob.sk --out ~/.tendermint/config/priv_validator_key.json
+  key into-tendermint --secret-key test-network/keys/bob.sk --out ~/.cometbft/config/priv_validator_key.json
 ```
 
 See if it looks reasonable:
 
 <details>
-<summary>~/.tendermint/config/priv_validator_key.json</summary>
+<summary>~/.cometbft/config/priv_validator_key.json</summary>
 
 ```console
-$ cat ~/.tendermint/config/priv_validator_key.json
+$ cat ~/.cometbft/config/priv_validator_key.json
 {
   "address": "66FA0CFB373BD737DBFC7CE70BEF994DD42A3812",
   "priv_key": {
@@ -344,20 +344,20 @@ If we need to restart the application from scratch, we can do so by erasing all 
 rm -rf ~/.fendermint/data/rocksdb
 ```
 
-### Run Tendermint
+### Run CometBFT
 
-Tendermint can be configured via `~/.tendermint/config/config.toml`; see the default settings [here](https://docs.tendermint.com/v0.34/tendermint-core/configuration.html).
+CometBFT can be configured via `~/.cometbft/config/config.toml`; see the default settings [here](https://docs.cometbft.com/v0.37/core/configuration).
 
-Now we are ready to start Tendermint and let it connect to the Fendermint Application.
+Now we are ready to start CometBFT and let it connect to the Fendermint Application.
 
 ```shell
-tendermint start
+cometbft start
 ```
 
-If we need to restart the application from scratch, we can erase all Tendermint state like so:
+If we need to restart the application from scratch, we can erase all CometBFT state like so:
 
 ```shell
-tendermint unsafe-reset-all
+cometbft unsafe-reset-all
 ```
 
 If all goes well, we will see block created in the Fendermint Application log as well the Tendermint log:
@@ -368,55 +368,40 @@ If all goes well, we will see block created in the Fendermint Application log as
 ```console
 $ rm -rf ~/.fendermint/data/rocksdb && cargo run -p fendermint_app --release -- --log-level debug run
 ...
-2023-03-30T11:51:34.239909Z DEBUG tower_abci::server: new request request=Info(Info { version: "v0.37.0-rc2", block_version: 11, p2p_version: 8, abci_version: "1.0.0" })
+2023-05-19T09:13:45.400896Z DEBUG tower_abci::v037::server: new request request=Info(Info { version: "0.37.1", block_version: 11, p2p_version: 8, abci_version: "1.0.0" })
 ...
-2023-03-30T11:51:34.240250Z DEBUG tower_abci::server: flushing response response=Ok(Info(Info { data: "fendermint", version: "0.1.0", app_version: 0, last_block_height: block::Height(0), last_block_app_hash: AppHash(0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8) }))
-2023-03-30T11:51:34.240914Z DEBUG tower_abci::server: new request request=InitChain(...)
+2023-05-19T09:13:45.401018Z DEBUG tower_abci::v037::server: flushing response response=Ok(Info(Info { data: "fendermint", version: "0.1.0", app_version: 0, last_block_height: block::Height(0), last_block_app_hash: AppHash(0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8) }))
+2023-05-19T09:13:45.401262Z DEBUG tower_abci::v037::server: new request request=InitChain(...)
 ...
-2023-03-30T11:51:34.295133Z  INFO fendermint_app::app: init chain state_root="bafy2bzaceaurow7dd2zs2zek7jb44x4jumraubzy5fyjya5edgxnc32nhap76" app_hash="0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF"
-2023-03-30T11:51:34.295665Z DEBUG tower_abci::server: flushing response response=Ok(InitChain(...))
+2023-05-19T09:13:54.062109Z DEBUG tower_abci::v037::server: new request request=PrepareProposal(...)
 ...
-2023-03-30T11:51:35.365180Z DEBUG tower_abci::server: new request request=BeginBlock(...)
+2023-05-19T09:13:54.083246Z DEBUG tower_abci::v037::server: new request request=ProcessProposal(ProcessProposal { ..., height: block::Height(3), ... })
 ...
-2023-03-30T11:51:35.365662Z DEBUG fendermint_app::app: begin block height=1
-2023-03-30T11:51:42.552711Z DEBUG fendermint_app::app: initialized exec state
-2023-03-30T11:51:42.553013Z DEBUG tower_abci::server: flushing response response=Ok(BeginBlock(...))
+2023-05-19T09:13:54.105797Z DEBUG fendermint_app::app: begin block height=3
+2023-05-19T09:13:54.105922Z DEBUG fendermint_app::app: initialized exec state
 ...
-2023-03-30T11:51:42.560459Z DEBUG tower_abci::server: flushing response response=Ok(Commit(...))
-...
-2023-03-30T11:51:42.606102Z DEBUG tower_abci::server: new request request=BeginBlock(...)
-...
-2023-03-30T11:51:42.606359Z DEBUG fendermint_app::app: begin block height=2
-2023-03-30T11:51:42.606623Z DEBUG fendermint_app::app: initialized exec state
-...
+2023-05-19T09:13:54.110007Z DEBUG fendermint_app::app: commit state state_root="bafy2bzacebh4fbl6rv7tlxxf2zsxqifjr424tkykwmgffqaho6mvr6hy7dq42" timestamp=1684487633
 ```
 </details>
 
 
 <details>
-  <summary>Tendermint log</summary>
+  <summary>CometBFT log</summary>
 
 ```console
-$ tendermint unsafe-reset-all && tendermint start
+$ cometbft unsafe-reset-all && cometbft start
 ...
-I[2023-03-30|12:51:34.240] ABCI Handshake App Info                      module=consensus height=0 hash=0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8 software-version=0.1.0 protocol-version=0
-I[2023-03-30|12:51:34.240] ABCI Replay Blocks                           module=consensus appHeight=0 storeHeight=0 stateHeight=0
-I[2023-03-30|12:51:34.299] Completed ABCI Handshake - Tendermint and App are synced module=consensus appHeight=0 appHash=0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8
+I[2023-05-19|10:13:45.449] Completed ABCI Handshake - CometBFT and App are synced module=consensus appHeight=0 appHash=0171A0E402203AAAC8F10B0E837FDF2546C98BF164972B07B49196E25322711E3C4807CF8AD8
+I[2023-05-19|10:13:45.449] Version info                                 module=main tendermint_version=0.37.1 abci=1.0.0 block=11 p2p=8 commit_hash=2af25aea6
+I[2023-05-19|10:13:45.449] This node is a validator                     module=consensus addr=1202F4D1C5ACCC8219E2973394CBD06FD1F33B5A pubKey=PubKeySecp256k1{02DBBA09ABF7888AA63D75534A8A0CD79209B0E549DFB3FDE015FC61069D1C7232}
 ...
-I[2023-03-30|12:51:35.335] received proposal                            module=consensus proposal="Proposal{1/0 (9FD634BC038D3CA4FC885E8530CD56B1693739AEBACBF404AAB5DDA5ADC8D180:1:756F1391A4CF, -1) 2BC2F835CBC1 @ 2023-03-30T11:51:35.327328663Z}"
-I[2023-03-30|12:51:35.339] received complete proposal block             module=consensus height=1 hash=9FD634BC038D3CA4FC885E8530CD56B1693739AEBACBF404AAB5DDA5ADC8D180
-I[2023-03-30|12:51:35.357] finalizing commit of block                   module=consensus height=1 hash=9FD634BC038D3CA4FC885E8530CD56B1693739AEBACBF404AAB5DDA5ADC8D180 root=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF num_txs=0
-I[2023-03-30|12:51:38.316] Timed out                                    module=consensus dur=3s height=1 round=0 step=RoundStepPropose
-I[2023-03-30|12:51:42.553] executed block                               module=state height=1 num_valid_txs=0 num_invalid_txs=0
-I[2023-03-30|12:51:42.560] committed state                              module=state height=1 num_txs=0 app_hash=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF
-I[2023-03-30|12:51:42.564] Timed out                                    module=consensus dur=-6.207267593s height=2 round=0 step=RoundStepNewHeight
-I[2023-03-30|12:51:42.567] indexed block                                module=txindex height=1
-I[2023-03-30|12:51:42.577] received proposal                            module=consensus proposal="Proposal{2/0 (5D2D09F6829D7F0481E597CEAE87DCFA5665987B0B7D57C05B302BEB8DB95406:1:4D3E5565CA22, -1) 693D8DF9C36E @ 2023-03-30T11:51:42.570865715Z}"
-I[2023-03-30|12:51:42.581] received complete proposal block             module=consensus height=2 hash=5D2D09F6829D7F0481E597CEAE87DCFA5665987B0B7D57C05B302BEB8DB95406
-I[2023-03-30|12:51:42.598] finalizing commit of block                   module=consensus height=2 hash=5D2D09F6829D7F0481E597CEAE87DCFA5665987B0B7D57C05B302BEB8DB95406 root=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF num_txs=0
-I[2023-03-30|12:51:42.607] executed block                               module=state height=2 num_valid_txs=0 num_invalid_txs=0
-I[2023-03-30|12:51:42.612] committed state                              module=state height=2 num_txs=0 app_hash=0171A0E4022029175BE31EB32D648AFA43CE5F89A3220A0738E9709C03A419AED16F4D381FFF
-I[2023-03-30|12:51:42.618] indexed block                                module=txindex height=2
+I[2023-05-19|10:13:54.061] Timed out                                    module=consensus dur=984.901925ms height=3 round=0 step=RoundStepNewHeight
+I[2023-05-19|10:13:54.079] received proposal                            module=consensus proposal="Proposal{3/0 (08CCBA6EDC7B6E77022D98A1BA528F34D2BDFFB94FE02DD36A3ECB873C321E07:1:ADBA4ABBE9A6, -1) 28842808EA1D @ 2023-05-19T09:13:54.072518233Z}"
+I[2023-05-19|10:13:54.082] received complete proposal block             module=consensus height=3 hash=08CCBA6EDC7B6E77022D98A1BA528F34D2BDFFB94FE02DD36A3ECB873C321E07
+I[2023-05-19|10:13:54.098] finalizing commit of block                   module=consensus height=3 hash=08CCBA6EDC7B6E77022D98A1BA528F34D2BDFFB94FE02DD36A3ECB873C321E07 root=0171A0E402204FC2857E8D7F35DEE5D6657820A98F35C9AB0AB30C52C007779958F8F8F8E1CD num_txs=0
+I[2023-05-19|10:13:54.106] executed block                               module=state height=3 num_valid_txs=0 num_invalid_txs=0
+I[2023-05-19|10:13:54.110] committed state                              module=state height=3 num_txs=0 app_hash=0171A0E402204FC2857E8D7F35DEE5D6657820A98F35C9AB0AB30C52C007779958F8F8F8E1CD
+I[2023-05-19|10:13:54.116] indexed block exents                         module=txindex height=3
 ...
 ```
 </details>
@@ -428,27 +413,37 @@ but after that the blocks come in fast, one per second.
 ## Query the state
 
 The Fendermint binary has some commands to support querying state. Behind the scenes it uses the `tendermint_rpc` crate to talk
-to the Tendermint JSON-RPC endpoints, which forward the requests to the Application through ABCI.
+to the CometBFT JSON-RPC endpoints, which forward the requests to the Application through ABCI.
 
 Assuming both processes have been started, see if we can query the state of one of our actors. For this we need the actor address,
 which we saw in the `genesis.json` file earlier.
 
+To make it easier to reuse these addresses, let's store them in variables:
+
+```shell
+ALICE_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key test-network/keys/alice.pk)
+BOB_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key test-network/keys/bob.pk)
+```
+
 ```shell
 cargo run -p fendermint_app --release -- \
-  rpc query actor-state --address f1jqqlnr5b56rnmc34ywp7p7i2lg37ty23s2bmg4y
+  rpc query actor-state --address $ALICE_ADDR
 ```
 
 The state is printed to STDOUT as JSON:
 
 ```console
+$ echo $ALICE_ADDR
+f1i2izmkzef5q6udtdooeujzfsuieybxzl2yer5ey
+$ cargo run -p fendermint_app --release --   rpc query actor-state --address $ALICE_ADDR
 {
   "id": 100,
   "state": {
     "balance": "1000000000000000000",
-    "code": "bafk2bzaceaqi73ey2grdtwgmnl22yj37l6pttsmrqnoc44o6wdqtt5rmpam6y",
+    "code": "bafk2bzacealdyp7dmpc6eir65qhuh2hgv7onmv53rzzyp5futafmjjlxrt6fg",
     "delegated_address": null,
     "sequence": 0,
-    "state": "bafy2bzaceaayg22rmfjw5di7obchf2cdz3yydo32njavenej5uluf7hfatosi"
+    "state": "bafy2bzaceas2zajrutdp7ugb6w2lpmow3z3klr3gzqimxtuz22tkkqallfch4"
   }
 }
 ```
@@ -460,14 +455,14 @@ We can retrieve the raw state of the account with the `ipld` command by using th
 
 ```shell
 cargo run -p fendermint_app --release -- \
-        rpc query ipld --cid bafy2bzaceaayg22rmfjw5di7obchf2cdz3yydo32njavenej5uluf7hfatosi
+        rpc query ipld --cid bafy2bzaceas2zajrutdp7ugb6w2lpmow3z3klr3gzqimxtuz22tkkqallfch4
 ```
 
 The binary contents are printed with Base64 encoding, which we could pipe to a file. It would be more useful to run this query
 programmatically and parse it to the appropriate data structure from [builtin-actors](https://github.com/filecoin-project/builtin-actors).
 
 ```console
-gVUBTCC2x6HvotYLfMWf9/0aWbf541s=
+gVUBRpGWKyQvYeoOY3OJROSyogmA3ys=
 ```
 
 ## Transfer tokens
@@ -477,7 +472,6 @@ The simplest transaction we can do is to transfer tokens from one account to ano
 For example we can send 1000 tokens from Alice to Bob:
 
 ```shell
-BOB_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key test-network/keys/bob.pk)
 cargo run -p fendermint_app --release -- \
   rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000
 ```
@@ -528,8 +522,6 @@ The `code: 0` parts indicate that both check and delivery were successful. Let's
 $ cargo run -p fendermint_app --release -- rpc query actor-state --address $BOB_ADDR | jq .state.balance
 "1000"
 
-$ ALICE_ADDR=$(cargo run -p fendermint_app --release -- key address --public-key test-network/keys/alice.pk)
-
 $ cargo run -p fendermint_app --release -- rpc query actor-state --address $ALICE_ADDR | jq "{balance: .state.balance, sequence: .state.sequence}"
 {
   "balance": "999999999999999000",
@@ -558,20 +550,24 @@ cargo run -p fendermint_app --release -- \
 Note that now we are using `--sequence 1` because this is the second transaction sent by Alice.
 
 The output shows what addresses have been assigned to the created contract,
-which we can use to call the contract.
+which we can use to call the contract, namely by copying the `delegated_address`.
 
 ```console
-$ cargo run -p fendermint_app --release -- \
+$ CREATE=$(cargo run -p fendermint_app --release -- \
         rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
-          create --contract $CONTRACT | jq .return_data
+          create --contract $CONTRACT)
+
+$ echo $CREATE | jq .return_data
 {
-  "actor_address": "f0105",
-  "actor_id": 105,
-  "actor_id_as_eth_address": "ff00000000000000000000000000000000000069",
-  "delegated_address": "f410fsho763qmlcfi6ufnim7sujmbaqyc64b3pzpa7bq",
-  "eth_address": "91ddff6e0c588a8f50ad433f2a258104302f703b",
-  "robust_address": "f2rd3cu2jokusukudmbwotuu4rvoebm45qnze7e6q"
+    "actor_address": "f0105",
+    "actor_id": 105,
+    "actor_id_as_eth_address": "ff00000000000000000000000000000000000069",
+    "delegated_address": "f410f7do6trb2wkh6vwj6wpg5oxpgbipmj6btcc3kipq",
+    "eth_address": "f8dde9c43ab28fead93eb3cdd75de60a1ec4f833",
+    "robust_address": "f2yapgav7dqzifnry3ccqfg3xdzek73zd7rjvwsci"
 }
+
+$ DELEGATED_ADDR=$(echo $CREATE | jq -r .return_data.delegated_address)
 ```
 
 ## Invoke FEVM Contract
@@ -581,11 +577,13 @@ Now that we have a contract deployed, we can call it. The arguments in the follo
 ```console
 $ cargo run -p fendermint_app --release -- \
               rpc fevm --secret-key test-network/keys/alice.sk --sequence 2 \
-                invoke --contract f410fsho763qmlcfi6ufnim7sujmbaqyc64b3pzpa7bq  \
+                invoke --contract $DELEGATED_ADDR  \
                        --method f8b2cb4f --method-args 000000000000000000000000ff00000000000000000000000000000000000064 \
           | jq .return_data
 "0000000000000000000000000000000000000000000000000000000000002710"
 ```
+
+If we look at the [method signatures](https://github.com/filecoin-project/builtin-actors/blob/v10.0.0/actors/evm/tests/contracts/SimpleCoin.signatures#L2) we can see that this is calling [getBalance](https://github.com/filecoin-project/builtin-actors/blob/v10.0.0/actors/evm/tests/contracts/simplecoin.sol#L28), and indeed if we decode `2710` from hexadecimal to decimal, we get the `10000` balance the owner should have.
 
 To avoid having to come up with ABI encoded arguments in hexadecimal format, we can use the RPC client in combination with [ethers](https://docs.rs/crate/ethers/latest) excellent `abigen` functionality.
 
@@ -593,11 +591,11 @@ Here's an [example](../fendermint/rpc/examples/simplecoin.rs) of doing that with
 
 ```console
 $ cargo run -p fendermint_rpc --release --example simplecoin -- --secret-key test-network/keys/alice.sk --verbose
-2023-04-06T11:00:18.287411Z DEBUG fendermint_rpc::client: Using HTTP client to submit request to: http://127.0.0.1:26657/
+2023-05-19T10:18:47.234878Z DEBUG fendermint_rpc::client: Using HTTP client to submit request to: http://127.0.0.1:26657/
 ...
-2023-04-06T11:00:18.586419Z  INFO simplecoin: contract deployed contract_address="f410fiv7rempf2cfdykbfl5xzrjnilgwb3jcgrelnvki" actor_id=107
+2023-05-19T10:18:47.727563Z  INFO simplecoin: contract deployed contract_address="f410fvbmxiqdn6svyo5oubfbzxsorkvydcb5ecmlbwma" actor_id=107
 ...
-2023-04-06T11:00:19.581317Z  INFO simplecoin: owner balance balance="10000" owner_eth_addr="ff00000000000000000000000000000000000064"
+2023-05-19T10:18:48.805085Z  INFO simplecoin: owner balance balance="10000" owner_eth_addr="ff00000000000000000000000000000000000064"
 ```
 
 Note that the script figures out the Alice's nonce on its own, so we don't have to pass it in. It also has an example of running an EVM view method (which is read-only) either as as a distributed read-transaction (which is included on the chain and costs gas) or a query anwered by our node without involving the blockchain. Both have their uses, depending on our level of trust.

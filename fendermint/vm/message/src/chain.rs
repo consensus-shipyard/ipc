@@ -12,7 +12,7 @@ use crate::signed::SignedMessage;
 /// signed by BLS signatures are aggregated to the block level, and their original
 /// signatures are stripped from the messages, to save space. Tendermint Core will
 /// not do this for us (perhaps with ABCI++ Vote Extensions we could do it), though.
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ChainMessage {
     /// A message that can be passed on to the FVM as-is.
     Signed(Box<SignedMessage>),

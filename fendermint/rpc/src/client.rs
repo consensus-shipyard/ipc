@@ -8,8 +8,7 @@ use async_trait::async_trait;
 use fendermint_vm_message::chain::ChainMessage;
 use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
-use tendermint_rpc::v0_37::Client;
-use tendermint_rpc::{endpoint::abci_query::AbciQuery, HttpClient, Scheme, Url};
+use tendermint_rpc::{endpoint::abci_query::AbciQuery, Client, HttpClient, Scheme, Url};
 
 use fendermint_vm_message::query::FvmQuery;
 

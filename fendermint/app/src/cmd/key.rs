@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use fvm_shared::address::Address;
 use libsecp256k1::{PublicKey, SecretKey};
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
@@ -41,7 +41,8 @@ cmd! {
   KeyIntoTendermintArgs(self) {
     let sk = read_secret_key(&self.secret_key)?;
     let pk = PublicKey::from_secret_key(&sk);
-    let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&pk.serialize())?;
+    let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(&pk.serialize())
+      .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
     let pub_key = tendermint::PublicKey::Secp256k1(vk);
     let address = tendermint::account::Id::from(pub_key);
 

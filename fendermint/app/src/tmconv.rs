@@ -1,22 +1,24 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Conversions to Tendermint data types.
+use anyhow::{anyhow, Context};
 use fendermint_vm_genesis::Validator;
 use fendermint_vm_interpreter::{
     fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet},
     Timestamp,
 };
 use fvm_shared::{error::ExitCode, event::StampedEvent};
+use prost::Message;
 use std::num::NonZeroU32;
 use tendermint::abci::{response, Code, Event, EventAttribute};
 
 use crate::{app::AppError, BlockHeight};
 
 /// IPLD encoding of data types we know we must be able to encode.
-macro_rules! must_encode {
+macro_rules! ipld_encode {
     ($var:ident) => {
         fvm_ipld_encoding::to_vec(&$var)
-            .unwrap_or_else(|e| panic!("error encoding {}: {}", stringify!($var), e))
+            .map_err(|e| anyhow!("error IPLD encoding {}: {}", stringify!($var), e))?
     };
 }
 
@@ -133,7 +135,7 @@ pub fn to_events(kind: &str, stamped_events: Vec<StampedEvent>) -> Vec<Event> {
 }
 
 /// Map to query results.
-pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query {
+pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<response::Query> {
     let exit_code = match ret {
         FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => ExitCode::USR_NOT_FOUND,
         FvmQueryRet::Ipld(_) | FvmQueryRet::ActorState(_) => ExitCode::OK,
@@ -151,35 +153,42 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> response::Query 
         FvmQueryRet::Ipld(Some(bz)) => (Vec::new(), bz),
         FvmQueryRet::ActorState(Some(x)) => {
             let (id, st) = *x;
-            let k = must_encode!(id);
-            let v = must_encode!(st);
+            let k = ipld_encode!(id);
+            let v = ipld_encode!(st);
             (k, v)
         }
         FvmQueryRet::Call(ret) => {
             // Send back an entire Tendermint deliver_tx response, encoded as IPLD.
             // This is so there is a single representation of a call result, instead
             // of a normal delivery being one way and a query exposing `FvmApplyRet`.
-            let r = to_deliver_tx(ret);
-            let v = must_encode!(r);
+            let dtx = to_deliver_tx(ret);
+            let dtx = tendermint_proto::abci::ResponseDeliverTx::from(dtx);
+            let mut buf = bytes::BytesMut::new();
+            dtx.encode(&mut buf)?;
+            let bz = buf.to_vec();
+            // So the value is an IPLD encoded Protobuf byte vector.
+            let v = ipld_encode!(bz);
             (Vec::new(), v)
         }
         FvmQueryRet::EstimateGas(est) => {
-            let v = must_encode!(est);
+            let v = ipld_encode!(est);
             (Vec::new(), v)
         }
     };
 
     // The height here is the height of the block that was committed, not in which the app hash appeared.
-    let height = tendermint::block::Height::try_from(block_height).expect("height too big");
+    let height = tendermint::block::Height::try_from(block_height).context("height too big")?;
 
-    response::Query {
+    let res = response::Query {
         code: to_code(exit_code),
         info: to_error_msg(exit_code).to_owned(),
         key: key.into(),
         value: value.into(),
         height,
         ..Default::default()
-    }
+    };
+
+    Ok(res)
 }
 
 /// Project Genesis validators to Tendermint.
@@ -189,7 +198,10 @@ pub fn to_validator_updates(
     let mut updates = vec![];
     for v in validators {
         let bz = v.public_key.0.serialize();
-        let key = k256::ecdsa::VerifyingKey::from_sec1_bytes(&bz)?;
+
+        let key = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(&bz)
+            .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
+
         updates.push(tendermint::validator::Update {
             pub_key: tendermint::public_key::PublicKey::Secp256k1(key),
             power: tendermint::vote::Power::try_from(v.power.0)?,
