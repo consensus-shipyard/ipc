@@ -56,8 +56,26 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
         loop {
             // Load the latest config.
             let config = self.config.get_config();
-            let (top_down_managers, bottom_up_managers) =
-                setup_managers_from_config(&config.subnets, self.wallet_store.clone()).await?;
+            let (top_down_managers, bottom_up_managers) = match setup_managers_from_config(
+                &config.subnets,
+                self.wallet_store.clone(),
+            )
+            .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error!("Please check configuration! Cannot start the checkpoint subsystem due to config error: {e:}. Update and reload config.");
+                    match config_chan.recv().await {
+                        Ok(_) => continue,
+                        Err(e) => {
+                            // this should seldom happen, but good to report it.
+                            return Err(anyhow!(
+                                "config update notification channel closed unexpected: {e:}"
+                            ));
+                        }
+                    }
+                }
+            };
 
             loop {
                 select! {
