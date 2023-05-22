@@ -30,32 +30,42 @@ pub struct RocksDb {
 /// let mut db = RocksDb::open("test_db", &RocksDbConfig::default()).unwrap();
 /// ```
 impl RocksDb {
+    /// Open existing column families.
     pub fn open<P>(path: P, config: &RocksDbConfig) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        let cfs = Self::list_cf(&path, config)?;
-        Self::open_cf(&path, config, cfs.iter())
+        let cfs: Vec<String> = Vec::new();
+        Self::open_cf(path, config, cfs.iter())
     }
 
-    /// Open all column families with the same config.
-    fn open_cf<P, I, N>(path: P, config: &RocksDbConfig, cfs: I) -> Result<Self, Error>
+    /// Open existing column families and potentially create new ones, using the same config.
+    pub fn open_cf<P, I, N>(path: P, config: &RocksDbConfig, cfs: I) -> Result<Self, Error>
     where
         P: AsRef<Path>,
         I: Iterator<Item = N>,
         N: AsRef<str>,
     {
         let db_opts: rocksdb::Options = config.into();
+        let ex_cfs = Self::list_cf(&path, config)?;
+        let ex_cfs = ex_cfs
+            .into_iter()
+            .map(|cf| ColumnFamilyDescriptor::new(cf, db_opts.clone()));
 
-        let cfs =
-            cfs.map(|cf| ColumnFamilyDescriptor::new(cf.as_ref().to_owned(), db_opts.clone()));
+        let db = OptimisticTransactionDB::open_cf_descriptors(&db_opts, path, ex_cfs)?;
 
-        let db = OptimisticTransactionDB::open_cf_descriptors(&db_opts, path, cfs)?;
-
-        Ok(Self {
+        let db = Self {
             db: Arc::new(db),
             options: db_opts,
-        })
+        };
+
+        for cf in cfs {
+            if !db.has_cf_handle(cf.as_ref()) {
+                db.new_cf_handle(cf.as_ref())?;
+            }
+        }
+
+        Ok(db)
     }
 
     /// List existing column families in a database.

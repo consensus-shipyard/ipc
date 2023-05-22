@@ -3,7 +3,7 @@
 mod rocks;
 
 #[cfg(feature = "blockstore")]
-mod blockstore;
+pub mod blockstore;
 #[cfg(feature = "kvstore")]
 mod kvstore;
 

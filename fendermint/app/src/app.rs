@@ -78,12 +78,19 @@ impl AppState {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, S, I>
+pub struct App<DB, SS, S, I>
 where
-    DB: Blockstore + 'static,
+    SS: Blockstore + 'static,
     S: KVStore,
 {
+    /// Database backing all key-value operations.
     db: Arc<DB>,
+    /// State store, backing all the smart contracts.
+    ///
+    /// Must be kept separate from storage that can be influenced by network operations such as Bitswap;
+    /// nodes must be able to run transactions deterministically. By contrast the Bitswap store should
+    /// be able to read its own storage area as well as state storage, to serve content from both.
+    state_store: Arc<SS>,
     /// Wasm engine cache.
     multi_engine: Arc<MultiEngine>,
     /// Path to the Wasm bundle.
@@ -106,26 +113,28 @@ where
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
     /// State accumulating changes during block execution.
-    exec_state: Arc<Mutex<Option<FvmExecState<DB>>>>,
+    exec_state: Arc<Mutex<Option<FvmExecState<SS>>>>,
     /// Projected partial state accumulating during transaction checks.
-    check_state: Arc<tokio::sync::Mutex<Option<FvmCheckState<DB>>>>,
+    check_state: Arc<tokio::sync::Mutex<Option<FvmCheckState<SS>>>>,
     /// How much history to keep.
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
 }
 
-impl<DB, S, I> App<DB, S, I>
+impl<DB, SS, S, I> App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + 'static,
+    DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
+    SS: Blockstore + Clone + 'static,
 {
     pub fn new(
         db: DB,
+        state_store: SS,
         actor_bundle_path: PathBuf,
         app_namespace: S::Namespace,
         state_hist_namespace: S::Namespace,
@@ -134,6 +143,7 @@ where
     ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
+            state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
             actor_bundle_path,
             namespace: app_namespace,
@@ -148,26 +158,27 @@ where
     }
 }
 
-impl<DB, S, I> App<DB, S, I>
+impl<DB, SS, S, I> App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    DB: Blockstore + KVWritable<S> + KVReadable<S> + 'static + Clone,
+    DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
+    SS: Blockstore + 'static + Clone,
 {
-    /// Get an owned clone of the database.
-    fn clone_db(&self) -> DB {
-        self.db.as_ref().clone()
+    /// Get an owned clone of the state store.
+    fn state_store_clone(&self) -> SS {
+        self.state_store.as_ref().clone()
     }
 
     /// Ensure the store has some initial state.
     fn init_committed_state(&self) -> Result<()> {
         if self.get_committed_state()?.is_none() {
             // We need to be careful never to run a query on this.
-            let mut state_tree =
-                empty_state_tree(self.clone_db()).context("failed to create empty state tree")?;
+            let mut state_tree = empty_state_tree(self.state_store_clone())
+                .context("failed to create empty state tree")?;
             let state_root = state_tree.flush()?;
             let state = AppState {
                 block_height: 0,
@@ -226,14 +237,14 @@ where
     }
 
     /// Put the execution state during block execution. Has to be empty.
-    fn put_exec_state(&self, state: FvmExecState<DB>) {
+    fn put_exec_state(&self, state: FvmExecState<SS>) {
         let mut guard = self.exec_state.lock().expect("mutex poisoned");
         assert!(guard.is_none(), "exec state not empty");
         *guard = Some(state);
     }
 
     /// Take the execution state during block execution. Has to be non-empty.
-    fn take_exec_state(&self) -> FvmExecState<DB> {
+    fn take_exec_state(&self) -> FvmExecState<SS> {
         let mut guard = self.exec_state.lock().expect("mutex poisoned");
         guard.take().expect("exec state empty")
     }
@@ -241,8 +252,8 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce(FvmExecState<DB>) -> R,
-        R: Future<Output = Result<(FvmExecState<DB>, T)>>,
+        F: FnOnce(FvmExecState<SS>) -> R,
+        R: Future<Output = Result<(FvmExecState<SS>, T)>>,
     {
         let state = self.take_exec_state();
         let (state, ret) = f(state).await?;
@@ -280,9 +291,9 @@ where
 // of `Response` actually has an `Exception` type, so in theory we could use that, and
 // Tendermint would break up the connection. However, before the response could reach it,
 // the `tower-abci` library would throw an exception when it tried to convert a
-// `Response::Exception` into a `ConensusResponse` for example.
+// `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, S, I> Application for App<DB, S, I>
+impl<DB, SS, S, I> Application for App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -290,26 +301,27 @@ where
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
     S::Namespace: Sync + Send,
-    DB: Blockstore + KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
+    DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
+    SS: Blockstore + Clone + Send + Sync + 'static,
     I: ExecInterpreter<
-        State = FvmExecState<DB>,
+        State = FvmExecState<SS>,
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRet,
         EndOutput = (),
     >,
     I: CheckInterpreter<
-        State = FvmCheckState<DB>,
+        State = FvmCheckState<SS>,
         Message = Vec<u8>,
         Output = BytesMessageCheckRet,
     >,
     I: QueryInterpreter<
-        State = FvmQueryState<DB>,
+        State = FvmQueryState<SS>,
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRet,
     >,
     I: GenesisInterpreter<
-        State = FvmGenesisState<DB>,
+        State = FvmGenesisState<SS>,
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
@@ -336,7 +348,7 @@ where
         let bundle = std::fs::read(bundle_path)
             .map_err(|e| anyhow!("failed to load bundle CAR from {bundle_path:?}: {e}"))?;
 
-        let state = FvmGenesisState::new(self.clone_db(), &bundle)
+        let state = FvmGenesisState::new(self.state_store_clone(), &bundle)
             .await
             .context("failed to create genesis state")?;
 
@@ -387,7 +399,7 @@ where
 
     /// Query the application for data at the current or past height.
     async fn query(&self, request: request::Query) -> AbciResult<response::Query> {
-        let db = self.clone_db();
+        let db = self.state_store_clone();
         let (state_params, block_height) = self.state_params_at_height(request.height)?;
 
         tracing::info!(
@@ -436,7 +448,7 @@ where
         let state = match guard.take() {
             Some(state) => state,
             None => {
-                let db = self.clone_db();
+                let db = self.state_store_clone();
                 let state = self.committed_state()?;
                 FvmCheckState::new(db, state.state_root()).context("error creating check state")?
             }
@@ -471,7 +483,7 @@ where
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
     async fn begin_block(&self, request: request::BeginBlock) -> AbciResult<response::BeginBlock> {
-        let db = self.clone_db();
+        let db = self.state_store_clone();
         let height = request.header.height.into();
         let state = self.committed_state()?;
         let mut state_params = state.state_params.clone();

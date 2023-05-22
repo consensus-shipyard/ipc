@@ -4,7 +4,7 @@
 use anyhow::{anyhow, Context};
 use fendermint_abci::ApplicationService;
 use fendermint_app::{App, AppStore};
-use fendermint_rocksdb::{namespaces, RocksDb, RocksDbConfig};
+use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_interpreter::{
     bytes::BytesMessageInterpreter, chain::ChainMessageInterpreter, fvm::FvmMessageInterpreter,
     signed::SignedMessageInterpreter,
@@ -20,7 +20,7 @@ cmd! {
 }
 
 async fn run(settings: Settings) -> anyhow::Result<()> {
-    let interpreter = FvmMessageInterpreter::<RocksDb>::new();
+    let interpreter = FvmMessageInterpreter::<NamespaceBlockstore>::new();
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::new(interpreter);
     let interpreter = BytesMessageInterpreter::new(interpreter);
@@ -28,8 +28,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;
 
-    let app: App<_, AppStore, _> = App::new(
+    let state_store =
+        NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
+
+    let app: App<_, _, AppStore, _> = App::new(
         db,
+        state_store,
         settings.builtin_actors_bundle(),
         ns.app,
         ns.state_hist,
@@ -64,24 +68,18 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 namespaces! {
     Namespaces {
         app,
-        state_hist
+        state_hist,
+        state_store
     }
 }
 
+/// Open database with all
 fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     let path = settings.data_dir().join("rocksdb");
     info!(
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
-    let db = RocksDb::open(path, &RocksDbConfig::default())?;
-
-    // Filter names first, then create, which is just a way to catch duplicates.
-    let mut names = ns.values();
-    names.retain(|name| !db.has_cf_handle(name));
-    for name in names {
-        db.new_cf_handle(name)?;
-    }
-
+    let db = RocksDb::open_cf(path, &RocksDbConfig::default(), ns.values().iter())?;
     Ok(db)
 }
