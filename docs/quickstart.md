@@ -59,7 +59,7 @@ git clone https://github.com/consensus-shipyard/ipc-agent.git
 ```
 * Download and compile eudico (might take a while)
 ```bash
-git clone https://github.com/consensus-shipyard/lotus.git
+git clone --branch spacenet https://github.com/consensus-shipyard/lotus.git
 (cd lotus && make spacenet)
 ```
 
@@ -101,7 +101,7 @@ accounts = []
 
 * Create a new wallet in your agent
 ```bash
-./ipc-agent/bin/ipc-agent wallet new --key-type=secp256k1
+./ipc-agent/bin/ipc-agent wallet new --key-type secp256k1
 ```
 
 * Add your new wallet address in the accounts field of your config:
@@ -142,9 +142,9 @@ Although we set a minimum of 2 active validators in the previous, we'll deploy 3
 ```
 * Export each wallet (WALLET_1, WALLET_2, and WALLET_3) by substituting their addresses below
 ```bash
-./ipc-agent/bin/ipc-agent wallet export --address=<WALLET_1> --output=~/.ipc-agent/wallet1.key
-./ipc-agent/bin/ipc-agent wallet export --address=<WALLET_2> --output=~/.ipc-agent/wallet2.key
-./ipc-agent/bin/ipc-agent wallet export --address=<WALLET_3> --output=~/.ipc-agent/wallet3.key
+./ipc-agent/bin/ipc-agent wallet export --address <WALLET_1> --output ~/.ipc-agent/wallet1.key
+./ipc-agent/bin/ipc-agent wallet export --address <WALLET_2> --output ~/.ipc-agent/wallet2.key
+./ipc-agent/bin/ipc-agent wallet export --address <WALLET_3> --output ~/.ipc-agent/wallet3.key
 ```
 * We also need to fund the wallets with enough collateral to; we'll send the funds from our default wallet 
 ```bash
@@ -169,7 +169,7 @@ We can deploy the subnet nodes. Note that each node should be importing a differ
 >>> Subnet /root/<SUBNET_ID> daemon running in container: <CONTAINER_ID_#> (friendly name: <CONTAINER_NAME_#>)
 >>> Token to /root/<SUBNET_ID> daemon: <AUTH_TOKEN_#>
 >>> Default wallet: <WALLET_#>
->>> Subnet subnet validator info:
+>>> Subnet validator info:
 <VALIDATOR_ADDR_#>
 >>> API listening in host port <PORT_#>
 >>> Validator listening in host port <VALIDATOR_PORT_#>
