@@ -5,11 +5,11 @@
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::crypto::signature::SignatureType;
-use serde::Deserialize;
 use std::fmt::Debug;
 use std::str::FromStr;
 
 use crate::cli::commands::get_ipc_agent_url;
+use crate::cli::commands::wallet::LotusJsonKeyType;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
@@ -61,11 +61,4 @@ pub(crate) struct WalletImportArgs {
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "Path of keyinfo file for the key to import")]
     pub path: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct LotusJsonKeyType {
-    r#type: String,
-    private_key: String,
 }

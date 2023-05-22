@@ -9,7 +9,8 @@ mod commands;
 use crate::config::Config;
 pub use commands::*;
 
-const DEFAULT_CONFIG_PATH: &str = ".ipc-agent/config.toml";
+const DEFAULT_REPO_PATH: &str = ".ipc-agent";
+const DEFAULT_CONFIG_NAME: &str = "config.toml";
 
 /// The trait that represents the abstraction of a command line handler. To implement a new command
 /// line operation, implement this trait and register it.
@@ -42,17 +43,23 @@ pub struct GlobalArguments {
 
 impl GlobalArguments {
     pub fn config_path(&self) -> String {
-        self.config_path.clone().unwrap_or_else(|| {
-            let home = match std::env::var("HOME") {
-                Ok(home) => home,
-                Err(_) => panic!("cannot get home"),
-            };
-            format!("{home:}/{:}", DEFAULT_CONFIG_PATH)
-        })
+        self.config_path.clone().unwrap_or_else(default_config_path)
     }
 
     pub fn config(&self) -> Result<Config> {
         let config_path = self.config_path();
         Config::from_file(config_path)
     }
+}
+
+pub fn default_repo_path() -> String {
+    let home = match std::env::var("HOME") {
+        Ok(home) => home,
+        Err(_) => panic!("cannot get home"),
+    };
+    format!("{home:}/{:}", DEFAULT_REPO_PATH)
+}
+
+pub fn default_config_path() -> String {
+    format!("{}/{:}", default_repo_path(), DEFAULT_CONFIG_NAME)
 }

@@ -28,7 +28,7 @@ use crate::cli::commands::wallet::WalletCommandsArgs;
 
 pub use subnet::*;
 
-use super::DEFAULT_CONFIG_PATH;
+use super::default_repo_path;
 
 /// The collection of all subcommands to be called, see clap's documentation for usage. Internal
 /// to the current mode. Register a new command accordingly.
@@ -125,10 +125,10 @@ pub(crate) fn get_ipc_agent_url(
     Ok(url)
 }
 
-pub(crate) fn get_keystore(path: &Option<String>) -> Result<KeyStore> {
+pub(crate) fn get_keystore(path: Option<String>) -> Result<KeyStore> {
     let path = match path {
         Some(p) => p,
-        None => DEFAULT_CONFIG_PATH,
+        None => default_repo_path(),
     };
-    new_keystore_from_path(path)
+    new_keystore_from_path(&path)
 }

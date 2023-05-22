@@ -1,7 +1,7 @@
-use anyhow::anyhow;
-use fvm_shared::crypto::signature::SignatureType;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+use anyhow::anyhow;
+use fvm_shared::crypto::signature::SignatureType;
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display, EnumString};
 
@@ -23,6 +23,17 @@ impl TryFrom<WalletKeyType> for SignatureType {
             WalletKeyType::BLS => Ok(SignatureType::BLS),
             WalletKeyType::Secp256k1 => Ok(SignatureType::Secp256k1),
             WalletKeyType::Secp256k1Ledger => Err(anyhow!("type not supported")),
+        }
+    }
+}
+
+impl TryFrom<SignatureType> for WalletKeyType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SignatureType) -> Result<Self, Self::Error> {
+        match value {
+            SignatureType::BLS => Ok(WalletKeyType::BLS),
+            SignatureType::Secp256k1 => Ok(WalletKeyType::Secp256k1),
         }
     }
 }

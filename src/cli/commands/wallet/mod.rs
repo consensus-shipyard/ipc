@@ -5,6 +5,7 @@ use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::cli::commands::wallet::balances::{WalletBalances, WalletBalancesArgs};
 use crate::cli::commands::wallet::new::{WalletNew, WalletNewArgs};
 use clap::{Args, Subcommand};
+use serde::{Deserialize, Serialize};
 
 use self::export::{WalletExport, WalletExportArgs};
 use self::import::{WalletImport, WalletImportArgs};
@@ -39,4 +40,12 @@ pub(crate) enum Commands {
     Balances(WalletBalancesArgs),
     Import(WalletImportArgs),
     Export(WalletExportArgs),
+}
+
+// Lotus JSON keytype format
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct LotusJsonKeyType {
+    r#type: String,
+    private_key: String,
 }
