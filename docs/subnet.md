@@ -12,7 +12,7 @@ We provide instructions for running both a [simple single-validator subnet](#run
 
 In order to run a validator in a subnet, we'll need a set of keys to handle that validator. To export the validator key from your agent you need to run: 
 ```bash
-./ipc-agent/bin/ipc-agent wallet export --address=<address-to-export> --output=<output file>
+./ipc-agent/bin/ipc-agent wallet export --address <address-to-export> --output <output file>
 ```
 
 If for some reason, you want to use for your validator a set of keys that are not managed by the IPC agent, and are held in a raw Eudico node of another network, you can export the wallet key into a file (like the wallet address we are using in the rootnet), with the following Lotus command:
@@ -38,14 +38,14 @@ $ docker exec -it ipc_root_1234 eudico wallet export --lotus-json t1cp4q4lqsdhob
 ### Importing wallet keys
 Your agent handles the keys for all of your addresses in IPC and is responsible for signing the transactions to the different networks. To import a key to the agent you can use: 
 ```bash
-`./ipc-agent/bin/ipc-agent wallet import --path=<wallet-key-file-path>`
+`./ipc-agent/bin/ipc-agent wallet import --path <wallet-key-file-path>`
 ```
 
 The only operation that requres importing the keys into your raw Eudico node is when running a subnet validator. Subnet validators need to hold the validator keys in their wallets in order to be able to sign new blocks. You may use the following commands to import a wallet directly into the raw subnet node of your validator: 
 
 ```bash
 # Bare: Import directly into eudico
-./eudico wallet import --lotus-json <wallet-key-file-path>
+./eudico wallet import --format lotus-json <wallet-key-file-path>
 ```
 ```console
 # Example execution
@@ -54,11 +54,11 @@ $ ./eudico wallet import --lotus-json ~/.ipc-agent/wallet.key
 
 ```bash
 # Docker: Copy the wallet key into the container and import into eudico
-docker cp <wallet-key-path> <container-id>:<target-file-in-container> && docker exec -it <container-id> eudico wallet import --format=json-lotus <target-file-in-container>
+docker cp <wallet-key-path> <container-id>:<target-file-in-container> && docker exec -it <container-id> eudico wallet import --format json-lotus <target-file-in-container>
 ```
 ```console
 # Example execution
-$ docker cp ~/.ipc-agent/wallet.key ipc_root_t01002_1250:/input.key && docker exec -it ipc_root_t01002_1250 eudico wallet import --format=json-lotus input.key
+$ docker cp ~/.ipc-agent/wallet.key ipc_root_t01002_1250:/input.key && docker exec -it ipc_root_t01002_1250 eudico wallet import --format json-lotus input.key
 ```
 
 ## Running a simple subnet with a single validator
@@ -158,6 +158,7 @@ With this, we can already create the subnet with `/root` as its parent. We are g
 ```bash
 ./bin/ipc-agent subnet create --parent /root --name test --min-validator-stake 1 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
 ```
+
 ### Deploying the infrastructure
 
 In order to deploy the 3 validators for the subnet, we will have to first export the keys from our root node so we can import them to our validators. Depending on how you are running your rootnet node you'll have to make a call to the docker container, or your nodes API. More information about exporting keys from your node can be found under [this section](#Exporting-wallet-keys).

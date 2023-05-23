@@ -8,10 +8,10 @@ IPC subnets have the same exact support for the deployment of EVM contracts as t
 In order to connect the Ethereum tooling to your subnet, you'll need to get the RPC endpoint of your subnet peer and the subnet's `chainID`. For this, you can use the following command from your IPC agent to retrieve the RPC endpoint for a specific subnet: 
 
 ```bash
-./bin/ipc-agent subnet rpc --subnet=<subnet-id>
+./bin/ipc-agent subnet rpc --subnet <subnet-id>
 
 # Sample command
-$ ./bin/ipc-agent subnet rpc --subnet=/root/t01002
+$ ./bin/ipc-agent subnet rpc --subnet /root/t01002
 [2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] rpc endpoint for subnet /root/t01002: http://127.0.0.1:1240/rpc/v1
 [2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] chainID for subnet /root/t01002: 31415926
 ```
@@ -46,9 +46,9 @@ To deploy a smart contract in your subnet the only pre-requirement is to have so
 It is important to note that the IPC agent doesn't understand Ethereum addresses directly, which means that to send funds to an Ethereum address, you will need to send funds to their underlying f4 address. You can use the following command from the IPC agent to get the f4 address for an Ethereum address: 
 
 ```bash
-./bin/ipc-agent util eth-to-f4-addr --addr=<eth-adddress>
+./bin/ipc-agent util eth-to-f4-addr --addr <eth-adddress>
 
-$ ./bin/ipc-agent util eth-to-f4-addr --addr=0x6BE1Ccf648c74800380d0520D797a170c808b624
+$ ./bin/ipc-agent util eth-to-f4-addr --addr 0x6BE1Ccf648c74800380d0520D797a170c808b624
 [2023-05-17T13:37:37Z INFO  ipc_agent::cli::commands::util::f4] f4 address: t410fnpq4z5siy5eaaoanauqnpf5bodearnren5fxyoi
 ```
 
