@@ -1,10 +1,10 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::{
-    Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Timestamp, Validator,
-    ValidatorKey,
+    Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Validator, ValidatorKey,
 };
 use fendermint_testing::arb::{ArbAddress, ArbTokenAmount};
+use fendermint_vm_core::Timestamp;
 use fvm_shared::version::NetworkVersion;
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
@@ -65,7 +65,7 @@ impl Arbitrary for Genesis {
         let na = usize::arbitrary(g) % 10;
         Self {
             timestamp: Timestamp(u64::arbitrary(g)),
-            network_name: String::arbitrary(g),
+            chain_name: String::arbitrary(g),
             network_version: NetworkVersion::new(*g.choose(&[18u32]).unwrap()),
             base_fee: ArbTokenAmount::arbitrary(g).0,
             validators: (0..nv).map(|_| Arbitrary::arbitrary(g)).collect(),

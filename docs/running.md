@@ -31,7 +31,7 @@ mkdir test-network
 First, create a new `genesis.json` file devoid of accounts and validators. The `--base-fee` here is completely arbitrary.
 
 ```shell
-cargo run -p fendermint_app -- genesis --genesis-file test-network/genesis.json new --network-name test --base-fee 1000 --timestamp 1680101412
+cargo run -p fendermint_app -- genesis --genesis-file test-network/genesis.json new --chain-name test --base-fee 1000 --timestamp 1680101412
 ```
 
 We can check what the contents look like:
@@ -40,7 +40,7 @@ We can check what the contents look like:
 $ cat test-network/genesis.json
 {
   "timestamp": 1680101412,
-  "network_name": "test",
+  "chain_name": "test",
   "network_version": 18,
   "base_fee": "1000",
   "validators": [],
@@ -241,7 +241,7 @@ $ cat ~/.cometbft/config/genesis.json
       }
     ],
     "base_fee": "1000",
-    "network_name": "test",
+    "chain_name": "test",
     "network_version": 18,
     "timestamp": 1680101412,
     "validators": [
@@ -473,7 +473,7 @@ For example we can send 1000 tokens from Alice to Bob:
 
 ```shell
 cargo run -p fendermint_app --release -- \
-  rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000
+  rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 --chain-name test
 ```
 
 Note that we are using `--sequence 0` because this is the first transaction we make using Alice's key.
@@ -481,7 +481,7 @@ Note that we are using `--sequence 0` because this is the first transaction we m
 The `transfer` command waits for the commit results of the transaction:
 
 ```console
-$ cargo run -p fendermint_app --release -- rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000
+$ cargo run -p fendermint_app --release -- rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR --sequence 0 --value 1000 --chain-name test
     Finished dev [unoptimized + debuginfo] target(s) in 0.40s
      Running `target/debug/fendermint rpc transfer --secret-key test-network/keys/alice.sk --to f1kgtzp5nuob3gdccagivcgns7e25be2c2rqozilq --sequence 0 --value 1000`
 {
@@ -543,7 +543,7 @@ Say we want to deploy the `SimpleCoin` contract from that directory.
 ```shell
 CONTRACT=../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin
 cargo run -p fendermint_app --release -- \
-  rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
+  rpc fevm --secret-key test-network/keys/alice.sk --sequence 1  --chain-name test \
     create --contract $CONTRACT
 ```
 
@@ -554,7 +554,7 @@ which we can use to call the contract, namely by copying the `delegated_address`
 
 ```console
 $ CREATE=$(cargo run -p fendermint_app --release -- \
-        rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
+        rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 --chain-name test \
           create --contract $CONTRACT)
 
 $ echo $CREATE | jq .return_data
@@ -576,7 +576,7 @@ Now that we have a contract deployed, we can call it. The arguments in the follo
 
 ```console
 $ cargo run -p fendermint_app --release -- \
-              rpc fevm --secret-key test-network/keys/alice.sk --sequence 2 \
+              rpc fevm --secret-key test-network/keys/alice.sk --sequence 2 --chain-name test \
                 invoke --contract $DELEGATED_ADDR  \
                        --method f8b2cb4f --method-args 000000000000000000000000ff00000000000000000000000000000000000064 \
           | jq .return_data
@@ -590,7 +590,7 @@ To avoid having to come up with ABI encoded arguments in hexadecimal format, we 
 Here's an [example](../fendermint/rpc/examples/simplecoin.rs) of doing that with the [SimpleCoin](https://github.com/filecoin-project/builtin-actors/blob/v10.0.0/actors/evm/tests/contracts/simplecoin.sol) contract.
 
 ```console
-$ cargo run -p fendermint_rpc --release --example simplecoin -- --secret-key test-network/keys/alice.sk --verbose
+$ cargo run -p fendermint_rpc --release --example simplecoin -- --secret-key test-network/keys/alice.sk --chain-name test --verbose
 2023-05-19T10:18:47.234878Z DEBUG fendermint_rpc::client: Using HTTP client to submit request to: http://127.0.0.1:26657/
 ...
 2023-05-19T10:18:47.727563Z  INFO simplecoin: contract deployed contract_address="f410fvbmxiqdn6svyo5oubfbzxsorkvydcb5ecmlbwma" actor_id=107

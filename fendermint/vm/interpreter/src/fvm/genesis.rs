@@ -3,8 +3,10 @@
 
 use async_trait::async_trait;
 use fendermint_vm_actor_interface::{cron, eam, init, system};
-use fendermint_vm_genesis::{ActorMeta, Genesis, Timestamp, Validator};
+use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_genesis::{ActorMeta, Genesis, Validator};
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use num_traits::Zero;
@@ -15,6 +17,7 @@ use super::state::FvmGenesisState;
 use super::FvmMessageInterpreter;
 
 pub struct FvmGenesisOutput {
+    pub chain_id: ChainID,
     pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
     pub base_fee: TokenAmount,
@@ -54,10 +57,17 @@ where
         mut state: Self::State,
         genesis: Self::Genesis,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
+        // NOTE: We could consider adding the chain ID to the interpreter
+        //       and rejecting genesis if it doesn't match the expectation,
+        //       but the Tendermint genesis file also has this field, and
+        //       presumably Tendermint checks that its peers have the same.
+        let chain_id = chainid::from_str_hashed(&genesis.chain_name)?;
+
         // Currently we just pass them back as they are, but later we should
         // store them in the IPC actors; or in case of a snapshot restore them
         // from the state.
         let output = FvmGenesisOutput {
+            chain_id,
             timestamp: genesis.timestamp,
             network_version: genesis.network_version,
             circ_supply: circ_supply(&genesis),
@@ -77,11 +87,9 @@ where
         )?;
 
         // Init actor
-        let (init_state, addr_to_id) = init::State::new(
-            state.store(),
-            genesis.network_name.clone(),
-            &genesis.accounts,
-        )?;
+        let (init_state, addr_to_id) =
+            init::State::new(state.store(), genesis.chain_name.clone(), &genesis.accounts)?;
+
         state.create_actor(
             init::INIT_ACTOR_CODE_ID,
             init::INIT_ACTOR_ID,

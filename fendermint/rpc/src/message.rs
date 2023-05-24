@@ -9,7 +9,9 @@ use bytes::Bytes;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
-use fvm_shared::{address::Address, econ::TokenAmount, message::Message, MethodNum, METHOD_SEND};
+use fvm_shared::{
+    address::Address, chainid::ChainID, econ::TokenAmount, message::Message, MethodNum, METHOD_SEND,
+};
 use libsecp256k1::{PublicKey, SecretKey};
 
 use crate::B64_ENGINE;
@@ -19,13 +21,19 @@ pub struct MessageFactory {
     sk: SecretKey,
     addr: Address,
     sequence: u64,
+    chain_id: ChainID,
 }
 
 impl MessageFactory {
-    pub fn new(sk: SecretKey, sequence: u64) -> anyhow::Result<Self> {
+    pub fn new(sk: SecretKey, sequence: u64, chain_id: ChainID) -> anyhow::Result<Self> {
         let pk = PublicKey::from_secret_key(&sk);
         let addr = Address::new_secp256k1(&pk.serialize())?;
-        Ok(Self { sk, addr, sequence })
+        Ok(Self {
+            sk,
+            addr,
+            sequence,
+            chain_id,
+        })
     }
 
     /// Convenience method to read the secret key from a file, expected to be in Base64 format.
@@ -85,7 +93,7 @@ impl MessageFactory {
             gas_premium: gas_params.gas_premium,
         };
         self.sequence += 1;
-        let signed = SignedMessage::new_secp256k1(message, &self.sk)?;
+        let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id)?;
         let chain = ChainMessage::Signed(Box::new(signed));
         Ok(chain)
     }

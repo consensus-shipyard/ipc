@@ -2114,6 +2114,7 @@ dependencies = [
  "fendermint_rpc",
  "fendermint_storage",
  "fendermint_vm_actor_interface",
+ "fendermint_vm_core",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
@@ -2171,6 +2172,7 @@ dependencies = [
  "clap 4.2.7",
  "ethers",
  "fendermint_vm_actor_interface",
+ "fendermint_vm_core",
  "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
@@ -2233,6 +2235,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_vm_core"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "fvm_shared",
+ "lazy_static",
+ "quickcheck 1.0.3",
+ "quickcheck_macros",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "fendermint_vm_encoding"
 version = "0.1.0"
 dependencies = [
@@ -2249,6 +2264,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "fendermint_testing",
+ "fendermint_vm_core",
  "fendermint_vm_encoding",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
@@ -2272,6 +2288,7 @@ dependencies = [
  "async-trait",
  "cid",
  "fendermint_vm_actor_interface",
+ "fendermint_vm_core",
  "fendermint_vm_genesis",
  "fendermint_vm_message",
  "fvm",

@@ -4,6 +4,7 @@
 
 use cid::Cid;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
+use fvm_shared::chainid::ChainID;
 use fvm_shared::crypto::signature::{Signature, SignatureType};
 use fvm_shared::message::Message;
 
@@ -44,8 +45,9 @@ impl SignedMessage {
     pub fn new_checked(
         message: Message,
         signature: Signature,
+        chain_id: &ChainID,
     ) -> Result<SignedMessage, SignedMessageError> {
-        Self::verify_signature(&message, &signature)?;
+        Self::verify_signature(&message, &signature, chain_id)?;
         Ok(SignedMessage { message, signature })
     }
 
@@ -54,11 +56,12 @@ impl SignedMessage {
     pub fn new_secp256k1(
         message: Message,
         sk: &libsecp256k1::SecretKey,
+        chain_id: &ChainID,
     ) -> Result<Self, fvm_ipld_encoding::Error> {
-        let cid = Self::cid(&message)?;
+        let data = Self::bytes_to_sign(&message, chain_id)?;
         let signature = Signature {
             sig_type: SignatureType::Secp256k1,
-            bytes: sign_secp256k1(sk, &cid.to_bytes()).to_vec(),
+            bytes: sign_secp256k1(sk, &data).to_vec(),
         };
         Ok(Self { message, signature })
     }
@@ -68,20 +71,35 @@ impl SignedMessage {
         crate::cid(message)
     }
 
+    /// Calculate the bytes that need to be signed.
+    ///
+    /// The [`ChainID`] is used as a replay attack protection, a variation of
+    /// https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0039.md
+    pub fn bytes_to_sign(
+        message: &Message,
+        chain_id: &ChainID,
+    ) -> Result<Vec<u8>, fvm_ipld_encoding::Error> {
+        let mut data = Self::cid(message)?.to_bytes();
+        data.extend(chain_id_bytes(chain_id).iter());
+        Ok(data)
+    }
+
     /// Verify that the message CID was signed by the `from` address.
     pub fn verify_signature(
         message: &Message,
         signature: &Signature,
+        chain_id: &ChainID,
     ) -> Result<(), SignedMessageError> {
-        let cid = Self::cid(message)?.to_bytes();
+        let data = Self::bytes_to_sign(message, chain_id)?;
+
         signature
-            .verify(&cid, &message.from)
+            .verify(&data, &message.from)
             .map_err(SignedMessageError::InvalidSignature)
     }
 
     /// Verifies that the from address of the message generated the signature.
-    pub fn verify(&self) -> Result<(), SignedMessageError> {
-        Self::verify_signature(&self.message, &self.signature)
+    pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
+        Self::verify_signature(&self.message, &self.signature, chain_id)
     }
 
     /// Returns reference to the unsigned message.
@@ -132,6 +150,11 @@ fn sign_secp256k1(
     signature
 }
 
+/// Turn a [`ChainID`] into bytes. Uses big-endian encoding.
+fn chain_id_bytes(chain_id: &ChainID) -> [u8; 8] {
+    u64::from(*chain_id).to_be_bytes()
+}
+
 /// Signed message with an invalid random signature.
 #[cfg(feature = "arb")]
 mod arb {
@@ -155,5 +178,40 @@ mod arb {
                 signature: Signature::arbitrary(g),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fvm_shared::{address::Address, chainid::ChainID};
+    use quickcheck_macros::quickcheck;
+    use rand::{rngs::StdRng, SeedableRng};
+
+    use super::SignedMessage;
+
+    #[quickcheck]
+    fn chain_id_in_signature(msg: SignedMessage, chain_id: u64, seed: u64) -> Result<(), String> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let sk = libsecp256k1::SecretKey::random(&mut rng);
+        let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+
+        let chain_id0 = ChainID::from(chain_id);
+        let chain_id1 = ChainID::from(chain_id.overflowing_add(1).0);
+
+        let mut msg = msg.into_message();
+        msg.from = Address::new_secp256k1(&pk.serialize())
+            .map_err(|e| format!("failed to conver to address: {e}"))?;
+
+        let signed = SignedMessage::new_secp256k1(msg, &sk, &chain_id0)
+            .map_err(|e| format!("signing failed: {e}"))?;
+
+        signed
+            .verify(&chain_id0)
+            .map_err(|e| format!("verifying failed: {e}"))?;
+
+        if signed.verify(&chain_id1).is_ok() {
+            return Err("verifying with a different chain ID should fail".into());
+        }
+        Ok(())
     }
 }

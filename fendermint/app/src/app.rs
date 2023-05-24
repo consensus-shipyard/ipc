@@ -11,7 +11,7 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
-use fendermint_vm_genesis::Timestamp;
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRet, BytesMessageCheckRet, BytesMessageQuery, BytesMessageQueryRet,
 };
@@ -26,6 +26,7 @@ use fendermint_vm_interpreter::{
 };
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use num_traits::Zero;
@@ -69,6 +70,9 @@ pub struct AppState {
 impl AppState {
     pub fn state_root(&self) -> Cid {
         self.state_params.state_root
+    }
+    pub fn chain_id(&self) -> ChainID {
+        ChainID::from(self.state_params.chain_id)
     }
     pub fn app_hash(&self) -> tendermint::hash::AppHash {
         tendermint::hash::AppHash::try_from(self.state_root().to_bytes())
@@ -189,6 +193,7 @@ where
                     network_version: NetworkVersion::MAX,
                     base_fee: TokenAmount::zero(),
                     circ_supply: TokenAmount::zero(),
+                    chain_id: 0,
                 },
             };
             self.set_committed_state(state)?;
@@ -377,6 +382,7 @@ where
                 network_version: out.network_version,
                 base_fee: out.base_fee,
                 circ_supply: out.circ_supply,
+                chain_id: out.chain_id.into(),
             },
         };
 
@@ -450,7 +456,8 @@ where
             None => {
                 let db = self.state_store_clone();
                 let state = self.committed_state()?;
-                FvmCheckState::new(db, state.state_root()).context("error creating check state")?
+                FvmCheckState::new(db, state.state_root(), state.chain_id())
+                    .context("error creating check state")?
             }
         };
 

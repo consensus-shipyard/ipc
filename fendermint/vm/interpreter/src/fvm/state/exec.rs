@@ -10,11 +10,14 @@ use fvm::{
     DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{clock::ChainEpoch, econ::TokenAmount, message::Message, version::NetworkVersion};
+use fvm_shared::{
+    chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, message::Message,
+    version::NetworkVersion,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::fvm::externs::FendermintExterns;
-use crate::Timestamp;
+use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -24,6 +27,12 @@ pub struct FvmStateParams {
     pub network_version: NetworkVersion,
     pub base_fee: TokenAmount,
     pub circ_supply: TokenAmount,
+    /// The [`ChainID`] is stored here to hint at the possibility that
+    /// a chain ID might change during the lifetime of a chain, in case
+    /// there is a fork, or perhaps a subnet migration in IPC.
+    ///
+    /// How exactly that would be communicated is uknown at this point.
+    pub chain_id: u64,
 }
 
 /// A state we create for the execution of all the messages in a block.
@@ -45,7 +54,8 @@ where
         block_height: ChainEpoch,
         params: FvmStateParams,
     ) -> anyhow::Result<Self> {
-        let nc = NetworkConfig::new(params.network_version);
+        let mut nc = NetworkConfig::new(params.network_version);
+        nc.chain_id = ChainID::from(params.chain_id);
 
         // TODO: Configure:
         // * circ_supply; by default it's for Filecoin
@@ -100,5 +110,14 @@ where
     /// The timestamp of the currently executing block.
     pub fn timestamp(&self) -> Timestamp {
         Timestamp(self.executor.context().timestamp)
+    }
+}
+
+impl<DB> HasChainID for FvmExecState<DB>
+where
+    DB: Blockstore,
+{
+    fn chain_id(&self) -> &ChainID {
+        &self.executor.context().network.chain_id
     }
 }

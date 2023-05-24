@@ -7,8 +7,6 @@ pub mod chain;
 pub mod fvm;
 pub mod signed;
 
-pub use fendermint_vm_genesis::Timestamp;
-
 /// The `ExecInterpreter` applies messages on some state, which is
 /// tied to the lifecycle of a block in the ABCI.
 ///

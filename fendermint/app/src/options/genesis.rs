@@ -39,7 +39,7 @@ pub struct GenesisNewArgs {
     pub timestamp: u64,
     /// Name of the network and chain.
     #[arg(long, short = 'n')]
-    pub network_name: String,
+    pub chain_name: String,
     /// Network version, governs which set of built-in actors to use.
     #[arg(long, short = 'v', default_value = "18", value_parser = parse_network_version)]
     pub network_version: NetworkVersion,

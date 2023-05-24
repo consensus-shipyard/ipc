@@ -3,6 +3,7 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 
+use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::signed::{SignedMessage, SignedMessageError};
 
 use crate::{
@@ -30,9 +31,10 @@ impl<I> SignedMessageInterpreter<I> {
 }
 
 #[async_trait]
-impl<I> ExecInterpreter for SignedMessageInterpreter<I>
+impl<I, S> ExecInterpreter for SignedMessageInterpreter<I>
 where
-    I: ExecInterpreter<Message = FvmMessage, DeliverOutput = FvmApplyRet>,
+    I: ExecInterpreter<Message = FvmMessage, DeliverOutput = FvmApplyRet, State = S>,
+    S: HasChainID + Send + 'static,
 {
     type State = I::State;
     type Message = SignedMessage;
@@ -45,7 +47,8 @@ where
         state: Self::State,
         msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
-        match msg.verify() {
+        let chain_id = state.chain_id();
+        match msg.verify(chain_id) {
             Err(SignedMessageError::Ipld(e)) => Err(anyhow!(e)),
             Err(SignedMessageError::InvalidSignature(s)) => {
                 // TODO: We can penalize the validator for including an invalid signature.
@@ -68,9 +71,10 @@ where
 }
 
 #[async_trait]
-impl<I> CheckInterpreter for SignedMessageInterpreter<I>
+impl<I, S> CheckInterpreter for SignedMessageInterpreter<I>
 where
-    I: CheckInterpreter<Message = FvmMessage, Output = FvmCheckRet>,
+    I: CheckInterpreter<Message = FvmMessage, Output = FvmCheckRet, State = S>,
+    S: HasChainID + Send + 'static,
 {
     type State = I::State;
     type Message = SignedMessage;
@@ -82,7 +86,11 @@ where
         msg: Self::Message,
         is_recheck: bool,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
-        let verify_result = if is_recheck { Ok(()) } else { msg.verify() };
+        let verify_result = if is_recheck {
+            Ok(())
+        } else {
+            msg.verify(state.chain_id())
+        };
 
         match verify_result {
             Err(SignedMessageError::Ipld(e)) => Err(anyhow!(e)),

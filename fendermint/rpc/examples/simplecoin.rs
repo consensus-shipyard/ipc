@@ -21,6 +21,7 @@ use ethers::prelude::{abigen, decode_function_data};
 use ethers::types::H160;
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
+use fendermint_vm_core::chainid;
 use fvm_shared::address::Address;
 use lazy_static::lazy_static;
 use libsecp256k1::{PublicKey, SecretKey};
@@ -85,6 +86,10 @@ pub struct Options {
     /// Path to the secret key to deploy with, expected to be in Base64 format.
     #[arg(long, short)]
     pub secret_key: PathBuf,
+
+    /// The name of the chain we are connecting to, which becomes part of the message signature.
+    #[arg(long, short)]
+    pub chain_name: String,
 }
 
 impl Options {
@@ -114,7 +119,9 @@ async fn main() {
         .await
         .expect("error getting sequence");
 
-    let mf = MessageFactory::new(sk, sn).unwrap();
+    let chain_id = chainid::from_str_hashed(&opts.chain_name).expect("problematic chain name");
+
+    let mf = MessageFactory::new(sk, sn, chain_id).unwrap();
 
     let mut client = client.bind(mf);
 

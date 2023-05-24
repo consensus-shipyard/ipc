@@ -9,9 +9,10 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fendermint_vm_message = { path = "../message" }
-fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_actor_interface = { path = "../actor_interface" }
+fendermint_vm_core = { path = "../core" }
+fendermint_vm_genesis = { path = "../genesis" }
+fendermint_vm_message = { path = "../message" }
 
 async-trait = { workspace = true }
 anyhow = { workspace = true }
@@ -31,7 +32,6 @@ quickcheck = { workspace = true }
 tokio = { workspace = true }
 
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
-
 
 [features]
 default = []

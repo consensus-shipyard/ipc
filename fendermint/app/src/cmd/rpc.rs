@@ -13,6 +13,7 @@ use fendermint_rpc::tx::{
     AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
     TxCommit, TxSync,
 };
+use fendermint_vm_core::chainid;
 use fendermint_vm_message::chain::ChainMessage;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -317,7 +318,8 @@ struct TransClient {
 impl TransClient {
     pub fn new(client: FendermintClient, args: &TransArgs) -> anyhow::Result<Self> {
         let sk = read_secret_key(&args.secret_key)?;
-        let mf = MessageFactory::new(sk, args.sequence)?;
+        let chain_id = chainid::from_str_hashed(&args.chain_name)?;
+        let mf = MessageFactory::new(sk, args.sequence, chain_id)?;
         let client = client.bind(mf);
         let client = Self {
             inner: client,

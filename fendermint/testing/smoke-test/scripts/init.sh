@@ -9,7 +9,7 @@ KEYS_DIR=$FM_DIR/keys
 GENESIS_FILE=$FM_DIR/genesis.json
 
 # Create a genesis file
-fendermint genesis --genesis-file $GENESIS_FILE new --network-name smoke --base-fee 1000  --timestamp 1680101412
+fendermint genesis --genesis-file $GENESIS_FILE new --chain-name $FM_CHAIN_NAME --base-fee 1000  --timestamp 1680101412
 
 # Create test keys
 mkdir -p $KEYS_DIR

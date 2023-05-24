@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Conversions to Tendermint data types.
 use anyhow::{anyhow, Context};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::Validator;
-use fendermint_vm_interpreter::{
-    fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet},
-    Timestamp,
-};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet};
 use fvm_shared::{error::ExitCode, event::StampedEvent};
 use prost::Message;
 use std::num::NonZeroU32;

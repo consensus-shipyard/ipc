@@ -3,6 +3,7 @@
 //! A Genesis data structure similar to [genesis.Template](https://github.com/filecoin-project/lotus/blob/v1.20.4/genesis/types.go)
 //! in Lotus, which is used to [initialize](https://github.com/filecoin-project/lotus/blob/v1.20.4/chain/gen/genesis/genesis.go) the state tree.
 
+use fendermint_vm_core::Timestamp;
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use libsecp256k1::curve::Affine;
@@ -14,16 +15,6 @@ use fendermint_vm_encoding::IsHumanReadable;
 
 #[cfg(feature = "arb")]
 mod arb;
-
-/// Unix timestamp (in seconds).
-#[derive(Clone, Debug, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Timestamp(pub u64);
-
-impl Timestamp {
-    pub fn as_secs(&self) -> i64 {
-        self.0 as i64
-    }
-}
 
 /// Wrapper around [`Address`] to provide human readable serialization in JSON format.
 ///
@@ -107,8 +98,12 @@ pub struct Validator {
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
+    /// The name of the blockchain.
+    ///
+    /// It will be used to derive a chain ID as well as being
+    /// the network name in the `InitActor`
+    pub chain_name: String,
     pub timestamp: Timestamp,
-    pub network_name: String,
     pub network_version: NetworkVersion,
     #[serde_as(as = "IsHumanReadable")]
     pub base_fee: TokenAmount,
