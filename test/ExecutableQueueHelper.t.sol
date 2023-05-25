@@ -15,6 +15,7 @@ contract ExecutableQueueHelperTest is Test {
     uint64 constant EPOCH_ONE = 10;
     uint64 constant EPOCH_TWO = 20;
     uint64 constant EPOCH_THREE = 30;
+    uint64 constant EPOCH_FOUR = 40;
 
     function setUp() public {
         queue.period = BLOCKS_PER_EPOCH;
@@ -59,22 +60,24 @@ contract ExecutableQueueHelperTest is Test {
 
     function test_Remove_Works_FirstEpoch() public {
         _assertPush(EPOCH_ONE);
-        _assertPush(EPOCH_TWO);
+        _assertPush(EPOCH_THREE);
+        _assertPush(EPOCH_FOUR);
 
         _assertRemove(EPOCH_ONE);
 
-        require(queue.first == EPOCH_TWO);
-        require(queue.last == EPOCH_TWO);
+        require(queue.first == EPOCH_THREE);
+        require(queue.last == EPOCH_FOUR);
     }
 
     function test_Remove_Works_LastEpoch() public {
         _assertPush(EPOCH_ONE);
         _assertPush(EPOCH_TWO);
+        _assertPush(EPOCH_THREE);
 
-        _assertRemove(EPOCH_TWO);
+        _assertRemove(EPOCH_THREE);
 
         require(queue.first == EPOCH_ONE);
-        require(queue.last == EPOCH_ONE);
+        require(queue.last == EPOCH_TWO);
     }
 
 

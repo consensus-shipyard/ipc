@@ -89,7 +89,7 @@ library CrossMsgHelper {
 
     function toHash(
         CrossMsg[] memory crossMsgs
-    ) internal pure returns (bytes32) {
+    ) public pure returns (bytes32) {
         return keccak256(abi.encode(crossMsgs));
     }
 

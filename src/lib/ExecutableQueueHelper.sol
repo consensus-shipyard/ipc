@@ -4,7 +4,7 @@ pragma solidity ^0.8.7;
 import "../structs/ExecutableQueue.sol";
 
 library ExecutableQueueHelper {
-    function push(ExecutableQueue storage queue, uint64 epoch) internal {
+    function push(ExecutableQueue storage queue, uint64 epoch) public {
         if (epoch == 0) return;
 
         if (queue.first == 0 || queue.first > epoch) {
@@ -17,7 +17,7 @@ library ExecutableQueueHelper {
         queue.epochs[epoch] = true;
     }
 
-    function remove(ExecutableQueue storage queue, uint64 epoch) internal {
+    function remove(ExecutableQueue storage queue, uint64 epoch) public {
         if (!contains(queue, epoch)) return;
 
         delete queue.epochs[epoch];
@@ -61,7 +61,7 @@ library ExecutableQueueHelper {
     function contains(
         ExecutableQueue storage queue,
         uint64 epoch
-    ) internal view returns (bool) {
+    ) public view returns (bool) {
         return queue.epochs[epoch];
     }
 }

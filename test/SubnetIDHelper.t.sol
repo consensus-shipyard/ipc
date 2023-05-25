@@ -134,7 +134,38 @@ contract SubnetIDHelperTest is Test {
 
         require(subnetId2.down(subnetId1).equals(subnetId2));
         require(sub3Id.down(subnetId1).equals(subnetId2));
+    }
 
+    function test_Down_Subnet2RouteLenghtLargerThanSubnet1() public view {
+        address[] memory route1 = new address[](1);
+        route1[0] = ROOT_ADDRESS;
+
+        address[] memory route2 = new address[](2);
+        route2[0] = ROOT_ADDRESS;
+        route2[1] = SUBNET_ONE_ADDRESS;
+
+        SubnetID memory subnetId1 = SubnetID(route1);
+        SubnetID memory subnetId2 = SubnetID(route2);
+
+        require(
+            subnetId1.down(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH
+        );
+    }
+
+    function test_Down_NoCommonRoute() public view {
+        address[] memory route1 = new address[](2);
+        route1[0] = ROOT_ADDRESS;
+        route1[1] = SUBNET_ONE_ADDRESS;
+
+        address[] memory route2 = new address[](1);
+        route2[0] = SUBNET_TWO_ADDRESS;
+
+        SubnetID memory subnetId1 = SubnetID(route1);
+        SubnetID memory subnetId2 = SubnetID(route2);
+
+        require(
+            subnetId1.down(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH
+        );
     }
 
     function test_ToString_Works_NoRoutes() public view {

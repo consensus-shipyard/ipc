@@ -12,9 +12,9 @@ contract CrossMsgHelperTest is Test {
     using CrossMsgHelper for CrossMsg;
     using CrossMsgHelper for CrossMsg[];
 
-    bytes32 EMPTY_CROSS_MSGS_HASH =
+    bytes32 immutable EMPTY_CROSS_MSGS_HASH =
         keccak256(abi.encode(createCrossMsgs(0, 0)));
-    bytes32 EMPTY_CROSS_MSG_HASH = keccak256(abi.encode(createCrossMsg(0)));
+    bytes32 immutable EMPTY_CROSS_MSG_HASH = keccak256(abi.encode(createCrossMsg(0)));
 
     CrossMsg public crossMsg;
     CrossMsg[] public crossMsgs;

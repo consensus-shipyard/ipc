@@ -15,10 +15,10 @@ abstract contract Voting {
     uint8 constant MIN_CHECKPOINT_PERIOD = 10;
 
     /// @notice percent approvals needed to reach consensus
-    uint8 public majorityPercentage;
+    uint8 public immutable majorityPercentage;
 
     /// @notice number of blocks between two checkpoint submissions
-    uint64 public submissionPeriod;
+    uint64 public immutable submissionPeriod;
 
     /// @notice last executed epoch after voting
     uint64 public lastVotingExecutedEpoch;
@@ -30,15 +30,19 @@ abstract contract Voting {
     /// epoch is ready to be executed. Most of the time this should be empty
     ExecutableQueue public executableQueue;
 
-    modifier validEpochOnly(uint64 epoch) {
-        require(epoch > lastVotingExecutedEpoch, "epoch already executed");
-        require(epoch > genesisEpoch && (epoch - genesisEpoch) % submissionPeriod == 0, "epoch not votable");
+    error EpochAlreadyExecuted();
+    error EpochNotVotable();
+    error InvalidMajorityPercentage();
+    error ValidatorAlreadyVoted();
 
+    modifier validEpochOnly(uint64 epoch) {
+        if(epoch <= lastVotingExecutedEpoch) revert EpochAlreadyExecuted();
+        if(epoch > genesisEpoch && (epoch - genesisEpoch) % submissionPeriod != 0) revert EpochNotVotable();
         _;
     }
 
     constructor(uint8 _majorityPercentage, uint64 _submissionPeriod) {
-        require(_majorityPercentage <= 100);
+        if(_majorityPercentage > 100) revert InvalidMajorityPercentage();
 
         majorityPercentage = _majorityPercentage;
         submissionPeriod = _submissionPeriod < MIN_CHECKPOINT_PERIOD
@@ -120,11 +124,7 @@ abstract contract Voting {
         uint256 totalWeight
     ) internal returns (bool shouldExecuteVote) {
         uint256 nonce = vote.nonce;
-
-        require(
-            vote.submitters[nonce][submitterAddress] == false,
-            "validator has already voted"
-        );
+        if(vote.submitters[nonce][submitterAddress]) revert ValidatorAlreadyVoted();
 
         vote.submitters[nonce][submitterAddress] = true;
         vote.totalSubmissionWeight += submitterWeight;

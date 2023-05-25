@@ -29,6 +29,26 @@ contract SubnetActorTest is Test {
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     address GATEWAY_ADDRESS;
 
+    error NotGateway();
+    error NotAccount();
+    error CollateralIsZero();
+    error CallerHasNoStake();
+    error CollateralStillLockedInSubnet();
+    error SubnetAlreadyKilled();
+    error NotAllValidatorsHaveLeft();
+    error NotValidator();
+    error SubnetNotActive();
+    error WrongCheckpointSource();
+    error CheckpointNotChained();
+    error NoRewardsSentForDistribution();
+    error NoValidatorsInSubnet();
+    error NotEnoughBalanceForRewards();
+    error EpochAlreadyExecuted();
+    error EpochNotVotable();
+    error ValidatorAlreadyVoted();
+    error MessagesNotSorted();
+
+
     function setUp() public
     {
         address[] memory path = new address[](1);
@@ -65,7 +85,7 @@ contract SubnetActorTest is Test {
 
         vm.deal(validator, 1 gwei);
         vm.prank(validator);
-        vm.expectRevert("a minimum collateral is required to join the subnet");
+        vm.expectRevert(CollateralIsZero.selector);
 
         sa.join();
     }
@@ -77,7 +97,7 @@ contract SubnetActorTest is Test {
         _assertLeave(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         _assertKill(validator);
 
-        vm.expectRevert("the subnet is already in a killed or terminating state");
+        vm.expectRevert(SubnetAlreadyKilled.selector);
         vm.prank(validator);
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE + 1);
 
@@ -103,6 +123,14 @@ contract SubnetActorTest is Test {
         vm.expectCall(GATEWAY_ADDRESS, DEFAULT_MIN_VALIDATOR_STAKE, abi.encodeWithSelector(gw.register.selector), 1);
         
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+    }
+
+    function test_Join_Works_LessThanMinStake() public {
+        address validator = vm.addr(1235);
+
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE - 1);
+
+        require(sa.validatorCount() == 0);
     }
 
     function test_Join_Works_MultipleNewValidators() public {
@@ -166,7 +194,7 @@ contract SubnetActorTest is Test {
 
         vm.prank(validator);
         vm.deal(validator, amount);
-        vm.expectRevert("the subnet is already in a killed or terminating state");
+        vm.expectRevert(SubnetAlreadyKilled.selector);
 
         sa.leave();
     }
@@ -176,7 +204,8 @@ contract SubnetActorTest is Test {
 
         vm.prank(caller);
         vm.deal(caller, 1 ether);
-        vm.expectRevert("caller has no stake in subnet");
+
+        vm.expectRevert(NotValidator.selector);
 
         sa.leave();
     }
@@ -202,7 +231,7 @@ contract SubnetActorTest is Test {
         _assertLeave(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.prank(validator1);
-        vm.expectRevert("this subnet can only be killed when all validators have left");
+        vm.expectRevert(NotAllValidatorsHaveLeft.selector);
         sa.kill();
     }
 
@@ -215,7 +244,8 @@ contract SubnetActorTest is Test {
         _assertKill(validator);
 
         vm.prank(validator);
-        vm.expectRevert("the subnet is already in a killed or terminating state");
+        vm.expectRevert(SubnetAlreadyKilled.selector);
+
         sa.kill();
     }
 
@@ -233,11 +263,11 @@ contract SubnetActorTest is Test {
         require(success, "funding SubnetActor failed");
 
         vm.prank(validator);
-        vm.expectRevert("there is still collateral in the subnet");
+        vm.expectRevert(CollateralStillLockedInSubnet.selector);
         sa.kill();
     }
 
-    function test_SubmitCheckpoint_Works() public {
+    function test_SubmitCheckpoint_Works_Executed() public {
         address validator = vm.addr(100);
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         address validator2 = vm.addr(101);
@@ -247,28 +277,218 @@ contract SubnetActorTest is Test {
 
         BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
 
+        _assertVote(validator, checkpoint);
+        _assertVote(validator2, checkpoint);
+
+        vm.expectCall(GATEWAY_ADDRESS, abi.encodeWithSelector(IGateway(GATEWAY_ADDRESS).commitChildCheck.selector, checkpoint));
+        
+        _assertVote(validator3, checkpoint);
+
+        (
+            SubnetID memory source,
+            uint64 epoch,
+            uint256 fee,
+            bytes32 prevHash
+        ) = sa.committedCheckpoints(checkpoint.epoch);
+
+        require(sa.prevExecutedCheckpointHash() == checkpoint.toHash());
+        require(sa.lastVotingExecutedEpoch() == checkpoint.epoch);
+        require(source.toHash() == checkpoint.source.toHash());
+        require(epoch == checkpoint.epoch);
+        require(fee == checkpoint.fee);
+        require(prevHash == checkpoint.prevHash);
+    }
+
+    function test_SubnetCheckpoint_Works_ExecutedFromQueue() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        address validator2 = vm.addr(101);
+        _assertJoin(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+        address validator3 = vm.addr(102);
+        _assertJoin(validator3, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        BottomUpCheckpoint memory checkpoint1 = _createBottomUpCheckpoint();
+        BottomUpCheckpoint memory checkpoint2 = _createBottomUpCheckpoint();
+        BottomUpCheckpoint memory checkpoint3 = _createBottomUpCheckpoint();
+        BottomUpCheckpoint memory checkpoint4 = _createBottomUpCheckpoint();
+
+        _assertVote(validator, checkpoint1);
+        _assertVote(validator2, checkpoint1);
+        _assertVote(validator3, checkpoint1);
+
+        require(sa.lastVotingExecutedEpoch() == checkpoint1.epoch);
+        require(sa.prevExecutedCheckpointHash() == checkpoint1.toHash());
+
+        // next epochs
+        checkpoint2.epoch = checkpoint1.epoch + DEFAULT_CHECKPOINT_PERIOD;
+        checkpoint3.epoch = checkpoint2.epoch + DEFAULT_CHECKPOINT_PERIOD;
+        checkpoint4.epoch = checkpoint3.epoch + DEFAULT_CHECKPOINT_PERIOD;
+        checkpoint2.crossMsgs[0].message.nonce = checkpoint1.crossMsgs[0].message.nonce + 1;
+        checkpoint3.crossMsgs[0].message.nonce = checkpoint2.crossMsgs[0].message.nonce + 1;
+        checkpoint4.crossMsgs[0].message.nonce = checkpoint3.crossMsgs[0].message.nonce + 1;
+        checkpoint2.prevHash = checkpoint1.toHash();
+        checkpoint3.prevHash = checkpoint2.toHash();
+        checkpoint4.prevHash = checkpoint3.toHash();
+
+        // add checkpoint 3 to the queue
+        _assertVote(validator, checkpoint3);
+        _assertVote(validator2, checkpoint3);    
+        _assertVote(validator3, checkpoint3);   
+
+        // ensures no execution is triggered
+        require(sa.lastVotingExecutedEpoch() == checkpoint1.epoch);
+        require(sa.prevExecutedCheckpointHash() == checkpoint1.toHash());
+        
+        // trigger execution of checkpoint 2  
+        _assertVote(validator, checkpoint2);
+        _assertVote(validator2, checkpoint2);    
+        _assertVote(validator3, checkpoint2);
+
+        require(sa.lastVotingExecutedEpoch() == checkpoint2.epoch);
+        require(sa.prevExecutedCheckpointHash() == checkpoint2.toHash());
+
+        // vote for checkpoint 4 and trigger execution of checkpoint 3 from the queue  
+        _assertVote(validator, checkpoint4);
+
+        (
+            SubnetID memory source,
+            uint64 epoch,
+            uint256 fee,
+            bytes32 prevHash
+        ) = sa.committedCheckpoints(checkpoint3.epoch);
+
+        require(sa.lastVotingExecutedEpoch() == checkpoint3.epoch);
+        require(sa.prevExecutedCheckpointHash() == checkpoint3.toHash());
+        require(source.toHash() == checkpoint3.source.toHash());
+        require(epoch == checkpoint3.epoch);
+        require(fee == checkpoint3.fee);
+        require(prevHash == checkpoint3.prevHash);
+    }
+
+    function test_SubmitCheckpoint_Works_RoundAbort() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        address validator2 = vm.addr(101);
+        _assertJoin(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        BottomUpCheckpoint memory checkpoint1 = _createBottomUpCheckpoint();
+        BottomUpCheckpoint memory checkpoint2 = _createBottomUpCheckpoint();
+
+        checkpoint2.fee = 1;
+
+        _assertVote(validator, checkpoint1);
+        
+        vm.prank(validator2);
+
+        // should reset votes
+        sa.submitCheckpoint(checkpoint2);
+
+        require(sa.hasValidatorVotedForSubmission(checkpoint1.epoch, validator) == false);
+        require(sa.hasValidatorVotedForSubmission(checkpoint2.epoch, validator2) == false);
+        require(sa.lastVotingExecutedEpoch() == 0);
+
+        (, uint256 first, uint256 last) = sa.executableQueue();
+        
+        require(first == 0);
+        require(last == 0);
+    }
+
+    function test_SubmitCheckpoint_Fails_MessagesNotSorted() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        SubnetID memory subnetId = gw.getNetworkName().createSubnetId(address(sa));
+        CrossMsg[] memory crossMsgs = new CrossMsg[](2);
+        crossMsgs[0] = CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: address(this)
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: address(this)
+                    }),
+                    value: CROSS_MSG_FEE + 1,
+                    nonce: 1,
+                    method: METHOD_SEND,
+                    params: new bytes(0)
+                }),
+                wrapped: false
+            });
+        crossMsgs[1] = CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: address(this)
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({route: new address[](0)}),
+                        rawAddress: address(this)
+                    }),
+                    value: CROSS_MSG_FEE + 1,
+                    nonce: 0,
+                    method: METHOD_SEND,
+                    params: new bytes(0)
+                }),
+                wrapped: false
+            });
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({source: subnetId, epoch: DEFAULT_CHECKPOINT_PERIOD, fee: 0, crossMsgs: crossMsgs, prevHash: EMPTY_HASH, children: new ChildCheck[](0)});
+
+        vm.expectRevert(MessagesNotSorted.selector);
         vm.prank(validator);
         sa.submitCheckpoint(checkpoint);
 
-        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator) == true);
+    }
 
-        vm.prank(validator2);
-        sa.submitCheckpoint(checkpoint);
+    function test_SubmitCheckpoint_Works_CheckpointNotChained() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        address validator2 = vm.addr(101);
+        _assertJoin(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+        address validator3 = vm.addr(102);
+        _assertJoin(validator3, DEFAULT_MIN_VALIDATOR_STAKE);
 
-        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator2) == true);
+        BottomUpCheckpoint memory checkpoint1 = _createBottomUpCheckpoint();
+        BottomUpCheckpoint memory checkpoint2 = _createBottomUpCheckpoint();
+        
+        _assertVote(validator, checkpoint1);
+        _assertVote(validator2, checkpoint1);
+        _assertVote(validator3, checkpoint1);
 
+        require(sa.lastVotingExecutedEpoch() == checkpoint1.epoch);
+        require(sa.prevExecutedCheckpointHash() == checkpoint1.toHash());
+        
+        // set next epoch
+        checkpoint2.epoch = checkpoint1.epoch + DEFAULT_CHECKPOINT_PERIOD;
+
+        _assertVote(validator, checkpoint2);
+        _assertVote(validator2, checkpoint2);
+
+        // not commited
+        vm.expectCall(GATEWAY_ADDRESS, abi.encodeWithSelector(IGateway(GATEWAY_ADDRESS).commitChildCheck.selector, checkpoint2), 0);
         vm.prank(validator3);
-        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector));
-        sa.submitCheckpoint(checkpoint);
 
-        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator3) == true);
+        // should reset votes
+        sa.submitCheckpoint(checkpoint2);
+
+        require(sa.hasValidatorVotedForSubmission(checkpoint2.epoch, validator) == false);
+        require(sa.hasValidatorVotedForSubmission(checkpoint2.epoch, validator2) == false);
+        require(sa.hasValidatorVotedForSubmission(checkpoint2.epoch, validator3) == false);
+        require(sa.lastVotingExecutedEpoch() == checkpoint1.epoch);
+        require(sa.prevExecutedCheckpointHash() == checkpoint1.toHash());
+
+        (, uint256 first, uint256 last) = sa.executableQueue();
+        
+        require(first == 0);
+        require(last == 0);
     }
 
     function callback() public view {
         console.log("callback called");
     }
 
-    function test_SubmitCheckpoint_AddsVoter() public  {
+    function test_SubmitCheckpoint_Works_VoteForCheckpoint() public  {
         address validator = vm.addr(100);
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         address validator2 = vm.addr(101);
@@ -276,10 +496,35 @@ contract SubnetActorTest is Test {
         
         BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
 
-        vm.prank(validator);
-        sa.submitCheckpoint(checkpoint);
+        _assertVote(validator, checkpoint);
 
         require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator) == true);
+        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator2) == false);
+        require(sa.lastVotingExecutedEpoch() == 0);
+
+    }
+
+    function test_SubmitCheckpoint_Fails_NotAccount() public {
+        address validator = address(1235);
+
+        BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
+
+        vm.prank(validator);
+        vm.expectRevert(NotAccount.selector);
+        sa.submitCheckpoint(checkpoint);
+    }
+
+    function test_SubmitCheckpoint_Fails_SubnetNotActive() public {
+        address validator = address(1235);
+
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertLeave(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
+
+        vm.prank(validator);
+        vm.expectRevert(SubnetNotActive.selector);
+        sa.submitCheckpoint(checkpoint);
     }
 
     function test_SubmitCheckpoint_Fails_InvalidValidator() public {
@@ -291,23 +536,50 @@ contract SubnetActorTest is Test {
         address notValidator = vm.addr(200);
         vm.prank(notValidator);
         vm.deal(notValidator, 1);
-        vm.expectRevert("not validator");
+        vm.expectRevert(NotValidator.selector);
         sa.submitCheckpoint(checkpoint);
     }
 
-    function test_SubmitCheckpoint_Fails_CheckpointAlreadyCommited() public {
+    function test_SubmitCheckpoint_Fails_WrongSource() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        
+        BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
+
+        checkpoint.source = SubnetID(new address[](0));
+
+        vm.prank(validator);
+        vm.expectRevert(WrongCheckpointSource.selector);
+        sa.submitCheckpoint(checkpoint);
+    }
+
+    function test_SubmitCheckpoint_Fails_EpochAlreadyExecuted() public {
         address validator = vm.addr(100);
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
 
         BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
 
-        vm.prank(validator);
-        sa.submitCheckpoint(checkpoint);
+        _assertVote(validator, checkpoint);
 
         checkpoint.epoch = 1;
 
         vm.prank(validator);
-        vm.expectRevert("epoch already executed");
+        vm.expectRevert(EpochAlreadyExecuted.selector);
+        sa.submitCheckpoint(checkpoint);
+    }
+
+    function test_SubmitCheckpoint_Fails_EpochNotVotable() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
+
+        checkpoint.epoch = 1;
+
+        vm.prank(validator);
+        vm.expectRevert(EpochNotVotable.selector);
+        // vm.expectRevert("epoch not votable");
+
         sa.submitCheckpoint(checkpoint);
     }
 
@@ -320,11 +592,56 @@ contract SubnetActorTest is Test {
 
         BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
 
-        vm.startPrank(validator);
-        sa.submitCheckpoint(checkpoint);
+        _assertVote(validator, checkpoint);
 
-        vm.expectRevert("validator has already voted");
+        vm.expectRevert(ValidatorAlreadyVoted.selector);
+        vm.prank(validator);
+
         sa.submitCheckpoint(checkpoint);
+    }
+
+    function test_Reward_Works_SingleValidator() public {
+        address validator = vm.addr(100);
+
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        uint256 balanceBefore = validator.balance;
+
+        vm.startPrank(GATEWAY_ADDRESS);
+        vm.deal(GATEWAY_ADDRESS, 1 ether);
+
+        sa.reward{value: 1 ether}();
+
+        require(validator.balance == balanceBefore + 1 ether);
+    }
+
+    function test_Reward_Fails_NoRewardsSentForDistribution() public {
+        _assertJoin(vm.addr(100), DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.startPrank(GATEWAY_ADDRESS);
+        vm.deal(GATEWAY_ADDRESS, 1 ether);
+        vm.expectRevert(NoRewardsSentForDistribution.selector);
+
+        sa.reward();
+    }
+
+    function test_Reward_Fails_NoValidatorsInSubnet() public {
+        vm.startPrank(GATEWAY_ADDRESS);
+        vm.deal(GATEWAY_ADDRESS, 1 ether);
+        vm.expectRevert(NoValidatorsInSubnet.selector);
+
+        sa.reward{value: 1 ether}();
+    }
+
+    function test_Reward_Fails_NotEnoughBalanceForRewards() public {
+        _assertJoin(vm.addr(100), DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(vm.addr(101), DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.startPrank(GATEWAY_ADDRESS);
+        vm.deal(GATEWAY_ADDRESS, 1 ether);
+        vm.expectRevert(NotEnoughBalanceForRewards.selector);
+
+        sa.reward{value: 1}();
     }
 
     function _assertJoin(address validator, uint256 amount) internal { 
@@ -375,6 +692,13 @@ contract SubnetActorTest is Test {
         vm.stopPrank();
     }
 
+    function _assertVote(address validator, BottomUpCheckpoint memory checkpoint) internal {
+        vm.prank(validator);
+        sa.submitCheckpoint(checkpoint);
+
+        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator) == true);
+    }
+
     function _assertDeploySubnetActor(string memory _name, address _ipcGatewayAddr, ConsensusType _consensus, uint256 _minActivationCollateral, uint64 _minValidators, uint64 _checkPeriod, bytes memory _genesis, uint8 _majorityPercentage) public {
         SubnetID memory _parentId = gw.getNetworkName();
 
@@ -406,8 +730,10 @@ contract SubnetActorTest is Test {
         address[] memory route = new address[](2);
         route[0] = address(0);
         route[1] = address(sa);
+
         SubnetID memory source = SubnetID({route: route});
         CrossMsg[] memory crossMsgs = new CrossMsg[](1);
+
         crossMsgs[0] = CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -425,8 +751,8 @@ contract SubnetActorTest is Test {
                 }),
                 wrapped: false
             });
-        checkpoint = BottomUpCheckpoint({source: source, epoch: DEFAULT_CHECKPOINT_PERIOD, fee: 0, crossMsgs: crossMsgs, prevHash: EMPTY_HASH, children: new ChildCheck[](0)});
 
+        checkpoint = BottomUpCheckpoint({source: source, epoch: DEFAULT_CHECKPOINT_PERIOD, fee: 0, crossMsgs: crossMsgs, prevHash: EMPTY_HASH, children: new ChildCheck[](0)});
     }
 
 }

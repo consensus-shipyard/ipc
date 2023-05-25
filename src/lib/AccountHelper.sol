@@ -7,7 +7,7 @@ import "fevmate/utils/FilAddress.sol";
 /// @title Helper library for checking account type
 /// @author LimeChain team
 library AccountHelper {
-    function isAccount(address _address) internal view returns (bool) {
+    function isAccount(address _address) external view returns (bool) {
         uint size;
 
         assembly {
@@ -20,7 +20,7 @@ library AccountHelper {
             ADDRESS_CODEHASH == keccak256(_address.code);
     }
 
-    function isSystemActor(address _address) internal pure returns (bool) {
+    function isSystemActor(address _address) external pure returns (bool) {
         return _address == FilAddress.SYSTEM_ACTOR;
     }
 }
