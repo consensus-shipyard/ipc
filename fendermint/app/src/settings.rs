@@ -28,6 +28,27 @@ pub struct DbSettings {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct Address {
+    pub host: String,
+    pub port: u32,
+}
+
+impl Address {
+    pub fn addr(&self) -> String {
+        format!("{}:{}", self.host, self.port)
+    }
+}
+
+/// Ethereum API facade settings.
+#[derive(Debug, Deserialize)]
+pub struct EthSettings {
+    /// Listen address for JSON-RPC
+    pub http: Address,
+    /// Listen address for WebSockets
+    pub ws: Address,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
     home_dir: PathBuf,
@@ -35,6 +56,7 @@ pub struct Settings {
     builtin_actors_bundle: PathBuf,
     pub abci: AbciSettings,
     pub db: DbSettings,
+    pub eth: EthSettings,
 }
 
 impl Settings {

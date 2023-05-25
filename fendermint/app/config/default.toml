@@ -13,3 +13,20 @@ bound = 1
 [db]
 # Keep unlimited history by default.
 state_hist_size = 0
+
+# Ethereum API facade.
+[eth]
+
+# Ethereum API facade for JSON-RPC.
+[eth.http]
+# Only accept local connections by default.
+host = "127.0.0.1"
+# The default port where the Ethereum JSON-RPC API will listen to connections.
+port = 8545
+
+# Ethereum API facade for WebSockets.
+[eth.ws]
+# Only accept local connections by default.
+host = "127.0.0.1"
+# The default port where the Ethereum WebSocket API will listen to connections.
+port = 8546

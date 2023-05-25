@@ -13,6 +13,7 @@ use base64::engine::GeneralPurpose;
 use base64::engine::{DecodePaddingMode, GeneralPurposeConfig};
 use base64::{alphabet, Engine};
 
+pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod rpc;
@@ -83,6 +84,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
         Commands::Key(args) => args.exec(()).await,
         Commands::Genesis(args) => args.exec(()).await,
         Commands::Rpc(args) => args.exec(()).await,
+        Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
     }
 }
 

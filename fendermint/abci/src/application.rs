@@ -161,6 +161,11 @@ where
         // but if we use the `tower_abci::buffer4::Worker` that means nothing else
         // get processed during that time.
         let app = self.0.clone();
+
+        // Another trick to avoid any subtle bugs is the mem::replace.
+        // See https://github.com/tower-rs/tower/issues/547
+        let app: A = std::mem::replace(&mut self.0, app);
+
         let res = async move {
             let res = match req {
                 Request::Echo(r) => Response::Echo(app.echo(r).await?),

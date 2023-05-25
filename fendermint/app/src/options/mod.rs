@@ -7,8 +7,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::settings::expand_tilde;
 
-use self::{genesis::GenesisArgs, key::KeyArgs, rpc::RpcArgs, run::RunArgs};
+use self::{eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, rpc::RpcArgs, run::RunArgs};
 
+pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod rpc;
@@ -79,4 +80,6 @@ pub enum Commands {
     Genesis(GenesisArgs),
     /// Subcommands related to sending JSON-RPC commands/queries to Tendermint.
     Rpc(RpcArgs),
+    /// Subcommands related to the Ethereum API facade.
+    Eth(EthArgs),
 }
