@@ -2217,8 +2217,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "clap 4.2.7",
+ "ethers",
+ "ethers-core",
+ "hex",
  "jsonrpc-v2",
+ "lazy_static",
+ "paste",
+ "serde_json",
+ "tendermint",
+ "tendermint-rpc",
+ "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

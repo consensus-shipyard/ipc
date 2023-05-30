@@ -8,6 +8,21 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+ethers-core = { workspace = true }
 axum = { workspace = true }
-jsonrpc-v2 = { workspace = true }
+jsonrpc-v2 = { workspace = true, features = ["easy-errors"] }
+paste = { workspace = true }
+serde_json = { workspace = true }
 tracing = { workspace = true }
+tendermint = { workspace = true }
+tendermint-rpc = { workspace = true }
+
+
+[dev-dependencies]
+clap = { workspace = true }
+ethers = { workspace = true, features = ["abigen"] }
+hex = { workspace = true }
+lazy_static = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

@@ -1,5 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+
 //! Example of using the RPC library in combination with ethers abigen
 //! to programmatically deploy and call a contract.
 //!
@@ -63,7 +64,7 @@ abigen!(
 //         .unwrap()
 //         .generate()
 //         .unwrap()
-//         .write_to_file("./tests/storage_footprint_abi.rs")
+//         .write_to_file("./simplecoin.rs")
 //         .unwrap();
 // ```
 // This approach combined with `build.rs` was explored in https://github.com/filecoin-project/ref-fvm/pull/1507

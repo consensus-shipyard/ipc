@@ -2,17 +2,23 @@
 NETWORK_NAME = "smoke"
 CMT_CONTAINER_NAME = "smoke-cometbft"
 FM_CONTAINER_NAME = "smoke-fendermint"
+ETHAPI_CONTAINER_NAME = "smoke-ethapi"
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_IMAGE = "fendermint:latest"
 TEST_DATA_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/test-data"
 TEST_SCRIPTS_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/scripts"
 ACTORS_BUNDLE = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/../builtin-actors/output/bundle.car"
-HOST_RPC_PORT = 26657
+CMT_HOST_PORT = 26657
+ETHAPI_HOST_PORT = 8545
 CARGO_MAKE_WAIT_MILLISECONDS = 5000
 
 # smoke-test infrastructure:
 # cargo install cargo-make
 # cargo make
+# - or -
+# cargo setup
+# cargo test
+# cargo treardown
 
 [tasks.default]
 clear = true
@@ -30,11 +36,12 @@ dependencies = [
   "fendermint-init",
   "fendermint-start",
   "cometbft-start",
+  "ethapi-start",
   "wait",
 ]
 
 [tasks.test]
-dependencies = ["simplecoin-example"]
+dependencies = ["simplecoin-example", "ethapi-example"]
 
 [tasks.teardown]
 # `dependencies` doesn't seem to work with `cleanup_task`.
@@ -43,6 +50,8 @@ run_task = { name = [
   "cometbft-rm",
   "fendermint-stop",
   "fendermint-rm",
+  "ethapi-stop",
+  "ethapi-rm",
   "network-rm",
   "test-data-dir-rm",
 ] }
@@ -54,6 +63,13 @@ script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
 cargo run -p fendermint_rpc --release --example simplecoin -- \
   --secret-key fendermint/testing/smoke-test/test-data/fendermint/keys/alice.sk
+"""
+
+
+[tasks.ethapi-example]
+script = """
+cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
+cargo run -p fendermint_eth_api --release --example ethers
 """
 
 
@@ -89,7 +105,7 @@ docker run \
   --name ${CMT_CONTAINER_NAME} \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
-  --publish 26657:${HOST_RPC_PORT} \
+  --publish 26657:${CMT_HOST_PORT} \
   --volume ${TEST_DATA_DIR}/cometbft:/cometbft \
   --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
   --env CMT_PEX=false \
@@ -126,6 +142,27 @@ docker run \
 """
 dependencies = ["test-data-dir", "network-create"]
 
+[tasks.ethapi-start]
+extend = "ethapi-run"
+env = { "CMD" = "eth run", "FLAGS" = "-d" }
+
+
+[tasks.ethapi-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --rm \
+  --name ${ETHAPI_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish 8545:${ETHAPI_HOST_PORT} \
+  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  ${FM_DOCKER_IMAGE} \
+  ${CMD}
+"""
+dependencies = ["network-create"]
+
 [tasks.network-create]
 command = "docker"
 args = ["network", "create", "${NETWORK_NAME}"]
@@ -151,6 +188,14 @@ env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
 [tasks.fendermint-stop]
 extend = "docker-stop"
 env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+
+[tasks.ethapi-rm]
+extend = "docker-rm"
+env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
+
+[tasks.ethapi-stop]
+extend = "docker-stop"
+env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
 
 [tasks.docker-stop]
 command = "docker"

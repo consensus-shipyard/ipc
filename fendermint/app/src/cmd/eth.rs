@@ -15,13 +15,13 @@ cmd! {
     match self.command.clone() {
       EthCommands::Run { url, proxy_url } => {
         let client = http_client(url, proxy_url)?;
-        run(client, settings).await
+        run(settings, client).await
       }
     }
   }
 }
 
 /// Run the Ethereum
-async fn run(_client: HttpClient, settings: EthSettings) -> anyhow::Result<()> {
-    fendermint_eth_api::listen(settings.http.addr()).await
+async fn run(settings: EthSettings, client: HttpClient) -> anyhow::Result<()> {
+    fendermint_eth_api::listen(settings.http.addr(), client).await
 }

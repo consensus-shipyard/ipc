@@ -29,7 +29,7 @@ fendermint_vm_message = { path = "../vm/message", features = ["secp256k1"] }
 
 [dev-dependencies]
 clap = { workspace = true }
-ethers = { version = "2.0", features = ["abigen"] }
+ethers = { workspace = true, features = ["abigen"] }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 tokio = { workspace = true }
