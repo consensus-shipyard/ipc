@@ -9,9 +9,8 @@ use std::fmt::Debug;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::create::{CreateSubnetParams, CreateSubnetResponse};
+use crate::sdk::IpcAgentClient;
+use crate::server::create::CreateSubnetParams;
 
 /// The command to create a new subnet actor.
 pub struct CreateSubnet;
@@ -22,8 +21,6 @@ impl CreateSubnet {
         arguments: &CreateSubnetArgs,
     ) -> anyhow::Result<String> {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
-
         let params = CreateSubnetParams {
             from: arguments.from.clone(),
             parent: arguments.parent.clone(),
@@ -34,13 +31,8 @@ impl CreateSubnet {
             topdown_check_period: arguments.topdown_check_period,
         };
 
-        Ok(json_rpc_client
-            .request::<CreateSubnetResponse>(
-                json_rpc_methods::CREATE_SUBNET,
-                serde_json::to_value(params)?,
-            )
-            .await?
-            .address)
+        let client = IpcAgentClient::default_from_url(url);
+        client.create_subnet(params).await
     }
 }
 

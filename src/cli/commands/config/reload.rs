@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: MIT
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::ReloadConfigParams;
+use crate::sdk::IpcAgentClient;
 use async_trait::async_trait;
 use clap::Args;
 
@@ -18,19 +16,10 @@ impl CommandLineHandler for ReloadConfig {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("reload config with args: {:?}", arguments);
 
-        let params = ReloadConfigParams {
-            path: arguments.path.clone(),
-        };
-
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
+        let client = IpcAgentClient::default_from_url(url);
 
-        json_rpc_client
-            .request::<()>(
-                json_rpc_methods::RELOAD_CONFIG,
-                serde_json::to_value(params)?,
-            )
-            .await?;
+        client.reload_config(arguments.path.clone()).await?;
 
         log::info!("Reload json rpc config successful");
 

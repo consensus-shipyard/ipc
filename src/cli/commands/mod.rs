@@ -8,7 +8,7 @@ mod crossmsg;
 mod daemon;
 mod subnet;
 mod util;
-mod wallet;
+pub mod wallet;
 
 use crate::cli::commands::checkpoint::CheckpointCommandsArgs;
 use crate::cli::commands::crossmsg::CrossMsgsCommandsArgs;

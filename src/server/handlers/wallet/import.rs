@@ -10,12 +10,19 @@ use ipc_identity::json::KeyInfoJson;
 use ipc_identity::{KeyInfo, Wallet};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
+use zeroize::Zeroize;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletImportParams {
     pub key_type: u8,
     /// Base64 encoded private key string
     pub private_key: String,
+}
+
+impl Drop for WalletImportParams {
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,7 +57,7 @@ impl JsonRPCRequestHandler for WalletImportHandler {
 
         let key_info = KeyInfoJson(KeyInfo::new(
             key_type,
-            base64::engine::general_purpose::STANDARD.decode(request.private_key)?,
+            base64::engine::general_purpose::STANDARD.decode(&request.private_key)?,
         ));
         let key_info = KeyInfo::try_from(key_info)?;
         let address = wallet.import(key_info)?;
