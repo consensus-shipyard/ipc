@@ -2251,6 +2251,7 @@ dependencies = [
  "ethers",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
+ "fendermint_vm_genesis",
  "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",

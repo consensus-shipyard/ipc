@@ -53,8 +53,7 @@ run_task = { name = [
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
 cargo run -p fendermint_rpc --release --example simplecoin -- \
-  --secret-key fendermint/testing/smoke-test/test-data/fendermint/keys/alice.sk \
-  --chain-name ${NETWORK_NAME}
+  --secret-key fendermint/testing/smoke-test/test-data/fendermint/keys/alice.sk
 """
 
 

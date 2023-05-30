@@ -25,12 +25,12 @@ use fendermint_vm_core::chainid;
 use fvm_shared::address::Address;
 use lazy_static::lazy_static;
 use libsecp256k1::{PublicKey, SecretKey};
-use tendermint_rpc::Url;
+use tendermint_rpc::{Client, Url};
 use tracing::Level;
 
 use fvm_shared::econ::TokenAmount;
 
-use fendermint_rpc::client::FendermintClient;
+use fendermint_rpc::client::{FendermintClient, TendermintClient};
 use fendermint_rpc::message::{GasParams, MessageFactory};
 use fendermint_rpc::tx::{CallClient, TxClient, TxCommit};
 
@@ -86,10 +86,6 @@ pub struct Options {
     /// Path to the secret key to deploy with, expected to be in Base64 format.
     #[arg(long, short)]
     pub secret_key: PathBuf,
-
-    /// The name of the chain we are connecting to, which becomes part of the message signature.
-    #[arg(long, short)]
-    pub chain_name: String,
 }
 
 impl Options {
@@ -115,11 +111,20 @@ async fn main() {
 
     let sk = MessageFactory::read_secret_key(&opts.secret_key).expect("error reading secret key");
 
+    // Query the account nonce from the state, so it doesn't need to be passed as an arg.
     let sn = sequence(&client, &sk)
         .await
         .expect("error getting sequence");
 
-    let chain_id = chainid::from_str_hashed(&opts.chain_name).expect("problematic chain name");
+    // Get the chain ID from Genesis, so it doesn't need to be passed as an arg.
+    let genesis: tendermint::Genesis<fendermint_vm_genesis::Genesis> = client
+        .underlying()
+        .genesis()
+        .await
+        .expect("failed to query genesis");
+
+    let chain_id =
+        chainid::from_str_hashed(genesis.chain_id.as_str()).expect("problematic chain name");
 
     let mf = MessageFactory::new(sk, sn, chain_id).unwrap();
 
