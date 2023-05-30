@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ipld/resolver", "testing/e2e", "identity"]
+members = [".", "ipld/resolver", "testing/e2e", "identity", "testing/itest"]
 
 [workspace.package]
 authors = ["Protocol Labs"]
@@ -44,6 +44,7 @@ serde_bytes = "0.11.9"
 clap = { version = "4.1.4", features = ["env", "derive"] }
 thiserror = { workspace = true }
 serde_tuple = "0.5.0"
+zeroize = "1.6.0"
 
 fvm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true }
