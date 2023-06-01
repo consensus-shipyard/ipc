@@ -87,6 +87,8 @@ pub enum RpcQueryCommands {
         #[arg(long, short, value_parser = parse_address)]
         address: Address,
     },
+    /// Get the slowly changing state parameters.
+    StateParams,
 }
 
 #[derive(Subcommand, Debug, Clone)]

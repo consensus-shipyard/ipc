@@ -151,4 +151,8 @@ where
         }
         self.with_exec_state(|s| s.execute_explicit(msg))
     }
+
+    pub fn state_params(&self) -> &FvmStateParams {
+        &self.state_params
+    }
 }

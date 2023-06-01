@@ -97,6 +97,11 @@ async fn query(
                 }
             }
         }
+        RpcQueryCommands::StateParams => {
+            let res = client.state_params(Some(height)).await?;
+            let json = json!({ "response": res });
+            print_json(&json)?;
+        }
     };
     Ok(())
 }

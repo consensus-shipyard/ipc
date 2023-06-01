@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
-use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate};
+use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate, StateParams};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{ActorID, BLOCK_GAS_LIMIT};
 
@@ -22,6 +22,8 @@ pub enum FvmQueryRet {
     Call(FvmApplyRet),
     /// The estimated gas limit.
     EstimateGas(GasEstimate),
+    /// Current state parameters.
+    StateParams(StateParams),
 }
 
 #[async_trait]
@@ -76,6 +78,16 @@ where
                 };
 
                 FvmQueryRet::EstimateGas(est)
+            }
+            FvmQuery::StateParams => {
+                let state_params = state.state_params();
+                let state_params = StateParams {
+                    base_fee: state_params.base_fee.clone(),
+                    circ_supply: state_params.circ_supply.clone(),
+                    chain_id: state_params.chain_id,
+                    network_version: state_params.network_version,
+                };
+                FvmQueryRet::StateParams(state_params)
             }
         };
         Ok((state, res))

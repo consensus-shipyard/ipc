@@ -22,16 +22,16 @@ use ethers::prelude::{abigen, decode_function_data};
 use ethers::types::H160;
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
-use fendermint_vm_core::chainid;
 use fvm_shared::address::Address;
+use fvm_shared::chainid::ChainID;
 use lazy_static::lazy_static;
 use libsecp256k1::{PublicKey, SecretKey};
-use tendermint_rpc::{Client, Url};
+use tendermint_rpc::Url;
 use tracing::Level;
 
 use fvm_shared::econ::TokenAmount;
 
-use fendermint_rpc::client::{FendermintClient, TendermintClient};
+use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::{GasParams, MessageFactory};
 use fendermint_rpc::tx::{CallClient, TxClient, TxCommit};
 
@@ -117,17 +117,16 @@ async fn main() {
         .await
         .expect("error getting sequence");
 
-    // Get the chain ID from Genesis, so it doesn't need to be passed as an arg.
-    let genesis: tendermint::Genesis<fendermint_vm_genesis::Genesis> = client
-        .underlying()
-        .genesis()
+    // Query the chain ID, so it doesn't need to be passed as an arg.
+    // We could the chain name using `client.underlying().genesis().await?.chain_id.as_str()` as well.
+    let chain_id = client
+        .state_params(None)
         .await
-        .expect("failed to query genesis");
+        .expect("error getting state params")
+        .value
+        .chain_id;
 
-    let chain_id =
-        chainid::from_str_hashed(genesis.chain_id.as_str()).expect("problematic chain name");
-
-    let mf = MessageFactory::new(sk, sn, chain_id).unwrap();
+    let mf = MessageFactory::new(sk, sn, ChainID::from(chain_id)).unwrap();
 
     let mut client = client.bind(mf);
 

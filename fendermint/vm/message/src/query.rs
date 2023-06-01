@@ -3,6 +3,7 @@
 use cid::Cid;
 use fvm_shared::{
     address::Address, econ::TokenAmount, error::ExitCode, message::Message as FvmMessage,
+    version::NetworkVersion,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -32,6 +33,8 @@ pub enum FvmQuery {
     /// This is effectively a [`Call`], but it's included so that in the future
     /// it can do more sophisticated things with premiums, caps and over estimation.
     EstimateGas(Box<FvmMessage>),
+    /// Retrieve the slowly changing state parameters that aren't part of the state tree.
+    StateParams,
 }
 
 /// State of all actor implementations.
@@ -74,6 +77,28 @@ pub struct GasEstimate {
     pub gas_limit: u64,
 }
 
+/// Slowly changing state parameters outside the state tree.
+#[serde_as]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct StateParams {
+    /// Base fee.
+    ///
+    /// Its evolution can depend on the size of blocks, contention, etc.
+    #[serde_as(as = "IsHumanReadable")]
+    pub base_fee: TokenAmount,
+    /// Circulating supply.
+    ///
+    /// Its value depends on the amount moving in/out of the subnet.
+    #[serde_as(as = "IsHumanReadable")]
+    pub circ_supply: TokenAmount,
+    /// Numeric chain ID for signing transactions.
+    ///
+    /// Its value is most likely fixed since genesis, but it might change during a fork.
+    pub chain_id: u64,
+    /// Current network version.
+    pub network_version: NetworkVersion,
+}
+
 #[cfg(feature = "arb")]
 mod arb {
     use fendermint_testing::arb::{ArbAddress, ArbCid, ArbTokenAmount};
@@ -84,10 +109,12 @@ mod arb {
 
     impl quickcheck::Arbitrary for FvmQuery {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            match u8::arbitrary(g) % 3 {
+            match u8::arbitrary(g) % 5 {
                 0 => FvmQuery::Ipld(ArbCid::arbitrary(g).0),
                 1 => FvmQuery::ActorState(ArbAddress::arbitrary(g).0),
-                _ => FvmQuery::Call(Box::new(SignedMessage::arbitrary(g).into_message())),
+                2 => FvmQuery::Call(Box::new(SignedMessage::arbitrary(g).into_message())),
+                3 => FvmQuery::EstimateGas(Box::new(SignedMessage::arbitrary(g).into_message())),
+                _ => FvmQuery::StateParams,
             }
         }
     }

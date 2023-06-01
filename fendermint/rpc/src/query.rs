@@ -14,7 +14,7 @@ use cid::Cid;
 use fvm_shared::ActorID;
 use fvm_shared::{address::Address, error::ExitCode};
 
-use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate};
+use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate, StateParams};
 
 use crate::response::encode_data;
 
@@ -95,6 +95,20 @@ pub trait QueryClient: Send + Sync {
         let value = extract(res, |res| {
             fvm_ipld_encoding::from_slice(&res.value)
                 .context("failed to decode GasEstimate from query")
+        })?;
+        Ok(QueryResponse { height, value })
+    }
+
+    /// Slowly changing state parameters.
+    async fn state_params(
+        &self,
+        height: Option<Height>,
+    ) -> anyhow::Result<QueryResponse<StateParams>> {
+        let res = self.perform(FvmQuery::StateParams, height).await?;
+        let height = res.height;
+        let value = extract(res, |res| {
+            fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode StateParams from query")
         })?;
         Ok(QueryResponse { height, value })
     }

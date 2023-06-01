@@ -140,6 +140,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         // For calls and estimates, the caller needs to look into the `value` field to see the real exit code;
         // the query itself is successful, even if the value represents a failure.
         FvmQueryRet::Call(_) | FvmQueryRet::EstimateGas(_) => ExitCode::OK,
+        FvmQueryRet::StateParams(_) => ExitCode::OK,
     };
 
     // The return value has a `key` field which is supposed to be set to the data matched.
@@ -170,6 +171,10 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         }
         FvmQueryRet::EstimateGas(est) => {
             let v = ipld_encode!(est);
+            (Vec::new(), v)
+        }
+        FvmQueryRet::StateParams(sp) => {
+            let v = ipld_encode!(sp);
             (Vec::new(), v)
         }
     };
