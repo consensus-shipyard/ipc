@@ -33,6 +33,7 @@ libp2p = { version = "0.50", default-features = false, features = [
   "plaintext",
 ] }
 libipld = { workspace = true }
+libp2p-bitswap = "0.25.1"
 log = { workspace = true }
 prometheus = { workspace = true }
 quickcheck = { workspace = true, optional = true }
@@ -46,9 +47,6 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true, optional = true }
 fvm_ipld_blockstore = { workspace = true, optional = true }
 
-# Using a fork of libp2p-bitswap so that we can do rate limiting.
-#libp2p-bitswap = "0.25"
-libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap", branch = "req-res-pub" }
 
 [dev-dependencies]
 quickcheck = { workspace = true }

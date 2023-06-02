@@ -1,18 +1,12 @@
-.PHONY: all build test lint license check-fmt check-clippy diagrams install_infra
+.PHONY: all build test lint license check-fmt check-clippy diagrams
 
 all: test build
 
 build:
-	cargo build -Z unstable-options --release --out-dir ./bin
+	cargo build -Z unstable-options --release
 
 test:
-	cargo test --release --workspace --exclude ipc_e2e itest
-
-itest:
-	cargo test -p itest --test checkpoint -- --nocapture
-
-e2e:
-	cargo test --release -p ipc_e2e
+	cargo test --release --workspace
 
 clean:
 	cargo clean
@@ -24,9 +18,6 @@ lint: \
 
 license:
 	./scripts/add_license.sh
-
-install-infra:
-	./scripts/install_infra.sh
 
 check-fmt:
 	cargo fmt --all --check

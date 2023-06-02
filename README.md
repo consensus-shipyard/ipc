@@ -2,11 +2,11 @@
 
 The IPLD Resolver is a Peer-to-Peer library which can be used to resolve arbitrary CIDs from subnets in InterPlanetary Consensus.
 
-See the [docs](../../docs/) for a conceptual overview.
+See the [docs](./docs/) for a conceptual overview.
 
 ## Usage
 
-Please have a look at the [smoke test](tests/smoke.rs) for an example of using the library.
+Please have a look at the [smoke test](./ipld/resolver/tests/smoke.rs) for an example of using the library.
 
 The following snippet demonstrates how one would create a resolver instance and use it:
 
