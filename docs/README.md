@@ -1,6 +1,6 @@
 # IPLD Resolver
 
-The [IPLD Resolver](/ipld/resolver) is a library that [IPC Agents](https://github.com/consensus-shipyard/ipc-agent/) can use to exchange data between subnets in IPLD format.
+The IPLD Resolver is a library that [IPC Agents](https://github.com/consensus-shipyard/ipc-agent/) can use to exchange data between subnets in IPLD format.
 
 ## Checkpointing
 
@@ -48,7 +48,7 @@ See the libp2p [specs](https://github.com/libp2p/specs) and [docs](https://docs.
 
 The Resolver is completely agnostic over what content it can resolve, as long as it's based on CIDs; it's not aware of the checkpointing use case above.
 
-The interface with the host system is through a host-provided implementation of the [BitswapStore](https://github.com/ipfs-rust/libp2p-bitswap/blob/7dd9cececda3e4a8f6e14c200a4b457159d8db33/src/behaviour.rs#L55) which the library uses to retrieve and store content. Implementors can make use of the [missing_blocks](https://github.com/consensus-shipyard/ipc-agent/blob/main/ipld/resolver/src/missing_blocks.rs) helper method which recursively collects all CIDs from an IPLD `Blockstore`, starting from the root CID we are looking for.
+The interface with the host system is through a host-provided implementation of the [BitswapStore](https://github.com/ipfs-rust/libp2p-bitswap/blob/7dd9cececda3e4a8f6e14c200a4b457159d8db33/src/behaviour.rs#L55) which the library uses to retrieve and store content. Implementors can make use of the [missing_blocks](../src/missing_blocks.rs) helper method which recursively collects all CIDs from an IPLD `Blockstore`, starting from the root CID we are looking for.
 
 Internally the protocols are wrapped into behaviours that interpret their events and manage their associated state:
 * `Discovery` wraps `Kademlia`
@@ -59,7 +59,7 @@ The following diagram shows a typical sequence of events within the IPLD Resolve
 
 ![IPLD Resolver](diagrams/ipld_resolver.png)
 
-# Automation
+# Diagram Automation
 
 The diagrams in this directory can be rendered with `make diagrams`.
 
@@ -74,7 +74,7 @@ set -eo pipefail
 # Redirect output to stderr.
 exec 1>&2
 
-if git diff --cached --name-only | grep .puml
+if git diff --cached --name-only  --diff-filter=d | grep .puml
 then
   make diagrams
   git add docs/diagrams/*.png

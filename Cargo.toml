@@ -1,29 +1,60 @@
-[workspace]
-members = ["ipld/resolver"]
-
-[workspace.package]
+[package]
+name = "ipc_ipld_resolver"
+version = "0.1.0"
+description = "P2P library to resolve IPLD content across IPC subnets."
 authors = ["Protocol Labs"]
 edition = "2021"
 license-file = "LICENSE"
 
-[workspace.dependencies]
+[dependencies]
 anyhow = "1.0"
 base64 = "0.21.0"
-lazy_static = "1.4"
-log = "0.4"
-env_logger = "0.10"
-prometheus = "0.13"
-serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.16", features = ["full"] }
-thiserror = "1.0.38"
-quickcheck = "1"
-quickcheck_macros = "1"
 blake2b_simd = "1.0"
-rand = "0.8"
-serde_json = { version = "1.0.91", features = ["raw_value"] }
-
-fvm_ipld_blockstore = "0.1"
-fvm_ipld_encoding = "0.3"
-fvm_shared = { version = "=3.0.0-alpha.17", default-features = false, features = ["crypto"] }
-ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", tag = "v0.2.0" }
+bloom = "0.3"
+gcra = "0.3"
+lazy_static = "1.4"
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
+libp2p = { version = "0.50", default-features = false, features = [
+  "gossipsub",
+  "kad",
+  "identify",
+  "ping",
+  "noise",
+  "yamux",
+  "tcp",
+  "dns",
+  "mplex",
+  "request-response",
+  "metrics",
+  "tokio",
+  "macros",
+  "serde",
+  "secp256k1",
+  "plaintext",
+] }
+libp2p-bitswap = "0.25.1"
+log = "0.4"
+prometheus = "0.13"
+quickcheck = { version = "1", optional = true }
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0.91", features = ["raw_value"] }
+thiserror = "1.0.38"
+tokio = { version = "1.16", features = ["full"] }
+
+fvm_ipld_encoding = "0.3"
+fvm_shared = { version = "=3.0.0-alpha.17", default-features = false, features = ["crypto"], optional = true }
+fvm_ipld_blockstore = { version = "0.1", optional = true }
+ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", tag = "v0.2.0" }
+
+[dev-dependencies]
+quickcheck_macros = "1"
+env_logger = "0.10"
+fvm_ipld_hamt = "0.6"
+
+ipc_ipld_resolver = { path = ".", features = ["arb"] }
+
+[features]
+default = ["arb", "missing_blocks"]
+arb = ["quickcheck", "fvm_shared/arb"]
+missing_blocks = ["fvm_ipld_blockstore"]
