@@ -2328,10 +2328,12 @@ name = "fendermint_vm_core"
 version = "0.1.0"
 dependencies = [
  "cid",
+ "fnv",
  "fvm_shared",
  "lazy_static",
  "quickcheck 1.0.3",
  "quickcheck_macros",
+ "regex",
  "serde",
  "thiserror",
 ]

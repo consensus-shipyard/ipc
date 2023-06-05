@@ -1,11 +1,12 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::collections::HashMap;
+use std::hash::Hasher;
 
-use cid::{multihash, multihash::MultihashDigest};
-use fvm_shared::bigint::{BigInt, Integer, Sign};
+use fvm_shared::bigint::Integer;
 use fvm_shared::chainid::ChainID;
 use lazy_static::lazy_static;
+use regex::Regex;
 use thiserror::Error;
 
 lazy_static! {
@@ -25,6 +26,11 @@ lazy_static! {
 
     /// Reverse index over the chain IDs.
     static ref KNOWN_CHAIN_NAMES: HashMap<&'static str, u64> = KNOWN_CHAIN_IDS.iter().map(|(k, v)| (*v, *k)).collect();
+
+    /// Regex for capturing a single root subnet ID.
+    ///
+    /// See https://github.com/consensus-shipyard/ipc-actors/pull/109
+    static ref ROOT_RE: Regex = Regex::new(r"^/r(0|[1-9]\d*)$").unwrap();
 }
 
 /// Maximum value that MetaMask and other Ethereum JS tools can safely handle.
@@ -42,29 +48,23 @@ pub enum ChainIDError {
 
 /// Hash the name of the chain and reduce it to a number within the acceptable range.
 ///
-/// If the name is one of the well known ones, return that name as is.
+/// If the name is one of the well known ones, return the ID for that name as-is.
 pub fn from_str_hashed(name: &str) -> Result<ChainID, ChainIDError> {
-    // TODO: If we want to use the subnet ID (e.g. "/root/foo/bar")
-    // as the chain name, we should change it so the "/root" part is
-    // not common to all chain, but rather be like "/filecoin/foo/bar".
-    // And if someone is looking for the ID of "/filecoin" without
-    // any further path (ie. the root) then we should strip the "/"
-    // when looking up if it's a well known network ID.
-
+    // See if the name matches one of the well known chains.
     if let Some(chain_id) = KNOWN_CHAIN_NAMES.get(name) {
         return Ok(ChainID::from(*chain_id));
     }
 
-    let bz = name.as_bytes();
-    let digest = multihash::Code::Blake2b256.digest(bz);
+    // See if the name is actually a rootnet ID like "/r123"
+    if let Some(chain_id) = just_root_id(name) {
+        return Ok(ChainID::from(chain_id));
+    }
 
-    let num_digest = BigInt::from_bytes_be(Sign::Plus, digest.digest());
-    let max_chain_id = BigInt::from(MAX_CHAIN_ID);
+    let mut hasher = fnv::FnvHasher::default();
+    hasher.write(name.as_bytes());
+    let num_digest = hasher.finish();
 
-    let chain_id = num_digest.mod_floor(&max_chain_id);
-    let chain_id: u64 = chain_id
-        .try_into()
-        .expect("modulo should be safe to convert to u64");
+    let chain_id = num_digest.mod_floor(&MAX_CHAIN_ID);
 
     if KNOWN_CHAIN_IDS.contains_key(&chain_id) {
         Err(ChainIDError::IllegalName(name.to_owned(), chain_id))
@@ -78,13 +78,21 @@ pub trait HasChainID {
     fn chain_id(&self) -> &ChainID;
 }
 
+/// Extract the root chain ID _iff_ the name is in the format of "/r<chain-id>".
+fn just_root_id(name: &str) -> Option<u64> {
+    ROOT_RE.captures_iter(name).next().and_then(|cap| {
+        let chain_id = &cap[1];
+        chain_id.parse::<u64>().ok()
+    })
+}
+
 #[cfg(test)]
 mod tests {
 
     use fvm_shared::chainid::ChainID;
     use quickcheck_macros::quickcheck;
 
-    use crate::chainid::KNOWN_CHAIN_NAMES;
+    use crate::chainid::{just_root_id, KNOWN_CHAIN_NAMES};
 
     use super::{from_str_hashed, MAX_CHAIN_ID};
 
@@ -132,6 +140,42 @@ mod tests {
     fn chain_id_of_known() {
         for (name, id) in KNOWN_CHAIN_NAMES.iter() {
             assert_eq!(from_str_hashed(name).unwrap(), ChainID::from(*id))
+        }
+    }
+
+    #[test]
+    fn chain_id_examples() {
+        for (name, id) in [("/r123/f0456/f0789", 3911219601699869)] {
+            assert_eq!(u64::from(from_str_hashed(name).unwrap()), id);
+        }
+    }
+
+    #[test]
+    fn just_root_id_some() {
+        assert_eq!(just_root_id("/r0"), Some(0));
+        assert_eq!(just_root_id("/r123"), Some(123));
+
+        for (_, id) in KNOWN_CHAIN_NAMES.iter() {
+            assert_eq!(
+                from_str_hashed(&format!("/r{id}")).unwrap(),
+                ChainID::from(*id)
+            )
+        }
+    }
+
+    #[test]
+    fn just_root_id_none() {
+        for name in [
+            "",
+            "/",
+            "/r",
+            "/r01",
+            "/r1234567890123456789012345678901234567890",
+            "123",
+            "abc",
+            "/r123/f456",
+        ] {
+            assert!(just_root_id(name).is_none());
         }
     }
 }

@@ -7,7 +7,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+fnv = { workspace = true }
 lazy_static = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
