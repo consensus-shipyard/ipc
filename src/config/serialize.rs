@@ -61,13 +61,13 @@ mod tests {
     json_rpc_address = "127.0.0.1:3030"
 
     [[subnets]]
-    id = "/root"
-    gateway_addr = "t064"
+    id = "/r123"
+    gateway_addr = "f064"
     network_name = "root"
     jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
     jsonrpc_api_ws = "wss://example.org/rpc/v0"
     auth_token = "YOUR TOKEN"
-    accounts = ["t01"]
+    accounts = ["f01"]
     "#;
 
     #[test]

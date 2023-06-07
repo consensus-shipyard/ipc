@@ -26,7 +26,7 @@ if [ "${IPC_NODE_TYPE}" == "eudico" ]; then
   echo "[*] Creating new wallet with agent-$IPC_AGENT_NR on $IPC_NODE_TYPE node-$IPC_NODE_NR in subnet $IPC_SUBNET_ID"
 
   # Example output from the agent:
-  # [2023-04-14T14:24:27Z INFO  ipc_agent::cli::commands::wallet::new] created new wallet with address WalletNewResponse { address: "t1qn46gmcao6vnujtim7l2a4ombut2ywyhh4ccdga" } in subnet "/root"
+  # [2023-04-14T14:24:27Z INFO  ipc_agent::cli::commands::wallet::new] created new wallet with address WalletNewResponse { address: "t1qn46gmcao6vnujtim7l2a4ombut2ywyhh4ccdga" } in subnet "/r31415926"
   set +e
   LOG=$($AGENT wallet new --ipc-agent-url $AGENT_URL --key-type secp256k1 --subnet=$IPC_SUBNET_ID 2>&1)
   STATUS=$?

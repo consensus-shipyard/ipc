@@ -1,11 +1,14 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use ipc_sdk::subnet_id::{SubnetID, ROOTNET_ID};
+use std::str::FromStr;
+
+use ipc_sdk::subnet_id::SubnetID;
 
 use ipc_e2e::TestClient;
 
 const IPC_AGENT_JSON_RPC_URL_ENV: &str = "IPC_AGENT_JSON_RPC_URL";
+const DEFAULT_ROOT: &str = "/r31415926";
 
 #[tokio::test]
 async fn subnet_lifecycle() {
@@ -13,12 +16,13 @@ async fn subnet_lifecycle() {
 
     // step 1. create the subnet
     let address = client
-        .create_subnet("/root")
+        .create_subnet(DEFAULT_ROOT)
         .await
         .expect("create subnet in root failed");
 
     // obtain the created subnet id
-    let subnet_id = SubnetID::new_from_parent(&ROOTNET_ID, address);
+    let root = SubnetID::from_str(DEFAULT_ROOT).unwrap();
+    let subnet_id = SubnetID::new_from_parent(&root, address);
     log::info!("created subnet: {:} in root", subnet_id);
 
     // step 2. join the subnet

@@ -87,9 +87,9 @@ nano ~/.ipc-agent/config.toml
 json_rpc_address = "0.0.0.0:3030"
 
 [[subnets]]
-id = "/root"
+id = "/r31415926"
 gateway_addr = "t064"
-network_name = "root"
+network_name = "andromeda"
 jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 auth_token = "<AUTH_TOKEN_0>"
 accounts = []
@@ -123,11 +123,11 @@ accounts = ["<WALLET_0>"]
 
 ## Step 4: Create the subnet
 
-* The next step is to create a subnet under `/root`
+* The next step is to create a subnet under `/r31415926`
 ```bash
-./ipc-agent/bin/ipc-agent subnet create --parent /root --name andromeda --min-validator-stake 1 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
+./ipc-agent/bin/ipc-agent subnet create --parent /r31415926 --name andromeda --min-validator-stake 1 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
 ```
-* Make a note of the address of the subnet you created (`/root/<SUBNET_ID>`)
+* Make a note of the address of the subnet you created (`/r31415926/<SUBNET_ID>`)
 
 
 ## Step 5: Create and export validator wallets
@@ -148,9 +148,9 @@ Although we set a minimum of 2 active validators in the previous, we'll deploy 3
 ```
 * We also need to fund the wallets with enough collateral to; we'll send the funds from our default wallet 
 ```bash
-./ipc-agent/bin/ipc-agent subnet send-value --subnet /root --to <WALLET_1> 2
-./ipc-agent/bin/ipc-agent subnet send-value --subnet /root --to <WALLET_2> 2
-./ipc-agent/bin/ipc-agent subnet send-value --subnet /root --to <WALLET_3> 2
+./ipc-agent/bin/ipc-agent subnet send-value --subnet /r31415926 --to <WALLET_1> 2
+./ipc-agent/bin/ipc-agent subnet send-value --subnet /r31415926 --to <WALLET_2> 2
+./ipc-agent/bin/ipc-agent subnet send-value --subnet /r31415926 --to <WALLET_3> 2
 ```
 
 
@@ -160,14 +160,14 @@ We can deploy the subnet nodes. Note that each node should be importing a differ
 
 * Deploy and run a container for each validator, importing the corresponding wallet keys
 ```bash
-./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1251 1351 /root/<SUBNET_ID> ~/.ipc-agent/wallet1.key
-./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1252 1352 /root/<SUBNET_ID> ~/.ipc-agent/wallet2.key
-./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1253 1353 /root/<SUBNET_ID> ~/.ipc-agent/wallet3.key
+./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1251 1351 /r31415926/<SUBNET_ID> ~/.ipc-agent/wallet1.key
+./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1252 1352 /r31415926/<SUBNET_ID> ~/.ipc-agent/wallet2.key
+./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1253 1353 /r31415926/<SUBNET_ID> ~/.ipc-agent/wallet3.key
 ```
 * If the deployment is successful, each of these nodes should return the following output at the end of their logs. Save the information for the next step.
 ```
->>> Subnet /root/<SUBNET_ID> daemon running in container: <CONTAINER_ID_#> (friendly name: <CONTAINER_NAME_#>)
->>> Token to /root/<SUBNET_ID> daemon: <AUTH_TOKEN_#>
+>>> Subnet /r31415926/<SUBNET_ID> daemon running in container: <CONTAINER_ID_#> (friendly name: <CONTAINER_NAME_#>)
+>>> Token to /r31415926/<SUBNET_ID> daemon: <AUTH_TOKEN_#>
 >>> Default wallet: <WALLET_#>
 >>> Subnet validator info:
 <VALIDATOR_ADDR_#>
@@ -186,7 +186,7 @@ nano ~/.ipc-agent/config.toml
 * Append the new subnet to the configuration
 ```toml
 [[subnets]]
-id = "/root/<SUBNET_ID>"
+id = "/r31415926/<SUBNET_ID>"
 gateway_addr = "t064"
 network_name = "andromeda"
 jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
@@ -205,9 +205,9 @@ All the infrastructure for the subnet is now deployed, and we can join our valid
 
 * Join the subnet with each validator
 ```bash
-./ipc-agent/bin/ipc-agent subnet join --from <WALLET_1> --subnet /root/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_1>
-./ipc-agent/bin/ipc-agent subnet join --from <WALLET_2> --subnet /root/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_2>
-./ipc-agent/bin/ipc-agent subnet join --from <WALLET_3> --subnet /root/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_3>
+./ipc-agent/bin/ipc-agent subnet join --from <WALLET_1> --subnet /r31415926/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_1>
+./ipc-agent/bin/ipc-agent subnet join --from <WALLET_2> --subnet /r31415926/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_2>
+./ipc-agent/bin/ipc-agent subnet join --from <WALLET_3> --subnet /r31415926/<SUBNET_ID> --collateral 1 --validator-net-addr <VALIDATOR_ADDR_3>
 ```
 
 
@@ -225,7 +225,7 @@ We have everything in place now to start validating. Run the following script fo
 
 * Check that the subnet is running
 ```bash
-./ipc-agent/bin/ipc-agent subnet list --gateway-address t064 --subnet /root
+./ipc-agent/bin/ipc-agent subnet list --gateway-address t064 --subnet /r31415926
 ```
 * If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc-agent). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience!
 * Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system.

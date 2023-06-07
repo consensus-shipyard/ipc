@@ -42,8 +42,8 @@ fi
 set -e
 
 # Example output from the agent:
-# [2023-04-17T11:44:13Z INFO  ipc_agent::cli::commands::subnet::create] created subnet actor with id: /root/t01003
-IPC_SUBNET_ID=$(echo $LOG | sed 's/^.*id: \(\/root\/.*\)$/\1/')
+# [2023-04-17T11:44:13Z INFO  ipc_agent::cli::commands::subnet::create] created subnet actor with id: /r31415926/t01003
+IPC_SUBNET_ID=$(echo $LOG | sed 's/^.*id: \(\/r31415926\/.*\)$/\1/')
 
 if [ -z "$IPC_SUBNET_ID" ]; then
     echo "ERROR: Could not find the subnet ID in the logs.";

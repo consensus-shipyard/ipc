@@ -56,8 +56,9 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         let result = state_wait_response
             .receipt
             .parse_result_into::<InitExecReturn>()?;
-        let addr = result.id_address;
-        log::info!("created subnet result: {addr:}");
+        let addr = result.robust_address;
+        let id = result.id_address;
+        log::info!("created subnet result - robust address: {addr:}, robust address: {id:}");
 
         Ok(addr)
     }

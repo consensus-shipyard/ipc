@@ -105,7 +105,7 @@ For instance, running `./bin/ipc-infra/run-root-docker-1val.sh 1234 1235` will r
 $ ./bin/ipc-infra/run-root-docker-1val.sh 1234 1235
 (...)
 >>> Root daemon running in container: 84711d67cf162e30747c4525d69728c4dea8c6b4b35cd89f6d0947fee14bf908
->>> Token to /root daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0
+>>> Token to /r31415926 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0
 >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq
 ```
 This information will be relevant to configure our agent to connect to this rootnet node.
@@ -117,20 +117,20 @@ The default config path for the agent is `~/.ipc-agent/config.toml`. The agent w
 ./bin/ipc-agent config init
 ```
 
-The `/root` section of the agent's `config.toml` must be updated to connect to your node. In the examples above, we need to set the endpoint of our rootnet node to be `127.0.0.1:1234`, and replace the `auth_token` and `account` with the ones provided by our node.
+The `/r31415926` section of the agent's `config.toml` must be updated to connect to your node. In the examples above, we need to set the endpoint of our rootnet node to be `127.0.0.1:1234`, and replace the `auth_token` and `account` with the ones provided by our node.
 
 *Example*:
 ```toml
 [[subnets]]
-id = "/root"
-gateway_addr = "t064"
+id = "/r31415926"
+gateway_addr = "f064"
 network_name = "root"
 jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0"
 accounts = ["t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq"]
 ```
 
-> 💡 In the current implementation of Spacenet, the gateway is always deployed in the `t064` address. This should be the address always reflected on your config for the gateway. In the future, this will change, and the gateway may be deployed in different addresses.
+> 💡 In the current implementation of Spacenet, the gateway is always deployed in the `f064` address. This should be the address always reflected on your config for the gateway. In the future, this will change, and the gateway may be deployed in different addresses.
 
 > 💡 If you are already running the daemon, then run `./bin/ipc-agent config reload` to pick up the config changes.
 
@@ -148,8 +148,8 @@ To check if the agent has connected to the rootnet successfully, you can try usi
 
 *Example*:
 ```console
-$ ./bin/ipc-agent wallet new --key-type bls --subnet /root
-2023-03-30T12:01:11Z INFO  ipc_agent::cli::commands::manager::wallet] created new wallet with address WalletNewResponse { address: "t1om5pijjq5dqic4ccnqqrvv6zgzwrlxf6bh2apvi" } in subnet "/root"
+$ ./bin/ipc-agent wallet new --key-type bls --subnet /r31415926
+2023-03-30T12:01:11Z INFO  ipc_agent::cli::commands::manager::wallet] created new wallet with address WalletNewResponse { address: "t1om5pijjq5dqic4ccnqqrvv6zgzwrlxf6bh2apvi" } in subnet "/r31415926"
 ```
 
 ## Help

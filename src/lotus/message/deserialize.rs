@@ -50,42 +50,36 @@ where
         where
             A: MapAccess<'de>,
         {
-            let mut parent = None;
-            let mut actor = None;
+            let mut root = None;
+            let mut children = None;
             while let Some((key, value)) = map
                 .next_entry()?
                 .map(|(k, v): (String, &'de serde_json::value::RawValue)| (k, v))
             {
                 match key.as_str() {
-                    "Parent" => {
+                    "Root" => {
                         let s = value.get();
-                        if s.starts_with('"') {
-                            let id =
-                                SubnetID::from_str(&s[1..s.len() - 1]).map_err(A::Error::custom)?;
-                            parent = Some(id);
-                        } else {
-                            return Err(A::Error::custom("invalid parent"));
-                        }
+                        let id: u64 = s[1..s.len() - 1].parse().map_err(A::Error::custom)?;
+                        root = Some(id);
                     }
-                    "Actor" => {
+                    "Children" => {
                         let s = value.get();
-                        if s.starts_with('"') {
-                            let addr =
-                                Address::from_str(&s[1..s.len() - 1]).map_err(A::Error::custom)?;
-                            actor = Some(addr)
-                        } else {
-                            return Err(A::Error::custom("invalid actor"));
-                        }
+                        let v: Vec<String> = serde_json::from_str(s).map_err(A::Error::custom)?;
+                        let addr: Result<Vec<Address>, A::Error> = v
+                            .iter()
+                            .map(|s| Address::from_str(s).map_err(A::Error::custom))
+                            .collect();
+                        children = Some(addr?);
                     }
                     _ => {}
                 }
             }
 
-            if parent.is_none() || actor.is_none() {
+            if root.is_none() || children.is_none() {
                 return Err(A::Error::custom("parent or actor not present"));
             }
 
-            Ok(SubnetID::new_from_parent(&parent.unwrap(), actor.unwrap()))
+            Ok(SubnetID::new(root.unwrap(), children.unwrap()))
         }
     }
     deserializer.deserialize_map(SubnetIdVisitor)

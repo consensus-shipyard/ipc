@@ -11,9 +11,9 @@ In order to connect the Ethereum tooling to your subnet, you'll need to get the 
 ./bin/ipc-agent subnet rpc --subnet <subnet-id>
 
 # Sample command
-$ ./bin/ipc-agent subnet rpc --subnet /root/t01002
-[2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] rpc endpoint for subnet /root/t01002: http://127.0.0.1:1240/rpc/v1
-[2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] chainID for subnet /root/t01002: 31415926
+$ ./bin/ipc-agent subnet rpc --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
+[2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] rpc endpoint for subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq: http://127.0.0.1:1240/rpc/v1
+[2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] chainID for subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq: 31415926
 ```
 
 You can also inspect the `json_rpcapi_http` field of your subnet on your config directly to get the RPC endpoint for your subnet.

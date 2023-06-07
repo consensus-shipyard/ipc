@@ -7,7 +7,7 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use fvm_shared::address::Address;
 use indoc::formatdoc;
-use ipc_sdk::subnet_id::{SubnetID, ROOTNET_ID};
+use ipc_sdk::subnet_id::SubnetID;
 use tempfile::NamedTempFile;
 use url::Url;
 
@@ -15,15 +15,15 @@ use crate::config::{Config, ReloadableConfig};
 
 // Arguments for the config's fields
 const SERVER_JSON_RPC_ADDR: &str = "127.0.0.1:3030";
-const ROOT_ID: &str = "/root";
-const CHILD_ID: &str = "/root/t0100";
-const GATEWAY_ADDR: &str = "t064";
+const ROOT_ID: &str = "/r123";
+const CHILD_ID: &str = "/r123/f0100";
+const GATEWAY_ADDR: &str = "f064";
 const ROOT_AUTH_TOKEN: &str = "ROOT_AUTH_TOKEN";
 const CHILD_AUTH_TOKEN: &str = "CHILD_AUTH_TOKEN";
 const JSONRPC_API_HTTP: &str = "https://example.org/rpc/v0";
 const JSONRPC_API_WS: &str = "ws://example.org/rpc/v0";
 const ACCOUNT_ADDRESS: &str =
-    "t3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a";
+    "f3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a";
 
 #[tokio::test]
 async fn reload_works() {
@@ -97,8 +97,9 @@ fn check_server_config() {
 fn check_subnets_config() {
     let config = read_config().subnets;
 
-    let root = &config[&ROOTNET_ID];
-    assert_eq!(root.id, *ROOTNET_ID);
+    let rt_sn = SubnetID::from_str(ROOT_ID).unwrap();
+    let root = &config[&rt_sn];
+    assert_eq!(root.id, rt_sn);
     assert_eq!(root.network_name, "root");
     assert_eq!(root.gateway_addr, Address::from_str(GATEWAY_ADDR).unwrap());
     assert_eq!(

@@ -7,8 +7,11 @@ use anyhow::{anyhow, Result};
 use ipc_sdk::subnet_id::SubnetID;
 use std::fs;
 use std::fs::File;
+use std::path::Path;
 use std::process::{Child, Command};
 use std::thread::sleep;
+
+const DEFAULT_LOG_DIR: &str = "./logs";
 
 fn node_from_topology(topology: &SubnetConfig) -> SubnetNode {
     SubnetNode::new(
@@ -305,10 +308,16 @@ impl SubnetNode {
 
         let subnet_id = self.subnet_id_cli_string();
 
-        let node_std_out =
-            File::create(format!("./{subnet_id:}_node_{:}.log", self.node.tcp_port))?;
-        let node_std_err =
-            File::create(format!("./{subnet_id:}_node_{:}.err", self.node.tcp_port))?;
+        let base_path = Path::new(DEFAULT_LOG_DIR);
+        fs::create_dir_all(base_path)?;
+        let node_std_out = File::create(Path::join(
+            base_path,
+            format!("./{subnet_id:}_node_{:}.log", self.node.tcp_port),
+        ))?;
+        let node_std_err = File::create(Path::join(
+            base_path,
+            format!("./{subnet_id:}_node_{:}.err", self.node.tcp_port),
+        ))?;
 
         log::info!(
             "spawning node with api: {:}, genesis: {:}, lotus path: {:}",

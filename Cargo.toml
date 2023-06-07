@@ -31,7 +31,7 @@ tokio-stream = "0.1.12"
 tokio-graceful-shutdown = "0.12.1"
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 derive_builder = "0.12.0"
-num-traits = "0.2.15"
+num-traits = { workspace = true }
 num-derive = "0.3.3"
 env_logger = "0.10.0"
 base64 = { workspace = true }
@@ -61,6 +61,7 @@ tempfile = "3.4.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
+num-traits = "0.2.15"
 base64 = "0.21.0"
 lazy_static = "1.4"
 log = "0.4"
@@ -79,9 +80,9 @@ fvm_ipld_blockstore = "0.1"
 fvm_ipld_encoding = "0.3"
 fvm_shared = { version = "=3.0.0-alpha.17", default-features = false, features = ["crypto"] }
 fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", features = ["fil-actor"] }
-ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", tag = "v0.2.0" }
-ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [], tag = "v0.2.0" }
-ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [],  tag = "v0.2.0"  }
+ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", branch = "adlrocha/subnetid-refactor" }
+ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [], branch = "adlrocha/subnetid-refactor" }
+ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [], branch = "adlrocha/subnetid-refactor" }
 ipc_ipld_resolver = { git = "https://github.com/consensus-shipyard/ipc-ipld-resolver.git", branch = "main" }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
 primitives = { git = "https://github.com/consensus-shipyard/fvm-utils" }

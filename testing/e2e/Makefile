@@ -191,7 +191,7 @@ $(IPC_NODE_DIR): | .make/$(IPC_NODE_TYPE) template/$(IPC_NODE_TYPE)/genesis/wall
 	@# The IPC_SUBNET will have to be evaluated later when pre-up step has been executed.
 	if [ "$(IPC_PARENT_NODE_NR)" = "$(IPC_NODE_NR)" ]; then \
 		export IPC_WALLET_KEY=${PWD}/template/$(IPC_NODE_TYPE)/genesis/wallet.key && \
-		export IPC_SUBNET="\"echo /root\""; \
+		export IPC_SUBNET="\"echo /r31415926\""; \
 	else \
 		export IPC_WALLET_KEY=${PWD}/.ipc/nodes/node-$(IPC_PARENT_NODE_NR)/wallets/wallet-$(IPC_WALLET_NR)/wallet.key && \
 		export IPC_SUBNET="\"cat .ipc/nodes/node-$(IPC_PARENT_NODE_NR)/subnets/$(IPC_SUBNET_NAME)/id\"" ; \

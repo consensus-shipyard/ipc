@@ -1,8 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use ipc_sdk::subnet_id::SubnetID;
-use itest::infra;
 use itest::infra::SubnetInfra;
+use itest::{infra, set_network_from_env, DEFAULT_ROOT};
 use std::str::FromStr;
 use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
@@ -11,6 +11,7 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
+    set_network_from_env();
     run().await.unwrap();
 }
 
@@ -27,7 +28,7 @@ async fn run() -> anyhow::Result<()> {
     let parent_lotus_path = std::env::var("PARENT_LOTUS_PATH")
         .unwrap_or_else(|_| "/home/admin/.lotus-local-net0".to_string());
     let parent_subnet_id_str =
-        std::env::var("PARENT_SUBNET_ID").unwrap_or_else(|_| "/root".to_string());
+        std::env::var("PARENT_SUBNET_ID").unwrap_or_else(|_| DEFAULT_ROOT.to_string());
     let subnet_name = std::env::var("SUBNET_NAME").unwrap_or_else(|_| "test-subnet".to_string());
 
     let api_port_sequence = Arc::new(AtomicU16::new(10));
@@ -40,7 +41,7 @@ async fn run() -> anyhow::Result<()> {
         eudico_binary_path,
         SubnetID::from_str(&parent_subnet_id_str).unwrap(),
         api_port_sequence,
-        SubnetID::from_str("/root/t01002")?,
+        SubnetID::from_str(&(DEFAULT_ROOT.to_owned() + "/t01002"))?,
     );
 
     let mut infra = SubnetInfra::new(config);

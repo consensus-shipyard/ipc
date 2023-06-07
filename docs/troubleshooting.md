@@ -52,5 +52,5 @@ Changing the validator is as simple as running the following command:
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent subnet set-validator-net-addr --subnet /root/t01002 --validator-net-addr "/dns/host.docker.internal/tcp/1349/p2p/12D3KooWDeN3bTvZEH11s9Gq5bDeZZLKgRZiMDcy2KmA6mUaT9KE"
+$ ./bin/ipc-agent subnet set-validator-net-addr --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --validator-net-addr "/dns/host.docker.internal/tcp/1349/p2p/12D3KooWDeN3bTvZEH11s9Gq5bDeZZLKgRZiMDcy2KmA6mUaT9KE"
 ```

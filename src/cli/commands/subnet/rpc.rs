@@ -4,11 +4,13 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use ipc_gateway::SubnetID;
 use std::fmt::Debug;
+use std::str::FromStr;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::{json_rpc_methods, DEFAULT_SUBNET_CHAIN_ID};
+use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::rpc::RPCSubnetParams;
 
@@ -33,13 +35,15 @@ impl CommandLineHandler for RPCSubnet {
             .request::<String>(json_rpc_methods::RPC_SUBNET, serde_json::to_value(params)?)
             .await?;
 
+        let id = SubnetID::from_str(&arguments.subnet)?;
+
         log::info!("rpc endpoint for subnet {:}: {:}", arguments.subnet, rpc);
         // todo: We currently have the same ChainID for all subnet. This will be changed
         // once https://github.com/consensus-shipyard/lotus/issues/178 is implemented
         log::info!(
             "chainID for subnet {:}: {:}",
             arguments.subnet,
-            DEFAULT_SUBNET_CHAIN_ID
+            id.chain_id(),
         );
 
         Ok(())

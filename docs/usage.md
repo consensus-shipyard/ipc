@@ -11,8 +11,8 @@ As a sanity-check that we have joined the subnet successfully and that we provid
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent list-subnets --gateway-address=t064 --subnet=/root
-[2023-03-30T17:00:25Z INFO  ipc_agent::cli::commands::manager::list_subnets] /root/t01003 - status: 0, collateral: 2 FIL, circ.supply: 0.0 FIL
+$ ./bin/ipc-agent list-subnets --gateway-address=f064 --subnet=/r31415926
+[2023-03-30T17:00:25Z INFO  ipc_agent::cli::commands::manager::list_subnets] /r31415926/t01003 - status: 0, collateral: 2 FIL, circ.supply: 0.0 FIL
 ```
 
 This command only shows subnets that have been registered to the gateway, i.e. that have provided enough collateral to participate in the IPC protocol and haven't been killed. It is not an exhaustive list of all of the subnet actors deployed over the network.
@@ -25,7 +25,7 @@ With the daemon for a subnet deployed (see [instructions](/docs/subnet.md)), one
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent subnet join --subnet /root/t01002 --collateral 2 --validator-net-addr /dns/host.docker.internal/tcp/1349/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmSw3Fb
+$ ./bin/ipc-agent subnet join --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --collateral 2 --validator-net-addr /dns/host.docker.internal/tcp/1349/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmSw3Fb
 ```
 This command specifies the subnet to join, the amount of collateral to provide and the validator net address used by other validators to dial them.
 
@@ -36,8 +36,8 @@ In order to send messages in a subnet, you'll need to have funds in your subnt a
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent wallet balances --subnet=/root/t01002
-[2023-06-07T09:36:53Z INFO  ipc_agent::cli::commands::wallet::balances] wallets in subnet /root/t01002 are {"t1ycyy4ruvhyoskdhihetbmohyjaruz6nrxoorjfa": "1.978777008362780242", "t1zsfereuvaiszd54vtgyf3p47urg7fdi72yeq43y": "9.999993934693663367", "t13ehykbvdpdhdhg46vixbkxzrp23ve7uvcvoipti": "0.820843443226907064", "t1yvgsyu4ar2ogags5gizoao2fpz3lanqayjdqhzq": "0.98232851709680446"}
+$ ./bin/ipc-agent wallet balances --subnet=/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
+[2023-06-07T09:36:53Z INFO  ipc_agent::cli::commands::wallet::balances] wallets in subnet --subnet=/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq are {"t1ycyy4ruvhyoskdhihetbmohyjaruz6nrxoorjfa": "1.978777008362780242", "t1zsfereuvaiszd54vtgyf3p47urg7fdi72yeq43y": "9.999993934693663367", "t13ehykbvdpdhdhg46vixbkxzrp23ve7uvcvoipti": "0.820843443226907064", "t1yvgsyu4ar2ogags5gizoao2fpz3lanqayjdqhzq": "0.98232851709680446"}
 ```
 
 ## Sending funds in a subnet
@@ -48,7 +48,7 @@ The agent provides a command to conveniently exchange funds between addresses of
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent subnet send-value --subnet /root/t01002 --to t1xbevqterae2tanmh2kaqksnoacflrv6w2dflq4i 10
+$ ./bin/ipc-agent subnet send-value --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to t1xbevqterae2tanmh2kaqksnoacflrv6w2dflq4i 10
 ```
 
 ## Sending funds between subnets
@@ -68,7 +68,7 @@ Funding a subnet can be performed by using the following command:
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent cross-msg fund --subnet /root/t01002 100
+$ ./bin/ipc-agent cross-msg fund --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 100
 ```
 This command includes the cross-net message into the next top-down checkpoint after the current epoch. Once the top-down checkpoint is committed, you should see the funds in your account of the child subnet.
 
@@ -81,7 +81,7 @@ In order to release funds from a subnet, your account must hold enough funds ins
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent cross-msg release --subnet=/root/t01002 100
+$ ./bin/ipc-agent cross-msg release --subnet=/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 100
 ```
 This command includes the cross-net message into a bottom-up checkpoint after the current epoch. Once the bottom-up checkpoint is committed, you should see the funds in your account in the parent. 
 
@@ -94,7 +94,7 @@ Subnets are periodically committing checkpoints to their parent every `bottomup-
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent checkpoint list-bottomup --from-epoch 0 --to-epoch 100 --subnet /root/t01002
+$ ./bin/ipc-agent checkpoint list-bottomup --from-epoch 0 --to-epoch 100 --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
 [2023-03-29T12:43:42Z INFO  ipc_agent::cli::commands::manager::list_checkpoints] epoch 0 - prev_check={"/":"bafy2bzacedkoa623kvi5gfis2yks7xxjl73vg7xwbojz4tpq63dd5jpfz757i"}, cross_msgs=null, child_checks=null
 [2023-03-29T12:43:42Z INFO  ipc_agent::cli::commands::manager::list_checkpoints] epoch 10 - prev_check={"/":"bafy2bzacecsatvda6lodrorh7y7foxjt3a2dexxx5jiyvtl7gimrrvywb7l5m"}, cross_msgs=null, child_checks=null
 [2023-03-29T12:43:42Z INFO  ipc_agent::cli::commands::manager::list_checkpoints] epoch 30 - prev_check={"/":"bafy2bzaceauzdx22hna4e4cqf55jqmd64a4fx72sxprzj72qhrwuxhdl7zexu"}, cross_msgs=null, child_checks=null
@@ -108,7 +108,7 @@ In order to check the health of top-down checkpointing in a subnet, the followin
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent checkpoint last-topdown --subnet /root/t01002
+$ ./bin/ipc-agent checkpoint last-topdown --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
 [2023-04-18T17:11:34Z INFO  ipc_agent::cli::commands::checkpoint::topdown_executed] Last top-down checkpoint executed in epoch: 9866
 ```
 
@@ -122,6 +122,6 @@ To leave a subnet, the following agent command can be used:
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent subnet leave --subnet /root/t01002
+$ ./bin/ipc-agent subnet leave --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
 ```
 Leaving a subnet will release the collateral for the validator and remove all the validation rights from its account. This means that if you have a validator running in that subnet, its validation process will immediately terminate.

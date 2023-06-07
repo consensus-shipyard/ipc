@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Based on https://github.com/consensus-shipyard/lotus/blob/spacenet/scripts/ipc/src/root-single-validator.sh
+# Based on https://github.com/consensus-shipyard/lotus/blob/spacenet/scripts/ipc/src/r31415926-single-validator.sh
 
 # There is also https://github.com/consensus-shipyard/lotus/blob/spacenet/scripts/ipc/src/subnet-validator.sh
 # but it looks incomplete at the moment, not starting the validator.
@@ -25,7 +25,7 @@ eudico mir validator config init
 # The process seems to have some `--membership=onchain` parameter that might help.
 validator_addr=`eudico mir validator config validator-addr | grep -vE '(/ip6/)' | grep -v "127.0.0.1"  | grep -E '/tcp/1347'`
 
-if [ "$IPC_SUBNET_ID" != "/root" ]; then
+if [ "$IPC_SUBNET_ID" != "/r31415926" ]; then
   # On subnets Mir crashes if the address contains the <wallet-id>@ part.
   validator_addr=$(echo $validator_addr | sed 's/^.*@//')
 fi
@@ -37,7 +37,7 @@ set -e
 
 echo "[*] Starting validator"
 
-if [ "$IPC_SUBNET_ID" == "/root" ]; then
+if [ "$IPC_SUBNET_ID" == "/r31415926" ]; then
   eudico mir validator run --nosync
 else
   # In the infra scripts this is called in mine-subnet.sh

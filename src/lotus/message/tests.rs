@@ -31,10 +31,10 @@ fn test_ipc_address_from_map() {
     {
         "From": {
             "SubnetId": {
-                "Parent": "/root/t01",
-                "Actor": "t064"
+                "Parent": "/r123/f01",
+                "Actor": "f064"
             },
-            "RawAddress": "t064"
+            "RawAddress": "f064"
         }
     }"#;
 
@@ -44,8 +44,8 @@ fn test_ipc_address_from_map() {
     assert_eq!(
         w.unwrap().from,
         IPCAddress::new(
-            &SubnetID::from_str("/root/t01/t064").unwrap(),
-            &Address::from_str("t064").unwrap()
+            &SubnetID::from_str("/r123/f01/f064").unwrap(),
+            &Address::from_str("f064").unwrap()
         )
         .unwrap()
     )
@@ -67,14 +67,14 @@ fn test_subnet_from_map() {
     let raw_str = r#"
     {
         "ID": {
-            "Parent": "/root/t01",
-            "Actor": "t064"
+            "Parent": "/r123/f01",
+            "Actor": "f064"
         }
     }"#;
 
     let w: Result<SubnetIdWrapper, _> = serde_json::from_str(raw_str);
     assert!(w.is_ok());
-    assert_eq!(w.unwrap().id, SubnetID::from_str("/root/t01/t064").unwrap())
+    assert_eq!(w.unwrap().id, SubnetID::from_str("/r123/f01/f064").unwrap())
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_subnet_from_map_error() {
     {
         "Id": {
             "Parent": 65,
-            "Actor": "t064"
+            "Actor": "f064"
         }
     }"#;
 
@@ -142,8 +142,8 @@ fn test_subnet_info_from_str() {
     let raw_str = r#"
     {
         "ID": {
-            "Parent": "/root",
-            "Actor": "t010000000002"
+            "Parent": "/r123",
+            "Actor": "f010000000002"
         },
         "Stake": "10000000000000000000",
         "TopDownMsgs": {
@@ -157,7 +157,7 @@ fn test_subnet_info_from_str() {
     "#;
 
     let w: SubnetInfo = serde_json::from_str(raw_str).unwrap();
-    assert_eq!(w.id, SubnetID::from_str("/root/t010000000002").unwrap());
+    assert_eq!(w.id, SubnetID::from_str("/r123/f010000000002").unwrap());
 }
 
 #[test]
@@ -166,8 +166,8 @@ fn test_checkpoint_template_from_str() {
     {
     "Data": {
         "Source": {
-            "Parent": "/root",
-            "Actor": "t01002"
+            "Parent": "/r123",
+            "Actor": "f01002"
         },
         "Proof": null,
         "Epoch": 0,
@@ -180,5 +180,5 @@ fn test_checkpoint_template_from_str() {
     "#;
 
     let w: BottomUpCheckpointWrapper = serde_json::from_str(raw_str).unwrap();
-    assert_eq!(w.data.source, SubnetID::from_str("/root/t01002").unwrap());
+    assert_eq!(w.data.source, SubnetID::from_str("/r123/f01002").unwrap());
 }

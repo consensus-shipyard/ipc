@@ -14,8 +14,8 @@ use fvm_shared::clock::ChainEpoch;
 use std::fmt::Display;
 
 /// Checkpoint manager that handles a specific parent - child - checkpoint type tuple.
-/// For example, we might have `/root` subnet and `/root/t01` as child, one implementation of manager
-/// is handling the top-down checkpoint submission for `/root` to `/root/t01`.
+/// For example, we might have `/r123` subnet and `/r123/t01` as child, one implementation of manager
+/// is handling the top-down checkpoint submission for `/r123` to `/r123/t01`.
 #[async_trait]
 pub trait CheckpointManager: Display {
     type LotusClient: LotusClient;

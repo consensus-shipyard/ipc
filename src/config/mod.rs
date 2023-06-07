@@ -30,16 +30,14 @@ pub use subnet::Subnet;
 
 pub const JSON_RPC_VERSION: &str = "2.0";
 
-pub const DEFAULT_SUBNET_CHAIN_ID: u64 = 31415926;
-
 /// DefaulDEFAULT_CHAIN_IDSUBNET_e
 pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
 [server]
 json_rpc_address = "127.0.0.1:3030"
 
 [[subnets]]
-id = "/root"
-gateway_addr = "t064"
+id = "/r123"
+gateway_addr = "f064"
 network_name = "root"
 jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 jsonrpc_api_ws = "wss://example.org/rpc/v0"
@@ -47,8 +45,8 @@ auth_token = "YOUR TOKEN"
 accounts = ["t01"]
 
 [[subnets]]
-id = "/root/t01"
-gateway_addr = "t064"
+id = "/r123/t01"
+gateway_addr = "f064"
 network_name = "child"
 jsonrpc_api_http = "http://127.0.0.1:1250/rpc/v1"
 auth_token = "YOUR TOKEN"

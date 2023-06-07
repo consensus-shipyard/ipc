@@ -4,7 +4,7 @@ json_rpc_address = "127.0.0.1:3030"
 [subnets]
 
 [[subnets]]
-id = "/root"
+id = "/r31415926"
 network_name = "root"
 gateway_addr = "t064"
 jsonrpc_api_http = "https://example.org/rpc/v0"
@@ -12,7 +12,7 @@ jsonrpc_api_ws = "wss://example.org/rpc/v0"
 auth_token = "YOUR ROOT AUTH TOKEN"
 
 [[subnets]]
-id = "/root/t0100"
+id = "/r31415926/t0100"
 network_name = "child"
 gateway_addr = "t064"
 jsonrpc_api_http = "https://example.org/rpc/v2"
