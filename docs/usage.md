@@ -32,12 +32,12 @@ This command specifies the subnet to join, the amount of collateral to provide a
 ## Listing your balance in a subnet
 In order to send messages in a subnet, you'll need to have funds in your subnt account. You can use the following command to list the balance of your wallets in a subnet:
 ```bash
-./bin/ipc-agent wallet list --subnet <subnet-id>
+./bin/ipc-agent wallet balances --subnet <subnet-id>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent wallet list --subnet=/root/t01002
-ipc_agent::cli::commands::wallet::list] wallets in subnet /root are {"t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq": "500.0"}
+$ ./bin/ipc-agent wallet balances --subnet=/root/t01002
+[2023-06-07T09:36:53Z INFO  ipc_agent::cli::commands::wallet::balances] wallets in subnet /root/t01002 are {"t1ycyy4ruvhyoskdhihetbmohyjaruz6nrxoorjfa": "1.978777008362780242", "t1zsfereuvaiszd54vtgyf3p47urg7fdi72yeq43y": "9.999993934693663367", "t13ehykbvdpdhdhg46vixbkxzrp23ve7uvcvoipti": "0.820843443226907064", "t1yvgsyu4ar2ogags5gizoao2fpz3lanqayjdqhzq": "0.98232851709680446"}
 ```
 
 ## Sending funds in a subnet
