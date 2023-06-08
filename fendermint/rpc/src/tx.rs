@@ -108,7 +108,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
 
 /// Convenience trait to call FEVM methods in read-only mode, without doing a transaction.
 #[async_trait]
-pub trait CallClient: QueryClient + BoundClient + Send + Sync {
+pub trait CallClient: QueryClient + BoundClient {
     /// Call a method on a FEVM contract without including a transaction on the blockchain.
     async fn fevm_call(
         &mut self,
@@ -158,7 +158,7 @@ pub trait CallClient: QueryClient + BoundClient + Send + Sync {
 }
 
 /// Auto-implement this trait for anything that satisfies the bounds.
-impl<C> CallClient for C where C: QueryClient + BoundClient {}
+impl<C> CallClient for C where C: QueryClient + BoundClient + Send + Sync {}
 
 /// Return immediately after the transaction is broadcasted without waiting for check results.
 pub struct TxAsync;

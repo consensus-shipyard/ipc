@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 // See https://ethereum.org/en/developers/docs/apis/json-rpc/#json-rpc-methods
+// and https://ethereum.github.io/execution-apis/api-documentation/
 
 use jsonrpc_v2::{MapRouter, ServerBuilder};
 use paste::paste;
@@ -29,33 +30,34 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         accounts,
         blockNumber,
         // eth_call
-        // eth_chainId
+        chainId,
         // eth_coinbase
         // eth_compileLLL
         // eth_compileSerpent
         // eth_compileSolidity
         // eth_estimateGas
-        // eth_gasPrice
-        // eth_getBalance
-        // eth_getBlockByHash
-        // eth_getBlockByNumber
-        // eth_getBlockTransactionCountByHash
-        getBlockTransactionCountByNumber
+        feeHistory,
+        gasPrice,
+        getBalance,
+        getBlockByHash,
+        getBlockByNumber,
+        getBlockTransactionCountByHash,
+        getBlockTransactionCountByNumber,
         // eth_getCode
         // eth_getCompilers
         // eth_getFilterChanges
         // eth_getFilterLogs
         // eth_getLogs
         // eth_getStorageAt
-        // eth_getTransactionByBlockHashAndIndex
-        // eth_getTransactionByBlockNumberAndIndex
-        // eth_getTransactionByHash
-        // eth_getTransactionCount
-        // eth_getTransactionReceipt
-        // eth_getUncleByBlockHashAndIndex
-        // eth_getUncleByBlockNumberAndIndex
-        // eth_getUncleCountByBlockHash
-        // eth_getUncleCountByBlockNumber
+        getTransactionByBlockHashAndIndex,
+        getTransactionByBlockNumberAndIndex,
+        getTransactionByHash,
+        getTransactionCount,
+        getTransactionReceipt,
+        getUncleByBlockHashAndIndex,
+        getUncleByBlockNumberAndIndex,
+        getUncleCountByBlockHash,
+        getUncleCountByBlockNumber
         // eth_getWork
         // eth_hashrate
         // eth_mining

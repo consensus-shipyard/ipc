@@ -18,7 +18,7 @@ rand = { workspace = true, optional = true }
 
 cid = { workspace = true, optional = true }
 fvm_ipld_encoding = { workspace = true, optional = true }
-fvm_shared = { workspace = true, optional = true }
+fvm_shared = { workspace = true, optional = true, features = ["arb"] }
 
 [dev-dependencies]
 arbtest = { workspace = true }

@@ -18,6 +18,7 @@ CARGO_MAKE_WAIT_MILLISECONDS = 5000
 # - or -
 # cargo setup
 # cargo test
+# docker logs smoke-ethapi
 # cargo treardown
 
 [tasks.default]
@@ -41,6 +42,7 @@ dependencies = [
 ]
 
 [tasks.test]
+clear = true
 dependencies = ["simplecoin-example", "ethapi-example"]
 
 [tasks.teardown]
@@ -67,9 +69,11 @@ cargo run -p fendermint_rpc --release --example simplecoin -- \
 
 
 [tasks.ethapi-example]
+# 100 is Alice's ID, hardcoded here because we know how the init method sets them up.
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
-cargo run -p fendermint_eth_api --release --example ethers
+cargo run -p fendermint_eth_api --release --example ethers -- \
+  --actor-id 100
 """
 
 
@@ -144,7 +148,7 @@ dependencies = ["test-data-dir", "network-create"]
 
 [tasks.ethapi-start]
 extend = "ethapi-run"
-env = { "CMD" = "eth run", "FLAGS" = "-d" }
+env = { "CMD" = "--log-level debug eth run", "FLAGS" = "-d" }
 
 
 [tasks.ethapi-run]

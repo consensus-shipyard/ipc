@@ -11,7 +11,7 @@ mod cid;
 
 pub use crate::arb::cid::ArbCid;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Unfortunately an arbitrary `TokenAmount` is not serializable if it has more than 128 bytes, we get "BigInt too large" error.
 ///
 /// The max below is taken from https://github.com/filecoin-project/ref-fvm/blob/fvm%40v3.0.0-alpha.24/shared/src/bigint/bigint_ser.rs#L80-L81
@@ -28,7 +28,7 @@ impl Arbitrary for ArbTokenAmount {
 }
 
 /// Unfortunately an arbitrary `DelegatedAddress` can be inconsistent with bytes that do not correspond to its length.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ArbAddress(pub Address);
 
 impl Arbitrary for ArbAddress {

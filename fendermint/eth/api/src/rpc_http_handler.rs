@@ -6,7 +6,7 @@
 
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use jsonrpc_v2::RequestObject as JsonRpcRequestObject;
+use jsonrpc_v2::{Id, RequestObject as JsonRpcRequestObject};
 
 use crate::JsonRpcServer;
 
@@ -20,16 +20,19 @@ pub async fn handle(
 
     // NOTE: Any authorization can come here.
 
+    tracing::debug!("RPC request: {request:?}");
+
+    let id = request.id_ref().map(id_to_string).unwrap_or_default();
     let method = request.method_ref().to_owned();
 
     match call_rpc_str(server.clone(), request).await {
         Ok(result) => {
-            tracing::debug!(method, "RPC call success");
+            tracing::debug!(method, id, "RPC call success");
             (StatusCode::OK, response_headers, result)
         }
         Err(err) => {
             let msg = err.to_string();
-            tracing::error!(method, msg, "RPC call failure");
+            tracing::error!(method, id, msg, "RPC call failure");
             (StatusCode::INTERNAL_SERVER_ERROR, response_headers, msg)
         }
     }
@@ -42,4 +45,12 @@ pub async fn call_rpc_str(
 ) -> anyhow::Result<String> {
     let response = server.handle(request).await;
     Ok(serde_json::to_string(&response)?)
+}
+
+fn id_to_string(id: &jsonrpc_v2::Id) -> String {
+    match id {
+        Id::Null => "null".to_owned(),
+        Id::Str(s) => (**s).to_owned(),
+        Id::Num(n) => n.to_string(),
+    }
 }

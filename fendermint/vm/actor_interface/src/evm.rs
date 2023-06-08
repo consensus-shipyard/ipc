@@ -1,7 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use cid::Cid;
 use fvm_shared::METHOD_CONSTRUCTOR;
+use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
 define_code!(EVM { code_id: 14 });
 
@@ -18,4 +20,10 @@ pub enum Method {
     // Here we can use it if we want, however the release cycle is a bit lagging, preventing us from using the latest ref-fvm at the moment.
     //InvokeContract = frc42_dispatch::method_hash!("InvokeEVM"),
     InvokeContract = 3844450837,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+#[serde(transparent)]
+pub struct BytecodeReturn {
+    pub code: Option<Cid>,
 }

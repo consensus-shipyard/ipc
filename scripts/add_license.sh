@@ -5,7 +5,7 @@
 COPYRIGHT_TXT=$(dirname $0)/copyright.txt
 
 # Any year is fine. We can update the year as a single PR in all files that have it up to last year.
-PAT_PL=".*// Copyright 2022-202\d Protocol Labs.*"
+PAT_PL=".*// Copyright 202(1|2)-202\d Protocol Labs.*"
 PAT_SPDX="/*// SPDX-License-Identifier: Apache-2.0, MIT.*"
 
 # Look at enough lines so that we can include multiple copyright holders.

@@ -36,6 +36,19 @@ impl EthAddress {
     }
 }
 
+impl From<&EthAddress> for Address {
+    fn from(value: &EthAddress) -> Address {
+        if value.0[0] == 0xff {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(&value.0[12..]);
+            let id = u64::from_be_bytes(bytes);
+            Address::new_id(id)
+        } else {
+            Address::new_delegated(EAM_ACTOR_ID, &value.0).expect("EthAddress is delegated")
+        }
+    }
+}
+
 /// Helper to read return value from contract creation.
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct CreateReturn {

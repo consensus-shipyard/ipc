@@ -27,7 +27,7 @@ pub struct QueryResponse<T> {
 
 /// Fendermint client for submitting queries.
 #[async_trait]
-pub trait QueryClient: Send + Sync {
+pub trait QueryClient: Sync {
     /// Query the contents of a CID from the IPLD store.
     async fn ipld(&self, cid: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
         let res = self.perform(FvmQuery::Ipld(*cid), None).await?;

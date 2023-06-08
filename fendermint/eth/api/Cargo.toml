@@ -8,15 +8,25 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-ethers-core = { workspace = true }
 axum = { workspace = true }
+ethers-core = { workspace = true }
+hex = { workspace = true }
 jsonrpc-v2 = { workspace = true, features = ["easy-errors"] }
+lazy_static = { workspace = true }
+libsecp256k1 = { workspace = true }
 paste = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
 
+cid = { workspace = true }
+fvm_shared = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+
+fendermint_rpc = { path = "../../rpc" }
+fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
+fendermint_vm_message = { path = "../../vm/message" }
 
 [dev-dependencies]
 clap = { workspace = true }
@@ -26,3 +36,7 @@ lazy_static = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
+
+fendermint_testing = { path = "../../testing", features = ["arb"] }
