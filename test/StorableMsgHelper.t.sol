@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "forge-std/Test.sol";
 
@@ -8,16 +8,9 @@ import "../src/lib/StorableMsgHelper.sol";
 contract StorableMsgHelperTest is Test {
     using StorableMsgHelper for StorableMsg;
 
-
     StorableMsg EMPTY_STORABLE_MESSAGE = StorableMsg({
-        from: IPCAddress({
-            subnetId: SubnetID(new address[](0)),
-            rawAddress: address(0)
-        }),
-        to: IPCAddress({
-            subnetId: SubnetID(new address[](0)),
-            rawAddress: address(0)
-        }),
+        from: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
+        to: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
         value: 0,
         nonce: 0,
         method: METHOD_SEND,
@@ -25,19 +18,15 @@ contract StorableMsgHelperTest is Test {
     });
 
     function test_ToHash_Works_EmptyMessage() public view {
-        require(EMPTY_STORABLE_MESSAGE.toHash() == StorableMsgHelper.EMPTY_STORABLE_MESSAGE_HASH, "Hashes should be equal");
+        require(
+            EMPTY_STORABLE_MESSAGE.toHash() == StorableMsgHelper.EMPTY_STORABLE_MESSAGE_HASH, "Hashes should be equal"
+        );
     }
 
-    function test_ToHash_Works_NonEmptyMessage() public pure{
+    function test_ToHash_Works_NonEmptyMessage() public pure {
         StorableMsg memory storableMsg = StorableMsg({
-            from: IPCAddress({
-                subnetId: SubnetID(new address[](0)),
-                rawAddress: address(0)
-            }),
-            to: IPCAddress({
-                subnetId: SubnetID(new address[](0)),
-                rawAddress: address(0)
-            }),
+            from: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
+            to: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
@@ -57,14 +46,8 @@ contract StorableMsgHelperTest is Test {
         to[3] = address(4);
 
         StorableMsg memory storableMsg = StorableMsg({
-            from: IPCAddress({
-                subnetId: SubnetID({route: from}),
-                rawAddress: address(3)
-            }),
-            to: IPCAddress({
-                subnetId: SubnetID({route: to}),
-                rawAddress: address(3)
-            }),
+            from: IPCAddress({subnetId: SubnetID({route: from}), rawAddress: address(3)}),
+            to: IPCAddress({subnetId: SubnetID({route: to}), rawAddress: address(3)}),
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
@@ -80,7 +63,6 @@ contract StorableMsgHelperTest is Test {
 
         require(storableMsg.applyType(subnetId) == IPCMsgType.TopDown, "Should be TopDown");
 
-    
         address[] memory current2 = new address[](3);
         current2[0] = address(1);
         current2[1] = address(2);
@@ -97,14 +79,8 @@ contract StorableMsgHelperTest is Test {
         to[0] = address(1);
 
         StorableMsg memory storableMsg = StorableMsg({
-            from: IPCAddress({
-                subnetId: SubnetID({route: from}),
-                rawAddress: address(3)
-            }),
-            to: IPCAddress({
-                subnetId: SubnetID({route: to}),
-                rawAddress: address(3)
-            }),
+            from: IPCAddress({subnetId: SubnetID({route: from}), rawAddress: address(3)}),
+            to: IPCAddress({subnetId: SubnetID({route: to}), rawAddress: address(3)}),
             value: 1,
             nonce: 1,
             method: METHOD_SEND,

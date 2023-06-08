@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "forge-std/Test.sol";
 
@@ -71,15 +71,13 @@ contract ExecutableQueueHelperTest is Test {
 
     function test_Remove_Works_LastEpoch() public {
         _assertPush(EPOCH_ONE);
-        _assertPush(EPOCH_TWO);
-        _assertPush(EPOCH_THREE);
+        _assertPush(EPOCH_FOUR);
 
-        _assertRemove(EPOCH_THREE);
+        _assertRemove(EPOCH_FOUR);
 
         require(queue.first == EPOCH_ONE);
-        require(queue.last == EPOCH_TWO);
+        require(queue.last == EPOCH_ONE);
     }
-
 
     function test_Remove_Works_MiddleEpoch() public {
         _assertPush(EPOCH_ONE);
@@ -88,7 +86,7 @@ contract ExecutableQueueHelperTest is Test {
 
         require(queue.first == EPOCH_ONE);
         require(queue.last == EPOCH_THREE);
-        
+
         _assertRemove(EPOCH_TWO);
 
         require(queue.first == EPOCH_ONE);

@@ -1,10 +1,9 @@
 [profile.default]
 # no_storage_caching = true
 block_gas_limit = 10000000000
-optimizer_runs=100
-optimizer=true
+optimizer_runs=1
 # via_ir = true
-#eth_rpc_url = "https://api.hyperspace.node.glif.io/rpc/v1"
+# eth_rpc_url = "https://api.hyperspace.node.glif.io/rpc/v1"
 memory_limit =  2147483648 # 2GB
 # [profile.default.optimizer_details]
 # constantOptimizer = true

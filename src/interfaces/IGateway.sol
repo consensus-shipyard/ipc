@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "../structs/Checkpoint.sol";
 import "../structs/Subnet.sol";
@@ -15,7 +15,7 @@ interface IGateway {
     function addStake() external payable;
 
     /// Release stake recovers some collateral of the subnet
-    function releaseStake(uint amount) external;
+    function releaseStake(uint256 amount) external;
 
     // Kill propagates the kill signal from a subnet actor to unregister it from th
     /// hierarchy.
@@ -23,10 +23,8 @@ interface IGateway {
 
     /// CommitChildCheck propagates the commitment of a checkpoint from a child subnet,
     /// process the cross-messages directed to the subnet.
-    function commitChildCheck(
-        BottomUpCheckpoint calldata bottomupCheckpoint
-    ) external;
-    
+    function commitChildCheck(BottomUpCheckpoint calldata bottomupCheckpoint) external;
+
     /// Fund injects new funds from an account of the parent chain to a subnet.
     ///
     /// This functions receives a transaction with the FILs that want to be injected in the subnet.
@@ -43,7 +41,6 @@ interface IGateway {
     /// the amount of funds that can be released for a specific address.
     function release() external payable;
 
-
     /// SendCross sends an arbitrary cross-message to other subnet in the hierarchy.
     ///
     /// If the message includes any funds they need to be burnt (like in Release)
@@ -54,15 +51,12 @@ interface IGateway {
     /// included in the message by the actor). Only actors are allowed to send arbitrary
     /// cross-messages as a side-effect of their execution. For plain token exchanges
     /// fund and release have to be used.
-    function sendCross(SubnetID memory destination, CrossMsg memory crossMsg)
-        external
-        payable;
-    
+    function sendCross(SubnetID memory destination, CrossMsg memory crossMsg) external payable;
+
     /// Whitelist a series of addresses as propagator of a cross net message.
     /// This is basically adding this list of addresses to the `PostBoxItem::owners`.
     /// Only existing owners can perform this operation.
-    function whitelistPropagator(bytes32 msgCid, address[] calldata owners)
-        external;
+    function whitelistPropagator(bytes32 msgCid, address[] calldata owners) external;
 
     /// Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;

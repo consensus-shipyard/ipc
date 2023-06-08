@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "../constants/Constants.sol";
 import "fevmate/utils/FilAddress.sol";
@@ -8,16 +8,13 @@ import "fevmate/utils/FilAddress.sol";
 /// @author LimeChain team
 library AccountHelper {
     function isAccount(address _address) external view returns (bool) {
-        uint size;
+        uint256 size;
 
         assembly {
             size := extcodesize(_address)
         }
 
-        return
-            size == 0 &&
-            ADDRESS_CODEHASH == _address.codehash &&
-            ADDRESS_CODEHASH == keccak256(_address.code);
+        return size == 0 && ADDRESS_CODEHASH == _address.codehash && ADDRESS_CODEHASH == keccak256(_address.code);
     }
 
     function isSystemActor(address _address) external pure returns (bool) {

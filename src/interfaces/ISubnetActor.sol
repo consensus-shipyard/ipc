@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
+
 import "../structs/Checkpoint.sol";
 
 /// @title Subnet Actor interface
@@ -8,7 +9,7 @@ interface ISubnetActor {
     /// Called by peers looking to join a subnet.
     ///
     /// It implements the basic logic to onboard new peers to the subnet.
-    function join() external payable;
+    function join(string calldata networkAddr) external payable;
 
     /// Called by peers looking to leave a subnet.
     function leave() external;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/utils/Strings.sol";
@@ -15,10 +15,12 @@ contract SubnetIDHelperTest is Test {
     address SUBNET_TWO_ADDRESS;
     address SUBNET_THREE_ADDRESS;
 
-    bytes32 constant EMPTY_SUBNET_ID_HASH =
-        0x2b88776ddf4d5290d360b934e1785b2f98fc538a5a4d0dc8dab162167e24841c;
+    bytes32 constant EMPTY_SUBNET_ID_HASH = 0x2b88776ddf4d5290d360b934e1785b2f98fc538a5a4d0dc8dab162167e24841c;
 
     SubnetID EMPTY_SUBNET_ID = SubnetID(new address[](0));
+
+    error NoParentForSubnet();
+    error EmptySubnet();
 
     function setUp() public {
         ROOT_ADDRESS = makeAddr("root"); // 0x9f86b1918e5cf3a2150388024ff87df8c90d1d82
@@ -27,7 +29,7 @@ contract SubnetIDHelperTest is Test {
     }
 
     function test_GetParentSubnet_Fails_EmptySubnet() public {
-        vm.expectRevert("error getting parent for subnet addr");
+        vm.expectRevert(NoParentForSubnet.selector);
 
         EMPTY_SUBNET_ID.getParentSubnet();
     }
@@ -38,7 +40,7 @@ contract SubnetIDHelperTest is Test {
 
         SubnetID memory emptySubnet = SubnetID(route);
 
-        vm.expectRevert("error getting parent for subnet addr");
+        vm.expectRevert(NoParentForSubnet.selector);
 
         emptySubnet.getParentSubnet();
     }
@@ -53,10 +55,7 @@ contract SubnetIDHelperTest is Test {
         address[] memory expectedRoute = new address[](1);
         expectedRoute[0] = ROOT_ADDRESS;
 
-        require(
-            subnetId.getParentSubnet().toHash() ==
-                SubnetID(expectedRoute).toHash()
-        );
+        require(subnetId.getParentSubnet().toHash() == SubnetID(expectedRoute).toHash());
     }
 
     function test_GetParentSubnet_Works_ParentSubnetOne() public view {
@@ -71,10 +70,7 @@ contract SubnetIDHelperTest is Test {
         expectedRoute[0] = ROOT_ADDRESS;
         expectedRoute[1] = SUBNET_ONE_ADDRESS;
 
-        require(
-            subnetId.getParentSubnet().toHash() ==
-                SubnetID(expectedRoute).toHash()
-        );
+        require(subnetId.getParentSubnet().toHash() == SubnetID(expectedRoute).toHash());
     }
 
     function test_CommonParent_Works() public view {
@@ -94,10 +90,7 @@ contract SubnetIDHelperTest is Test {
         expectedRoute[0] = ROOT_ADDRESS;
         expectedRoute[1] = SUBNET_ONE_ADDRESS;
 
-        require(
-            subnetId1.commonParent(subnetId2).toHash() ==
-                SubnetID(expectedRoute).toHash()
-        );
+        require(subnetId1.commonParent(subnetId2).toHash() == SubnetID(expectedRoute).toHash());
     }
 
     function test_CommonParent_EmptySubnetOnNoCommonParent() public view {
@@ -111,9 +104,7 @@ contract SubnetIDHelperTest is Test {
         route2[0] = SUBNET_THREE_ADDRESS;
         SubnetID memory subnetId2 = SubnetID(route2);
 
-        require(
-            subnetId1.commonParent(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH
-        );
+        require(subnetId1.commonParent(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH);
     }
 
     function test_Down_Works() public view {
@@ -147,9 +138,7 @@ contract SubnetIDHelperTest is Test {
         SubnetID memory subnetId1 = SubnetID(route1);
         SubnetID memory subnetId2 = SubnetID(route2);
 
-        require(
-            subnetId1.down(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH
-        );
+        require(subnetId1.down(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH);
     }
 
     function test_Down_NoCommonRoute() public view {
@@ -163,9 +152,7 @@ contract SubnetIDHelperTest is Test {
         SubnetID memory subnetId1 = SubnetID(route1);
         SubnetID memory subnetId2 = SubnetID(route2);
 
-        require(
-            subnetId1.down(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH
-        );
+        require(subnetId1.down(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH);
     }
 
     function test_ToString_Works_NoRoutes() public view {
@@ -176,11 +163,7 @@ contract SubnetIDHelperTest is Test {
         address[] memory route = new address[](1);
         route[0] = ROOT_ADDRESS;
 
-        require(
-            SubnetID(route).toString().equal(
-                "/root/0x9f86b1918e5cf3a2150388024ff87df8c90d1d82"
-            )
-        );
+        require(SubnetID(route).toString().equal("/root/0x9f86b1918e5cf3a2150388024ff87df8c90d1d82"));
     }
 
     function test_ToString_Works_MultiRoute() public view {
@@ -213,7 +196,7 @@ contract SubnetIDHelperTest is Test {
     }
 
     function test_CreateSubnetId_Fails_EmptySubnet() public {
-        vm.expectRevert("cannot set actor for empty subnet");
+        vm.expectRevert(EmptySubnet.selector);
 
         EMPTY_SUBNET_ID.createSubnetId(SUBNET_ONE_ADDRESS);
     }
@@ -222,9 +205,7 @@ contract SubnetIDHelperTest is Test {
         address[] memory route = new address[](1);
         route[0] = ROOT_ADDRESS;
 
-        SubnetID memory subnetId = SubnetID({route: route}).createSubnetId(
-            SUBNET_ONE_ADDRESS
-        );
+        SubnetID memory subnetId = SubnetID({route: route}).createSubnetId(SUBNET_ONE_ADDRESS);
 
         address[] memory expectedRoute = new address[](2);
         expectedRoute[0] = ROOT_ADDRESS;
@@ -405,8 +386,8 @@ contract SubnetIDHelperTest is Test {
         sub2[2] = SUBNET_TWO_ADDRESS;
         SubnetID memory sub2Id = SubnetID({route: sub2});
 
-        require(isBottomUp(sub1Id,sub2Id) == false);
-        require(isBottomUp(sub2Id,sub2Id) == false);
+        require(isBottomUp(sub1Id, sub2Id) == false);
+        require(isBottomUp(sub2Id, sub2Id) == false);
 
         address[] memory sub3 = new address[](4);
         sub3[0] = ROOT_ADDRESS;
@@ -418,7 +399,6 @@ contract SubnetIDHelperTest is Test {
         require(isBottomUp(sub2Id, sub3Id) == false);
     }
 
-
     function test_IsBottomUp_True() public view {
         address[] memory sub1 = new address[](2);
         sub1[0] = ROOT_ADDRESS;
@@ -429,7 +409,7 @@ contract SubnetIDHelperTest is Test {
         sub2[0] = ROOT_ADDRESS;
         SubnetID memory sub2Id = SubnetID({route: sub2});
 
-        require(isBottomUp(sub1Id,sub2Id) == true);
+        require(isBottomUp(sub1Id, sub2Id) == true);
 
         address[] memory sub3 = new address[](3);
         sub3[0] = ROOT_ADDRESS;
@@ -437,9 +417,9 @@ contract SubnetIDHelperTest is Test {
         sub3[2] = SUBNET_THREE_ADDRESS;
         SubnetID memory sub3Id = SubnetID({route: sub3});
 
-        require(isBottomUp(sub1Id,sub3Id) == true);
+        require(isBottomUp(sub1Id, sub3Id) == true);
     }
- 
+
     function test_Equals_Works_Empty() public view {
         require(EMPTY_SUBNET_ID.equals(EMPTY_SUBNET_ID) == true);
         require(EMPTY_SUBNET_ID.equals(SubnetID({route: new address[](0)})) == true);
@@ -461,9 +441,9 @@ contract SubnetIDHelperTest is Test {
         require(SubnetID({route: route}).equals(SubnetID({route: route2})) == false);
     }
 
-    function isBottomUp(SubnetID memory from, SubnetID memory to) public pure returns (bool){
+    function isBottomUp(SubnetID memory from, SubnetID memory to) public pure returns (bool) {
         SubnetID memory parent = from.commonParent(to);
-        if(parent.route.length == 0) return false;
+        if (parent.route.length == 0) return false;
         return from.route.length > parent.route.length;
     }
 }

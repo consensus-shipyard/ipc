@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "forge-std/Test.sol";
 
@@ -16,7 +16,7 @@ contract CheckpointHelperTest is Test {
 
     function test_ToHash_Works_BottomUpCheckpoint() public {
         checkpoint.epoch = 10;
-        
+
         require(
             BottomUpCheckpoint({
                 source: SubnetID(new address[](0)),
@@ -31,10 +31,7 @@ contract CheckpointHelperTest is Test {
 
     function test_ToHash_Works_TopDownCheckpoint() public {
         topDownCheckpoint.epoch = 10;
-        require(TopDownCheckpoint({
-            epoch: 10,
-            topDownMsgs: new CrossMsg[](0)
-        }).toHash() == topDownCheckpoint.toHash());
+        require(TopDownCheckpoint({epoch: 10, topDownMsgs: new CrossMsg[](0)}).toHash() == topDownCheckpoint.toHash());
     }
 
     function test_Sorted_SingleElement() public {
@@ -46,9 +43,9 @@ contract CheckpointHelperTest is Test {
     function test_Sorted_True() public {
         crossMsg.message.nonce = 10;
         checkpoint.crossMsgs.push(crossMsg);
-        crossMsg.message.nonce  = 20;
+        crossMsg.message.nonce = 20;
         checkpoint.crossMsgs.push(crossMsg);
-        crossMsg.message.nonce  = 30;
+        crossMsg.message.nonce = 30;
         checkpoint.crossMsgs.push(crossMsg);
         require(isSorted(checkpoint));
     }
@@ -56,22 +53,17 @@ contract CheckpointHelperTest is Test {
     function test_Sorted_False() public {
         crossMsg.message.nonce = 10;
         checkpoint.crossMsgs.push(crossMsg);
-        crossMsg.message.nonce  = 20;
+        crossMsg.message.nonce = 20;
         checkpoint.crossMsgs.push(crossMsg);
-        crossMsg.message.nonce  = 10;
+        crossMsg.message.nonce = 10;
         checkpoint.crossMsgs.push(crossMsg);
         require(isSorted(checkpoint) == false);
     }
 
-    function isSorted(
-        BottomUpCheckpoint memory _checkpoint
-    ) public pure returns (bool) {
+    function isSorted(BottomUpCheckpoint memory _checkpoint) public pure returns (bool) {
         if (_checkpoint.crossMsgs.length < 2) return true;
-        for (uint i = 1; i < _checkpoint.crossMsgs.length; ) {
-            if (
-                _checkpoint.crossMsgs[i].message.nonce <=
-                _checkpoint.crossMsgs[i - 1].message.nonce
-            ) return false;
+        for (uint256 i = 1; i < _checkpoint.crossMsgs.length;) {
+            if (_checkpoint.crossMsgs[i].message.nonce <= _checkpoint.crossMsgs[i - 1].message.nonce) return false;
 
             unchecked {
                 ++i;
@@ -79,5 +71,4 @@ contract CheckpointHelperTest is Test {
         }
         return true;
     }
-
 }

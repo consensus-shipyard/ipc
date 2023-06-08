@@ -6,7 +6,6 @@ import "../src/SubnetActor.sol";
 import "forge-std/Script.sol";
 
 contract Deployer is Script {
-
     uint64 constant MIN_COLLATERAL_AMOUNT = 1 ether;
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
@@ -14,7 +13,10 @@ contract Deployer is Script {
     uint256 constant CROSS_MSG_FEE = 10 gwei;
     bytes private constant GENESIS = EMPTY_BYTES;
     address public constant ROOTNET_ADDRESS = address(0);
-    string private constant DEFAULT_NETWORK_NAME = "test";
+    bytes32 private constant DEFAULT_NETWORK_NAME = bytes32("test");
+
+    // add this to be excluded from coverage report
+    function test() public {}
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");

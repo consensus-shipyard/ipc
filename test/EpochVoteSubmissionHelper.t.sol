@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "forge-std/Test.sol";
 
@@ -74,7 +74,10 @@ contract EpochVoteSubmissionHelperTest is Test {
         voteSubmission.submissionWeights[nonce][submissionHash2] = SECOND_SUBMITTER_WEIGHT;
 
         voteSubmission.mostVotedSubmission = submissionHash1;
-        if (voteSubmission.submissionWeights[nonce][submissionHash1] < voteSubmission.submissionWeights[nonce][submissionHash2]) {
+        if (
+            voteSubmission.submissionWeights[nonce][submissionHash1]
+                < voteSubmission.submissionWeights[nonce][submissionHash2]
+        ) {
             voteSubmission.mostVotedSubmission = submissionHash2;
         }
 

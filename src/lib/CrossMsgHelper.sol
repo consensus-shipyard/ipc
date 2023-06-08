@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "../structs/Checkpoint.sol";
 import "../constants/Constants.sol";
@@ -13,83 +13,63 @@ library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
 
-    bytes32 public constant EMPTY_CROSS_MSG =
-        keccak256(
-            abi.encode(
-                CrossMsg({
-                    message: StorableMsg({
-                        from: IPCAddress({
-                            subnetId: SubnetID(new address[](0)),
-                            rawAddress: address(0)
-                        }),
-                        to: IPCAddress({
-                            subnetId: SubnetID(new address[](0)),
-                            rawAddress: address(0)
-                        }),
-                        value: 0,
-                        nonce: 0,
-                        method: METHOD_SEND,
-                        params: EMPTY_BYTES
-                    }),
-                    wrapped: false
-                })
-            )
-        );
-
-    function createReleaseMsg(
-        SubnetID calldata subnet,
-        address signer,
-        uint256 value
-    ) public pure returns (CrossMsg memory) {
-        return
+    bytes32 public constant EMPTY_CROSS_MSG = keccak256(
+        abi.encode(
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({
-                        subnetId: subnet,
-                        rawAddress: BURNT_FUNDS_ACTOR
-                    }),
-                    to: IPCAddress({
-                        subnetId: subnet.getParentSubnet(),
-                        rawAddress: signer
-                    }),
-                    value: value,
+                    from: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
+                    to: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
+                    value: 0,
                     nonce: 0,
                     method: METHOD_SEND,
                     params: EMPTY_BYTES
                 }),
                 wrapped: false
-            });
+            })
+        )
+    );
+
+    function createReleaseMsg(SubnetID calldata subnet, address signer, uint256 value)
+        public
+        pure
+        returns (CrossMsg memory)
+    {
+        return CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({subnetId: subnet, rawAddress: BURNT_FUNDS_ACTOR}),
+                to: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
+                value: value,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
     }
 
-    function createFundMsg(
-        SubnetID calldata subnet,
-        address signer,
-        uint256 value
-    ) public pure returns (CrossMsg memory) {
-        return
-            CrossMsg({
-                message: StorableMsg({
-                    from: IPCAddress({
-                        subnetId: subnet.getParentSubnet(),
-                        rawAddress: signer
-                    }),
-                    to: IPCAddress({subnetId: subnet, rawAddress: signer}),
-                    value: value,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: EMPTY_BYTES
-                }),
-                wrapped: false
-            });
+    function createFundMsg(SubnetID calldata subnet, address signer, uint256 value)
+        public
+        pure
+        returns (CrossMsg memory)
+    {
+        return CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
+                to: IPCAddress({subnetId: subnet, rawAddress: signer}),
+                value: value,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
     }
 
     function toHash(CrossMsg memory crossMsg) internal pure returns (bytes32) {
         return keccak256(abi.encode(crossMsg));
     }
 
-    function toHash(
-        CrossMsg[] memory crossMsgs
-    ) public pure returns (bytes32) {
+    function toHash(CrossMsg[] memory crossMsgs) public pure returns (bytes32) {
         return keccak256(abi.encode(crossMsgs));
     }
 
@@ -112,21 +92,19 @@ library CrossMsgHelper {
             params = abi.encode(crossMsg);
         }
 
-        bytes memory data = abi.encodeWithSelector(
-            crossMsg.message.method,
-            params
-        );
+        bytes memory data = abi.encodeWithSelector(crossMsg.message.method, params);
 
-        if (value > 0)
+        if (value > 0) {
             return Address.functionCallWithValue(recipient, data, value);
+        }
 
         return Address.functionCall(recipient, data);
     }
 
     // checks whether the cross messages are sorted in ascending order or not
-    function isSorted(CrossMsg[] calldata crossMsgs) external pure returns(bool) {
+    function isSorted(CrossMsg[] calldata crossMsgs) external pure returns (bool) {
         uint256 prevNonce = 0;
-        for (uint256 i = 0; i < crossMsgs.length; ) {
+        for (uint256 i = 0; i < crossMsgs.length;) {
             uint256 nonce = crossMsgs[i].message.nonce;
 
             if (prevNonce >= nonce && i > 0) return false;

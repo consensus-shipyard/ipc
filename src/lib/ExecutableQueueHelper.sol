@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.7;
+pragma solidity 0.8.18;
 
 import "../structs/ExecutableQueue.sol";
 
@@ -10,7 +10,7 @@ library ExecutableQueueHelper {
         if (queue.first == 0 || queue.first > epoch) {
             queue.first = epoch;
         }
-        if (queue.last == 0 || queue.last < epoch ) {
+        if (queue.last == 0 || queue.last < epoch) {
             queue.last = epoch;
         }
 
@@ -58,10 +58,7 @@ library ExecutableQueueHelper {
         }
     }
 
-    function contains(
-        ExecutableQueue storage queue,
-        uint64 epoch
-    ) public view returns (bool) {
+    function contains(ExecutableQueue storage queue, uint64 epoch) public view returns (bool) {
         return queue.epochs[epoch];
     }
 }

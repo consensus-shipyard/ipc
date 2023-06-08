@@ -1,0 +1,40 @@
+{
+  "name": "filecoin-ipc-actors-fevm",
+  "version": "1.0.0",
+  "description": "This repository includes the reference implementation of all the actors (i.e. smart contracts) responsible for the operation of the IPC (i.e. Inter-Planetary Consensus) protocol. These actors are written in Solidity and target FileCoin’s FEVM.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LimeChain/filecoin-ipc-actors-fevm.git"
+  },
+  "author": "Limechain team",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LimeChain/filecoin-ipc-actors-fevm/issues"
+  },
+  "homepage": "https://github.com/LimeChain/filecoin-ipc-actors-fevm#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-foundry": "^1.0.1",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@typechain/ethers-v5": "^7.0.1",
+    "@typechain/hardhat": "^2.1.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.3",
+    "typechain": "^5.0.0",
+    "hardhat-contract-sizer": "^2.6.1",
+    "dotenv": "^16.0.1",
+    "ethers": "^5.7.0",
+    "hardhat-deploy": "^0.11.14",
+    "hardhat-deploy-ethers": "^0.3.0-beta.13"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.7.3"
+  }
+}
