@@ -7,7 +7,7 @@
 As a sanity-check that we have joined the subnet successfully and that we provided enough collateral to register the subnet to IPC, we can list the child subnets of our parent with the following command:
 
 ```bash
-./bin/ipc-agent list-subnets --gateway-address=<gateway-addr> --subnet=<parent-subnet-id>
+./bin/ipc-agent list-subnets --gateway-address <gateway-addr> --subnet <parent-subnet-id>
 ```
 ```console
 # Example execution
@@ -32,19 +32,19 @@ This command specifies the subnet to join, the amount of collateral to provide a
 ## Listing your balance in a subnet
 In order to send messages in a subnet, you'll need to have funds in your subnt account. You can use the following command to list the balance of your wallets in a subnet:
 ```bash
-./bin/ipc-agent wallet list --subnet=<subnet-id>
+./bin/ipc-agent wallet balances --subnet <subnet-id>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent wallet list --subnet=/root/t01002
-ipc_agent::cli::commands::wallet::list] wallets in subnet /root are {"t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq": "500.0"}
+$ ./bin/ipc-agent wallet balances --subnet=/root/t01002
+[2023-06-07T09:36:53Z INFO  ipc_agent::cli::commands::wallet::balances] wallets in subnet /root/t01002 are {"t1ycyy4ruvhyoskdhihetbmohyjaruz6nrxoorjfa": "1.978777008362780242", "t1zsfereuvaiszd54vtgyf3p47urg7fdi72yeq43y": "9.999993934693663367", "t13ehykbvdpdhdhg46vixbkxzrp23ve7uvcvoipti": "0.820843443226907064", "t1yvgsyu4ar2ogags5gizoao2fpz3lanqayjdqhzq": "0.98232851709680446"}
 ```
 
 ## Sending funds in a subnet
 
 The agent provides a command to conveniently exchange funds between addresses of the same subnet. This can be achieved through the following command:
 ```bash
-./bin/ipc-agent subnet send-value --subnet <subnet-id> --to <to-addr> <value>
+./bin/ipc-agent subnet send-value --subnet <subnet-id> [--from <from-addr>] --to <to-addr> <value>
 ```
 ```console
 # Example execution
@@ -64,11 +64,11 @@ Complex behavior can be implemented using these primitives: sending value to a u
 ### Fund
 Funding a subnet can be performed by using the following command:
 ```bash
-./bin/ipc-agent cross-msg fund --subnet=<subnet-id> <amount>
+./bin/ipc-agent cross-msg fund --subnet <subnet-id> [--from <from-addr>] <amount>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent cross-msg fund --subnet=/root/t01002 100
+$ ./bin/ipc-agent cross-msg fund --subnet /root/t01002 100
 ```
 This command includes the cross-net message into the next top-down checkpoint after the current epoch. Once the top-down checkpoint is committed, you should see the funds in your account of the child subnet.
 
@@ -77,7 +77,7 @@ This command includes the cross-net message into the next top-down checkpoint af
 ### Release
 In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following comand:
 ```bash
-./bin/ipc-agent cross-msg release --subnet=<subnet-id> <amount>
+./bin/ipc-agent cross-msg release --subnet <subnet-id> [--from <from-addr>] <amount>
 ```
 ```console
 # Example execution
@@ -104,7 +104,7 @@ You can find the checkpoint where your cross-message was included by listing the
 ## Checking the health of top-down checkpoints
 In order to check the health of top-down checkpointing in a subnet, the following command can be run:
 ```bash
-./bin/ipc-agent checkpoint last-topdown --subnet=<subnet-id>
+./bin/ipc-agent checkpoint last-topdown --subnet <subnet-id>
 ```
 ```console
 # Example execution

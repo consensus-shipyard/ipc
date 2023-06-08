@@ -29,7 +29,6 @@ The IPC Agent is the entry point to interacting with IPC. It is a client applica
 >💡 **We've prepared a [quick start guide](/docs/quickstart.md) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
 See:
-- [docs/architecture.md](docs/architecture.md) for a conceptual overview of the tool
 - [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture
 - [docs/usage.md](docs/usage.md) for instructions on how to use the IPC Agent to interact with subnets
 - [docs/contracts.md](docs/contracts.md) for instructions on how to deploy FEVM actors on subnets

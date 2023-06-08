@@ -8,8 +8,7 @@ use std::fmt::Debug;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
+use crate::sdk::IpcAgentClient;
 use crate::server::leave::LeaveSubnetParams;
 
 /// The command to leave a new subnet.
@@ -22,20 +21,15 @@ impl CommandLineHandler for LeaveSubnet {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("leave subnet with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
-
         let params = LeaveSubnetParams {
             subnet: arguments.subnet.clone(),
             from: arguments.from.clone(),
         };
 
-        json_rpc_client
-            .request::<()>(
-                json_rpc_methods::LEAVE_SUBNET,
-                serde_json::to_value(params)?,
-            )
-            .await?;
+        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
+
+        let client = IpcAgentClient::default_from_url(url);
+        client.leave_subnet(params).await?;
 
         log::info!("left subnet: {:}", arguments.subnet);
 

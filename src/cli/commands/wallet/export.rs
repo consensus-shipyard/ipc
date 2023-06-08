@@ -10,7 +10,7 @@ use std::fmt::Debug;
 use std::io::Write;
 use std::str::FromStr;
 
-use crate::cli::commands::wallet::LotusJsonKeyType;
+use crate::sdk::LotusJsonKeyType;
 use crate::{
     cli::{get_keystore, CommandLineHandler, GlobalArguments},
     lotus::message::wallet::WalletKeyType,

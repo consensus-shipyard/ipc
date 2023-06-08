@@ -38,7 +38,7 @@ $ docker exec -it ipc_root_1234 eudico wallet export --lotus-json t1cp4q4lqsdhob
 ### Importing wallet keys
 Your agent handles the keys for all of your addresses in IPC and is responsible for signing the transactions to the different networks. To import a key to the agent you can use: 
 ```bash
-`./ipc-agent/bin/ipc-agent wallet import --path=<wallet-key-file-path>`
+`./ipc-agent/bin/ipc-agent wallet import --path <wallet-key-file-path>`
 ```
 
 The only operation that requres importing the keys into your raw Eudico node is when running a subnet validator. Subnet validators need to hold the validator keys in their wallets in order to be able to sign new blocks. You may use the following commands to import a wallet directly into the raw subnet node of your validator: 

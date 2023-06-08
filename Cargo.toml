@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ipld/resolver", "testing/e2e", "identity"]
+members = [".", "testing/e2e", "identity", "testing/itest"]
 
 [workspace.package]
 authors = ["Protocol Labs"]
@@ -44,6 +44,7 @@ serde_bytes = "0.11.9"
 clap = { version = "4.1.4", features = ["env", "derive"] }
 thiserror = { workspace = true }
 serde_tuple = "0.5.0"
+zeroize = "1.6.0"
 
 fvm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true }
@@ -81,6 +82,7 @@ fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", 
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", tag = "v0.2.0" }
 ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [], tag = "v0.2.0" }
 ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [],  tag = "v0.2.0"  }
+ipc_ipld_resolver = { git = "https://github.com/consensus-shipyard/ipc-ipld-resolver.git", branch = "main" }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
 primitives = { git = "https://github.com/consensus-shipyard/fvm-utils" }
 

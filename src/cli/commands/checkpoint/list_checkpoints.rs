@@ -7,13 +7,10 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::clock::ChainEpoch;
-use serde_json::Value;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::list_checkpoints::ListBottomUpCheckpointsParams;
+use crate::sdk::IpcAgentClient;
 
 /// The command to list checkpoints committed in a subnet actor.
 pub(crate) struct ListBottomUpCheckpoints;
@@ -26,22 +23,12 @@ impl CommandLineHandler for ListBottomUpCheckpoints {
         log::debug!("list checkpoints with args: {:?}", arguments);
 
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
-
-        let params = ListBottomUpCheckpointsParams {
-            subnet_id: arguments.subnet.clone(),
-            from_epoch: arguments.from_epoch,
-            to_epoch: arguments.to_epoch,
-        };
-
-        let checkpoints = json_rpc_client
-            .request::<Value>(
-                json_rpc_methods::LIST_BOTTOMUP_CHECKPOINTS,
-                serde_json::to_value(params)?,
-            )
+        let client = IpcAgentClient::default_from_url(url);
+        let checkpoints = client
+            .list_bottom_up_checkpoints(&arguments.subnet, arguments.from_epoch, arguments.to_epoch)
             .await?;
 
-        for c in checkpoints.as_array().unwrap().iter() {
+        for c in checkpoints.iter() {
             let c = &c["data"];
             log::info!(
                 "epoch {} - prev_check={}, cross_msgs={}, child_checks={}",

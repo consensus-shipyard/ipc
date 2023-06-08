@@ -6,7 +6,10 @@ build:
 	cargo build -Z unstable-options --release --out-dir ./bin
 
 test:
-	cargo test --release --workspace --exclude ipc_e2e
+	cargo test --release --workspace --exclude ipc_e2e itest
+
+itest:
+	cargo test -p itest --test checkpoint -- --nocapture
 
 e2e:
 	cargo test --release -p ipc_e2e

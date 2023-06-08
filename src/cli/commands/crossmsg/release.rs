@@ -4,14 +4,11 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::clock::ChainEpoch;
 use std::fmt::Debug;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::release::ReleaseParams;
+use crate::sdk::IpcAgentClient;
 
 /// The command to release funds from a child to a parent
 pub(crate) struct Release;
@@ -24,15 +21,9 @@ impl CommandLineHandler for Release {
         log::debug!("release operation with args: {:?}", arguments);
 
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
-
-        let params = ReleaseParams {
-            subnet: arguments.subnet.clone(),
-            from: arguments.from.clone(),
-            amount: arguments.amount,
-        };
-        let epoch = json_rpc_client
-            .request::<ChainEpoch>(json_rpc_methods::RELEASE, serde_json::to_value(params)?)
+        let client = IpcAgentClient::default_from_url(url);
+        let epoch = client
+            .release(&arguments.subnet, arguments.from.clone(), arguments.amount)
             .await?;
 
         log::info!("released subnet: {:} at epoch {epoch:}", arguments.subnet);
