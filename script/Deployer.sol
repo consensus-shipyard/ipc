@@ -14,6 +14,7 @@ contract Deployer is Script {
     bytes private constant GENESIS = EMPTY_BYTES;
     address public constant ROOTNET_ADDRESS = address(0);
     bytes32 private constant DEFAULT_NETWORK_NAME = bytes32("test");
+    uint64 private constant ROOTNET_CHAINID = 31415926;
 
     // add this to be excluded from coverage report
     function test() public {}
@@ -26,7 +27,7 @@ contract Deployer is Script {
         path[0] = ROOTNET_ADDRESS;
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
@@ -35,7 +36,7 @@ contract Deployer is Script {
         Gateway gw = new Gateway(constructorParams);
 
         SubnetActor.ConstructParams memory subnetConstructorParams = SubnetActor.ConstructParams({
-            parentId: SubnetID({route: path}),
+            parentId: SubnetID({root: ROOTNET_CHAINID, route: path}),
             name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(gw),
             consensus: ConsensusType.Mir,

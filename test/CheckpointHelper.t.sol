@@ -19,7 +19,7 @@ contract CheckpointHelperTest is Test {
 
         require(
             BottomUpCheckpoint({
-                source: SubnetID(new address[](0)),
+                source: SubnetID(0, new address[](0)),
                 epoch: 10,
                 crossMsgs: new CrossMsg[](0),
                 fee: 0,

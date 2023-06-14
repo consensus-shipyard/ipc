@@ -27,6 +27,7 @@ contract SubnetActorTest is Test {
     bytes private constant GENESIS = EMPTY_BYTES;
     uint256 constant CROSS_MSG_FEE = 10 gwei;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
+    uint64 private constant ROOTNET_CHAINID = 123;
     address GATEWAY_ADDRESS;
 
     error NotGateway();
@@ -50,12 +51,8 @@ contract SubnetActorTest is Test {
     error GatewayCannotBeZero();
 
     function setUp() public {
-        address[] memory path = new address[](1);
-        // root
-        path[0] = address(0);
-
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
@@ -109,11 +106,8 @@ contract SubnetActorTest is Test {
     function test_Deployments_Fail_GatewayCannotBeZero() public {
         vm.expectRevert(GatewayCannotBeZero.selector);
 
-        address[] memory path = new address[](1);
-        path[0] = address(0);
-
         new SubnetActor(SubnetActor.ConstructParams({
-            parentId: SubnetID(path),
+            parentId: SubnetID(ROOTNET_CHAINID, new address[](0)),
             name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(0),
             consensus: ConsensusType.Mir,
@@ -477,8 +471,11 @@ contract SubnetActorTest is Test {
         CrossMsg[] memory crossMsgs = new CrossMsg[](2);
         crossMsgs[0] = CrossMsg({
             message: StorableMsg({
-                from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: address(this)}),
-                to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: address(this)}),
+                from: IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: address(this)}),
                 value: CROSS_MSG_FEE + 1,
                 nonce: 1,
                 method: METHOD_SEND,
@@ -488,8 +485,11 @@ contract SubnetActorTest is Test {
         });
         crossMsgs[1] = CrossMsg({
             message: StorableMsg({
-                from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: address(this)}),
-                to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: address(this)}),
+                from: IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: address(this)}),
                 value: CROSS_MSG_FEE + 1,
                 nonce: 0,
                 method: METHOD_SEND,
@@ -653,7 +653,7 @@ contract SubnetActorTest is Test {
 
         BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
 
-        checkpoint.source = SubnetID(new address[](0));
+        checkpoint.source = SubnetID(0, new address[](0));
 
         vm.prank(validator);
         vm.expectRevert(WrongCheckpointSource.selector);
@@ -681,7 +681,7 @@ contract SubnetActorTest is Test {
 
         BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
 
-        checkpoint.epoch = 1;
+        checkpoint.epoch = 11;
 
         vm.prank(validator);
         vm.expectRevert(EpochNotVotable.selector);
@@ -902,21 +902,23 @@ contract SubnetActorTest is Test {
         require(keccak256(sa.genesis()) == keccak256(_genesis), "keccak256(sa.genesis()) == keccak256(_genesis)");
         require(sa.majorityPercentage() == _majorityPercentage, "sa.majorityPercentage() == _majorityPercentage");
         require(sa.consensus() == _consensus);
-        require(sa.getParent().toHash() == _parentId.toHash(), "parent.toHash() == SubnetID({route: path}).toHash()");
+        require(
+            sa.getParent().toHash() == _parentId.toHash(),
+            "parent.toHash() == SubnetID({root: ROOTNET_CHAINID, route: path}).toHash()"
+        );
     }
 
     function _createBottomUpCheckpoint() internal view returns (BottomUpCheckpoint memory checkpoint) {
-        address[] memory route = new address[](2);
-        route[0] = address(0);
-        route[1] = address(sa);
-
-        SubnetID memory source = SubnetID({route: route});
+        SubnetID memory subnetActorId = sa.getParent().createSubnetId(address(sa));
         CrossMsg[] memory crossMsgs = new CrossMsg[](1);
 
         crossMsgs[0] = CrossMsg({
             message: StorableMsg({
-                from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: address(this)}),
-                to: IPCAddress({subnetId: gw.getNetworkName(), rawAddress: address(this)}),
+                from: IPCAddress({
+                    subnetId: subnetActorId,
+                    rawAddress: address(this)
+                }),
+                to: IPCAddress({subnetId: subnetActorId, rawAddress: address(this)}),
                 value: 0,
                 nonce: 0,
                 method: this.callback.selector,
@@ -926,7 +928,7 @@ contract SubnetActorTest is Test {
         });
 
         checkpoint = BottomUpCheckpoint({
-            source: source,
+            source: subnetActorId,
             epoch: DEFAULT_CHECKPOINT_PERIOD,
             fee: 0,
             crossMsgs: crossMsgs,

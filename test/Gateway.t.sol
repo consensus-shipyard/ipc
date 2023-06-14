@@ -34,6 +34,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
     Gateway gw2;
     SubnetActor sa;
 
+    uint64 private constant ROOTNET_CHAINID = 123;
     address public constant ROOTNET_ADDRESS = address(1);
 
     address TOPDOWN_VALIDATOR_1 = address(12);
@@ -81,7 +82,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path2[1] = CHILD_NETWORK_ADDRESS_2;
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
@@ -91,11 +92,11 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
 
-        constructorParams.networkName = SubnetID({route: path2});
+        constructorParams.networkName = SubnetID({root: ROOTNET_CHAINID, route: path2});
         gw2 = new Gateway(constructorParams);
 
         SubnetActor.ConstructParams memory subnetConstructorParams = SubnetActor.ConstructParams({
-            parentId: SubnetID({route: path}),
+            parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(gw),
             consensus: ConsensusType.Mir,
@@ -117,11 +118,9 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
     function test_Deployment_Works_Root(uint64 checkpointPeriod) public {
         vm.assume(checkpointPeriod >= DEFAULT_CHECKPOINT_PERIOD);
-        address[] memory path = new address[](1);
-        path[0] = address(0);
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
             topDownCheckPeriod: checkpointPeriod,
             msgFee: CROSS_MSG_FEE,
@@ -150,7 +149,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path[1] = address(1);
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
             topDownCheckPeriod: checkpointPeriod,
             msgFee: CROSS_MSG_FEE,
@@ -471,7 +470,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         (SubnetID memory id, uint256 stake, uint256 nonce,, uint256 circSupply, Status status) =
             getSubnet(subnetAddress);
 
-        require(id.toHash() == SubnetID(new address[](0)).toHash());
+        require(id.toHash() == SubnetID(0, new address[](0)).toHash());
         require(stake == 0);
         require(nonce == 0);
         require(circSupply == 0);
@@ -848,7 +847,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
         vm.expectRevert(NotRegisteredSubnet.selector);
 
-        gw.fund{value: fundAmount}(SubnetID(wrongPath));
+        gw.fund{value: fundAmount}(SubnetID(ROOTNET_CHAINID, wrongPath));
     }
 
     function test_Fund_Fails_InvalidAccount() public {
@@ -881,7 +880,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         address[] memory wrongSubnetPath = new address[](2);
         wrongSubnetPath[0] = vm.addr(102);
         wrongSubnetPath[0] = vm.addr(103);
-        SubnetID memory wrongSubnetId = SubnetID({route: wrongSubnetPath});
+        SubnetID memory wrongSubnetId = SubnetID({root: ROOTNET_CHAINID, route: wrongSubnetPath});
 
         vm.expectRevert(NotRegisteredSubnet.selector);
         gw.fund{value: fundAmount}(wrongSubnetId);
@@ -909,7 +908,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path[1] = address(2);
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
@@ -932,7 +931,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path[1] = address(2);
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
@@ -958,7 +957,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path[1] = makeAddr("subnet_one");
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
@@ -983,7 +982,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path[1] = makeAddr("subnet_one");
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
@@ -1010,7 +1009,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path[1] = makeAddr("subnet_one");
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
@@ -1038,11 +1037,11 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
         vm.expectRevert(InvalidCrossMsgDestinationSubnet.selector);
         gw.sendCross{value: CROSS_MSG_FEE + 1}(
-            SubnetID({route: new address[](0)}),
+            SubnetID({root: 0, route: new address[](0)}),
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
-                    to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
+                    from: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
+                    to: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
                     value: CROSS_MSG_FEE + 1,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -1060,11 +1059,11 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
         vm.expectRevert(NotSignableAccount.selector);
         gw.sendCross{value: CROSS_MSG_FEE + 1}(
-            SubnetID({route: new address[](0)}),
+            SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
-                    to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
+                    from: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
+                    to: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
                     value: CROSS_MSG_FEE + 1,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -1086,8 +1085,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             destination,
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
-                    to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
+                    from: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
+                    to: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
                     value: CROSS_MSG_FEE + 1,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -1109,8 +1108,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             destination,
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
-                    to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
+                    from: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
+                    to: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
                     value: 5,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -1132,8 +1131,11 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             destination,
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
-                    to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: address(0)}),
+                    from: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
+                    to: IPCAddress({
+                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                        rawAddress: address(0)
+                    }),
                     value: CROSS_MSG_FEE + 1,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -1155,8 +1157,11 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             destination,
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: caller}),
-                    to: IPCAddress({subnetId: SubnetID({route: new address[](0)}), rawAddress: address(0)}),
+                    from: IPCAddress({subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), rawAddress: caller}),
+                    to: IPCAddress({
+                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                        rawAddress: address(0)
+                    }),
                     value: 0,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -1226,7 +1231,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         SubnetID memory network2 = gw2.getNetworkName();
         address[] memory destinationPath = new address[](1);
         destinationPath[0] = ROOTNET_ADDRESS;
-        SubnetID memory destination = SubnetID({route: destinationPath});
+        SubnetID memory destination = SubnetID({root: ROOTNET_CHAINID, route: destinationPath});
 
         CrossMsg memory crossMsg = CrossMsg({
             message: StorableMsg({
@@ -1258,7 +1263,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         SubnetID memory network2 = gw2.getNetworkName();
         address[] memory rootnetPath = new address[](1);
         rootnetPath[0] = ROOTNET_ADDRESS;
-        SubnetID memory destination = SubnetID({route: rootnetPath});
+        SubnetID memory destination = SubnetID({root: ROOTNET_CHAINID, route: rootnetPath});
 
         CrossMsg memory crossMsg = CrossMsg({
             message: StorableMsg({
@@ -1577,7 +1582,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         path[1] = address(1);
 
         Gateway.ConstructorParams memory constructorParams = Gateway.ConstructorParams({
-            networkName: SubnetID({route: path}),
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
@@ -1708,7 +1713,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         topDownMsgs[0] = CrossMsg({
             message: StorableMsg({
                 from: IPCAddress({subnetId: gw.getNetworkName(), rawAddress: address(this)}),
-                to: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(this)}),
+                to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(this)}),
                 value: 0,
                 nonce: 10,
                 method: this.callback.selector,

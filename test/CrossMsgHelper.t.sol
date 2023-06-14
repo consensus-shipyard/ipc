@@ -14,6 +14,7 @@ contract CrossMsgHelperTest is Test {
 
     bytes32 immutable EMPTY_CROSS_MSGS_HASH = keccak256(abi.encode(createCrossMsgs(0, 0)));
     bytes32 immutable EMPTY_CROSS_MSG_HASH = keccak256(abi.encode(createCrossMsg(0)));
+    uint64 private constant ROOTNET_CHAINID = 123;
 
     CrossMsg public crossMsg;
     CrossMsg[] public crossMsgs;
@@ -59,7 +60,7 @@ contract CrossMsgHelperTest is Test {
         address[] memory route = new address[](2);
         route[0] = makeAddr("root");
         route[1] = makeAddr("subnet");
-        SubnetID memory subnetId = SubnetID(route);
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, route);
 
         vm.prank(sender);
 
@@ -67,7 +68,7 @@ contract CrossMsgHelperTest is Test {
 
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
-        SubnetID memory parentSubnetId = SubnetID(parentRoute);
+        SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
 
         require(releaseMsg.message.from.subnetId.toHash() == subnetId.toHash());
         require(releaseMsg.message.from.rawAddress == BURNT_FUNDS_ACTOR);
@@ -81,20 +82,41 @@ contract CrossMsgHelperTest is Test {
     }
 
     function test_CreateReleaseMsg_Fails_SubnetNoParent(uint256 releaseAmount, address sender) public {
-        address[] memory route = new address[](1);
-        route[0] = makeAddr("root");
-        SubnetID memory subnetId = SubnetID(route);
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
         vm.expectRevert(NoParentForSubnet.selector);
 
         CrossMsgHelper.createReleaseMsg(subnetId, sender, releaseAmount);
     }
 
+    function test_CreateFundMsg_Works_Root(uint256 fundAmount, address sender) public {
+        address[] memory parentRoute = new address[](1);
+        parentRoute[0] = address(101);
+        SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
+
+        vm.prank(sender);
+
+        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(parentSubnetId, sender, fundAmount);
+
+
+        SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
+
+        require(fundMsg.message.from.subnetId.toHash() == rootSubnetId.toHash());
+        require(fundMsg.message.from.rawAddress == sender);
+        require(fundMsg.message.to.subnetId.toHash() == parentSubnetId.toHash());
+        require(fundMsg.message.to.rawAddress == sender);
+        require(fundMsg.message.value == fundAmount);
+        require(fundMsg.message.nonce == 0);
+        require(fundMsg.message.method == METHOD_SEND);
+        require(keccak256(fundMsg.message.params) == keccak256(EMPTY_BYTES));
+        require(fundMsg.wrapped == false);
+    }
+
     function test_CreateFundMsg_Works(uint256 fundAmount, address sender) public {
         address[] memory route = new address[](2);
         route[0] = makeAddr("root");
         route[1] = makeAddr("subnet");
-        SubnetID memory subnetId = SubnetID(route);
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, route);
 
         vm.prank(sender);
 
@@ -102,7 +124,7 @@ contract CrossMsgHelperTest is Test {
 
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
-        SubnetID memory parentSubnetId = SubnetID(parentRoute);
+        SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
 
         require(fundMsg.message.from.subnetId.toHash() == parentSubnetId.toHash());
         require(fundMsg.message.from.rawAddress == sender);
@@ -116,9 +138,7 @@ contract CrossMsgHelperTest is Test {
     }
 
     function test_CreateFundMsg_Fails_SubnetNoParent(uint256 fundAmount, address sender) public {
-        address[] memory noParentRoute = new address[](1);
-        noParentRoute[0] = makeAddr("root");
-        SubnetID memory subnetId = SubnetID(noParentRoute);
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
         vm.expectRevert(NoParentForSubnet.selector);
 
@@ -227,8 +247,8 @@ contract CrossMsgHelperTest is Test {
     function createCrossMsg(uint64 nonce) internal pure returns (CrossMsg memory) {
         return CrossMsg({
             message: StorableMsg({
-                from: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
-                to: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
+                from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+                to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
                 value: 0,
                 nonce: nonce,
                 method: METHOD_SEND,

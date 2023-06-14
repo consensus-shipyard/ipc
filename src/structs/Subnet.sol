@@ -7,6 +7,8 @@ import "../enums/Status.sol";
 /// @title Subnet id struct
 /// @author LimeChain team
 struct SubnetID {
+    /// @notice chainID of the root subnet
+    uint64 root;
     /// @notice parent path of the subnet
     address[] route;
 }

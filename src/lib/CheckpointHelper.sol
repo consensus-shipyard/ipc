@@ -14,7 +14,7 @@ library CheckpointHelper {
     bytes32 constant EMPTY_BOTTOMUPCHECKPOINT_HASH = keccak256(
         abi.encode(
             BottomUpCheckpoint({
-                source: SubnetID(new address[](0)),
+                source: SubnetID(0, new address[](0)),
                 epoch: 0,
                 fee: 0,
                 crossMsgs: new CrossMsg[](0),

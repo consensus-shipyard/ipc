@@ -17,8 +17,8 @@ library CrossMsgHelper {
         abi.encode(
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
-                    to: IPCAddress({subnetId: SubnetID(new address[](0)), rawAddress: address(0)}),
+                    from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+                    to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
                     value: 0,
                     nonce: 0,
                     method: METHOD_SEND,
