@@ -112,7 +112,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
     }
 
     modifier notKilled() {
-        if (status == Status.Terminating || status == Status.Killed) revert SubnetAlreadyKilled();
+        if (status == Status.Terminating || status == Status.Killed) {
+            revert SubnetAlreadyKilled();
+        }
         _;
     }
 
@@ -162,10 +164,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         stake[validator] += validatorStake;
         totalStake += validatorStake;
 
-        if (
-            stake[validator] >= minActivationCollateral && !validators.contains(validator)
-                && (consensus != ConsensusType.Delegated || validators.length() == 0)
-        ) {
+        if (stake[validator] >= minActivationCollateral && !validators.contains(validator)) {
             validators.add(validator);
             validatorNetAddresses[validator] = netAddr;
         }
@@ -179,10 +178,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
             IGateway(ipcGatewayAddr).addStake{value: validatorStake}();
         }
 
-        if(status == Status.Inactive && totalStake >= minActivationCollateral) {
+        if (status == Status.Inactive && totalStake >= minActivationCollateral) {
             status = Status.Active;
         }
-
     }
 
     /// @notice method that allows a validator to leave the subnet
@@ -207,7 +205,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
     /// @notice method that allows the subnet no be killed after all validators leave
     function kill() external signableOnly notKilled {
         if (address(this).balance > 0) revert CollateralStillLockedInSubnet();
-        if (validators.length() != 0 || totalStake != 0) revert NotAllValidatorsHaveLeft();
+        if (validators.length() != 0 || totalStake != 0) {
+            revert NotAllValidatorsHaveLeft();
+        }
 
         status = Status.Terminating;
 
@@ -230,7 +230,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         if (checkpoint.source.toHash() != parentId.createSubnetId(address(this)).toHash()) {
             revert WrongCheckpointSource();
         }
-        if (!CrossMsgHelper.isSorted(checkpoint.crossMsgs)) revert MessagesNotSorted();
+        if (!CrossMsgHelper.isSorted(checkpoint.crossMsgs)) {
+            revert MessagesNotSorted();
+        }
 
         EpochVoteBottomUpSubmission storage voteSubmission = epochVoteSubmissions[checkpoint.epoch];
 

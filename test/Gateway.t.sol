@@ -9,7 +9,7 @@ import "../src/lib/SubnetIDHelper.sol";
 import "../src/lib/CheckpointHelper.sol";
 import "../src/lib/CrossMsgHelper.sol";
 
-contract GatewayDeploymentTest is StdInvariant,Test {
+contract GatewayDeploymentTest is StdInvariant, Test {
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
     using CrossMsgHelper for CrossMsg;
@@ -98,7 +98,7 @@ contract GatewayDeploymentTest is StdInvariant,Test {
             parentId: SubnetID({route: path}),
             name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(gw),
-            consensus: ConsensusType.Dummy,
+            consensus: ConsensusType.Mir,
             minActivationCollateral: MIN_COLLATERAL_AMOUNT,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,

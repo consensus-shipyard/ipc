@@ -38,7 +38,7 @@ contract Deployer is Script {
             parentId: SubnetID({route: path}),
             name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(gw),
-            consensus: ConsensusType.Dummy,
+            consensus: ConsensusType.Mir,
             minActivationCollateral: MIN_COLLATERAL_AMOUNT,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,

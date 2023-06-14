@@ -67,7 +67,7 @@ contract SubnetActorTest is Test {
         _assertDeploySubnetActor(
             DEFAULT_NETWORK_NAME,
             GATEWAY_ADDRESS,
-            ConsensusType.Dummy,
+            ConsensusType.Mir,
             DEFAULT_MIN_VALIDATOR_STAKE,
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_CHECKPOINT_PERIOD,
@@ -92,7 +92,7 @@ contract SubnetActorTest is Test {
         _assertDeploySubnetActor(
             _networkName,
             _ipcGatewayAddr,
-            ConsensusType.Dummy,
+            ConsensusType.Mir,
             _minActivationCollateral,
             _minValidators,
             _checkPeriod,
@@ -174,24 +174,6 @@ contract SubnetActorTest is Test {
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE - 1);
 
         require(sa.validatorCount() == 0);
-    }
-
-    function test_Join_Works_DelegatedConsensusType() public {
-        _assertDeploySubnetActor(
-            DEFAULT_NETWORK_NAME,
-            GATEWAY_ADDRESS,
-            ConsensusType.Delegated,
-            DEFAULT_MIN_VALIDATOR_STAKE,
-            DEFAULT_MIN_VALIDATORS,
-            DEFAULT_CHECKPOINT_PERIOD,
-            GENESIS,
-            DEFAULT_MAJORITY_PERCENTAGE
-        );
-
-        _assertJoin(vm.addr(1234), DEFAULT_MIN_VALIDATOR_STAKE);
-        _assertJoin(vm.addr(1235), DEFAULT_MIN_VALIDATOR_STAKE);
-
-        require(sa.validatorCount() == 1);
     }
 
     function test_Join_Works_ReactivateSubnet() public {
@@ -737,18 +719,20 @@ contract SubnetActorTest is Test {
     ) public {
         SubnetID memory _parentId = gw.getNetworkName();
 
-        sa = new SubnetActor(SubnetActor.ConstructParams({
-            parentId: _parentId,
-            name: _name,
-            ipcGatewayAddr: _ipcGatewayAddr,
-            consensus: _consensus,
-            minActivationCollateral: _minActivationCollateral,
-            minValidators: _minValidators,
-            bottomUpCheckPeriod: _checkPeriod,
-            topDownCheckPeriod: _checkPeriod,
-            majorityPercentage: _majorityPercentage,
-            genesis: _genesis
-        }));
+        sa = new SubnetActor(
+            SubnetActor.ConstructParams({
+                parentId: _parentId,
+                name: _name,
+                ipcGatewayAddr: _ipcGatewayAddr,
+                consensus: _consensus,
+                minActivationCollateral: _minActivationCollateral,
+                minValidators: _minValidators,
+                bottomUpCheckPeriod: _checkPeriod,
+                topDownCheckPeriod: _checkPeriod,
+                majorityPercentage: _majorityPercentage,
+                genesis: _genesis
+            })
+        );
 
         require(
             keccak256(abi.encodePacked(sa.name())) == keccak256(abi.encodePacked(_name)),
@@ -801,5 +785,4 @@ contract SubnetActorTest is Test {
         assertEq(address(gw).balance, sa.totalStake());
         assertEq(address(sa).balance, 0);
     }
-
 }

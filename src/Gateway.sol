@@ -656,7 +656,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         postboxHasOwner[cid][crossMsg.message.from.rawAddress] = true;
     }
 
-    /// @notice applies a cross-net messages coming from some other subnet. 
+    /// @notice applies a cross-net messages coming from some other subnet.
     /// The forwarder argument determines the previous subnet that submitted the checkpoint triggering the cross-net message execution.
     /// @param forwarder - the subnet that handles the messages
     /// @param crossMsgs - the cross-net messages to apply
