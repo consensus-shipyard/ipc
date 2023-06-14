@@ -31,8 +31,10 @@ library ExecutableQueueHelper {
         }
 
         // epoch is somewhere in the middle, so do nothing else
-        if (epoch > queue.first && epoch < queue.last) {
-            return;
+        if (epoch > queue.first) {
+            if (epoch < queue.last) {
+                return;
+            }
         }
 
         // find the closest epoch on the right and set it as the new first

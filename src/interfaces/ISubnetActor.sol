@@ -24,8 +24,6 @@ interface ISubnetActor {
     /// votes from 2/3 of miners with collateral.
     function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external;
 
-    // function setValidatorNetAddr(string calldata validatorNetAddr) external;
-
-    /// Distributes the rewards for the subnet to validators.
-    function reward() external payable;
+    /// Tracks the accumulated rewards for each validator.
+    function reward(uint256 amount) external;
 }

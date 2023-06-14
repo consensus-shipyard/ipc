@@ -18,7 +18,8 @@ library SubnetIDHelper {
         if (subnet.route.length <= 1) revert NoParentForSubnet();
 
         address[] memory route = new address[](subnet.route.length - 1);
-        for (uint256 i = 0; i < route.length;) {
+        uint256 routeLength = route.length;
+        for (uint256 i = 0; i < routeLength;) {
             route[i] = subnet.route[i];
             unchecked {
                 ++i;
@@ -30,7 +31,8 @@ library SubnetIDHelper {
 
     function toString(SubnetID calldata subnet) public pure returns (string memory) {
         string memory route = "/root";
-        for (uint256 i = 0; i < subnet.route.length;) {
+        uint256 routeLength = subnet.route.length;
+        for (uint256 i = 0; i < routeLength;) {
             route = string.concat(route, "/");
             route = string.concat(route, subnet.route[i].toHexString());
             unchecked {
@@ -49,7 +51,8 @@ library SubnetIDHelper {
         if (subnet.route.length == 0) revert EmptySubnet();
 
         newSubnet.route = new address[](subnet.route.length + 1);
-        for (uint256 i = 0; i < subnet.route.length;) {
+        uint256 routeLength = subnet.route.length;
+        for (uint256 i = 0; i < routeLength;) {
             newSubnet.route[i] = subnet.route[i];
             unchecked {
                 ++i;
@@ -78,7 +81,9 @@ library SubnetIDHelper {
     /// @notice Computes the common parent of the current subnet and the one given as argument
     function commonParent(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (SubnetID memory) {
         uint256 i = 0;
-        while (i < subnet1.route.length && i < subnet2.route.length && subnet1.route[i] == subnet2.route[i]) {
+        uint256 subnet1routeLength = subnet1.route.length;
+        uint256 subnet2routeLength = subnet2.route.length;
+        while (i < subnet1routeLength && i < subnet2routeLength && subnet1.route[i] == subnet2.route[i]) {
             unchecked {
                 ++i;
             }
@@ -105,9 +110,10 @@ library SubnetIDHelper {
         }
 
         uint256 i = 0;
-        while (i < subnet2.route.length && subnet1.route[i] == subnet2.route[i]) {
+        uint256 subnet2routeLength = subnet2.route.length;
+        while (i < subnet2routeLength && subnet1.route[i] == subnet2.route[i]) {
             unchecked {
-                i++;
+                ++i;
             }
         }
 
@@ -120,7 +126,7 @@ library SubnetIDHelper {
         for (uint256 j = 0; j <= i;) {
             route[j] = subnet1.route[j];
             unchecked {
-                j++;
+                ++j;
             }
         }
 

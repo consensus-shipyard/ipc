@@ -104,10 +104,15 @@ library CrossMsgHelper {
     // checks whether the cross messages are sorted in ascending order or not
     function isSorted(CrossMsg[] calldata crossMsgs) external pure returns (bool) {
         uint256 prevNonce = 0;
-        for (uint256 i = 0; i < crossMsgs.length;) {
+        uint256 length = crossMsgs.length;
+        for (uint256 i = 0; i < length;) {
             uint256 nonce = crossMsgs[i].message.nonce;
 
-            if (prevNonce >= nonce && i > 0) return false;
+            if (prevNonce >= nonce) {
+                if (i > 0) {
+                    return false;
+                }
+            }
 
             prevNonce = nonce;
             unchecked {

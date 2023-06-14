@@ -33,7 +33,6 @@ contract SubnetActorTest is Test {
     error NotAccount();
     error CollateralIsZero();
     error CallerHasNoStake();
-    error CollateralStillLockedInSubnet();
     error SubnetAlreadyKilled();
     error NotAllValidatorsHaveLeft();
     error NotValidator();
@@ -47,6 +46,8 @@ contract SubnetActorTest is Test {
     error EpochNotVotable();
     error ValidatorAlreadyVoted();
     error MessagesNotSorted();
+    error NoRewardToWithdraw();
+    error GatewayCannotBeZero();
 
     function setUp() public {
         address[] memory path = new address[](1);
@@ -76,7 +77,7 @@ contract SubnetActorTest is Test {
         );
     }
 
-    function testDeployment(
+    function test_Deployment_Works(
         bytes32 _networkName,
         address _ipcGatewayAddr,
         uint256 _minActivationCollateral,
@@ -88,6 +89,7 @@ contract SubnetActorTest is Test {
         vm.assume(_minActivationCollateral > DEFAULT_MIN_VALIDATOR_STAKE);
         vm.assume(_checkPeriod > DEFAULT_CHECKPOINT_PERIOD);
         vm.assume(_majorityPercentage <= 100);
+        vm.assume(_ipcGatewayAddr != address(0));
 
         _assertDeploySubnetActor(
             _networkName,
@@ -104,12 +106,54 @@ contract SubnetActorTest is Test {
         require(parent.isRoot(), "parent.isRoot()");
     }
 
+    function test_Deployments_Fail_GatewayCannotBeZero() public {
+        vm.expectRevert(GatewayCannotBeZero.selector);
+
+        address[] memory path = new address[](1);
+        path[0] = address(0);
+
+        new SubnetActor(SubnetActor.ConstructParams({
+            parentId: SubnetID(path),
+            name: DEFAULT_NETWORK_NAME,
+            ipcGatewayAddr: address(0),
+            consensus: ConsensusType.Mir,
+            minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesis: EMPTY_BYTES
+        }));
+    }
+
+    function test_Receive_Fail_NotGateway() public {
+        vm.expectRevert(NotGateway.selector);
+        (bool success,) = payable(address(sa)).call{value: 1}("");
+        require(success);
+    }
+
+    function test_Receive_Works() public {
+        vm.prank(GATEWAY_ADDRESS);
+        vm.deal(GATEWAY_ADDRESS, 1);
+        (bool success,) = payable(address(sa)).call{value: 1}("");
+        require(success);
+    }
+
     function test_Join_Fail_NoMinColalteral() public {
         address validator = vm.addr(100);
 
         vm.deal(validator, 1 gwei);
         vm.prank(validator);
         vm.expectRevert(CollateralIsZero.selector);
+
+        sa.join(DEFAULT_NET_ADDR);
+    }
+
+    function test_Join_Fail_NotAccount() public {
+        address contractAddress = address(sa);
+        vm.deal(contractAddress, 1 gwei);
+        vm.prank(contractAddress);
+        vm.expectRevert(NotAccount.selector);
 
         sa.join(DEFAULT_NET_ADDR);
     }
@@ -174,6 +218,7 @@ contract SubnetActorTest is Test {
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE - 1);
 
         require(sa.validatorCount() == 0);
+        require(sa.status() == Status.Instantiated);
     }
 
     function test_Join_Works_ReactivateSubnet() public {
@@ -187,6 +232,7 @@ contract SubnetActorTest is Test {
         _assertJoin(vm.addr(1235), DEFAULT_MIN_VALIDATOR_STAKE);
 
         require(sa.validatorCount() == 1);
+        require(sa.status() == Status.Active);
     }
 
     function test_Leave_Works_NoValidatorsLeft() public payable {
@@ -200,6 +246,32 @@ contract SubnetActorTest is Test {
         require(sa.totalStake() == 0);
         require(sa.validatorCount() == 0);
         require(sa.status() == Status.Inactive);
+    }
+
+    function test_Leave_Works_StillActive() public payable {
+        address validator1 = address(1234);
+        address validator2 = address(1235);
+        uint256 amount = DEFAULT_MIN_VALIDATOR_STAKE;
+
+        _assertJoin(validator1, amount);
+        _assertJoin(validator2, amount);
+
+        _assertLeave(validator1, amount);
+
+        require(sa.totalStake() == amount);
+        require(sa.validatorCount() == 1);
+        require(sa.status() == Status.Active);
+    }
+
+    function test_Leave_Fail_NotAccount() public payable {
+        address contractAddress = address(sa);
+        uint256 amount = DEFAULT_MIN_VALIDATOR_STAKE;
+
+        vm.prank(contractAddress);
+        vm.deal(contractAddress, amount);
+        vm.expectRevert(NotAccount.selector);
+
+        sa.leave();
     }
 
     function test_Leave_Fail_AlreadyKilled() public payable {
@@ -238,6 +310,15 @@ contract SubnetActorTest is Test {
         _assertKill(validator);
 
         require(GATEWAY_ADDRESS.balance == 0);
+        require(gw.totalSubnets() == 0);
+    }
+
+    function test_Kill_Fails_NotAccount() public payable {
+        address contractAddress = address(sa);
+
+        vm.prank(contractAddress);
+        vm.expectRevert(NotAccount.selector);
+        sa.kill();
     }
 
     function test_Kill_Fails_NotAllValidatorsLeft() public payable {
@@ -265,24 +346,6 @@ contract SubnetActorTest is Test {
         vm.prank(validator);
         vm.expectRevert(SubnetAlreadyKilled.selector);
 
-        sa.kill();
-    }
-
-    function test_Kill_Fails_CollateralNotZero() public {
-        address validator = vm.addr(1235);
-
-        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
-        _assertLeave(validator, DEFAULT_MIN_VALIDATOR_STAKE);
-
-        vm.prank(GATEWAY_ADDRESS);
-        vm.deal(GATEWAY_ADDRESS, 1 ether);
-
-        (bool success,) = address(sa).call{value: 1}("");
-
-        require(success, "funding SubnetActor failed");
-
-        vm.prank(validator);
-        vm.expectRevert(CollateralStillLockedInSubnet.selector);
         sa.kill();
     }
 
@@ -497,6 +560,42 @@ contract SubnetActorTest is Test {
         console.log("callback called");
     }
 
+    function test_SubmitCheckpoint_Works_MostVotedWeightEqualToThreshold_Abort() public {
+        uint8 majorityPercentage = 50;
+
+        _assertDeploySubnetActor(
+            DEFAULT_NETWORK_NAME,
+            GATEWAY_ADDRESS,
+            ConsensusType.Mir,
+            DEFAULT_MIN_VALIDATOR_STAKE,
+            DEFAULT_MIN_VALIDATORS,
+            DEFAULT_CHECKPOINT_PERIOD,
+            GENESIS,
+            majorityPercentage
+        );
+
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        address validator2 = vm.addr(101);
+        _assertJoin(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        BottomUpCheckpoint memory checkpoint1 = _createBottomUpCheckpoint();
+        BottomUpCheckpoint memory checkpoint2 = _createBottomUpCheckpoint();
+
+        checkpoint2.crossMsgs[0].message.value = 1;
+
+        _assertVote(validator, checkpoint1);
+
+        vm.prank(validator2);
+
+        // should reset votes
+        sa.submitCheckpoint(checkpoint2);
+
+        require(sa.hasValidatorVotedForSubmission(checkpoint1.epoch, validator) == false);
+        require(sa.hasValidatorVotedForSubmission(checkpoint2.epoch, validator2) == false);
+        require(sa.lastVotingExecutedEpoch() == 0);
+    }
+
     function test_SubmitCheckpoint_Works_VoteForCheckpoint() public {
         address validator = vm.addr(100);
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
@@ -586,7 +685,6 @@ contract SubnetActorTest is Test {
 
         vm.prank(validator);
         vm.expectRevert(EpochNotVotable.selector);
-        // vm.expectRevert("epoch not votable");
 
         sa.submitCheckpoint(checkpoint);
     }
@@ -613,24 +711,34 @@ contract SubnetActorTest is Test {
 
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
 
-        uint256 balanceBefore = validator.balance;
-
         vm.startPrank(GATEWAY_ADDRESS);
         vm.deal(GATEWAY_ADDRESS, 1 ether);
 
-        sa.reward{value: 1 ether}();
+        sa.reward(1 ether);
 
-        require(validator.balance == balanceBefore + 1 ether);
+        require(sa.accumulatedRewards(validator) == 1 ether);
+        // sa.reward{value: 1}();
+
+        // require(validator.balance == balanceBefore + 1);
     }
 
-    function test_Reward_Fails_NoRewardsSentForDistribution() public {
-        _assertJoin(vm.addr(100), DEFAULT_MIN_VALIDATOR_STAKE);
+    function test_Reward_Works_MultipleValidators() public {
+        address validator1 = vm.addr(100);
+        address validator2 = vm.addr(101);
+
+        _assertJoin(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        uint256 validator1BalanceBefore = sa.accumulatedRewards(validator1);
+        uint256 validator2BalanceBefore = sa.accumulatedRewards(validator2);
 
         vm.startPrank(GATEWAY_ADDRESS);
         vm.deal(GATEWAY_ADDRESS, 1 ether);
-        vm.expectRevert(NoRewardsSentForDistribution.selector);
 
-        sa.reward();
+        sa.reward(110);
+
+        require(sa.accumulatedRewards(validator1) - validator1BalanceBefore == 55);
+        require(sa.accumulatedRewards(validator2) - validator2BalanceBefore == 55);
     }
 
     function test_Reward_Fails_NoValidatorsInSubnet() public {
@@ -638,7 +746,17 @@ contract SubnetActorTest is Test {
         vm.deal(GATEWAY_ADDRESS, 1 ether);
         vm.expectRevert(NoValidatorsInSubnet.selector);
 
-        sa.reward{value: 1 ether}();
+        sa.reward(1 ether);
+    }
+
+    function test_Reward_Fails_NotGateway() public {
+        address notGatewayAddr = vm.addr(101);
+
+        vm.startPrank(notGatewayAddr);
+        vm.deal(notGatewayAddr, 1 ether);
+        vm.expectRevert(NotGateway.selector);
+
+        sa.reward(1 ether);
     }
 
     function test_Reward_Fails_NotEnoughBalanceForRewards() public {
@@ -649,7 +767,43 @@ contract SubnetActorTest is Test {
         vm.deal(GATEWAY_ADDRESS, 1 ether);
         vm.expectRevert(NotEnoughBalanceForRewards.selector);
 
-        sa.reward{value: 1}();
+        sa.reward(1);
+    }
+
+    function test_Withdraw_Fails_NotAccount() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.prank(address(this));
+        vm.expectRevert(NotAccount.selector);
+
+        sa.withdraw();
+    }
+
+    function test_Withdraw_Fails_NoRewardToWithdraw() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.prank(validator);
+        vm.expectRevert(NoRewardToWithdraw.selector);
+
+        sa.withdraw();
+    }
+
+    function test_Withdraw_Works() public {
+        address validator = vm.addr(100);
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.deal(GATEWAY_ADDRESS, 1 ether + 1);
+        vm.prank(GATEWAY_ADDRESS);
+        sa.reward(1 ether);
+
+        uint256 balanceBefore = validator.balance;
+        vm.prank(validator);
+        sa.withdraw();
+
+        require(validator.balance == balanceBefore + 1 ether);
+        require(sa.accumulatedRewards(validator) == 0);
     }
 
     function _assertJoin(address validator, uint256 amount) internal {
@@ -704,7 +858,7 @@ contract SubnetActorTest is Test {
         vm.prank(validator);
         sa.submitCheckpoint(checkpoint);
 
-        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator) == true);
+        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator) == true, "validator not voted");
     }
 
     function _assertDeploySubnetActor(

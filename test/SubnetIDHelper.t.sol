@@ -441,6 +441,17 @@ contract SubnetIDHelperTest is Test {
         require(SubnetID({route: route}).equals(SubnetID({route: route2})) == false);
     }
 
+    function test_IsEmpty_Works_Empty() public view {
+        require(EMPTY_SUBNET_ID.isEmpty());
+    }
+
+    function test_IsEmpty_Works_NonEmpty() public view {
+        address[] memory route = new address[](1);
+        route[0] = ROOT_ADDRESS;
+
+        require(SubnetID(route).isEmpty() == false);
+    }
+
     function isBottomUp(SubnetID memory from, SubnetID memory to) public pure returns (bool) {
         SubnetID memory parent = from.commonParent(to);
         if (parent.route.length == 0) return false;
