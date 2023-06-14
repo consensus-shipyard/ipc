@@ -20,3 +20,8 @@ npx hardhat deploy-gateway
 ```bash
 npx hardhat deploy-subnet
 ```
+
+## To deploy only the Registry:
+```bash
+npx hardhat run scripts/deploy-registry.ts
+```

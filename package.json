@@ -35,6 +35,7 @@
     "hardhat-deploy-ethers": "^0.3.0-beta.13"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.7.3"
+    "@openzeppelin/contracts": "^4.7.3",
+    "hardhat": "^2.15.0"
   }
 }
