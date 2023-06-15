@@ -157,7 +157,7 @@ contract SubnetIDHelperTest is Test {
 
         require(subnetId1.down(subnetId2).toHash() == EMPTY_SUBNET_ID_HASH);
     }
-    
+
     function test_Down_Works_CommonRootParent() public view {
         address[] memory subnetRoute1 = new address[](2);
         subnetRoute1[0] = address(101);
@@ -211,7 +211,7 @@ contract SubnetIDHelperTest is Test {
         address[] memory route = new address[](2);
         route[0] = SUBNET_ONE_ADDRESS;
         route[1] = SUBNET_TWO_ADDRESS;
-        
+
         require(
             SubnetID(ROOTNET_CHAINID, route).toString().equal(
                 "/r123/0xb0c7ebf9ce6bfce01fba323a8b98054326032522/0x374b3bb66c3a33e054e804d5ea825a8c2514816a"

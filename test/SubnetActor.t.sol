@@ -914,10 +914,7 @@ contract SubnetActorTest is Test {
 
         crossMsgs[0] = CrossMsg({
             message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: subnetActorId,
-                    rawAddress: address(this)
-                }),
+                from: IPCAddress({subnetId: subnetActorId, rawAddress: address(this)}),
                 to: IPCAddress({subnetId: subnetActorId, rawAddress: address(this)}),
                 value: 0,
                 nonce: 0,

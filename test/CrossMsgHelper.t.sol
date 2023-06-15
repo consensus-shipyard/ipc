@@ -98,7 +98,6 @@ contract CrossMsgHelperTest is Test {
 
         CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(parentSubnetId, sender, fundAmount);
 
-
         SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
         require(fundMsg.message.from.subnetId.toHash() == rootSubnetId.toHash());

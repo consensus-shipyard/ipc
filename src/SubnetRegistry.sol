@@ -8,7 +8,7 @@ import "./lib/SubnetIDHelper.sol";
 contract SubnetRegistry {
     using SubnetIDHelper for SubnetID;
 
-    /// @notice Mapping that tracks the deployed subnet actors. 
+    /// @notice Mapping that tracks the deployed subnet actors.
     /// Key is the hash of Subnet ID, values are addresses.
     mapping(bytes32 => address) public subnets;
 
@@ -23,8 +23,8 @@ contract SubnetRegistry {
         gateway = _gateway;
     }
 
-    function newSubnetActor(SubnetActor.ConstructParams calldata _params) external returns(address subnetAddr) {
-        if (_params.ipcGatewayAddr != gateway) { revert NotSameGateway(); }
+    function newSubnetActor(SubnetActor.ConstructParams calldata _params) external returns (address subnetAddr) {
+        if (_params.ipcGatewayAddr != gateway) revert NotSameGateway();
 
         subnetAddr = address(new SubnetActor(_params));
 
@@ -36,7 +36,7 @@ contract SubnetRegistry {
         emit SubnetDeployed(subnetAddr, id);
     }
 
-    function subnetAddress(SubnetID calldata _subnetId) external view returns(address subnet) {
+    function subnetAddress(SubnetID calldata _subnetId) external view returns (address subnet) {
         bytes32 subnetHash = _subnetId.toHash();
         subnet = subnets[subnetHash];
 
