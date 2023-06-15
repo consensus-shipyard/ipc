@@ -17,6 +17,7 @@ export async function deploy(libs: { [key in string]: string }) {
 
     const gatewayConstructorParams = {
         networkName: {
+            root: 314159,
             route: [ethers.constants.AddressZero]
         },
         bottomUpCheckPeriod: 10,
