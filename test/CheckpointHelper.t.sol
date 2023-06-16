@@ -24,7 +24,8 @@ contract CheckpointHelperTest is Test {
                 crossMsgs: new CrossMsg[](0),
                 fee: 0,
                 prevHash: EMPTY_HASH,
-                children: new ChildCheck[](0)
+                children: new ChildCheck[](0),
+                proof: new bytes(0)
             }).toHash() == checkpoint.toHash()
         );
     }

@@ -12,6 +12,7 @@ struct BottomUpCheckpoint {
     CrossMsg[] crossMsgs;
     ChildCheck[] children;
     bytes32 prevHash;
+    bytes proof;
 }
 
 struct TopDownCheckpoint {

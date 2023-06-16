@@ -657,7 +657,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             fee: 0,
             crossMsgs: new CrossMsg[](0),
             prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
 
         vm.expectRevert(InvalidCheckpointSource.selector);
@@ -707,7 +708,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             fee: 0,
             crossMsgs: new CrossMsg[](0),
             prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
 
         vm.expectRevert(SubnetNotActive.selector);
@@ -727,7 +729,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             fee: 0,
             crossMsgs: new CrossMsg[](0),
             prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
         gw.commitChildCheck(checkpoint);
 
@@ -739,7 +742,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             fee: 0,
             crossMsgs: new CrossMsg[](0),
             prevHash: checkpoint.toHash(),
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
 
         vm.expectRevert(InconsistentPrevCheckpoint.selector);
@@ -759,7 +763,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             fee: MIN_COLLATERAL_AMOUNT * 2,
             crossMsgs: new CrossMsg[](0),
             prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
 
         vm.expectRevert(NotEnoughSubnetCircSupply.selector);
@@ -2100,14 +2105,14 @@ contract GatewayDeploymentTest is StdInvariant, Test {
     }
 
     function release(uint256 releaseAmount, uint256 crossMsgFee, uint64 epoch) internal {
-        (,, uint256 feeBefore,) = gw.bottomUpCheckpoints(epoch);
+        (,, uint256 feeBefore,,) = gw.bottomUpCheckpoints(epoch);
 
         uint256 expectedNonce = gw.bottomUpNonce() + 1;
         uint256 expectedCheckpointDataFee = feeBefore + crossMsgFee;
 
         gw.release{value: releaseAmount}();
 
-        (,, uint256 fee,) = gw.bottomUpCheckpoints(epoch);
+        (,, uint256 fee,,) = gw.bottomUpCheckpoints(epoch);
         console.log("fee %d", fee);
         console.log("expectedCheckpointDataFee: %d", expectedCheckpointDataFee);
 
@@ -2127,7 +2132,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
             fee: 0,
             crossMsgs: new CrossMsg[](0),
             prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
 
         return checkpoint;

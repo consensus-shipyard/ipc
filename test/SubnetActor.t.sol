@@ -362,7 +362,7 @@ contract SubnetActorTest is Test {
 
         _assertVote(validator3, checkpoint);
 
-        (SubnetID memory source, uint64 epoch, uint256 fee, bytes32 prevHash) =
+        (SubnetID memory source, uint64 epoch, uint256 fee, bytes32 prevHash, bytes memory proof) =
             sa.committedCheckpoints(checkpoint.epoch);
 
         require(sa.prevExecutedCheckpointHash() == checkpoint.toHash());
@@ -371,6 +371,7 @@ contract SubnetActorTest is Test {
         require(epoch == checkpoint.epoch);
         require(fee == checkpoint.fee);
         require(prevHash == checkpoint.prevHash);
+        require(proof.length == 0);
     }
 
     function test_SubnetCheckpoint_Works_ExecutedFromQueue() public {
@@ -424,7 +425,7 @@ contract SubnetActorTest is Test {
         // vote for checkpoint 4 and trigger execution of checkpoint 3 from the queue
         _assertVote(validator, checkpoint4);
 
-        (SubnetID memory source, uint64 epoch, uint256 fee, bytes32 prevHash) =
+        (SubnetID memory source, uint64 epoch, uint256 fee, bytes32 prevHash, bytes memory proof) =
             sa.committedCheckpoints(checkpoint3.epoch);
 
         require(sa.lastVotingExecutedEpoch() == checkpoint3.epoch);
@@ -433,6 +434,7 @@ contract SubnetActorTest is Test {
         require(epoch == checkpoint3.epoch);
         require(fee == checkpoint3.fee);
         require(prevHash == checkpoint3.prevHash);
+        require(proof.length == 0);
     }
 
     function test_SubmitCheckpoint_Works_RoundAbort() public {
@@ -503,7 +505,8 @@ contract SubnetActorTest is Test {
             fee: 0,
             crossMsgs: crossMsgs,
             prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
 
         vm.expectRevert(MessagesNotSorted.selector);
@@ -930,7 +933,8 @@ contract SubnetActorTest is Test {
             fee: 0,
             crossMsgs: crossMsgs,
             prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0)
+            children: new ChildCheck[](0),
+            proof: new bytes(0)
         });
     }
 

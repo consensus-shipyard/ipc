@@ -21,7 +21,8 @@ library CheckpointHelper {
                 fee: 0,
                 crossMsgs: new CrossMsg[](0),
                 children: new ChildCheck[](0),
-                prevHash: EMPTY_HASH
+                prevHash: EMPTY_HASH,
+                proof: new bytes(0)
             })
         )
     );

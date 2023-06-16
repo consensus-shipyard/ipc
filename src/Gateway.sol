@@ -503,6 +503,15 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         }
     }
 
+    /// @notice wheather a validator has voted for a checkpoint submission during an epoch
+    /// @param epoch - the epoch to check
+    /// @param submitter - the validator to check
+    function hasValidatorVotedForSubmission(uint64 epoch, address submitter) external view returns (bool) {
+        EpochVoteTopDownSubmission storage voteSubmission = epochVoteSubmissions[epoch];
+
+        return voteSubmission.vote.submitters[voteSubmission.vote.nonce][submitter];
+    }
+
     /// @notice marks a checkpoint as executed based on the last vote that reached majority
     /// @notice voteSubmission - the vote submission data
     /// @return the cross messages that should be executed
