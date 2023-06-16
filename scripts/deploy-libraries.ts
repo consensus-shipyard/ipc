@@ -14,13 +14,13 @@ export async function deploy() {
     const txArgs = await getTransactionFees();
 
     const { address: accountHelperAddress } = await deployContractWithDeployer(deployer, "AccountHelper", {}, txArgs);
-    const { address: checkpointHelperAddress } = await deployContractWithDeployer(deployer, "CheckpointHelper", {}, txArgs);
     const { address: epochVoteSubmissionHelperAddress } = await deployContractWithDeployer(deployer, "EpochVoteSubmissionHelper", {}, txArgs);
     const { address: executableQueueHelperAddress } = await deployContractWithDeployer(deployer, "ExecutableQueueHelper", {}, txArgs);
     const { address: subnetIDHelperAddress } = await deployContractWithDeployer(deployer, "SubnetIDHelper", {}, txArgs);
     // nested libs
     const { address: crossMsgHelperAddress } = await deployContractWithDeployer(deployer, "CrossMsgHelper", { "SubnetIDHelper": subnetIDHelperAddress }, txArgs);
     const { address: storableMsgHelperAddress } = await deployContractWithDeployer(deployer, "StorableMsgHelper", { "SubnetIDHelper": subnetIDHelperAddress }, txArgs);
+    const { address: checkpointHelperAddress } = await deployContractWithDeployer(deployer, "CheckpointHelper", { "SubnetIDHelper": subnetIDHelperAddress }, txArgs);
 
     return {
         "AccountHelper": accountHelperAddress,

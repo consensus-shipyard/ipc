@@ -18,7 +18,7 @@ export async function deploy(libs: { [key in string]: string }) {
     const gatewayConstructorParams = {
         networkName: {
             root: 314159,
-            route: [ethers.constants.AddressZero]
+            route: []
         },
         bottomUpCheckPeriod: 10,
         topDownCheckPeriod: 10,
@@ -26,7 +26,7 @@ export async function deploy(libs: { [key in string]: string }) {
         majorityPercentage: 66
     }
 
-    const { address: gatewayAddress } = await deployContractWithDeployer(deployer, "Gateway", libs, gatewayConstructorParams, txArgs);
+    const { address: gatewayAddress } = await deployContractWithDeployer(deployer, "Gateway", LIBMAP, gatewayConstructorParams, txArgs);
 
     return {
         "Gateway": gatewayAddress

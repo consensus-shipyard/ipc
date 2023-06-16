@@ -95,6 +95,11 @@ const config: HardhatUserConfig = {
       chainId: 314159,
       url: process.env.RPC_URL!,
       accounts: [process.env.PRIVATE_KEY!],
+    },
+    localnet: {
+      chainId: 31415926,
+      url: process.env.RPC_URL!,
+      accounts: [process.env.PRIVATE_KEY!],
     }
   },
   solidity: {

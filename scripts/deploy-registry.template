@@ -1,0 +1,31 @@
+import hre, { ethers } from 'hardhat';
+import { getTransactionFees } from './util';
+
+async function main() {
+  try {
+
+    await hre.run('compile');
+
+    const [deployer] = await ethers.getSigners();
+    const balance = await deployer.getBalance();
+
+    console.log(`Deploying contracts with account: ${deployer.address} and balance: ${balance.toString()}`);
+
+    const gatewayAddress = GATEWAY.Gateway;
+    const txArgs = await getTransactionFees();
+
+    // deploy
+    const registry = await ethers.getContractFactory('SubnetRegistry', { signer: deployer, libraries: LIBMAP });
+    const contract = await registry.deploy(gatewayAddress, txArgs);
+
+    // FEVM: 
+    console.log(`registry contract deployed to: ${contract.address}`);
+
+    process.exit(0);
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+main();
