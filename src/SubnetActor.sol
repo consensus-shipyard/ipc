@@ -303,8 +303,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         return validators.at(index);
     }
 
-    /// @notice get all the validators in the subnet. TODO: we can introduce pagination
-    function allValidators() external view returns (address[] memory) {
+    /// @notice get all the validators in the subnet.
+    /// TODO: we can introduce pagination
+    function getValidators() external view returns (address[] memory) {
         uint256 length = validators.length();
         address[] memory result = new address[](length);
 

@@ -180,7 +180,7 @@ abstract contract Voting {
 
     /// @notice method that gives the epoch for a given block number and checkpoint period
     /// @return epoch - the epoch for the given block number and checkpoint period
-    function _getEpoch(uint256 blockNumber, uint64 checkPeriod) internal pure returns (uint64) {
+    function _getNextEpoch(uint256 blockNumber, uint64 checkPeriod) internal pure returns (uint64) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 }

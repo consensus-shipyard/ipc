@@ -512,6 +512,19 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         return voteSubmission.vote.submitters[voteSubmission.vote.nonce][submitter];
     }
 
+    /// @notice returns the current bottom-up checkpoint
+    /// @param epoch - the epoch to check
+    /// @return exists - whether the checkpoint exists
+    /// @return checkpoint - the checkpoint struct
+    function bottomUpCheckpointAtEpoch(uint64 epoch)
+        external
+        view
+        returns (bool exists, BottomUpCheckpoint memory checkpoint)
+    {
+        checkpoint = bottomUpCheckpoints[epoch];
+        exists = checkpoint.source.isEmpty() == false;
+    }
+
     /// @notice marks a checkpoint as executed based on the last vote that reached majority
     /// @notice voteSubmission - the vote submission data
     /// @return the cross messages that should be executed
@@ -615,6 +628,14 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         subnet.topDownMsgs.push(crossMessage);
     }
 
+    function getTopDownMsgs(SubnetID calldata subnetId) external view returns(CrossMsg[] memory) {
+        (bool registered, Subnet storage subnet) = _getSubnet(subnetId);
+
+        if (registered == false) revert NotRegisteredSubnet();
+
+        return subnet.topDownMsgs;
+    }
+
     /// @notice commit bottomup messages for their execution in the subnet. Adds the message to the checkpoint for future execution
     /// @param crossMessage - the cross message to be committed
     function _commitBottomUpMsg(CrossMsg memory crossMessage) internal {
@@ -703,7 +724,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         view
         returns (bool exists, uint64 epoch, BottomUpCheckpoint storage checkpoint)
     {
-        epoch = _getEpoch(block.number, bottomUpCheckPeriod);
+        epoch = _getNextEpoch(block.number, bottomUpCheckPeriod);
         checkpoint = bottomUpCheckpoints[epoch];
         exists = checkpoint.source.isEmpty() == false;
     }
