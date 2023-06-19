@@ -1,6 +1,6 @@
 # IPC Agent
 
-> The InterPlanetary Consensus (IPC) orchestrator.
+**‼️ The IPC Agent, the IPC actors, and eudico haven't been audited, tested in depth, or otherwise verified. Moreover, the system is missing critical recovery functionality in case of crashes. There are multiple ways in which you may lose funds moved into an IPC subnet, and we strongly advise against deploying IPC on mainnet and/or using it with tokens with real value.**
 
 ```console
 $ ./bin/ipc-agent --help
@@ -35,6 +35,19 @@ See:
 - [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions
 
 For a detailed overview of the entire IPC stack design, please check the up-to-date **[IPC Design Reference](https://github.com/consensus-shipyard/IPC-design-reference-spec/blob/main/main.pdf)** doc.
+
+## Branching Strategy
+
+### Production branch
+
+The production branch is `main`.
+The `main` branch is always compatible with the "stable" release of eudico that's running on Spacenet.
+Updates to `main` **always** come from the `dev` branch.
+
+### Development branch
+
+The primary development branch is `dev`.
+`dev` contains the most up-to-date software but may not be compatible with the version of eudico running on spacenet. Only use `dev` if doing a full local deployment, but note that the packaged deployment scripts default to checking out eudico `spacenet`. 
 
 ## Building
 
