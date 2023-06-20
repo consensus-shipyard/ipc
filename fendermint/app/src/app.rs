@@ -45,6 +45,7 @@ pub enum AppStoreKey {
 }
 
 // TODO: What range should we use for our own error codes? Should we shift FVM errors?
+#[derive(Debug)]
 #[repr(u32)]
 pub enum AppError {
     /// Failed to deserialize the transaction.

@@ -57,7 +57,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         getUncleByBlockHashAndIndex,
         getUncleByBlockNumberAndIndex,
         getUncleCountByBlockHash,
-        getUncleCountByBlockNumber
+        getUncleCountByBlockNumber,
         // eth_getWork
         // eth_hashrate
         // eth_mining
@@ -65,7 +65,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_newFilter
         // eth_newPendingTransactionFilter
         // eth_protocolVersion
-        // eth_sendRawTransaction
+        sendRawTransaction
         // eth_sendTransaction
         // eth_sign
         // eth_signTransaction

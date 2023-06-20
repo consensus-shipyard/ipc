@@ -4,6 +4,7 @@
 
 use cid::Cid;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
+use fvm_shared::address::Protocol;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::crypto::signature::{Signature, SignatureType};
 use fvm_shared::message::Message;
@@ -37,18 +38,6 @@ impl SignedMessage {
     /// The signature will not be verified.
     pub fn new_unchecked(message: Message, signature: Signature) -> SignedMessage {
         SignedMessage { message, signature }
-    }
-
-    /// Generate a new signed message from fields.
-    ///
-    /// The signature will be verified.
-    pub fn new_checked(
-        message: Message,
-        signature: Signature,
-        chain_id: &ChainID,
-    ) -> Result<SignedMessage, SignedMessageError> {
-        Self::verify_signature(&message, &signature, chain_id)?;
-        Ok(SignedMessage { message, signature })
     }
 
     /// Create a signed message.
@@ -90,6 +79,10 @@ impl SignedMessage {
         signature: &Signature,
         chain_id: &ChainID,
     ) -> Result<(), SignedMessageError> {
+        if message.from.protocol() == Protocol::Delegated {
+            // TODO: https://github.com/consensus-shipyard/fendermint/issues/114
+            return Ok(());
+        }
         let data = Self::bytes_to_sign(message, chain_id)?;
 
         signature

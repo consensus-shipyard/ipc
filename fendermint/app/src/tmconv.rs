@@ -23,6 +23,7 @@ macro_rules! ipld_encode {
 /// Response to delivery where the input was blatantly invalid.
 /// This indicates that the validator who made the block was Byzantine.
 pub fn invalid_deliver_tx(err: AppError, description: String) -> response::DeliverTx {
+    tracing::info!(error = ?err, description, "invalid deliver_tx");
     response::DeliverTx {
         code: Code::Err(NonZeroU32::try_from(err as u32).expect("error codes are non-zero")),
         info: description,
@@ -33,6 +34,7 @@ pub fn invalid_deliver_tx(err: AppError, description: String) -> response::Deliv
 /// Response to checks where the input was blatantly invalid.
 /// This indicates that the user who sent the transaction is either attacking or has a faulty client.
 pub fn invalid_check_tx(err: AppError, description: String) -> response::CheckTx {
+    tracing::info!(error = ?err, description, "invalid check_tx");
     response::CheckTx {
         code: Code::Err(NonZeroU32::try_from(err as u32).expect("error codes are non-zero")),
         info: description,
@@ -42,6 +44,7 @@ pub fn invalid_check_tx(err: AppError, description: String) -> response::CheckTx
 
 /// Response to queries where the input was blatantly invalid.
 pub fn invalid_query(err: AppError, description: String) -> response::Query {
+    tracing::info!(error = ?err, description, "invalid query");
     response::Query {
         code: Code::Err(NonZeroU32::try_from(err as u32).expect("error codes are non-zero")),
         info: description,

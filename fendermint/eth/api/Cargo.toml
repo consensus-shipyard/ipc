@@ -11,7 +11,7 @@ anyhow = { workspace = true }
 axum = { workspace = true }
 ethers-core = { workspace = true }
 hex = { workspace = true }
-jsonrpc-v2 = { workspace = true, features = ["easy-errors"] }
+jsonrpc-v2 = { workspace = true }
 lazy_static = { workspace = true }
 libsecp256k1 = { workspace = true }
 paste = { workspace = true }
@@ -29,14 +29,18 @@ fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
 fendermint_vm_message = { path = "../../vm/message" }
 
 [dev-dependencies]
+async-trait = { workspace = true }
 clap = { workspace = true }
 ethers = { workspace = true, features = ["abigen"] }
 hex = { workspace = true }
 lazy_static = { workspace = true }
+rand = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
+thiserror = { workspace = true }
 
 fendermint_testing = { path = "../../testing", features = ["arb"] }
+fendermint_vm_message = { path = "../../vm/message", features = ["arb"] }

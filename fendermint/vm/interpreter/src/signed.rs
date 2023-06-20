@@ -47,7 +47,10 @@ where
         state: Self::State,
         msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
+        // Doing these first, so the compiler doesn't need `Send` bound, which it would if the
+        // async call to `inner.deliver` would be inside a match holding a reference to `state`.
         let chain_id = state.chain_id();
+
         match msg.verify(chain_id) {
             Err(SignedMessageError::Ipld(e)) => Err(anyhow!(e)),
             Err(SignedMessageError::InvalidSignature(s)) => {

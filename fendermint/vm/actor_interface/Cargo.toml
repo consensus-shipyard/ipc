@@ -26,3 +26,10 @@ fvm_ipld_blockstore = { workspace = true }
 # frc42_dispatch = { workspace = true }
 
 fendermint_vm_genesis = { path = "../genesis" }
+
+[dev-dependencies]
+ethers-core = { workspace = true }
+libsecp256k1 = { workspace = true }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
+rand = { workspace = true }

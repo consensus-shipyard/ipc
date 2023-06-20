@@ -5,21 +5,19 @@
 
 use std::str::FromStr;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
+use cid::multihash::MultihashDigest;
 use ethers_core::types::{self as et};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::eam::EAM_ACTOR_ID;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_shared::chainid::ChainID;
-use fvm_shared::crypto::signature::SignatureType;
-use fvm_shared::crypto::signature::SECP_SIG_LEN;
-use fvm_shared::message::Message;
-use fvm_shared::{address::Payload, bigint::BigInt, econ::TokenAmount};
+use fvm_shared::{bigint::BigInt, econ::TokenAmount};
 use lazy_static::lazy_static;
-use libsecp256k1::RecoveryId;
 use tendermint::abci::response::DeliverTx;
 use tendermint::abci::EventAttribute;
 use tendermint_rpc::endpoint;
+
+use super::from_fvm::{to_eth_from_address, to_eth_signature, to_eth_to_address, to_eth_tokens};
 
 // Values taken from https://github.com/filecoin-project/lotus/blob/6e7dc9532abdb3171427347710df4c860f1957a2/chain/types/ethtypes/eth_types.go#L199
 
@@ -47,7 +45,7 @@ lazy_static! {
 }
 
 /// Convert a Tendermint block to Ethereum with only the block hashes in the body.
-pub fn to_rpc_block(
+pub fn to_eth_block(
     block: tendermint::Block,
     block_results: tendermint_rpc::endpoint::block_results::Response,
     base_fee: TokenAmount,
@@ -90,14 +88,19 @@ pub fn to_rpc_block(
     // assume that all we have is signed transactions.
     for (idx, data) in block.data().iter().enumerate() {
         size += et::U256::from(data.len());
+
         if let Some(result) = transaction_results.get(idx) {
             gas_used += et::U256::from(result.gas_used);
             gas_limit += et::U256::from(result.gas_wanted);
         }
-        let msg = fvm_ipld_encoding::from_slice::<ChainMessage>(data)?;
+
+        let msg = to_chain_message(data)?;
+
         if let ChainMessage::Signed(msg) = msg {
-            let hash = tendermint::Hash::from_bytes(tendermint::hash::Algorithm::Sha256, data)?;
-            let mut tx = to_rpc_transaction(hash, *msg, chain_id)?;
+            let hash = message_hash(data)?;
+
+            let mut tx = to_eth_transaction(hash, *msg, chain_id)
+                .context("failed to convert to eth transaction")?;
             tx.transaction_index = Some(et::U64::from(idx));
             transactions.push(tx);
         }
@@ -111,7 +114,7 @@ pub fn to_rpc_block(
         author: Some(author),
         state_root: app_hash_to_root(&block.header().app_hash)?,
         transactions_root,
-        base_fee_per_gas: Some(tokens_to_u256(&base_fee)?),
+        base_fee_per_gas: Some(to_eth_tokens(&base_fee)?),
         difficulty: et::U256::zero(),
         total_difficulty: None,
         nonce: None,
@@ -134,26 +137,14 @@ pub fn to_rpc_block(
     Ok(block)
 }
 
-pub fn to_rpc_transaction(
+pub fn to_eth_transaction(
     hash: tendermint::Hash,
     msg: SignedMessage,
     chain_id: ChainID,
 ) -> anyhow::Result<et::Transaction> {
     // Based on https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2048
-    let sig = msg.signature;
-    let (v, sig) = match sig.sig_type {
-        SignatureType::Secp256k1 => parse_secp256k1(&sig.bytes)?,
-        other => return Err(anyhow!("unexpected signature type: {other:?}")),
-    };
-
-    // The following hash is what we use during signing, however, it would be useless
-    // when trying to look up the transaction in the Tendermint API.
-    // Judging by the parameters of the `tendermint_rpc::Client::tx` method Tendermint
-    // probably uses a SHA256 hash of the data to index transactions.
-    // let cid = SignedMessage::cid(&msg)?;
-    // let hash = et::H256::from_slice(cid.hash().digest());
+    let sig = to_eth_signature(msg.signature()).context("failed to convert to eth signature")?;
     let hash = et::H256::from_slice(hash.as_bytes());
-
     let msg = msg.message;
 
     let tx = et::Transaction {
@@ -162,18 +153,18 @@ pub fn to_rpc_transaction(
         block_hash: None,
         block_number: None,
         transaction_index: None,
-        from: eth_from_address(&msg)?,
-        to: eth_to_address(&msg),
-        value: tokens_to_u256(&msg.value)?,
+        from: to_eth_from_address(&msg)?,
+        to: to_eth_to_address(&msg),
+        value: to_eth_tokens(&msg.value)?,
         gas: et::U256::from(msg.gas_limit),
-        max_fee_per_gas: Some(tokens_to_u256(&msg.gas_fee_cap)?),
-        max_priority_fee_per_gas: Some(tokens_to_u256(&msg.gas_premium)?),
+        max_fee_per_gas: Some(to_eth_tokens(&msg.gas_fee_cap)?),
+        max_priority_fee_per_gas: Some(to_eth_tokens(&msg.gas_premium)?),
         gas_price: None,
         input: et::Bytes::from(msg.params.bytes().to_vec()),
         chain_id: Some(et::U256::from(u64::from(chain_id))),
-        v: et::U64::from(v.serialize()),
-        r: et::U256::from_big_endian(sig.r.b32().as_ref()),
-        s: et::U256::from_big_endian(sig.s.b32().as_ref()),
+        v: et::U64::from(sig.v),
+        r: sig.r,
+        s: sig.s,
         transaction_type: None,
         access_list: None,
         other: Default::default(),
@@ -184,7 +175,7 @@ pub fn to_rpc_transaction(
 
 // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2174
 // https://github.com/evmos/ethermint/blob/07cf2bd2b1ce9bdb2e44ec42a39e7239292a14af/rpc/backend/tx_info.go#L147
-pub fn to_rpc_receipt(
+pub fn to_eth_receipt(
     msg: SignedMessage,
     result: endpoint::tx::Response,
     block_results: endpoint::block_results::Response,
@@ -267,8 +258,8 @@ pub fn to_rpc_receipt(
         transaction_index,
         block_hash: Some(block_hash),
         block_number: Some(block_number),
-        from: eth_from_address(&msg)?,
-        to: eth_to_address(&msg),
+        from: to_eth_from_address(&msg)?,
+        to: to_eth_to_address(&msg),
         cumulative_gas_used,
         gas_used: Some(et::U256::from(result.tx_result.gas_used)),
         contract_address,
@@ -281,7 +272,7 @@ pub fn to_rpc_receipt(
         root: Some(app_hash_to_root(&header.app_hash)?),
         logs_bloom: et::Bloom::from_slice(&*EMPTY_ETH_BLOOM),
         transaction_type: Some(et::U64::from(2)), // Value used by Lotus.
-        effective_gas_price: Some(tokens_to_u256(&effective_gas_price)?),
+        effective_gas_price: Some(to_eth_tokens(&effective_gas_price)?),
         other: Default::default(),
     };
     Ok(receipt)
@@ -354,62 +345,11 @@ where
     Ok(block)
 }
 
-pub fn tokens_to_u256(amount: &TokenAmount) -> anyhow::Result<et::U256> {
-    if amount.atto() > &MAX_U256 {
-        Err(anyhow!("TokenAmount > U256.MAX"))
-    } else {
-        let (_sign, bz) = amount.atto().to_bytes_be();
-        Ok(et::U256::from_big_endian(&bz))
-    }
-}
-
-fn parse_secp256k1(
-    sig: &[u8],
-) -> anyhow::Result<(libsecp256k1::RecoveryId, libsecp256k1::Signature)> {
-    if sig.len() != SECP_SIG_LEN {
-        return Err(anyhow!("unexpected Secp256k1 length: {}", sig.len()));
-    }
-
-    // generate types to recover key from
-    let rec_id = RecoveryId::parse(sig[64])?;
-
-    // Signature value without recovery byte
-    let mut s = [0u8; 64];
-    s.clone_from_slice(&sig[..64]);
-
-    // generate Signature
-    let sig = libsecp256k1::Signature::parse_standard(&s)?;
-
-    Ok((rec_id, sig))
-}
-
 fn app_hash_to_root(app_hash: &tendermint::AppHash) -> anyhow::Result<et::H256> {
     // Out app hash is a CID. We only need the hash part.
     let state_root = cid::Cid::try_from(app_hash.as_bytes())?;
     let state_root = et::H256::from_slice(state_root.hash().digest());
     Ok(state_root)
-}
-
-fn eth_from_address(msg: &Message) -> anyhow::Result<et::H160> {
-    match msg.from.payload() {
-        Payload::Secp256k1(h) => Ok(et::H160::from_slice(h)),
-        Payload::Delegated(d) if d.namespace() == EAM_ACTOR_ID && d.subaddress().len() == 20 => {
-            Ok(et::H160::from_slice(d.subaddress()))
-        }
-        other => Err(anyhow!("unexpected `from` address payload: {other:?}")),
-    }
-}
-
-fn eth_to_address(msg: &Message) -> Option<et::H160> {
-    match msg.to.payload() {
-        Payload::Secp256k1(h) => Some(et::H160::from_slice(h)),
-        Payload::Delegated(d) if d.namespace() == EAM_ACTOR_ID && d.subaddress().len() == 20 => {
-            Some(et::H160::from_slice(d.subaddress()))
-        }
-        Payload::Actor(h) => Some(et::H160::from_slice(h)),
-        Payload::ID(id) => Some(et::H160::from_slice(&EthAddress::from_id(*id).0)),
-        _ => None, // BLS or an invalid delegated address. Just move on.
-    }
 }
 
 fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {
@@ -446,37 +386,14 @@ fn to_topics_and_data(attrs: &Vec<EventAttribute>) -> anyhow::Result<(Vec<et::H2
     Ok((topics, data.unwrap_or_default()))
 }
 
-#[cfg(test)]
-mod tests {
+/// Decode the transaction payload as a [ChainMessage].
+pub fn to_chain_message(tx: &[u8]) -> anyhow::Result<ChainMessage> {
+    fvm_ipld_encoding::from_slice::<ChainMessage>(tx).context("failed to decode tx as ChainMessage")
+}
 
-    use std::str::FromStr;
-
-    use fendermint_testing::arb::ArbTokenAmount;
-    use fvm_shared::{bigint::BigInt, econ::TokenAmount};
-    use quickcheck_macros::quickcheck;
-
-    use super::tokens_to_u256;
-
-    #[quickcheck]
-    fn prop_token_amount_to_u256(tokens: ArbTokenAmount) -> bool {
-        let tokens = tokens.0;
-        if let Ok(u256_from_tokens) = tokens_to_u256(&tokens) {
-            let tokens_as_str = tokens.atto().to_str_radix(10);
-            let u256_from_str = ethers_core::types::U256::from_dec_str(&tokens_as_str).unwrap();
-            return u256_from_str == u256_from_tokens;
-        }
-        true
-    }
-
-    #[test]
-    fn test_token_amount_to_u256() {
-        let atto = BigInt::from_str(
-            "99191064924191451313862974502415542781658129482631472725645205117646186753315",
-        )
-        .unwrap();
-
-        let tokens = TokenAmount::from_atto(atto);
-
-        tokens_to_u256(&tokens).unwrap();
-    }
+/// Hash the transaction payload for Tendermint.
+pub fn message_hash(tx: &[u8]) -> anyhow::Result<tendermint::Hash> {
+    let hash = cid::multihash::Code::Sha3_256.digest(tx);
+    tendermint::Hash::from_bytes(tendermint::hash::Algorithm::Sha256, hash.digest())
+        .context("failed to convert to tendermint hash")
 }

@@ -2216,6 +2216,7 @@ name = "fendermint_eth_api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "cid",
  "clap 4.2.7",
@@ -2234,9 +2235,11 @@ dependencies = [
  "paste",
  "quickcheck 1.0.3",
  "quickcheck_macros",
+ "rand 0.8.5",
  "serde_json",
  "tendermint",
  "tendermint-rpc",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2323,12 +2326,17 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "ethers-core",
  "fendermint_vm_genesis",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
+ "libsecp256k1",
  "paste",
+ "quickcheck 1.0.3",
+ "quickcheck_macros",
+ "rand 0.8.5",
  "serde",
  "serde_tuple",
 ]
@@ -2403,6 +2411,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
