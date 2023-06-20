@@ -413,7 +413,7 @@ pub async fn get_uncle_by_block_number_and_index<C>(
 }
 
 fn h160_to_fvm_addr(addr: et::H160) -> fvm_shared::address::Address {
-    Address::from(&EthAddress(addr.0))
+    Address::from(EthAddress(addr.0))
 }
 
 /// Fetch transaction results to produce the full block.

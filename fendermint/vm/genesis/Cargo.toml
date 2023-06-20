@@ -17,6 +17,7 @@ arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
+cid = { workspace = true, optional = true }
 fvm_shared = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 fendermint_vm_core = { path = "../core" }
@@ -35,4 +36,4 @@ fvm_ipld_encoding = { workspace = true }
 
 [features]
 default = []
-arb = ["arbitrary", "quickcheck", "fvm_shared/arb", "fendermint_testing/arb", "rand"]
+arb = ["arbitrary", "quickcheck", "fvm_shared/arb", "fendermint_testing/arb", "rand", "cid"]

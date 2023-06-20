@@ -3,10 +3,16 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand};
+use clap::{Args, Subcommand, ValueEnum};
 
 use super::parse::{parse_network_version, parse_token_amount};
 use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum AccountKind {
+    Regular,
+    Ethereum,
+}
 
 #[derive(Subcommand, Debug)]
 pub enum GenesisCommands {
@@ -56,6 +62,9 @@ pub struct GenesisAddAccountArgs {
     /// Initial balance in atto.
     #[arg(long, short, value_parser = parse_token_amount)]
     pub balance: TokenAmount,
+    /// Indicate whether the account is a regular or ethereum account.
+    #[arg(long, short, default_value = "regular")]
+    pub kind: AccountKind,
 }
 
 #[derive(Args, Debug)]

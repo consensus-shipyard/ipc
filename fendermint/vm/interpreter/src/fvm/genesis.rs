@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use async_trait::async_trait;
-use fendermint_vm_actor_interface::{cron, eam, init, system};
+use fendermint_vm_actor_interface::{cron, eam, init, system, EMPTY_ARR};
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Validator};
 use fvm_ipld_blockstore::Blockstore;
@@ -84,6 +84,7 @@ where
             system::SYSTEM_ACTOR_ID,
             &system_state,
             TokenAmount::zero(),
+            None,
         )?;
 
         // Init actor
@@ -95,6 +96,7 @@ where
             init::INIT_ACTOR_ID,
             &init_state,
             TokenAmount::zero(),
+            None,
         )?;
 
         // Cron actor
@@ -106,15 +108,16 @@ where
             cron::CRON_ACTOR_ID,
             &cron_state,
             TokenAmount::zero(),
+            None,
         )?;
 
         // Ethereum Account Manager (EAM) actor
-        let eam_state = [(); 0]; // Based on how it's done in `Tester`.
         state.create_actor(
             eam::EAM_ACTOR_CODE_ID,
             eam::EAM_ACTOR_ID,
-            &eam_state,
+            &EMPTY_ARR,
             TokenAmount::zero(),
+            None,
         )?;
 
         // Create accounts

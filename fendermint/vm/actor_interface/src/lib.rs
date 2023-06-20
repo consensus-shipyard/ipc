@@ -14,6 +14,9 @@
 //! The actor IDs can be found in [singletons](https://github.com/filecoin-project/builtin-actors/blob/master/runtime/src/builtin/singletons.rs),
 //! while the code IDs are in [builtins](https://github.com/filecoin-project/builtin-actors/blob/master/runtime/src/runtime/builtins.rs)
 
+/// Something we can use for empty state, similar to how the FVM uses `EMPTY_ARR_CID`.
+pub const EMPTY_ARR: [(); 0] = [(); 0]; // Based on how it's done in `Tester`.
+
 macro_rules! define_code {
     ($name:ident { code_id: $code_id:literal }) => {
         paste::paste! {
@@ -36,7 +39,9 @@ macro_rules! define_singleton {
 pub mod account;
 pub mod cron;
 pub mod eam;
+pub mod ethaccount;
 pub mod evm;
 pub mod init;
 pub mod multisig;
+pub mod placeholder;
 pub mod system;

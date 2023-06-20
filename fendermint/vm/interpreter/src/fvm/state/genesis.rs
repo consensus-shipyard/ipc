@@ -3,7 +3,14 @@
 
 use anyhow::{anyhow, Context};
 use cid::{multihash::Code, Cid};
-use fendermint_vm_actor_interface::{account, init, multisig};
+use fendermint_vm_actor_interface::{
+    account::{self, ACCOUNT_ACTOR_CODE_ID},
+    eam,
+    ethaccount::ETHACCOUNT_ACTOR_CODE_ID,
+    init,
+    multisig::{self, MULTISIG_ACTOR_CODE_ID},
+    EMPTY_ARR,
+};
 use fendermint_vm_genesis::{Account, Multisig};
 use fvm::{
     machine::Manifest,
@@ -12,7 +19,13 @@ use fvm::{
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::load_car_unchecked;
 use fvm_ipld_encoding::CborStore;
-use fvm_shared::{clock::ChainEpoch, econ::TokenAmount, state::StateTreeVersion, ActorID};
+use fvm_shared::{
+    address::{Address, Payload},
+    clock::ChainEpoch,
+    econ::TokenAmount,
+    state::StateTreeVersion,
+    ActorID,
+};
 use num_traits::Zero;
 use serde::Serialize;
 
@@ -83,6 +96,7 @@ where
         id: ActorID,
         state: &impl Serialize,
         balance: TokenAmount,
+        delegated_address: Option<Address>,
     ) -> anyhow::Result<()> {
         // Retrieve the CID of the actor code by the numeric ID.
         let code_cid = *self
@@ -97,7 +111,7 @@ where
             state: state_cid,
             sequence: 0,
             balance,
-            delegated_address: None,
+            delegated_address,
         };
 
         self.state_tree.set_actor(id, actor_state);
@@ -112,13 +126,23 @@ where
         ids: &init::AddressMap,
     ) -> anyhow::Result<()> {
         let owner = acct.owner.0;
-        let state = account::State { address: owner };
 
         let id = ids
             .get(&owner)
             .ok_or_else(|| anyhow!("can't find ID for owner {owner}"))?;
 
-        self.create_actor(account::ACCOUNT_ACTOR_CODE_ID, *id, &state, balance)
+        match owner.payload() {
+            Payload::Secp256k1(_) => {
+                let state = account::State { address: owner };
+                self.create_actor(ACCOUNT_ACTOR_CODE_ID, *id, &state, balance, None)
+            }
+            Payload::Delegated(d) if d.namespace() == eam::EAM_ACTOR_ID => {
+                let state = EMPTY_ARR;
+                // NOTE: Here we could use the placeholder code ID as well.
+                self.create_actor(ETHACCOUNT_ACTOR_CODE_ID, *id, &state, balance, Some(owner))
+            }
+            other => Err(anyhow!("unexpected actor owner: {other:?}")),
+        }
     }
 
     pub fn create_multisig_actor(
@@ -153,7 +177,7 @@ where
             balance.clone(),
         )?;
 
-        self.create_actor(multisig::MULTISIG_ACTOR_CODE_ID, next_id, &state, balance)
+        self.create_actor(MULTISIG_ACTOR_CODE_ID, next_id, &state, balance, None)
     }
 
     pub fn store(&self) -> &DB {

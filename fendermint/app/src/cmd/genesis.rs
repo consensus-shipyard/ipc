@@ -6,6 +6,7 @@ use fendermint_app::APP_VERSION;
 use fvm_shared::address::Address;
 use std::path::PathBuf;
 
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{
     Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Validator, ValidatorKey,
@@ -13,8 +14,8 @@ use fendermint_vm_genesis::{
 
 use crate::cmd;
 use crate::options::genesis::{
-    GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs, GenesisArgs,
-    GenesisCommands, GenesisIntoTendermintArgs, GenesisNewArgs,
+    AccountKind, GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs,
+    GenesisArgs, GenesisCommands, GenesisIntoTendermintArgs, GenesisNewArgs,
 };
 
 use super::key::read_public_key;
@@ -77,7 +78,11 @@ cmd! {
 fn add_account(genesis_file: &PathBuf, args: &GenesisAddAccountArgs) -> anyhow::Result<()> {
     update_genesis(genesis_file, |mut genesis| {
         let pk = read_public_key(&args.public_key)?;
-        let addr = Address::new_secp256k1(&pk.serialize())?;
+        let pk = pk.serialize();
+        let addr = match args.kind {
+            AccountKind::Regular => Address::new_secp256k1(&pk)?,
+            AccountKind::Ethereum => Address::from(EthAddress::new_secp256k1(&pk)?),
+        };
         let meta = ActorMeta::Account(Account {
             owner: SignerAddr(addr),
         });

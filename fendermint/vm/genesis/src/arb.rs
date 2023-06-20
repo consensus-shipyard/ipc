@@ -3,23 +3,39 @@
 use crate::{
     Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Validator, ValidatorKey,
 };
-use fendermint_testing::arb::{ArbAddress, ArbTokenAmount};
+use cid::multihash::MultihashDigest;
+use fendermint_testing::arb::ArbTokenAmount;
 use fendermint_vm_core::Timestamp;
-use fvm_shared::version::NetworkVersion;
+use fvm_shared::{address::Address, version::NetworkVersion};
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
 
 impl Arbitrary for ActorMeta {
     fn arbitrary(g: &mut Gen) -> Self {
-        // NOTE: Signer addresses are probably only valid with public keys, but here we don't care.
+        // Generate keys which the loader knows how to initialize.
         if bool::arbitrary(g) {
+            let pk = ValidatorKey::arbitrary(g).0;
+            let pk = pk.serialize();
+            let addr = if bool::arbitrary(g) {
+                Address::new_secp256k1(&pk).unwrap()
+            } else {
+                // NOTE: Not using `EthAddress` because it would be circular dependency.
+                let mut hash20 = [0u8; 20];
+                let hash32 = cid::multihash::Code::Keccak256.digest(&pk[1..]);
+                hash20.copy_from_slice(&hash32.digest()[12..]);
+                Address::new_delegated(10, &hash20).unwrap()
+            };
             ActorMeta::Account(Account {
-                owner: SignerAddr(ArbAddress::arbitrary(g).0),
+                owner: SignerAddr(addr),
             })
         } else {
             let n = u64::arbitrary(g) % 4 + 2;
             let signers = (0..n)
-                .map(|_| SignerAddr(ArbAddress::arbitrary(g).0))
+                .map(|_| {
+                    let pk = ValidatorKey::arbitrary(g).0;
+                    let addr = Address::new_secp256k1(&pk.serialize()).unwrap();
+                    SignerAddr(addr)
+                })
                 .collect();
             let threshold = u64::arbitrary(g) % n + 1;
             ActorMeta::Multisig(Multisig {

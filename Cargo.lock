@@ -2364,6 +2364,7 @@ name = "fendermint_vm_genesis"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "cid",
  "fendermint_testing",
  "fendermint_vm_core",
  "fendermint_vm_encoding",

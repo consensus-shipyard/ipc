@@ -1,11 +1,15 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use cid::multihash::MultihashDigest;
 use fvm_ipld_encoding::{
     strict_bytes,
     tuple::{Deserialize_tuple, Serialize_tuple},
 };
-use fvm_shared::{address::Address, ActorID, METHOD_CONSTRUCTOR};
+use fvm_shared::{
+    address::{Address, Error, SECP_PUB_LEN},
+    ActorID, METHOD_CONSTRUCTOR,
+};
 
 define_singleton!(EAM {
     id: 10,
@@ -28,16 +32,28 @@ impl EthAddress {
     /// Returns an EVM-form ID address from actor ID.
     ///
     /// This is copied from the `evm` actor library.
-    pub fn from_id(id: u64) -> EthAddress {
+    pub fn from_id(id: u64) -> Self {
         let mut bytes = [0u8; 20];
         bytes[0] = 0xff;
         bytes[12..].copy_from_slice(&id.to_be_bytes());
-        EthAddress(bytes)
+        Self(bytes)
+    }
+
+    /// Hash the public key according to the Ethereum convention.
+    pub fn new_secp256k1(pubkey: &[u8]) -> Result<Self, Error> {
+        if pubkey.len() != SECP_PUB_LEN {
+            return Err(Error::InvalidSECPLength(pubkey.len()));
+        }
+        let mut hash20 = [0u8; 20];
+        // Based on [ethers::core::types::Signature]
+        let hash32 = cid::multihash::Code::Keccak256.digest(&pubkey[1..]);
+        hash20.copy_from_slice(&hash32.digest()[12..]);
+        Ok(Self(hash20))
     }
 }
 
-impl From<&EthAddress> for Address {
-    fn from(value: &EthAddress) -> Address {
+impl From<EthAddress> for Address {
+    fn from(value: EthAddress) -> Address {
         if value.0[0] == 0xff {
             let mut bytes = [0u8; 8];
             bytes.copy_from_slice(&value.0[12..]);
