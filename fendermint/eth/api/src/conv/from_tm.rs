@@ -17,7 +17,7 @@ use tendermint::abci::response::DeliverTx;
 use tendermint::abci::EventAttribute;
 use tendermint_rpc::endpoint;
 
-use super::from_fvm::{to_eth_from_address, to_eth_signature, to_eth_to_address, to_eth_tokens};
+use super::from_fvm::{to_eth_address, to_eth_signature, to_eth_tokens};
 
 // Values taken from https://github.com/filecoin-project/lotus/blob/6e7dc9532abdb3171427347710df4c860f1957a2/chain/types/ethtypes/eth_types.go#L199
 
@@ -153,8 +153,8 @@ pub fn to_eth_transaction(
         block_hash: None,
         block_number: None,
         transaction_index: None,
-        from: to_eth_from_address(&msg)?,
-        to: to_eth_to_address(&msg),
+        from: to_eth_address(&msg.from).unwrap_or_default(),
+        to: to_eth_address(&msg.to),
         value: to_eth_tokens(&msg.value)?,
         gas: et::U256::from(msg.gas_limit),
         max_fee_per_gas: Some(to_eth_tokens(&msg.gas_fee_cap)?),
@@ -258,8 +258,8 @@ pub fn to_eth_receipt(
         transaction_index,
         block_hash: Some(block_hash),
         block_number: Some(block_number),
-        from: to_eth_from_address(&msg)?,
-        to: to_eth_to_address(&msg),
+        from: to_eth_address(&msg.from).unwrap_or_default(),
+        to: to_eth_address(&msg.to),
         cumulative_gas_used,
         gas_used: Some(et::U256::from(result.tx_result.gas_used)),
         contract_address,

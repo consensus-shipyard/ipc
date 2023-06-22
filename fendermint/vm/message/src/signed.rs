@@ -2,14 +2,26 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::anyhow;
 use cid::Cid;
+use ethers_core::types as et;
+use fendermint_vm_actor_interface::{eam, evm};
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
-use fvm_shared::address::Protocol;
+use fvm_shared::address::{Address, Payload};
 use fvm_shared::chainid::ChainID;
-use fvm_shared::crypto::signature::{Signature, SignatureType};
+use fvm_shared::crypto::signature::{Signature, SignatureType, SECP_SIG_LEN};
 use fvm_shared::message::Message;
 
 use thiserror::Error;
+
+use crate::conv::from_fvm;
+
+enum Signable {
+    /// Pair of transaction hash and from.
+    Ethereum((et::H256, et::H160)),
+    /// Bytes to be passed to the FVM Signature for hashing or verification.
+    Regular(Vec<u8>),
+}
 
 #[derive(Error, Debug)]
 pub enum SignedMessageError {
@@ -17,6 +29,8 @@ pub enum SignedMessageError {
     Ipld(#[from] fvm_ipld_encoding::Error),
     #[error("invalid signature: {0}")]
     InvalidSignature(String),
+    #[error("message cannot be converted to ethereum")]
+    Ethereum(#[from] anyhow::Error),
 }
 
 /// Represents a wrapped message with signature bytes.
@@ -41,16 +55,18 @@ impl SignedMessage {
     }
 
     /// Create a signed message.
-    #[cfg(feature = "secp256k1")]
     pub fn new_secp256k1(
         message: Message,
         sk: &libsecp256k1::SecretKey,
         chain_id: &ChainID,
-    ) -> Result<Self, fvm_ipld_encoding::Error> {
-        let data = Self::bytes_to_sign(&message, chain_id)?;
+    ) -> Result<Self, SignedMessageError> {
+        let sig = match Self::signable(&message, chain_id)? {
+            Signable::Ethereum((hash, _)) => sign_eth(sk, hash).to_vec(),
+            Signable::Regular(data) => sign_regular(sk, &data).to_vec(),
+        };
         let signature = Signature {
             sig_type: SignatureType::Secp256k1,
-            bytes: sign_secp256k1(sk, &data).to_vec(),
+            bytes: sig,
         };
         Ok(Self { message, signature })
     }
@@ -64,13 +80,32 @@ impl SignedMessage {
     ///
     /// The [`ChainID`] is used as a replay attack protection, a variation of
     /// https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0039.md
-    pub fn bytes_to_sign(
-        message: &Message,
-        chain_id: &ChainID,
-    ) -> Result<Vec<u8>, fvm_ipld_encoding::Error> {
-        let mut data = Self::cid(message)?.to_bytes();
-        data.extend(chain_id_bytes(chain_id).iter());
-        Ok(data)
+    fn signable(message: &Message, chain_id: &ChainID) -> Result<Signable, SignedMessageError> {
+        // Here we look at the sender to decide what scheme to use for hashing.
+        //
+        // This is in contrast to https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0055.md#delegated-signature-type
+        // which introduces a `SignatureType::Delegated`, in which case the signature check should be done by the recipient actor.
+        //
+        // However, that isn't implemented, and adding that type would mean copying the entire `Signature` type into Fendermint,
+        // similarly to how Forest did it https://github.com/ChainSafe/forest/blob/b3c5efe6cc81607da945227bb41c60cec47909c3/utils/forest_shim/src/crypto.rs#L166
+        //
+        // Instead of special casing on the signature type, we are special casing on the sender,
+        // which should be okay because the CLI only uses `f1` addresses and the Ethereum API only uses `f410` addresses,
+        // so at least for now they are easy to tell apart: any `f410` address is coming from Ethereum API and must have
+        // been signed according to the Ethereum scheme, and it could not have been signed by an `f1` address, it doesn't
+        // work with regular accounts.
+        match maybe_eth_address(&message.from) {
+            Some(addr) => {
+                let tx = from_fvm::to_eth_transaction(message, chain_id)
+                    .map_err(SignedMessageError::Ethereum)?;
+                Ok(Signable::Ethereum((tx.sighash(), addr)))
+            }
+            None => {
+                let mut data = Self::cid(message)?.to_bytes();
+                data.extend(chain_id_bytes(chain_id).iter());
+                Ok(Signable::Regular(data))
+            }
+        }
     }
 
     /// Verify that the message CID was signed by the `from` address.
@@ -79,15 +114,30 @@ impl SignedMessage {
         signature: &Signature,
         chain_id: &ChainID,
     ) -> Result<(), SignedMessageError> {
-        if message.from.protocol() == Protocol::Delegated {
-            // TODO: https://github.com/consensus-shipyard/fendermint/issues/114
-            return Ok(());
-        }
-        let data = Self::bytes_to_sign(message, chain_id)?;
+        match Self::signable(message, chain_id)? {
+            Signable::Ethereum((hash, from)) => {
+                // If the sender is ethereum, recover the public key from the signature (which verifies it),
+                // then turn it into an `EthAddress` and verify it matches the `from` of the message.
+                let sig =
+                    from_fvm::to_eth_signature(signature).map_err(SignedMessageError::Ethereum)?;
 
-        signature
-            .verify(&data, &message.from)
-            .map_err(SignedMessageError::InvalidSignature)
+                let rec = sig
+                    .recover(hash)
+                    .map_err(|e| SignedMessageError::Ethereum(anyhow!(e)))?;
+
+                if rec == from {
+                    verify_eth_method(message)
+                } else {
+                    Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature".into()))
+                }
+            }
+            Signable::Regular(data) => {
+                // This works when `from` corresponds to the signature type.
+                signature
+                    .verify(&data, &message.from)
+                    .map_err(SignedMessageError::InvalidSignature)
+            }
+        }
     }
 
     /// Verifies that the from address of the message generated the signature.
@@ -121,11 +171,8 @@ impl SignedMessage {
     }
 }
 
-#[cfg(feature = "secp256k1")]
-fn sign_secp256k1(
-    sk: &libsecp256k1::SecretKey,
-    data: &[u8],
-) -> [u8; fvm_shared::crypto::signature::SECP_SIG_LEN] {
+/// Sign a transaction pre-image using Blake2b256, in a way that [Signature::verify] expects it.
+fn sign_regular(sk: &libsecp256k1::SecretKey, data: &[u8]) -> [u8; SECP_SIG_LEN] {
     let hash: [u8; 32] = blake2b_simd::Params::new()
         .hash_length(32)
         .to_state()
@@ -135,9 +182,19 @@ fn sign_secp256k1(
         .try_into()
         .unwrap();
 
-    let (sig, recovery_id) = libsecp256k1::sign(&libsecp256k1::Message::parse(&hash), sk);
+    sign_secp256k1(sk, &hash)
+}
 
-    let mut signature = [0u8; fvm_shared::crypto::signature::SECP_SIG_LEN];
+/// Sign a transaction pre-image in the same way Ethereum clients would sign it.
+fn sign_eth(sk: &libsecp256k1::SecretKey, hash: et::H256) -> [u8; SECP_SIG_LEN] {
+    sign_secp256k1(sk, &hash.0)
+}
+
+/// Sign a hash using the secret key.
+fn sign_secp256k1(sk: &libsecp256k1::SecretKey, hash: &[u8; 32]) -> [u8; SECP_SIG_LEN] {
+    let (sig, recovery_id) = libsecp256k1::sign(&libsecp256k1::Message::parse(hash), sk);
+
+    let mut signature = [0u8; SECP_SIG_LEN];
     signature[..64].copy_from_slice(&sig.serialize());
     signature[64] = recovery_id.serialize();
     signature
@@ -148,26 +205,50 @@ fn chain_id_bytes(chain_id: &ChainID) -> [u8; 8] {
     u64::from(*chain_id).to_be_bytes()
 }
 
+/// Return the 20 byte Ethereum address if the address is that kind of delegated one.
+fn maybe_eth_address(addr: &Address) -> Option<et::H160> {
+    match addr.payload() {
+        Payload::Delegated(addr)
+            if addr.namespace() == eam::EAM_ACTOR_ID && addr.subaddress().len() == 20 =>
+        {
+            Some(et::H160::from_slice(addr.subaddress()))
+        }
+        _ => None,
+    }
+}
+
+/// Verify that the method ID and the recipient are one of the allowed combination,
+/// which for example is set by [from_eth::to_fvm_message].
+///
+/// The method ID is not part of the signature, so someone could modify it, which is
+/// why we have to check explicitly that there is nothing untowards going on.
+fn verify_eth_method(msg: &Message) -> Result<(), SignedMessageError> {
+    if msg.to == eam::EAM_ACTOR_ADDR && msg.method_num != eam::Method::CreateExternal as u64 {
+        Err(SignedMessageError::Ethereum(anyhow!(
+            "The EAM actor can only be called with CreateExternal"
+        )))
+    } else if msg.method_num != evm::Method::InvokeContract as u64 {
+        Err(SignedMessageError::Ethereum(anyhow!(
+            "An EVM actor can only be called with InvokeContract"
+        )))
+    } else {
+        Ok(())
+    }
+}
+
 /// Signed message with an invalid random signature.
 #[cfg(feature = "arb")]
 mod arb {
-    use fendermint_testing::arb::{ArbAddress, ArbTokenAmount};
-    use fvm_shared::{crypto::signature::Signature, message::Message};
+    use fendermint_testing::arb::ArbMessage;
+    use fvm_shared::crypto::signature::Signature;
 
     use super::SignedMessage;
 
     /// An arbitrary `SignedMessage` that is at least as consistent as required for serialization.
     impl quickcheck::Arbitrary for SignedMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            let mut message = Message::arbitrary(g);
-            message.gas_fee_cap = ArbTokenAmount::arbitrary(g).0;
-            message.gas_premium = ArbTokenAmount::arbitrary(g).0;
-            message.value = ArbTokenAmount::arbitrary(g).0;
-            message.to = ArbAddress::arbitrary(g).0;
-            message.from = ArbAddress::arbitrary(g).0;
-
             Self {
-                message,
+                message: ArbMessage::arbitrary(g).0,
                 signature: Signature::arbitrary(g),
             }
         }
@@ -176,17 +257,38 @@ mod arb {
 
 #[cfg(test)]
 mod tests {
+    use fendermint_vm_actor_interface::eam::EthAddress;
     use fvm_shared::{address::Address, chainid::ChainID};
     use quickcheck_macros::quickcheck;
     use rand::{rngs::StdRng, SeedableRng};
 
+    use crate::conv::from_fvm::tests::EthMessage;
+
     use super::SignedMessage;
 
+    #[derive(Debug, Clone)]
+    struct KeyPair {
+        sk: libsecp256k1::SecretKey,
+        pk: libsecp256k1::PublicKey,
+    }
+
+    impl quickcheck::Arbitrary for KeyPair {
+        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            let seed = u64::arbitrary(g);
+            let mut rng = StdRng::seed_from_u64(seed);
+            let sk = libsecp256k1::SecretKey::random(&mut rng);
+            let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+            Self { sk, pk }
+        }
+    }
+
     #[quickcheck]
-    fn chain_id_in_signature(msg: SignedMessage, chain_id: u64, seed: u64) -> Result<(), String> {
-        let mut rng = StdRng::seed_from_u64(seed);
-        let sk = libsecp256k1::SecretKey::random(&mut rng);
-        let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+    fn chain_id_in_signature(
+        msg: SignedMessage,
+        chain_id: u64,
+        key: KeyPair,
+    ) -> Result<(), String> {
+        let KeyPair { sk, pk } = key;
 
         let chain_id0 = ChainID::from(chain_id);
         let chain_id1 = ChainID::from(chain_id.overflowing_add(1).0);
@@ -206,5 +308,23 @@ mod tests {
             return Err("verifying with a different chain ID should fail".into());
         }
         Ok(())
+    }
+
+    #[quickcheck]
+    fn eth_sign_and_verify(msg: EthMessage, chain_id: u64, key: KeyPair) -> Result<(), String> {
+        let chain_id = ChainID::from(chain_id);
+        let KeyPair { sk, pk } = key;
+
+        // Set the message to the address we are going to sign with.
+        let ea = EthAddress::new_secp256k1(&pk.serialize()).map_err(|e| e.to_string())?;
+        let mut msg = msg.0;
+        msg.from = Address::from(ea);
+
+        eprintln!("from = {:?}", msg.from);
+
+        let signed =
+            SignedMessage::new_secp256k1(msg, &sk, &chain_id).map_err(|e| e.to_string())?;
+
+        signed.verify(&chain_id).map_err(|e| e.to_string())
     }
 }

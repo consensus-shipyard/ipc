@@ -53,6 +53,7 @@ where
 
         match msg.verify(chain_id) {
             Err(SignedMessageError::Ipld(e)) => Err(anyhow!(e)),
+            Err(SignedMessageError::Ethereum(e)) => Err(e),
             Err(SignedMessageError::InvalidSignature(s)) => {
                 // TODO: We can penalize the validator for including an invalid signature.
                 Ok((state, Err(InvalidSignature(s))))
@@ -97,6 +98,7 @@ where
 
         match verify_result {
             Err(SignedMessageError::Ipld(e)) => Err(anyhow!(e)),
+            Err(SignedMessageError::Ethereum(e)) => Err(e),
             Err(SignedMessageError::InvalidSignature(s)) => {
                 // There is nobody we can punish for this, we can just tell Tendermint to discard this message,
                 // and potentially block the source IP address.

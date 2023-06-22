@@ -2418,15 +2418,19 @@ dependencies = [
 name = "fendermint_vm_message"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "blake2b_simd",
  "cid",
+ "ethers-core",
  "fendermint_testing",
+ "fendermint_vm_actor_interface",
  "fendermint_vm_encoding",
  "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
+ "lazy_static",
  "libsecp256k1",
  "num-traits",
  "quickcheck 1.0.3",

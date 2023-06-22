@@ -4,6 +4,7 @@ use fvm_shared::{
     address::Address,
     bigint::{BigInt, Integer, Sign, MAX_BIGINT_SIZE},
     econ::TokenAmount,
+    message::Message,
 };
 use quickcheck::{Arbitrary, Gen};
 
@@ -36,5 +37,20 @@ impl Arbitrary for ArbAddress {
         let addr = Address::arbitrary(g);
         let bz = addr.to_bytes();
         Self(Address::from_bytes(&bz).unwrap())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ArbMessage(pub Message);
+
+impl Arbitrary for ArbMessage {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let mut message = Message::arbitrary(g);
+        message.gas_fee_cap = ArbTokenAmount::arbitrary(g).0;
+        message.gas_premium = ArbTokenAmount::arbitrary(g).0;
+        message.value = ArbTokenAmount::arbitrary(g).0;
+        message.to = ArbAddress::arbitrary(g).0;
+        message.from = ArbAddress::arbitrary(g).0;
+        Self(message)
     }
 }

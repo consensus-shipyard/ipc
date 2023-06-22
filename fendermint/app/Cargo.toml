@@ -38,7 +38,7 @@ fendermint_eth_api = { path = "../eth/api" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_interpreter = { path = "../vm/interpreter", features = ["bundle"] }
-fendermint_vm_message = { path = "../vm/message", features = ["secp256k1"] }
+fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_genesis = { path = "../vm/genesis" }
 
 cid = { workspace = true }

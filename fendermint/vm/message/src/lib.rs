@@ -5,6 +5,7 @@ use fvm_ipld_encoding::{to_vec, Error as IpldError, DAG_CBOR};
 use serde::Serialize;
 
 pub mod chain;
+pub mod conv;
 pub mod query;
 pub mod signed;
 

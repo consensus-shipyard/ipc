@@ -179,9 +179,9 @@ impl TestAccount {
 // - eth_getTransactionByHash
 // - eth_getTransactionReceipt
 // - eth_feeHistory
+// - eth_sendRawTransaction
 //
 // DOING:
-// - eth_sendRawTransaction
 //
 // TODO:
 // - eth_newBlockFilter

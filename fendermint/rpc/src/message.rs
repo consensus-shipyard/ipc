@@ -17,6 +17,9 @@ use libsecp256k1::{PublicKey, SecretKey};
 use crate::B64_ENGINE;
 
 /// Factory methods for signed transaction payload construction.
+///
+/// It assumes the sender is an `f1` type address, it won't work with `f410` addresses.
+/// For those one must use the Ethereum API, with a suitable client library such as [ethers].
 pub struct MessageFactory {
     sk: SecretKey,
     addr: Address,

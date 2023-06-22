@@ -50,11 +50,16 @@ impl EthAddress {
         hash20.copy_from_slice(&hash32.digest()[12..]);
         Ok(Self(hash20))
     }
+
+    /// Indicate whether this hash is really an actor ID.
+    pub fn is_masked_id(&self) -> bool {
+        self.0[0] == 0xff && self.0[1..].starts_with(&[0u8; 11])
+    }
 }
 
 impl From<EthAddress> for Address {
     fn from(value: EthAddress) -> Address {
-        if value.0[0] == 0xff {
+        if value.is_masked_id() {
             let mut bytes = [0u8; 8];
             bytes.copy_from_slice(&value.0[12..]);
             let id = u64::from_be_bytes(bytes);
