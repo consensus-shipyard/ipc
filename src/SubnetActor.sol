@@ -182,18 +182,18 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
 
         if (status == Status.Instantiated) {
             if (totalStake >= minActivationCollateral) {
-                IGateway(ipcGatewayAddr).register{value: totalStake}();
                 status = Status.Active;
+                IGateway(ipcGatewayAddr).register{value: totalStake}();
             }
         } else {
+            if (status == Status.Inactive) {
+                if (totalStake >= minActivationCollateral) {
+                    status = Status.Active;
+                }
+            }
             IGateway(ipcGatewayAddr).addStake{value: validatorStake}();
         }
 
-        if (status == Status.Inactive) {
-            if (totalStake >= minActivationCollateral) {
-                status = Status.Active;
-            }
-        }
     }
 
     /// @notice method that allows a validator to leave the subnet
@@ -205,14 +205,13 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         stake[msg.sender] = 0;
         totalStake -= amount;
         validators.remove(msg.sender);
-
-        IGateway(ipcGatewayAddr).releaseStake(amount);
-
         if (status == Status.Active) {
             if (totalStake < minActivationCollateral) {
                 status = Status.Inactive;
             }
         }
+
+        IGateway(ipcGatewayAddr).releaseStake(amount);
 
         payable(msg.sender).sendValue(amount);
     }
