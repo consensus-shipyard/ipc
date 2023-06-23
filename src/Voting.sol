@@ -102,7 +102,7 @@ abstract contract Voting {
     /// @param epoch - the epoch to mark as executed
     function _markSubmissionExecuted(uint64 epoch) internal {
         // epoch not the next executable epoch
-        if (_isNextExecutableEpoch(epoch) == false) return;
+        if (!_isNextExecutableEpoch(epoch)) return;
 
         // epoch not the next executable epoch in the queue
         if (executableQueue.contains(epoch)) {

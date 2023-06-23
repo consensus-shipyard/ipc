@@ -57,7 +57,7 @@ library CheckpointHelper {
         uint256 childIndex = child[0]; // index at checkpoint.data.children for the given subnet
         bool childExists = child[1] == 1; // 0 - no, 1 - yes
 
-        if (childExists == false) {
+        if (!childExists) {
             checkpoint.children.push(ChildCheck({source: commit.source, checks: new bytes32[](0)}));
             childIndex = checkpoint.children.length - 1;
         }

@@ -131,12 +131,12 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error NotEnoughFundsForMembership();
 
     modifier signableOnly() {
-        if (msg.sender.isAccount() == false) revert NotSignableAccount();
+        if (!msg.sender.isAccount()) revert NotSignableAccount();
         _;
     }
 
     modifier systemActorOnly() {
-        if (msg.sender.isSystemActor() == false) revert NotSystemActor();
+        if (!msg.sender.isSystemActor()) revert NotSystemActor();
         _;
     }
 
@@ -146,7 +146,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     }
 
     modifier onlyValidPostboxOwner(bytes32 msgCid) {
-        if (postboxHasOwner[msgCid][msg.sender] == false) {
+        if (!postboxHasOwner[msgCid][msg.sender]) {
             revert InvalidPostboxOwner();
         }
         _;
@@ -227,7 +227,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
 
-        if (registered == false) revert NotRegisteredSubnet();
+        if (!registered) revert NotRegisteredSubnet();
 
         subnet.stake += msg.value;
 
@@ -244,7 +244,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
 
-        if (registered == false) revert NotRegisteredSubnet();
+        if (!registered) revert NotRegisteredSubnet();
         if (subnet.stake < amount) revert NotEnoughFundsToRelease();
 
         subnet.stake -= amount;
@@ -260,7 +260,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         if (amount == 0) revert CannotReleaseZero();
 
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
-        if (registered == false) revert NotRegisteredSubnet();
+        if (!registered) revert NotRegisteredSubnet();
 
         payable(subnet.id.getActor()).sendValue(amount);
     }
@@ -269,7 +269,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     function kill() external {
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
 
-        if (registered == false) revert NotRegisteredSubnet();
+        if (!registered) revert NotRegisteredSubnet();
         if (subnet.circSupply > 0) revert NotEmptySubnetCircSupply();
 
         uint256 stake = subnet.stake;
@@ -283,7 +283,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
     function commitChildCheck(BottomUpCheckpoint calldata commit) external {
-        if (initialized == false) revert NotInitialized();
+        if (!initialized) revert NotInitialized();
         if (commit.source.getActor().normalize() != msg.sender) {
             revert InvalidCheckpointSource();
         }
@@ -301,7 +301,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             _getCurrentBottomUpCheckpoint();
 
         // create checkpoint if not exists
-        if (checkpointExists == false) {
+        if (!checkpointExists) {
             checkpoint.source = networkName;
             checkpoint.epoch = currentEpoch;
         }
@@ -405,7 +405,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     {
         uint256 validatorWeight = validatorSet[validatorNonce][msg.sender];
 
-        if (initialized == false) revert NotInitialized();
+        if (!initialized) revert NotInitialized();
         if (validatorWeight == 0) revert NotValidator();
         if (!CrossMsgHelper.isSorted(checkpoint.topDownMsgs)) {
             revert MessagesNotSorted();
@@ -475,7 +475,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             if (owners[i] != address(0)) {
                 address owner = owners[i];
 
-                if (postboxHasOwner[msgCid][owner] == false) {
+                if (!postboxHasOwner[msgCid][owner]) {
                     postboxHasOwner[msgCid][owner] = true;
                 }
             }
@@ -522,7 +522,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         returns (bool exists, BottomUpCheckpoint memory checkpoint)
     {
         checkpoint = bottomUpCheckpoints[epoch];
-        exists = checkpoint.source.isEmpty() == false;
+        exists = !checkpoint.source.isEmpty();
     }
 
     /// @notice returns the historical bottom-up checkpoint hash
@@ -594,7 +594,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         bool shouldCommitBottomUp;
 
         if (applyType == IPCMsgType.BottomUp) {
-            shouldCommitBottomUp = to.commonParent(from).equals(networkName) == false;
+            shouldCommitBottomUp = !to.commonParent(from).equals(networkName);
         }
 
         if (shouldCommitBottomUp) {
@@ -636,7 +636,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
         (bool registered, Subnet storage subnet) = _getSubnet(subnetId);
 
-        if (registered == false) revert NotRegisteredSubnet();
+        if (!registered) revert NotRegisteredSubnet();
 
         crossMessage.message.nonce = subnet.topDownNonce;
         subnet.topDownNonce += 1;
@@ -647,7 +647,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     function getTopDownMsgs(SubnetID calldata subnetId) external view returns(CrossMsg[] memory) {
         (bool registered, Subnet storage subnet) = _getSubnet(subnetId);
 
-        if (registered == false) revert NotRegisteredSubnet();
+        if (!registered) revert NotRegisteredSubnet();
 
         return subnet.topDownMsgs;
     }
@@ -690,7 +690,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             if (applyType == IPCMsgType.BottomUp) {
                 if (!forwarder.isEmpty()) {
                     (bool registered, Subnet storage subnet) = _getSubnet(forwarder);
-                    if (registered == false) revert NotRegisteredSubnet();
+                    if (!registered) revert NotRegisteredSubnet();
                     if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
                         revert InvalidCrossMsgNonce();
                     }
@@ -742,7 +742,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     {
         epoch = _getNextEpoch(block.number, bottomUpCheckPeriod);
         checkpoint = bottomUpCheckpoints[epoch];
-        exists = checkpoint.source.isEmpty() == false;
+        exists = !checkpoint.source.isEmpty();
     }
 
     /// @notice distribute rewards to validators in child subnet
@@ -769,6 +769,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @return subnet -  the subnet struct
     function _getSubnet(SubnetID memory subnetId) internal view returns (bool found, Subnet storage subnet) {
         subnet = subnets[subnetId.toHash()];
-        found = subnet.id.isEmpty() == false;
+        found = !subnet.id.isEmpty();
     }
 }
