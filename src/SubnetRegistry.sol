@@ -12,7 +12,7 @@ contract SubnetRegistry {
     /// Key is the hash of Subnet ID, values are addresses.
     mapping(bytes32 => address) public subnets;
 
-    address public gateway;
+    address public immutable gateway;
 
     /// @notice Event emitted when a new subnet is deployed.
     event SubnetDeployed(address subnetAddr, SubnetID subnetId);
