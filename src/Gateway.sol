@@ -36,7 +36,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     using EpochVoteSubmissionHelper for EpochVoteTopDownSubmission;
 
     // uint8 constant MIN_CHECKPOINT_PERIOD = 10;
-    uint256 constant MIN_COLLATERAL_AMOUNT = 1 ether;
+    uint256 constant public MIN_COLLATERAL_AMOUNT = 1 ether;
 
     /// @notice path to the current network
     SubnetID private networkName;

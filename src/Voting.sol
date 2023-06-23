@@ -13,7 +13,7 @@ abstract contract Voting {
     using EpochVoteSubmissionHelper for EpochVoteSubmission;
 
     /// @notice minimum checkpoint period. Values get clamped to this
-    uint8 constant MIN_CHECKPOINT_PERIOD = 10;
+    uint8 constant public MIN_CHECKPOINT_PERIOD = 10;
 
     /// @notice percent approvals needed to reach consensus
     uint8 public immutable majorityPercentage;

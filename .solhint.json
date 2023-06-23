@@ -1,0 +1,9 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "compiler-version": ["error", "0.8.18"],
+    "func-visibility": ["warn", { "ignoreConstructors": true }],
+    "prettier/prettier": "error",
+    "no-global-import": "off"
+  }
+}

@@ -10,10 +10,10 @@ import "../constants/Constants.sol";
 library CheckpointHelper {
     using SubnetIDHelper for SubnetID;
 
-    bytes32 constant EMPTY_TOPDOWNCHECKPOINT_HASH =
+    bytes32 constant private EMPTY_TOPDOWNCHECKPOINT_HASH =
         keccak256(abi.encode(TopDownCheckpoint({epoch: 0, topDownMsgs: new CrossMsg[](0)})));
 
-    bytes32 constant EMPTY_BOTTOMUPCHECKPOINT_HASH = keccak256(
+    bytes32 constant private EMPTY_BOTTOMUPCHECKPOINT_HASH = keccak256(
         abi.encode(
             BottomUpCheckpoint({
                 source: SubnetID(0, new address[](0)),
