@@ -308,8 +308,11 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         uint256 length = validators.length();
         address[] memory result = new address[](length);
 
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length;) {
             result[i] = validators.at(i);
+            unchecked {
+                ++i;
+            }
         }
 
         return result;

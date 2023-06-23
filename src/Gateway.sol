@@ -603,7 +603,10 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             return (shouldBurn = crossMessage.message.value > 0, shouldDistributeRewards = false);
         }
 
-        appliedTopDownNonce += applyType == IPCMsgType.TopDown ? 1 : 0;
+        if (applyType == IPCMsgType.TopDown) {
+            ++appliedTopDownNonce;
+        }
+
         _commitTopDownMsg(crossMessage);
 
         return (shouldBurn = false, shouldDistributeRewards = true);

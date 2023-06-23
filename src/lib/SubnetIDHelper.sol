@@ -123,7 +123,7 @@ library SubnetIDHelper {
             }
         }
 
-        i++;
+        ++i;
 
         address[] memory route = new address[](i);
 

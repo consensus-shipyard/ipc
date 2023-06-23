@@ -6,7 +6,7 @@ import "../structs/EpochVoteSubmission.sol";
 
 library EpochVoteSubmissionHelper {
     function reset(EpochVoteSubmission storage voteSubmission) external {
-        voteSubmission.nonce++;
+        ++voteSubmission.nonce;
         voteSubmission.totalSubmissionWeight = 0;
         voteSubmission.mostVotedSubmission = EMPTY_HASH;
     }
