@@ -1,6 +1,6 @@
 {
-  "name": "filecoin-ipc-actors-fevm",
-  "version": "1.0.0",
+  "name": "ipc-solidity-actors",
+  "version": "0.0.1",
   "description": "This repository includes the reference implementation of all the actors (i.e. smart contracts) responsible for the operation of the IPC (i.e. Inter-Planetary Consensus) protocol. These actors are written in Solidity and target FileCoin’s FEVM.",
   "main": "index.js",
   "directories": {
@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LimeChain/filecoin-ipc-actors-fevm.git"
+    "url": "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git"
   },
-  "author": "Limechain team",
-  "license": "ISC",
+  "author": "Limechain team, ConsensusLab, Protocol Labs, Filecoin Core Devs",
+  "license": "MIT OR Apache-2.0",
   "bugs": {
-    "url": "https://github.com/LimeChain/filecoin-ipc-actors-fevm/issues"
+    "url": "https://github.com/consensus-shipyard/ipc-solidity-actors/issues"
   },
-  "homepage": "https://github.com/LimeChain/filecoin-ipc-actors-fevm#readme",
+  "homepage": "https://github.com/consensus-shipyard/ipc-solidity-actors/",
   "devDependencies": {
     "@nomicfoundation/hardhat-foundry": "^1.0.1",
     "@nomiclabs/hardhat-ethers": "^2.2.3",
