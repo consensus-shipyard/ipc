@@ -84,7 +84,9 @@ pub fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
 pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
     response::CheckTx {
         code: to_code(ret.exit_code),
-        info: to_error_msg(ret.exit_code).to_owned(),
+        info: ret
+            .info
+            .unwrap_or_else(|| to_error_msg(ret.exit_code).to_owned()),
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
         ..Default::default()

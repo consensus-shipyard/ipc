@@ -16,6 +16,7 @@ pub struct FvmCheckRet {
     pub sender: Address,
     pub gas_limit: u64,
     pub exit_code: ExitCode,
+    pub info: Option<String>,
 }
 
 #[async_trait]
@@ -37,14 +38,23 @@ where
         msg: Self::Message,
         _is_recheck: bool,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
-        let checked = |state, exit_code| {
+        let checked = |state, exit_code, info| {
             let ret = FvmCheckRet {
                 sender: msg.from,
                 gas_limit: msg.gas_limit,
                 exit_code,
+                info,
             };
             Ok((state, ret))
         };
+
+        if let Err(e) = msg.check() {
+            return checked(
+                state,
+                ExitCode::SYS_ASSERTION_FAILED,
+                Some(format!("{:#}", e)),
+            );
+        }
 
         // NOTE: This would be a great place for let-else, but clippy runs into a compilation bug.
         let state_tree = state.state_tree_mut();
@@ -52,15 +62,15 @@ where
             if let Some(mut actor) = state_tree.get_actor(id)? {
                 let balance_needed = msg.gas_fee_cap * msg.gas_limit;
                 if actor.balance < balance_needed || actor.sequence != msg.sequence {
-                    return checked(state, ExitCode::SYS_SENDER_STATE_INVALID);
+                    return checked(state, ExitCode::SYS_SENDER_STATE_INVALID, None);
                 } else {
                     actor.sequence += 1;
                     actor.balance -= balance_needed;
                     state_tree.set_actor(id, actor);
-                    return checked(state, ExitCode::OK);
+                    return checked(state, ExitCode::OK, None);
                 }
             }
         }
-        return checked(state, ExitCode::SYS_SENDER_INVALID);
+        return checked(state, ExitCode::SYS_SENDER_INVALID, None);
     }
 }

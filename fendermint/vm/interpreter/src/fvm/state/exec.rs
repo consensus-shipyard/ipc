@@ -5,14 +5,15 @@ use cid::Cid;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
-    executor::{ApplyKind, ApplyRet, DefaultExecutor, Executor},
+    executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
     machine::{DefaultMachine, Machine, NetworkConfig},
     DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
-    chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, message::Message,
-    version::NetworkVersion,
+    chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode, message::Message,
+    receipt::Receipt, version::NetworkVersion,
 };
 use serde::{Deserialize, Serialize};
 
@@ -86,6 +87,10 @@ where
     }
 
     pub fn execute_message(&mut self, msg: Message, kind: ApplyKind) -> anyhow::Result<ApplyRet> {
+        if let Err(e) = msg.check() {
+            return Ok(check_error(e));
+        }
+
         // TODO: We could preserve the message length by changing the input type.
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
         self.executor.execute_message(msg, kind, raw_length)
@@ -119,5 +124,34 @@ where
 {
     fn chain_id(&self) -> &ChainID {
         &self.executor.context().network.chain_id
+    }
+}
+
+/// The FVM would return an error from `DefaultExecutor::preflight_message` if it was called
+/// with a message that doesn't pass basic checks, for example it has no gas limit, as opposed
+/// to returning an `ApplyRet`. This would cause our application to fail.
+/// I'm not sure if it's intentional, or how Lotus handles it, it's not desireable to crash
+/// because such messages can be included by malicious validators or user queries. We could
+/// use ABCI++ to filter out messages from blocks, but that doesn't affect queries, so we
+/// might as well encode it as an error. To keep the types simpler, let's fabricate an `ApplyRet`.
+fn check_error(e: anyhow::Error) -> ApplyRet {
+    let zero = TokenAmount::from_atto(0);
+    ApplyRet {
+        msg_receipt: Receipt {
+            exit_code: ExitCode::SYS_ASSERTION_FAILED,
+            return_data: RawBytes::default(),
+            gas_used: 0,
+            events_root: None,
+        },
+        penalty: zero.clone(),
+        miner_tip: zero.clone(),
+        base_fee_burn: zero.clone(),
+        over_estimation_burn: zero.clone(),
+        refund: zero,
+        gas_refund: 0,
+        gas_burned: 0,
+        failure_info: Some(ApplyFailure::PreValidation(format!("{:#}", e))),
+        exec_trace: Vec::new(),
+        events: Vec::new(),
     }
 }
