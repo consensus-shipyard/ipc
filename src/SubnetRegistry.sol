@@ -24,7 +24,9 @@ contract SubnetRegistry {
     }
 
     function newSubnetActor(SubnetActor.ConstructParams calldata _params) external returns (address subnetAddr) {
-        if (_params.ipcGatewayAddr != gateway) revert NotSameGateway();
+        if (_params.ipcGatewayAddr != gateway) {
+            revert NotSameGateway();
+        }
 
         subnetAddr = address(new SubnetActor(_params));
 

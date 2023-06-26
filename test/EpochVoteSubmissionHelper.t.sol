@@ -75,8 +75,8 @@ contract EpochVoteSubmissionHelperTest is Test {
 
         voteSubmission.mostVotedSubmission = submissionHash1;
         if (
-            voteSubmission.submissionWeights[nonce][submissionHash1]
-                < voteSubmission.submissionWeights[nonce][submissionHash2]
+            voteSubmission.submissionWeights[nonce][submissionHash1] <
+            voteSubmission.submissionWeights[nonce][submissionHash2]
         ) {
             voteSubmission.mostVotedSubmission = submissionHash2;
         }

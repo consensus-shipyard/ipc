@@ -1,0 +1,40 @@
+name: Static analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  slither:
+    name: Slither check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.3.0
+        with:
+          fail-on: low
+
+  solhint:
+    name: Solhint check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          cache: 'npm'
+      - name: Install Node dependencies
+        run: npm i --unsafe-perm
+      - name: Install solidity plugin
+        run: npm i --unsafe-perm prettier prettier-plugin-solidity
+      - name: Prettier check
+        run: npx prettier --check 'src/**/*.sol' 'test/*.sol'
+      - name: Solhint check
+        run: npx solhint 'src/**/*.sol'

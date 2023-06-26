@@ -10,22 +10,23 @@ import "../constants/Constants.sol";
 library CheckpointHelper {
     using SubnetIDHelper for SubnetID;
 
-    bytes32 constant private EMPTY_TOPDOWNCHECKPOINT_HASH =
+    bytes32 public constant EMPTY_TOPDOWNCHECKPOINT_HASH =
         keccak256(abi.encode(TopDownCheckpoint({epoch: 0, topDownMsgs: new CrossMsg[](0)})));
 
-    bytes32 constant private EMPTY_BOTTOMUPCHECKPOINT_HASH = keccak256(
-        abi.encode(
-            BottomUpCheckpoint({
-                source: SubnetID(0, new address[](0)),
-                epoch: 0,
-                fee: 0,
-                crossMsgs: new CrossMsg[](0),
-                children: new ChildCheck[](0),
-                prevHash: EMPTY_HASH,
-                proof: new bytes(0)
-            })
-        )
-    );
+    bytes32 public constant EMPTY_BOTTOMUPCHECKPOINT_HASH =
+        keccak256(
+            abi.encode(
+                BottomUpCheckpoint({
+                    source: SubnetID(0, new address[](0)),
+                    epoch: 0,
+                    fee: 0,
+                    crossMsgs: new CrossMsg[](0),
+                    children: new ChildCheck[](0),
+                    prevHash: EMPTY_HASH,
+                    proof: new bytes(0)
+                })
+            )
+        );
 
     function toHash(BottomUpCheckpoint memory bottomupCheckpoint) public pure returns (bytes32) {
         return keccak256(abi.encode(bottomupCheckpoint));

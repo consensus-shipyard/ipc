@@ -244,17 +244,18 @@ contract CrossMsgHelperTest is Test {
     }
 
     function createCrossMsg(uint64 nonce) internal pure returns (CrossMsg memory) {
-        return CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                value: 0,
-                nonce: nonce,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
+        return
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+                    to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+                    value: 0,
+                    nonce: nonce,
+                    method: METHOD_SEND,
+                    params: EMPTY_BYTES
+                }),
+                wrapped: false
+            });
     }
 
     function createCrossMsgs(uint256 length, uint64 nonce) internal pure returns (CrossMsg[] memory _crossMsgs) {

@@ -13,56 +13,59 @@ library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
 
-    bytes32 public constant EMPTY_CROSS_MSG = keccak256(
-        abi.encode(
+    bytes32 public constant EMPTY_CROSS_MSG =
+        keccak256(
+            abi.encode(
+                CrossMsg({
+                    message: StorableMsg({
+                        from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+                        to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+                        value: 0,
+                        nonce: 0,
+                        method: METHOD_SEND,
+                        params: EMPTY_BYTES
+                    }),
+                    wrapped: false
+                })
+            )
+        );
+
+    function createReleaseMsg(
+        SubnetID calldata subnet,
+        address signer,
+        uint256 value
+    ) public pure returns (CrossMsg memory) {
+        return
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                    to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                    value: 0,
+                    from: IPCAddress({subnetId: subnet, rawAddress: BURNT_FUNDS_ACTOR}),
+                    to: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
+                    value: value,
                     nonce: 0,
                     method: METHOD_SEND,
                     params: EMPTY_BYTES
                 }),
                 wrapped: false
-            })
-        )
-    );
-
-    function createReleaseMsg(SubnetID calldata subnet, address signer, uint256 value)
-        public
-        pure
-        returns (CrossMsg memory)
-    {
-        return CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: subnet, rawAddress: BURNT_FUNDS_ACTOR}),
-                to: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
-                value: value,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
+            });
     }
 
-    function createFundMsg(SubnetID calldata subnet, address signer, uint256 value)
-        public
-        pure
-        returns (CrossMsg memory)
-    {
-        return CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
-                to: IPCAddress({subnetId: subnet, rawAddress: signer}),
-                value: value,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
+    function createFundMsg(
+        SubnetID calldata subnet,
+        address signer,
+        uint256 value
+    ) public pure returns (CrossMsg memory) {
+        return
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
+                    to: IPCAddress({subnetId: subnet, rawAddress: signer}),
+                    value: value,
+                    nonce: 0,
+                    method: METHOD_SEND,
+                    params: EMPTY_BYTES
+                }),
+                wrapped: false
+            });
     }
 
     function toHash(CrossMsg memory crossMsg) internal pure returns (bytes32) {
@@ -105,7 +108,7 @@ library CrossMsgHelper {
     function isSorted(CrossMsg[] calldata crossMsgs) external pure returns (bool) {
         uint256 prevNonce = 0;
         uint256 length = crossMsgs.length;
-        for (uint256 i = 0; i < length;) {
+        for (uint256 i = 0; i < length; ) {
             uint256 nonce = crossMsgs[i].message.nonce;
 
             if (prevNonce >= nonce) {

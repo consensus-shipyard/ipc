@@ -81,3 +81,13 @@ And to generate coverage report run
 ```bash
 forge coverage
 ```
+
+# Development
+
+Before committing:
+
+```bash
+make format
+make 
+make check
+```

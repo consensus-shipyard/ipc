@@ -3,7 +3,24 @@
   "rules": {
     "compiler-version": ["error", "0.8.18"],
     "func-visibility": ["warn", { "ignoreConstructors": true }],
-    "prettier/prettier": "error",
-    "no-global-import": "off"
+    "no-global-import": "off",
+    "no-unused-vars": "error",
+    "const-name-snakecase": "error",
+    "contract-name-camelcase": "error",
+    "event-name-camelcase": "error",
+    "func-name-mixedcase": "error",
+    "func-param-name-mixedcase": "error",
+    "modifier-name-mixedcase": "error",
+    "private-vars-leading-underscore": "error",
+    "var-name-mixedcase": "error",
+    "imports-on-top": "error",
+    "no-empty-blocks": "error",
+    "reason-string": "error",
+    "quotes": "error",
+    "use-forbidden-name": "error",
+    "visibility-modifier-order": "error",
+    "avoid-tx-origin": "error",
+    "reentrancy": "error",
+    "state-visibility": "error"
   }
 }

@@ -10,18 +10,20 @@ contract StorableMsgHelperTest is Test {
 
     uint64 private constant ROOTNET_CHAINID = 123;
 
-    StorableMsg EMPTY_STORABLE_MESSAGE = StorableMsg({
-        from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-        to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-        value: 0,
-        nonce: 0,
-        method: METHOD_SEND,
-        params: EMPTY_BYTES
-    });
+    StorableMsg EMPTY_STORABLE_MESSAGE =
+        StorableMsg({
+            from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+            to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+            value: 0,
+            nonce: 0,
+            method: METHOD_SEND,
+            params: EMPTY_BYTES
+        });
 
     function test_ToHash_Works_EmptyMessage() public view {
         require(
-            EMPTY_STORABLE_MESSAGE.toHash() == StorableMsgHelper.EMPTY_STORABLE_MESSAGE_HASH, "Hashes should be equal"
+            EMPTY_STORABLE_MESSAGE.toHash() == StorableMsgHelper.EMPTY_STORABLE_MESSAGE_HASH,
+            "Hashes should be equal"
         );
     }
 

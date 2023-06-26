@@ -36,10 +36,10 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     using EpochVoteSubmissionHelper for EpochVoteTopDownSubmission;
 
     // uint8 constant MIN_CHECKPOINT_PERIOD = 10;
-    uint256 constant public MIN_COLLATERAL_AMOUNT = 1 ether;
+    uint256 public constant MIN_COLLATERAL_AMOUNT = 1 ether;
 
     /// @notice path to the current network
-    SubnetID private networkName;
+    SubnetID private _networkName;
 
     /// @notice Number of active subnets spawned from this one
     uint64 public totalSubnets;
@@ -66,6 +66,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     uint64 public immutable topDownCheckPeriod;
 
     /// @notice BottomUpCheckpoints in the GW per epoch
+    // slither-disable-next-line uninitialized-state
     mapping(uint64 => BottomUpCheckpoint) public bottomUpCheckpoints;
 
     /// @notice nonce for bottom-up messages
@@ -89,16 +90,17 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     uint256 public validatorNonce;
 
     /// @notice epoch => SubnetID => [childIndex, exists(0 - no, 1 - yes)]
-    mapping(uint64 => mapping(bytes32 => uint256[2])) private children;
+    mapping(uint64 => mapping(bytes32 => uint256[2])) private _children;
 
     /// @notice epoch => SubnetID => check => exists
-    mapping(uint64 => mapping(bytes32 => mapping(bytes32 => bool))) private checks;
+    mapping(uint64 => mapping(bytes32 => mapping(bytes32 => bool))) private _checks;
 
     /// @notice whether the contract is initialized
     bool public initialized;
 
     /// @notice contains voted submissions for a given epoch
-    mapping(uint64 => EpochVoteTopDownSubmission) private epochVoteSubmissions;
+    // slither-disable-next-line uninitialized-state
+    mapping(uint64 => EpochVoteTopDownSubmission) private _epochVoteSubmissions;
 
     error NotSystemActor();
     error NotSignableAccount();
@@ -131,17 +133,23 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error NotEnoughFundsForMembership();
 
     modifier signableOnly() {
-        if (!msg.sender.isAccount()) revert NotSignableAccount();
+        if (!msg.sender.isAccount()) {
+            revert NotSignableAccount();
+        }
         _;
     }
 
     modifier systemActorOnly() {
-        if (!msg.sender.isSystemActor()) revert NotSystemActor();
+        if (!msg.sender.isSystemActor()) {
+            revert NotSystemActor();
+        }
         _;
     }
 
     modifier hasFee() {
-        if (msg.value < crossMsgFee) revert NotEnoughFee();
+        if (msg.value < crossMsgFee) {
+            revert NotEnoughFee();
+        }
         _;
     }
 
@@ -161,16 +169,18 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     }
 
     constructor(ConstructorParams memory params) Voting(params.majorityPercentage, params.topDownCheckPeriod) {
-        networkName = params.networkName;
+        _networkName = params.networkName;
         minStake = MIN_COLLATERAL_AMOUNT;
-        bottomUpCheckPeriod =
-            params.bottomUpCheckPeriod < MIN_CHECKPOINT_PERIOD ? MIN_CHECKPOINT_PERIOD : params.bottomUpCheckPeriod;
-        topDownCheckPeriod =
-            params.topDownCheckPeriod < MIN_CHECKPOINT_PERIOD ? MIN_CHECKPOINT_PERIOD : params.topDownCheckPeriod;
+        bottomUpCheckPeriod = params.bottomUpCheckPeriod < MIN_CHECKPOINT_PERIOD
+            ? MIN_CHECKPOINT_PERIOD
+            : params.bottomUpCheckPeriod;
+        topDownCheckPeriod = params.topDownCheckPeriod < MIN_CHECKPOINT_PERIOD
+            ? MIN_CHECKPOINT_PERIOD
+            : params.topDownCheckPeriod;
         crossMsgFee = params.msgFee;
 
         // the root doesn't need to be explicitly initialized
-        if (networkName.isRoot()) {
+        if (_networkName.isRoot()) {
             initialized = true;
         }
     }
@@ -191,13 +201,15 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice get the network name in subnet id format
     function getNetworkName() external view returns (SubnetID memory) {
-        return networkName;
+        return _networkName;
     }
 
     /// @notice initialize the contract with the genesis epoch
     /// @param _genesisEpoch - genesis epoch to set
     function initGenesisEpoch(uint64 _genesisEpoch) external systemActorOnly {
-        if (initialized) revert AlreadyInitialized();
+        if (initialized) {
+            revert AlreadyInitialized();
+        }
 
         genesisEpoch = _genesisEpoch;
         initialized = true;
@@ -205,13 +217,17 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice register a subnet in the gateway. called by a subnet when it reaches the threshold stake
     function register() external payable {
-        if (msg.value < minStake) revert NotEnoughFunds();
+        if (msg.value < minStake) {
+            revert NotEnoughFunds();
+        }
 
-        SubnetID memory subnetId = networkName.createSubnetId(msg.sender);
+        SubnetID memory subnetId = _networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = _getSubnet(subnetId);
 
-        if (registered) revert AlreadyRegisteredSubnet();
+        if (registered) {
+            revert AlreadyRegisteredSubnet();
+        }
 
         subnet.id = subnetId;
         subnet.stake = msg.value;
@@ -223,11 +239,15 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice addStake - add collateral for an existing subnet
     function addStake() external payable {
-        if (msg.value <= 0) revert NotEnoughFunds();
+        if (msg.value <= 0) {
+            revert NotEnoughFunds();
+        }
 
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
 
-        if (!registered) revert NotRegisteredSubnet();
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
 
         subnet.stake += msg.value;
 
@@ -240,12 +260,18 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice release collateral for an existing subnet
     function releaseStake(uint256 amount) external nonReentrant {
-        if (amount == 0) revert CannotReleaseZero();
+        if (amount == 0) {
+            revert CannotReleaseZero();
+        }
 
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
 
-        if (!registered) revert NotRegisteredSubnet();
-        if (subnet.stake < amount) revert NotEnoughFundsToRelease();
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
+        if (subnet.stake < amount) {
+            revert NotEnoughFundsToRelease();
+        }
 
         subnet.stake -= amount;
 
@@ -257,10 +283,14 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     }
 
     function releaseRewards(uint256 amount) external nonReentrant {
-        if (amount == 0) revert CannotReleaseZero();
+        if (amount == 0) {
+            revert CannotReleaseZero();
+        }
 
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
-        if (!registered) revert NotRegisteredSubnet();
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
 
         payable(subnet.id.getActor()).sendValue(amount);
     }
@@ -269,8 +299,12 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     function kill() external {
         (bool registered, Subnet storage subnet) = _getSubnet(msg.sender);
 
-        if (!registered) revert NotRegisteredSubnet();
-        if (subnet.circSupply > 0) revert NotEmptySubnetCircSupply();
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
+        if (subnet.circSupply > 0) {
+            revert NotEmptySubnetCircSupply();
+        }
 
         uint256 stake = subnet.stake;
 
@@ -283,34 +317,43 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
     function commitChildCheck(BottomUpCheckpoint calldata commit) external {
-        if (!initialized) revert NotInitialized();
+        if (!initialized) {
+            revert NotInitialized();
+        }
         if (commit.source.getActor().normalize() != msg.sender) {
             revert InvalidCheckpointSource();
         }
 
         (, Subnet storage subnet) = _getSubnet(msg.sender);
-        if (subnet.status != Status.Active) revert SubnetNotActive();
-        if (subnet.prevCheckpoint.epoch >= commit.epoch) revert InvalidCheckpointEpoch();
+        if (subnet.status != Status.Active) {
+            revert SubnetNotActive();
+        }
+        if (subnet.prevCheckpoint.epoch >= commit.epoch) {
+            revert InvalidCheckpointEpoch();
+        }
         if (commit.prevHash != EMPTY_HASH) {
             if (commit.prevHash != subnet.prevCheckpoint.toHash()) {
                 revert InconsistentPrevCheckpoint();
             }
         }
 
-        (bool checkpointExists, uint64 currentEpoch, BottomUpCheckpoint storage checkpoint) =
-            _getCurrentBottomUpCheckpoint();
+        (
+            bool checkpointExists,
+            uint64 currentEpoch,
+            BottomUpCheckpoint storage checkpoint
+        ) = _getCurrentBottomUpCheckpoint();
 
         // create checkpoint if not exists
         if (!checkpointExists) {
-            checkpoint.source = networkName;
+            checkpoint.source = _networkName;
             checkpoint.epoch = currentEpoch;
         }
 
-        checkpoint.setChildCheck(commit, children, checks, currentEpoch);
+        checkpoint.setChildCheck(commit, _children, _checks, currentEpoch);
 
         uint256 totalValue = 0;
         uint256 crossMsgLength = commit.crossMsgs.length;
-        for (uint256 i = 0; i < crossMsgLength;) {
+        for (uint256 i = 0; i < crossMsgLength; ) {
             totalValue += commit.crossMsgs[i].message.value;
             unchecked {
                 ++i;
@@ -321,7 +364,9 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
         bottomUpNonce += commit.crossMsgs.length > 0 ? 1 : 0;
 
-        if (subnet.circSupply < totalValue) revert NotEnoughSubnetCircSupply();
+        if (subnet.circSupply < totalValue) {
+            revert NotEnoughSubnetCircSupply();
+        }
 
         subnet.circSupply -= totalValue;
 
@@ -345,7 +390,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds
     function release() external payable signableOnly hasFee {
-        CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg(networkName, msg.sender, msg.value - crossMsgFee);
+        CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg(_networkName, msg.sender, msg.value - crossMsgFee);
 
         _commitBottomUpMsg(crossMsg);
     }
@@ -364,12 +409,14 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
         // setup the new validator set
         uint256 validatorsLength = validators.length;
-        for (uint256 validatorIndex = 0; validatorIndex < validatorsLength;) {
+        for (uint256 validatorIndex = 0; validatorIndex < validatorsLength; ) {
             address validatorAddress = validators[validatorIndex];
             if (validatorAddress != address(0)) {
                 uint256 validatorWeight = weights[validatorIndex];
 
-                if (validatorWeight == 0) revert ValidatorWeightIsZero();
+                if (validatorWeight == 0) {
+                    revert ValidatorWeightIsZero();
+                }
 
                 validatorSet[validatorNonce][validatorAddress] = validatorWeight;
 
@@ -385,7 +432,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             // to be committed. This doesn't apply to the root.
             // TODO: Once account abstraction is conveniently supported, there will be
             // no need for this initial funding of validators.
-            // if (block.number == 1 && !networkName.isRoot())
+            // if (block.number == 1 && !_networkName.isRoot())
             //     payable(validatorAddress).sendValue(INITIAL_VALIDATOR_FUNDS);
 
             unchecked {
@@ -398,24 +445,27 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice allows a validator to submit a batch of messages in a top-down commitment
     /// @param checkpoint - top-down checkpoint
-    function submitTopDownCheckpoint(TopDownCheckpoint calldata checkpoint)
-        external
-        signableOnly
-        validEpochOnly(checkpoint.epoch)
-    {
+    function submitTopDownCheckpoint(
+        TopDownCheckpoint calldata checkpoint
+    ) external signableOnly validEpochOnly(checkpoint.epoch) {
         uint256 validatorWeight = validatorSet[validatorNonce][msg.sender];
 
-        if (!initialized) revert NotInitialized();
-        if (validatorWeight == 0) revert NotValidator();
+        if (!initialized) {
+            revert NotInitialized();
+        }
+        if (validatorWeight == 0) {
+            revert NotValidator();
+        }
         if (!CrossMsgHelper.isSorted(checkpoint.topDownMsgs)) {
             revert MessagesNotSorted();
         }
 
-        EpochVoteTopDownSubmission storage voteSubmission = epochVoteSubmissions[checkpoint.epoch];
+        EpochVoteTopDownSubmission storage voteSubmission = _epochVoteSubmissions[checkpoint.epoch];
 
         // submit the vote
         bool shouldExecuteVote = _submitTopDownVote(voteSubmission, checkpoint, msg.sender, validatorWeight);
 
+        // slither-disable-next-line uninitialized-local
         CrossMsg[] memory topDownMsgs;
 
         if (shouldExecuteVote) {
@@ -427,7 +477,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             (uint64 nextExecutableEpoch, bool isExecutableEpoch) = _getNextExecutableEpoch();
 
             if (isExecutableEpoch) {
-                EpochVoteTopDownSubmission storage nextVoteSubmission = epochVoteSubmissions[nextExecutableEpoch];
+                EpochVoteTopDownSubmission storage nextVoteSubmission = _epochVoteSubmissions[nextExecutableEpoch];
 
                 topDownMsgs = _markMostVotedSubmissionExecuted(nextVoteSubmission);
             }
@@ -442,17 +492,19 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @param crossMsg - message to send
     function sendCross(SubnetID memory destination, CrossMsg memory crossMsg) external payable signableOnly hasFee {
         // destination is the current network, you are better off with a good ol' message, no cross needed
-        if (destination.equals(networkName)) {
+        if (destination.equals(_networkName)) {
             revert CannotSendCrossMsgToItself();
         }
-        if (crossMsg.message.value != msg.value) revert NotEnoughFunds();
+        if (crossMsg.message.value != msg.value) {
+            revert NotEnoughFunds();
+        }
         if (crossMsg.message.to.rawAddress == address(0)) {
             revert InvalidCrossMsgDestinationAddress();
         }
 
         // we disregard the "to" of the message. the caller is the one set as the "from" of the message.
         crossMsg.message.to.subnetId = destination;
-        crossMsg.message.from.subnetId = networkName;
+        crossMsg.message.from.subnetId = _networkName;
         crossMsg.message.from.rawAddress = msg.sender;
 
         // commit cross-message for propagation
@@ -467,11 +519,13 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     function whitelistPropagator(bytes32 msgCid, address[] calldata owners) external onlyValidPostboxOwner(msgCid) {
         CrossMsg storage crossMsg = postbox[msgCid];
 
-        if (crossMsg.isEmpty()) revert PostboxNotExist();
+        if (crossMsg.isEmpty()) {
+            revert PostboxNotExist();
+        }
 
         // update postbox with the new owners
         uint256 ownersLength = owners.length;
-        for (uint256 i = 0; i < ownersLength;) {
+        for (uint256 i = 0; i < ownersLength; ) {
             if (owners[i] != address(0)) {
                 address owner = owners[i];
 
@@ -507,7 +561,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @param epoch - the epoch to check
     /// @param submitter - the validator to check
     function hasValidatorVotedForSubmission(uint64 epoch, address submitter) external view returns (bool) {
-        EpochVoteTopDownSubmission storage voteSubmission = epochVoteSubmissions[epoch];
+        EpochVoteTopDownSubmission storage voteSubmission = _epochVoteSubmissions[epoch];
 
         return voteSubmission.vote.submitters[voteSubmission.vote.nonce][submitter];
     }
@@ -516,11 +570,9 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @param epoch - the epoch to check
     /// @return exists - whether the checkpoint exists
     /// @return checkpoint - the checkpoint struct
-    function bottomUpCheckpointAtEpoch(uint64 epoch)
-        public
-        view
-        returns (bool exists, BottomUpCheckpoint memory checkpoint)
-    {
+    function bottomUpCheckpointAtEpoch(
+        uint64 epoch
+    ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
         checkpoint = bottomUpCheckpoints[epoch];
         exists = !checkpoint.source.isEmpty();
     }
@@ -529,11 +581,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @param epoch - the epoch to check
     /// @return exists - whether the checkpoint exists
     /// @return hash - the hash of the checkpoint
-    function bottomUpCheckpointHashAtEpoch(uint64 epoch)
-        external
-        view
-        returns (bool, bytes32)
-    {
+    function bottomUpCheckpointHashAtEpoch(uint64 epoch) external view returns (bool, bytes32) {
         (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
         return (exists, checkpoint.toHash());
     }
@@ -541,12 +589,12 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @notice marks a checkpoint as executed based on the last vote that reached majority
     /// @notice voteSubmission - the vote submission data
     /// @return the cross messages that should be executed
-    function _markMostVotedSubmissionExecuted(EpochVoteTopDownSubmission storage voteSubmission)
-        internal
-        returns (CrossMsg[] storage)
-    {
-        TopDownCheckpoint storage mostVotedSubmission =
-            voteSubmission.submissions[voteSubmission.vote.mostVotedSubmission];
+    function _markMostVotedSubmissionExecuted(
+        EpochVoteTopDownSubmission storage voteSubmission
+    ) internal returns (CrossMsg[] storage) {
+        TopDownCheckpoint storage mostVotedSubmission = voteSubmission.submissions[
+            voteSubmission.vote.mostVotedSubmission
+        ];
 
         _markSubmissionExecuted(mostVotedSubmission.epoch);
 
@@ -567,7 +615,12 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         bytes32 submissionHash = submission.toHash();
 
         shouldExecuteVote = _submitVote(
-            voteSubmission.vote, submissionHash, submitterAddress, submitterWeight, submission.epoch, totalWeight
+            voteSubmission.vote,
+            submissionHash,
+            submitterAddress,
+            submitterWeight,
+            submission.epoch,
+            totalWeight
         );
 
         // store the submission only the first time
@@ -579,22 +632,26 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @notice Commit the cross message to storage. It outputs a flag signaling
     /// if the committed messages was bottom-up and some funds need to be
     /// burnt or if a top-down message fee needs to be distributed.
-    function _commitCrossMessage(CrossMsg memory crossMessage)
-        internal
-        returns (bool shouldBurn, bool shouldDistributeRewards)
-    {
+    function _commitCrossMessage(
+        CrossMsg memory crossMessage
+    ) internal returns (bool shouldBurn, bool shouldDistributeRewards) {
         SubnetID memory to = crossMessage.message.to.subnetId;
 
-        if (to.isEmpty()) revert InvalidCrossMsgDestinationSubnet();
-        if (to.equals(networkName)) revert InvalidCrossMsgDestinationSubnet();
+        if (to.isEmpty()) {
+            revert InvalidCrossMsgDestinationSubnet();
+        }
+        if (to.equals(_networkName)) {
+            revert InvalidCrossMsgDestinationSubnet();
+        }
 
         SubnetID memory from = crossMessage.message.from.subnetId;
-        IPCMsgType applyType = crossMessage.message.applyType(networkName);
+        IPCMsgType applyType = crossMessage.message.applyType(_networkName);
 
+        // slither-disable-next-line uninitialized-local
         bool shouldCommitBottomUp;
 
         if (applyType == IPCMsgType.BottomUp) {
-            shouldCommitBottomUp = !to.commonParent(from).equals(networkName);
+            shouldCommitBottomUp = !to.commonParent(from).equals(_networkName);
         }
 
         if (shouldCommitBottomUp) {
@@ -623,7 +680,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         }
 
         if (shouldDistributeRewards) {
-            SubnetID memory toSubnetId = crossMsg.message.to.subnetId.down(networkName);
+            SubnetID memory toSubnetId = crossMsg.message.to.subnetId.down(_networkName);
 
             _distributeRewards(toSubnetId.getActor(), crossMsgFee);
         }
@@ -632,11 +689,13 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @notice commit topdown messages for their execution in the subnet. Adds the message to the subnet struct for future execution
     /// @param crossMessage - the cross message to be committed
     function _commitTopDownMsg(CrossMsg memory crossMessage) internal {
-        SubnetID memory subnetId = crossMessage.message.to.subnetId.down(networkName);
+        SubnetID memory subnetId = crossMessage.message.to.subnetId.down(_networkName);
 
         (bool registered, Subnet storage subnet) = _getSubnet(subnetId);
 
-        if (!registered) revert NotRegisteredSubnet();
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
 
         crossMessage.message.nonce = subnet.topDownNonce;
         subnet.topDownNonce += 1;
@@ -644,10 +703,12 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         subnet.topDownMsgs.push(crossMessage);
     }
 
-    function getTopDownMsgs(SubnetID calldata subnetId) external view returns(CrossMsg[] memory) {
+    function getTopDownMsgs(SubnetID calldata subnetId) external view returns (CrossMsg[] memory) {
         (bool registered, Subnet storage subnet) = _getSubnet(subnetId);
 
-        if (!registered) revert NotRegisteredSubnet();
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
 
         return subnet.topDownMsgs;
     }
@@ -655,7 +716,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @notice commit bottomup messages for their execution in the subnet. Adds the message to the checkpoint for future execution
     /// @param crossMessage - the cross message to be committed
     function _commitBottomUpMsg(CrossMsg memory crossMessage) internal {
-        (,, BottomUpCheckpoint storage checkpoint) = _getCurrentBottomUpCheckpoint();
+        (, , BottomUpCheckpoint storage checkpoint) = _getCurrentBottomUpCheckpoint();
 
         crossMessage.message.nonce = bottomUpNonce;
 
@@ -680,17 +741,19 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             }
         }
 
-        IPCMsgType applyType = crossMsg.message.applyType(networkName);
+        IPCMsgType applyType = crossMsg.message.applyType(_networkName);
 
         // If the cross-message destination is the current network.
-        if (crossMsg.message.to.subnetId.equals(networkName)) {
+        if (crossMsg.message.to.subnetId.equals(_networkName)) {
             // forwarder will always be empty subnet when we reach here from submitTopDownCheckpoint
             // so we check against it to not reach here in coverage
 
             if (applyType == IPCMsgType.BottomUp) {
                 if (!forwarder.isEmpty()) {
                     (bool registered, Subnet storage subnet) = _getSubnet(forwarder);
-                    if (!registered) revert NotRegisteredSubnet();
+                    if (!registered) {
+                        revert NotRegisteredSubnet();
+                    }
                     if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
                         revert InvalidCrossMsgNonce();
                     }
@@ -706,6 +769,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
                 appliedTopDownNonce += 1;
             }
 
+            // slither-disable-next-line unused-return
             crossMsg.execute();
             return;
         }
@@ -723,7 +787,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @param crossMsgs - the cross-net messages to apply
     function _applyMessages(SubnetID memory forwarder, CrossMsg[] memory crossMsgs) internal {
         uint256 crossMsgsLength = crossMsgs.length;
-        for (uint256 i = 0; i < crossMsgsLength;) {
+        for (uint256 i = 0; i < crossMsgsLength; ) {
             _applyMsg(forwarder, crossMsgs[i]);
             unchecked {
                 ++i;
@@ -749,7 +813,10 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @param to - the address of the target subnet contract
     /// @param amount - the amount of rewards to distribute
     function _distributeRewards(address to, uint256 amount) internal {
-        if (amount == 0) return;
+        if (amount == 0) {
+            return;
+        }
+        // slither-disable-next-line unused-return
         Address.functionCall(to.normalize(), abi.encodeWithSelector(ISubnetActor.reward.selector, amount));
     }
 
@@ -758,7 +825,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @return found whether the subnet exists
     /// @return subnet -  the subnet struct
     function _getSubnet(address actor) internal view returns (bool found, Subnet storage subnet) {
-        SubnetID memory subnetId = networkName.createSubnetId(actor);
+        SubnetID memory subnetId = _networkName.createSubnetId(actor);
 
         return _getSubnet(subnetId);
     }
