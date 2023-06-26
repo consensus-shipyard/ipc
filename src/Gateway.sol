@@ -117,6 +117,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error AlreadyRegisteredSubnet();
     error AlreadyInitialized();
     error InconsistentPrevCheckpoint();
+    error InvalidActorAddress();
     error InvalidPostboxOwner();
     error InvalidCheckpointEpoch();
     error InvalidCheckpointSource();
@@ -838,6 +839,9 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @return found whether the subnet exists
     /// @return subnet -  the subnet struct
     function _getSubnet(address actor) internal view returns (bool found, Subnet storage subnet) {
+        if (actor == address(0)) {
+            revert InvalidActorAddress();
+        }
         SubnetID memory subnetId = _networkName.createSubnetId(actor);
 
         return _getSubnet(subnetId);

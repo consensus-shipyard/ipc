@@ -18,8 +18,11 @@ contract SubnetRegistry {
     event SubnetDeployed(address subnetAddr, SubnetID subnetId);
 
     error NotSameGateway();
+    error GatewayCannotBeZero();
+    error ZeroSubnetAddress();
 
     constructor(address _gateway) {
+        if (_gateway == address(0)) revert GatewayCannotBeZero();
         gateway = _gateway;
     }
 
@@ -41,7 +44,6 @@ contract SubnetRegistry {
     function subnetAddress(SubnetID calldata _subnetId) external view returns (address subnet) {
         bytes32 subnetHash = _subnetId.toHash();
         subnet = subnets[subnetHash];
-
-        require(subnet != address(0), "Not exists");
+        if (subnet == address(0)) revert ZeroSubnetAddress();
     }
 }
