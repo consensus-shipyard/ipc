@@ -70,10 +70,16 @@ where
                 // XXX: This value is for Filecoin, and it's not even used by the FVM, but at least it should not have a problem with it.
                 msg.gas_limit = BLOCK_GAS_LIMIT;
 
+                // TODO: This actually fails if the caller doesn't have enough gas.
+                //       Should we modify the state tree up front to give it more?
                 let apply_ret = state.call(*msg)?;
 
                 let est = GasEstimate {
                     exit_code: apply_ret.msg_receipt.exit_code,
+                    info: apply_ret
+                        .failure_info
+                        .map(|x| x.to_string())
+                        .unwrap_or_default(),
                     gas_limit: apply_ret.msg_receipt.gas_used,
                 };
 

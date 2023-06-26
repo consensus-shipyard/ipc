@@ -28,21 +28,22 @@
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use clap::Parser;
 use ethers::{
-    prelude::SignerMiddleware,
+    prelude::{abigen, ContractCall, ContractFactory, SignerMiddleware},
     providers::{Http, Middleware, Provider, ProviderError},
     signers::{Signer, Wallet},
 };
 use ethers_core::{
     k256::ecdsa::SigningKey,
     types::{
-        Address, BlockId, BlockNumber, Eip1559TransactionRequest, TransactionReceipt, H160, H256,
-        U256, U64,
+        transaction::eip2718::TypedTransaction, Address, BlockId, BlockNumber, Bytes,
+        Eip1559TransactionRequest, TransactionReceipt, H160, H256, U256, U64,
     },
 };
 use fendermint_rpc::message::MessageFactory;
@@ -51,6 +52,25 @@ use libsecp256k1::SecretKey;
 use tracing::Level;
 
 type TestMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
+type TestContractCall<T> = ContractCall<TestMiddleware, T>;
+
+// This assumes that https://github.com/filecoin-project/builtin-actors is checked out next to this project,
+// which the Makefile in the root takes care of with `make actor-bundle`, a dependency of creating docker images.
+const SIMPLECOIN_HEX: &'static str =
+    include_str!("../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin");
+
+const SIMPLECOIN_ABI: &'static str =
+    include_str!("../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi");
+
+/// Gas limit to set for transactions.
+const ENOUGH_GAS: u64 = 10_000_000_000u64;
+
+// Generate a statically typed interface for the contract.
+// An example of what it looks like is at https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs
+abigen!(
+    SimpleCoin,
+    "../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi"
+);
 
 #[derive(Parser, Debug)]
 pub struct Options {
@@ -180,6 +200,8 @@ impl TestAccount {
 // - eth_getTransactionReceipt
 // - eth_feeHistory
 // - eth_sendRawTransaction
+// - eth_call
+// - eth_estimateGas
 //
 // DOING:
 //
@@ -199,8 +221,6 @@ impl TestAccount {
 // - eth_mining
 // - eth_subscribe
 // - eth_unsubscribe
-// - eth_call
-// - eth_estimateGas
 // - eth_getStorageAt
 // - eth_getCode
 //
@@ -224,12 +244,16 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
         bn.as_u64() > 0
     })?;
 
+    // Go back one block, so we can be sure there are results.
+    let bn = bn - 1;
+
     let chain_id = request("eth_chainId", provider.get_chainid().await, |id| {
         !id.is_zero()
     })?;
 
     let mw = make_middleware(provider.clone(), chain_id.as_u64(), &from)
         .context("failed to create middleware")?;
+    let mw = Arc::new(mw);
 
     request(
         "eth_getBalance",
@@ -300,8 +324,16 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
         !id.is_zero()
     })?;
 
-    // Send the transaction and wait for receipt
-    let receipt = example_transfer(mw, to).await.context("transfer failed")?;
+    tracing::info!("sending example transfer");
+
+    let transfer = make_transfer(&mw, to)
+        .await
+        .context("failed to make a transfer")?;
+
+    let receipt = send_transaction(&mw, transfer.clone())
+        .await
+        .context("failed to send transfer")?;
+
     let tx_hash = receipt.transaction_hash;
     let bn = receipt.block_number.unwrap();
     let bh = receipt.block_hash.unwrap();
@@ -353,29 +385,101 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
         |tx| tx.is_some(),
     )?;
 
+    // Calling with 0 nonce so the node figures out the latest value.
+    let mut probe_tx = transfer.clone();
+    probe_tx.set_nonce(0);
+    let probe_height = BlockId::Number(BlockNumber::Number(bn));
+
+    request(
+        "eth_call",
+        provider.call(&probe_tx, Some(probe_height)).await,
+        |_| true,
+    )?;
+
+    request(
+        "eth_estimateGas",
+        provider.estimate_gas(&probe_tx, Some(probe_height)).await,
+        |gas: &U256| !gas.is_zero(),
+    )?;
+
+    tracing::info!("deploying SimpleCoin");
+
+    let bytecode =
+        Bytes::from(hex::decode(SIMPLECOIN_HEX).context("failed to decode contract hex")?);
+    let abi = serde_json::from_str::<ethers::core::abi::Abi>(SIMPLECOIN_ABI)?;
+
+    let factory = ContractFactory::new(abi, bytecode, mw.clone());
+    let mut deployer = factory.deploy(())?;
+
+    // Fill the fields so we can debug any difference between this and the node.
+    // Using `Some` block ID because with `None` the eth_estimateGas call would receive invalid parameters.
+    mw.fill_transaction(&mut deployer.tx, Some(BlockId::Number(BlockNumber::Latest)))
+        .await?;
+    tracing::info!(sighash = ?deployer.tx.sighash(), "deployment tx");
+
+    // NOTE: This will call eth_estimateGas to figure out how much gas to use, because we don't set it,
+    // unlike in the case of the example transfer. What the [Provider::fill_transaction] will _also_ do
+    // is estimate the fees using eth_feeHistory, here:
+    // https://github.com/gakonst/ethers-rs/blob/df165b84229cdc1c65e8522e0c1aeead3746d9a8/ethers-providers/src/rpc/provider.rs#LL300C30-L300C51
+    // These were set to zero in the earlier example transfer, ie. it was basically paid for by the miner (which is not at the moment charged),
+    // so the test passed. Here, however, there will be a non-zero cost to pay by the deployer, and therefore those balances
+    // have to be much higher than the defaults used earlier, e.g. the deployment cost 30 FIL, and we used to give 1 FIL.
+    let (contract, receipt) = deployer
+        .send_with_receipt()
+        .await
+        .context("failed to send deployment")?;
+
+    tracing::info!(addr = ?contract.address(), "SimpleCoin deployed");
+
+    let contract = SimpleCoin::new(contract.address(), contract.client());
+
+    let _tx_hash = receipt.transaction_hash;
+    let _bn = receipt.block_number.unwrap();
+    let _bh = receipt.block_hash.unwrap();
+
+    let mut coin_call: TestContractCall<U256> = contract.get_balance(from.eth_addr);
+    mw.fill_transaction(
+        &mut coin_call.tx,
+        Some(BlockId::Number(BlockNumber::Latest)),
+    )
+    .await?;
+
+    let coin_balance: U256 = coin_call.call().await.context("coin balance call failed")?;
+
+    if coin_balance != U256::from(10000) {
+        bail!("unexpected coin balance: {coin_balance}");
+    }
+
     Ok(())
 }
 
-/// Make an example transfer.
-async fn example_transfer(
-    mw: TestMiddleware,
-    to: TestAccount,
-) -> anyhow::Result<TransactionReceipt> {
+async fn make_transfer(mw: &TestMiddleware, to: TestAccount) -> anyhow::Result<TypedTransaction> {
     // Create a transaction to transfer 1000 atto.
     let tx = Eip1559TransactionRequest::new().to(to.eth_addr).value(1000);
 
-    // Set the gas based on the testkit so it doesn't trigger estimation (which isn't implemented yet).
-    let tx = tx
-        .gas(10_000_000_000u64)
+    // Set the gas based on the testkit so it doesn't trigger estimation.
+    let mut tx = tx
+        .gas(ENOUGH_GAS)
         .max_fee_per_gas(0)
-        .max_priority_fee_per_gas(0);
+        .max_priority_fee_per_gas(0)
+        .into();
 
+    // Fill in the missing fields like `from` and `nonce` (which involves querying the API).
+    mw.fill_transaction(&mut tx, None).await?;
+
+    Ok(tx)
+}
+
+async fn send_transaction(
+    mw: &TestMiddleware,
+    tx: TypedTransaction,
+) -> anyhow::Result<TransactionReceipt> {
     // `send_transaction` will fill in the missing fields like `from` and `nonce` (which involves querying the API).
     let receipt = mw
         .send_transaction(tx, None)
         .await
         .context("failed to send transaction")?
-        .log_msg("Pending transfer")
+        .log_msg("Pending transaction")
         .retries(5)
         .await?
         .context("Missing receipt")?;

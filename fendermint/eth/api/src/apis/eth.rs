@@ -7,11 +7,12 @@
 // * https://github.com/filecoin-project/lotus/blob/v1.23.1-rc2/node/impl/full/eth.go
 
 use anyhow::Context;
+use ethers_core::types as et;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
-use ethers_core::types::{self as et, BlockId};
 use ethers_core::utils::rlp;
 use fendermint_rpc::message::MessageFactory;
 use fendermint_rpc::query::QueryClient;
+use fendermint_rpc::response::decode_fevm_invoke;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_shared::crypto::signature::Signature;
@@ -190,10 +191,7 @@ pub async fn get_balance<C>(
 where
     C: Client + Sync + Send + Send,
 {
-    let header = match block_id {
-        BlockId::Number(n) => data.header_by_height(n).await?,
-        BlockId::Hash(h) => data.header_by_hash(h).await?,
-    };
+    let header = data.header_by_id(block_id).await?;
     let height = header.height;
     let addr = to_fvm_address(addr);
     let res = data.client.actor_state(&addr, Some(height)).await?;
@@ -331,10 +329,7 @@ pub async fn get_transaction_count<C>(
 where
     C: Client + Sync + Send + Send,
 {
-    let header = match block_id {
-        BlockId::Number(n) => data.header_by_height(n).await?,
-        BlockId::Hash(h) => data.header_by_hash(h).await?,
-    };
+    let header = data.header_by_id(block_id).await?;
     let height = header.height;
     let addr = to_fvm_address(addr);
     let res = data.client.actor_state(&addr, Some(height)).await?;
@@ -432,18 +427,10 @@ where
     C: Client + Sync + Send + Send,
 {
     let rlp = rlp::Rlp::new(tx.as_ref());
-    let (tx, sig) = et::transaction::eip2718::TypedTransaction::decode_signed(&rlp)
+    let (tx, sig) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
-    let msg = match tx {
-        TypedTransaction::Eip1559(tx) => to_fvm_message(&tx)?,
-        TypedTransaction::Legacy(_) | TypedTransaction::Eip2930(_) => {
-            return error(
-                ExitCode::USR_ILLEGAL_ARGUMENT,
-                "unexpected transaction type",
-            )
-        }
-    };
+    let msg = to_fvm_message(tx)?;
     let msg = SignedMessage {
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
@@ -458,5 +445,56 @@ where
             ExitCode::new(res.code.value()),
             hex::encode(res.data.as_ref()), // TODO: What is the content?
         )
+    }
+}
+
+/// Executes a new message call immediately without creating a transaction on the block chain.
+pub async fn call<C>(
+    data: JsonRpcData<C>,
+    Params((tx, block_id)): Params<(TypedTransaction, et::BlockId)>,
+) -> JsonRpcResult<et::Bytes>
+where
+    C: Client + Sync + Send + Send,
+{
+    let msg = to_fvm_message(tx)?;
+    let header = data.header_by_id(block_id).await?;
+    let response = data.client.call(msg, Some(header.height)).await?;
+    let deliver_tx = response.value;
+
+    // Based on Lotus, we should return the data from the receipt.
+    if deliver_tx.code.is_err() {
+        error(ExitCode::new(deliver_tx.code.value()), deliver_tx.info)
+    } else {
+        let return_data = decode_fevm_invoke(&deliver_tx)
+            .context("error decoding data from deliver_tx in query")?;
+
+        Ok(et::Bytes::from(return_data))
+    }
+}
+
+/// Generates and returns an estimate of how much gas is necessary to allow the transaction to complete.
+/// The transaction will not be added to the blockchain.
+/// Note that the estimate may be significantly more than the amount of gas actually used by the transaction, f
+/// or a variety of reasons including EVM mechanics and node performance.
+pub async fn estimate_gas<C>(
+    data: JsonRpcData<C>,
+    Params((tx, block_id)): Params<(TypedTransaction, et::BlockId)>,
+) -> JsonRpcResult<et::U256>
+where
+    C: Client + Sync + Send + Send,
+{
+    let msg = to_fvm_message(tx)?;
+    let header = data.header_by_id(block_id).await?;
+    let response = data.client.estimate_gas(msg, Some(header.height)).await?;
+    let estimate = response.value;
+
+    // Based on Lotus, we should return the data from the receipt.
+    if !estimate.exit_code.is_success() {
+        error(
+            estimate.exit_code,
+            format!("failed to estimate gas: {}", estimate.info),
+        )
+    } else {
+        Ok(estimate.gas_limit.into())
     }
 }

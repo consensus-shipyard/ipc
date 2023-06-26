@@ -85,6 +85,17 @@ where
         Ok(header)
     }
 
+    /// Get the Tendermint header at a specificed height or hash.
+    pub async fn header_by_id(
+        &self,
+        block_id: et::BlockId,
+    ) -> JsonRpcResult<tendermint::block::Header> {
+        match block_id {
+            et::BlockId::Number(n) => self.header_by_height(n).await,
+            et::BlockId::Hash(h) => self.header_by_hash(h).await,
+        }
+    }
+
     /// Get a Tendermint block by hash, if it exists.
     pub async fn block_by_hash_opt(
         &self,

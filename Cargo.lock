@@ -2422,6 +2422,7 @@ dependencies = [
  "arbitrary",
  "blake2b_simd",
  "cid",
+ "ethers",
  "ethers-core",
  "fendermint_testing",
  "fendermint_vm_actor_interface",

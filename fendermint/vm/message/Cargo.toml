@@ -32,9 +32,11 @@ fendermint_vm_actor_interface = { path = "../actor_interface" }
 fendermint_testing = { path = "../../testing", optional = true }
 
 [dev-dependencies]
+ethers = { workspace = true }
+hex = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
-hex = { workspace = true }
+
 
 # Enable arb on self for tests.
 # Ideally we could do this with `#[cfg(any(test, feature = "arb"))]`,

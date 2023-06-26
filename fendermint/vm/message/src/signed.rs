@@ -98,6 +98,7 @@ impl SignedMessage {
             Some(addr) => {
                 let tx = from_fvm::to_eth_transaction(message, chain_id)
                     .map_err(SignedMessageError::Ethereum)?;
+
                 Ok(Signable::Ethereum((tx.sighash(), addr)))
             }
             None => {
@@ -128,7 +129,7 @@ impl SignedMessage {
                 if rec == from {
                     verify_eth_method(message)
                 } else {
-                    Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature".into()))
+                    Err(SignedMessageError::InvalidSignature(format!("the Ethereum delegated address did not match the one recovered from the signature (sighash = {:?})", hash)))
                 }
             }
             Signable::Regular(data) => {
@@ -223,17 +224,21 @@ fn maybe_eth_address(addr: &Address) -> Option<et::H160> {
 /// The method ID is not part of the signature, so someone could modify it, which is
 /// why we have to check explicitly that there is nothing untowards going on.
 fn verify_eth_method(msg: &Message) -> Result<(), SignedMessageError> {
-    if msg.to == eam::EAM_ACTOR_ADDR && msg.method_num != eam::Method::CreateExternal as u64 {
-        Err(SignedMessageError::Ethereum(anyhow!(
-            "The EAM actor can only be called with CreateExternal"
-        )))
+    if msg.to == eam::EAM_ACTOR_ADDR {
+        if msg.method_num != eam::Method::CreateExternal as u64 {
+            return Err(SignedMessageError::Ethereum(anyhow!(
+                "The EAM actor can only be called with CreateExternal; got {}",
+                msg.method_num
+            )));
+        }
     } else if msg.method_num != evm::Method::InvokeContract as u64 {
-        Err(SignedMessageError::Ethereum(anyhow!(
-            "An EVM actor can only be called with InvokeContract"
-        )))
-    } else {
-        Ok(())
+        return Err(SignedMessageError::Ethereum(anyhow!(
+            "An EVM actor can only be called with InvokeContract; got {} - {}",
+            msg.to,
+            msg.method_num
+        )));
     }
+    Ok(())
 }
 
 /// Signed message with an invalid random signature.
@@ -260,27 +265,10 @@ mod tests {
     use fendermint_vm_actor_interface::eam::EthAddress;
     use fvm_shared::{address::Address, chainid::ChainID};
     use quickcheck_macros::quickcheck;
-    use rand::{rngs::StdRng, SeedableRng};
 
-    use crate::conv::from_fvm::tests::EthMessage;
+    use crate::conv::tests::{EthMessage, KeyPair};
 
     use super::SignedMessage;
-
-    #[derive(Debug, Clone)]
-    struct KeyPair {
-        sk: libsecp256k1::SecretKey,
-        pk: libsecp256k1::PublicKey,
-    }
-
-    impl quickcheck::Arbitrary for KeyPair {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            let seed = u64::arbitrary(g);
-            let mut rng = StdRng::seed_from_u64(seed);
-            let sk = libsecp256k1::SecretKey::random(&mut rng);
-            let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
-            Self { sk, pk }
-        }
-    }
 
     #[quickcheck]
     fn chain_id_in_signature(
@@ -319,8 +307,6 @@ mod tests {
         let ea = EthAddress::new_secp256k1(&pk.serialize()).map_err(|e| e.to_string())?;
         let mut msg = msg.0;
         msg.from = Address::from(ea);
-
-        eprintln!("from = {:?}", msg.from);
 
         let signed =
             SignedMessage::new_secp256k1(msg, &sk, &chain_id).map_err(|e| e.to_string())?;

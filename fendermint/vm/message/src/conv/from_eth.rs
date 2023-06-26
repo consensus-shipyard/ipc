@@ -8,7 +8,7 @@ use fendermint_vm_actor_interface::{
     eam::{self, EthAddress},
     evm,
 };
-use fvm_ipld_encoding::RawBytes;
+use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{
     address::Address,
     bigint::{BigInt, Sign},
@@ -39,6 +39,10 @@ pub fn to_fvm_message(tx: &Eip1559TransactionRequest) -> anyhow::Result<Message>
     // this should be usable as a delegated address.
     let from = to_fvm_address(tx.from.unwrap_or_default());
 
+    // Wrap calldata in IPLD byte format.
+    let calldata = tx.data.clone().unwrap_or_default().to_vec();
+    let params = RawBytes::serialize(BytesSer(&calldata))?;
+
     let msg = Message {
         version: 0,
         from,
@@ -46,7 +50,7 @@ pub fn to_fvm_message(tx: &Eip1559TransactionRequest) -> anyhow::Result<Message>
         sequence: tx.nonce.unwrap_or_default().as_u64(),
         value: to_fvm_tokens(&tx.value.unwrap_or_default()),
         method_num,
-        params: RawBytes::new(tx.data.clone().unwrap_or_default().to_vec()),
+        params,
         gas_limit: tx
             .gas
             .map(|gas| gas.min(U256::from(u64::MAX)).as_u64())

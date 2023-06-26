@@ -26,17 +26,24 @@ macro_rules! define_code {
     };
 }
 
-macro_rules! define_singleton {
-    ($name:ident { id: $id:literal, code_id: $code_id:literal }) => {
+macro_rules! define_id {
+    ($name:ident { id: $id:literal }) => {
         paste::paste! {
             pub const [<$name _ACTOR_ID>]: fvm_shared::ActorID = $id;
             pub const [<$name _ACTOR_ADDR>]: fvm_shared::address::Address = fvm_shared::address::Address::new_id([<$name _ACTOR_ID>]);
         }
+    };
+}
+
+macro_rules! define_singleton {
+    ($name:ident { id: $id:literal, code_id: $code_id:literal }) => {
+        define_id!($name { id: $id });
         define_code!($name { code_id: $code_id });
     };
 }
 
 pub mod account;
+pub mod burntfunds;
 pub mod cron;
 pub mod eam;
 pub mod ethaccount;
@@ -44,4 +51,5 @@ pub mod evm;
 pub mod init;
 pub mod multisig;
 pub mod placeholder;
+pub mod reward;
 pub mod system;

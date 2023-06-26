@@ -40,7 +40,7 @@ for NAME in emily eric; do
   fendermint \
     genesis --genesis-file $GENESIS_FILE \
     add-account --public-key $KEYS_DIR/$NAME.pk \
-                --balance 1000000000000000000 \
+                --balance 1000000000000000000000 \
                 --kind ethereum
 done
 

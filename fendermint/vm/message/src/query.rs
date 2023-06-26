@@ -71,6 +71,8 @@ pub struct ActorState {
 pub struct GasEstimate {
     /// Exit code, potentially signalling out-of-gas errors, or that the actor was not found.
     pub exit_code: ExitCode,
+    /// Any information about failed estimations.
+    pub info: String,
     /// Gas used during the probing.
     ///
     /// Potentially contains an over-estimate, but it should be within the account balance limit.

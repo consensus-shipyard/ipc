@@ -10,6 +10,7 @@ use ethers_core::types as et;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::eam::EAM_ACTOR_ID;
+use fvm_ipld_encoding::BytesDe;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::chainid::ChainID;
@@ -39,6 +40,8 @@ pub fn to_eth_address(addr: &Address) -> Option<et::H160> {
         Payload::Delegated(d) if d.namespace() == EAM_ACTOR_ID && d.subaddress().len() == 20 => {
             Some(et::H160::from_slice(d.subaddress()))
         }
+        // Deployments should be sent with an empty `to`.
+        Payload::ID(EAM_ACTOR_ID) => None,
         // It should be possible to send to an ethereum account by ID.
         Payload::ID(id) => Some(et::H160::from_slice(&EthAddress::from_id(*id).0)),
         // XXX: The following fit into the type but are not valid ethereum addresses.
@@ -99,17 +102,25 @@ pub fn to_eth_transaction(msg: &Message, chain_id: &ChainID) -> anyhow::Result<T
         gas_premium,
     } = msg;
 
+    let data = fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?;
+
     let mut tx = et::Eip1559TransactionRequest::new()
         .chain_id(chain_id)
         .from(to_eth_address(from).unwrap_or_default())
         .nonce(*sequence)
-        .value(to_eth_tokens(value)?)
         .gas(*gas_limit)
         .max_fee_per_gas(to_eth_tokens(gas_fee_cap)?)
         .max_priority_fee_per_gas(to_eth_tokens(gas_premium)?)
-        .data(et::Bytes::from(params.to_vec()));
+        .data(et::Bytes::from(data));
 
     tx.to = to_eth_address(to).map(et::NameOrAddress::Address);
+
+    // NOTE: It's impossible to tell if the original Ethereum transaction sent None or Some(0).
+    // The ethers deployer sends None, so let's assume that's the useful behavour to match.
+    // Luckily the RLP encoding at some point seems to resolve them to the same thing.
+    if !value.is_zero() {
+        tx.value = Some(to_eth_tokens(value)?);
+    }
 
     Ok(tx.into())
 }
@@ -117,70 +128,25 @@ pub fn to_eth_transaction(msg: &Message, chain_id: &ChainID) -> anyhow::Result<T
 #[cfg(test)]
 pub mod tests {
 
-    use std::{array, str::FromStr};
+    use std::str::FromStr;
 
-    use fendermint_testing::arb::{ArbMessage, ArbTokenAmount};
-    use fendermint_vm_actor_interface::{
-        eam::{EthAddress, EAM_ACTOR_ID},
-        evm,
-    };
+    use ethers::signers::{Signer, Wallet};
+    use ethers_core::utils::rlp;
+    use ethers_core::{k256::ecdsa::SigningKey, types::transaction::eip2718::TypedTransaction};
+    use fendermint_testing::arb::ArbTokenAmount;
     use fendermint_vm_message::signed::SignedMessage;
-    use fvm_shared::{
-        address::Address,
-        bigint::{BigInt, Integer},
-        chainid::ChainID,
-        econ::TokenAmount,
-        message::Message,
-    };
+    use fvm_shared::crypto::signature::Signature;
+    use fvm_shared::{bigint::BigInt, chainid::ChainID, econ::TokenAmount};
     use libsecp256k1::SecretKey;
     use quickcheck_macros::quickcheck;
     use rand::{rngs::StdRng, SeedableRng};
 
-    use crate::conv::from_eth::to_fvm_message;
+    use crate::conv::{
+        from_eth::to_fvm_message,
+        tests::{EthMessage, KeyPair},
+    };
 
-    use super::{to_eth_signature, to_eth_tokens, to_eth_transaction, MAX_U256};
-
-    #[derive(Clone, Debug)]
-    struct EthDelegatedAddress(Address);
-
-    impl quickcheck::Arbitrary for EthDelegatedAddress {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            let mut subaddr: [u8; 20] = array::from_fn(|_| u8::arbitrary(g));
-            while EthAddress(subaddr).is_masked_id() {
-                subaddr[0] = u8::arbitrary(g);
-            }
-            Self(Address::new_delegated(EAM_ACTOR_ID, &subaddr).unwrap())
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    struct EthTokenAmount(TokenAmount);
-
-    impl quickcheck::Arbitrary for EthTokenAmount {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            let t = ArbTokenAmount::arbitrary(g).0;
-            let (_, t) = t.atto().div_mod_floor(&MAX_U256);
-            Self(TokenAmount::from_atto(t))
-        }
-    }
-
-    /// Message that only contains data which can survive a roundtrip.
-    #[derive(Clone, Debug)]
-    pub struct EthMessage(pub Message);
-
-    impl quickcheck::Arbitrary for EthMessage {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            let mut m = ArbMessage::arbitrary(g).0;
-            m.version = 0;
-            m.method_num = evm::Method::InvokeContract as u64;
-            m.from = EthDelegatedAddress::arbitrary(g).0;
-            m.to = EthDelegatedAddress::arbitrary(g).0;
-            m.value = EthTokenAmount::arbitrary(g).0;
-            m.gas_fee_cap = EthTokenAmount::arbitrary(g).0;
-            m.gas_premium = EthTokenAmount::arbitrary(g).0;
-            Self(m)
-        }
-    }
+    use super::{to_eth_signature, to_eth_tokens, to_eth_transaction};
 
     #[quickcheck]
     fn prop_to_eth_tokens(tokens: ArbTokenAmount) -> bool {
@@ -232,10 +198,42 @@ pub mod tests {
     fn prop_to_and_from_eth_transaction(msg: EthMessage, chain_id: u64) {
         let chain_id = ChainID::from(chain_id);
         let msg0 = msg.0;
-        let tx = to_eth_transaction(&msg0, &chain_id).unwrap();
-        let tx = tx.as_eip1559_ref().unwrap();
-        let msg1 = to_fvm_message(tx).unwrap();
+        let tx = to_eth_transaction(&msg0, &chain_id).expect("to_eth_transaction failed");
+        let tx = tx.as_eip1559_ref().expect("not an eip1559 transaction");
+        let msg1 = to_fvm_message(tx).expect("to_fvm_message failed");
 
         assert_eq!(msg1, msg0)
+    }
+
+    #[quickcheck]
+    fn prop_eth_signature(msg: EthMessage, chain_id: u64, key_pair: KeyPair) {
+        // ethers has `to_eip155_v` which would fail with u64 overflow if the chain ID is too big.
+        let chain_id = chain_id / 3;
+
+        let chain_id = ChainID::from(chain_id);
+        let msg0 = msg.0;
+        let tx = to_eth_transaction(&msg0, &chain_id).expect("to_eth_transaction failed");
+
+        let wallet: Wallet<SigningKey> = Wallet::from_bytes(&key_pair.sk.serialize())
+            .expect("failed to create wallet")
+            .with_chain_id(chain_id);
+
+        let sig = wallet.sign_transaction_sync(&tx).expect("failed to sign");
+
+        let bz = tx.rlp_signed(&sig);
+        let rlp = rlp::Rlp::new(bz.as_ref());
+
+        let (tx1, sig) = TypedTransaction::decode_signed(&rlp)
+            .expect("failed to decode RLP as signed TypedTransaction");
+
+        let tx1 = tx1.as_eip1559_ref().expect("not an eip1559 transaction");
+        let msg1 = to_fvm_message(tx1).expect("to_fvm_message failed");
+
+        let signed = SignedMessage {
+            message: msg1,
+            signature: Signature::new_secp256k1(sig.to_vec()),
+        };
+
+        signed.verify(&chain_id).expect("signature should be valid")
     }
 }
