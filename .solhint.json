@@ -1,8 +1,16 @@
 {
   "extends": "solhint:recommended",
   "rules": {
-    "compiler-version": ["error", "0.8.18"],
-    "func-visibility": ["warn", { "ignoreConstructors": true }],
+    "compiler-version": [
+      "error",
+      "0.8.19"
+    ],
+    "func-visibility": [
+      "warn",
+      {
+        "ignoreConstructors": true
+      }
+    ],
     "no-global-import": "off",
     "no-unused-vars": "error",
     "const-name-snakecase": "error",

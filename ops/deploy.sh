@@ -21,6 +21,7 @@ echo "[*] Populating deploy-gateway script"
 cat scripts/${LIB_OUTPUT} |  cat - scripts/deploy-gateway.template > temp && mv temp scripts/deploy-gateway.ts
 echo "[*] Gateway script in $PWD/scripts/deploy-gateway.ts"
 (npx hardhat deploy-gateway --network ${NETWORK} |  sed -n '/{/,/}/p') > scripts/${GATEWAY_OUTPUT}
+echo "[*] Gateway deployed: " | cat - scripts/${GATEWAY_OUTPUT}
 echo "const GATEWAY =" | cat - scripts/${GATEWAY_OUTPUT}  > temp && mv temp scripts/${GATEWAY_OUTPUT}
 echo "[*] Output gateway address in $PWD/scripts/${GATEWAY_OUTPUT}"
 

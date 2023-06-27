@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.18;
+pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import "../src/lib/CrossMsgHelper.sol";
 import "../src/lib/SubnetIDHelper.sol";
+import "openzeppelin-contracts/utils/Address.sol";
 
 contract CrossMsgHelperTest is Test {
     using SubnetIDHelper for SubnetID;
@@ -203,7 +204,7 @@ contract CrossMsgHelperTest is Test {
     }
 
     function test_Execute_Fails_InvalidMethod() public {
-        vm.expectRevert("Address: low-level call failed");
+        vm.expectRevert(Address.FailedInnerCall.selector);
 
         crossMsg.message.to.rawAddress = address(this);
         crossMsg.message.method = bytes4("1");
