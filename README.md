@@ -1,4 +1,6 @@
 # IPC Solidity Actors
+[![SAST](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/sast.yaml/badge.svg)](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/sast.yaml)
+[![Tests](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/test.yml/badge.svg)](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/test.yml)
 
 **‼️ The IPC Agent, the IPC actors, and Eudico haven't been audited, tested in depth, or otherwise verified.
 Moreover, the system is missing critical recovery functionality in case of crashes.
