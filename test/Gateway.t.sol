@@ -184,7 +184,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         gw2.initGenesisEpoch(50);
 
         require(gw2.initialized() == true);
-        require(gw2.genesisEpoch() == 50);
+        require(gw2.getGenesisEpoch() == 50);
     }
 
     function test_InitGenesisEpoch_Fails_NotSystemActor() public {

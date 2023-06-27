@@ -25,7 +25,7 @@ abstract contract Voting {
     uint64 public lastVotingExecutedEpoch;
 
     /// @notice Initial epoch number
-    uint64 public genesisEpoch;
+    uint64 internal _genesisEpoch;
 
     /// @notice Contains the executable epochs that are ready to be executed, but has yet to be executed.
     /// This usually happens when previous submission epoch has not executed, but the next submission
@@ -41,8 +41,8 @@ abstract contract Voting {
         if (epoch <= lastVotingExecutedEpoch) {
             revert EpochAlreadyExecuted();
         }
-        if (epoch > genesisEpoch) {
-            if ((epoch - genesisEpoch) % submissionPeriod != 0) {
+        if (epoch > _genesisEpoch) {
+            if ((epoch - _genesisEpoch) % submissionPeriod != 0) {
                 revert EpochNotVotable();
             }
         }
@@ -189,5 +189,11 @@ abstract contract Voting {
     /// @return epoch - the epoch for the given block number and checkpoint period
     function _getNextEpoch(uint256 blockNumber, uint64 checkPeriod) internal pure returns (uint64) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
+    }
+
+    /// @notice method that returns the genesis epoch
+    /// @return epoch - the genesis epoch
+    function getGenesisEpoch() public view returns (uint64) {
+        return _genesisEpoch;
     }
 }

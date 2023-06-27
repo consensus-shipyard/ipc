@@ -206,13 +206,13 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     }
 
     /// @notice initialize the contract with the genesis epoch
-    /// @param _genesisEpoch - genesis epoch to set
-    function initGenesisEpoch(uint64 _genesisEpoch) external systemActorOnly {
+    /// @param genesisEpoch - genesis epoch to set
+    function initGenesisEpoch(uint64 genesisEpoch) external systemActorOnly {
         if (initialized) {
             revert AlreadyInitialized();
         }
 
-        genesisEpoch = _genesisEpoch;
+        _genesisEpoch = genesisEpoch;
         initialized = true;
     }
 

@@ -33,7 +33,8 @@ library SubnetIDHelper {
 
     function toString(SubnetID calldata subnet) public pure returns (string memory) {
         string memory route = string(abi.encodePacked("/r", Strings.toString(subnet.root)));
-        for (uint256 i = 0; i < subnet.route.length; ) {
+        uint256 subnetLength = subnet.route.length;
+        for (uint256 i = 0; i < subnetLength; ) {
             route = string.concat(route, "/");
             route = string.concat(route, subnet.route[i].toHexString());
             unchecked {
