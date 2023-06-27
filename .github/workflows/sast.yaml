@@ -38,3 +38,15 @@ jobs:
         run: npx prettier --check 'src/**/*.sol' 'test/*.sol'
       - name: Solhint check
         run: npx solhint 'src/**/*.sol'
+
+  codespell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: CodeSpell check
+        uses: codespell-project/actions-codespell@v2.0
+        with:
+          check_hidden: true
+          check_filenames: true
+          path: src/*,script/*,scripts/*,test/*
+          ignore_words_file: .codespellignore

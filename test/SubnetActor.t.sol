@@ -547,7 +547,7 @@ contract SubnetActorTest is Test {
         _assertVote(validator, checkpoint2);
         _assertVote(validator2, checkpoint2);
 
-        // not commited
+        // not committed
         vm.expectCall(
             GATEWAY_ADDRESS,
             abi.encodeWithSelector(IGateway(GATEWAY_ADDRESS).commitChildCheck.selector, checkpoint2),
