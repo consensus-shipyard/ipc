@@ -338,19 +338,20 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             }
         }
 
+        // get checkpoint for the current template being populated
         (
             bool checkpointExists,
-            uint64 currentEpoch,
+            uint64 nextCheckEpoch,
             BottomUpCheckpoint storage checkpoint
         ) = _getCurrentBottomUpCheckpoint();
 
-        // create checkpoint if not exists
+        // create a checkpoint template if it doesn't exists
         if (!checkpointExists) {
             checkpoint.source = _networkName;
-            checkpoint.epoch = currentEpoch;
+            checkpoint.epoch = nextCheckEpoch;
         }
 
-        checkpoint.setChildCheck(commit, _children, _checks, currentEpoch);
+        checkpoint.setChildCheck(commit, _children, _checks, nextCheckEpoch);
 
         uint256 totalValue = 0;
         uint256 crossMsgLength = commit.crossMsgs.length;
@@ -362,8 +363,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         }
 
         totalValue += commit.fee + checkpoint.fee; // add fee that is already in checkpoint as well. For example from release message interacting with the same checkpoint
-
-        bottomUpNonce += commit.crossMsgs.length > 0 ? 1 : 0;
 
         if (subnet.circSupply < totalValue) {
             revert NotEnoughSubnetCircSupply();

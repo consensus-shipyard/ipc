@@ -564,7 +564,6 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
         (, , uint256 appliedBottomUpNonce, , uint256 circSupplyAfter, ) = getSubnet(subnetAddress);
 
-        require(gw.bottomUpNonce() == 1);
         require(appliedBottomUpNonce == 1);
         require(circSupplyAfter == circSupplyBefore - checkpoint.fee - checkpoint.crossMsgs[0].message.value);
     }
