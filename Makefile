@@ -31,4 +31,4 @@ test:
 	forge test
 
 # ==============================================================================
-.PHONY: deploy-ipc lint format check-subnet slither check-gateway format
+.PHONY: deploy-ipc lint format check-subnet slither check-gateway test
