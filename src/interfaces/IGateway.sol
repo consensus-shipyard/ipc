@@ -44,7 +44,7 @@ interface IGateway {
     /// the amount of funds that can be released for a specific address.
     function release() external payable;
 
-    /// SendCross sends an arbitrary cross-message to other subnet in the hierarchy.
+    /// SendCrossMessage sends an arbitrary cross-message to other subnet in the hierarchy.
     ///
     /// If the message includes any funds they need to be burnt (like in Release)
     /// before being propagated to the corresponding subnet.
@@ -54,7 +54,7 @@ interface IGateway {
     /// included in the message by the actor). Only actors are allowed to send arbitrary
     /// cross-messages as a side-effect of their execution. For plain token exchanges
     /// fund and release have to be used.
-    function sendCross(SubnetID memory destination, CrossMsg memory crossMsg) external payable;
+    function sendCrossMessage(CrossMsg memory crossMsg) external payable;
 
     /// Whitelist a series of addresses as propagator of a cross net message.
     /// This is basically adding this list of addresses to the `PostBoxItem::owners`.

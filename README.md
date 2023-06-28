@@ -90,6 +90,11 @@ Before committing:
 
 ```bash
 make format
-make 
-make check
+make lint
+make test
+make slither
+```
+or
+```bash
+make prepare
 ```

@@ -12,8 +12,6 @@ library SubnetIDHelper {
     error NoParentForSubnet();
     error EmptySubnet();
 
-    bytes32 public constant EMPTY_SUBNET_HASH = keccak256(abi.encode(SubnetID({root: 0, route: new address[](0)})));
-
     function getParentSubnet(SubnetID memory subnet) public pure returns (SubnetID memory) {
         if (subnet.route.length == 0) {
             revert NoParentForSubnet();
@@ -149,6 +147,6 @@ library SubnetIDHelper {
     }
 
     function isEmpty(SubnetID calldata subnetId) external pure returns (bool) {
-        return toHash(subnetId) == EMPTY_SUBNET_HASH;
+        return subnetId.route.length == 0 && subnetId.root == 0;
     }
 }
