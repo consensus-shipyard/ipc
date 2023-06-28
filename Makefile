@@ -2,10 +2,12 @@
 # Deployment
 
 NETWORK ?= localnet
+OUTPUT ?= ./out
 
 deploy-ipc:
 	./ops/deploy.sh $(NETWORK)
-
+compile-abi:
+	./ops/compile-abi.sh $(OUTPUT)
 # ==============================================================================
 # Running security checks within the local computer
 
