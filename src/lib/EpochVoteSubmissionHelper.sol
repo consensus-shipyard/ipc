@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "./CheckpointHelper.sol";
-import "../structs/EpochVoteSubmission.sol";
+import {EMPTY_HASH} from "../constants/Constants.sol";
+import {EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
 
 library EpochVoteSubmissionHelper {
     function reset(EpochVoteSubmission storage voteSubmission) external {

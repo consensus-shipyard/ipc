@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 
 /// @title Subnet Actor interface
 /// @author LimeChain team

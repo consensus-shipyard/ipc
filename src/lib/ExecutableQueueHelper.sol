@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../structs/ExecutableQueue.sol";
+import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
 
 library ExecutableQueueHelper {
     function push(ExecutableQueue storage queue, uint64 epoch) public {

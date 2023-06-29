@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "./SubnetActor.sol";
-import "./structs/Subnet.sol";
-import "./lib/SubnetIDHelper.sol";
+import {SubnetActor} from "./SubnetActor.sol";
+import {SubnetID} from "./structs/Subnet.sol";
+import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 
 contract SubnetRegistry {
     using SubnetIDHelper for SubnetID;
@@ -15,22 +15,22 @@ contract SubnetRegistry {
     address public immutable gateway;
 
     /// @notice Event emitted when a new subnet is deployed.
-    event SubnetDeployed(address subnetAddr, SubnetID subnetId);
+    event SubnetDeployed(address subnetAddr, bytes32);
 
-    error NotSameGateway();
-    error GatewayCannotBeZero();
-    error ZeroSubnetAddress();
+    error WrongGateway();
+    error ZeroGatewayAddress();
+    error UnknownSubnet();
 
     constructor(address _gateway) {
         if (_gateway == address(0)) {
-            revert GatewayCannotBeZero();
+            revert ZeroGatewayAddress();
         }
         gateway = _gateway;
     }
 
     function newSubnetActor(SubnetActor.ConstructParams calldata params) external returns (address subnetAddr) {
         if (params.ipcGatewayAddr != gateway) {
-            revert NotSameGateway();
+            revert WrongGateway();
         }
 
         subnetAddr = address(new SubnetActor(params));
@@ -40,14 +40,13 @@ contract SubnetRegistry {
         bytes32 subnetHash = id.toHash();
         subnets[subnetHash] = subnetAddr;
 
-        emit SubnetDeployed(subnetAddr, id);
+        emit SubnetDeployed(subnetAddr, subnetHash);
     }
 
-    function subnetAddress(SubnetID calldata subnetId) external view returns (address subnet) {
-        bytes32 subnetHash = subnetId.toHash();
+    function subnetAddress(bytes32 subnetHash) external view returns (address subnet) {
         subnet = subnets[subnetHash];
         if (subnet == address(0)) {
-            revert ZeroSubnetAddress();
+            revert UnknownSubnet();
         }
     }
 }

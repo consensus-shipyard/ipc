@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "./Subnet.sol";
+import {SubnetID, IPCAddress} from "./Subnet.sol";
 
 /// @title BottomUpCheckpoint struct
 /// @author LimeChain team
@@ -37,9 +37,4 @@ struct StorableMsg {
     uint64 nonce;
     bytes4 method;
     bytes params;
-}
-
-struct IPCAddress {
-    SubnetID subnetId;
-    address rawAddress;
 }

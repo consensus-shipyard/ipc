@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../constants/Constants.sol";
-import "fevmate/utils/FilAddress.sol";
+import {ADDRESS_CODEHASH} from "../constants/Constants.sol";
+import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 /// @title Helper library for checking account type
 /// @author LimeChain team

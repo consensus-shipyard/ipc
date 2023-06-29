@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../lib/SubnetIDHelper.sol";
-import "../structs/Checkpoint.sol";
-import "../constants/Constants.sol";
+import {EMPTY_HASH} from "../constants/Constants.sol";
+import {SubnetID} from "../structs/Subnet.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
 
 /// @title Helper library for manipulating Checkpoint struct
 /// @author LimeChain team

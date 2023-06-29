@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../structs/Checkpoint.sol";
-import "../structs/Subnet.sol";
+import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
+import {SubnetID} from "../structs/Subnet.sol";
 
 /// @title Gateway interface
 /// @author LimeChain team

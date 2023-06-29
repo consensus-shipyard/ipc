@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../structs/Checkpoint.sol";
-import "../constants/Constants.sol";
-import "../lib/SubnetIDHelper.sol";
-import "../enums/IPCMsgType.sol";
+import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
+import {StorableMsg} from "../structs/Checkpoint.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../constants/Constants.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {IPCMsgType} from "../enums/IPCMsgType.sol";
 
 /// @title Helper library for manipulating StorableMsg struct
 /// @author LimeChain team

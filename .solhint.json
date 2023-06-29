@@ -11,7 +11,7 @@
         "ignoreConstructors": true
       }
     ],
-    "no-global-import": "off",
+    "no-global-import": "error",
     "no-unused-vars": "error",
     "const-name-snakecase": "error",
     "contract-name-camelcase": "error",

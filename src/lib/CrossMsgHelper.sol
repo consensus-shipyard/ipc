@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../structs/Checkpoint.sol";
-import "../constants/Constants.sol";
-import "../lib/SubnetIDHelper.sol";
-import "openzeppelin-contracts/utils/Address.sol";
-import "fevmate/utils/FilAddress.sol";
+import {METHOD_SEND, EMPTY_BYTES, BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
+import {StorableMsg, CrossMsg} from "../structs/Checkpoint.sol";
+import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 /// @title Helper library for manipulating StorableMsg struct
 /// @author LimeChain team

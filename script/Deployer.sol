@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../src/Gateway.sol";
-import "../src/SubnetActor.sol";
+import { EMPTY_BYTES } from "../src/constants/Constants.sol";
+import { ConsensusType } from "../src/enums/ConsensusType.sol";
+import { SubnetID, Subnet } from "../src/structs/Subnet.sol";
+import { Gateway } from "../src/Gateway.sol";
+import { SubnetActor } from "../src/SubnetActor.sol";
 import "forge-std/Script.sol";
 
 contract Deployer is Script {

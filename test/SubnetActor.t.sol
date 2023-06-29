@@ -4,6 +4,8 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
+import {EMPTY_BYTES} from "../src/constants/Constants.sol";
+
 import "../src/SubnetActor.sol";
 import "../src/Gateway.sol";
 import "../src/enums/Status.sol";

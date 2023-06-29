@@ -1,25 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "./Voting.sol";
-import "./structs/Checkpoint.sol";
-import "./structs/EpochVoteSubmission.sol";
-import "./enums/Status.sol";
-import "./enums/VoteExecutionStatus.sol";
-import "./interfaces/IGateway.sol";
-import "./interfaces/ISubnetActor.sol";
-import "./lib/SubnetIDHelper.sol";
-import "./lib/CheckpointHelper.sol";
-import "./lib/AccountHelper.sol";
-import "./lib/CrossMsgHelper.sol";
-import "./lib/StorableMsgHelper.sol";
-import "./lib/ExecutableQueueHelper.sol";
-import "./lib/EpochVoteSubmissionHelper.sol";
-import "fevmate/utils/FilAddress.sol";
-import "openzeppelin-contracts/security/ReentrancyGuard.sol";
-import "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
-import "openzeppelin-contracts/utils/structs/EnumerableMap.sol";
-import "openzeppelin-contracts/utils/Address.sol";
+import {EMPTY_HASH, BURNT_FUNDS_ACTOR, METHOD_SEND} from "./constants/Constants.sol";
+import {Voting} from "./Voting.sol";
+import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg} from "./structs/Checkpoint.sol";
+import {EpochVoteTopDownSubmission} from "./structs/EpochVoteSubmission.sol";
+import {Status} from "./enums/Status.sol";
+import {IPCMsgType} from "./enums/IPCMsgType.sol";
+import {ExecutableQueue} from "./structs/ExecutableQueue.sol";
+import {IGateway} from "./interfaces/IGateway.sol";
+import {ISubnetActor} from "./interfaces/ISubnetActor.sol";
+import {SubnetID, Subnet} from "./structs/Subnet.sol";
+import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
+import {CheckpointHelper} from "./lib/CheckpointHelper.sol";
+import {AccountHelper} from "./lib/AccountHelper.sol";
+import {CrossMsgHelper} from "./lib/CrossMsgHelper.sol";
+import {StorableMsgHelper} from "./lib/StorableMsgHelper.sol";
+import {ExecutableQueueHelper} from "./lib/ExecutableQueueHelper.sol";
+import {EpochVoteSubmissionHelper} from "./lib/EpochVoteSubmissionHelper.sol";
+import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableMap} from "openzeppelin-contracts/utils/structs/EnumerableMap.sol";
+import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 /// @title Gateway Contract
 /// @author LimeChain team
@@ -136,31 +139,47 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error ValidatorWeightIsZero();
     error NotEnoughFundsForMembership();
 
-    modifier signableOnly() {
+    function _signableOnly() private view {
         if (!msg.sender.isAccount()) {
             revert NotSignableAccount();
         }
+    }
+
+    function _hasFee() private view {
+        if (msg.value < crossMsgFee) {
+            revert NotEnoughFee();
+        }
+    }
+
+    function _systemActorOnly() private view {
+        if (!msg.sender.isSystemActor()) {
+            revert NotSystemActor();
+        }
+    }
+
+    function _onlyValidPostboxOwner(bytes32 msgCid) private view {
+        if (!postboxHasOwner[msgCid][msg.sender]) {
+            revert InvalidPostboxOwner();
+        }
+    }
+
+    modifier signableOnly() {
+        _signableOnly();
         _;
     }
 
     modifier systemActorOnly() {
-        if (!msg.sender.isSystemActor()) {
-            revert NotSystemActor();
-        }
+        _systemActorOnly();
         _;
     }
 
     modifier hasFee() {
-        if (msg.value < crossMsgFee) {
-            revert NotEnoughFee();
-        }
+        _hasFee();
         _;
     }
 
     modifier onlyValidPostboxOwner(bytes32 msgCid) {
-        if (!postboxHasOwner[msgCid][msg.sender]) {
-            revert InvalidPostboxOwner();
-        }
+        _onlyValidPostboxOwner(msgCid);
         _;
     }
 
