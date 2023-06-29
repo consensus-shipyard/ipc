@@ -387,6 +387,24 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         return result;
     }
 
+    /// @notice get the full details of the validators, not just their addresses.
+    function getValidatorSet() external view returns (ValidatorSet memory) {
+        uint256 length = _validators.length();
+
+        ValidatorInfo[] memory details = new ValidatorInfo[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            details[i] = ValidatorInfo({
+                addr: _validators.at(i),
+                weight: stake[_validators.at(i)],
+                workerAddr: validatorWorkerAddresses[_validators.at(i)],
+                netAddresses: validatorNetAddresses[_validators.at(i)]
+            });
+        }
+
+        return ValidatorSet({validators: details, configurationNumber: configurationNumber});
+    }
+
     /// @notice whether a validator has voted for a checkpoint submission during an epoch
     /// @param epoch - the epoch to check
     /// @param submitter - the validator to check
