@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.7.3",
+    "@solidity-parser/parser": "^0.16.0",
     "hardhat": "^2.15.0"
   }
 }

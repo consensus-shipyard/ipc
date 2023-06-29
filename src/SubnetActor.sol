@@ -21,6 +21,8 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
+import {FvmAddress} from "./structs/FvmAddress.sol";
+import {FvmAddressHelper} from "./lib/FvmAddressHelper.sol";
 
 /// @title Subnet Actor Contract
 /// @author LimeChain team
@@ -34,6 +36,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
     using ExecutableQueueHelper for ExecutableQueue;
     using EpochVoteSubmissionHelper for EpochVoteSubmission;
     using CrossMsgHelper for CrossMsg;
+    using FvmAddressHelper for FvmAddress;
 
     /// @notice minimum collateral validators need to stake in order to join the subnet. Values get clamped to this
     uint256 public constant MIN_COLLATERAL_AMOUNT = 1 ether;
@@ -52,6 +55,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
 
     /// @notice Minimal number of validators required for the subnet to be able to validate new blocks.
     uint64 public immutable minValidators;
+
+    /// @notice Sequence number that uniquely identifies a validator set.
+    uint64 public configurationNumber;
 
     /// @notice Address of the IPC gateway for the subnet
     address public immutable ipcGatewayAddr;
@@ -90,6 +96,9 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
     /// @notice validator address to validator net address
     mapping(address => string) public validatorNetAddresses;
 
+    /// @notice validator address to validator worker address
+    mapping(address => FvmAddress) public validatorWorkerAddresses;
+
     /// @notice ID of the parent subnet
     SubnetID private _parentId;
 
@@ -98,6 +107,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
 
     error NotGateway();
     error NotAccount();
+    error WorkerAddressInvalid();
     error CollateralIsZero();
     error CallerHasNoStake();
     error CollateralStillLockedInSubnet();
@@ -146,6 +156,18 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         _;
     }
 
+    struct ValidatorInfo {
+        address addr;
+        uint256 weight;
+        FvmAddress workerAddr;
+        string netAddresses;
+    }
+
+    struct ValidatorSet {
+        ValidatorInfo[] validators;
+        uint64 configurationNumber;
+    }
+
     struct ConstructParams {
         SubnetID parentId;
         bytes32 name;
@@ -192,7 +214,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
 
     /// @notice method that allows a validator to join the subnet
     /// @param netAddr - the network address of the validator
-    function join(string calldata netAddr) external payable signableOnly notKilled {
+    function join(string calldata netAddr, FvmAddress calldata workerAddr) external payable signableOnly notKilled {
         uint256 validatorStake = msg.value;
         address validator = msg.sender;
         if (validatorStake == 0) {
@@ -207,6 +229,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
                 // slither-disable-next-line unused-return
                 _validators.add(validator);
                 validatorNetAddresses[validator] = netAddr;
+                validatorWorkerAddresses[validator] = workerAddr;
             }
         }
 
@@ -371,6 +394,26 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         EpochVoteBottomUpSubmission storage voteSubmission = _epochVoteSubmissions[epoch];
 
         return voteSubmission.vote.submitters[voteSubmission.vote.nonce][submitter];
+    }
+
+    /// @notice returns the committed bottom-up checkpoint at specific epoch
+    /// @param epoch - the epoch to check
+    /// @return exists - whether the checkpoint exists
+    /// @return checkpoint - the checkpoint struct
+    function bottomUpCheckpointAtEpoch(
+        uint64 epoch
+    ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
+        checkpoint = committedCheckpoints[epoch];
+        exists = !checkpoint.source.isEmpty();
+    }
+
+    /// @notice returns the historical committed bottom-up checkpoint hash
+    /// @param epoch - the epoch to check
+    /// @return exists - whether the checkpoint exists
+    /// @return hash - the hash of the checkpoint
+    function bottomUpCheckpointHashAtEpoch(uint64 epoch) external view returns (bool, bytes32) {
+        (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
+        return (exists, checkpoint.toHash());
     }
 
     /// @notice submits a vote for a checkpoint

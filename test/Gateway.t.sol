@@ -8,6 +8,7 @@ import "../src/SubnetActor.sol";
 import "../src/lib/SubnetIDHelper.sol";
 import "../src/lib/CheckpointHelper.sol";
 import "../src/lib/CrossMsgHelper.sol";
+import "../src/structs/FvmAddress.sol";
 
 contract GatewayDeploymentTest is StdInvariant, Test {
     using SubnetIDHelper for SubnetID;
@@ -2228,7 +2229,7 @@ contract GatewayDeploymentTest is StdInvariant, Test {
     function _join(address validatorAddress) internal {
         vm.prank(validatorAddress);
         vm.deal(validatorAddress, MIN_COLLATERAL_AMOUNT + 1);
-        sa.join{value: MIN_COLLATERAL_AMOUNT}(DEFAULT_NET_ADDR);
+        sa.join{value: MIN_COLLATERAL_AMOUNT}(DEFAULT_NET_ADDR, FvmAddress({addrType: 1, payload: new bytes(20)}));
 
         require(sa.status() == Status.Active);
     }

@@ -208,6 +208,14 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         }
     }
 
+    /// @notice returns the subnet with the given id
+    /// @param subnetId the id of the subnet
+    /// @return found whether the subnet exists
+    /// @return subnet -  the subnet struct
+    function getSubnet(SubnetID calldata subnetId) external view returns (bool, Subnet memory) {
+        return _getSubnet(subnetId);
+    }
+
     /// @notice get number of top-down messages for the given subnet
     function getSubnetTopDownMsgsLength(SubnetID memory subnetId) external view returns (uint256) {
         (, Subnet storage subnet) = _getSubnet(subnetId);
