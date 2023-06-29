@@ -6,6 +6,7 @@ use std::{cell::RefCell, sync::Arc};
 use anyhow::{anyhow, Context};
 
 use cid::Cid;
+use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_message::query::ActorState;
 use fvm::{engine::MultiEngine, executor::ApplyRet, state_tree::StateTree};
 use fvm_ipld_blockstore::Blockstore;
@@ -149,7 +150,14 @@ where
                 msg.sequence = state.sequence;
             }
         }
-        self.with_exec_state(|s| s.execute_explicit(msg))
+        self.with_exec_state(|s| {
+            if msg.from == SYSTEM_ACTOR_ADDR {
+                // Explicit execution requires `from` to be an account kind.
+                s.execute_implicit(msg)
+            } else {
+                s.execute_explicit(msg)
+            }
+        })
     }
 
     pub fn state_params(&self) -> &FvmStateParams {

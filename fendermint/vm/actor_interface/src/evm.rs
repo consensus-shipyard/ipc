@@ -5,6 +5,8 @@ use cid::Cid;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
+pub use fil_actors_evm_shared::uints;
+
 define_code!(EVM { code_id: 14 });
 
 #[repr(u64)]
@@ -22,8 +24,21 @@ pub enum Method {
     InvokeContract = 3844450837,
 }
 
+// XXX: I don't know why the following arent' part of `fil_actors_evm_shared` :(
+
 #[derive(Serialize_tuple, Deserialize_tuple)]
 #[serde(transparent)]
 pub struct BytecodeReturn {
     pub code: Option<Cid>,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+pub struct GetStorageAtParams {
+    pub storage_key: uints::U256,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+#[serde(transparent)]
+pub struct GetStorageAtReturn {
+    pub storage: uints::U256,
 }

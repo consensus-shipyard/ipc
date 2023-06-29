@@ -43,12 +43,13 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         getBlockByNumber,
         getBlockTransactionCountByHash,
         getBlockTransactionCountByNumber,
-        // eth_getCode
+        getBlockReceipts,
+        getCode,
         // eth_getCompilers
         // eth_getFilterChanges
         // eth_getFilterLogs
         // eth_getLogs
-        // eth_getStorageAt
+        getStorageAt,
         getTransactionByBlockHashAndIndex,
         getTransactionByBlockNumberAndIndex,
         getTransactionByHash,
@@ -65,13 +66,13 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_newFilter
         // eth_newPendingTransactionFilter
         // eth_protocolVersion
-        sendRawTransaction
+        sendRawTransaction,
         // eth_sendTransaction
         // eth_sign
         // eth_signTransaction
         // eth_submitHashrate
         // eth_submitWork
-        // eth_syncing
+        syncing
         // eth_uninstallFilter
     })
 }

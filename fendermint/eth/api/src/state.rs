@@ -4,11 +4,13 @@
 //! Tendermint RPC helper methods for the implementation of the APIs.
 
 use anyhow::Context;
-use ethers_core::types::{self as et};
+use ethers_core::types::{self as et, BlockId};
 use fendermint_rpc::client::TendermintClient;
 use fendermint_rpc::query::QueryClient;
-use fendermint_vm_message::chain::ChainMessage;
-use fvm_shared::{chainid::ChainID, error::ExitCode};
+use fendermint_vm_actor_interface::{evm, system};
+use fendermint_vm_message::{chain::ChainMessage, conv::from_eth::to_fvm_address};
+use fvm_ipld_encoding::{de::DeserializeOwned, RawBytes};
+use fvm_shared::{chainid::ChainID, econ::TokenAmount, error::ExitCode, message::Message};
 use tendermint::block::Height;
 use tendermint_rpc::{
     endpoint::{block, block_by_hash, block_results, commit, header, header_by_hash},
@@ -39,7 +41,7 @@ where
         let block = match block_number {
             et::BlockNumber::Number(height) => {
                 let height =
-                    Height::try_from(height.as_u64()).context("failed to conver to height")?;
+                    Height::try_from(height.as_u64()).context("failed to convert to height")?;
                 let res: block::Response = self.tm().block(height).await?;
                 res.block
             }
@@ -47,7 +49,13 @@ where
             | et::BlockNumber::Latest
             | et::BlockNumber::Safe
             | et::BlockNumber::Pending => {
-                let res: block::Response = self.tm().latest_block().await?;
+                // Using 1 block less than `latest_block` so if this is followed up by `block_results`
+                // then we don't get an error.
+                let commit: commit::Response = self.tm().latest_commit().await?;
+                let height = commit.signed_header.header.height.value();
+                let height = Height::try_from((height.saturating_sub(1)).max(1))
+                    .context("failed to convert to height")?;
+                let res: block::Response = self.tm().block(height).await?;
                 res.block
             }
             et::BlockNumber::Earliest => {
@@ -189,5 +197,50 @@ where
         } else {
             Ok(None)
         }
+    }
+
+    /// Send a message by the system actor to an EVM actor for a read-only query.
+    pub async fn read_evm_actor<T>(
+        &self,
+        address: et::H160,
+        method: evm::Method,
+        params: RawBytes,
+        block_id: BlockId,
+    ) -> JsonRpcResult<T>
+    where
+        T: DeserializeOwned,
+    {
+        let header = self.header_by_id(block_id).await?;
+
+        // We send off a read-only query to an EVM actor at the given address.
+        let message = Message {
+            version: Default::default(),
+            from: system::SYSTEM_ACTOR_ADDR,
+            to: to_fvm_address(address),
+            sequence: 0,
+            value: TokenAmount::from_atto(0),
+            method_num: method as u64,
+            params,
+            gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+            gas_fee_cap: TokenAmount::from_atto(0),
+            gas_premium: TokenAmount::from_atto(0),
+        };
+
+        let result = self
+            .client
+            .call(message, Some(header.height))
+            .await
+            .context("failed to call contract")?;
+
+        if result.value.code.is_err() {
+            return error(ExitCode::new(result.value.code.value()), result.value.info);
+        }
+
+        let data = fendermint_rpc::response::decode_bytes(&result.value)
+            .context("failed to decode data as bytes")?;
+
+        let data: T = fvm_ipld_encoding::from_slice(&data).context("failed to decode as IPLD")?;
+
+        Ok(data)
     }
 }

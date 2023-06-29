@@ -26,24 +26,24 @@
 // and https://coinsbench.com/ethereum-with-rust-tutorial-part-2-compile-and-deploy-solidity-contract-with-rust-c3cd16fce8ee
 
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use clap::Parser;
 use ethers::{
     prelude::{abigen, ContractCall, ContractFactory, SignerMiddleware},
-    providers::{Http, Middleware, Provider, ProviderError},
+    providers::{Http, Middleware, Provider},
     signers::{Signer, Wallet},
 };
 use ethers_core::{
     k256::ecdsa::SigningKey,
     types::{
         transaction::eip2718::TypedTransaction, Address, BlockId, BlockNumber, Bytes,
-        Eip1559TransactionRequest, TransactionReceipt, H160, H256, U256, U64,
+        Eip1559TransactionRequest, SyncingStatus, TransactionReceipt, H160, H256, U256, U64,
     },
 };
 use fendermint_rpc::message::MessageFactory;
@@ -145,11 +145,12 @@ impl CheckResult for bool {
     }
 }
 
-fn request<T, F, C>(method: &str, res: Result<T, ProviderError>, check: F) -> anyhow::Result<T>
+fn request<T, E, F, C>(method: &str, res: Result<T, E>, check: F) -> anyhow::Result<T>
 where
     T: Debug,
     F: FnOnce(&T) -> C,
     C: CheckResult,
+    E: Display,
 {
     tracing::debug!("checking request {method}...");
     match res {
@@ -157,7 +158,7 @@ where
             Ok(()) => Ok(value),
             Err(e) => Err(anyhow!("failed to check {method}: {e}:\n{value:?}")),
         },
-        Err(e) => Err(anyhow!("failed to call {method}: {e}")),
+        Err(e) => Err(anyhow!("failed to call {method}: {e:#}")),
     }
 }
 
@@ -202,31 +203,31 @@ impl TestAccount {
 // - eth_sendRawTransaction
 // - eth_call
 // - eth_estimateGas
+// - eth_getBlockReceipts
+// - eth_getStorageAt
+// - eth_getCode
+// - eth_syncing
 //
 // DOING:
 //
 // TODO:
-// - eth_newBlockFilter
-// - eth_newPendingTransactionFilter
-// - eth_getBlockReceipts
-// - eth_syncing
-// - eth_createAccessList
+//
 // - eth_getLogs
 // - eth_newBlockFilter
+// - eth_newPendingTransactionFilter
 // - eth_newPendingTransactionFilter
 // - eth_newFilter
 // - eth_uninstallFilter
 // - eth_getFilterChanges
-// - eth_getProof
-// - eth_mining
 // - eth_subscribe
 // - eth_unsubscribe
-// - eth_getStorageAt
-// - eth_getCode
 //
 // WON'T DO:
 // - eth_sign
 // - eth_sendTransaction
+// - eth_mining
+// - eth_createAccessList
+// - eth_getProof
 //
 
 /// Exercise the above methods, so we know at least the parameters are lined up correctly.
@@ -385,6 +386,12 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
         |tx| tx.is_some(),
     )?;
 
+    request(
+        "eth_getBlockReceipts",
+        provider.get_block_receipts(BlockNumber::Number(bn)).await,
+        |rs| !rs.is_empty(),
+    )?;
+
     // Calling with 0 nonce so the node figures out the latest value.
     let mut probe_tx = transfer.clone();
     probe_tx.set_nonce(0);
@@ -408,7 +415,7 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
         Bytes::from(hex::decode(SIMPLECOIN_HEX).context("failed to decode contract hex")?);
     let abi = serde_json::from_str::<ethers::core::abi::Abi>(SIMPLECOIN_ABI)?;
 
-    let factory = ContractFactory::new(abi, bytecode, mw.clone());
+    let factory = ContractFactory::new(abi, bytecode.clone(), mw.clone());
     let mut deployer = factory.deploy(())?;
 
     // Fill the fields so we can debug any difference between this and the node.
@@ -442,13 +449,51 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
         &mut coin_call.tx,
         Some(BlockId::Number(BlockNumber::Latest)),
     )
-    .await?;
+    .await
+    .context("failed to fill call transaction")?;
 
-    let coin_balance: U256 = coin_call.call().await.context("coin balance call failed")?;
+    request("eth_call", coin_call.call().await, |coin_balance| {
+        *coin_balance == U256::from(10000)
+    })?;
 
-    if coin_balance != U256::from(10000) {
-        bail!("unexpected coin balance: {coin_balance}");
-    }
+    // We could calculate the storage location of the balance of the owner of the contract,
+    // but let's just see what it returns with at slot 0. See an example at
+    // https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getstorageat
+    request(
+        "eth_getStorageAt",
+        mw.get_storage_at(
+            contract.address(),
+            {
+                let mut bz = [0u8; 32];
+                U256::zero().to_big_endian(&mut bz);
+                H256::from_slice(&bz)
+            },
+            None,
+        )
+        .await,
+        |_| true,
+    )?;
+
+    request(
+        "eth_code",
+        mw.get_code(contract.address(), None).await,
+        |bz| {
+            // It's not exactly the same as the bytecode above.
+            // The initcode is stripped, only the runtime bytecode is returned.
+            // But the two seem to start and end the same way.
+            let a = bz.iter();
+            let b = bytecode.iter();
+            let ar = bz.iter().rev();
+            let br = bytecode.iter().rev();
+            !bz.is_empty()
+                && a.zip(b).take_while(|(a, b)| a == b).count() > 0
+                && ar.zip(br).take_while(|(a, b)| a == b).count() > 0
+        },
+    )?;
+
+    request("eth_syncing", mw.syncing().await, |s| {
+        *s == SyncingStatus::IsFalse // There is only one node.
+    })?;
 
     Ok(())
 }

@@ -173,21 +173,37 @@ pub fn to_eth_transaction(
     Ok(tx)
 }
 
+/// Helper function to produce cumulative gas used after the execution of each transaction in a block,
+/// along with cumulative event log count.
+pub fn to_cumulative(block_results: &endpoint::block_results::Response) -> Vec<(et::U256, usize)> {
+    let mut records = Vec::new();
+    let mut cumulative_gas_used = et::U256::zero();
+    let mut cumulative_event_count = 0usize;
+    if let Some(rs) = block_results.txs_results.as_ref() {
+        for r in rs {
+            cumulative_gas_used += et::U256::from(r.gas_used);
+            cumulative_event_count += r.events.len();
+            records.push((cumulative_gas_used, cumulative_event_count));
+        }
+    }
+    records
+}
+
 // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2174
 // https://github.com/evmos/ethermint/blob/07cf2bd2b1ce9bdb2e44ec42a39e7239292a14af/rpc/backend/tx_info.go#L147
 pub fn to_eth_receipt(
-    msg: SignedMessage,
-    result: endpoint::tx::Response,
-    block_results: endpoint::block_results::Response,
-    header: tendermint::block::Header,
-    base_fee: TokenAmount,
+    msg: &SignedMessage,
+    result: &endpoint::tx::Response,
+    cumulative: &[(et::U256, usize)],
+    header: &tendermint::block::Header,
+    base_fee: &TokenAmount,
 ) -> anyhow::Result<et::TransactionReceipt> {
     let block_hash = et::H256::from_slice(header.hash().as_bytes());
     let block_number = et::U64::from(result.height.value());
     let transaction_hash = et::H256::from_slice(result.hash.as_bytes());
     let transaction_index = et::U64::from(result.index);
 
-    let msg = msg.message;
+    let msg = &msg.message;
     // Lotus effective gas price is based on total spend divided by gas used,
     // for which it recalculates the gas outputs. However, we don't have access
     // to the VM interpreter here to restore those results, and they are discarded
@@ -195,20 +211,13 @@ pub fn to_eth_receipt(
     // We could put it into the [`DeliverTx::info`] field, or we can calculate
     // something based on the gas fields of the transaction, like Ethermint.
     let effective_gas_price =
-        crate::gas::effective_gas_price(&msg, &base_fee, result.tx_result.gas_used);
+        crate::gas::effective_gas_price(msg, base_fee, result.tx_result.gas_used);
 
     // Sum up gas up to this transaction.
-    let mut cumulative_gas_used = et::U256::zero();
-    let mut cumulative_event_count = 0usize;
-    for res in block_results
-        .txs_results
-        .unwrap_or_default()
-        .iter()
-        .take(result.index as usize + 1)
-    {
-        cumulative_gas_used += et::U256::from(res.gas_used);
-        cumulative_event_count += res.events.len();
-    }
+    let (cumulative_gas_used, cumulative_event_count) = cumulative
+        .get(result.index as usize)
+        .cloned()
+        .unwrap_or_default();
 
     let log_index_start = cumulative_event_count.saturating_sub(result.tx_result.events.len());
 
