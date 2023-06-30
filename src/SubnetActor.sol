@@ -205,6 +205,7 @@ contract SubnetActor is ISubnetActor, ReentrancyGuard, Voting {
         // In the future we can use the current epoch. This will be really
         // useful once we support the docking of subnets to new parents, etc.
         _genesisEpoch = 0;
+        configurationNumber = 0;
     }
 
     /* solhint-disable no-empty-blocks */

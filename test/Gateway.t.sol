@@ -820,6 +820,12 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         fund(BLS_ACCOUNT_ADDREESS, fundAmount);
     }
 
+    function test_GetTopDownMsgs_Works_Empty() public view {
+        (SubnetID memory subnetId, , , , , ) = getSubnet(address(sa));
+
+        require(gw.getTopDownMsgs(subnetId, 0).length == 0, "td msgs length not 0");
+    }
+
     function test_Fund_Works_MultipleFundings() public {
         uint8 numberOfFunds = 5;
         uint256 fundAmount = 1 ether;
@@ -837,6 +843,10 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
             fund(funderAddress, fundAmount);
         }
+
+        (SubnetID memory subnetId, , , , , ) = getSubnet(address(sa));
+
+        require(gw.getTopDownMsgs(subnetId, 0).length == numberOfFunds, "td msgs length not correct");
     }
 
     function test_Fund_Fails_WrongSubnet() public {
