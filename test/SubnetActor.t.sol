@@ -631,6 +631,32 @@ contract SubnetActorTest is Test {
         require(sa.lastVotingExecutedEpoch() == 0);
     }
 
+    function test_SubmitCheckpoint_Works_EpochEqualToGenesisEpoch() public {
+        address validator = vm.addr(100);
+
+        vm.roll(0);
+
+        _assertDeploySubnetActor(
+            DEFAULT_NETWORK_NAME,
+            GATEWAY_ADDRESS,
+            ConsensusType.Mir,
+            DEFAULT_MIN_VALIDATOR_STAKE,
+            DEFAULT_MIN_VALIDATORS,
+            DEFAULT_CHECKPOINT_PERIOD,
+            GENESIS,
+            DEFAULT_MAJORITY_PERCENTAGE
+        );
+
+        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
+
+        _assertVote(validator, checkpoint);
+
+        require(sa.hasValidatorVotedForSubmission(checkpoint.epoch, validator) == true);
+        require(sa.lastVotingExecutedEpoch() == checkpoint.epoch);
+    }
+
     function test_SubmitCheckpoint_Fails_NotAccount() public {
         address validator = address(1235);
 

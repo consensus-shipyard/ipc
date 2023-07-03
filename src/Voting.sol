@@ -40,10 +40,11 @@ abstract contract Voting {
         if (epoch <= lastVotingExecutedEpoch) {
             revert EpochAlreadyExecuted();
         }
-        if (epoch > _genesisEpoch) {
-            if ((epoch - _genesisEpoch) % submissionPeriod != 0) {
-                revert EpochNotVotable();
-            }
+        if (epoch < _genesisEpoch) {
+            revert EpochNotVotable();
+        }
+        if ((epoch - _genesisEpoch) % submissionPeriod != 0) {
+            revert EpochNotVotable();
         }
     }
 
