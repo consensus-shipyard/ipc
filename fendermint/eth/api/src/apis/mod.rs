@@ -9,6 +9,8 @@ use paste::paste;
 use tendermint_rpc::HttpClient;
 
 mod eth;
+mod net;
+mod web3;
 
 macro_rules! with_methods {
     ($server:ident, $module:ident, { $($method:ident),* }) => {
@@ -26,7 +28,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
     // This is the list of eth methods. Apart from these Lotus implements 1 method from web3,
     // while Ethermint does more across web3, debug, miner, net, txpool, and personal.
     // The unimplemented ones are commented out, to make it easier to see where we're at.
-    with_methods!(server, eth, {
+    let server = with_methods!(server, eth, {
         accounts,
         blockNumber,
         call,
@@ -65,7 +67,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_newBlockFilter
         // eth_newFilter
         // eth_newPendingTransactionFilter
-        // eth_protocolVersion
+        protocolVersion,
         sendRawTransaction,
         // eth_sendTransaction
         // eth_sign
@@ -74,5 +76,16 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_submitWork
         syncing
         // eth_uninstallFilter
+    });
+
+    let server = with_methods!(server, web3, {
+        clientVersion,
+        sha3
+    });
+
+    with_methods!(server, net, {
+        version,
+        listening,
+        peerCount
     })
 }

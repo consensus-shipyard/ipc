@@ -65,6 +65,16 @@ where
     Ok(et::U64::from(res.value.chain_id))
 }
 
+/// The current FVM network version.
+pub async fn protocol_version<C>(data: JsonRpcData<C>) -> JsonRpcResult<String>
+where
+    C: Client + Sync + Send,
+{
+    let res = data.client.state_params(None).await?;
+    let version: u32 = res.value.network_version.into();
+    Ok(version.to_string())
+}
+
 /// Returns transaction base fee per gas and effective priority fee per gas for the requested/supported block range.
 pub async fn fee_history<C>(
     data: JsonRpcData<C>,

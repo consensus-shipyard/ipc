@@ -207,6 +207,7 @@ impl TestAccount {
 // - eth_getStorageAt
 // - eth_getCode
 // - eth_syncing
+// - web3_clientVersion
 //
 // DOING:
 //
@@ -236,6 +237,14 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
     let to = TestAccount::new(&opts.secret_key_to)?;
 
     tracing::info!(from = ?from.eth_addr, to = ?to.eth_addr, "ethereum address");
+
+    request("web3_clientVersion", provider.client_version().await, |v| {
+        v.starts_with("fendermint/")
+    })?;
+
+    request("net_version", provider.get_net_version().await, |v| {
+        !v.is_empty() && v.chars().all(|c| c.is_numeric())
+    })?;
 
     request("eth_accounts", provider.get_accounts().await, |acnts| {
         acnts.is_empty()
