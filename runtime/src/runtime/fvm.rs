@@ -6,7 +6,7 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_encoding::{to_vec, CborStore, DAG_CBOR};
 use fvm_sdk as fvm;
 use fvm_sdk::NO_DATA_BLOCK_ID;
-use fvm_shared::address::Address;
+use fvm_shared::address::{Address, Protocol};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
@@ -430,8 +430,32 @@ fn init_logging() {
     }
 }
 
+/// Resolves the SECP or BLS public key of an account actor ID address.
 pub fn resolve_secp_bls(rt: &mut impl Runtime, addr: &Address) -> Result<Address, ActorError> {
-    let resolved = match rt.resolve_address(addr) {
+    // return directly if it is already a public key
+    match addr.protocol() {
+        Protocol::Secp256k1 | Protocol::BLS => Ok(addr.clone()),
+        Protocol::ID => {
+            let ret = rt.send(
+                &addr,
+                PUBLIC_RESOLVE_ADDRESS_METHOD,
+                None,
+                TokenAmount::zero(),
+            )?;
+            deserialize_block(ret)
+        }
+        _ => Err(ActorError::illegal_argument(String::from(
+            "address type not compatible",
+        ))),
+    }
+}
+
+pub fn equal_account_id(
+    rt: &mut impl Runtime,
+    a: &Address,
+    b: &Address,
+) -> Result<bool, ActorError> {
+    let a_id = match rt.resolve_address(a) {
         Some(id) => id,
         None => {
             return Err(ActorError::illegal_argument(String::from(
@@ -439,12 +463,13 @@ pub fn resolve_secp_bls(rt: &mut impl Runtime, addr: &Address) -> Result<Address
             )))
         }
     };
-    let ret = rt.send(
-        &resolved,
-        PUBLIC_RESOLVE_ADDRESS_METHOD,
-        None,
-        TokenAmount::zero(),
-    )?;
-
-    deserialize_block(ret)
+    let b_id = match rt.resolve_address(b) {
+        Some(id) => id,
+        None => {
+            return Err(ActorError::illegal_argument(String::from(
+                "couldn't resolve actor address",
+            )))
+        }
+    };
+    Ok(a_id == b_id)
 }
