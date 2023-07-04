@@ -1,44 +1,44 @@
 [package]
-name = "fil_actors_runtime"
-description = "System actors for the Filecoin protocol"
-version = "0.0.1"
-license = "MIT OR Apache-2.0"
 authors = ["ChainSafe Systems <info@chainsafe.io>", "Protocol Labs", "Filecoin Core Devs"]
+description = "System actors for the Filecoin protocol"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+name = "fil_actors_runtime"
 repository = "https://github.com/filecoin-project/builtin-actors"
+version = "0.0.1"
 
 [dependencies]
-fvm_ipld_hamt = "0.5.1"
-fvm_ipld_amt = { version = "0.4.2", features = ["go-interop"] }
-frc42_dispatch = "3.0.0"
-fvm_shared = { version = "=3.0.0-alpha.17", default-features = false }
-num-traits = "0.2.14"
-num-derive = "0.3.3"
-serde = { version = "1.0.136", features = ["derive"] }
-lazy_static = "1.4.0"
-unsigned-varint = "0.7.1"
-integer-encoding = { version = "3.0.3", default-features = false }
-byteorder = "1.4.3"
-cid = { version = "0.8.3", default-features = false, features = ["serde-codec"] }
 base64 = "0.13.0"
-log = "0.4.14"
-indexmap = { version = "1.8.0", features = ["serde-1"] }
-thiserror = "1.0.30"
+byteorder = "1.4.3"
 castaway = "0.2.2"
+cid = {version = "0.8.3", default-features = false, features = ["serde-codec"]}
+frc42_dispatch = "3.0.0"
+fvm_ipld_amt = {version = "0.4.2", features = ["go-interop"]}
+fvm_ipld_hamt = "0.5.1"
+fvm_shared = {version = "=3.2.0", default-features = false}
+indexmap = {version = "1.8.0", features = ["serde-1"]}
+integer-encoding = {version = "3.0.3", default-features = false}
+lazy_static = "1.4.0"
+log = "0.4.14"
+num-derive = "0.3.3"
+num-traits = "0.2.14"
+serde = {version = "1.0.136", features = ["derive"]}
+thiserror = "1.0.30"
+unsigned-varint = "0.7.1"
 # enforce wasm compat
-getrandom = { version = "0.2.3", features = ["js"]}
-rand = "0.7.3"
-hex = { version = "0.4.3", optional = true }
 anyhow = "1.0.56"
-fvm_sdk = { version = "=3.0.0-alpha.22", optional = true }
 blake2b_simd = "1.0"
 fvm_ipld_blockstore = "0.1.1"
 fvm_ipld_encoding = "0.3.3"
-multihash = { version = "0.16.1", default-features = false }
-serde_repr = "0.1.8"
-regex = "1"
+fvm_sdk = {version = "=3.2.0", optional = true}
+getrandom = {version = "0.2.3", features = ["js"]}
+hex = {version = "0.4.3", optional = true}
 itertools = "0.10"
+multihash = {version = "0.16.1", default-features = false}
 paste = "1.0.9"
+rand = "0.7.3"
+regex = "1"
+serde_repr = "0.1.8"
 serde_tuple = "0.5.0"
 
 [dependencies.sha2]

@@ -8,11 +8,11 @@ version = "0.1.0"
 fil_actors_runtime = {path = "../runtime", features = ["test_utils", "fil-actor"]}
 primitives = {path = "../primitives"}
 
-frc42_dispatch = "3.0.0"
+frc42_dispatch = "3.2.0"
 fvm_ipld_blockstore = "0.1.1"
 fvm_ipld_encoding = "0.3.3"
 fvm_ipld_hamt = "0.5.1"
-fvm_shared = {version = "=3.0.0-alpha.17", default-features = false}
+fvm_shared = {version = "=3.2.0", default-features = false}
 
 anyhow = "1.0.56"
 cid = {version = "0.8.3", default-features = false, features = ["serde-codec"]}
