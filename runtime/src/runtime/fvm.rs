@@ -434,10 +434,10 @@ fn init_logging() {
 pub fn resolve_secp_bls(rt: &mut impl Runtime, addr: &Address) -> Result<Address, ActorError> {
     // return directly if it is already a public key
     match addr.protocol() {
-        Protocol::Secp256k1 | Protocol::BLS => Ok(addr.clone()),
+        Protocol::Secp256k1 | Protocol::BLS => Ok(*addr),
         Protocol::ID => {
             let ret = rt.send(
-                &addr,
+                addr,
                 PUBLIC_RESOLVE_ADDRESS_METHOD,
                 None,
                 TokenAmount::zero(),
