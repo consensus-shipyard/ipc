@@ -14,7 +14,9 @@ The following command runs unit and integration tests:
 make test
 ```
 
-while the next command builds docker images and runs an end-to-end test using the [SimpleCoin](./fendermint/rpc/examples/simplecoin.rs) example:
+while the next command builds docker images and runs an end-to-end test using the
+[SimpleCoin](./fendermint/rpc/examples/simplecoin.rs) and the
+[ethers](./fendermint/eth/api/examples/ethers.rs) examples:
 
 ```bash
 make e2e

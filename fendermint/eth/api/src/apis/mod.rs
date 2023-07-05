@@ -50,7 +50,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_getCompilers
         // eth_getFilterChanges
         // eth_getFilterLogs
-        // eth_getLogs
+        getLogs,
         getStorageAt,
         getTransactionByBlockHashAndIndex,
         getTransactionByBlockNumberAndIndex,
