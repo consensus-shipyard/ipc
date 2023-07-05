@@ -5,6 +5,8 @@ import {METHOD_SEND, EMPTY_BYTES, BURNT_FUNDS_ACTOR} from "../constants/Constant
 import {StorableMsg, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
+import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
@@ -13,34 +15,19 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
-
-    bytes32 public constant EMPTY_CROSS_MSG =
-        keccak256(
-            abi.encode(
-                CrossMsg({
-                    message: StorableMsg({
-                        from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                        to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                        value: 0,
-                        nonce: 0,
-                        method: METHOD_SEND,
-                        params: EMPTY_BYTES
-                    }),
-                    wrapped: false
-                })
-            )
-        );
+    using FvmAddressHelper for FvmAddress;
 
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
+        FvmAddress calldata to,
         uint256 value
     ) public pure returns (CrossMsg memory) {
         return
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: subnet, rawAddress: BURNT_FUNDS_ACTOR}),
-                    to: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
+                    from: IPCAddress({subnetId: subnet, rawAddress: FvmAddressHelper.from(signer)}),
+                    to: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: to}),
                     value: value,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -53,13 +40,14 @@ library CrossMsgHelper {
     function createFundMsg(
         SubnetID calldata subnet,
         address signer,
+        FvmAddress calldata to,
         uint256 value
     ) public pure returns (CrossMsg memory) {
         return
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: signer}),
-                    to: IPCAddress({subnetId: subnet, rawAddress: signer}),
+                    from: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: FvmAddressHelper.from(signer)}),
+                    to: IPCAddress({subnetId: subnet, rawAddress: to}),
                     value: value,
                     nonce: 0,
                     method: METHOD_SEND,
@@ -78,12 +66,15 @@ library CrossMsgHelper {
     }
 
     function isEmpty(CrossMsg memory crossMsg) internal pure returns (bool) {
-        return toHash(crossMsg) == EMPTY_CROSS_MSG;
+        return
+            crossMsg.message.nonce == 0 &&
+            crossMsg.message.to.subnetId.root == 0 &&
+            crossMsg.message.from.subnetId.root == 0;
     }
 
     function execute(CrossMsg calldata crossMsg) public returns (bytes memory) {
         uint256 value = crossMsg.message.value;
-        address recipient = crossMsg.message.to.rawAddress.normalize();
+        address recipient = crossMsg.message.to.rawAddress.extractEvmAddress().normalize();
 
         if (crossMsg.message.method == METHOD_SEND) {
             Address.sendValue(payable(recipient), value);

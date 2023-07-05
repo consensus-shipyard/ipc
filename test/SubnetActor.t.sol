@@ -13,6 +13,7 @@ import "../src/structs/Subnet.sol";
 import "../src/structs/FvmAddress.sol";
 import "../src/lib/SubnetIDHelper.sol";
 import "../src/lib/CheckpointHelper.sol";
+import "../src/lib/FvmAddressHelper.sol";
 
 contract SubnetActorTest is Test {
     using SubnetIDHelper for SubnetID;
@@ -484,11 +485,11 @@ contract SubnetActorTest is Test {
             message: StorableMsg({
                 from: IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: address(this)
+                    rawAddress: FvmAddressHelper.from(address(this))
                 }),
                 to: IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: address(this)
+                    rawAddress: FvmAddressHelper.from(address(this))
                 }),
                 value: CROSS_MSG_FEE + 1,
                 nonce: 1,
@@ -501,11 +502,11 @@ contract SubnetActorTest is Test {
             message: StorableMsg({
                 from: IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: address(this)
+                    rawAddress: FvmAddressHelper.from(address(this))
                 }),
                 to: IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: address(this)
+                    rawAddress: FvmAddressHelper.from(address(this))
                 }),
                 value: CROSS_MSG_FEE + 1,
                 nonce: 0,
@@ -965,8 +966,8 @@ contract SubnetActorTest is Test {
 
         crossMsgs[0] = CrossMsg({
             message: StorableMsg({
-                from: IPCAddress({subnetId: subnetActorId, rawAddress: address(this)}),
-                to: IPCAddress({subnetId: subnetActorId, rawAddress: address(this)}),
+                from: IPCAddress({subnetId: subnetActorId, rawAddress: FvmAddressHelper.from(address(this))}),
+                to: IPCAddress({subnetId: subnetActorId, rawAddress: FvmAddressHelper.from(address(this))}),
                 value: 0,
                 nonce: nonce,
                 method: this.callback.selector,

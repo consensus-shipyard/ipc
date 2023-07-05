@@ -10,3 +10,12 @@ struct FvmAddress {
     uint8 addrType;
     bytes payload;
 }
+
+/*
+ * The delegated f4 address in Fil Address from FVM.
+ */
+struct DelegatedAddress {
+    uint64 namespace;
+    uint128 length;
+    bytes buffer;
+}

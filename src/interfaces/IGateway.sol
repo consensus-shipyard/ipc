@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID} from "../structs/Subnet.sol";
+import {FvmAddress} from "../structs/FvmAddress.sol";
 
 /// @title Gateway interface
 /// @author LimeChain team
@@ -35,14 +36,14 @@ interface IGateway {
     /// - A new fund cross-message is created and stored to propagate it to the subnet. It will be
     /// picked up by miners to include it in the next possible block.
     /// - The cross-message nonce is updated
-    function fund(SubnetID memory subnetId) external payable;
+    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable;
 
     /// Release creates a new check message to release funds in parent chain
     ///
     /// This function burns the funds that will be released in the current subnet
     /// and propagates a new checkpoint message to the parent chain to signal
     /// the amount of funds that can be released for a specific address.
-    function release() external payable;
+    function release(FvmAddress calldata to) external payable;
 
     /// SendCrossMessage sends an arbitrary cross-message to other subnet in the hierarchy.
     ///

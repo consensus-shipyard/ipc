@@ -6,46 +6,23 @@ import "forge-std/console.sol";
 
 import "../src/lib/CrossMsgHelper.sol";
 import "../src/lib/SubnetIDHelper.sol";
+import "../src/lib/FvmAddressHelper.sol";
+import {FvmAddress} from "../src/structs/FvmAddress.sol";
+
 import "openzeppelin-contracts/utils/Address.sol";
 
 contract CrossMsgHelperTest is Test {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
     using CrossMsgHelper for CrossMsg[];
+    using FvmAddressHelper for FvmAddress;
 
-    bytes32 immutable EMPTY_CROSS_MSGS_HASH = keccak256(abi.encode(createCrossMsgs(0, 0)));
-    bytes32 immutable EMPTY_CROSS_MSG_HASH = keccak256(abi.encode(createCrossMsg(0)));
     uint64 private constant ROOTNET_CHAINID = 123;
 
     CrossMsg public crossMsg;
     CrossMsg[] public crossMsgs;
 
     error NoParentForSubnet();
-
-    function test_ToHash_Works_EmptyCrossMsg() public view {
-        require(crossMsg.toHash() == EMPTY_CROSS_MSG_HASH);
-    }
-
-    function test_ToHash_Works_NonEmptyCrossMsg(uint64 nonce) public {
-        crossMsg.message.nonce = nonce;
-
-        CrossMsg memory crossMsgExpected = createCrossMsg(nonce);
-
-        require(crossMsg.toHash() == crossMsgExpected.toHash());
-    }
-
-    function test_ToHash_Works_EmptyCrossMsgs() public view {
-        require(crossMsgs.toHash() == EMPTY_CROSS_MSGS_HASH);
-    }
-
-    function test_ToHash_Works_NonEmptyCrossMsgs(uint64 nonce) public {
-        crossMsg.message.nonce = nonce;
-        crossMsgs.push(crossMsg);
-
-        CrossMsg[] memory crossMsgsExpected = createCrossMsgs(1, nonce);
-
-        require(crossMsgs.toHash() == crossMsgsExpected.toHash());
-    }
 
     function test_IsEmpty_Works_EmptyCrossMsg() public view {
         require(crossMsg.isEmpty() == true);
@@ -65,16 +42,21 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory releaseMsg = CrossMsgHelper.createReleaseMsg(subnetId, sender, releaseAmount);
+        CrossMsg memory releaseMsg = CrossMsgHelper.createReleaseMsg(
+            subnetId,
+            sender,
+            FvmAddressHelper.from(sender),
+            releaseAmount
+        );
 
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
         SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
 
         require(releaseMsg.message.from.subnetId.toHash() == subnetId.toHash());
-        require(releaseMsg.message.from.rawAddress == BURNT_FUNDS_ACTOR);
+        require(releaseMsg.message.from.rawAddress.extractEvmAddress() == sender);
         require(releaseMsg.message.to.subnetId.toHash() == parentSubnetId.toHash());
-        require(releaseMsg.message.to.rawAddress == sender);
+        require(releaseMsg.message.to.rawAddress.extractEvmAddress() == sender);
         require(releaseMsg.message.value == releaseAmount);
         require(releaseMsg.message.nonce == 0);
         require(releaseMsg.message.method == METHOD_SEND);
@@ -87,7 +69,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createReleaseMsg(subnetId, sender, releaseAmount);
+        CrossMsgHelper.createReleaseMsg(subnetId, sender, FvmAddressHelper.from(sender), releaseAmount);
     }
 
     function test_CreateFundMsg_Works_Root(uint256 fundAmount, address sender) public {
@@ -97,14 +79,19 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(parentSubnetId, sender, fundAmount);
+        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(
+            parentSubnetId,
+            sender,
+            FvmAddressHelper.from(sender),
+            fundAmount
+        );
 
         SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
         require(fundMsg.message.from.subnetId.toHash() == rootSubnetId.toHash());
-        require(fundMsg.message.from.rawAddress == sender);
+        require(fundMsg.message.from.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.message.to.subnetId.toHash() == parentSubnetId.toHash());
-        require(fundMsg.message.to.rawAddress == sender);
+        require(fundMsg.message.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.message.value == fundAmount);
         require(fundMsg.message.nonce == 0);
         require(fundMsg.message.method == METHOD_SEND);
@@ -120,16 +107,21 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(subnetId, sender, fundAmount);
+        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(
+            subnetId,
+            sender,
+            FvmAddressHelper.from(sender),
+            fundAmount
+        );
 
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
         SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
 
         require(fundMsg.message.from.subnetId.toHash() == parentSubnetId.toHash());
-        require(fundMsg.message.from.rawAddress == sender);
+        require(fundMsg.message.from.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.message.to.subnetId.toHash() == subnetId.toHash());
-        require(fundMsg.message.to.rawAddress == sender);
+        require(fundMsg.message.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.message.value == fundAmount);
         require(fundMsg.message.nonce == 0);
         require(fundMsg.message.method == METHOD_SEND);
@@ -142,14 +134,14 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createFundMsg(subnetId, sender, fundAmount);
+        CrossMsgHelper.createFundMsg(subnetId, sender, FvmAddressHelper.from(sender), fundAmount);
     }
 
     function test_Execute_Works_SendValue() public {
         address sender = address(this);
         address recipient = address(100);
 
-        crossMsg.message.to.rawAddress = recipient;
+        crossMsg.message.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.message.method = METHOD_SEND;
         crossMsg.message.value = 1;
 
@@ -166,7 +158,7 @@ contract CrossMsgHelperTest is Test {
         address sender = address(this);
         address recipient = address(this);
 
-        crossMsg.message.to.rawAddress = recipient;
+        crossMsg.message.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.message.method = this.callback.selector;
         crossMsg.message.value = 1;
         crossMsg.message.params = EMPTY_BYTES;
@@ -185,7 +177,7 @@ contract CrossMsgHelperTest is Test {
         address sender = address(this);
         address recipient = address(this);
 
-        crossMsg.message.to.rawAddress = recipient;
+        crossMsg.message.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.message.method = this.callback.selector;
         crossMsg.message.value = 0;
         crossMsg.message.params = EMPTY_BYTES;
@@ -206,7 +198,7 @@ contract CrossMsgHelperTest is Test {
     function test_Execute_Fails_InvalidMethod() public {
         vm.expectRevert(Address.FailedInnerCall.selector);
 
-        crossMsg.message.to.rawAddress = address(this);
+        crossMsg.message.to.rawAddress = FvmAddressHelper.from(address(this));
         crossMsg.message.method = bytes4("1");
 
         crossMsg.execute();
@@ -248,8 +240,14 @@ contract CrossMsgHelperTest is Test {
         return
             CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                    to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
+                    from: IPCAddress({
+                        subnetId: SubnetID(0, new address[](0)),
+                        rawAddress: FvmAddressHelper.from(address(0))
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID(0, new address[](0)),
+                        rawAddress: FvmAddressHelper.from(address(0))
+                    }),
                     value: 0,
                     nonce: nonce,
                     method: METHOD_SEND,

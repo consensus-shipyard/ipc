@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
+import {SubnetID} from "../structs/Subnet.sol";
 import {StorableMsg} from "../structs/Checkpoint.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../constants/Constants.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -11,20 +11,6 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 /// @author LimeChain team
 library StorableMsgHelper {
     using SubnetIDHelper for SubnetID;
-
-    bytes32 public constant EMPTY_STORABLE_MESSAGE_HASH =
-        keccak256(
-            abi.encode(
-                StorableMsg({
-                    from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                    to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
-                    value: 0,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: EMPTY_BYTES
-                })
-            )
-        );
 
     function applyType(StorableMsg calldata message, SubnetID calldata currentSubnet) public pure returns (IPCMsgType) {
         SubnetID memory toSubnet = message.to.subnetId;

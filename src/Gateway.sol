@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {EMPTY_HASH, BURNT_FUNDS_ACTOR, METHOD_SEND} from "./constants/Constants.sol";
 import {Voting} from "./Voting.sol";
 import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg} from "./structs/Checkpoint.sol";
+import {FvmAddress} from "./structs/FvmAddress.sol";
 import {EpochVoteTopDownSubmission} from "./structs/EpochVoteSubmission.sol";
 import {Status} from "./enums/Status.sol";
 import {IPCMsgType} from "./enums/IPCMsgType.sol";
@@ -12,6 +13,7 @@ import {IGateway} from "./interfaces/IGateway.sol";
 import {ISubnetActor} from "./interfaces/ISubnetActor.sol";
 import {SubnetID, Subnet} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "./lib/FvmAddressHelper.sol";
 import {CheckpointHelper} from "./lib/CheckpointHelper.sol";
 import {AccountHelper} from "./lib/AccountHelper.sol";
 import {CrossMsgHelper} from "./lib/CrossMsgHelper.sol";
@@ -29,6 +31,7 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 contract Gateway is IGateway, ReentrancyGuard, Voting {
     using FilAddress for address;
     using FilAddress for address payable;
+    using FvmAddressHelper for FvmAddress;
     using AccountHelper for address;
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
@@ -112,10 +115,10 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error NotEnoughFunds();
     error NotEnoughFundsToRelease();
     error CannotReleaseZero();
+    error NotEnoughSubnetCircSupply();
     error NotEnoughBalance();
     error NotInitialized();
     error NotValidator();
-    error NotEnoughSubnetCircSupply();
     error NotEmptySubnetCircSupply();
     error NotRegisteredSubnet();
     error AlreadyRegisteredSubnet();
@@ -127,10 +130,8 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error InvalidCheckpointSource();
     error InvalidCrossMsgNonce();
     error InvalidCrossMsgDestinationSubnet();
-    error InvalidCrossMsgDestinationAddress();
     error InvalidCrossMsgsSortOrder();
     error InvalidCrossMsgFromSubnetId();
-    error InvalidCrossMsgFromRawAddress();
     error CannotSendCrossMsgToItself();
     error SubnetNotActive();
     error PostboxNotExist();
@@ -409,8 +410,9 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     /// @notice fund - commit a top-down message releasing funds in a child subnet. There is an associated fee that gets distributed to validators in the subnet as well
     /// @param subnetId - subnet to fund
-    function fund(SubnetID calldata subnetId) external payable signableOnly hasFee {
-        CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg(subnetId, msg.sender, msg.value - crossMsgFee);
+    /// @param to - the address to send funds to
+    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable signableOnly hasFee {
+        CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg(subnetId, msg.sender, to, msg.value - crossMsgFee);
 
         // commit top-down message.
         _commitTopDownMsg(crossMsg);
@@ -419,8 +421,13 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     }
 
     /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds
-    function release() external payable signableOnly hasFee {
-        CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg(_networkName, msg.sender, msg.value - crossMsgFee);
+    function release(FvmAddress calldata to) external payable signableOnly hasFee {
+        CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg(
+            _networkName,
+            msg.sender,
+            to,
+            msg.value - crossMsgFee
+        );
 
         _commitBottomUpMsg(crossMsg);
     }
@@ -523,9 +530,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         if (crossMsg.message.value != msg.value) {
             revert NotEnoughFunds();
         }
-        if (crossMsg.message.to.rawAddress == address(0)) {
-            revert InvalidCrossMsgDestinationAddress();
-        }
 
         // We disregard the "to" of the message that will be verified in the _commitCrossMessage().
         // The caller is the one set as the "from" of the message
@@ -537,9 +541,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         // They can be equal, we can propagate the real sender address only or both.
         // We are going to use the simplest implementation for now and define the appropriate interpretation later
         // based on the business requirements.
-        if (crossMsg.message.from.rawAddress != msg.sender) {
-            revert InvalidCrossMsgFromRawAddress();
-        }
 
         // commit cross-message for propagation
         (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(crossMsg);
@@ -793,9 +794,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// @param forwarder - the subnet that handles the cross message
     /// @param crossMsg - the cross message to be executed
     function _applyMsg(SubnetID memory forwarder, CrossMsg memory crossMsg) internal {
-        if (crossMsg.message.to.rawAddress == address(0)) {
-            revert InvalidCrossMsgDestinationAddress();
-        }
         if (crossMsg.message.to.subnetId.isEmpty()) {
             revert InvalidCrossMsgDestinationSubnet();
         }
@@ -842,7 +840,8 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         bytes32 cid = crossMsg.toHash();
 
         postbox[cid] = crossMsg;
-        postboxHasOwner[cid][crossMsg.message.from.rawAddress] = true;
+        FvmAddress memory addr = crossMsg.message.from.rawAddress;
+        postboxHasOwner[cid][addr.extractEvmAddress()] = true;
     }
 
     /// @notice applies a cross-net messages coming from some other subnet.

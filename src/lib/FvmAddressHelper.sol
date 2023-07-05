@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import {FvmAddress} from "../structs/FvmAddress.sol";
+import {FvmAddress, DelegatedAddress} from "../structs/FvmAddress.sol";
 
 /// @title Helper library for Fil Address
 library FvmAddressHelper {
@@ -9,21 +9,45 @@ library FvmAddressHelper {
     uint8 public constant SECP256K1 = 1;
     uint8 public constant PAYLOAD_HASH_LEN = 20;
 
-    /// @notice Checks if two fil addresses are the same
-    function isEqual(FvmAddress calldata f1, FvmAddress calldata f2) internal pure returns (bool) {
-        if (f1.addrType != f2.addrType) {
-            return false;
+    /// For delegated FIL address
+    uint8 public constant DELEGATED = 4;
+    uint64 public constant EAM_ACTOR = 10;
+
+    error NotDelegatedEvmAddress();
+
+    /// @notice Creates a FvmAddress from address type
+    function from(address addr) internal pure returns (FvmAddress memory fvmAddress) {
+        bytes memory payload = abi.encode(
+            DelegatedAddress({namespace: EAM_ACTOR, length: 20, buffer: abi.encodePacked(addr)})
+        );
+
+        fvmAddress = FvmAddress({addrType: DELEGATED, payload: payload});
+    }
+
+    function extractEvmAddress(FvmAddress memory fvmAddress) internal pure returns (address addr) {
+        if (fvmAddress.addrType != DELEGATED) {
+            revert NotDelegatedEvmAddress();
         }
-        return f1.payload.length == f2.payload.length && keccak256(f1.payload) == keccak256(f2.payload);
+
+        DelegatedAddress memory delegated = abi.decode(fvmAddress.payload, (DelegatedAddress));
+
+        if (delegated.namespace != EAM_ACTOR) {
+            revert NotDelegatedEvmAddress();
+        }
+        if (delegated.length != 20) {
+            revert NotDelegatedEvmAddress();
+        }
+        if (delegated.buffer.length != 20) {
+            revert NotDelegatedEvmAddress();
+        }
+
+        addr = _bytesToAddress(delegated.buffer);
     }
 
-    /// @notice Checks if the fil addresses is valid
-    function isValid(FvmAddress calldata filAddress) internal pure returns (bool) {
-        require(filAddress.addrType == SECP256K1, "Addr not supported");
-        return _isValidF1Address(filAddress.payload);
-    }
-
-    function _isValidF1Address(bytes calldata payload) private pure returns (bool) {
-        return payload.length == PAYLOAD_HASH_LEN;
+    function _bytesToAddress(bytes memory bys) private pure returns (address addr) {
+        // solhint-disable-next-line
+        assembly {
+            addr := mload(add(bys, 20))
+        }
     }
 }
