@@ -7,6 +7,13 @@ import { deployContractWithDeployer, getTransactionFees } from './util';
 export async function deploy(libs: { [key in string]: string }) {
     if (!libs || Object.keys(libs).length === 0) throw new Error(`Libraries are missing`);
 
+    // choose chain ID according to the network in 
+    // environmental variable
+    let chainId = 31415926;
+    if (process.env.NETWORK == "calibrationnet") {
+        chainId = 314159;
+    }
+
     await hre.run('compile');
 
     const [deployer] = await ethers.getSigners();
@@ -17,7 +24,7 @@ export async function deploy(libs: { [key in string]: string }) {
 
     const gatewayConstructorParams = {
         networkName: {
-            root: 314159,
+            root: chainId,
             route: []
         },
         bottomUpCheckPeriod: 10,

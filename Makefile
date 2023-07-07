@@ -6,6 +6,7 @@ OUTPUT ?= ./out
 
 deploy-ipc:
 	./ops/deploy.sh $(NETWORK)
+
 compile-abi:
 	./ops/compile-abi.sh $(OUTPUT)
 # ==============================================================================
