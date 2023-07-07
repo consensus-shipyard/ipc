@@ -57,11 +57,6 @@ interface IGateway {
     /// fund and release have to be used.
     function sendCrossMessage(CrossMsg memory crossMsg) external payable;
 
-    /// Whitelist a series of addresses as propagator of a cross net message.
-    /// This is basically adding this list of addresses to the `PostBoxItem::owners`.
-    /// Only existing owners can perform this operation.
-    function whitelistPropagator(bytes32 msgCid, address[] calldata owners) external;
-
     /// Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;
 

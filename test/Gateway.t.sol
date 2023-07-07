@@ -58,7 +58,6 @@ contract GatewayDeploymentTest is StdInvariant, Test {
     error AlreadyInitialized();
     error AlreadyCommittedCheckpoint();
     error InconsistentPrevCheckpoint();
-    error InvalidPostboxOwner();
     error InvalidCheckpointEpoch();
     error InvalidCheckpointSource();
     error InvalidCrossMsgNonce();
@@ -1349,83 +1348,6 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         require(gw2.appliedTopDownNonce() == 0);
     }
 
-    function test_WhitelistPropagator_Works() public {
-        address caller = vm.addr(100);
-        address receiver = vm.addr(101);
-
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: gw.getNetworkName(), rawAddress: FvmAddressHelper.from(caller)}),
-                to: IPCAddress({
-                    subnetId: gw.getNetworkName().createSubnetId(receiver),
-                    rawAddress: FvmAddressHelper.from(receiver)
-                }),
-                value: CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: false
-        });
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = crossMsg;
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-        vm.prank(TOPDOWN_VALIDATOR_1);
-        vm.deal(TOPDOWN_VALIDATOR_1, 1);
-        gw.submitTopDownCheckpoint(checkpoint);
-
-        bytes32 postboxItemId = crossMsg.toHash();
-        address[] memory ownersToAdd = new address[](2);
-        ownersToAdd[0] = receiver;
-
-        vm.prank(caller);
-        vm.deal(caller, CROSS_MSG_FEE + 2);
-        gw.whitelistPropagator(postboxItemId, ownersToAdd);
-
-        require(gw.postboxHasOwner(postboxItemId, caller), "gw.postboxHasOwner(postboxItemId, caller)");
-        require(gw.postboxHasOwner(postboxItemId, receiver), "gw.postboxHasOwner(postboxItemId, receiver)");
-
-        (StorableMsg memory storableMsg, bool wrapped) = gw.postbox(postboxItemId);
-        CrossMsg memory msgFrompostbox = CrossMsg(storableMsg, wrapped);
-        require(msgFrompostbox.toHash() == crossMsg.toHash());
-    }
-
-    function test_WhitelistPropagator_Fails_NotOwner() public {
-        address caller = vm.addr(100);
-        vm.deal(caller, 1 ether);
-        address receiver = vm.addr(101);
-
-        bytes32 postBoxItemId = setupWhiteListMethod(caller);
-
-        address[] memory owners = new address[](1);
-        owners[0] = caller;
-
-        vm.prank(receiver);
-        vm.expectRevert(InvalidPostboxOwner.selector);
-        gw.whitelistPropagator(postBoxItemId, owners);
-    }
-
-    function test_WhitelistPropagator_Fails_PostboxItemDoesNotExist() public {
-        address caller = vm.addr(100);
-        vm.deal(caller, 1 ether);
-        setupWhiteListMethod(caller);
-
-        address[] memory owners = new address[](1);
-        owners[0] = caller;
-
-        vm.expectRevert(InvalidPostboxOwner.selector);
-
-        gw.whitelistPropagator(bytes32(0), owners);
-    }
-
     function test_Propagate_Works_WithFeeRemainder() external {
         address[] memory validators = setupValidators();
         address caller = validators[0];
@@ -1465,29 +1387,6 @@ contract GatewayDeploymentTest is StdInvariant, Test {
 
         vm.expectRevert(NotEnoughFee.selector);
         gw.propagate(bytes32(""));
-    }
-
-    function test_Propagate_Fails_NotOwner() public {
-        address caller = vm.addr(100);
-        vm.deal(caller, 1 ether);
-        address notOwner = vm.addr(102);
-
-        bytes32 postboxItemCid = setupWhiteListMethod(caller);
-
-        address[] memory owners = new address[](1);
-        owners[0] = caller;
-
-        vm.prank(notOwner);
-        vm.deal(notOwner, 1 ether);
-        vm.expectRevert(InvalidPostboxOwner.selector);
-        gw.propagate{value: 1 ether}(postboxItemCid);
-    }
-
-    function test_Propagate_Fails_PostboxItemDoesNotExist() public {
-        vm.prank(vm.addr(100));
-        vm.deal(vm.addr(100), 1 ether);
-        vm.expectRevert(InvalidPostboxOwner.selector);
-        gw.propagate{value: 1 ether}(bytes32(0));
     }
 
     function setupWhiteListMethod(address caller) internal returns (bytes32) {

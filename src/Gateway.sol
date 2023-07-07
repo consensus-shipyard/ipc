@@ -65,9 +65,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// cross-net message id => CrossMsg
     mapping(bytes32 => CrossMsg) public postbox;
 
-    /// @notice cross-net message id => set of owners
-    mapping(bytes32 => mapping(address => bool)) public postboxHasOwner;
-
     /// @notice top-down period in number of epochs for the subnet
     uint64 public immutable topDownCheckPeriod;
 
@@ -125,7 +122,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error AlreadyInitialized();
     error InconsistentPrevCheckpoint();
     error InvalidActorAddress();
-    error InvalidPostboxOwner();
     error InvalidCheckpointEpoch();
     error InvalidCheckpointSource();
     error InvalidCrossMsgNonce();
@@ -158,12 +154,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         }
     }
 
-    function _onlyValidPostboxOwner(bytes32 msgCid) private view {
-        if (!postboxHasOwner[msgCid][msg.sender]) {
-            revert InvalidPostboxOwner();
-        }
-    }
-
     modifier signableOnly() {
         _signableOnly();
         _;
@@ -176,11 +166,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
 
     modifier hasFee() {
         _hasFee();
-        _;
-    }
-
-    modifier onlyValidPostboxOwner(bytes32 msgCid) {
-        _onlyValidPostboxOwner(msgCid);
         _;
     }
 
@@ -553,35 +538,9 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         );
     }
 
-    /// @notice whitelist a series of addresses as propagator of a cross net message
-    /// @param msgCid - the cid of the cross-net message
-    /// @param owners - list of addresses to be added as owners
-    function whitelistPropagator(bytes32 msgCid, address[] calldata owners) external onlyValidPostboxOwner(msgCid) {
-        CrossMsg storage crossMsg = postbox[msgCid];
-
-        if (crossMsg.isEmpty()) {
-            revert PostboxNotExist();
-        }
-
-        // update postbox with the new owners
-        uint256 ownersLength = owners.length;
-        for (uint256 i = 0; i < ownersLength; ) {
-            if (owners[i] != address(0)) {
-                address owner = owners[i];
-
-                if (!postboxHasOwner[msgCid][owner]) {
-                    postboxHasOwner[msgCid][owner] = true;
-                }
-            }
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
     /// @notice propagates the populated cross net message for the given cid
     /// @param msgCid - the cid of the cross-net message
-    function propagate(bytes32 msgCid) external payable hasFee onlyValidPostboxOwner(msgCid) {
+    function propagate(bytes32 msgCid) external payable hasFee {
         CrossMsg storage crossMsg = postbox[msgCid];
 
         (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(crossMsg);
@@ -840,8 +799,6 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         bytes32 cid = crossMsg.toHash();
 
         postbox[cid] = crossMsg;
-        FvmAddress memory addr = crossMsg.message.from.rawAddress;
-        postboxHasOwner[cid][addr.extractEvmAddress()] = true;
     }
 
     /// @notice applies a cross-net messages coming from some other subnet.
