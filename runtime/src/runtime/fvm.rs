@@ -450,26 +450,18 @@ pub fn resolve_secp_bls(rt: &mut impl Runtime, addr: &Address) -> Result<Address
     }
 }
 
-pub fn equal_account_id(
-    rt: &mut impl Runtime,
-    a: &Address,
-    b: &Address,
-) -> Result<bool, ActorError> {
+pub fn equal_account_id(rt: &mut impl Runtime, a: &Address, b: &Address) -> bool {
     let a_id = match rt.resolve_address(a) {
         Some(id) => id,
         None => {
-            return Err(ActorError::illegal_argument(String::from(
-                "couldn't resolve actor address",
-            )))
+            return false;
         }
     };
     let b_id = match rt.resolve_address(b) {
         Some(id) => id,
         None => {
-            return Err(ActorError::illegal_argument(String::from(
-                "couldn't resolve actor address",
-            )))
+            return false;
         }
     };
-    Ok(a_id == b_id)
+    a_id == b_id
 }
