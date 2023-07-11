@@ -1,15 +1,25 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use ethers_core::types as et;
 use fendermint_vm_actor_interface::eam::EthAddress;
+use futures::StreamExt;
 use fvm_shared::address::Address;
 use tendermint_rpc::{
     event::{Event, EventData},
     query::{EventType, Query},
+    Subscription,
+};
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    RwLock,
 };
 
 use crate::conv::from_tm;
@@ -41,6 +51,18 @@ pub fn matches_topics(filter: &et::Filter, log: &et::Log) -> bool {
 }
 
 pub type FilterId = et::U256;
+pub type FilterMap = Arc<RwLock<HashMap<FilterId, Sender<FilterCommand>>>>;
+
+pub enum FilterCommand {
+    /// Update the records with an event, coming from one of the Tendermint subscriptions.
+    Update(Event),
+    /// One of the subscriptions has ended, potentially with an error.
+    Finish(Option<tendermint_rpc::Error>),
+    /// Take the accumulated records, coming from the API consumer.
+    Take(tokio::sync::oneshot::Sender<anyhow::Result<Option<FilterRecords>>>),
+    /// The API consumer is no longer interested in taking the records.
+    Uninstall,
+}
 
 pub enum FilterKind {
     NewBlocks,
@@ -171,26 +193,89 @@ impl From<&FilterRecords> for FilterRecords {
 
 /// Accumulate changes between polls.
 pub struct FilterState {
-    _id: FilterId,
+    id: FilterId,
     timeout: Duration,
     last_poll: Instant,
     finished: Option<Option<anyhow::Error>>,
     records: FilterRecords,
+    rx: Receiver<FilterCommand>,
 }
 
 impl FilterState {
-    pub fn new(id: FilterId, timeout: Duration, kind: &FilterKind) -> Self {
-        Self {
-            _id: id,
+    pub fn new(
+        id: FilterId,
+        timeout: Duration,
+        kind: &FilterKind,
+    ) -> (Self, Sender<FilterCommand>) {
+        let (tx, rx) = tokio::sync::mpsc::channel(10);
+        let s = Self {
+            id,
             timeout,
             last_poll: Instant::now(),
             finished: None,
             records: FilterRecords::from(kind),
+            rx,
+        };
+        (s, tx)
+    }
+
+    pub fn id(&self) -> FilterId {
+        self.id
+    }
+
+    /// Consume commands until some end condition is met.
+    ///
+    /// In the end the filter removes itself from the registry.
+    pub async fn run(mut self, filters: FilterMap) {
+        let id = self.id;
+
+        tracing::info!(?id, "handling filter events");
+        while let Some(cmd) = self.rx.recv().await {
+            match cmd {
+                FilterCommand::Update(event) => {
+                    if self.is_finished() {
+                        continue;
+                    }
+                    if self.is_timed_out() {
+                        tracing::debug!(?id, "filter timed out");
+                        return self.remove(filters).await;
+                    }
+                    if let Err(err) = self.update(event) {
+                        tracing::error!(?id, "failed to update filter: {err}");
+                        self.finish(Some(anyhow!("failed to update filter: {err}")));
+                    }
+                }
+                FilterCommand::Finish(err) => {
+                    tracing::info!(?id, "filter producer finished: {err:?}");
+                    self.finish(err.map(|e| anyhow!("subscription failed: {e}")))
+                }
+                FilterCommand::Uninstall => {
+                    tracing::error!(?id, "filter uninstalled");
+                    return self.remove(filters).await;
+                }
+                FilterCommand::Take(tx) => {
+                    let result = self.try_take();
+                    let remove = match result {
+                        Ok(None) | Err(_) => true,
+                        Ok(Some(_)) => false,
+                    };
+                    let _ = tx.send(result);
+                    if remove {
+                        tracing::info!(?id, "filter finished");
+                        return self.remove(filters).await;
+                    }
+                }
+            }
         }
+        // All producers have been dropped, so there is no way for new commands to arrive.
+    }
+
+    async fn remove(self, filters: FilterMap) {
+        filters.write().await.remove(&self.id);
     }
 
     /// Accumulate the events.
-    pub fn update(&mut self, event: Event) -> anyhow::Result<()> {
+    fn update(&mut self, event: Event) -> anyhow::Result<()> {
         match (&mut self.records, &event.data) {
             (
                 FilterRecords::NewBlocks(ref mut hashes),
@@ -290,7 +375,7 @@ impl FilterState {
     ///
     /// If there are no changes but there was an error, return that.
     /// If the producers have stopped, return `None`.
-    pub fn try_take(&mut self) -> anyhow::Result<Option<FilterRecords>> {
+    fn try_take(&mut self) -> anyhow::Result<Option<FilterRecords>> {
         self.last_poll = Instant::now();
 
         let mut records = FilterRecords::from(&self.records);
@@ -312,7 +397,7 @@ impl FilterState {
     /// Signal that the producers are finished, or that the reader is no longer intersted.
     ///
     /// Propagate the error to the reader next time it comes to check on the filter.
-    pub fn finish(&mut self, error: Option<anyhow::Error>) {
+    fn finish(&mut self, error: Option<anyhow::Error>) {
         // Keep any already existing error.
         let error = self.finished.take().flatten().or(error);
 
@@ -321,14 +406,52 @@ impl FilterState {
 
     /// Indicate whether the reader has been too slow at polling the filter
     /// and that it should be removed.
-    pub fn is_timed_out(&self) -> bool {
+    fn is_timed_out(&self) -> bool {
         Instant::now().duration_since(self.last_poll) > self.timeout
     }
 
     /// Indicate that that the filter takes no more data.
-    pub fn is_finished(&self) -> bool {
+    fn is_finished(&self) -> bool {
         self.finished.is_some()
     }
+}
+
+/// Spawn a Tendermint subscription handler in a new task.
+pub async fn run_subscription(id: FilterId, mut sub: Subscription, tx: Sender<FilterCommand>) {
+    let query = sub.query().to_string();
+    tracing::debug!(?id, query, "polling filter subscription");
+    while let Some(result) = sub.next().await {
+        match result {
+            Ok(event) => {
+                if tx.send(FilterCommand::Update(event)).await.is_err() {
+                    // Filter has been uninstalled.
+                    tracing::debug!(
+                        ?id,
+                        query,
+                        "filter no longer listening, quiting subscription"
+                    );
+                    return;
+                }
+            }
+            Err(err) => {
+                tracing::error!(
+                    ?id,
+                    query,
+                    error = ?err,
+                    "filter subscription error"
+                );
+                let _ = tx.send(FilterCommand::Finish(Some(err))).await;
+                return;
+            }
+        }
+    }
+    tracing::debug!(?id, query, "filter subscription finished");
+    let _ = tx.send(FilterCommand::Finish(None)).await;
+
+    // Dropping the `Subscription` should cause the client to unsubscribe,
+    // if this was the last one interested in that query; we don't have to
+    // call the unsubscribe method explicitly.
+    // See https://docs.rs/tendermint-rpc/0.31.1/tendermint_rpc/client/struct.WebSocketClient.html
 }
 
 #[cfg(test)]

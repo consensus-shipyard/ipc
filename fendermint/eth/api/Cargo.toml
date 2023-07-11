@@ -17,6 +17,7 @@ lazy_static = { workspace = true }
 libsecp256k1 = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
+rand = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tendermint = { workspace = true }

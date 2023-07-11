@@ -49,7 +49,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         getCode,
         // eth_getCompilers
         getFilterChanges,
-        // eth_getFilterLogs
+        getFilterLogs,
         getLogs,
         getStorageAt,
         getTransactionByBlockHashAndIndex,

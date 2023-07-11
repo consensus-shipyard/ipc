@@ -831,7 +831,7 @@ pub async fn uninstall_filter<C>(
     data: JsonRpcData<C>,
     Params((filter_id,)): Params<(FilterId,)>,
 ) -> JsonRpcResult<bool> {
-    Ok(data.uninstall_filter(filter_id))
+    Ok(data.uninstall_filter(filter_id).await?)
 }
 
 pub async fn get_filter_changes<C>(
@@ -848,11 +848,28 @@ pub async fn get_filter_changes<C>(
         Ok(values)
     }
 
-    if let Some(accum) = data.take_filter_changes(filter_id)? {
+    if let Some(accum) = data.take_filter_changes(filter_id).await? {
         match accum {
             FilterRecords::Logs(logs) => to_json(logs),
             FilterRecords::NewBlocks(hashes) => to_json(hashes),
             FilterRecords::PendingTransactions(hashes) => to_json(hashes),
+        }
+    } else {
+        error(ExitCode::USR_NOT_FOUND, "filter not found")
+    }
+}
+
+/// Returns an array of all logs matching filter with given id.
+pub async fn get_filter_logs<C>(
+    data: JsonRpcData<C>,
+    Params((filter_id,)): Params<(FilterId,)>,
+) -> JsonRpcResult<Vec<et::Log>> {
+    if let Some(accum) = data.take_filter_changes(filter_id).await? {
+        match accum {
+            FilterRecords::Logs(logs) => Ok(logs),
+            FilterRecords::NewBlocks(_) | FilterRecords::PendingTransactions(_) => {
+                error(ExitCode::USR_ILLEGAL_STATE, "not a log filter")
+            }
         }
     } else {
         error(ExitCode::USR_NOT_FOUND, "filter not found")
