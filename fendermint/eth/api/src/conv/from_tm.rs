@@ -13,7 +13,7 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::{bigint::BigInt, econ::TokenAmount};
 use lazy_static::lazy_static;
 use tendermint::abci::response::DeliverTx;
-use tendermint::abci::EventAttribute;
+use tendermint::abci::{self, EventAttribute};
 use tendermint::crypto::sha256::Sha256;
 use tendermint_rpc::endpoint;
 
@@ -222,7 +222,7 @@ pub fn to_eth_receipt(
     let log_index_start = cumulative_event_count.saturating_sub(result.tx_result.events.len());
 
     let logs = to_logs(
-        &result.tx_result,
+        &result.tx_result.events,
         block_hash,
         block_number,
         transaction_hash,
@@ -345,7 +345,7 @@ fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {
 }
 
 pub fn to_logs(
-    tx_result: &DeliverTx,
+    events: &[abci::Event],
     block_hash: et::H256,
     block_number: et::U64,
     transaction_hash: et::H256,
@@ -353,7 +353,7 @@ pub fn to_logs(
     log_index_start: usize,
 ) -> anyhow::Result<Vec<et::Log>> {
     let mut logs = Vec::new();
-    for (idx, event) in tx_result.events.iter().enumerate() {
+    for (idx, event) in events.iter().enumerate() {
         // TODO: Lotus looks up an Ethereum address based on the actor ID:
         // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L1987
         let address = event

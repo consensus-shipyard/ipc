@@ -21,6 +21,7 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
+tokio = { workspace = true }
 
 cid = { workspace = true }
 fvm_shared = { workspace = true }
@@ -42,7 +43,6 @@ tracing-subscriber = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
 
 fendermint_testing = { path = "../../testing", features = ["arb"] }
 fendermint_vm_message = { path = "../../vm/message", features = ["arb"] }

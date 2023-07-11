@@ -112,6 +112,24 @@ pub fn to_begin_block(ret: FvmApplyRet) -> response::BeginBlock {
 }
 
 /// Convert events to key-value pairs.
+///
+///
+/// Fot the EVM, they are returned like so:
+///
+/// ```text
+/// StampedEvent { emitter: 103,
+///  event: ActorEvent { entries: [
+///    Entry { flags: FLAG_INDEXED_VALUE, key: "t1", value: RawBytes { 5820ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef } },
+///    Entry { flags: FLAG_INDEXED_VALUE, key: "t2", value: RawBytes { 54ff00000000000000000000000000000000000065 } },
+///    Entry { flags: FLAG_INDEXED_VALUE, key: "t3", value: RawBytes { 54ff00000000000000000000000000000000000066 } },
+///    Entry { flags: FLAG_INDEXED_VALUE, key: "d", value: RawBytes { 582000000000000000000000000000000000000000000000000000000000000007d0 } }] } }
+/// ```
+///
+/// The values are:
+/// * "t1" will be the cbor encoded keccak-256 hash of the event signature Transfer(address,address,uint256)
+/// * "t2" will be the first indexed argument, i.e. _from  (cbor encoded byte array; needs padding to 32 bytes to work with ethers)
+/// * "t3" will be the second indexed argument, i.e. _to (cbor encoded byte array; needs padding to 32 bytes to work with ethers)
+/// * "d" is a cbor encoded byte array of all the remaining arguments
 pub fn to_events(kind: &str, stamped_events: Vec<StampedEvent>) -> Vec<Event> {
     stamped_events
         .into_iter()

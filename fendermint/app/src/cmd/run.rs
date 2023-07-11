@@ -58,7 +58,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // Run the ABCI server.
     server
-        .listen(settings.abci.listen_addr())
+        .listen(settings.abci.listen.addr())
         .await
         .map_err(|e| anyhow!("error listening: {e}"))?;
 

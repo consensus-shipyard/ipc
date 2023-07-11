@@ -6,7 +6,7 @@
 
 use jsonrpc_v2::{MapRouter, ServerBuilder};
 use paste::paste;
-use tendermint_rpc::HttpClient;
+use tendermint_rpc::WebSocketClient;
 
 mod eth;
 mod net;
@@ -18,7 +18,7 @@ macro_rules! with_methods {
             $server
                 $(.with_method(
                     stringify!([< $module _ $method >]),
-                    $module :: [< $method:snake >] ::<HttpClient>
+                    $module :: [< $method:snake >] ::<WebSocketClient>
                 ))*
         }
     };
@@ -48,7 +48,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         getBlockReceipts,
         getCode,
         // eth_getCompilers
-        // eth_getFilterChanges
+        getFilterChanges,
         // eth_getFilterLogs
         getLogs,
         getStorageAt,
@@ -64,9 +64,9 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_getWork
         // eth_hashrate
         // eth_mining
-        // eth_newBlockFilter
-        // eth_newFilter
-        // eth_newPendingTransactionFilter
+        newBlockFilter,
+        newFilter,
+        newPendingTransactionFilter,
         protocolVersion,
         sendRawTransaction,
         // eth_sendTransaction
@@ -74,8 +74,8 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_signTransaction
         // eth_submitHashrate
         // eth_submitWork
-        syncing
-        // eth_uninstallFilter
+        syncing,
+        uninstallFilter
     });
 
     let server = with_methods!(server, web3, {

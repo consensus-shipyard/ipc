@@ -21,9 +21,8 @@ CMD ["run"]
 
 STOPSIGNAL SIGTERM
 
-ENV FM_ABCI__HOST=0.0.0.0
-ENV FM_ETH__HTTP__HOST=0.0.0.0
-ENV FM_ETH__WS__HOST=0.0.0.0
+ENV FM_ABCI__LISTEN__HOST=0.0.0.0
+ENV FM_ETH__LISTEN__HOST=0.0.0.0
 
 COPY fendermint/app/config $FM_HOME_DIR/config
 COPY docker/.artifacts/bundle.car $FM_HOME_DIR/bundle.car

@@ -9,6 +9,7 @@ use fendermint_vm_message::chain::ChainMessage;
 use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint_rpc::{endpoint::abci_query::AbciQuery, Client, HttpClient, Scheme, Url};
+use tendermint_rpc::{WebSocketClient, WebSocketClientDriver};
 
 use fendermint_vm_message::query::FvmQuery;
 
@@ -66,12 +67,22 @@ pub fn http_client(url: Url, proxy_url: Option<Url>) -> anyhow::Result<HttpClien
     Ok(client)
 }
 
+/// Create a Tendermint WebSocket client.
+///
+/// The caller must start the driver in a background task.
+pub async fn ws_client(url: Url) -> anyhow::Result<(WebSocketClient, WebSocketClientDriver)> {
+    // TODO: Doesn't handle proxy.
+    tracing::debug!("Using WS client to submit request to: {}", url);
+    let (client, driver) = WebSocketClient::new(url).await?;
+    Ok((client, driver))
+}
+
 /// Unauthenticated Fendermint client.
 pub struct FendermintClient<C = HttpClient> {
     inner: C,
 }
 
-impl<C: Client> FendermintClient<C> {
+impl<C> FendermintClient<C> {
     pub fn new(inner: C) -> Self {
         Self { inner }
     }
@@ -90,12 +101,12 @@ impl FendermintClient<HttpClient> {
 }
 
 /// Get to the underlying Tendermint client if necessary, for example to query the state of transactions.
-pub trait TendermintClient<C: Client> {
+pub trait TendermintClient<C> {
     /// The underlying Tendermint client.
     fn underlying(&self) -> &C;
 }
 
-impl<C: Client> TendermintClient<C> for FendermintClient<C> {
+impl<C> TendermintClient<C> for FendermintClient<C> {
     fn underlying(&self) -> &C {
         &self.inner
     }
@@ -117,10 +128,7 @@ pub struct BoundFendermintClient<C = HttpClient> {
     message_factory: MessageFactory,
 }
 
-impl<C> BoundFendermintClient<C>
-where
-    C: Client,
-{
+impl<C> BoundFendermintClient<C> {
     pub fn new(inner: C, message_factory: MessageFactory) -> Self {
         Self {
             inner,
@@ -135,10 +143,7 @@ impl<C> BoundClient for BoundFendermintClient<C> {
     }
 }
 
-impl<C> TendermintClient<C> for BoundFendermintClient<C>
-where
-    C: Client,
-{
+impl<C> TendermintClient<C> for BoundFendermintClient<C> {
     fn underlying(&self) -> &C {
         &self.inner
     }

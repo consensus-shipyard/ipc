@@ -212,6 +212,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-tungstenite"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e0388bb7a400072bbb41ceb75d65c3baefb2ea99672fa22e85278452cd9b58b"
+dependencies = [
+ "futures-io",
+ "futures-util",
+ "log",
+ "pin-project-lite",
+ "rustls-native-certs 0.6.3",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tungstenite",
+]
+
+[[package]]
 name = "async_io_stream"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2213,6 +2229,7 @@ dependencies = [
  "rand_chacha 0.3.1",
  "serde",
  "serde_json",
+ "serde_with",
  "tempfile",
  "tendermint",
  "tendermint-proto",
@@ -3319,7 +3336,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-rustls 0.22.1",
- "rustls-native-certs",
+ "rustls-native-certs 0.5.0",
  "tokio",
  "tokio-rustls 0.22.0",
  "tower-service",
@@ -3337,7 +3354,7 @@ dependencies = [
  "hyper",
  "log",
  "rustls 0.19.1",
- "rustls-native-certs",
+ "rustls-native-certs 0.5.0",
  "tokio",
  "tokio-rustls 0.22.0",
  "webpki 0.21.4",
@@ -5211,6 +5228,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-native-certs"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9aace74cb666635c918e9c12bc0d348266037aa8eb599b5cba565709a8dff00"
+dependencies = [
+ "openssl-probe",
+ "rustls-pemfile",
+ "schannel",
+ "security-framework",
+]
+
+[[package]]
 name = "rustls-pemfile"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6158,6 +6187,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "120ccb296a0ec4485ddb78eb842e481d7a859d5659e0f1881456f8c127d5e950"
 dependencies = [
  "async-trait",
+ "async-tungstenite",
  "bytes",
  "flex-error",
  "futures",

@@ -24,8 +24,9 @@ use fvm_shared::address::Address;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tendermint_rpc::endpoint::{self, status};
+use tendermint_rpc::SubscriptionClient;
 use tendermint_rpc::{
     endpoint::{block, block_results, broadcast::tx_sync, consensus_params, header},
     Client,
@@ -33,7 +34,7 @@ use tendermint_rpc::{
 
 use crate::conv::from_eth::{to_fvm_message, to_tm_hash};
 use crate::conv::from_tm::{self, message_hash, to_chain_message, to_cumulative};
-use crate::filters::matches_topics;
+use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
 use crate::{
     conv::{
         from_eth::to_fvm_address,
@@ -757,7 +758,7 @@ where
                     }
 
                     let mut tx_logs = from_tm::to_logs(
-                        tx_result,
+                        &tx_result.events,
                         block_hash,
                         block_number,
                         tx_hash,
@@ -780,4 +781,80 @@ where
     }
 
     Ok(logs)
+}
+
+/// Creates a filter object, based on filter options, to notify when the state changes (logs).
+/// To check if the state has changed, call eth_getFilterChanges.
+pub async fn new_filter<C>(
+    data: JsonRpcData<C>,
+    Params((filter,)): Params<(et::Filter,)>,
+) -> JsonRpcResult<FilterId>
+where
+    C: SubscriptionClient + Sync + Send,
+{
+    let id = data
+        .new_filter(FilterKind::Logs(Box::new(filter)))
+        .await
+        .context("failed to add log filter")?;
+    Ok(id)
+}
+
+/// Creates a filter in the node, to notify when a new block arrives.
+/// To check if the state has changed, call eth_getFilterChanges.
+pub async fn new_block_filter<C>(data: JsonRpcData<C>) -> JsonRpcResult<FilterId>
+where
+    C: SubscriptionClient + Sync + Send,
+{
+    let id = data
+        .new_filter(FilterKind::NewBlocks)
+        .await
+        .context("failed to add block filter")?;
+    Ok(id)
+}
+
+/// Creates a filter in the node, to notify when new pending transactions arrive.
+/// To check if the state has changed, call eth_getFilterChanges.
+pub async fn new_pending_transaction_filter<C>(data: JsonRpcData<C>) -> JsonRpcResult<FilterId>
+where
+    C: SubscriptionClient + Sync + Send,
+{
+    let id = data
+        .new_filter(FilterKind::PendingTransactions)
+        .await
+        .context("failed to add transaction filter")?;
+    Ok(id)
+}
+
+/// Uninstalls a filter with given id. Should always be called when watch is no longer needed.
+/// Additionally Filters timeout when they aren't requested with eth_getFilterChanges for a period of time
+pub async fn uninstall_filter<C>(
+    data: JsonRpcData<C>,
+    Params((filter_id,)): Params<(FilterId,)>,
+) -> JsonRpcResult<bool> {
+    Ok(data.uninstall_filter(filter_id))
+}
+
+pub async fn get_filter_changes<C>(
+    data: JsonRpcData<C>,
+    Params((filter_id,)): Params<(FilterId,)>,
+) -> JsonRpcResult<Vec<serde_json::Value>> {
+    fn to_json<R: Serialize>(values: Vec<R>) -> JsonRpcResult<Vec<serde_json::Value>> {
+        let values: Vec<serde_json::Value> = values
+            .into_iter()
+            .map(serde_json::to_value)
+            .collect::<Result<Vec<_>, _>>()
+            .context("failed to convert events to JSON")?;
+
+        Ok(values)
+    }
+
+    if let Some(accum) = data.take_filter_changes(filter_id)? {
+        match accum {
+            FilterRecords::Logs(logs) => to_json(logs),
+            FilterRecords::NewBlocks(hashes) => to_json(hashes),
+            FilterRecords::PendingTransactions(hashes) => to_json(hashes),
+        }
+    } else {
+        error(ExitCode::USR_NOT_FOUND, "filter not found")
+    }
 }

@@ -31,9 +31,8 @@ CMD ["run"]
 
 STOPSIGNAL SIGTERM
 
-ENV FM_ABCI__HOST=0.0.0.0
-ENV FM_ETH__HTTP__HOST=0.0.0.0
-ENV FM_ETH__WS__HOST=0.0.0.0
+ENV FM_ABCI__LISTEN__HOST=0.0.0.0
+ENV FM_ETH__LISTEN__HOST=0.0.0.0
 
 # We could build the actor bundles in the `builder` as well,
 # but we should be able to copy it from somewhere.

@@ -165,7 +165,7 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --publish 8545:${ETHAPI_HOST_PORT} \
-  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env TENDERMINT_WS_URL=ws://${CMT_CONTAINER_NAME}:26657/websocket \
   --env LOG_LEVEL=debug \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \

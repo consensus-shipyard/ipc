@@ -3,12 +3,18 @@
 
 //! Tendermint RPC helper methods for the implementation of the APIs.
 
-use anyhow::Context;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use anyhow::{anyhow, Context};
 use ethers_core::types::{self as et, BlockId};
-use fendermint_rpc::client::TendermintClient;
+use fendermint_rpc::client::{FendermintClient, TendermintClient};
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::{evm, system};
 use fendermint_vm_message::{chain::ChainMessage, conv::from_eth::to_fvm_address};
+use futures::StreamExt;
 use fvm_ipld_encoding::{de::DeserializeOwned, RawBytes};
 use fvm_shared::{chainid::ChainID, econ::TokenAmount, error::ExitCode, message::Message};
 use tendermint::block::Height;
@@ -16,23 +22,49 @@ use tendermint_rpc::{
     endpoint::{block, block_by_hash, block_results, commit, header, header_by_hash},
     Client,
 };
+use tendermint_rpc::{Subscription, SubscriptionClient};
 
+use crate::filters::{FilterId, FilterKind, FilterRecords, FilterState};
 use crate::{
     conv::from_tm::{
         map_rpc_block_txs, message_hash, to_chain_message, to_eth_block, to_eth_transaction,
     },
-    error, JsonRpcResult, JsonRpcState,
+    error, JsonRpcResult,
 };
+
+type FilterMap = Arc<Mutex<HashMap<FilterId, Arc<Mutex<FilterState>>>>>;
+
+// Made generic in the client type so we can mock it if we want to test API
+// methods without having to spin up a server. In those tests the methods
+// below would not be used, so those aren't generic; we'd directly invoke
+// e.g. `fendermint_eth_api::apis::eth::accounts` with some mock client.
+pub struct JsonRpcState<C> {
+    pub client: FendermintClient<C>,
+    filter_timeout: Duration,
+    next_filter_id: AtomicUsize,
+    filters: FilterMap,
+}
+
+impl<C> JsonRpcState<C> {
+    pub fn new(client: C, filter_timeout: Duration) -> Self {
+        Self {
+            client: FendermintClient::new(client),
+            filter_timeout,
+            next_filter_id: Default::default(),
+            filters: Default::default(),
+        }
+    }
+
+    /// The underlying Tendermint RPC client.
+    pub fn tm(&self) -> &C {
+        self.client.underlying()
+    }
+}
 
 impl<C> JsonRpcState<C>
 where
     C: Client + Sync + Send,
 {
-    /// The underlying Tendermint RPC client.
-    pub fn tm(&self) -> &C {
-        self.client.underlying()
-    }
-
     /// Get the Tendermint block at a specific height.
     pub async fn block_by_height(
         &self,
@@ -243,4 +275,148 @@ where
 
         Ok(data)
     }
+}
+
+impl<C> JsonRpcState<C>
+where
+    C: SubscriptionClient,
+{
+    /// Create a new filter with the next available ID and insert it into the filters collection.
+    fn new_filter_state(&self, filter: &FilterKind) -> (FilterId, Arc<Mutex<FilterState>>) {
+        let id = FilterId::from(self.next_filter_id.fetch_add(1, Ordering::Relaxed));
+        let state = FilterState::new(id, self.filter_timeout, filter);
+        let state = Arc::new(Mutex::new(state));
+        let mut filters = self.filters.lock().expect("lock poisoned");
+        filters.insert(id, state.clone());
+        (id, state)
+    }
+
+    /// Create a new filter, subscribe with Tendermint and start handlers in the background.
+    pub async fn new_filter(&self, filter: FilterKind) -> anyhow::Result<FilterId> {
+        let queries = filter
+            .to_queries()
+            .context("failed to convert filter to queries")?;
+
+        let mut subs = Vec::new();
+
+        for query in queries {
+            let sub: Subscription = self
+                .tm()
+                .subscribe(query)
+                .await
+                .context("failed to subscribe to query")?;
+
+            subs.push(sub);
+        }
+
+        let (id, state) = self.new_filter_state(&filter);
+
+        for sub in subs {
+            spawn_subscription_handler(self.filters.clone(), id, state.clone(), sub);
+        }
+
+        Ok(id)
+    }
+}
+
+impl<C> JsonRpcState<C> {
+    pub fn uninstall_filter(&self, filter_id: FilterId) -> bool {
+        let removed = {
+            let mut filters = self.filters.lock().expect("lock poisoned");
+            filters.remove(&filter_id)
+        };
+
+        if let Some(filter) = removed {
+            // Signal to the background tasks that they can unsubscribe.
+            let mut filter = filter.lock().expect("lock poisoned");
+            filter.finish(None);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Take the currently accumulated changes, and remove the filter if it's finished.
+    pub fn take_filter_changes(
+        &self,
+        filter_id: FilterId,
+    ) -> anyhow::Result<Option<FilterRecords>> {
+        let mut filters = self.filters.lock().expect("lock poisoned");
+
+        let result = match filters.get(&filter_id) {
+            None => Ok(None),
+            Some(state) => {
+                let mut state = state.lock().expect("lock poisoned");
+                state.try_take()
+            }
+        };
+
+        let keep = match result {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(_) => false,
+        };
+
+        if !keep {
+            // Filter won't produce more data, remove it from the registry.
+            filters.remove(&filter_id);
+        }
+
+        result
+    }
+}
+
+/// Spawn a subscription handler in a new task.
+fn spawn_subscription_handler(
+    filters: FilterMap,
+    id: FilterId,
+    state: Arc<Mutex<FilterState>>,
+    mut sub: Subscription,
+) {
+    tokio::spawn(async move {
+        tracing::debug!(
+            ?id,
+            query = sub.query().to_string(),
+            "polling filter subscription"
+        );
+        while let Some(result) = sub.next().await {
+            tracing::debug!(?id, ?result, "next filter event");
+            let mut state = state.lock().expect("lock poisoned");
+
+            if state.is_finished() {
+                tracing::debug!(?id, "filter already finished");
+                return;
+            } else if state.is_timed_out() {
+                tracing::warn!(?id, "removing timed out filter");
+                // Clean up because the reader won't do it.
+                filters.lock().expect("lock poisoned").remove(&id);
+                state.finish(Some(anyhow!("filter timeout")));
+                return;
+            } else {
+                match result {
+                    Ok(event) => {
+                        if let Err(err) = state.update(event) {
+                            tracing::error!(?id, "failed to update filter: {err}");
+                            state.finish(Some(anyhow!("update failed: {err}")));
+                            return;
+                        }
+                        tracing::debug!(?id, "filter updated");
+                    }
+                    Err(err) => {
+                        tracing::error!(?id, "filter subscription failed: {err}");
+                        state.finish(Some(anyhow!("subscription failed: {err}")));
+                        return;
+                    }
+                }
+            }
+        }
+        // Mark the state as finished, but don't remove; let the poller consume whatever is left.
+        tracing::debug!(?id, "finishing filter");
+        state.lock().expect("lock poisoned").finish(None)
+
+        // Dropping the `Subscription` should cause the client to unsubscribe,
+        // if this was the last one interested in that query; we don't have to
+        // call the unsubscribe method explicitly.
+        // See https://docs.rs/tendermint-rpc/0.31.1/tendermint_rpc/client/struct.WebSocketClient.html
+    });
 }

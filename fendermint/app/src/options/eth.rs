@@ -18,8 +18,8 @@ pub enum EthCommands {
         #[arg(
             long,
             short,
-            default_value = "http://127.0.0.1:26657",
-            env = "TENDERMINT_RPC_URL"
+            default_value = "ws://127.0.0.1:26657/websocket",
+            env = "TENDERMINT_WS_URL"
         )]
         url: Url,
 
