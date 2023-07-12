@@ -5,9 +5,9 @@ pragma solidity 0.8.19;
 /// @author LimeChain team
 enum Status {
     Unset,
-    Instantiated,
     Active,
     Inactive,
+    Killed,
     Terminating,
-    Killed
+    Instantiated
 }
