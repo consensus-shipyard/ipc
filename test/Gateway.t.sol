@@ -181,6 +181,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         registerSubnet(subnetCollateral, subnetAddress);
 
         require(gw.totalSubnets() == 1);
+        Subnet[] memory subnets = gw.listSubnets();
+        require(subnets.length == 1, "subnets.length == 1");
     }
 
     function test_InitGenesisEpoch_Works() public {
@@ -214,6 +216,8 @@ contract GatewayDeploymentTest is StdInvariant, Test {
         }
 
         require(gw.totalSubnets() == numberOfSubnets);
+        Subnet[] memory subnets = gw.listSubnets();
+        require(subnets.length == numberOfSubnets, "subnets.length == numberOfSubnets");
     }
 
     function test_Register_Fail_InsufficientCollateral(uint256 collateral) public {

@@ -57,6 +57,9 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     /// SubnetID => Subnet
     mapping(bytes32 => Subnet) public subnets;
 
+    /// @notice Keys of the registered subnets. Useful to iterate through them
+    bytes32[] public subnetKeys;
+
     /// @notice bottom-up period in number of epochs for the subnet
     uint64 public immutable bottomUpCheckPeriod;
 
@@ -135,6 +138,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     error ValidatorsAndWeightsLengthMismatch();
     error ValidatorWeightIsZero();
     error NotEnoughFundsForMembership();
+    error MethodNotSupportedYet();
 
     function _signableOnly() private view {
         if (!msg.sender.isAccount()) {
@@ -250,6 +254,8 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         subnet.stake = msg.value;
         subnet.status = Status.Active;
         subnet.genesisEpoch = block.number;
+
+        subnetKeys.push(subnetId.toHash());
 
         totalSubnets += 1;
     }
@@ -463,6 +469,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         }
 
         totalWeight = totalValidatorsWeight;
+        // revert MethodNotSupportedYet();
     }
 
     /// @notice allows a validator to submit a batch of messages in a top-down commitment
@@ -536,6 +543,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
             shouldBurn,
             shouldDistributeRewards
         );
+        // revert MethodNotSupportedYet();
     }
 
     /// @notice propagates the populated cross net message for the given cid
@@ -558,6 +566,7 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         if (feeRemainder > 0) {
             payable(msg.sender).sendValue(feeRemainder);
         }
+        // revert MethodNotSupportedYet();
     }
 
     /// @notice whether a validator has voted for a checkpoint submission during an epoch
@@ -860,5 +869,20 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
     function _getSubnet(SubnetID memory subnetId) internal view returns (bool found, Subnet storage subnet) {
         subnet = subnets[subnetId.toHash()];
         found = !subnet.id.isEmpty();
+    }
+
+    /// @notice returns the list of registered subnets in IPC
+    /// @return subnet - the list of subnets
+    function listSubnets() external view returns (Subnet[] memory) {
+        uint256 size = subnetKeys.length;
+        Subnet[] memory out = new Subnet[](size);
+        for (uint256 i = 0; i < size; ) {
+            bytes32 key = subnetKeys[i];
+            out[i] = subnets[key];
+            unchecked {
+                ++i;
+            }
+        }
+        return out;
     }
 }

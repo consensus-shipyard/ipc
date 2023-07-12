@@ -4,7 +4,7 @@ set -e
 
 if [ $# -ne 1 ]
 then
-    echo "Expected a single argument with the name of the network to deploy (localnet, calibrationnet)"
+    echo "Expected a single argument with the name of the network to deploy (localnet, calibrationnet, mainnet)"
     exit 1
 fi
 
