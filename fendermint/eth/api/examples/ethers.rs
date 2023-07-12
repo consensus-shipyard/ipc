@@ -24,6 +24,7 @@
 
 // See https://coinsbench.com/ethereum-with-rust-tutorial-part-1-create-simple-transactions-with-rust-26d365a7ea93
 // and https://coinsbench.com/ethereum-with-rust-tutorial-part-2-compile-and-deploy-solidity-contract-with-rust-c3cd16fce8ee
+// and https://coinsbench.com/ethers-rust-power-or-ethers-abigen-rundown-89ab5e47875d
 
 use std::{
     fmt::{Debug, Display},
@@ -537,7 +538,8 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
 
     // Send a SimpleCoin transaction to get an event emitted.
     // Not using `prepare_call` here because `send_transaction` will fill the missing fields.
-    let coin_send: TestContractCall<bool> = contract.send_coin(to.eth_addr, U256::from(100));
+    let coin_send_value = U256::from(100);
+    let coin_send: TestContractCall<bool> = contract.send_coin(to.eth_addr, coin_send_value);
     // Using `send_transaction` instead of `coin_send.send()` so it gets the receipt.
     // Unfortunately the returned `bool` is not available through the Ethereum API.
     let receipt = request(
@@ -574,12 +576,31 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
         },
     )?;
 
-    // TODO: Parse logs with the contract.
-    request(
+    let logs = request(
         "eth_getFilterChanges (logs)",
         mw.get_filter_changes(logs_filter_id).await,
         |logs: &Vec<Log>| !logs.is_empty(),
     )?;
+
+    // eprintln!("LOGS = {logs:?}");
+
+    // Parse `Transfer` events from the logs with the SimpleCoin contract.
+    // Based on https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/fevm_features/common.rs#L616
+    //      and https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/fevm_features/simple_coin.rs#L26
+    //      and https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs#L103
+
+    // The contract has methods like `.transfer_filter()` which allows querying logs, but here we just test parsing to make sure the data is correct.
+    let transfer_events = logs
+        .into_iter()
+        .filter(|log| log.address == contract.address())
+        .map(|log| contract.decode_event::<TransferFilter>("Transfer", log.topics, log.data))
+        .collect::<Result<Vec<_>, _>>()
+        .context("failed to parse logs to transfer events")?;
+
+    assert!(!transfer_events.is_empty());
+    assert_eq!(transfer_events[0].from, from.eth_addr);
+    assert_eq!(transfer_events[0].to, to.eth_addr);
+    assert_eq!(transfer_events[0].value, coin_send_value);
 
     // Uninstall all filters.
     for id in filter_ids {

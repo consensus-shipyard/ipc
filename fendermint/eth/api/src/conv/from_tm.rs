@@ -341,7 +341,12 @@ fn app_hash_to_root(app_hash: &tendermint::AppHash) -> anyhow::Result<et::H256> 
 fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {
     fendermint_rpc::response::decode_fevm_create(deliver_tx)
         .ok()
-        .map(|cr| cr.eth_address)
+        .map(|cr| {
+            // We can return `cr.eth_address` here and that's an address usable for calling the contract.
+            // However, the events are reported using the actor ID, so unless we want to translate those
+            // to ETH addresses on the fly, we can return a masked address here and see if that works.
+            EthAddress::from_id(cr.actor_id)
+        })
 }
 
 pub fn to_logs(
