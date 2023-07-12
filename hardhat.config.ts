@@ -91,6 +91,12 @@ task('deploy', 'Builds and deploys all contracts on the selected network', async
 const config: HardhatUserConfig = {
   defaultNetwork: "calibrationnet",
   networks: {
+    mainnet: {
+      chainId: 314,
+      url: process.env.RPC_URL!,
+      accounts: [process.env.PRIVATE_KEY!],
+      timeout: 1000000,
+    },
     calibrationnet: {
       chainId: 314159,
       url: process.env.RPC_URL!,
