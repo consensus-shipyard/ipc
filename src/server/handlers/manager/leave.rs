@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 //! Leave subnet handler and parameters
 
-use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::handlers::manager::{check_subnet, parse_from};
 use crate::server::JsonRPCRequestHandler;

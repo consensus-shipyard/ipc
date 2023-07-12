@@ -23,7 +23,12 @@ impl CommandLineHandler for Fund {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let client = IpcAgentClient::default_from_url(url);
         let epoch = client
-            .fund(&arguments.subnet, arguments.from.clone(), arguments.amount)
+            .fund(
+                &arguments.subnet,
+                arguments.from.clone(),
+                arguments.to.clone(),
+                arguments.amount,
+            )
             .await?;
 
         log::info!("funded subnet: {:} at epoch: {epoch:}", arguments.subnet);
@@ -37,8 +42,14 @@ impl CommandLineHandler for Fund {
 pub(crate) struct FundArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(long, short, help = "The address to send funds from and to")]
+    #[arg(long, short, help = "The address to send funds from")]
     pub from: Option<String>,
+    #[arg(
+        long,
+        short,
+        help = "The address to send funds to (if not set, amount sent to from address)"
+    )]
+    pub to: Option<String>,
     #[arg(long, short, help = "The subnet to fund")]
     pub subnet: String,
     #[arg(help = "The amount to fund in FIL, in whole FIL")]

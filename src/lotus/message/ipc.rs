@@ -98,11 +98,22 @@ pub struct ValidatorSet {
     pub configuration_number: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QueryValidatorSetResponse {
+    /// The validator set for the subnet fetched from the parent.
+    pub validator_set: ValidatorSet,
+    /// Minimum number of validators required by the subnet
+    pub min_validators: u64,
+    /// Genesis epoch at which the subnet was registered
+    pub genesis_epoch: i64,
+}
+
 /// The validator struct. See `ValidatorSet` comment on why we need this duplicated definition.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Validator {
     pub addr: String,
     pub net_addr: String,
+    pub worker_addr: Option<String>,
     pub weight: String,
 }
 

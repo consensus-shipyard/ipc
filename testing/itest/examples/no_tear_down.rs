@@ -38,7 +38,7 @@ async fn run() -> anyhow::Result<()> {
         "t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq".to_string(),
         parent_lotus_path,
         ipc_root_folder,
-        2,
+        1,
         eudico_binary_path,
         SubnetID::from_str(&parent_subnet_id_str).unwrap(),
         api_port_sequence,

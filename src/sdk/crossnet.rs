@@ -14,11 +14,13 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
         &self,
         subnet: &str,
         from: Option<String>,
+        to: Option<String>,
         amount: f64,
     ) -> anyhow::Result<ChainEpoch> {
         let params = FundParams {
             subnet: subnet.to_string(),
             from,
+            to,
             amount,
         };
 
@@ -31,11 +33,13 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
         &self,
         subnet: &str,
         from: Option<String>,
+        to: Option<String>,
         amount: f64,
     ) -> anyhow::Result<ChainEpoch> {
         let params = ReleaseParams {
             subnet: subnet.to_string(),
             from,
+            to,
             amount,
         };
         self.json_rpc_client

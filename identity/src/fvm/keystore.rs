@@ -73,7 +73,7 @@ impl KeyInfo {
 }
 
 pub mod json {
-    use crate::serialization::json::signature_type::SignatureTypeJson;
+    use crate::fvm::serialization::json::signature_type::SignatureTypeJson;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
     use super::*;

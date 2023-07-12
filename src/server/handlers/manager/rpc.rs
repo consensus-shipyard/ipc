@@ -39,6 +39,6 @@ impl JsonRPCRequestHandler for RPCSubnetHandler {
             Some(conn) => conn,
         };
 
-        Ok(conn.subnet().jsonrpc_api_http.to_string())
+        Ok(conn.subnet().rpc_http().to_string())
     }
 }

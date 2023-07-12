@@ -9,6 +9,7 @@ use crate::infra::subnet::{spawn_first_node, spawn_other_nodes, SubnetNode};
 use crate::infra::util::trim_newline;
 use anyhow::anyhow;
 use fvm_shared::address::Address;
+use ipc_agent::config::subnet::FVMSubnet;
 use ipc_agent::config::{Config, Subnet};
 use ipc_sdk::subnet_id::SubnetID;
 use std::str::FromStr;
@@ -138,7 +139,7 @@ impl SubnetInfra {
 
         let actor_addr = util::create_subnet(
             self.config.ipc_agent_url(),
-            self.config.parent_wallet_address.clone(),
+            None,
             parent,
             self.config.name.clone(),
             self.config.number_of_nodes as u64,
@@ -290,16 +291,17 @@ impl SubnetInfra {
 
         Ok(Subnet {
             id: self.config.id.clone().unwrap(),
-            gateway_addr: Address::from_str("t064")?,
             network_name: self.config.name.clone(),
-            jsonrpc_api_http: format!(
-                "http://127.0.0.1:{:}/rpc/v1",
-                self.nodes.as_ref().unwrap()[0].node.tcp_port
-            )
-            .parse()?,
-            jsonrpc_api_ws: None,
-            auth_token: Some(admin_token),
-            accounts,
+            config: ipc_agent::config::subnet::SubnetConfig::Fvm(FVMSubnet {
+                gateway_addr: Address::from_str("t064")?,
+                jsonrpc_api_http: format!(
+                    "http://127.0.0.1:{:}/rpc/v1",
+                    self.nodes.as_ref().unwrap()[0].node.tcp_port
+                )
+                .parse()?,
+                auth_token: Some(admin_token),
+                accounts,
+            }),
         })
     }
 }

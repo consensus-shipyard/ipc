@@ -21,14 +21,14 @@ fn client_from_url(url: String) -> anyhow::Result<IpcAgentClient<JsonRpcClientIm
 /// Create a new subnet in the actor
 pub async fn create_subnet(
     ipc_agent_url: String,
-    from: String,
+    from: Option<String>,
     parent: String,
     name: String,
     min_validators: u64,
 ) -> anyhow::Result<String> {
     let client = client_from_url(ipc_agent_url)?;
     let params = CreateSubnetParams {
-        from: Some(from),
+        from,
         parent,
         name,
         min_validator_stake: DEFAULT_MIN_STAKE,
@@ -42,7 +42,8 @@ pub async fn create_subnet(
 /// Join the subnet
 pub async fn join_subnet(
     ipc_agent_url: String,
-    from: String,
+    from: Option<String>,
+    worker_addr: Option<String>,
     subnet: String,
     collateral: f64,
     validator_net_addr: String,
@@ -50,9 +51,10 @@ pub async fn join_subnet(
     let client = client_from_url(ipc_agent_url)?;
     let params = JoinSubnetParams {
         subnet,
-        from: Some(from),
+        from,
         collateral,
         validator_net_addr,
+        worker_addr,
     };
     client.join_subnet(params).await
 }
@@ -79,7 +81,7 @@ pub fn send_token(
         .status()?;
 
     if status.success() {
-        log::info!("funded wallet: {:} with amount: {:} fil", addr, amount);
+        log::info!("funded wallet: {:} with amount: {:} fvm", addr, amount);
         Ok(())
     } else {
         Err(anyhow!("cannot send token to wallet:{:}", addr))

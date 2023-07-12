@@ -8,6 +8,8 @@ use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
+use tokio::select;
+use tokio::signal::unix::{signal, SignalKind};
 
 #[tokio::main]
 async fn main() {
@@ -29,6 +31,8 @@ async fn run() -> anyhow::Result<()> {
         .unwrap_or_else(|_| "/home/admin/.lotus-local-net0".to_string());
     let parent_subnet_id_str =
         std::env::var("PARENT_SUBNET_ID").unwrap_or_else(|_| DEFAULT_ROOT.to_string());
+    let child_subnet_id_str =
+        std::env::var("CHILD_SUBNET_ID").unwrap_or_else(|_| DEFAULT_ROOT.to_string());
     let subnet_name = std::env::var("SUBNET_NAME").unwrap_or_else(|_| "test-subnet".to_string());
 
     let api_port_sequence = Arc::new(AtomicU16::new(10));
@@ -37,11 +41,11 @@ async fn run() -> anyhow::Result<()> {
         "t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq".to_string(),
         parent_lotus_path,
         ipc_root_folder,
-        2,
+        1,
         eudico_binary_path,
         SubnetID::from_str(&parent_subnet_id_str).unwrap(),
         api_port_sequence,
-        SubnetID::from_str(&(DEFAULT_ROOT.to_owned() + "/t01002"))?,
+        SubnetID::from_str(&child_subnet_id_str)?,
     );
 
     let mut infra = SubnetInfra::new(config);
@@ -57,6 +61,28 @@ async fn run() -> anyhow::Result<()> {
     // wait for the validators to be mining
     sleep(Duration::from_secs(100));
     log::info!("wait for validators to be ready");
+
+    // forever running until kill or ctrl-c
+    let mut sigterm = signal(SignalKind::terminate()).unwrap();
+    let mut sigint = signal(SignalKind::interrupt()).unwrap();
+    loop {
+        select! {
+            _ = sigterm.recv() => {
+                log::info!("Recieve SIGTERM");
+                break;
+            },
+            _ = sigint.recv() => {
+                log::info!("Recieve SIGTERM");
+                break;
+            },
+        };
+    }
+
+    infra.tear_down()?;
+    log::info!("infra tear down");
+
+    infra.remove_from_ipc_agent_config().await?;
+    log::info!("removed subnet from ipc agent config");
 
     infra.trigger_ipc_config_reload().await?;
     log::info!("triggered ipc agent config reload");

@@ -12,6 +12,7 @@ use serde_json::Value;
 
 pub use config::ReloadConfigParams;
 use fvm_shared::econ::TokenAmount;
+use ipc_identity::PersistentKeyStore;
 use manager::create::CreateSubnetHandler;
 use manager::join::JoinSubnetHandler;
 use manager::kill::KillSubnetHandler;
@@ -36,8 +37,8 @@ use crate::server::net_addr::SetValidatorNetAddrHandler;
 use crate::server::JsonRPCRequestHandler;
 use ipc_identity::Wallet;
 
-pub use self::config::new_keystore_from_config;
-pub use self::config::new_keystore_from_path;
+pub use self::config::{new_evm_keystore_from_config, new_evm_keystore_from_path};
+pub use self::config::{new_fvm_wallet_from_config, new_keystore_from_path};
 use self::rpc::RPCSubnetHandler;
 use self::topdown_executed::LastTopDownExecHandler;
 use self::wallet::export::WalletExportHandler;
@@ -81,14 +82,22 @@ impl Handlers {
         }
     }
 
-    pub fn new(config: Arc<ReloadableConfig>, wallet: Arc<RwLock<Wallet>>) -> Result<Self> {
+    pub fn new(
+        config: Arc<ReloadableConfig>,
+        fvm_wallet: Arc<RwLock<Wallet>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    ) -> Result<Self> {
         let mut handlers = HashMap::new();
 
         let h: Box<dyn HandlerWrapper> = Box::new(ReloadConfigHandler::new(config.clone()));
         handlers.insert(String::from(json_rpc_methods::RELOAD_CONFIG), h);
 
         // subnet manager methods
-        let pool = Arc::new(SubnetManagerPool::new(config.clone(), wallet.clone()));
+        let pool = Arc::new(SubnetManagerPool::new(
+            config,
+            fvm_wallet.clone(),
+            evm_keystore.clone(),
+        ));
         let h: Box<dyn HandlerWrapper> = Box::new(CreateSubnetHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::CREATE_SUBNET), h);
 
@@ -119,19 +128,27 @@ impl Handlers {
         let h: Box<dyn HandlerWrapper> = Box::new(SendValueHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::SEND_VALUE), h);
 
-        let h: Box<dyn HandlerWrapper> = Box::new(WalletNewHandler::new(wallet.clone()));
+        let h: Box<dyn HandlerWrapper> = Box::new(WalletNewHandler::new(
+            fvm_wallet.clone(),
+            evm_keystore.clone(),
+        ));
         handlers.insert(String::from(json_rpc_methods::WALLET_NEW), h);
 
-        let h: Box<dyn HandlerWrapper> = Box::new(WalletImportHandler::new(wallet.clone()));
+        let h: Box<dyn HandlerWrapper> = Box::new(WalletImportHandler::new(
+            fvm_wallet.clone(),
+            evm_keystore.clone(),
+        ));
         handlers.insert(String::from(json_rpc_methods::WALLET_IMPORT), h);
 
-        let _h: Box<dyn HandlerWrapper> = Box::new(WalletExportHandler::new(wallet.clone()));
+        let _h: Box<dyn HandlerWrapper> =
+            Box::new(WalletExportHandler::new(fvm_wallet.clone(), evm_keystore));
         // FIXME: For security reasons currently not exposing the ability to export wallet
         // remotely through the RPC API, only directly through the CLI.
         // We can consider re-enabling once we have RPC authentication in the agent.
         // handlers.insert(String::from(json_rpc_methods::WALLET_EXPORT), h);
 
-        let h: Box<dyn HandlerWrapper> = Box::new(WalletBalancesHandler::new(pool.clone(), wallet));
+        let h: Box<dyn HandlerWrapper> =
+            Box::new(WalletBalancesHandler::new(pool.clone(), fvm_wallet));
         handlers.insert(String::from(json_rpc_methods::WALLET_BALANCES), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(SetValidatorNetAddrHandler::new(pool.clone()));
@@ -144,11 +161,11 @@ impl Handlers {
             Box::new(ListBottomUpCheckpointsHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::LIST_BOTTOMUP_CHECKPOINTS), h);
 
-        let h: Box<dyn HandlerWrapper> = Box::new(LastTopDownExecHandler::new(pool));
+        let h: Box<dyn HandlerWrapper> = Box::new(LastTopDownExecHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::LAST_TOPDOWN_EXECUTED), h);
 
         // query validator
-        let h: Box<dyn HandlerWrapper> = Box::new(QueryValidatorSetHandler::new(config));
+        let h: Box<dyn HandlerWrapper> = Box::new(QueryValidatorSetHandler::new(pool));
         handlers.insert(String::from(json_rpc_methods::QUERY_VALIDATOR_SET), h);
 
         Ok(Self { handlers })

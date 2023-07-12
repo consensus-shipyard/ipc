@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: MIT
 //! Expose the subnet actor validator set
 
-use crate::config::ReloadableConfig;
-use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::ipc::ValidatorSet;
-use crate::lotus::LotusClient;
-use crate::server::JsonRPCRequestHandler;
+use crate::lotus::message::ipc::QueryValidatorSetResponse;
+use crate::server::subnet::SubnetManagerPool;
+use crate::server::{check_subnet, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use cid::Cid;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -20,24 +17,14 @@ pub struct QueryValidatorSetParams {
     pub subnet: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct QueryValidatorSetResponse {
-    /// The validator set for the subnet fetched from the parent.
-    pub validator_set: ValidatorSet,
-    /// Minimum number of validators required by the subnet
-    pub min_validators: u64,
-    /// Genesis epoch at which the subnet was registered
-    pub genesis_epoch: i64,
-}
-
 /// The create subnet json rpc method handler.
 pub(crate) struct QueryValidatorSetHandler {
-    config: Arc<ReloadableConfig>,
+    pool: Arc<SubnetManagerPool>,
 }
 
 impl QueryValidatorSetHandler {
-    pub(crate) fn new(config: Arc<ReloadableConfig>) -> Self {
-        Self { config }
+    pub(crate) fn new(pool: Arc<SubnetManagerPool>) -> Self {
+        Self { pool }
     }
 }
 
@@ -52,33 +39,16 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
             .parent()
             .ok_or_else(|| anyhow!("cannot get for root"))?;
 
-        let config = self.config.get_config();
-        let subnet = match config.subnets.get(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(s) => s,
+        let conn = match self.pool.get(&parent) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
         };
 
-        let lotus = LotusJsonRPCClient::from_subnet(subnet);
+        let subnet_config = conn.subnet();
+        check_subnet(subnet_config)?;
 
-        // Read the parent's chain head and obtain the tip set CID.
-        // FIXME: This is used all over the place, make it a more
-        // compact function
-        let parent_head = lotus.chain_head().await?;
-        let cid_map = parent_head.cids.first().unwrap().clone();
-        let tip_set = Cid::try_from(cid_map)?;
-
-        let response = lotus
-            .ipc_read_subnet_actor_state(&subnet_id, tip_set)
-            .await?;
-
-        let genesis_epoch = lotus
-            .ipc_get_genesis_epoch_for_subnet(&subnet_id, subnet.gateway_addr)
-            .await?;
-
-        Ok(QueryValidatorSetResponse {
-            validator_set: response.validator_set,
-            min_validators: response.min_validators,
-            genesis_epoch,
-        })
+        conn.manager()
+            .get_validator_set(&subnet_id, subnet_config.gateway_addr())
+            .await
     }
 }

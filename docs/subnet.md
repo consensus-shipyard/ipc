@@ -12,7 +12,7 @@ We provide instructions for running both a [simple single-validator subnet](#run
 
 In order to run a validator in a subnet, we'll need a set of keys to handle that validator. To export the validator key from your agent you need to run: 
 ```bash
-./ipc-agent/bin/ipc-agent wallet export --address <address-to-export> --output <output file>
+./ipc-agent/bin/ipc-agent wallet export -w fvm --address <address-to-export> --output <output file>
 ```
 
 If for some reason, you want to use for your validator a set of keys that are not managed by the IPC agent, and are held in a raw Eudico node of another network, you can export the wallet key into a file (like the wallet address we are using in the rootnet), with the following Lotus command:
@@ -38,7 +38,7 @@ $ docker exec -it ipc_root_1234 eudico wallet export --lotus-json t1cp4q4lqsdhob
 ### Importing wallet keys
 Your agent handles the keys for all of your addresses in IPC and is responsible for signing the transactions to the different networks. To import a key to the agent you can use: 
 ```bash
-`./ipc-agent/bin/ipc-agent wallet import --path <wallet-key-file-path>`
+`./ipc-agent/bin/ipc-agent wallet import -w fvm --path <wallet-key-file-path>`
 ```
 
 The only operation that requres importing the keys into your raw Eudico node is when running a subnet validator. Subnet validators need to hold the validator keys in their wallets in order to be able to sign new blocks. You may use the following commands to import a wallet directly into the raw subnet node of your validator: 
@@ -109,11 +109,14 @@ The end of the log of the execution of this script provides a bit more of inform
 ```toml
 [[subnets]]
 id = "/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq"
-gateway_addr = "f064"
 network_name = "test"
-jsonrpc_api_http = "http://127.0.0.1:1250/rpc/v1"
-auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.TnoDqZJ1fqdkr_oCHFEXvdwU6kYR7Va_ALyEuoPnksA"
+
+[subnets.config]
+network_type = "fvm"
 accounts = ["t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq"]
+auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.TnoDqZJ1fqdkr_oCHFEXvdwU6kYR7Va_ALyEuoPnksA"
+gateway_addr = "t064"
+jsonrpc_api_http = "http://127.0.0.1:1250/rpc/v1"
 ```
 > 💡 Remember to run `./bin/ipc-agent config reload` for changes in the config of the agent to be picked up by the daemon.
 
@@ -146,7 +149,7 @@ The mining process is currently run in the foreground in interactive mode. Consi
 
 In this section, we will deploy a subnet where the IPC agent is responsible for handling more than one validator in the subnet. We are going to deploy a subnet with 3 validators. The first thing we'll need to do is create a new wallet for every validator we want to run. We can do this directly through the agent with the following command (3x):
 ```bash
-./bin/ipc-agent wallet new --key-type secp256k1 --subnet /r31415926
+./bin/ipc-agent wallet new -w fvm --key-type secp256k1 --subnet /r31415926
 ```
 
 We also need to provide with some funds our wallets so they can put collateral to join the subnet. According to the rootnet you are connected to, you may need to get some funds from the faucet, or send some from your main wallet. Funds can be sent from your main wallet also through the agent with (3x, adjusting `target-wallet` for each): 
@@ -192,14 +195,19 @@ To configure the agent for its use with all the validators, we need to connect t
 
 Here's an example of the configuration connecting to the RPC of the first validator, and configuring all the wallets for the validators in the subnet.
 ```toml
+
 [[subnets]]
 id = "/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq"
-gateway_addr = "f064"
 network_name = "test"
-jsonrpc_api_http = "http://127.0.0.1:1240/rpc/v1"
-auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.JTiumQwFIutkTb0gUC5JWTATs-lUvDaopEDE0ewgzLk"
+
+[subnets.config]
+network_type = "fvm"
 accounts = ["t1ivy6mo2ofxw4fdmft22nel66w63fb7cuyslm4cy", "t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq", "t1nv5jrdxk4ljzndaecfjgmu35k6iz54pkufktvua"]
+auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.JTiumQwFIutkTb0gUC5JWTATs-lUvDaopEDE0ewgzLk"
+gateway_addr = "t064"
+jsonrpc_api_http = "http://127.0.0.1:1240/rpc/v1"
 ```
+
 Remember to run `./bin/ipc-agent config reload` for your agent to pick up the latest changes for the config.
 
 ### Joining the subnet

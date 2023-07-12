@@ -12,7 +12,7 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::Error, wallet_helpers, KeyInfo, KeyStore};
+use crate::fvm::{errors::Error, wallet_helpers, KeyInfo, KeyStore};
 
 /// A key, this contains a `KeyInfo`, an address, and a public key.
 #[derive(Clone, PartialEq, Debug, Eq, Serialize, Deserialize)]

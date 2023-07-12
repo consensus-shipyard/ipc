@@ -5,12 +5,14 @@
 use async_trait::async_trait;
 use clap::Args;
 use std::fmt::Debug;
+use std::str::FromStr;
 
 use crate::cli::commands::get_ipc_agent_url;
+use crate::cli::wallet::WalletType;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use crate::server::wallet::new::{WalletNewParams, WalletNewResponse};
+use crate::server::wallet::new::{NewFvmWallet, WalletNewParams, WalletNewResponse};
 
 pub(crate) struct WalletNew;
 
@@ -24,8 +26,12 @@ impl CommandLineHandler for WalletNew {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
-        let params = WalletNewParams {
-            key_type: arguments.key_type.clone(),
+        let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
+        let params = match wallet_type {
+            WalletType::Evm => WalletNewParams::Evm,
+            WalletType::Fvm => WalletNewParams::Fvm(NewFvmWallet {
+                key_type: arguments.key_type.clone().expect("key type not specified"),
+            }),
         };
 
         let addr = json_rpc_client
@@ -49,7 +55,9 @@ pub(crate) struct WalletNewArgs {
     #[arg(
         long,
         short,
-        help = "Key type of the wallet (secp256k1, bls, secp256k1-ledger)"
+        help = "The fvm key type of the wallet (secp256k1, bls, secp256k1-ledger), only for fvm wallet type"
     )]
-    pub key_type: String,
+    pub key_type: Option<String>,
+    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    pub wallet_type: String,
 }

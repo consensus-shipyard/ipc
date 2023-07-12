@@ -64,7 +64,7 @@ Complex behavior can be implemented using these primitives: sending value to a u
 ### Fund
 Funding a subnet can be performed by using the following command:
 ```bash
-./bin/ipc-agent cross-msg fund --subnet <subnet-id> [--from <from-addr>] <amount>
+./bin/ipc-agent cross-msg fund --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
 ```
 ```console
 # Example execution
@@ -72,18 +72,30 @@ $ ./bin/ipc-agent cross-msg fund --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctci
 ```
 This command includes the cross-net message into the next top-down checkpoint after the current epoch. Once the top-down checkpoint is committed, you should see the funds in your account of the child subnet.
 
+Alternatively, we can pass an additional parameter to send the funds to a specific address in the child subnet
+
+```console
+# Example execution
+$ ./bin/ipc-agent cross-msg fund --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to=t17o2heqfzxfvtlopxilwoofte3akece2tgps7uny 100
+```
 >💡 Top-down checkpoints are not used to anchor the security of the parent into the child (as is the case for bottom-up checkpoints). They just include information of the top-down messages that need to be executed in the child subnet, and are a way for validators in the subnet to reach consensus on the finality on their parent.
 
 ### Release
 In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following comand:
 ```bash
-./bin/ipc-agent cross-msg release --subnet <subnet-id> [--from <from-addr>] <amount>
+./bin/ipc-agent cross-msg release --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
 ```
 ```console
 # Example execution
 $ ./bin/ipc-agent cross-msg release --subnet=/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 100
 ```
 This command includes the cross-net message into a bottom-up checkpoint after the current epoch. Once the bottom-up checkpoint is committed, you should see the funds in your account in the parent. 
+
+Alternatively, we can pass an additional parameter to release the funds to a specific address in the parent subnet
+
+```console
+# Example execution
+$ ./bin/ipc-agent cross-msg release --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to=t17o2heqfzxfvtlopxilwoofte3akece2tgps7uny 100
 
 
 ## Listing checkpoints from a subnet

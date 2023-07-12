@@ -2,47 +2,96 @@
 // SPDX-License-Identifier: MIT
 
 use crate::config::{ReloadableConfig, Subnet};
-use crate::lotus::client::{DefaultLotusJsonRPCClient, LotusJsonRPCClient};
-use crate::lotus::LotusClient;
-use crate::manager::checkpoint::manager::bottomup::BottomUpCheckpointManager;
-use crate::manager::checkpoint::manager::topdown::TopDownCheckpointManager;
-use crate::manager::checkpoint::manager::CheckpointManager;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use cid::Cid;
 use futures_util::future::join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_identity::Wallet;
-use ipc_sdk::subnet_id::SubnetID;
-use std::collections::HashMap;
-use std::str::FromStr;
+use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tokio::select;
 use tokio::time::sleep;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 
-pub use manager::*;
-mod manager;
+pub use fvm::*;
+use ipc_identity::PersistentKeyStore;
+use std::fmt::Display;
+
+mod fevm;
+mod fevm_fvm;
+mod fvm;
 mod proof;
+mod setup;
 
 const TASKS_PROCESS_THRESHOLD_SEC: u64 = 15;
 const SUBMISSION_LOOK_AHEAD_EPOCH: ChainEpoch = 50;
+
+/// Checkpoint manager that handles a specific parent - child - checkpoint type tuple.
+/// For example, we might have `/r123` subnet and `/r123/t01` as child, one implementation of manager
+/// is handling the top-down checkpoint submission for `/r123` to `/r123/t01`.
+#[async_trait]
+pub trait CheckpointManager: Display + Send + Sync {
+    /// Get the subnet config that this manager is submitting checkpoints to. For example, if it is
+    /// top down checkpoints, target subnet return the child subnet config. If it is bottom up, target
+    /// subnet returns parent subnet.
+    fn target_subnet(&self) -> &Subnet;
+
+    /// Getter for the parent subnet this checkpoint manager is handling
+    fn parent_subnet(&self) -> &Subnet;
+
+    /// Getter for the target subnet this checkpoint manager is handling
+    fn child_subnet(&self) -> &Subnet;
+
+    /// The checkpoint period that the current manager is submitting upon
+    fn checkpoint_period(&self) -> ChainEpoch;
+
+    /// Get the list of validators that should submit checkpoints
+    async fn validators(&self) -> Result<Vec<Address>>;
+
+    /// Obtain the last executed epoch of the checkpoint submission
+    async fn last_executed_epoch(&self) -> Result<ChainEpoch>;
+
+    /// The current epoch in the subnet that the checkpoints should be submitted to
+    async fn current_epoch(&self) -> Result<ChainEpoch>;
+
+    /// Submit the checkpoint based on the current epoch to submit and the previous epoch that was
+    /// already submitted.
+    async fn submit_checkpoint(&self, epoch: ChainEpoch, validator: &Address) -> Result<()>;
+
+    /// Checks if the validator has already submitted in the epoch
+    async fn should_submit_in_epoch(
+        &self,
+        validator: &Address,
+        epoch: ChainEpoch,
+    ) -> anyhow::Result<bool>;
+
+    /// Performs checks to see if the subnet is ready for checkpoint submission. If `true` means the
+    /// subnet is ready for submission, else means the subnet is not ready.
+    async fn presubmission_check(&self) -> anyhow::Result<bool>;
+}
 
 pub struct CheckpointSubsystem {
     /// The subsystem uses a `ReloadableConfig` to ensure that, at all, times, the subnets under
     /// management are those in the latest version of the config.
     config: Arc<ReloadableConfig>,
-    wallet_store: Arc<RwLock<Wallet>>,
+    fvm_wallet: Arc<RwLock<Wallet>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
 }
 
 impl CheckpointSubsystem {
     /// Creates a new `CheckpointSubsystem` with a configuration `config`.
-    pub fn new(config: Arc<ReloadableConfig>, wallet_store: Arc<RwLock<Wallet>>) -> Self {
+    pub fn new(
+        config: Arc<ReloadableConfig>,
+        fvm_wallet: Arc<RwLock<Wallet>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    ) -> Self {
         Self {
             config,
-            wallet_store,
+            fvm_wallet,
+            evm_keystore,
         }
     }
 }
@@ -56,9 +105,10 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
         loop {
             // Load the latest config.
             let config = self.config.get_config();
-            let (top_down_managers, bottom_up_managers) = match setup_managers_from_config(
+            let managers = match setup::setup_managers_from_config(
                 &config.subnets,
-                self.wallet_store.clone(),
+                self.fvm_wallet.clone(),
+                self.evm_keystore.clone(),
             )
             .await
             {
@@ -79,8 +129,7 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
 
             loop {
                 select! {
-                    _ = process_managers(&top_down_managers) => {},
-                    _ = process_managers(&bottom_up_managers) => {},
+                    _ = process_managers(managers.as_slice()) => {},
                     r = config_chan.recv() => {
                         log::info!("Config changed, reloading checkpointing subsystem");
                         match r {
@@ -101,81 +150,21 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
     }
 }
 
-fn handle_err_response(manager: &impl CheckpointManager, response: anyhow::Result<()>) {
+fn handle_err_response(manager: &dyn CheckpointManager, response: anyhow::Result<()>) {
     if response.is_err() {
         log::error!("manger {manager:} had error: {:}", response.unwrap_err());
     }
 }
 
-async fn setup_managers_from_config(
-    subnets: &HashMap<SubnetID, Subnet>,
-    wallet_store: Arc<RwLock<Wallet>>,
-) -> Result<(
-    Vec<TopDownCheckpointManager>,
-    Vec<BottomUpCheckpointManager<DefaultLotusJsonRPCClient>>,
-)> {
-    let mut bottom_up_managers = vec![];
-    let mut top_down_managers = vec![];
-
-    for s in subnets.values() {
-        log::info!("config checkpoint manager for subnet: {:}", s.id);
-
-        // We filter for subnets that have at least one account and for which the parent subnet
-        // is also in the configuration.
-        if s.accounts.is_empty() {
-            log::info!("no accounts in subnet: {:}, not managing checkpoints", s.id);
-            continue;
-        }
-
-        let parent = if let Some(p) = s.id.parent() && subnets.contains_key(&p) {
-            subnets.get(&p).unwrap()
-        } else {
-            log::info!("subnet has no parent configured: {:}, not managing checkpoints", s.id);
-            continue
-        };
-
-        bottom_up_managers.push(
-            BottomUpCheckpointManager::new(
-                LotusJsonRPCClient::from_subnet_with_wallet_store(parent, wallet_store.clone()),
-                parent.clone(),
-                LotusJsonRPCClient::from_subnet_with_wallet_store(s, wallet_store.clone()),
-                s.clone(),
-            )
-            .await?,
-        );
-
-        top_down_managers.push(
-            TopDownCheckpointManager::new(
-                LotusJsonRPCClient::from_subnet_with_wallet_store(parent, wallet_store.clone()),
-                parent.clone(),
-                LotusJsonRPCClient::from_subnet_with_wallet_store(s, wallet_store.clone()),
-                s.clone(),
-            )
-            .await?,
-        );
-    }
-
-    log::info!(
-        "we are managing checkpoints for {:} number of bottom up subnets",
-        bottom_up_managers.len()
-    );
-    log::info!(
-        "we are managing checkpoints for {:} number of top down subnets",
-        top_down_managers.len()
-    );
-
-    Ok((top_down_managers, bottom_up_managers))
-}
-
-async fn process_managers<T: CheckpointManager>(managers: &[T]) -> anyhow::Result<()> {
+async fn process_managers(managers: &[Box<dyn CheckpointManager>]) -> anyhow::Result<()> {
     // Tracks the start time of the processing, will use this to determine should sleep
     let start_time = Instant::now();
 
     let futures = managers
         .iter()
         .map(|manager| async {
-            let response = submit_till_current_epoch(manager).await;
-            handle_err_response(manager, response);
+            let response = submit_till_current_epoch(manager.borrow()).await;
+            handle_err_response(manager.borrow(), response);
         })
         .collect::<Vec<_>>();
 
@@ -195,7 +184,7 @@ async fn sleep_or_continue(start_time: Instant) {
 
 /// Attempts to submit checkpoints from the last executed epoch all the way to the current epoch for
 /// all the validators in the provided manager.
-async fn submit_till_current_epoch(manager: &impl CheckpointManager) -> Result<()> {
+async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()> {
     if !manager.presubmission_check().await? {
         log::info!("subnet in manager: {manager:} not ready to submit checkpoint");
         return Ok(());
@@ -203,11 +192,28 @@ async fn submit_till_current_epoch(manager: &impl CheckpointManager) -> Result<(
 
     // we might have to obtain the list of validators as some validators might leave the subnet
     // we can improve the performance by caching if this slows down the process significantly.
-    let validators = child_validators(manager).await?;
+    let mut validators = manager
+        .validators()
+        .await
+        .map_err(|e| anyhow!("cannot get child validators for {manager:} due to {e:}"))?;
+    remove_not_managed(&mut validators, &manager.target_subnet().accounts());
+    log::debug!("list of validators: {validators:?} for manager: {manager:}");
+
+    if validators.is_empty() {
+        log::info!("no validators: {validators:?} for manager: {manager:}, not submit checkpoints");
+        return Ok(());
+    }
+
     let period = manager.checkpoint_period();
 
-    let last_executed_epoch = manager.last_executed_epoch().await?;
-    let current_epoch = manager.current_epoch().await?;
+    let last_executed_epoch = manager
+        .last_executed_epoch()
+        .await
+        .map_err(|e| anyhow!("cannot get last executed epoch for {manager:} due to {e:}"))?;
+    let current_epoch = manager
+        .current_epoch()
+        .await
+        .map_err(|e| anyhow!("cannot get the current eopch for {manager:} due to {e:}"))?;
 
     log::debug!(
         "latest epoch {:?}, last executed epoch: {:?} for checkpointing: {:}",
@@ -260,35 +266,8 @@ async fn submit_till_current_epoch(manager: &impl CheckpointManager) -> Result<(
     Ok(())
 }
 
-/// Obtain the validators in the subnet from the parent subnet of the manager
-async fn child_validators(manager: &impl CheckpointManager) -> anyhow::Result<Vec<Address>> {
-    let parent_client = manager.parent_client();
-    let parent_head = parent_client.chain_head().await?;
-
-    // A key assumption we make now is that each block has exactly one tip set. We panic
-    // if this is not the case as it violates our assumption.
-    // TODO: update this logic once the assumption changes (i.e., mainnet)
-    assert_eq!(parent_head.cids.len(), 1);
-
-    let cid_map = parent_head.cids.first().unwrap().clone();
-    let parent_tip_set = Cid::try_from(cid_map)?;
-    let child_subnet = manager.child_subnet();
-
-    let subnet_actor_state = parent_client
-        .ipc_read_subnet_actor_state(&child_subnet.id, parent_tip_set)
-        .await?;
-
-    match subnet_actor_state.validator_set.validators {
-        None => Ok(vec![]),
-        Some(validators) => {
-            let mut vs = vec![];
-            for v in validators {
-                let addr = Address::from_str(&v.addr)?;
-                if child_subnet.accounts.contains(&addr) {
-                    vs.push(addr);
-                }
-            }
-            Ok(vs)
-        }
-    }
+/// Removes the not managed accounts from the list of validators
+fn remove_not_managed(validators: &mut Vec<Address>, managed_accounts: &[Address]) {
+    let set: HashSet<_> = managed_accounts.iter().collect();
+    validators.drain_filter(|v| !set.contains(v));
 }

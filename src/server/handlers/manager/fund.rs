@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MIT
 //! Fund operation in the gateway actor
 
-use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::{check_subnet, handlers, parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,7 @@ use std::sync::Arc;
 pub struct FundParams {
     pub subnet: String,
     pub from: Option<String>,
+    pub to: Option<String>,
     /// In whole FIL
     pub amount: f64,
 }
@@ -49,10 +50,15 @@ impl JsonRPCRequestHandler for FundHandler {
         check_subnet(subnet_config)?;
 
         let from = parse_from(subnet_config, request.from)?;
+        let to = request
+            .to
+            .map(|r| Address::from_str(&r))
+            .transpose()?
+            .unwrap_or(from);
         let amount = handlers::f64_to_token_amount(request.amount)?;
 
         conn.manager()
-            .fund(subnet, subnet_config.gateway_addr, from, amount)
+            .fund(subnet, subnet_config.gateway_addr(), from, to, amount)
             .await
     }
 }

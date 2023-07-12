@@ -15,10 +15,10 @@ use crate::cli::commands::crossmsg::CrossMsgsCommandsArgs;
 use crate::cli::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::cli::commands::util::UtilCommandsArgs;
 use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::server::new_keystore_from_path;
+use crate::server::{new_evm_keystore_from_path, new_keystore_from_path};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use ipc_identity::KeyStore;
+use ipc_identity::{KeyStore, PersistentKeyStore};
 use std::fmt::Debug;
 use subnet::SubnetCommandsArgs;
 use url::Url;
@@ -125,10 +125,19 @@ pub(crate) fn get_ipc_agent_url(
     Ok(url)
 }
 
-pub(crate) fn get_keystore(path: Option<String>) -> Result<KeyStore> {
+pub(crate) fn get_fvm_store(path: Option<String>) -> Result<KeyStore> {
     let path = match path {
         Some(p) => p,
         None => default_repo_path(),
     };
     new_keystore_from_path(&path)
+}
+
+pub(crate) fn get_evm_keystore(
+    path: &Option<String>,
+) -> Result<PersistentKeyStore<ethers::types::Address>> {
+    match path {
+        Some(p) => new_evm_keystore_from_path(p),
+        None => new_evm_keystore_from_path(&default_repo_path()),
+    }
 }

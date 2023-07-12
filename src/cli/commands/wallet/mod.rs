@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+use std::str::FromStr;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::cli::{CommandLineHandler, GlobalArguments};
@@ -39,4 +41,22 @@ pub(crate) enum Commands {
     Balances(WalletBalancesArgs),
     Import(WalletImportArgs),
     Export(WalletExportArgs),
+}
+
+/// The wallet type, i.e. for which network
+pub enum WalletType {
+    Evm,
+    Fvm,
+}
+
+impl FromStr for WalletType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "evm" => Self::Evm,
+            "fvm" => Self::Fvm,
+            _ => return Err(anyhow!("invalid wallet type")),
+        })
+    }
 }

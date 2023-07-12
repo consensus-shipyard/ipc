@@ -136,11 +136,14 @@ The `/r31415926` section of the agent's `config.toml` must be updated to connect
 ```toml
 [[subnets]]
 id = "/r31415926"
-gateway_addr = "f064"
 network_name = "root"
-jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
-auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0"
+
+[subnets.config]
+network_type = "fvm"
 accounts = ["t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq"]
+auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0"
+gateway_addr = "t064"
+jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 ```
 
 > 💡 In the current implementation of Spacenet, the gateway is always deployed in the `f064` address. This should be the address always reflected on your config for the gateway. In the future, this will change, and the gateway may be deployed in different addresses.
@@ -161,8 +164,8 @@ To check if the agent has connected to the rootnet successfully, you can try usi
 
 *Example*:
 ```console
-$ ./bin/ipc-agent wallet new --key-type bls --subnet /r31415926
-2023-03-30T12:01:11Z INFO  ipc_agent::cli::commands::manager::wallet] created new wallet with address WalletNewResponse { address: "t1om5pijjq5dqic4ccnqqrvv6zgzwrlxf6bh2apvi" } in subnet "/r31415926"
+$ ./bin/ipc-agent wallet new -w fvm --key-type bls
+2023-03-30T12:01:11Z INFO  ipc_agent::cli::commands::manager::wallet] created new wallet with address WalletNewResponse { address: "t3u7djutz4kwshntg4abams37ssy63irkfykqimodh4fs7krdst3y5qwcptvexmvic6gs5q6qygerminm2r3la" } in subnet "/r31415926"
 ```
 
 ## Help

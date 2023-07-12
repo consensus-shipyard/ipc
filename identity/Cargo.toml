@@ -20,18 +20,23 @@ serde_ipld_dagcbor = "0.2"
 libc = "0.2"
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
-bls-signatures = { version = "0.12", default-features = false, features = ["blst"] }
+bls-signatures = { version = "0.13.0", default-features = false, features = ["blst"] }
 serde_json = { workspace = true }
 serde = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
-
 fvm_shared = { workspace = true }
-
 ipc-sdk = { workspace = true }
 
+zeroize = "1.6.0"
+ethers = { workspace = true, optional = true }
+hex = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 tokio = { workspace = true }
 log = { workspace = true }
-tempfile = "3.4.0"
+
+[features]
+with-ethers = ["ethers"]
+

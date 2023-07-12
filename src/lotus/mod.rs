@@ -10,7 +10,7 @@ use cid::Cid;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use ipc_gateway::{BottomUpCheckpoint, CrossMsg};
+use ipc_gateway::{BottomUpCheckpoint, CrossMsg, TopDownCheckpoint};
 use ipc_sdk::subnet_id::SubnetID;
 use serde::de::DeserializeOwned;
 
@@ -96,6 +96,13 @@ pub trait LotusClient {
         epoch: ChainEpoch,
         tip_set: Cid,
     ) -> Result<GetTipSetByHeightResponse>;
+
+    async fn ipc_submit_top_down_checkpoint(
+        &self,
+        gateway_addr: Address,
+        validator: &Address,
+        checkpoint: TopDownCheckpoint,
+    ) -> Result<ChainEpoch>;
 
     async fn ipc_get_prev_checkpoint_for_child(
         &self,

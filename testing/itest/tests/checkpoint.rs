@@ -48,7 +48,7 @@ async fn test_fund_and_release() {
     let amount = 2.5;
 
     let fund_epoch = ipc_client
-        .fund(&subnet, Some(addr.clone()), amount)
+        .fund(&subnet, Some(addr.clone()), Some(addr.clone()), amount)
         .await
         .unwrap();
     println!("fund epoch: {fund_epoch:}");
@@ -62,7 +62,7 @@ async fn test_fund_and_release() {
     }
 
     let epoch = ipc_client
-        .release(&subnet, Some(addr.clone()), amount)
+        .release(&subnet, Some(addr.clone()), Some(addr.clone()), amount)
         .await
         .unwrap();
     println!("release epoch: {epoch:}");

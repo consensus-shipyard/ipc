@@ -43,9 +43,12 @@ bytes = "1.4.0"
 serde_bytes = "0.11.9"
 clap = { version = "4.1.4", features = ["env", "derive"] }
 thiserror = { workspace = true }
+hex = { workspace = true }
 serde_tuple = "0.5.0"
 zeroize = "1.6.0"
 
+ethers-contract = { workspace = true }
+ethers = { workspace = true }
 fvm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true }
 ipc-sdk = { workspace = true }
@@ -54,10 +57,11 @@ ipc-gateway = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 primitives = { workspace = true }
 
-ipc-identity = { path = "identity/." }
+ipc-identity = { path = "identity/.", features = ["with-ethers"] }
 
 [dev-dependencies]
-tempfile = "3.4.0"
+tempfile = { workspace = true }
+hex = { workspace = true }
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -74,18 +78,21 @@ quickcheck = "1"
 quickcheck_macros = "1"
 blake2b_simd = "1.0"
 rand = "0.8"
+hex = "0.4.3"
+tempfile = "3.4.0"
 serde_json = { version = "1.0.91", features = ["raw_value"] }
 
-fvm_ipld_blockstore = "0.1"
-fvm_ipld_encoding = "0.3"
-fvm_shared = { version = "=3.0.0-alpha.17", default-features = false, features = ["crypto"] }
+fvm_ipld_blockstore = "0.1.1"
+fvm_ipld_encoding = "0.3.3"
+fvm_shared = { version = "=3.2.0", default-features = false, features = ["crypto"] }
 fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", features = ["fil-actor"] }
-ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", branch = "adlrocha/subnetid-refactor" }
-ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [], branch = "adlrocha/subnetid-refactor" }
-ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [], branch = "adlrocha/subnetid-refactor" }
-ipc_ipld_resolver = { git = "https://github.com/consensus-shipyard/ipc-ipld-resolver.git", branch = "main" }
+ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git" }
+ipc-subnet-actor = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
+ipc-gateway = { git = "https://github.com/consensus-shipyard/ipc-actors.git", features = [] }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
 primitives = { git = "https://github.com/consensus-shipyard/fvm-utils" }
+ethers = { git = "https://github.com/cryptoAtwill/ethers-rs.git" }
+ethers-contract = { git = "https://github.com/cryptoAtwill/ethers-rs.git" }
 
 # Uncomment to point to you local versions
 # [patch."https://github.com/consensus-shipyard/fvm-utils"]

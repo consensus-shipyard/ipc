@@ -1,12 +1,11 @@
-use std::fmt::{Display, Formatter};
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+use crate::checkpoint::proof::create_proof;
+use crate::checkpoint::{chain_head_cid, child_validators, CheckpointManager};
 use crate::config::Subnet;
 use crate::lotus::client::DefaultLotusJsonRPCClient;
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::LotusClient;
-use crate::manager::checkpoint::proof::create_proof;
-use crate::manager::checkpoint::{chain_head_cid, CheckpointManager};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -17,6 +16,7 @@ use fvm_shared::MethodNum;
 use ipc_gateway::BottomUpCheckpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use primitives::TCid;
+use std::fmt::{Display, Formatter};
 
 pub struct BottomUpCheckpointManager<T> {
     parent: Subnet,
@@ -61,24 +61,15 @@ impl<T: LotusClient + Send + Sync> BottomUpCheckpointManager<T> {
     }
 
     async fn proof(&self, epoch: ChainEpoch) -> anyhow::Result<Vec<u8>> {
-        let child_chain_head_tip_sets = self.child_client.chain_head().await?.cids;
-        if child_chain_head_tip_sets.is_empty() {
-            return Err(anyhow!(
-                "chain head has empty cid: {:}",
-                self.child_subnet.id
-            ));
-        }
         let proof = create_proof(&self.child_client, epoch).await?;
-        Ok(cbor::serialize(&proof, "bottom up checkpoint proof")?.to_vec())
+        Ok(cbor::serialize(&proof, "fvm bottom up checkpoint proof")?.to_vec())
     }
 }
 
 #[async_trait]
 impl<T: LotusClient + Send + Sync> CheckpointManager for BottomUpCheckpointManager<T> {
-    type LotusClient = T;
-
-    fn parent_client(&self) -> &Self::LotusClient {
-        &self.parent_client
+    fn target_subnet(&self) -> &Subnet {
+        &self.parent
     }
 
     fn parent_subnet(&self) -> &Subnet {
@@ -91,6 +82,10 @@ impl<T: LotusClient + Send + Sync> CheckpointManager for BottomUpCheckpointManag
 
     fn checkpoint_period(&self) -> ChainEpoch {
         self.checkpoint_period
+    }
+
+    async fn validators(&self) -> anyhow::Result<Vec<Address>> {
+        child_validators(&self.parent_client, &self.child_subnet).await
     }
 
     async fn last_executed_epoch(&self) -> anyhow::Result<ChainEpoch> {
@@ -133,7 +128,7 @@ impl<T: LotusClient + Send + Sync> CheckpointManager for BottomUpCheckpointManag
         );
         let template = self
             .child_client
-            .ipc_get_checkpoint_template(&self.child_subnet.gateway_addr, epoch)
+            .ipc_get_checkpoint_template(&self.child_subnet.gateway_addr(), epoch)
             .await
             .map_err(|e| {
                 anyhow!(
@@ -153,7 +148,7 @@ impl<T: LotusClient + Send + Sync> CheckpointManager for BottomUpCheckpointManag
         );
         let response = self
             .parent_client
-            .ipc_get_prev_checkpoint_for_child(&self.child_subnet.gateway_addr, &self.child_subnet.id)
+            .ipc_get_prev_checkpoint_for_child(&self.child_subnet.gateway_addr(), &self.child_subnet.id)
             .await
             .map_err(|e| {
                 anyhow!(

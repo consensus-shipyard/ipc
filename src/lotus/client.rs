@@ -17,7 +17,8 @@ use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
-use ipc_gateway::{BottomUpCheckpoint, CrossMsg};
+use fvm_shared::MethodNum;
+use ipc_gateway::{BottomUpCheckpoint, CrossMsg, TopDownCheckpoint};
 use ipc_identity::Wallet;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::cast::ToPrimitive;
@@ -364,6 +365,30 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         Ok(r)
     }
 
+    async fn ipc_submit_top_down_checkpoint(
+        &self,
+        gateway_addr: Address,
+        validator: &Address,
+        checkpoint: TopDownCheckpoint,
+    ) -> Result<ChainEpoch> {
+        let epoch = checkpoint.epoch;
+
+        let message = MpoolPushMessage::new(
+            gateway_addr,
+            *validator,
+            ipc_gateway::Method::SubmitTopDownCheckpoint as MethodNum,
+            cbor::serialize(&checkpoint, "topdown_checkpoint")?.to_vec(),
+        );
+        let message_cid = self.mpool_push(message).await.map_err(|e| {
+            log::error!("error submitting top down checkpoint at epoch {epoch:} at gateway: {gateway_addr:}");
+            e
+        })?;
+
+        self.state_wait_msg(message_cid)
+            .await
+            .map(|r| r.height as ChainEpoch)
+    }
+
     async fn ipc_get_prev_checkpoint_for_child(
         &self,
         gateway_addr: &Address,
@@ -575,7 +600,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
         let message = fvm_shared::message::Message {
             version: msg
                 .version
-                .ok_or_else(|| anyhow!("version should not be empty"))? as i64,
+                .ok_or_else(|| anyhow!("version should not be empty"))? as u64,
             from: msg.from,
             to: msg.to,
             sequence: msg
@@ -590,7 +615,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
                 .ok_or_else(|| anyhow!("gas_limit should not be empty"))?
                 .atto()
                 .to_u64()
-                .unwrap() as i64,
+                .unwrap() as u64,
             gas_fee_cap: msg
                 .gas_fee_cap
                 .as_ref()
@@ -664,9 +689,9 @@ impl LotusJsonRPCClient<JsonRpcClientImpl> {
     /// A constructor that returns a `LotusJsonRPCClient` from a `Subnet`. The returned
     /// `LotusJsonRPCClient` makes requests to the URL defined in the `Subnet`.
     pub fn from_subnet(subnet: &crate::config::Subnet) -> Self {
-        let url = subnet.jsonrpc_api_http.clone();
-        let auth_token = subnet.auth_token.as_deref();
-        let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token);
+        let url = subnet.rpc_http().clone();
+        let auth_token = subnet.auth_token();
+        let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token.as_deref());
         LotusJsonRPCClient::new(jsonrpc_client, subnet.id.clone())
     }
 
@@ -674,9 +699,9 @@ impl LotusJsonRPCClient<JsonRpcClientImpl> {
         subnet: &crate::config::Subnet,
         wallet_store: Arc<RwLock<Wallet>>,
     ) -> Self {
-        let url = subnet.jsonrpc_api_http.clone();
-        let auth_token = subnet.auth_token.as_deref();
-        let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token);
+        let url = subnet.rpc_http().clone();
+        let auth_token = subnet.auth_token();
+        let jsonrpc_client = JsonRpcClientImpl::new(url, auth_token.as_deref());
         LotusJsonRPCClient::new_with_wallet_store(jsonrpc_client, subnet.id.clone(), wallet_store)
     }
 }

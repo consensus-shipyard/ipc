@@ -11,11 +11,11 @@ use clap::Args;
 use ipc_identity::Wallet;
 use tokio_graceful_shutdown::{IntoSubsystem, Toplevel};
 
+use crate::checkpoint::CheckpointSubsystem;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::ReloadableConfig;
-use crate::manager::checkpoint::CheckpointSubsystem;
 use crate::server::jsonrpc::JsonRPCServer;
-use crate::server::new_keystore_from_config;
+use crate::server::{new_evm_keystore_from_config, new_fvm_wallet_from_config};
 
 /// The number of seconds to wait for a subsystem to start before returning an error.
 const SUBSYSTEM_WAIT_TIME_SECS: Duration = Duration::from_secs(10);
@@ -35,13 +35,24 @@ impl CommandLineHandler for LaunchDaemon {
         );
 
         let reloadable_config = Arc::new(ReloadableConfig::new(global.config_path())?);
-        let wallet = Arc::new(RwLock::new(Wallet::new(new_keystore_from_config(
+        let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_wallet_from_config(
             reloadable_config.clone(),
         )?)));
+        let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_config(
+            reloadable_config.clone(),
+        )?));
 
         // Start subsystems.
-        let checkpointing = CheckpointSubsystem::new(reloadable_config.clone(), wallet.clone());
-        let server = JsonRPCServer::new(reloadable_config.clone(), wallet.clone());
+        let checkpointing = CheckpointSubsystem::new(
+            reloadable_config.clone(),
+            fvm_wallet.clone(),
+            evm_keystore.clone(),
+        );
+        let server = JsonRPCServer::new(
+            reloadable_config.clone(),
+            fvm_wallet.clone(),
+            evm_keystore.clone(),
+        );
         Toplevel::new()
             .start("Checkpoint subsystem", checkpointing.into_subsystem())
             .start("JSON-RPC server subsystem", server.into_subsystem())

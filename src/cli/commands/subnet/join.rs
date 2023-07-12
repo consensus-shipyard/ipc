@@ -30,6 +30,7 @@ impl CommandLineHandler for JoinSubnet {
             from: arguments.from.clone(),
             collateral: arguments.collateral,
             validator_net_addr: arguments.validator_net_addr.clone(),
+            worker_addr: arguments.worker_addr.clone(),
         };
 
         let client = IpcAgentClient::default_from_url(url);
@@ -58,4 +59,10 @@ pub struct JoinSubnetArgs {
     pub collateral: f64,
     #[arg(long, short, help = "The validator net address")]
     pub validator_net_addr: String,
+    #[arg(
+        long,
+        short,
+        help = "The validator worker address. If not set will be the same as `from`"
+    )]
+    pub worker_addr: Option<String>,
 }

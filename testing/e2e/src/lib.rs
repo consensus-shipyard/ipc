@@ -47,6 +47,7 @@ impl TestClient {
                 subnet: subnet_id.to_string(),
                 collateral: 10.0,
                 validator_net_addr,
+                worker_addr: None,
             },
         )
         .await

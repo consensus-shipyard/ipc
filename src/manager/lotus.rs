@@ -12,7 +12,9 @@ use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
-use ipc_gateway::{BottomUpCheckpoint, PropagateParams, WhitelistPropagatorParams};
+use ipc_gateway::{
+    BottomUpCheckpoint, FundParams, PropagateParams, ReleaseParams, WhitelistPropagatorParams,
+};
 use ipc_identity::Wallet;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
@@ -20,7 +22,7 @@ use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 use crate::config::Subnet;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::ipc::SubnetInfo;
+use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo};
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
 use crate::lotus::message::wallet::WalletKeyType;
@@ -68,8 +70,12 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         subnet: SubnetID,
         from: Address,
         collateral: TokenAmount,
-        params: JoinParams,
+        validator_net_addr: String,
+        worker_addr: Address,
     ) -> Result<()> {
+        if from != worker_addr {
+            return Err(anyhow!("worker address should equal sender"));
+        }
         let parent = subnet.parent().ok_or_else(|| anyhow!("cannot join root"))?;
         if !self.is_network_match(&parent).await? {
             return Err(anyhow!("subnet actor being deployed in the wrong parent network, parent network names do not match"));
@@ -80,7 +86,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             to,
             from,
             ipc_subnet_actor::Method::Join as MethodNum,
-            cbor::serialize(&params, "join subnet params")?.to_vec(),
+            cbor::serialize(&JoinParams { validator_net_addr }, "join subnet params")?.to_vec(),
         );
         message.value = collateral;
 
@@ -154,6 +160,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         subnet: SubnetID,
         gateway_addr: Address,
         from: Address,
+        to: Address,
         amount: TokenAmount,
     ) -> Result<ChainEpoch> {
         // When we perform the fund, we should send to the gateway of the subnet's parent
@@ -164,7 +171,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             ));
         }
 
-        let fund_params = cbor::serialize(&subnet, "fund subnet actor params")?;
+        let fund_params = cbor::serialize(&FundParams { subnet, to }, "fund subnet actor params")?;
         let mut message = MpoolPushMessage::new(
             gateway_addr,
             from,
@@ -172,7 +179,6 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             fund_params.to_vec(),
         );
         message.value = amount;
-
         let r = self.mpool_push_and_wait(message).await?;
         Ok(r.height as ChainEpoch)
     }
@@ -182,6 +188,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         subnet: SubnetID,
         gateway_addr: Address,
         from: Address,
+        to: Address,
         amount: TokenAmount,
     ) -> Result<ChainEpoch> {
         // When we perform the release, we should send to the gateway of the subnet
@@ -191,11 +198,12 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             ));
         }
 
+        let release_params = cbor::serialize(&ReleaseParams { to }, "fund subnet actor params")?;
         let mut message = MpoolPushMessage::new(
             gateway_addr,
             from,
             ipc_gateway::Method::Release as MethodNum,
-            vec![],
+            release_params.to_vec(),
         );
         message.value = amount;
 
@@ -347,6 +355,38 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             .ipc_list_checkpoints(subnet_id, from_epoch, to_epoch)
             .await?;
         Ok(checkpoints)
+    }
+
+    async fn get_validator_set(
+        &self,
+        subnet_id: &SubnetID,
+        gateway: Address,
+    ) -> Result<QueryValidatorSetResponse> {
+        let chain_head = self.lotus_client.chain_head().await?;
+        let cid_map = chain_head.cids.first().unwrap().clone();
+        let tip_set = Cid::try_from(cid_map)?;
+
+        let response = self
+            .lotus_client
+            .ipc_read_subnet_actor_state(subnet_id, tip_set)
+            .await?;
+
+        let genesis_epoch = self
+            .lotus_client
+            .ipc_get_genesis_epoch_for_subnet(subnet_id, gateway)
+            .await?;
+
+        let mut validator_set = response.validator_set;
+        if let Some(validators) = validator_set.validators.as_mut() {
+            validators
+                .iter_mut()
+                .for_each(|v| v.worker_addr = Some(v.addr.clone()));
+        }
+        Ok(QueryValidatorSetResponse {
+            validator_set,
+            min_validators: response.min_validators,
+            genesis_epoch,
+        })
     }
 }
 

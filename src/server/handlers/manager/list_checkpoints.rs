@@ -12,7 +12,6 @@ use ipc_gateway::BottomUpCheckpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 
-use crate::manager::SubnetManager;
 use crate::serialization::SerializeToJson;
 use crate::server::handlers::manager::check_subnet;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;

@@ -4,8 +4,8 @@
 
 mod v1;
 
+pub use crate::checkpoint::proof::v1::V1Proof;
 use crate::lotus::LotusClient;
-pub use crate::manager::checkpoint::proof::v1::V1Proof;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 

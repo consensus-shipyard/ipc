@@ -8,6 +8,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use fvm_shared::address::Address;
 use indoc::formatdoc;
 use ipc_sdk::subnet_id::SubnetID;
+use primitives::EthAddress;
 use tempfile::NamedTempFile;
 use url::Url;
 
@@ -21,7 +22,8 @@ const GATEWAY_ADDR: &str = "f064";
 const ROOT_AUTH_TOKEN: &str = "ROOT_AUTH_TOKEN";
 const CHILD_AUTH_TOKEN: &str = "CHILD_AUTH_TOKEN";
 const JSONRPC_API_HTTP: &str = "https://example.org/rpc/v0";
-const JSONRPC_API_WS: &str = "ws://example.org/rpc/v0";
+const PROVIDER_HTTP: &str = "http://127.0.0.1:3030/rpc/v1";
+const ETH_ADDRESS: &str = "0x6be1ccf648c74800380d0520d797a170c808b624";
 const ACCOUNT_ADDRESS: &str =
     "f3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a";
 
@@ -101,32 +103,28 @@ fn check_subnets_config() {
     let root = &config[&rt_sn];
     assert_eq!(root.id, rt_sn);
     assert_eq!(root.network_name, "root");
-    assert_eq!(root.gateway_addr, Address::from_str(GATEWAY_ADDR).unwrap());
     assert_eq!(
-        root.jsonrpc_api_http,
-        Url::from_str(JSONRPC_API_HTTP).unwrap()
+        root.gateway_addr(),
+        Address::from_str(GATEWAY_ADDR).unwrap()
     );
-    assert_eq!(
-        root.jsonrpc_api_ws.as_ref().unwrap(),
-        &Url::from_str(JSONRPC_API_WS).unwrap()
-    );
-    assert_eq!(root.auth_token.as_ref().unwrap(), ROOT_AUTH_TOKEN);
+    assert_eq!(*root.rpc_http(), Url::from_str(JSONRPC_API_HTTP).unwrap());
+    assert_eq!(root.auth_token().as_ref().unwrap(), ROOT_AUTH_TOKEN);
 
     let child_id = SubnetID::from_str(CHILD_ID).unwrap();
     let child = &config[&child_id];
     assert_eq!(child.id, child_id);
     assert_eq!(child.network_name, "child");
-    assert_eq!(child.gateway_addr, Address::from_str(GATEWAY_ADDR).unwrap());
     assert_eq!(
-        child.jsonrpc_api_http,
-        Url::from_str(JSONRPC_API_HTTP).unwrap(),
+        child.gateway_addr(),
+        Address::from(EthAddress::from_str(ETH_ADDRESS).unwrap())
     );
-    assert_eq!(child.auth_token.as_ref().unwrap(), CHILD_AUTH_TOKEN,);
+    assert_eq!(*child.rpc_http(), Url::from_str(PROVIDER_HTTP).unwrap(),);
+    assert_eq!(child.auth_token().as_ref().unwrap(), CHILD_AUTH_TOKEN);
     assert_eq!(
-        child.accounts.as_ref(),
+        child.accounts(),
         vec![
-            Address::from_str(ACCOUNT_ADDRESS).unwrap(),
-            Address::from_str(ACCOUNT_ADDRESS).unwrap()
+            Address::from(EthAddress::from_str(ETH_ADDRESS).unwrap()),
+            Address::from(EthAddress::from_str(ETH_ADDRESS).unwrap())
         ],
     );
 }
@@ -134,24 +132,31 @@ fn check_subnets_config() {
 fn config_str() -> String {
     formatdoc!(
         r#"
-            [server]
-            json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
+        [server]
+        json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
 
-            [[subnets]]
-            id = "{ROOT_ID}"
-            gateway_addr = "{GATEWAY_ADDR}"
-            network_name = "root"
-            jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-            jsonrpc_api_ws = "{JSONRPC_API_WS}"
-            auth_token = "{ROOT_AUTH_TOKEN}"
+        [[subnets]]
+        id = "{ROOT_ID}"
+        network_name = "root"
 
-            [[subnets]]
-            id = "{CHILD_ID}"
-            network_name = "child"
-            gateway_addr = "{GATEWAY_ADDR}"
-            jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-            auth_token = "{CHILD_AUTH_TOKEN}"
-            accounts = ["{ACCOUNT_ADDRESS}"]
+        [subnets.config]
+        network_type = "fvm"
+        gateway_addr = "{GATEWAY_ADDR}"
+        jsonrpc_api_http = "{JSONRPC_API_HTTP}"
+        auth_token = "{ROOT_AUTH_TOKEN}"
+        accounts = ["{ACCOUNT_ADDRESS}"]
+
+        [[subnets]]
+        id = "{CHILD_ID}"
+        network_name = "child"
+
+        [subnets.config]
+        network_type = "fevm"
+        auth_token = "{CHILD_AUTH_TOKEN}"
+        provider_http = "{PROVIDER_HTTP}"
+        registry_addr = "{ETH_ADDRESS}"
+        gateway_addr = "{ETH_ADDRESS}"
+        accounts = ["{ETH_ADDRESS}", "{ETH_ADDRESS}"]
         "#
     )
 }
@@ -159,51 +164,35 @@ fn config_str() -> String {
 fn config_str_diff_addr() -> String {
     formatdoc!(
         r#"
-            [server]
-            json_rpc_address = "127.0.0.1:3031"
+        [server]
+        json_rpc_address = "127.0.0.1:3031"
 
-            [[subnets]]
-            id = "{ROOT_ID}"
-            network_name = "root"
-            gateway_addr = "{GATEWAY_ADDR}"
-            jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-            jsonrpc_api_ws = "{JSONRPC_API_WS}"
-            auth_token = "{ROOT_AUTH_TOKEN}"
+        [[subnets]]
+        id = "{ROOT_ID}"
+        network_name = "root"
 
-            [[subnets]]
-            id = "{CHILD_ID}"
-            network_name = "child"
-            gateway_addr = "{GATEWAY_ADDR}"
-            jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-            auth_token = "{CHILD_AUTH_TOKEN}"
-            accounts = ["{ACCOUNT_ADDRESS}"]
+        [subnets.config]
+        network_type = "fvm"
+        gateway_addr = "{GATEWAY_ADDR}"
+        jsonrpc_api_http = "{JSONRPC_API_HTTP}"
+        auth_token = "{ROOT_AUTH_TOKEN}"
+        accounts = ["{ACCOUNT_ADDRESS}"]
+
+        [[subnets]]
+        id = "{CHILD_ID}"
+        network_name = "child"
+
+        [subnets.config]
+        network_type = "fevm"
+        auth_token = "{CHILD_AUTH_TOKEN}"
+        provider_http = "{PROVIDER_HTTP}"
+        registry_addr = "{ETH_ADDRESS}"
+        gateway_addr = "{ETH_ADDRESS}"
+        accounts = ["{ETH_ADDRESS}", "{ETH_ADDRESS}"]
         "#
     )
 }
 
 fn read_config() -> Config {
-    let config_str = formatdoc!(
-        r#"
-            [server]
-            json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
-
-            [[subnets]]
-            id = "{ROOT_ID}"
-            network_name = "root"
-            gateway_addr = "{GATEWAY_ADDR}"
-            jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-            jsonrpc_api_ws = "{JSONRPC_API_WS}"
-            auth_token = "{ROOT_AUTH_TOKEN}"
-
-            [[subnets]]
-            id = "{CHILD_ID}"
-            network_name = "child"
-            gateway_addr = "{GATEWAY_ADDR}"
-            jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-            auth_token = "{CHILD_AUTH_TOKEN}"
-            accounts = ["{ACCOUNT_ADDRESS}", "{ACCOUNT_ADDRESS}"]
-        "#
-    );
-
-    Config::from_toml_str(config_str.as_str()).unwrap()
+    Config::from_toml_str(config_str().as_str()).unwrap()
 }

@@ -3,7 +3,7 @@
 //! List subnets in gateway actor
 
 use crate::lotus::message::ipc::SubnetInfo;
-use crate::manager::SubnetManager;
+
 use crate::server::handlers::manager::check_subnet;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;

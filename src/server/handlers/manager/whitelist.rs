@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 //! WhitelistPropagator operation in the gateway actor
 
-use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::{check_subnet, parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
@@ -58,7 +57,7 @@ impl JsonRPCRequestHandler for WhitelistPropagatorHandler {
         conn.manager()
             .whitelist_propagator(
                 subnet,
-                subnet_config.gateway_addr,
+                subnet_config.gateway_addr(),
                 request.postbox_msg_cid,
                 from,
                 to_add,

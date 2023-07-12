@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 //! Set the subnet actor validator net addr
 
-use crate::manager::SubnetManager;
 use crate::server::subnet::SubnetManagerPool;
 use crate::server::{check_subnet, parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;

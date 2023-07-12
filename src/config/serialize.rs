@@ -3,9 +3,11 @@
 //! Serialization utils for config mod.
 
 use crate::config::Subnet;
-use fvm_shared::address::Address;
+use anyhow::anyhow;
+use fvm_shared::address::{Address, Payload};
 use ipc_sdk::subnet_id::SubnetID;
-use serde::ser::SerializeSeq;
+use primitives::EthAddress;
+use serde::ser::{Error, SerializeSeq};
 use serde::Serializer;
 use std::collections::HashMap;
 
@@ -41,6 +43,26 @@ where
     s.serialize_str(&addr.to_string())
 }
 
+pub fn serialize_eth_address_to_str<S>(addr: &Address, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let addr = address_to_eth_address(addr).map_err(S::Error::custom)?;
+    s.serialize_str(&format!("0x{:?}", addr))
+}
+
+pub fn serialize_eth_accounts<S>(addrs: &Vec<Address>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = s.serialize_seq(Some(addrs.len()))?;
+    for element in addrs {
+        let addr = address_to_eth_address(element).map_err(S::Error::custom)?;
+        seq.serialize_element(&format!("0x{:?}", addr))?;
+    }
+    seq.end()
+}
+
 pub fn serialize_accounts<S>(addrs: &Vec<Address>, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -52,9 +74,25 @@ where
     seq.end()
 }
 
+fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
+    match addr.payload() {
+        Payload::Delegated(inner) => {
+            let mut bytes = [0; 20];
+            bytes.copy_from_slice(&inner.subaddress()[0..20]);
+            Ok(EthAddress(bytes))
+        }
+        _ => Err(anyhow!("not eth address")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::config::Config;
+    use crate::config::subnet::{EVMSubnet, FVMSubnet, SubnetConfig};
+    use crate::config::{Config, Server, Subnet};
+    use fvm_shared::address::Address;
+    use ipc_sdk::subnet_id::SubnetID;
+    use primitives::EthAddress;
+    use std::str::FromStr;
 
     const STR: &str = r#"
     [server]
@@ -62,20 +100,73 @@ mod tests {
 
     [[subnets]]
     id = "/r123"
-    gateway_addr = "f064"
-    network_name = "root"
-    jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
-    jsonrpc_api_ws = "wss://example.org/rpc/v0"
-    auth_token = "YOUR TOKEN"
-    accounts = ["f01"]
+    network_name = "test"
+
+    [subnets.config]
+    network_type = "fvm"
+    gateway_addr = "f01"
+    jsonrpc_api_http = "http://127.0.0.1:3030/rpc/v1"
+    accounts = ["f01", "f01"]
+
+    [[subnets]]
+    id = "/r1234"
+    network_name = "test2"
+
+    [subnets.config]
+    network_type = "evm"
+    provider_http = "http://127.0.0.1:3030/rpc/v1"
+    registry_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
+    gateway_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
+    private_key = "0x6BE1Ccf648c74800380d0520D797a170c808b624"
+    accounts = ["0x6be1ccf648c74800380d0520d797a170c808b624", "0x6be1ccf648c74800380d0520d797a170c808b624"]
     "#;
 
     #[test]
-    fn test_serialization() {
+    fn test_serialization2() {
         let config = Config::from_toml_str(STR).unwrap();
 
         let r = toml::to_string(&config).unwrap();
         let from_str = Config::from_toml_str(&r).unwrap();
         assert_eq!(from_str, config);
+    }
+
+    #[test]
+    fn test_serialization() {
+        let mut config = Config {
+            server: Server {
+                json_rpc_address: "127.0.0.1:3030".parse().unwrap(),
+            },
+            subnets: Default::default(),
+        };
+
+        let subnet1 = Subnet {
+            id: SubnetID::new_root(123),
+            network_name: "test".to_string(),
+            config: SubnetConfig::Fvm(FVMSubnet {
+                gateway_addr: Address::from_str("f01").unwrap(),
+                jsonrpc_api_http: "http://127.0.0.1:3030/rpc/v1".parse().unwrap(),
+                auth_token: None,
+                accounts: vec![
+                    Address::from_str("f01").unwrap(),
+                    Address::from_str("f01").unwrap(),
+                ],
+            }),
+        };
+
+        let eth_addr1 = EthAddress::from_str("0x6BE1Ccf648c74800380d0520D797a170c808b624").unwrap();
+        let subnet2 = Subnet {
+            id: SubnetID::new_root(1234),
+            network_name: "test2".to_string(),
+            config: SubnetConfig::Fevm(EVMSubnet {
+                gateway_addr: Address::from(eth_addr1),
+                provider_http: "http://127.0.0.1:3030/rpc/v1".parse().unwrap(),
+                auth_token: None,
+                accounts: vec![Address::from(eth_addr1), Address::from(eth_addr1)],
+                registry_addr: Address::from(eth_addr1),
+            }),
+        };
+        config.add_subnet(subnet1);
+        config.add_subnet(subnet2);
+        assert!(toml::to_string(&config).is_ok());
     }
 }

@@ -23,7 +23,12 @@ impl CommandLineHandler for Release {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let client = IpcAgentClient::default_from_url(url);
         let epoch = client
-            .release(&arguments.subnet, arguments.from.clone(), arguments.amount)
+            .release(
+                &arguments.subnet,
+                arguments.from.clone(),
+                arguments.to.clone(),
+                arguments.amount,
+            )
             .await?;
 
         log::info!("released subnet: {:} at epoch {epoch:}", arguments.subnet);
@@ -39,6 +44,12 @@ pub(crate) struct ReleaseArgs {
     pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that releases funds")]
     pub from: Option<String>,
+    #[arg(
+        long,
+        short,
+        help = "The address to release funds to (if not set, amount sent to from address)"
+    )]
+    pub to: Option<String>,
     #[arg(long, short, help = "The subnet to release funds from")]
     pub subnet: String,
     #[arg(help = "The amount to release in FIL, in whole FIL")]

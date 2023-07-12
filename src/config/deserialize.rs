@@ -5,6 +5,7 @@
 use crate::config::Subnet;
 use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
+use primitives::EthAddress;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
@@ -53,6 +54,31 @@ where
     deserializer.deserialize_str(Visitor)
 }
 
+/// A serde deserialization method to deserialize an eth address from string, i.e. "0x...."
+pub(crate) fn deserialize_eth_address_from_str<'de, D>(
+    deserializer: D,
+) -> anyhow::Result<Address, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct Visitor;
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = Address;
+
+        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+            formatter.write_str("a string")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: Error,
+        {
+            eth_addr_str_to_address(v).map_err(E::custom)
+        }
+    }
+    deserializer.deserialize_str(Visitor)
+}
+
 /// A serde deserialization method to deserialize a subnet path string into a [`SubnetID`].
 pub(crate) fn deserialize_subnet_id<'de, D>(deserializer: D) -> anyhow::Result<SubnetID, D::Error>
 where
@@ -89,4 +115,24 @@ where
         .map(|raw_addr| Address::from_str(raw_addr))
         .collect();
     addrs.map_err(D::Error::custom)
+}
+
+/// A serde deserialization method to deserialize a list of eth account strings into a vector of
+/// [`Address`].
+pub(crate) fn deserialize_eth_accounts<'de, D>(
+    deserializer: D,
+) -> anyhow::Result<Vec<Address>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let addrs: Result<Vec<Address>, _> = <Vec<String>>::deserialize(deserializer)?
+        .iter()
+        .map(|raw_addr| eth_addr_str_to_address(raw_addr))
+        .collect();
+    addrs.map_err(D::Error::custom)
+}
+
+fn eth_addr_str_to_address(s: &str) -> anyhow::Result<Address> {
+    let addr = EthAddress::from_str(s)?;
+    Ok(Address::from(addr))
 }
