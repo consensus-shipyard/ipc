@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
+use crate::checkpoint::{
+    chain_head_cid, create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery,
+};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -22,7 +25,10 @@ use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 use crate::config::Subnet;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo};
+use crate::lotus::message::ipc::{
+    IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, QueryValidatorSetResponse,
+    SubnetInfo,
+};
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
 use crate::lotus::message::wallet::WalletKeyType;
@@ -32,6 +38,7 @@ use super::subnet::SubnetManager;
 
 pub struct LotusSubnetManager<T: JsonRpcClient> {
     lotus_client: LotusJsonRPCClient<T>,
+    gateway_addr: Address,
 }
 
 #[async_trait]
@@ -391,8 +398,30 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
 }
 
 impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
-    pub fn new(lotus_client: LotusJsonRPCClient<T>) -> Self {
-        Self { lotus_client }
+    pub fn new(lotus_client: LotusJsonRPCClient<T>, gateway_addr: Address) -> Self {
+        Self {
+            lotus_client,
+            gateway_addr,
+        }
+    }
+
+    async fn get_subnet_state(
+        &self,
+        subnet_id: &SubnetID,
+    ) -> Result<IPCReadSubnetActorStateResponse> {
+        let head = self.lotus_client.chain_head().await?;
+
+        // A key assumption we make now is that each block has exactly one tip set. We panic
+        // if this is not the case as it violates our assumption.
+        // TODO: update this logic once the assumption changes (i.e., mainnet)
+        assert_eq!(head.cids.len(), 1);
+
+        let cid_map = head.cids.first().unwrap().clone();
+        let tip_set = Cid::try_from(cid_map)?;
+
+        self.lotus_client
+            .ipc_read_subnet_actor_state(subnet_id, tip_set)
+            .await
     }
 
     /// Publish the message to memory pool and wait for the response
@@ -434,11 +463,148 @@ impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
 impl LotusSubnetManager<JsonRpcClientImpl> {
     pub fn from_subnet(subnet: &Subnet) -> Self {
         let client = LotusJsonRPCClient::from_subnet(subnet);
-        LotusSubnetManager::new(client)
+        LotusSubnetManager::new(client, subnet.gateway_addr())
     }
 
     pub fn from_subnet_with_wallet_store(subnet: &Subnet, wallet: Arc<RwLock<Wallet>>) -> Self {
         let client = LotusJsonRPCClient::from_subnet_with_wallet_store(subnet, wallet);
-        LotusSubnetManager::new(client)
+        LotusSubnetManager::new(client, subnet.gateway_addr())
+    }
+}
+
+impl<T: JsonRpcClient + Send + Sync> VoteQuery<NativeBottomUpCheckpoint> for LotusSubnetManager<T> {
+    async fn last_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
+        let subnet_actor_state = self.get_subnet_state(subnet_id).await?;
+
+        Ok(subnet_actor_state
+            .bottom_up_checkpoint_voting
+            .last_voting_executed)
+    }
+
+    async fn current_epoch(&self) -> Result<ChainEpoch> {
+        self.current_epoch().await
+    }
+
+    async fn has_voted(
+        &self,
+        subnet_id: &SubnetID,
+        epoch: ChainEpoch,
+        validator: &Address,
+    ) -> Result<bool> {
+        log::debug!(
+            "attempt to obtain the next submission epoch in bottom up checkpoint for subnet: {:?}",
+            subnet_id
+        );
+
+        let has_voted = self
+            .lotus_client
+            .ipc_validator_has_voted_bottomup(subnet_id, epoch, validator)
+            .await?;
+
+        // we should vote only when the validator has not voted
+        Ok(!has_voted)
+    }
+}
+
+#[async_trait]
+impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
+    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
+        let tip_set = chain_head_cid(&self.lotus_client).await?;
+        let state = self
+            .lotus_client
+            .ipc_read_subnet_actor_state(subnet_id, tip_set)
+            .await
+            .map_err(|e| {
+                log::error!("error getting subnet actor state for {:?}", subnet_id);
+                e
+            })?;
+
+        Ok(state.bottom_up_check_period)
+    }
+
+    async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>> {
+        let subnet_actor_state = self.get_subnet_state(subnet_id).await?;
+
+        subnet_actor_state
+            .validator_set
+            .validators
+            .unwrap_or_default()
+            .iter()
+            .map(|f| Address::from_str(&f.addr))
+            .collect()
+    }
+
+    async fn checkpoint_template(&self, epoch: ChainEpoch) -> Result<NativeBottomUpCheckpoint> {
+        let template = self
+            .lotus_client
+            .ipc_get_checkpoint_template(&self.gateway_addr, epoch)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "error getting bottom-up checkpoint template for epoch:{epoch:} in subnet: {:?} due to {e:}",
+                    self.child_subnet.id
+                )
+            })?;
+        let mut checkpoint = BottomUpCheckpoint::new(template.source().clone(), epoch);
+        checkpoint.data.children = template.data.children;
+        checkpoint.data.cross_msgs = template.data.cross_msgs;
+
+        // TODO: type conversion
+        todo!()
+    }
+
+    async fn populate_prev_hash(&self, template: &mut NativeBottomUpCheckpoint) -> Result<()> {
+        let response = self
+            .lotus_client
+            .ipc_get_prev_checkpoint_for_child(&self.gateway_addr, &template.source)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "error getting previous bottom-up checkpoint for epoch:{:} in subnet: {:?} due to {e:}",
+                    template.epoch,
+                    template.source
+                )
+            })?;
+
+        // if previous checkpoint is set
+        if let Some(cid_map) = response {
+            let cid = Cid::try_from(cid_map)?;
+            template.prev_check = Some(cid.to_bytes());
+        } else {
+            template.prev_check = None;
+        }
+
+        Ok(())
+    }
+
+    async fn populate_proof(&self, template: &mut NativeBottomUpCheckpoint) -> Result<()> {
+        let proof = create_proof(&self.lotus_client, template.epoch).await?;
+        let bytes = cbor::serialize(&proof, "fvm bottom up checkpoint proof")?.to_vec();
+        template.proof = Some(bytes);
+        Ok(())
+    }
+
+    async fn submit(
+        &self,
+        validator: &Address,
+        checkpoint: NativeBottomUpCheckpoint,
+    ) -> Result<ChainEpoch> {
+        let to = checkpoint.source.subnet_actor();
+        let message = MpoolPushMessage::new(
+            to,
+            *validator,
+            ipc_subnet_actor::Method::SubmitCheckpoint as MethodNum,
+            cbor::serialize(&BottomUpCheckpoint::try_from(checkpoint), "checkpoint")?.to_vec(),
+        );
+        let message_cid = self.lotus_client.mpool_push(message).await.map_err(|e| {
+            anyhow!(
+                "error submitting checkpoint for epoch {:} in subnet: {:?} with reason {e:}",
+                checkpoint.epoch,
+                checkpoint.source
+            )
+        })?;
+        log::debug!("checkpoint message published with cid: {message_cid:?}");
+
+        Ok(self.lotus_client.state_wait_msg(message_cid).await?.height as ChainEpoch)
     }
 }

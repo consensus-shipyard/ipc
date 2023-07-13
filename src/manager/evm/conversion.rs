@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Type conversion between evm and fvm
 
+use crate::checkpoint::NativeBottomUpCheckpoint;
 use crate::manager::evm::manager::{agent_subnet_to_evm_addresses, ethers_address_to_fil_address};
 use crate::manager::SubnetInfo;
 use anyhow::anyhow;
@@ -17,6 +18,14 @@ use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
+
+impl TryFrom<&NativeBottomUpCheckpoint> for BottomUpCheckpoint {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &NativeBottomUpCheckpoint) -> Result<Self, Self::Error> {
+        todo!()
+    }
+}
 
 impl TryFrom<BottomUpCheckpoint> for crate::manager::evm::subnet_contract::BottomUpCheckpoint {
     type Error = anyhow::Error;

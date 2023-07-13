@@ -16,10 +16,14 @@ use tokio::select;
 use tokio::time::sleep;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 
+pub use bottomup::*;
 pub use fvm::*;
 use ipc_identity::PersistentKeyStore;
+use ipc_sdk::subnet_id::SubnetID;
+pub use proof::create_proof;
 use std::fmt::Display;
 
+mod bottomup;
 mod fevm;
 mod fevm_fvm;
 mod fvm;
@@ -32,6 +36,18 @@ const SUBMISSION_LOOK_AHEAD_EPOCH: ChainEpoch = 50;
 /// Checkpoint manager that handles a specific parent - child - checkpoint type tuple.
 /// For example, we might have `/r123` subnet and `/r123/t01` as child, one implementation of manager
 /// is handling the top-down checkpoint submission for `/r123` to `/r123/t01`.
+#[async_trait]
+pub trait VoteQuery<T> {
+    async fn last_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    async fn current_epoch(&self) -> Result<ChainEpoch>;
+    async fn has_voted(
+        &self,
+        subnet_id: &SubnetID,
+        epoch: ChainEpoch,
+        validator: &Address,
+    ) -> Result<bool>;
+}
+
 #[async_trait]
 pub trait CheckpointManager: Display + Send + Sync {
     /// Get the subnet config that this manager is submitting checkpoints to. For example, if it is
@@ -270,4 +286,10 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
 fn remove_not_managed(validators: &mut Vec<Address>, managed_accounts: &[Address]) {
     let set: HashSet<_> = managed_accounts.iter().collect();
     validators.drain_filter(|v| !set.contains(v));
+}
+
+pub struct CheckpointMetadata {
+    pub(crate) parent: Subnet,
+    pub(crate) child: Subnet,
+    pub(crate) period: ChainEpoch,
 }
