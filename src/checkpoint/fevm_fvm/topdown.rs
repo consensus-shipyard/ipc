@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::checkpoint::{chain_head_cid, gateway_state, CheckpointManager};
+use crate::checkpoint::fvm::{chain_head_cid, gateway_state};
+use crate::checkpoint::CheckpointManager;
 use crate::config::Subnet;
 use crate::lotus::LotusClient;
 use crate::manager::EthManager;

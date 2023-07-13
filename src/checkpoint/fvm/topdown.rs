@@ -3,10 +3,11 @@
 use anyhow::anyhow;
 use std::fmt::{Display, Formatter};
 
-use crate::checkpoint::{chain_head_cid, child_validators, gateway_state, CheckpointManager};
+use crate::checkpoint::fvm::{chain_head_cid, child_validators, gateway_state};
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 
+use crate::checkpoint::CheckpointManager;
 use crate::config::Subnet;
 use crate::lotus::client::DefaultLotusJsonRPCClient;
 use crate::lotus::LotusClient;

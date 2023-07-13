@@ -1,26 +1,19 @@
-use crate::checkpoint::{
-    create_proof, BottomUpHandler, Bytes, NativeBottomUpCheckpoint, VoteQuery,
-};
+use crate::checkpoint::{create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery};
 use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::ipc::QueryValidatorSetResponse;
-use crate::lotus::message::wallet::WalletKeyType;
-use crate::manager::{EthManager, EthSubnetManager, SubnetInfo, SubnetManager};
-use cid::Cid;
+use crate::manager::{EthManager, EthSubnetManager};
+use async_trait::async_trait;
 use fil_actors_runtime::cbor;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::econ::TokenAmount;
-use ipc_gateway::BottomUpCheckpoint;
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_subnet_actor::ConstructParams;
-use std::collections::HashMap;
 
 pub struct FevmSubnetManager {
     evm_subnet_manager: EthSubnetManager,
     lotus_client: LotusJsonRPCClient<JsonRpcClientImpl>,
 }
 
+#[async_trait]
 impl VoteQuery<NativeBottomUpCheckpoint> for FevmSubnetManager {
     async fn last_executed_epoch(&self, _subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
         self.evm_subnet_manager

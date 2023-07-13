@@ -7,10 +7,8 @@ use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_gateway::checkpoint::BatchCrossMsgs;
-use ipc_gateway::BottomUpCheckpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::{Display, Formatter};
-use std::todo;
 
 pub type Bytes = Vec<u8>;
 
@@ -83,6 +81,7 @@ impl<P: BottomUpHandler, C: BottomUpHandler> Display for BottomUpManager<P, C> {
     }
 }
 
+#[async_trait]
 impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManager<P, C> {
     /// Get the subnet config that this manager is submitting checkpoints to. For example, if it is
     /// top down checkpoints, target subnet return the child subnet config. If it is bottom up, target
@@ -108,12 +107,16 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
 
     /// Get the list of validators that should submit checkpoints
     async fn validators(&self) -> Result<Vec<Address>> {
-        self.parent_handler.validators().await
+        self.parent_handler
+            .validators(&self.metadata.child.id)
+            .await
     }
 
     /// Obtain the last executed epoch of the checkpoint submission
     async fn last_executed_epoch(&self) -> Result<ChainEpoch> {
-        self.parent_handler.last_executed_epoch().await
+        self.parent_handler
+            .last_executed_epoch(&self.metadata.child.id)
+            .await
     }
 
     /// The current epoch in the subnet that the checkpoints should be submitted to
@@ -124,7 +127,7 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
     /// Submit the checkpoint based on the current epoch to submit and the previous epoch that was
     /// already submitted.
     async fn submit_checkpoint(&self, epoch: ChainEpoch, validator: &Address) -> Result<()> {
-        let mut template = self.parent_handler.checkpoint_template(self.epoch).await?;
+        let mut template = self.parent_handler.checkpoint_template(epoch).await?;
         log::debug!("bottom up template: {template:?}");
 
         self.child_handler.populate_proof(&mut template).await?;
@@ -135,7 +138,7 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
             .await?;
         log::debug!("bottom up checkpoint prev check: {:?}", template.prev_check);
 
-        log::info!("bottom up checkpoint to submit: {checkpoint:?}");
+        log::info!("bottom up checkpoint to submit: {template:?}");
 
         self.child_handler
             .submit(validator, template)
@@ -149,7 +152,7 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
     async fn should_submit_in_epoch(&self, validator: &Address, epoch: ChainEpoch) -> Result<bool> {
         let has_voted = self
             .parent_handler
-            .has_voted(&self.child.id, epoch, validator)
+            .has_voted(&self.metadata.child.id, epoch, validator)
             .await?;
         Ok(!has_voted)
     }

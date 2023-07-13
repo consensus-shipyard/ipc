@@ -17,7 +17,6 @@ use tokio::time::sleep;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 
 pub use bottomup::*;
-pub use fvm::*;
 use ipc_identity::PersistentKeyStore;
 use ipc_sdk::subnet_id::SubnetID;
 pub use proof::create_proof;
@@ -26,7 +25,7 @@ use std::fmt::Display;
 mod bottomup;
 mod fevm;
 mod fevm_fvm;
-mod fvm;
+pub mod fvm;
 mod proof;
 mod setup;
 

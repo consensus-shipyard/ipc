@@ -1,9 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::checkpoint::bottomup::BottomUpCheckpointManager as FVMBottomUpCheckpointManager;
 use crate::checkpoint::fevm::BottomUpCheckpointManager as FEVMBottomUpCheckpointManager;
 use crate::checkpoint::fevm::TopdownCheckpointManager as FEVMTopdownCheckpointManager;
-use crate::checkpoint::topdown::TopDownCheckpointManager as FVMTopDownCheckpointManager;
+use crate::checkpoint::fvm::bottomup::BottomUpCheckpointManager as FVMBottomUpCheckpointManager;
+use crate::checkpoint::fvm::topdown::TopDownCheckpointManager as FVMTopDownCheckpointManager;
 use crate::checkpoint::CheckpointManager;
 use crate::config::subnet::NetworkType;
 use crate::config::Subnet;

@@ -1,7 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+use crate::checkpoint::fvm::{chain_head_cid, child_validators};
 use crate::checkpoint::proof::create_proof;
-use crate::checkpoint::{chain_head_cid, child_validators, CheckpointManager};
+use crate::checkpoint::CheckpointManager;
 use crate::config::Subnet;
 use crate::lotus::client::DefaultLotusJsonRPCClient;
 use crate::lotus::message::mpool::MpoolPushMessage;

@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
-use crate::checkpoint::{
-    chain_head_cid, create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery,
-};
+use crate::checkpoint::fvm::chain_head_cid;
+use crate::checkpoint::{create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -26,8 +25,7 @@ use crate::config::Subnet;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::message::ipc::{
-    IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, QueryValidatorSetResponse,
-    SubnetInfo,
+    IPCReadSubnetActorStateResponse, QueryValidatorSetResponse, SubnetInfo,
 };
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
@@ -472,6 +470,7 @@ impl LotusSubnetManager<JsonRpcClientImpl> {
     }
 }
 
+#[async_trait]
 impl<T: JsonRpcClient + Send + Sync> VoteQuery<NativeBottomUpCheckpoint> for LotusSubnetManager<T> {
     async fn last_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let subnet_actor_state = self.get_subnet_state(subnet_id).await?;
@@ -530,8 +529,8 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
             .validators
             .unwrap_or_default()
             .iter()
-            .map(|f| Address::from_str(&f.addr))
-            .collect()
+            .map(|f| Address::from_str(&f.addr).map_err(|e| anyhow!("cannot create address: {e:}")))
+            .collect::<Result<_>>()
     }
 
     async fn checkpoint_template(&self, epoch: ChainEpoch) -> Result<NativeBottomUpCheckpoint> {
@@ -541,8 +540,7 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
             .await
             .map_err(|e| {
                 anyhow!(
-                    "error getting bottom-up checkpoint template for epoch:{epoch:} in subnet: {:?} due to {e:}",
-                    self.child_subnet.id
+                    "error getting bottom-up checkpoint template for epoch:{epoch:} due to {e:}"
                 )
             })?;
         let mut checkpoint = BottomUpCheckpoint::new(template.source().clone(), epoch);
@@ -594,7 +592,7 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
             to,
             *validator,
             ipc_subnet_actor::Method::SubmitCheckpoint as MethodNum,
-            cbor::serialize(&BottomUpCheckpoint::try_from(checkpoint), "checkpoint")?.to_vec(),
+            cbor::serialize(&BottomUpCheckpoint::try_from(&checkpoint)?, "checkpoint")?.to_vec(),
         );
         let message_cid = self.lotus_client.mpool_push(message).await.map_err(|e| {
             anyhow!(

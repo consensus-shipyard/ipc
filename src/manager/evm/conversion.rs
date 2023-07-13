@@ -22,7 +22,7 @@ use std::str::FromStr;
 impl TryFrom<&NativeBottomUpCheckpoint> for BottomUpCheckpoint {
     type Error = anyhow::Error;
 
-    fn try_from(value: &NativeBottomUpCheckpoint) -> Result<Self, Self::Error> {
+    fn try_from(_value: &NativeBottomUpCheckpoint) -> Result<Self, Self::Error> {
         todo!()
     }
 }
