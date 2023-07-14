@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use crate::checkpoint::{create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery};
 use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
@@ -12,6 +14,18 @@ use ipc_sdk::subnet_id::SubnetID;
 pub struct FevmSubnetManager {
     evm_subnet_manager: EthSubnetManager,
     lotus_client: LotusJsonRPCClient<JsonRpcClientImpl>,
+}
+
+impl FevmSubnetManager {
+    pub fn new(
+        evm_subnet_manager: EthSubnetManager,
+        lotus_client: LotusJsonRPCClient<JsonRpcClientImpl>,
+    ) -> Self {
+        Self {
+            evm_subnet_manager,
+            lotus_client,
+        }
+    }
 }
 
 #[async_trait]

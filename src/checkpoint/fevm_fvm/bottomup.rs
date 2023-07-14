@@ -22,42 +22,6 @@ pub struct BottomUpCheckpointManager<ParentManager, ChildManager> {
     child_fvm_manager: ChildManager,
 }
 
-impl<P: EthManager + Send + Sync, C: LotusClient + Send + Sync> BottomUpCheckpointManager<P, C> {
-    pub fn new_with_period(
-        parent: Subnet,
-        child: Subnet,
-        checkpoint_period: ChainEpoch,
-        parent_fevm_manager: P,
-        child_fvm_manager: C,
-    ) -> Self {
-        Self {
-            parent,
-            child,
-            checkpoint_period,
-            parent_fevm_manager,
-            child_fvm_manager,
-        }
-    }
-
-    pub async fn new(
-        parent_subnet: Subnet,
-        parent_manager: P,
-        child_subnet: Subnet,
-        child_manager: C,
-    ) -> anyhow::Result<Self> {
-        let checkpoint_period = parent_manager
-            .subnet_bottom_up_checkpoint_period(&child_subnet.id)
-            .await?;
-        Ok(Self::new_with_period(
-            parent_subnet,
-            child_subnet,
-            checkpoint_period,
-            parent_manager,
-            child_manager,
-        ))
-    }
-}
-
 impl<P, M> Display for BottomUpCheckpointManager<P, M> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(

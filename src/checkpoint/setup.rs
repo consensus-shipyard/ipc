@@ -8,7 +8,8 @@ use crate::checkpoint::CheckpointManager;
 use crate::config::subnet::NetworkType;
 use crate::config::Subnet;
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::manager::EthSubnetManager;
+use crate::manager::fevm::FevmSubnetManager;
+use crate::manager::{EthSubnetManager, LotusSubnetManager};
 use anyhow::anyhow;
 use ipc_identity::PersistentKeyStore;
 use ipc_identity::Wallet;
@@ -74,14 +75,18 @@ async fn parent_fevm_child_fvm(
     }
 
     let mut managers = vec![];
+
+    let fevm = FevmSubnetManager::new(
+        EthSubnetManager::from_subnet_with_wallet_store(parent, evm_wallet_store.clone())?,
+        LotusJsonRPCClient::from_subnet_with_wallet_store(child, fvm_wallet_store.clone()),
+    );
+    let fvm = LotusSubnetManager::new(
+        LotusJsonRPCClient::from_subnet_with_wallet_store(child, fvm_wallet_store.clone()),
+        child.gateway_addr(),
+    );
     let m: Box<dyn CheckpointManager> = Box::new(
-        crate::checkpoint::fevm_fvm::BottomUpCheckpointManager::new(
-            parent.clone(),
-            EthSubnetManager::from_subnet_with_wallet_store(parent, evm_wallet_store.clone())?,
-            child.clone(),
-            LotusJsonRPCClient::from_subnet_with_wallet_store(child, fvm_wallet_store.clone()),
-        )
-        .await?,
+        crate::checkpoint::bottomup::BottomUpManager::new(parent.clone(), child.clone(), fevm, fvm)
+            .await?,
     );
 
     managers.push(m);

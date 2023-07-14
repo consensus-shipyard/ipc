@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! Bottom up checkpoint manager
 
 use crate::checkpoint::{CheckpointManager, CheckpointMetadata, VoteQuery};
