@@ -1,6 +1,7 @@
 use crate::checkpoint::{create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery};
 use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
+use crate::manager::evm::subnet_contract;
 use crate::manager::{EthManager, EthSubnetManager};
 use async_trait::async_trait;
 use fil_actors_runtime::cbor;
@@ -53,10 +54,8 @@ impl BottomUpHandler for FevmSubnetManager {
         &self,
         epoch: ChainEpoch,
     ) -> anyhow::Result<NativeBottomUpCheckpoint> {
-        let _checkpoint = self.evm_subnet_manager.bottom_up_checkpoint(epoch).await?;
-
-        // TODO: impl type conversion to NativeBottomUpCheckpoint
-        todo!()
+        let checkpoint = self.evm_subnet_manager.bottom_up_checkpoint(epoch).await?;
+        NativeBottomUpCheckpoint::try_from(checkpoint)
     }
 
     async fn populate_prev_hash(
@@ -78,10 +77,14 @@ impl BottomUpHandler for FevmSubnetManager {
 
     async fn submit(
         &self,
-        _validator: &Address,
-        _checkpoint: NativeBottomUpCheckpoint,
+        validator: &Address,
+        checkpoint: NativeBottomUpCheckpoint,
     ) -> anyhow::Result<ChainEpoch> {
-        // TODO: implement type conversion
-        todo!()
+        self.evm_subnet_manager
+            .submit_bottom_up_checkpoint(
+                validator,
+                subnet_contract::BottomUpCheckpoint::try_from(checkpoint)?,
+            )
+            .await
     }
 }
