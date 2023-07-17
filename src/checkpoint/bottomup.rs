@@ -163,7 +163,7 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
             .parent_handler
             .has_voted(&self.metadata.child.id, epoch, validator)
             .await
-            .map_err(|e| anyhow!("cannot check if validator: {validator:} has voted in epoch: {epoch:}"))?;
+            .map_err(|e| anyhow!("cannot check if validator: {validator:} has voted in epoch: {epoch:} due to: {e:}"))?;
         Ok(!has_voted)
     }
 

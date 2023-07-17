@@ -30,9 +30,9 @@ impl FevmSubnetManager {
 
 #[async_trait]
 impl VoteQuery<NativeBottomUpCheckpoint> for FevmSubnetManager {
-    async fn last_executed_epoch(&self, _subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
+    async fn last_executed_epoch(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
         self.evm_subnet_manager
-            .subnet_last_voting_executed_epoch()
+            .subnet_last_voting_executed_epoch(subnet_id)
             .await
     }
 
