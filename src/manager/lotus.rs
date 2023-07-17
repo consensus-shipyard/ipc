@@ -481,7 +481,7 @@ impl<T: JsonRpcClient + Send + Sync> VoteQuery<NativeBottomUpCheckpoint> for Lot
     }
 
     async fn current_epoch(&self) -> Result<ChainEpoch> {
-        self.current_epoch().await
+        self.lotus_client.current_epoch().await
     }
 
     async fn has_voted(
