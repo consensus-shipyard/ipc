@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::checkpoint::{create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery};
@@ -6,6 +5,7 @@ use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::manager::evm::subnet_contract;
 use crate::manager::{EthManager, EthSubnetManager};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use fil_actors_runtime::cbor;
 use fvm_shared::address::Address;

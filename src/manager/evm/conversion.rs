@@ -88,16 +88,19 @@ impl TryFrom<NativeBottomUpCheckpoint>
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        let mut prev_hash = [0u8; 32];
+        if let Some(v) = &value.prev_check {
+            prev_hash.copy_from_slice(&v);
+        }
+
         let b = crate::manager::evm::subnet_contract::BottomUpCheckpoint {
             source: crate::manager::evm::subnet_contract::SubnetID::try_from(&value.source)?,
             epoch: value.epoch as u64,
             fee: U256::from_str(&value.cross_msgs.fee.atto().to_string())?,
             cross_msgs,
             children,
-
-            // update these two parameters from caller
-            prev_hash: [0; 32],
-            proof: ethers::core::types::Bytes::default(),
+            prev_hash,
+            proof: ethers::core::types::Bytes::from(value.proof),
         };
         Ok(b)
     }
