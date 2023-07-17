@@ -222,12 +222,14 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
         .last_executed_epoch()
         .await
         .map_err(|e| anyhow!("cannot get last executed epoch for {manager:} due to {e:}"))?;
+    log::debug!("obtained last executed epoch: {last_executed_epoch:} for manager: {manager:}");
     let current_epoch = manager
         .current_epoch()
         .await
         .map_err(|e| anyhow!("cannot get the current eopch for {manager:} due to {e:}"))?;
+    log::debug!("obtained current epoch: {last_executed_epoch:} for manager: {manager:}");
 
-    log::debug!(
+    log::info!(
         "latest epoch {:?}, last executed epoch: {:?} for checkpointing: {:}",
         current_epoch,
         last_executed_epoch,
