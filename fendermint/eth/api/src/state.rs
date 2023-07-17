@@ -3,6 +3,8 @@
 
 //! Tendermint RPC helper methods for the implementation of the APIs.
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
@@ -20,17 +22,23 @@ use tendermint_rpc::{
     Client,
 };
 use tendermint_rpc::{Subscription, SubscriptionClient};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Sender, UnboundedSender};
+use tokio::sync::RwLock;
 
 use crate::filters::{
-    run_subscription, FilterCommand, FilterId, FilterKind, FilterMap, FilterRecords, FilterState,
+    run_subscription, BlockHash, FilterCommand, FilterDriver, FilterId, FilterKind, FilterMap,
+    FilterRecords,
 };
+use crate::handlers::ws::MethodNotification;
 use crate::{
     conv::from_tm::{
         map_rpc_block_txs, message_hash, to_chain_message, to_eth_block, to_eth_transaction,
     },
     error, JsonRpcResult,
 };
+
+pub type WebSocketId = usize;
+pub type WebSocketSender = UnboundedSender<MethodNotification>;
 
 // Made generic in the client type so we can mock it if we want to test API
 // methods without having to spin up a server. In those tests the methods
@@ -40,6 +48,8 @@ pub struct JsonRpcState<C> {
     pub client: FendermintClient<C>,
     filter_timeout: Duration,
     filters: FilterMap,
+    next_web_socket_id: AtomicUsize,
+    web_sockets: RwLock<HashMap<WebSocketId, WebSocketSender>>,
 }
 
 impl<C> JsonRpcState<C> {
@@ -48,12 +58,37 @@ impl<C> JsonRpcState<C> {
             client: FendermintClient::new(client),
             filter_timeout,
             filters: Default::default(),
+            next_web_socket_id: Default::default(),
+            web_sockets: Default::default(),
         }
     }
 
     /// The underlying Tendermint RPC client.
     pub fn tm(&self) -> &C {
         self.client.underlying()
+    }
+
+    /// Register the sender of a web socket.
+    pub async fn add_web_socket(&self, tx: WebSocketSender) -> WebSocketId {
+        let next_id = self.next_web_socket_id.fetch_add(1, Ordering::Relaxed);
+        let mut guard = self.web_sockets.write().await;
+        guard.insert(next_id, tx);
+        next_id
+    }
+
+    /// Remove the sender of a web socket.
+    pub async fn remove_web_socket(&self, id: &WebSocketId) {
+        let mut guard = self.web_sockets.write().await;
+        guard.remove(id);
+    }
+
+    /// Get the sender of a web socket.
+    pub async fn get_web_socket(&self, id: &WebSocketId) -> anyhow::Result<WebSocketSender> {
+        let guard = self.web_sockets.read().await;
+        guard
+            .get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("web socket not found"))
     }
 }
 
@@ -175,16 +210,7 @@ where
     where
         C: Client + Sync + Send,
     {
-        let height = block.header().height;
-
-        let state_params = self.client.state_params(Some(height)).await?;
-        let base_fee = state_params.value.base_fee;
-        let chain_id = ChainID::from(state_params.value.chain_id);
-
-        let block_results: block_results::Response = self.tm().block_results(height).await?;
-
-        let block = to_eth_block(block, block_results, base_fee, chain_id)
-            .context("failed to convert to eth block")?;
+        let block = enrich_block(&self.client, block).await?;
 
         let block = if full_tx {
             map_rpc_block_txs(block, serde_json::to_value).context("failed to convert to JSON")?
@@ -275,10 +301,14 @@ where
 
 impl<C> JsonRpcState<C>
 where
-    C: SubscriptionClient,
+    C: Client + SubscriptionClient + Clone + Sync + Send + 'static,
 {
     /// Create a new filter with the next available ID and insert it into the filters collection.
-    async fn insert_filter(&self, filter: &FilterKind) -> (FilterState, Sender<FilterCommand>) {
+    async fn insert_filter_driver(
+        &self,
+        kind: FilterKind,
+        ws_sender: Option<WebSocketSender>,
+    ) -> (FilterDriver<C>, Sender<FilterCommand>) {
         let mut filters = self.filters.write().await;
 
         // Choose an unpredictable filter, so it's not so easy to clear out someone else's logs.
@@ -290,17 +320,27 @@ where
             }
         }
 
-        let (state, tx) = FilterState::new(id, self.filter_timeout, filter);
+        let (driver, tx) = FilterDriver::new(
+            id,
+            self.filter_timeout,
+            kind,
+            ws_sender,
+            self.client.clone(),
+        );
 
         // Inserting happens here, while removal will be handled by the `FilterState` itself.
         filters.insert(id, tx.clone());
 
-        (state, tx)
+        (driver, tx)
     }
 
-    /// Create a new filter, subscribe with Tendermint and start handlers in the background.
-    pub async fn new_filter(&self, filter: FilterKind) -> anyhow::Result<FilterId> {
-        let queries = filter
+    /// Create a new filter driver, subscribe with Tendermint and start handlers in the background.
+    async fn new_filter_driver(
+        &self,
+        kind: FilterKind,
+        ws_sender: Option<WebSocketSender>,
+    ) -> anyhow::Result<FilterId> {
+        let queries = kind
             .to_queries()
             .context("failed to convert filter to queries")?;
 
@@ -316,7 +356,7 @@ where
             subs.push(sub);
         }
 
-        let (state, tx) = self.insert_filter(&filter).await;
+        let (state, tx) = self.insert_filter_driver(kind, ws_sender).await;
         let id = state.id();
         let filters = self.filters.clone();
 
@@ -328,6 +368,20 @@ where
         }
 
         Ok(id)
+    }
+
+    /// Create a new filter, subscribe with Tendermint and start handlers in the background.
+    pub async fn new_filter(&self, kind: FilterKind) -> anyhow::Result<FilterId> {
+        self.new_filter_driver(kind, None).await
+    }
+
+    /// Create a new subscription, subscribe with Tendermint and start handlers in the background.
+    pub async fn new_subscription(
+        &self,
+        kind: FilterKind,
+        ws_sender: WebSocketSender,
+    ) -> anyhow::Result<FilterId> {
+        self.new_filter_driver(kind, Some(ws_sender)).await
     }
 }
 
@@ -350,7 +404,7 @@ impl<C> JsonRpcState<C> {
     pub async fn take_filter_changes(
         &self,
         filter_id: FilterId,
-    ) -> anyhow::Result<Option<FilterRecords>> {
+    ) -> anyhow::Result<Option<FilterRecords<BlockHash>>> {
         let filters = self.filters.read().await;
 
         match filters.get(&filter_id) {
@@ -366,4 +420,25 @@ impl<C> JsonRpcState<C> {
             }
         }
     }
+}
+
+pub async fn enrich_block<C>(
+    client: &FendermintClient<C>,
+    block: tendermint::Block,
+) -> JsonRpcResult<et::Block<et::Transaction>>
+where
+    C: Client + Sync + Send,
+{
+    let height = block.header().height;
+
+    let state_params = client.state_params(Some(height)).await?;
+    let base_fee = state_params.value.base_fee;
+    let chain_id = ChainID::from(state_params.value.chain_id);
+
+    let block_results: block_results::Response = client.underlying().block_results(height).await?;
+
+    let block = to_eth_block(block, block_results, base_fee, chain_id)
+        .context("failed to convert to eth block")?;
+
+    Ok(block)
 }

@@ -5,8 +5,8 @@ use fvm_shared::error::ExitCode;
 
 #[derive(Debug, Clone)]
 pub struct JsonRpcError {
-    code: i64,
-    message: String,
+    pub code: i64,
+    pub message: String,
 }
 
 impl From<anyhow::Error> for JsonRpcError {

@@ -35,9 +35,10 @@ use std::{
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
+use ethers::providers::StreamExt;
 use ethers::{
     prelude::{abigen, ContractCall, ContractFactory, SignerMiddleware},
-    providers::{FilterKind, Http, Middleware, Provider},
+    providers::{FilterKind, Http, JsonRpcClient, Middleware, Provider, Ws},
     signers::{Signer, Wallet},
 };
 use ethers_core::{
@@ -53,8 +54,8 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use libsecp256k1::SecretKey;
 use tracing::Level;
 
-type TestMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
-type TestContractCall<T> = ContractCall<TestMiddleware, T>;
+type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
+type TestContractCall<C, T> = ContractCall<TestMiddleware<C>, T>;
 
 // This assumes that https://github.com/filecoin-project/builtin-actors is checked out next to this project,
 // which the Makefile in the root takes care of with `make actor-bundle`, a dependency of creating docker images.
@@ -111,6 +112,11 @@ impl Options {
     pub fn http_endpoint(&self) -> String {
         format!("http://{}:{}", self.http_host, self.http_port)
     }
+
+    pub fn ws_endpoint(&self) -> String {
+        // Same address but accessed with GET
+        format!("ws://{}:{}", self.http_host, self.http_port)
+    }
 }
 
 /// See the module docs for how to run.
@@ -122,13 +128,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_max_level(opts.log_level())
         .init();
 
-    let mut provider = Provider::<Http>::try_from(opts.http_endpoint())?;
+    tracing::info!("Running the tests over HTTP...");
+    let provider = Provider::<Http>::try_from(opts.http_endpoint())?;
+    run_http(provider, &opts).await?;
 
-    // Tendermint block interval is lower.
-    provider.set_interval(Duration::from_secs(2));
-
-    tracing::debug!("running the tests...");
-    run(provider, opts).await?;
+    tracing::info!("Running the tests over WS...");
+    let provider = Provider::<Ws>::connect(opts.ws_endpoint()).await?;
+    run_ws(provider, &opts).await?;
 
     Ok(())
 }
@@ -216,12 +222,12 @@ impl TestAccount {
 // - eth_newPendingTransactionFilter
 // - eth_getFilterChanges
 // - eth_uninstallFilter
+// - eth_subscribe
+// - eth_unsubscribe
 //
 // DOING:
 //
 // TODO:
-// - eth_subscribe
-// - eth_unsubscribe
 //
 // WON'T DO:
 // - eth_sign
@@ -232,7 +238,10 @@ impl TestAccount {
 //
 
 /// Exercise the above methods, so we know at least the parameters are lined up correctly.
-async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
+async fn run<C>(provider: &Provider<C>, opts: &Options) -> anyhow::Result<()>
+where
+    C: JsonRpcClient + Clone + 'static,
+{
     let from = TestAccount::new(&opts.secret_key_from)?;
     let to = TestAccount::new(&opts.secret_key_to)?;
 
@@ -490,7 +499,7 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
 
     let contract = SimpleCoin::new(contract.address(), contract.client());
 
-    let coin_balance: TestContractCall<U256> =
+    let coin_balance: TestContractCall<_, U256> =
         prepare_call(&mw, contract.get_balance(from.eth_addr)).await?;
 
     request("eth_call", coin_balance.call().await, |coin_balance| {
@@ -539,7 +548,7 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
     // Send a SimpleCoin transaction to get an event emitted.
     // Not using `prepare_call` here because `send_transaction` will fill the missing fields.
     let coin_send_value = U256::from(100);
-    let coin_send: TestContractCall<bool> = contract.send_coin(to.eth_addr, coin_send_value);
+    let coin_send: TestContractCall<_, bool> = contract.send_coin(to.eth_addr, coin_send_value);
     // Using `send_transaction` instead of `coin_send.send()` so it gets the receipt.
     // Unfortunately the returned `bool` is not available through the Ethereum API.
     let receipt = request(
@@ -612,7 +621,64 @@ async fn run(provider: Provider<Http>, opts: Options) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn make_transfer(mw: &TestMiddleware, to: &TestAccount) -> anyhow::Result<TypedTransaction> {
+/// The HTTP interface provides JSON-RPC request/response endpoints.
+async fn run_http(mut provider: Provider<Http>, opts: &Options) -> anyhow::Result<()> {
+    adjust_provider(&mut provider);
+    run(&provider, opts).await
+}
+
+/// The WebSocket interface provides JSON-RPC request/response interactions
+/// as well as subscriptions, both using messages over the socket.
+///
+/// We subscribe to notifications first, then run the same suite of request/responses
+/// as the HTTP case, finally check that we have collected events over the subscriptions.
+async fn run_ws(mut provider: Provider<Ws>, opts: &Options) -> anyhow::Result<()> {
+    adjust_provider(&mut provider);
+
+    // Subscriptions as well.
+    let mut block_sub = provider.subscribe_blocks().await?;
+    let mut txs_sub = provider.subscribe_pending_txs().await?;
+    let mut log_sub = provider.subscribe_logs(&Filter::default()).await?;
+
+    run(&provider, opts).await?;
+
+    assert!(block_sub.next().await.is_some(), "blocks should arrive");
+    assert!(txs_sub.next().await.is_some(), "transactions should arrive");
+    assert!(log_sub.next().await.is_some(), "logs should arrive");
+
+    block_sub
+        .unsubscribe()
+        .await
+        .context("failed to unsubscribe blocks")?;
+
+    txs_sub
+        .unsubscribe()
+        .await
+        .context("failed to unsubscribe txs")?;
+
+    log_sub
+        .unsubscribe()
+        .await
+        .context("failed to unsubscribe logs")?;
+
+    Ok(())
+}
+
+fn adjust_provider<C>(provider: &mut Provider<C>)
+where
+    C: JsonRpcClient,
+{
+    // Tendermint block interval is lower.
+    provider.set_interval(Duration::from_secs(2));
+}
+
+async fn make_transfer<C>(
+    mw: &TestMiddleware<C>,
+    to: &TestAccount,
+) -> anyhow::Result<TypedTransaction>
+where
+    C: JsonRpcClient + 'static,
+{
     // Create a transaction to transfer 1000 atto.
     let tx = Eip1559TransactionRequest::new().to(to.eth_addr).value(1000);
 
@@ -630,11 +696,14 @@ async fn make_transfer(mw: &TestMiddleware, to: &TestAccount) -> anyhow::Result<
 }
 
 /// Send a transaction and await the receipt.
-async fn send_transaction(
-    mw: &TestMiddleware,
+async fn send_transaction<C>(
+    mw: &TestMiddleware<C>,
     tx: TypedTransaction,
     label: &str,
-) -> anyhow::Result<TransactionReceipt> {
+) -> anyhow::Result<TransactionReceipt>
+where
+    C: JsonRpcClient + 'static,
+{
     // `send_transaction` will fill in the missing fields like `from` and `nonce` (which involves querying the API).
     let receipt = mw
         .send_transaction(tx, None)
@@ -649,11 +718,14 @@ async fn send_transaction(
 }
 
 /// Create a middleware that will assign nonces and sign the message.
-fn make_middleware(
-    provider: Provider<Http>,
+fn make_middleware<C>(
+    provider: Provider<C>,
     chain_id: u64,
     sender: &TestAccount,
-) -> anyhow::Result<TestMiddleware> {
+) -> anyhow::Result<TestMiddleware<C>>
+where
+    C: JsonRpcClient,
+{
     // We have to use Ethereum's signing scheme, beause the `from` is not part of the RLP representation,
     // it is inferred from the public key recovered from the signature. We could potentially hash the
     // transaction in a different way, but we can't for example use the actor ID in the hash, because
@@ -665,10 +737,13 @@ fn make_middleware(
 }
 
 /// Fill the transaction fields such as gas and nonce.
-async fn prepare_call<T>(
-    mw: &TestMiddleware,
-    mut call: TestContractCall<T>,
-) -> anyhow::Result<TestContractCall<T>> {
+async fn prepare_call<C, T>(
+    mw: &TestMiddleware<C>,
+    mut call: TestContractCall<C, T>,
+) -> anyhow::Result<TestContractCall<C, T>>
+where
+    C: JsonRpcClient + 'static,
+{
     mw.fill_transaction(&mut call.tx, Some(BlockId::Number(BlockNumber::Latest)))
         .await
         .context("failed to fill transaction")?;

@@ -18,9 +18,17 @@ mod state;
 use error::{error, JsonRpcError};
 use state::JsonRpcState;
 
+/// This is passed to every method handler. It's generic in the client type to facilitate testing with mocks.
 type JsonRpcData<C> = Data<JsonRpcState<C>>;
 type JsonRpcServer = Arc<jsonrpc_v2::Server<jsonrpc_v2::MapRouter>>;
 type JsonRpcResult<T> = Result<T, JsonRpcError>;
+
+/// This is the state we will pass to [axum] so that we can extract it in handlers.
+#[derive(Clone)]
+pub struct AppState {
+    pub rpc_server: JsonRpcServer,
+    pub rpc_state: Arc<JsonRpcState<WebSocketClient>>,
+}
 
 /// Start listening to JSON-RPC requests.
 pub async fn listen<A: ToSocketAddrs>(
@@ -29,9 +37,13 @@ pub async fn listen<A: ToSocketAddrs>(
     filter_timeout: Duration,
 ) -> anyhow::Result<()> {
     if let Some(listen_addr) = listen_addr.to_socket_addrs()?.next() {
-        let state = JsonRpcState::new(client, filter_timeout);
-        let server = make_server(state);
-        let router = make_router(server);
+        let rpc_state = Arc::new(JsonRpcState::new(client, filter_timeout));
+        let rpc_server = make_server(rpc_state.clone());
+        let app_state = AppState {
+            rpc_server,
+            rpc_state,
+        };
+        let router = make_router(app_state);
         let server = axum::Server::try_bind(&listen_addr)?.serve(router.into_make_service());
 
         tracing::info!(?listen_addr, "bound Ethereum API");
@@ -43,16 +55,16 @@ pub async fn listen<A: ToSocketAddrs>(
 }
 
 /// Register method handlers with the JSON-RPC server construct.
-fn make_server(state: JsonRpcState<WebSocketClient>) -> JsonRpcServer {
-    let server = jsonrpc_v2::Server::new().with_data(Data(Arc::new(state)));
+fn make_server(state: Arc<JsonRpcState<WebSocketClient>>) -> JsonRpcServer {
+    let server = jsonrpc_v2::Server::new().with_data(Data(state));
     let server = apis::register_methods(server);
     server.finish()
 }
 
-/// Register routes in the `axum` router to handle JSON-RPC and WebSocket calls.
-fn make_router(server: JsonRpcServer) -> axum::Router {
+/// Register routes in the `axum` HTTP router to handle JSON-RPC and WebSocket calls.
+fn make_router(state: AppState) -> axum::Router {
     axum::Router::new()
         .route("/", post(handlers::http::handle))
         .route("/", get(handlers::ws::handle))
-        .with_state(server)
+        .with_state(state)
 }

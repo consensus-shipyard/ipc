@@ -33,7 +33,7 @@ bytes = "1.4"
 clap = { version = "4.1", features = ["derive", "env"] }
 config = "0.13"
 dirs = "5.0"
-ethers = { version = "2.0", features = ["abigen"] }
+ethers = { version = "2.0", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0" }
 fnv = "1.0"
 futures = "0.3"

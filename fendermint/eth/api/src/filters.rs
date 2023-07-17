@@ -3,26 +3,34 @@
 
 use std::{
     collections::HashMap,
+    pin::Pin,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Context};
 use ethers_core::types as et;
+use fendermint_rpc::client::FendermintClient;
 use fendermint_vm_actor_interface::eam::EthAddress;
-use futures::StreamExt;
-use fvm_shared::address::Address;
+use futures::{Future, StreamExt};
+use fvm_shared::{address::Address, error::ExitCode};
+use serde::Serialize;
 use tendermint_rpc::{
     event::{Event, EventData},
     query::{EventType, Query},
-    Subscription,
+    Client, Subscription,
 };
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     RwLock,
 };
 
-use crate::conv::from_tm;
+use crate::{
+    conv::from_tm::{self, map_rpc_block_txs},
+    error::JsonRpcError,
+    handlers::ws::{MethodNotification, Notification},
+    state::{enrich_block, WebSocketSender},
+};
 
 /// Check whether to keep a log according to the topic filter.
 ///
@@ -53,13 +61,15 @@ pub fn matches_topics(filter: &et::Filter, log: &et::Log) -> bool {
 pub type FilterId = et::U256;
 pub type FilterMap = Arc<RwLock<HashMap<FilterId, Sender<FilterCommand>>>>;
 
+pub type BlockHash = et::H256;
+
 pub enum FilterCommand {
     /// Update the records with an event, coming from one of the Tendermint subscriptions.
     Update(Event),
     /// One of the subscriptions has ended, potentially with an error.
     Finish(Option<tendermint_rpc::Error>),
     /// Take the accumulated records, coming from the API consumer.
-    Take(tokio::sync::oneshot::Sender<anyhow::Result<Option<FilterRecords>>>),
+    Take(tokio::sync::oneshot::Sender<anyhow::Result<Option<FilterRecords<BlockHash>>>>),
     /// The API consumer is no longer interested in taking the records.
     Uninstall,
 }
@@ -155,13 +165,34 @@ impl FilterKind {
 /// Accumulator for filter data.
 ///
 /// The type expected can be seen in [ethers::providers::Provider::watch_blocks].
-pub enum FilterRecords {
-    NewBlocks(Vec<et::H256>),
-    PendingTransactions(Vec<et::H256>),
+pub enum FilterRecords<B> {
+    NewBlocks(Vec<B>),
+    PendingTransactions(Vec<et::TxHash>),
     Logs(Vec<et::Log>),
 }
 
-impl FilterRecords {
+impl<B> FilterRecords<B>
+where
+    B: Serialize,
+{
+    pub fn new(value: &FilterKind) -> Self {
+        match value {
+            FilterKind::NewBlocks => Self::NewBlocks(vec![]),
+            FilterKind::PendingTransactions => Self::PendingTransactions(vec![]),
+            FilterKind::Logs(_) => Self::Logs(vec![]),
+        }
+    }
+
+    fn take(&mut self) -> Self {
+        let mut records = match self {
+            Self::NewBlocks(_) => Self::NewBlocks(vec![]),
+            Self::PendingTransactions(_) => Self::PendingTransactions(vec![]),
+            Self::Logs(_) => Self::Logs(vec![]),
+        };
+        std::mem::swap(self, &mut records);
+        records
+    }
+
     pub fn is_empty(&self) -> bool {
         match self {
             Self::NewBlocks(xs) => xs.is_empty(),
@@ -169,126 +200,32 @@ impl FilterRecords {
             Self::Logs(xs) => xs.is_empty(),
         }
     }
-}
 
-impl From<&FilterKind> for FilterRecords {
-    fn from(value: &FilterKind) -> Self {
-        match value {
-            FilterKind::NewBlocks => Self::NewBlocks(vec![]),
-            FilterKind::PendingTransactions => Self::PendingTransactions(vec![]),
-            FilterKind::Logs(_) => Self::Logs(vec![]),
+    pub fn to_json_vec(&self) -> anyhow::Result<Vec<serde_json::Value>> {
+        match self {
+            Self::Logs(xs) => to_json_vec(xs),
+            Self::NewBlocks(xs) => to_json_vec(xs),
+            Self::PendingTransactions(xs) => to_json_vec(xs),
         }
-    }
-}
-
-impl From<&FilterRecords> for FilterRecords {
-    fn from(value: &FilterRecords) -> Self {
-        match value {
-            Self::NewBlocks(_) => Self::NewBlocks(vec![]),
-            Self::PendingTransactions(_) => Self::PendingTransactions(vec![]),
-            Self::Logs(_) => Self::Logs(vec![]),
-        }
-    }
-}
-
-/// Accumulate changes between polls.
-pub struct FilterState {
-    id: FilterId,
-    timeout: Duration,
-    last_poll: Instant,
-    finished: Option<Option<anyhow::Error>>,
-    records: FilterRecords,
-    rx: Receiver<FilterCommand>,
-}
-
-impl FilterState {
-    pub fn new(
-        id: FilterId,
-        timeout: Duration,
-        kind: &FilterKind,
-    ) -> (Self, Sender<FilterCommand>) {
-        let (tx, rx) = tokio::sync::mpsc::channel(10);
-        let s = Self {
-            id,
-            timeout,
-            last_poll: Instant::now(),
-            finished: None,
-            records: FilterRecords::from(kind),
-            rx,
-        };
-        (s, tx)
-    }
-
-    pub fn id(&self) -> FilterId {
-        self.id
-    }
-
-    /// Consume commands until some end condition is met.
-    ///
-    /// In the end the filter removes itself from the registry.
-    pub async fn run(mut self, filters: FilterMap) {
-        let id = self.id;
-
-        tracing::info!(?id, "handling filter events");
-        while let Some(cmd) = self.rx.recv().await {
-            match cmd {
-                FilterCommand::Update(event) => {
-                    if self.is_finished() {
-                        continue;
-                    }
-                    if self.is_timed_out() {
-                        tracing::debug!(?id, "filter timed out");
-                        return self.remove(filters).await;
-                    }
-                    if let Err(err) = self.update(event) {
-                        tracing::error!(?id, "failed to update filter: {err}");
-                        self.finish(Some(anyhow!("failed to update filter: {err}")));
-                    }
-                }
-                FilterCommand::Finish(err) => {
-                    tracing::info!(?id, "filter producer finished: {err:?}");
-                    self.finish(err.map(|e| anyhow!("subscription failed: {e}")))
-                }
-                FilterCommand::Uninstall => {
-                    tracing::error!(?id, "filter uninstalled");
-                    return self.remove(filters).await;
-                }
-                FilterCommand::Take(tx) => {
-                    let result = self.try_take();
-                    let remove = match result {
-                        Ok(None) | Err(_) => true,
-                        Ok(Some(_)) => false,
-                    };
-                    let _ = tx.send(result);
-                    if remove {
-                        tracing::info!(?id, "filter finished");
-                        return self.remove(filters).await;
-                    }
-                }
-            }
-        }
-        // All producers have been dropped, so there is no way for new commands to arrive.
-    }
-
-    async fn remove(self, filters: FilterMap) {
-        filters.write().await.remove(&self.id);
     }
 
     /// Accumulate the events.
-    fn update(&mut self, event: Event) -> anyhow::Result<()> {
-        match (&mut self.records, &event.data) {
+    async fn update<F>(&mut self, event: Event, f: F) -> anyhow::Result<()>
+    where
+        F: FnOnce(tendermint::Block) -> Pin<Box<dyn Future<Output = anyhow::Result<B>> + Send>>,
+    {
+        match (self, event.data) {
             (
-                FilterRecords::NewBlocks(ref mut hashes),
+                Self::NewBlocks(ref mut blocks),
                 EventData::NewBlock {
                     block: Some(block), ..
                 },
             ) => {
-                let h = block.header().hash();
-                let h = et::H256::from_slice(h.as_bytes());
-                hashes.push(h);
+                let b: B = f(block).await?;
+                blocks.push(b);
             }
             (
-                FilterRecords::PendingTransactions(ref mut hashes),
+                Self::PendingTransactions(ref mut hashes),
                 EventData::NewBlock {
                     block: Some(block), ..
                 },
@@ -299,7 +236,7 @@ impl FilterState {
                     hashes.push(h);
                 }
             }
-            (FilterRecords::Logs(ref mut logs), EventData::Tx { tx_result }) => {
+            (Self::Logs(ref mut logs), EventData::Tx { tx_result }) => {
                 // An example of an `Event`:
                 // Event {
                 //     query: "tm.event = 'Tx'",
@@ -370,16 +307,255 @@ impl FilterState {
         }
         Ok(())
     }
+}
 
+fn to_json_vec<R: Serialize>(records: &[R]) -> anyhow::Result<Vec<serde_json::Value>> {
+    let values: Vec<serde_json::Value> = records
+        .iter()
+        .map(serde_json::to_value)
+        .collect::<Result<Vec<_>, _>>()
+        .context("failed to convert records to JSON")?;
+
+    Ok(values)
+}
+
+pub struct FilterDriver<C> {
+    id: FilterId,
+    state: FilterState<C>,
+    rx: Receiver<FilterCommand>,
+}
+
+enum FilterState<C> {
+    Poll(PollState),
+    Subscription(SubscriptionState<C>),
+}
+
+/// Accumulate changes between polls.
+///
+/// Polling returns batches.
+struct PollState {
+    timeout: Duration,
+    last_poll: Instant,
+    finished: Option<Option<anyhow::Error>>,
+    records: FilterRecords<BlockHash>,
+}
+
+/// Send changes to a WebSocket as soon as they happen, one by one, not in batches.
+struct SubscriptionState<C> {
+    client: FendermintClient<C>,
+    kind: FilterKind,
+    ws_sender: WebSocketSender,
+}
+
+impl<C> FilterDriver<C>
+where
+    C: Client + Send + Sync + Clone + 'static,
+{
+    pub fn new(
+        id: FilterId,
+        timeout: Duration,
+        kind: FilterKind,
+        ws_sender: Option<WebSocketSender>,
+        client: FendermintClient<C>,
+    ) -> (Self, Sender<FilterCommand>) {
+        let (tx, rx) = tokio::sync::mpsc::channel(10);
+
+        let state = match ws_sender {
+            Some(ws_sender) => FilterState::Subscription(SubscriptionState {
+                kind,
+                ws_sender,
+                client,
+            }),
+            None => FilterState::Poll(PollState {
+                timeout,
+                last_poll: Instant::now(),
+                finished: None,
+                records: FilterRecords::new(&kind),
+            }),
+        };
+
+        let r = Self { id, state, rx };
+
+        (r, tx)
+    }
+
+    pub fn id(&self) -> FilterId {
+        self.id
+    }
+
+    /// Consume commands until some end condition is met.
+    ///
+    /// In the end the filter removes itself from the registry.
+    pub async fn run(mut self, filters: FilterMap) {
+        let id = self.id;
+
+        tracing::info!(?id, "handling filter events");
+        while let Some(cmd) = self.rx.recv().await {
+            match self.state {
+                FilterState::Poll(ref mut state) => {
+                    match cmd {
+                        FilterCommand::Update(event) => {
+                            if state.is_timed_out() {
+                                tracing::debug!(?id, "filter timed out");
+                                return self.remove(filters).await;
+                            }
+                            if state.is_finished() {
+                                // Not returning to allow the consumer to get final results.
+                                continue;
+                            }
+
+                            let res = state
+                                .records
+                                .update(event, |block| {
+                                    Box::pin(async move {
+                                        Ok(et::H256::from_slice(block.header().hash().as_bytes()))
+                                    })
+                                })
+                                .await;
+
+                            if let Err(err) = res {
+                                tracing::error!(?id, "failed to update filter: {err}");
+                                state.finish(Some(anyhow!("failed to update filter: {err}")));
+                            }
+                        }
+                        FilterCommand::Finish(err) => {
+                            tracing::debug!(?id, "filter producer finished: {err:?}");
+                            state.finish(err.map(|e| anyhow!("subscription failed: {e}")))
+                        }
+                        FilterCommand::Take(tx) => {
+                            let result = state.try_take();
+                            let remove = match result {
+                                Ok(None) | Err(_) => true,
+                                Ok(Some(_)) => false,
+                            };
+                            let _ = tx.send(result);
+                            if remove {
+                                tracing::debug!(?id, "filter finished");
+                                return self.remove(filters).await;
+                            }
+                        }
+                        FilterCommand::Uninstall => {
+                            tracing::debug!(?id, "filter uninstalled");
+                            return self.remove(filters).await;
+                        }
+                    }
+                }
+                FilterState::Subscription(ref state) => match cmd {
+                    FilterCommand::Update(event) => {
+                        let mut records = FilterRecords::<et::Block<et::TxHash>>::new(&state.kind);
+
+                        let res = records
+                            .update(event, |block| {
+                                let client = state.client.clone();
+                                Box::pin(async move {
+                                    let block = enrich_block(&client, block).await?;
+                                    let block: anyhow::Result<et::Block<et::TxHash>> =
+                                        map_rpc_block_txs(block, |tx| Ok(tx.hash()));
+                                    block
+                                })
+                            })
+                            .await;
+
+                        match res {
+                            Err(e) => {
+                                send_error(
+                                    &state.ws_sender,
+                                    ExitCode::USR_UNSPECIFIED,
+                                    format!("failed to process events: {e}"),
+                                    id,
+                                );
+                            }
+                            Ok(()) => match records.to_json_vec() {
+                                Err(e) => tracing::error!("failed to convert events to JSON: {e}"),
+                                Ok(records) => {
+                                    for rec in records {
+                                        let msg: MethodNotification = notification(id, rec);
+                                        if state.ws_sender.send(msg).is_err() {
+                                            tracing::debug!(?id, "web socket no longer listening");
+                                            return self.remove(filters).await;
+                                        }
+                                    }
+                                }
+                            },
+                        }
+                    }
+                    FilterCommand::Finish(err) => {
+                        tracing::debug!(?id, "subscription producer finished: {err:?}");
+                        // We have already sent all updates to the socket.
+
+                        // Make best effort to notify the socket.
+                        if let Some(err) = err {
+                            send_error(
+                                &state.ws_sender,
+                                ExitCode::USR_UNSPECIFIED,
+                                format!("subscription finished with error: {err}"),
+                                id,
+                            );
+                        }
+
+                        // We know at least one subscription has failed, so might as well quit.
+                        return self.remove(filters).await;
+                    }
+                    FilterCommand::Take(tx) => {
+                        // This should not be used, but because we treat subscriptions and filters
+                        // under the same umbrella, it is possible to send a request to get changes.
+                        // Respond with empty, because all of the changes were already sent to the socket.
+                        let _ = tx.send(Ok(Some(FilterRecords::new(&state.kind))));
+                    }
+                    FilterCommand::Uninstall => {
+                        tracing::debug!(?id, "subscription uninstalled");
+                        return self.remove(filters).await;
+                    }
+                },
+            }
+        }
+    }
+
+    async fn remove(self, filters: FilterMap) {
+        filters.write().await.remove(&self.id);
+    }
+}
+
+fn send_error(ws_sender: &WebSocketSender, exit_code: ExitCode, msg: String, id: FilterId) {
+    tracing::error!(?id, "sending error to WS: {msg}");
+
+    let err = JsonRpcError {
+        code: exit_code.value().into(),
+        message: msg,
+    };
+    let err = jsonrpc_v2::Error::from(err);
+
+    match serde_json::to_value(err) {
+        Err(e) => tracing::error!("failed to convert JSON-RPC error to JSON: {e}"),
+        Ok(json) => {
+            // Ignoring the case where the socket is no longer there.
+            // Assuming that there will be another event to trigger removal.
+            let msg = notification(id, json);
+            let _ = ws_sender.send(msg);
+        }
+    }
+}
+
+fn notification(subscription: FilterId, result: serde_json::Value) -> MethodNotification {
+    MethodNotification {
+        // We know this is the only one at the moment.
+        method: "eth_subscribe".into(),
+        notification: Notification {
+            subscription,
+            result,
+        },
+    }
+}
+
+impl PollState {
     /// Take all the accumulated changes.
     ///
     /// If there are no changes but there was an error, return that.
     /// If the producers have stopped, return `None`.
-    fn try_take(&mut self) -> anyhow::Result<Option<FilterRecords>> {
+    fn try_take(&mut self) -> anyhow::Result<Option<FilterRecords<BlockHash>>> {
         self.last_poll = Instant::now();
 
-        let mut records = FilterRecords::from(&self.records);
-        std::mem::swap(&mut self.records, &mut records);
+        let records = self.records.take();
 
         if records.is_empty() {
             if let Some(ref mut finished) = self.finished {
@@ -417,6 +593,8 @@ impl FilterState {
 }
 
 /// Spawn a Tendermint subscription handler in a new task.
+///
+/// The subscription sends [Event] records to the driver over a channel.
 pub async fn run_subscription(id: FilterId, mut sub: Subscription, tx: Sender<FilterCommand>) {
     let query = sub.query().to_string();
     tracing::debug!(?id, query, "polling filter subscription");

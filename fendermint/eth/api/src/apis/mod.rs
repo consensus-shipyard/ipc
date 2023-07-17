@@ -75,7 +75,9 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_submitHashrate
         // eth_submitWork
         syncing,
-        uninstallFilter
+        uninstallFilter,
+        subscribe,
+        unsubscribe
     });
 
     let server = with_methods!(server, web3, {
@@ -88,4 +90,9 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         listening,
         peerCount
     })
+}
+
+/// Indicate whether a method requires a WebSocket connection.
+pub fn is_streaming_method(method: &str) -> bool {
+    method == "eth_subscribe"
 }

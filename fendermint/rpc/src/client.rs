@@ -78,6 +78,7 @@ pub async fn ws_client(url: Url) -> anyhow::Result<(WebSocketClient, WebSocketCl
 }
 
 /// Unauthenticated Fendermint client.
+#[derive(Clone)]
 pub struct FendermintClient<C = HttpClient> {
     inner: C,
 }
