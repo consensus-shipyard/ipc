@@ -286,6 +286,8 @@ fn remove_not_managed(validators: &mut Vec<Address>, managed_accounts: &[Address
     validators.drain_filter(|v| !set.contains(v));
 }
 
+/// Tracks the metadata required for both top down and bottom up checkpoint submissions, such as
+/// parent/child subnet and checkpoint period.
 pub struct CheckpointMetadata {
     pub(crate) parent: Subnet,
     pub(crate) child: Subnet,

@@ -12,25 +12,23 @@ use ipc_gateway::checkpoint::BatchCrossMsgs;
 use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::{Display, Formatter};
 
-pub type Bytes = Vec<u8>;
-
 /// Native bottom up checkpoint struct independent of chain specific implementations
 #[derive(Debug)]
 pub struct NativeBottomUpCheckpoint {
     pub source: SubnetID,
-    pub proof: Option<Bytes>,
+    pub proof: Option<Vec<u8>>,
     pub epoch: ChainEpoch,
-    pub prev_check: Option<Bytes>,
+    pub prev_check: Option<Vec<u8>>,
     pub children: Vec<NativeChildCheck>,
     pub cross_msgs: BatchCrossMsgs,
 
-    pub sig: Bytes,
+    pub sig: Vec<u8>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct NativeChildCheck {
     pub source: SubnetID,
-    pub checks: Vec<Bytes>,
+    pub checks: Vec<Vec<u8>>,
 }
 
 /// The trait that handles the bottom up checkpoint submission data preparation and actual submission.
