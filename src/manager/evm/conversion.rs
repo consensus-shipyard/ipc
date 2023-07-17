@@ -90,7 +90,7 @@ impl TryFrom<NativeBottomUpCheckpoint>
 
         let mut prev_hash = [0u8; 32];
         if let Some(v) = &value.prev_check {
-            prev_hash.copy_from_slice(&v);
+            prev_hash.copy_from_slice(v);
         }
 
         let proof = if let Some(v) = value.proof {
