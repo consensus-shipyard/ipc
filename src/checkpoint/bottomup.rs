@@ -12,7 +12,9 @@ use ipc_gateway::checkpoint::BatchCrossMsgs;
 use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::{Display, Formatter};
 
-/// Native bottom up checkpoint struct independent of chain specific implementations
+/// Native bottom up checkpoint struct independent of chain specific implementations.
+/// The goal of this struct is to have a common checkpoint data structure that can be
+/// eventually converted into their runtime-specific representations.
 #[derive(Debug)]
 pub struct NativeBottomUpCheckpoint {
     pub source: SubnetID,
