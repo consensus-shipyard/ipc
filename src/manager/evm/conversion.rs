@@ -93,6 +93,12 @@ impl TryFrom<NativeBottomUpCheckpoint>
             prev_hash.copy_from_slice(&v);
         }
 
+        let proof = if let Some(v) = value.proof {
+            ethers::core::types::Bytes::from(v)
+        } else {
+            ethers::core::types::Bytes::default()
+        };
+
         let b = crate::manager::evm::subnet_contract::BottomUpCheckpoint {
             source: crate::manager::evm::subnet_contract::SubnetID::try_from(&value.source)?,
             epoch: value.epoch as u64,
@@ -100,7 +106,7 @@ impl TryFrom<NativeBottomUpCheckpoint>
             cross_msgs,
             children,
             prev_hash,
-            proof: ethers::core::types::Bytes::from(value.proof),
+            proof,
         };
         Ok(b)
     }
