@@ -211,6 +211,7 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
         .validators()
         .await
         .map_err(|e| anyhow!("cannot get child validators for {manager:} due to {e:}"))?;
+    log::debug!("list of validators from on chain: {validators:?} for manager: {manager:}");
     remove_not_managed(&mut validators, &manager.target_subnet().accounts());
     log::debug!("list of validators: {validators:?} for manager: {manager:}");
 
