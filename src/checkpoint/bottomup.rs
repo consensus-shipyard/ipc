@@ -14,7 +14,9 @@ use std::fmt::{Display, Formatter};
 
 pub type Bytes = Vec<u8>;
 
-/// Native bottom up checkpoint struct independent of chain specific implementations
+/// Native bottom up checkpoint struct independent of chain specific implementations.
+/// The goal of this struct is to have a common checkpoint data structure that can be
+/// eventually converted into their runtime-specific representations.
 #[derive(Debug)]
 pub struct NativeBottomUpCheckpoint {
     pub source: SubnetID,
