@@ -32,7 +32,7 @@ impl FevmSubnetManager {
 impl VoteQuery<NativeBottomUpCheckpoint> for FevmSubnetManager {
     async fn last_executed_epoch(&self, _subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
         self.evm_subnet_manager
-            .gateway_last_voting_executed_epoch()
+            .subnet_last_voting_executed_epoch()
             .await
     }
 

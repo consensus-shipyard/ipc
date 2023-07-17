@@ -33,13 +33,20 @@ pub struct NativeChildCheck {
     pub checks: Vec<Bytes>,
 }
 
+/// The trait that handles the bottom up checkpoint submission data preparation and actual submission.
 #[async_trait]
 pub trait BottomUpHandler: Send + Sync + VoteQuery<NativeBottomUpCheckpoint> {
+    /// Get the checkpoint period
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    /// Get the list of validators in the subnet id
     async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>>;
+    /// Fetch the checkpoint template at the specified epoch
     async fn checkpoint_template(&self, epoch: ChainEpoch) -> Result<NativeBottomUpCheckpoint>;
+    /// Populate previous checkpoint hash for the checkpoint
     async fn populate_prev_hash(&self, template: &mut NativeBottomUpCheckpoint) -> Result<()>;
+    /// Populate the proof for the checkpoint
     async fn populate_proof(&self, template: &mut NativeBottomUpCheckpoint) -> Result<()>;
+    /// Submit the checkpoint for validator
     async fn submit(
         &self,
         validator: &Address,
@@ -88,7 +95,9 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
     /// Get the subnet config that this manager is submitting checkpoints to. For example, if it is
     /// top down checkpoints, target subnet return the child subnet config. If it is bottom up, target
     /// subnet returns parent subnet.
-    fn target_subnet(&self) -> &Subnet { &self.metadata.parent }
+    fn target_subnet(&self) -> &Subnet {
+        &self.metadata.parent
+    }
 
     /// Getter for the parent subnet this checkpoint manager is handling
     fn parent_subnet(&self) -> &Subnet {
