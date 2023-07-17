@@ -46,6 +46,7 @@ pub trait BottomUpHandler: Send + Sync + VoteQuery<NativeBottomUpCheckpoint> {
     async fn populate_prev_hash(
         &self,
         template: &mut NativeBottomUpCheckpoint,
+        subnet: &SubnetID,
         previous_epoch: ChainEpoch,
     ) -> Result<()>;
     /// Populate the proof for the checkpoint
@@ -148,7 +149,7 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
 
         let prev_epoch = epoch - self.metadata.period;
         self.parent_handler
-            .populate_prev_hash(&mut template, prev_epoch)
+            .populate_prev_hash(&mut template, &self.metadata.child.id, prev_epoch)
             .await?;
         log::debug!("bottom up checkpoint prev check: {:?}", template.prev_check);
 

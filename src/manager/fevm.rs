@@ -76,11 +76,12 @@ impl BottomUpHandler for FevmSubnetManager {
     async fn populate_prev_hash(
         &self,
         template: &mut NativeBottomUpCheckpoint,
+        subnet: &SubnetID,
         previous_epoch: ChainEpoch,
     ) -> anyhow::Result<()> {
         template.prev_check = Some(
             self.evm_subnet_manager
-                .prev_bottom_up_checkpoint_hash(&template.source, previous_epoch)
+                .prev_bottom_up_checkpoint_hash(subnet, previous_epoch)
                 .await
                 .map_err(|e| anyhow!("cannot get prev checkpoint hash due to: {e:}"))?
                 .to_vec(),
