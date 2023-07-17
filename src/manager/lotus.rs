@@ -550,7 +550,11 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
         NativeBottomUpCheckpoint::try_from(checkpoint)
     }
 
-    async fn populate_prev_hash(&self, template: &mut NativeBottomUpCheckpoint) -> Result<()> {
+    async fn populate_prev_hash(
+        &self,
+        template: &mut NativeBottomUpCheckpoint,
+        _previous_epoch: ChainEpoch,
+    ) -> Result<()> {
         let response = self
             .lotus_client
             .ipc_get_prev_checkpoint_for_child(&self.gateway_addr, &template.source)

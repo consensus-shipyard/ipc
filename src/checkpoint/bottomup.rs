@@ -43,7 +43,11 @@ pub trait BottomUpHandler: Send + Sync + VoteQuery<NativeBottomUpCheckpoint> {
     /// Fetch the checkpoint template at the specified epoch
     async fn checkpoint_template(&self, epoch: ChainEpoch) -> Result<NativeBottomUpCheckpoint>;
     /// Populate previous checkpoint hash for the checkpoint
-    async fn populate_prev_hash(&self, template: &mut NativeBottomUpCheckpoint) -> Result<()>;
+    async fn populate_prev_hash(
+        &self,
+        template: &mut NativeBottomUpCheckpoint,
+        previous_epoch: ChainEpoch,
+    ) -> Result<()>;
     /// Populate the proof for the checkpoint
     async fn populate_proof(&self, template: &mut NativeBottomUpCheckpoint) -> Result<()>;
     /// Submit the checkpoint for validator
@@ -136,20 +140,21 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
     /// Submit the checkpoint based on the current epoch to submit and the previous epoch that was
     /// already submitted.
     async fn submit_checkpoint(&self, epoch: ChainEpoch, validator: &Address) -> Result<()> {
-        let mut template = self.parent_handler.checkpoint_template(epoch).await?;
+        let mut template = self.child_handler.checkpoint_template(epoch).await?;
         log::debug!("bottom up template: {template:?}");
 
         self.child_handler.populate_proof(&mut template).await?;
         log::debug!("bottom up checkpoint proof: {:?}", template.proof);
 
+        let prev_epoch = epoch - self.metadata.period;
         self.parent_handler
-            .populate_prev_hash(&mut template)
+            .populate_prev_hash(&mut template, prev_epoch)
             .await?;
         log::debug!("bottom up checkpoint prev check: {:?}", template.prev_check);
 
         log::info!("bottom up checkpoint to submit: {template:?}");
 
-        self.child_handler
+        self.parent_handler
             .submit(validator, template)
             .await
             .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;

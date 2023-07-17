@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::checkpoint::{create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery};
@@ -75,17 +76,22 @@ impl BottomUpHandler for FevmSubnetManager {
     async fn populate_prev_hash(
         &self,
         template: &mut NativeBottomUpCheckpoint,
+        previous_epoch: ChainEpoch,
     ) -> anyhow::Result<()> {
-        let proof = create_proof(&self.lotus_client, template.epoch).await?;
-        let proof_bytes = cbor::serialize(&proof, "fevm bottom up checkpoint proof")?.to_vec();
-        template.proof = Some(proof_bytes);
+        template.prev_check = Some(
+            self.evm_subnet_manager
+                .prev_bottom_up_checkpoint_hash(&template.source, previous_epoch)
+                .await
+                .map_err(|e| anyhow!("cannot get prev checkpoint hash due to: {e:}"))?
+                .to_vec(),
+        );
         Ok(())
     }
 
     async fn populate_proof(&self, template: &mut NativeBottomUpCheckpoint) -> anyhow::Result<()> {
-        if template.proof.is_none() {
-            log::warn!("fevm template should have proof");
-        }
+        let proof = create_proof(&self.lotus_client, template.epoch).await?;
+        let proof_bytes = cbor::serialize(&proof, "fevm bottom up checkpoint proof")?.to_vec();
+        template.proof = Some(proof_bytes);
         Ok(())
     }
 
