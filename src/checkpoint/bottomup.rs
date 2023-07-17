@@ -130,7 +130,7 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
 
     /// The current epoch in the subnet that the checkpoints should be submitted to
     async fn current_epoch(&self) -> Result<ChainEpoch> {
-        self.parent_handler.current_epoch().await
+        self.child_handler.current_epoch().await
     }
 
     /// Submit the checkpoint based on the current epoch to submit and the previous epoch that was
@@ -162,7 +162,8 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
         let has_voted = self
             .parent_handler
             .has_voted(&self.metadata.child.id, epoch, validator)
-            .await?;
+            .await
+            .map_err(|e| anyhow!("cannot check if validator: {validator:} has voted in epoch: {epoch:}"))?;
         Ok(!has_voted)
     }
 

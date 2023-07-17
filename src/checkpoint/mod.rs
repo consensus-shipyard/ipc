@@ -81,11 +81,11 @@ pub trait CheckpointManager: Display + Send + Sync {
         &self,
         validator: &Address,
         epoch: ChainEpoch,
-    ) -> anyhow::Result<bool>;
+    ) -> Result<bool>;
 
     /// Performs checks to see if the subnet is ready for checkpoint submission. If `true` means the
     /// subnet is ready for submission, else means the subnet is not ready.
-    async fn presubmission_check(&self) -> anyhow::Result<bool>;
+    async fn presubmission_check(&self) -> Result<bool>;
 }
 
 pub struct CheckpointSubsystem {
