@@ -165,16 +165,19 @@ impl TopDownHandler for FevmSubnetManager {
     }
 
     async fn applied_topdown_nonce(&self) -> anyhow::Result<u64> {
+        // This getter is not currently implemented in solidity contracts
         todo!()
     }
 
     async fn top_down_msgs(
         &self,
-        _subnet_id: &SubnetID,
-        _nonce: u64,
-        _epoch: ChainEpoch,
+        subnet_id: &SubnetID,
+        nonce: u64,
+        epoch: ChainEpoch,
     ) -> anyhow::Result<Vec<CrossMsg>> {
-        todo!()
+        self.evm_subnet_manager
+            .top_down_msgs(subnet_id, epoch, nonce)
+            .await
     }
 
     async fn submit(

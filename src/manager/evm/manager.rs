@@ -513,7 +513,7 @@ impl EthManager for EthSubnetManager {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
         nonce: u64,
-    ) -> Result<Vec<gateway::CrossMsg>> {
+    ) -> Result<Vec<ipc_gateway::CrossMsg>> {
         let route = agent_subnet_to_evm_addresses(subnet_id)?;
         log::debug!("getting top down messages for route: {route:?}");
 
@@ -525,7 +525,7 @@ impl EthManager for EthSubnetManager {
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let r = gateway_contract
+        let raw_msgs = gateway_contract
             .method::<_, Vec<gateway::CrossMsg>>(
                 "getTopDownMsgs",
                 gateway::GetTopDownMsgsCall {
@@ -538,7 +538,12 @@ impl EthManager for EthSubnetManager {
             .call()
             .await
             .map_err(|e| anyhow!("cannot get evm top down messages: {e:}"))?;
-        Ok(r)
+
+        let mut msgs = vec![];
+        for c in raw_msgs {
+            msgs.push(ipc_gateway::CrossMsg::try_from(c)?);
+        }
+        Ok(msgs)
     }
 
     async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>> {
