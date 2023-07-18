@@ -415,7 +415,7 @@ impl EthManager for EthSubnetManager {
     ) -> Result<ChainEpoch> {
         log::debug!("submit top down checkpoint: {:?}", checkpoint);
 
-        let signer = self.get_signer(&from)?;
+        let signer = self.get_signer(from)?;
         let gateway_contract = Gateway::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
 
         let txn = gateway_contract.submit_top_down_checkpoint(checkpoint);
@@ -437,7 +437,7 @@ impl EthManager for EthSubnetManager {
             route[route.len() - 1]
         );
 
-        let signer = self.get_signer(&from)?;
+        let signer = self.get_signer(from)?;
         let contract = SubnetContract::new(route[route.len() - 1], Arc::new(signer));
 
         let txn = contract.submit_checkpoint(checkpoint);
