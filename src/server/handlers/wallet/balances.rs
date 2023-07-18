@@ -1,8 +1,11 @@
-use ipc_identity::Wallet;
+use ipc_identity::{PersistentKeyStore, Wallet};
+use primitives::EthAddress;
 use std::collections::HashMap;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use crate::config::subnet::SubnetConfig;
+use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
@@ -10,6 +13,7 @@ use async_trait::async_trait;
 use futures_util::future::join_all;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
+use ipc_identity::EvmKeyStore;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -26,33 +30,33 @@ pub type WalletBalancesResponse = HashMap<String, String>;
 /// Send value between two addresses within a subnet
 pub(crate) struct WalletBalancesHandler {
     pool: Arc<SubnetManagerPool>,
-    wallet: Arc<RwLock<Wallet>>,
+    fvm_wallet: Arc<RwLock<Wallet>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
 }
 
 impl WalletBalancesHandler {
-    pub(crate) fn new(pool: Arc<SubnetManagerPool>, wallet: Arc<RwLock<Wallet>>) -> Self {
-        Self { pool, wallet }
+    pub(crate) fn new(
+        pool: Arc<SubnetManagerPool>,
+        fvm_wallet: Arc<RwLock<Wallet>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    ) -> Self {
+        Self {
+            pool,
+            fvm_wallet,
+            evm_keystore,
+        }
     }
 }
 
-#[async_trait]
-impl JsonRPCRequestHandler for WalletBalancesHandler {
-    type Request = WalletBalancesParams;
-    type Response = WalletBalancesResponse;
-
-    async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let subnet = SubnetID::from_str(&request.subnet)?;
-        let conn = match self.pool.get(&subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
-
-        let manager = conn.manager();
-
-        let addresses = self.wallet.read().unwrap().list_addrs()?;
+impl WalletBalancesHandler {
+    async fn fvm_balances(
+        &self,
+        manager: &dyn SubnetManager,
+    ) -> anyhow::Result<WalletBalancesResponse> {
+        let addresses = self.fvm_wallet.read().unwrap().list_addrs()?;
         // Create a new Arc for wallet so it is pulled in the async block
         // from below.
-        let _arc_wallet = Arc::clone(&self.wallet);
+        let _arc_wallet = Arc::clone(&self.fvm_wallet);
 
         let r = addresses
             .iter()
@@ -74,4 +78,64 @@ impl JsonRPCRequestHandler for WalletBalancesHandler {
         }
         Ok(hashmap)
     }
+
+    async fn fevm_balances(
+        &self,
+        manager: &dyn SubnetManager,
+    ) -> anyhow::Result<WalletBalancesResponse> {
+        let keystore = Arc::clone(&self.evm_keystore);
+        let addresses = keystore.read().unwrap().list()?;
+
+        // Create a new Arc for keystore so it is pulled in the async block
+        // from below.
+        let _arc_keystore = keystore.clone();
+
+        let r = addresses
+            .iter()
+            .map(|addr| async move {
+                manager
+                    .wallet_balance(&ethers_address_to_fil_address(addr)?)
+                    .await
+                    .map(|balance| (balance, addr))
+            })
+            .collect::<Vec<_>>();
+
+        let mut hashmap = HashMap::new();
+        let r = join_all(r)
+            .await
+            .into_iter()
+            .collect::<anyhow::Result<Vec<(TokenAmount, &ethers::types::H160)>>>()?;
+        for (balance, addr) in r {
+            hashmap.insert(format!("{addr:?}"), balance.to_string());
+        }
+        Ok(hashmap)
+    }
+}
+
+#[async_trait]
+impl JsonRPCRequestHandler for WalletBalancesHandler {
+    type Request = WalletBalancesParams;
+    type Response = WalletBalancesResponse;
+
+    async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
+        let subnet = SubnetID::from_str(&request.subnet)?;
+        let conn = match self.pool.get(&subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+        let manager = conn.manager();
+
+        match conn.subnet().config {
+            SubnetConfig::Fvm(_) => self.fvm_balances(manager).await,
+            SubnetConfig::Fevm(_) => self.fevm_balances(manager).await,
+        }
+    }
+}
+
+fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
+    let raw_addr = format!("{addr:?}");
+    log::debug!("raw evm subnet addr: {raw_addr:}");
+
+    let eth_addr = EthAddress::from_str(&raw_addr)?;
+    Ok(Address::from(eth_addr))
 }

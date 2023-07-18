@@ -35,7 +35,12 @@ impl CommandLineHandler for WalletBalances {
             )
             .await?;
 
-        log::info!("wallets in subnet {:} are {:?}", arguments.subnet, addrs);
+        log::info!("wallets in subnet {:} are:", arguments.subnet);
+
+        // iterate through addresses and pretty print balances
+        for (addr, balance) in addrs {
+            log::info!("{}: {}", addr, balance);
+        }
 
         Ok(())
     }

@@ -116,6 +116,11 @@ impl Wallet {
         list_addrs(&self.keystore)
     }
 
+    pub fn remove(&mut self, addr: &Address) -> anyhow::Result<()> {
+        self.keystore.remove(addr.to_string())?;
+        Ok(())
+    }
+
     /// Return the address of the default `KeyInfo` in the wallet
     pub fn get_default(&self) -> Result<Address, Error> {
         let key_info = self.keystore.get("default")?;
