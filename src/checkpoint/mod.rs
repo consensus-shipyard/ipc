@@ -24,9 +24,6 @@ use std::fmt::Display;
 pub use topdown::*;
 
 mod bottomup;
-mod fevm;
-mod fevm_fvm;
-pub mod fvm;
 mod proof;
 mod setup;
 mod topdown;

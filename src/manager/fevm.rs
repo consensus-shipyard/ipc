@@ -1,7 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::checkpoint::{
-    create_proof, BottomUpHandler, CheckpointUtilQuery, NativeBottomUpCheckpoint, VoteQuery,
+    create_proof, BottomUpHandler, CheckpointUtilQuery, NativeBottomUpCheckpoint, TopDownHandler,
+    VoteQuery,
 };
 use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
@@ -12,6 +13,7 @@ use async_trait::async_trait;
 use fil_actors_runtime::cbor;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_gateway::{CrossMsg, TopDownCheckpoint};
 use ipc_sdk::subnet_id::SubnetID;
 
 pub struct FevmSubnetManager {
@@ -112,5 +114,74 @@ impl BottomUpHandler for FevmSubnetManager {
                 subnet_contract::BottomUpCheckpoint::try_from(checkpoint)?,
             )
             .await
+    }
+}
+
+#[async_trait]
+impl VoteQuery<TopDownCheckpoint> for FevmSubnetManager {
+    async fn last_executed_epoch(&self, _subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        self.evm_subnet_manager
+            .gateway_last_voting_executed_epoch()
+            .await
+    }
+
+    async fn current_epoch(&self) -> anyhow::Result<ChainEpoch> {
+        self.evm_subnet_manager.current_epoch().await
+    }
+
+    async fn has_voted(
+        &self,
+        subnet_id: &SubnetID,
+        epoch: ChainEpoch,
+        validator: &Address,
+    ) -> anyhow::Result<bool> {
+        let has_voted = self.evm_subnet_manager.has_voted_in_gateway(epoch, validator)
+            .await
+            .map_err(|e| {
+                anyhow!("error checking if validator has voted topdown in epoch: {epoch:} for subnet: {subnet_id:} due to {e:}")
+            })?;
+
+        Ok(has_voted)
+    }
+}
+
+#[async_trait]
+impl CheckpointUtilQuery<TopDownCheckpoint> for FevmSubnetManager {
+    async fn checkpoint_period(&self, _subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        self.evm_subnet_manager
+            .gateway_top_down_check_period()
+            .await
+    }
+
+    async fn validators(&self, subnet_id: &SubnetID) -> anyhow::Result<Vec<Address>> {
+        self.evm_subnet_manager.validators(subnet_id).await
+    }
+}
+
+#[async_trait]
+impl TopDownHandler for FevmSubnetManager {
+    async fn gateway_initialized(&self) -> anyhow::Result<bool> {
+        self.evm_subnet_manager.gateway_initialized().await
+    }
+
+    async fn applied_topdown_nonce(&self) -> anyhow::Result<u64> {
+        todo!()
+    }
+
+    async fn top_down_msgs(
+        &self,
+        _subnet_id: &SubnetID,
+        _nonce: u64,
+        _epoch: ChainEpoch,
+    ) -> anyhow::Result<Vec<CrossMsg>> {
+        todo!()
+    }
+
+    async fn submit(
+        &self,
+        _validator: &Address,
+        _checkpoint: TopDownCheckpoint,
+    ) -> anyhow::Result<ChainEpoch> {
+        todo!()
     }
 }

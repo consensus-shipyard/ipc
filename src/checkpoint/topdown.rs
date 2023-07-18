@@ -13,9 +13,17 @@ use std::fmt::{Display, Formatter};
 pub trait TopDownHandler:
     Send + Sync + VoteQuery<TopDownCheckpoint> + CheckpointUtilQuery<TopDownCheckpoint>
 {
+    /// Checks if the gateway is initialized
+    async fn gateway_initialized(&self) -> Result<bool>;
+    /// Get the latest applied top down nonce
+    async fn applied_topdown_nonce(&self) -> Result<u64>;
     /// Fetch the checkpoint top down messages at the specified epoch
-    async fn top_down_msgs(&self, subnet_id: &SubnetID, epoch: ChainEpoch)
-        -> Result<Vec<CrossMsg>>;
+    async fn top_down_msgs(
+        &self,
+        subnet_id: &SubnetID,
+        nonce: u64,
+        epoch: ChainEpoch,
+    ) -> Result<Vec<CrossMsg>>;
     /// Submit the checkpoint for validator
     async fn submit(
         &self,
@@ -97,9 +105,10 @@ impl<P: TopDownHandler, C: TopDownHandler> CheckpointManager for TopDownManager<
     }
 
     async fn submit_checkpoint(&self, epoch: ChainEpoch, validator: &Address) -> Result<()> {
+        let nonce = self.child_handler.applied_topdown_nonce().await?;
         let top_down_msgs = self
             .parent_handler
-            .top_down_msgs(&self.metadata.child.id, epoch)
+            .top_down_msgs(&self.metadata.child.id, nonce, epoch)
             .await?;
 
         // we submit the topdown messages to the CHILD subnet.
@@ -134,6 +143,10 @@ impl<P: TopDownHandler, C: TopDownHandler> CheckpointManager for TopDownManager<
     }
 
     async fn presubmission_check(&self) -> Result<bool> {
-        todo!()
+        if self.metadata.parent.id.is_root() {
+            Ok(true)
+        } else {
+            self.parent_handler.gateway_initialized().await
+        }
     }
 }

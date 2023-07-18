@@ -100,7 +100,9 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
     /// Get the subnet config that this manager is submitting checkpoints to. For example, if it is
     /// top down checkpoints, target subnet return the child subnet config. If it is bottom up, target
     /// subnet returns parent subnet.
-    fn target_subnet(&self) -> &Subnet { &self.metadata.parent }
+    fn target_subnet(&self) -> &Subnet {
+        &self.metadata.parent
+    }
 
     /// Getter for the parent subnet this checkpoint manager is handling
     fn parent_subnet(&self) -> &Subnet {

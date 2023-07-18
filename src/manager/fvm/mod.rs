@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
-use crate::checkpoint::fvm::chain_head_cid;
 use crate::checkpoint::{
-    create_proof, BottomUpHandler, CheckpointUtilQuery, NativeBottomUpCheckpoint, VoteQuery,
+    create_proof, BottomUpHandler, CheckpointUtilQuery, NativeBottomUpCheckpoint, TopDownHandler,
+    VoteQuery,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -20,7 +20,8 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use ipc_gateway::{
-    BottomUpCheckpoint, FundParams, PropagateParams, ReleaseParams, WhitelistPropagatorParams,
+    BottomUpCheckpoint, CrossMsg, FundParams, PropagateParams, ReleaseParams, TopDownCheckpoint,
+    WhitelistPropagatorParams,
 };
 use ipc_identity::Wallet;
 use ipc_sdk::subnet_id::SubnetID;
@@ -30,7 +31,8 @@ use crate::config::Subnet;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::message::ipc::{
-    IPCReadSubnetActorStateResponse, QueryValidatorSetResponse, SubnetInfo,
+    IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, QueryValidatorSetResponse,
+    SubnetInfo,
 };
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
@@ -475,6 +477,40 @@ impl LotusSubnetManager<JsonRpcClientImpl> {
     }
 }
 
+impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
+    async fn parent_head(&self) -> Result<Cid> {
+        chain_head_cid(&self.lotus_client).await
+    }
+
+    async fn submission_tipset(&self, epoch: ChainEpoch) -> anyhow::Result<Cid> {
+        let submission_tip_set = self
+            .lotus_client
+            .get_tipset_by_height(epoch, self.parent_head().await?)
+            .await?;
+        let cid_map = submission_tip_set.cids.first().unwrap().clone();
+        Cid::try_from(cid_map)
+    }
+
+    async fn child_head(&self) -> Result<Cid> {
+        chain_head_cid(&self.lotus_client).await
+    }
+
+    pub async fn gateway_state(&self) -> Result<IPCReadGatewayStateResponse> {
+        gateway_state(&self.lotus_client, &self.gateway_addr).await
+    }
+
+    async fn get_validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>> {
+        let subnet_actor_state = self.get_subnet_state(subnet_id).await?;
+        subnet_actor_state
+            .validator_set
+            .validators
+            .unwrap_or_default()
+            .iter()
+            .map(|f| Address::from_str(&f.addr).map_err(|e| anyhow!("cannot create address: {e:}")))
+            .collect::<Result<_>>()
+    }
+}
+
 #[async_trait]
 impl<T: JsonRpcClient + Send + Sync> VoteQuery<NativeBottomUpCheckpoint> for LotusSubnetManager<T> {
     async fn last_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
@@ -529,15 +565,7 @@ impl<T: JsonRpcClient + Send + Sync> CheckpointUtilQuery<NativeBottomUpCheckpoin
     }
 
     async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>> {
-        let subnet_actor_state = self.get_subnet_state(subnet_id).await?;
-
-        subnet_actor_state
-            .validator_set
-            .validators
-            .unwrap_or_default()
-            .iter()
-            .map(|f| Address::from_str(&f.addr).map_err(|e| anyhow!("cannot create address: {e:}")))
-            .collect::<Result<_>>()
+        self.get_validators(subnet_id).await
     }
 }
 
@@ -619,4 +647,121 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
 
         Ok(self.lotus_client.state_wait_msg(message_cid).await?.height as ChainEpoch)
     }
+}
+
+#[async_trait]
+impl<T: JsonRpcClient + Send + Sync> VoteQuery<TopDownCheckpoint> for LotusSubnetManager<T> {
+    async fn last_executed_epoch(&self, _subnet_id: &SubnetID) -> Result<ChainEpoch> {
+        let child_gw_state = self.gateway_state().await?;
+        Ok(child_gw_state
+            .top_down_checkpoint_voting
+            .last_voting_executed)
+    }
+
+    async fn current_epoch(&self) -> Result<ChainEpoch> {
+        self.lotus_client.current_epoch().await
+    }
+
+    async fn has_voted(
+        &self,
+        subnet_id: &SubnetID,
+        epoch: ChainEpoch,
+        validator: &Address,
+    ) -> Result<bool> {
+        let has_voted = self
+            .lotus_client
+            .ipc_validator_has_voted_topdown(&self.gateway_addr, epoch, validator)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "error checking if validator has voted for subnet: {subnet_id:} due to {e:}"
+                )
+            })?;
+        Ok(has_voted)
+    }
+}
+
+#[async_trait]
+impl<T: JsonRpcClient + Send + Sync> CheckpointUtilQuery<TopDownCheckpoint>
+    for LotusSubnetManager<T>
+{
+    async fn checkpoint_period(&self, _subnet_id: &SubnetID) -> Result<ChainEpoch> {
+        let tip_set = chain_head_cid(&self.lotus_client).await?;
+        let state = self
+            .lotus_client
+            .ipc_read_gateway_state(&self.gateway_addr, tip_set)
+            .await?;
+        Ok(state.top_down_check_period)
+    }
+
+    async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>> {
+        self.get_validators(subnet_id).await
+    }
+}
+
+#[async_trait]
+impl<T: JsonRpcClient + Send + Sync> TopDownHandler for LotusSubnetManager<T> {
+    async fn gateway_initialized(&self) -> Result<bool> {
+        let state = self.gateway_state().await?;
+        Ok(state.initialized)
+    }
+
+    async fn applied_topdown_nonce(&self) -> Result<u64> {
+        Ok(self
+            .lotus_client
+            .ipc_read_gateway_state(&self.gateway_addr, self.child_head().await?)
+            .await?
+            .applied_topdown_nonce)
+    }
+
+    async fn top_down_msgs(
+        &self,
+        subnet_id: &SubnetID,
+        nonce: u64,
+        epoch: ChainEpoch,
+    ) -> Result<Vec<CrossMsg>> {
+        let submission_tip_set = self.submission_tipset(epoch).await?;
+        let top_down_msgs = self
+            .lotus_client
+            .ipc_get_topdown_msgs(subnet_id, &self.gateway_addr, submission_tip_set, nonce)
+            .await?;
+
+        log::debug!(
+            "nonce: {:} for submission tip set: {:} at epoch {:} of subnet: {:}, size of top down messages: {:}",
+            nonce, submission_tip_set, epoch, subnet_id, top_down_msgs.len()
+        );
+
+        Ok(top_down_msgs)
+    }
+
+    async fn submit(
+        &self,
+        validator: &Address,
+        checkpoint: TopDownCheckpoint,
+    ) -> Result<ChainEpoch> {
+        let submitted_epoch = self
+            .lotus_client
+            .ipc_submit_top_down_checkpoint(self.gateway_addr, validator, checkpoint)
+            .await?;
+
+        Ok(submitted_epoch)
+    }
+}
+
+pub async fn gateway_state(
+    client: &(impl LotusClient + Sync),
+    gateway_addr: &Address,
+) -> Result<IPCReadGatewayStateResponse> {
+    let head = client.chain_head().await?;
+    let cid_map = head.cids.first().unwrap().clone();
+    let tip_set = Cid::try_from(cid_map)?;
+
+    client.ipc_read_gateway_state(gateway_addr, tip_set).await
+}
+
+/// Returns the first cid in the chain head
+pub async fn chain_head_cid(client: &(impl LotusClient + Sync)) -> anyhow::Result<Cid> {
+    let child_head = client.chain_head().await?;
+    let cid_map = child_head.cids.first().unwrap();
+    Cid::try_from(cid_map)
 }
