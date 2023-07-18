@@ -1,6 +1,3 @@
-use ipc_identity::{PersistentKeyStore, Wallet};
-use primitives::EthAddress;
-use std::collections::HashMap;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
@@ -14,8 +11,11 @@ use futures_util::future::join_all;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use ipc_identity::EvmKeyStore;
+use ipc_identity::{PersistentKeyStore, Wallet};
 use ipc_sdk::subnet_id::SubnetID;
+use primitives::EthAddress;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 

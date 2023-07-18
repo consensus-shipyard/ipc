@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Wallet new cli handler
+//! Wallet balances cli handler
 
 use async_trait::async_trait;
 use clap::Args;
