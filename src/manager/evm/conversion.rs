@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Type conversion between evm and fvm
 
-use crate::manager::evm::manager::{agent_subnet_to_evm_addresses, ethers_address_to_fil_address};
+use crate::manager::evm::manager::agent_subnet_to_evm_addresses;
 use crate::manager::SubnetInfo;
 use anyhow::anyhow;
 use ethers::abi::{ParamType, Token};
@@ -16,6 +16,7 @@ use ipc_gateway::{BottomUpCheckpoint, CrossMsg, Status, StorableMsg};
 use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
+use primitives::EthAddress;
 use std::str::FromStr;
 
 impl TryFrom<BottomUpCheckpoint> for crate::manager::evm::subnet_contract::BottomUpCheckpoint {
@@ -54,7 +55,7 @@ impl TryFrom<CheckData> for crate::manager::evm::subnet_contract::BottomUpCheckp
         let b = crate::manager::evm::subnet_contract::BottomUpCheckpoint {
             source: crate::manager::evm::subnet_contract::SubnetID::try_from(&check_data.source)?,
             epoch: check_data.epoch as u64,
-            fee: U256::from_str(&check_data.cross_msgs.fee.atto().to_string())?,
+            fee: fil_to_eth_amount(&check_data.cross_msgs.fee)?,
             cross_msgs,
             children,
 
@@ -347,12 +348,28 @@ impl TryFrom<crate::manager::evm::gateway::CrossMsg> for CrossMsg {
     }
 }
 
+/// Converts a Fil TokenAmount into an ethers::U256 amount.
+pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<ethers::types::U256> {
+    ethers::types::U256::from_str(amount.atto().to_string().as_str())
+        .map_err(|e| anyhow!("invalid amount: {e}"))
+}
+
+pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
+    let raw_addr = format!("{addr:?}");
+    log::debug!("raw evm subnet addr: {raw_addr:}");
+
+    let eth_addr = EthAddress::from_str(&raw_addr)?;
+    Ok(Address::from(eth_addr))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::manager::evm::subnet_contract::FvmAddress;
-    use fvm_shared::address::Address;
+    use fvm_shared::{address::Address, bigint::BigInt, econ::TokenAmount};
     use primitives::EthAddress;
     use std::str::FromStr;
+
+    use super::fil_to_eth_amount;
 
     #[test]
     fn test_fvm_address_encoding() {
@@ -366,5 +383,14 @@ mod tests {
         let address = Address::try_from(fvm_address).unwrap();
 
         assert_eq!(addr, address);
+    }
+
+    #[test]
+    fn test_amount_conversion() {
+        let v = BigInt::from_str("100000000000000").unwrap();
+        let fil_amount = TokenAmount::from_atto(v);
+
+        let eth_amount = fil_to_eth_amount(&fil_amount).unwrap();
+        assert_eq!(TokenAmount::from_atto(eth_amount.as_u128()), fil_amount);
     }
 }

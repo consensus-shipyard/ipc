@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::config::subnet::SubnetConfig;
+use crate::manager::evm::ethers_address_to_fil_address;
 use crate::manager::SubnetManager;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
@@ -13,7 +14,6 @@ use fvm_shared::econ::TokenAmount;
 use ipc_identity::EvmKeyStore;
 use ipc_identity::{PersistentKeyStore, Wallet};
 use ipc_sdk::subnet_id::SubnetID;
-use primitives::EthAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -130,12 +130,4 @@ impl JsonRPCRequestHandler for WalletBalancesHandler {
             SubnetConfig::Fevm(_) => self.fevm_balances(manager).await,
         }
     }
-}
-
-fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
-    let raw_addr = format!("{addr:?}");
-    log::debug!("raw evm subnet addr: {raw_addr:}");
-
-    let eth_addr = EthAddress::from_str(&raw_addr)?;
-    Ok(Address::from(eth_addr))
 }

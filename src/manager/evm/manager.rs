@@ -1,9 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
+pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -12,6 +12,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{abigen, Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
+use ethers::types::TransactionRequest;
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -20,7 +21,6 @@ use ipc_identity::{EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
 use num_traits::ToPrimitive;
-use primitives::EthAddress;
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
@@ -294,8 +294,19 @@ impl SubnetManager for EthSubnetManager {
     }
 
     /// Send value between two addresses in a subnet
-    async fn send_value(&self, _from: Address, _to: Address, _amount: TokenAmount) -> Result<()> {
-        todo!()
+    async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
+        let tx = TransactionRequest::new()
+            .to(payload_to_evm_address(to.payload())?)
+            .value(fil_to_eth_amount(&amount)?);
+
+        let signer = self.get_signer(&from)?;
+        let tx_pending = signer.send_transaction(tx, None).await?;
+
+        log::info!(
+            "sending FIL from {from:} to {to:} in tx {:?}",
+            tx_pending.tx_hash()
+        );
+        Ok(())
     }
 
     async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount> {
@@ -681,14 +692,6 @@ impl EthSubnetManager {
             keystore,
         ))
     }
-}
-
-pub(crate) fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> Result<Address> {
-    let raw_addr = format!("{addr:?}");
-    log::debug!("raw evm subnet addr: {raw_addr:}");
-
-    let eth_addr = EthAddress::from_str(&raw_addr)?;
-    Ok(Address::from(eth_addr))
 }
 
 /// Get the block number from the transaction receipt
