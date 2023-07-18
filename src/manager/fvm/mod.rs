@@ -8,7 +8,9 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use crate::checkpoint::fvm::chain_head_cid;
-use crate::checkpoint::{create_proof, BottomUpHandler, NativeBottomUpCheckpoint, VoteQuery};
+use crate::checkpoint::{
+    create_proof, BottomUpHandler, CheckpointUtilQuery, NativeBottomUpCheckpoint, VoteQuery,
+};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -509,7 +511,9 @@ impl<T: JsonRpcClient + Send + Sync> VoteQuery<NativeBottomUpCheckpoint> for Lot
 }
 
 #[async_trait]
-impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
+impl<T: JsonRpcClient + Send + Sync> CheckpointUtilQuery<NativeBottomUpCheckpoint>
+    for LotusSubnetManager<T>
+{
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let tip_set = chain_head_cid(&self.lotus_client).await?;
         let state = self
@@ -535,7 +539,10 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
             .map(|f| Address::from_str(&f.addr).map_err(|e| anyhow!("cannot create address: {e:}")))
             .collect::<Result<_>>()
     }
+}
 
+#[async_trait]
+impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
     async fn checkpoint_template(&self, epoch: ChainEpoch) -> Result<NativeBottomUpCheckpoint> {
         let template = self
             .lotus_client
