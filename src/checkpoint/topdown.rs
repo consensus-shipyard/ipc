@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use crate::checkpoint::{CheckpointManager, CheckpointMetadata, CheckpointUtilQuery, VoteQuery};
 use crate::config::Subnet;
 use anyhow::Result;
