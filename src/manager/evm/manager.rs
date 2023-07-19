@@ -12,7 +12,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{abigen, Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::TransactionRequest;
+use ethers::types::Eip1559TransactionRequest;
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -295,7 +295,7 @@ impl SubnetManager for EthSubnetManager {
 
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
-        let tx = TransactionRequest::new()
+        let tx = Eip1559TransactionRequest::new()
             .to(payload_to_evm_address(to.payload())?)
             .value(fil_to_eth_amount(&amount)?);
 
@@ -306,6 +306,7 @@ impl SubnetManager for EthSubnetManager {
             "sending FIL from {from:} to {to:} in tx {:?}",
             tx_pending.tx_hash()
         );
+        tx_pending.await?;
         Ok(())
     }
 
