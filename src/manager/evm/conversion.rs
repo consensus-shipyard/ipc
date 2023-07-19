@@ -349,9 +349,13 @@ impl TryFrom<crate::manager::evm::gateway::CrossMsg> for CrossMsg {
 }
 
 /// Converts a Fil TokenAmount into an ethers::U256 amount.
-pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<ethers::types::U256> {
-    ethers::types::U256::from_str(amount.atto().to_string().as_str())
-        .map_err(|e| anyhow!("invalid amount: {e}"))
+pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
+    Ok(U256::from(
+        amount
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("cannot convert value: {:?}", amount))?
+    ))
 }
 
 pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
