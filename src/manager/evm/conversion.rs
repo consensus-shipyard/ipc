@@ -9,13 +9,13 @@ use ethers::abi::{ParamType, Token};
 use ethers::types::U256;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{Address, Payload};
+use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use ipc_gateway::checkpoint::{CheckData, ChildCheck};
 use ipc_gateway::{BottomUpCheckpoint, CrossMsg, Status, StorableMsg};
 use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
-use num_traits::ToPrimitive;
 use primitives::EthAddress;
 use std::str::FromStr;
 
@@ -97,13 +97,7 @@ impl TryFrom<StorableMsg> for crate::manager::evm::subnet_contract::StorableMsg 
     type Error = anyhow::Error;
 
     fn try_from(value: StorableMsg) -> Result<Self, Self::Error> {
-        let msg_value = U256::from(
-            value
-                .value
-                .atto()
-                .to_u128()
-                .ok_or_else(|| anyhow!("cannot convert value: {:?}", value.value))?,
-        );
+        let msg_value = fil_to_eth_amount(&value.value)?;
 
         log::info!(
             "storable message token amount: {:}, converted: {:?}",
@@ -226,8 +220,8 @@ impl TryFrom<crate::manager::evm::gateway::Subnet> for SubnetInfo {
     fn try_from(value: crate::manager::evm::gateway::Subnet) -> Result<Self, Self::Error> {
         Ok(SubnetInfo {
             id: SubnetID::try_from(value.id)?,
-            stake: TokenAmount::from_atto(value.stake.as_u128()),
-            circ_supply: TokenAmount::from_atto(value.circ_supply.as_u128()),
+            stake: eth_to_fil_amount(&value.stake)?,
+            circ_supply: eth_to_fil_amount(&value.circ_supply)?,
             status: match value.status {
                 1 => Status::Active,
                 2 => Status::Inactive,
@@ -329,7 +323,7 @@ impl TryFrom<crate::manager::evm::gateway::StorableMsg> for StorableMsg {
             to: IPCAddress::try_from(value.to)?,
             method: u32::from_be_bytes(value.method) as MethodNum,
             params: RawBytes::from(value.params.to_vec()),
-            value: TokenAmount::from_atto(value.value.as_u128()),
+            value: eth_to_fil_amount(&value.value)?,
             nonce: value.nonce,
         };
         Ok(s)
@@ -350,12 +344,14 @@ impl TryFrom<crate::manager::evm::gateway::CrossMsg> for CrossMsg {
 
 /// Converts a Fil TokenAmount into an ethers::U256 amount.
 pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
-    Ok(U256::from(
-        amount
-            .atto()
-            .to_u128()
-            .ok_or_else(|| anyhow!("cannot convert value: {:?}", amount))?
-    ))
+    let str = amount.atto().to_string();
+    Ok(U256::from_dec_str(&str)?)
+}
+
+/// Converts an ethers::U256 TokenAmount into a FIL amount.
+pub fn eth_to_fil_amount(amount: &U256) -> anyhow::Result<TokenAmount> {
+    let v = BigInt::from_str(&amount.to_string())?;
+    Ok(TokenAmount::from_atto(v))
 }
 
 pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
@@ -368,6 +364,7 @@ pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::R
 
 #[cfg(test)]
 mod tests {
+    use crate::manager::evm::conversion::eth_to_fil_amount;
     use crate::manager::evm::subnet_contract::FvmAddress;
     use fvm_shared::{address::Address, bigint::BigInt, econ::TokenAmount};
     use primitives::EthAddress;
@@ -392,9 +389,10 @@ mod tests {
     #[test]
     fn test_amount_conversion() {
         let v = BigInt::from_str("100000000000000").unwrap();
-        let fil_amount = TokenAmount::from_atto(v);
+        let fil_amount = TokenAmount::from_atto(v.clone());
 
         let eth_amount = fil_to_eth_amount(&fil_amount).unwrap();
-        assert_eq!(TokenAmount::from_atto(eth_amount.as_u128()), fil_amount);
+        let test_amount = eth_to_fil_amount(&eth_amount).unwrap();
+        assert_eq!(test_amount, fil_amount);
     }
 }
