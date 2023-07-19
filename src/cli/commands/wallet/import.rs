@@ -8,9 +8,9 @@ use std::fmt::Debug;
 use std::str::FromStr;
 
 use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::wallet::WalletType;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::sdk::{IpcAgentClient, LotusJsonKeyType};
+use crate::server::wallet::WalletType;
 
 pub(crate) struct WalletImport;
 

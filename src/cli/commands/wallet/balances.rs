@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Wallet new cli handler
+//! Wallet balances cli handler
 
 use async_trait::async_trait;
 use clap::Args;
@@ -35,7 +35,12 @@ impl CommandLineHandler for WalletBalances {
             )
             .await?;
 
-        log::info!("wallets in subnet {:} are {:?}", arguments.subnet, addrs);
+        log::info!("wallets in subnet {:} are:", arguments.subnet);
+
+        // iterate through addresses and pretty print balances
+        for (addr, balance) in addrs {
+            log::info!("{}: {}", addr, balance);
+        }
 
         Ok(())
     }

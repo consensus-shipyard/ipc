@@ -13,7 +13,7 @@ use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
 
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
-use crate::lotus::message::{ipc::SubnetInfo, wallet::WalletKeyType};
+use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
@@ -100,12 +100,6 @@ pub trait SubnetManager: Send + Sync {
 
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()>;
-
-    /// Create new wallet in a subnet
-    async fn wallet_new(&self, key_type: WalletKeyType) -> Result<Address>;
-
-    /// List wallets in this subnet
-    async fn wallet_list(&self) -> Result<Vec<Address>>;
 
     /// Get the balance of an address
     async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount>;
