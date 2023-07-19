@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
 use anyhow::{anyhow, Result};
@@ -28,6 +29,11 @@ use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo, Validato
 use crate::manager::{EthManager, SubnetManager};
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
+
+/// Default polling time used by the Ethers provider to check for pending
+/// transactions and events. Default is 7, and for our child subnets we
+/// can reduce it to the block time (or potentially less)
+const ETH_PROVIDER_POLLING_TIME: Duration = Duration::from_secs(1);
 
 /// The majority vote percentage for checkpoint submission when creating a subnet.
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
@@ -681,7 +687,11 @@ impl EthSubnetManager {
             Http::new(url)
         };
 
-        let provider = Provider::new(provider);
+        let mut provider = Provider::new(provider);
+        // set polling interval for provider to fit fast child subnets block times.
+        // TODO: We may want to make it dynamic so it adjusts depending on the type of network
+        // so we don't have a too slow or too fast polling for the underlying block times.
+        provider.set_interval(ETH_PROVIDER_POLLING_TIME);
         let gateway_address = payload_to_evm_address(config.gateway_addr.payload())?;
         let registry_address = payload_to_evm_address(config.registry_addr.payload())?;
 
