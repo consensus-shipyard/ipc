@@ -53,10 +53,8 @@ impl WalletBalancesHandler {
         &self,
         manager: &dyn SubnetManager,
     ) -> anyhow::Result<WalletBalancesResponse> {
-        let addresses = self.fvm_wallet.read().unwrap().list_addrs()?;
-        // Create a new Arc for wallet so it is pulled in the async block
-        // from below.
-        let _arc_wallet = Arc::clone(&self.fvm_wallet);
+        let wallet = Arc::clone(&self.fvm_wallet);
+        let addresses = wallet.read().unwrap().list_addrs()?;
 
         let r = addresses
             .iter()
@@ -85,10 +83,6 @@ impl WalletBalancesHandler {
     ) -> anyhow::Result<WalletBalancesResponse> {
         let keystore = Arc::clone(&self.evm_keystore);
         let addresses = keystore.read().unwrap().list()?;
-
-        // Create a new Arc for keystore so it is pulled in the async block
-        // from below.
-        let _arc_keystore = keystore.clone();
 
         let r = addresses
             .iter()
