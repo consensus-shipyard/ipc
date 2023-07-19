@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn test_amount_conversion() {
         let v = BigInt::from_str("100000000000000").unwrap();
-        let fil_amount = TokenAmount::from_atto(v.clone());
+        let fil_amount = TokenAmount::from_atto(v);
 
         let eth_amount = fil_to_eth_amount(&fil_amount).unwrap();
         let test_amount = eth_to_fil_amount(&eth_amount).unwrap();
