@@ -38,6 +38,7 @@ export async function deploy(libs: { [key in string]: string }) {
     const { address: gatewayAddress } = await deployContractWithDeployer(deployer, "Gateway", LIBMAP, gatewayConstructorParams, txArgs);
 
     return {
+        "ChainID": chainId,
         "Gateway": gatewayAddress
     }
 
