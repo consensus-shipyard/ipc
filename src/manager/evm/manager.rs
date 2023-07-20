@@ -508,6 +508,33 @@ impl EthManager for EthSubnetManager {
         }
     }
 
+    async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> Result<u64> {
+        let route = agent_subnet_to_evm_addresses(subnet_id)?;
+        log::debug!("getting applied top down nonce for route: {route:?}");
+
+        let evm_subnet_id = gateway::SubnetID {
+            root: subnet_id.root_id(),
+            route,
+        };
+
+        let gateway_contract = Gateway::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let (exists, nonce) = gateway_contract
+            .get_applied_top_down_nonce(evm_subnet_id)
+            .call()
+            .await
+            .map_err(|e| anyhow!("cannot get applied top down nonce due to: {e:}"))?;
+
+        if !exists {
+            Err(anyhow!("subnet {:?} does not exists", subnet_id))
+        } else {
+            Ok(nonce)
+        }
+    }
+
     async fn top_down_msgs(
         &self,
         subnet_id: &SubnetID,

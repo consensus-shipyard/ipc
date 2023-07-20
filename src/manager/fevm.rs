@@ -164,9 +164,10 @@ impl TopDownHandler for FevmSubnetManager {
         self.evm_subnet_manager.gateway_initialized().await
     }
 
-    async fn applied_topdown_nonce(&self) -> anyhow::Result<u64> {
-        // This getter is not currently implemented in solidity contracts
-        todo!()
+    async fn applied_topdown_nonce(&self, subnet_id: &SubnetID) -> anyhow::Result<u64> {
+        self.evm_subnet_manager
+            .get_applied_top_down_nonce(subnet_id)
+            .await
     }
 
     async fn top_down_msgs(

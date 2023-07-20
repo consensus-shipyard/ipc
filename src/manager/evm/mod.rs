@@ -62,6 +62,9 @@ pub trait EthManager: SubnetManager {
         epoch: ChainEpoch,
     ) -> anyhow::Result<subnet_contract::BottomUpCheckpoint>;
 
+    /// Get the latest applied top down nonce
+    async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> anyhow::Result<u64>;
+
     /// Get the bottom up checkpoint a certain epoch
     async fn top_down_msgs(
         &self,

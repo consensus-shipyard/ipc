@@ -18,7 +18,7 @@ pub trait TopDownHandler:
     /// Checks if the gateway is initialized
     async fn gateway_initialized(&self) -> Result<bool>;
     /// Get the latest applied top down nonce
-    async fn applied_topdown_nonce(&self) -> Result<u64>;
+    async fn applied_topdown_nonce(&self, subnet_id: &SubnetID) -> Result<u64>;
     /// Fetch the checkpoint top down messages at the specified epoch
     async fn top_down_msgs(
         &self,
@@ -107,7 +107,10 @@ impl<P: TopDownHandler, C: TopDownHandler> CheckpointManager for TopDownManager<
     }
 
     async fn submit_checkpoint(&self, epoch: ChainEpoch, validator: &Address) -> Result<()> {
-        let nonce = self.child_handler.applied_topdown_nonce().await?;
+        let nonce = self
+            .child_handler
+            .applied_topdown_nonce(&self.metadata.child.id)
+            .await?;
         let top_down_msgs = self
             .parent_handler
             .top_down_msgs(&self.metadata.child.id, nonce, epoch)

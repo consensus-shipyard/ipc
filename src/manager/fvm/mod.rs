@@ -706,7 +706,7 @@ impl<T: JsonRpcClient + Send + Sync> TopDownHandler for LotusSubnetManager<T> {
         Ok(state.initialized)
     }
 
-    async fn applied_topdown_nonce(&self) -> Result<u64> {
+    async fn applied_topdown_nonce(&self, _subnet_id: &SubnetID) -> Result<u64> {
         Ok(self
             .lotus_client
             .ipc_read_gateway_state(&self.gateway_addr, self.child_head().await?)
