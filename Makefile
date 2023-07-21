@@ -3,6 +3,12 @@
 BUILTIN_ACTORS_DIR:=../builtin-actors
 BUILTIN_ACTORS_CODE:=$(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs" | grep -v target)
 BUILTIN_ACTORS_BUNDLE:=$(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
+
+IPC_ACTORS_DIR:=$(shell pwd)/../ipc-solidity-actors
+IPC_ACTORS_CODE:=$(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
+IPC_ACTORS_BUILD:=fendermint/vm/ipc_actors/build.rs
+IPC_ACTORS_ABI:=$(IPC_ACTORS_DIR)/out/.compile.abi
+
 FENDERMINT_CODE:=$(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
 all: test build
@@ -31,15 +37,17 @@ license:
 	./scripts/add_license.sh
 
 check-fmt:
-	cargo fmt --all --check
+	@# `nightly` is required to support ignore list in rustfmt.toml
+	cargo +nightly fmt --all --check
 
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
 
-docker-build: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE)
-	mkdir -p docker/.artifacts
+docker-build: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE) $(IPC_ACTORS_ABI)
+	mkdir -p docker/.artifacts/contracts
 
 	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
+	cp $(IPC_ACTORS_DIR)/out/*.json docker/.artifacts/contracts
 
 	if [ -z "$${GITHUB_ACTIONS}" ]; then \
 		DOCKER_FILE=local ; \
@@ -73,3 +81,31 @@ $(BUILTIN_ACTORS_BUNDLE): $(BUILTIN_ACTORS_CODE)
 	git pull && \
 	rustup target add wasm32-unknown-unknown && \
 	cargo run --release -- -o output/$(shell basename $@)
+
+
+# Compile the ABI artifacts and Rust bindings for the IPC Solidity actors.
+ipc-actors-abi: $(IPC_ACTORS_ABI)
+	cargo build --release -p fendermint_vm_ipc_actors
+
+# Clone the IPC Solidity actors if necessary and compile the ABI, putting down a marker at the end.
+$(IPC_ACTORS_ABI): $(IPC_ACTORS_CODE) | forge
+	if [ ! -d $(IPC_ACTORS_DIR) ]; then \
+		mkdir -p $(IPC_ACTORS_DIR) && \
+		cd $(IPC_ACTORS_DIR) && \
+		cd .. && \
+		git clone https://github.com/consensus-shipyard/ipc-solidity-actors.git; \
+	fi
+	cd $(IPC_ACTORS_DIR) && \
+	git checkout fm-156-ipc-solidity-actors && \
+	git pull
+	make -C $(IPC_ACTORS_DIR) compile-abi
+	touch $@
+
+
+# Forge is used by the ipc-solidity-actors compilation steps.
+.PHONY: forge
+forge:
+	@if [ -z "$(shell which forge)" ]; then \
+		echo "Please install Foundry. See https://book.getfoundry.sh/getting-started/installation"; \
+		exit 1; \
+	fi

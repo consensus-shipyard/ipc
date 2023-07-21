@@ -174,8 +174,8 @@ I[2023-03-29|09:58:06.324] Found genesis file                           module=m
 
 #### Convert the Genesis file
 
-We don't want to use the random values created by Tendermint; instead we need to use some CLI commands to convert the artifacts
-file we created earlier to the format Tendermint accepts. Start with the genesis file:
+We don't want to use the random values created by CometBFT; instead we need to use some CLI commands to convert the artifacts
+file we created earlier to the format CometBFT accepts. Start with the genesis file:
 
 ```shell
 mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig
@@ -184,7 +184,7 @@ cargo run -p fendermint_app -- \
   into-tendermint --out ~/.cometbft/config/genesis.json
 ```
 
-Check the contents of the created Tendermint Genesis file:
+Check the contents of the created Comet BFT Genesis file:
 
 <details>
   <summary>~/.cometbft/config/genesis.json</summary>
@@ -256,13 +256,13 @@ $ cat ~/.cometbft/config/genesis.json
 
 </details>
 
-We can see that our original `genesis.json` has been made part of Tendermint's version under `app_state`,
+We can see that our original `genesis.json` has been made part of CometBFT's version under `app_state`,
 and that the top level `validators` are empty, to be filled out by the application during the `init_chain` ABCI call.
 
 
 #### Convert the private key
 
-By default Tendermint uses Ed25519 validator keys, but in theory it can use anything that looks like a key.
+By default CometBFT uses Ed25519 validator keys, but in theory it can use anything that looks like a key.
 
 We can run the following command to replace the default `priv_validator_key.json` file with one based on
 one of the validators we created.
@@ -298,7 +298,7 @@ AiImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QE
 
 ## Run processes
 
-The Fendermint Application and Tendermint Core will run as separate processes.
+The Fendermint Application and CometBFT will run as separate processes.
 
 ### Run the Application
 
@@ -327,7 +327,7 @@ cargo run -p fendermint_app --release -- run
 ```
 
 It is important to use the `--release` option, otherwise it will take too long to load the Wasm actor modules and
-Tendermint will issue a timeout (by default we have 3 seconds to execute requests).
+CometBFT will issue a timeout (by default we have 3 seconds to execute requests).
 
 With the default `--log-level info` we can see that the application is listening:
 
@@ -360,7 +360,7 @@ If we need to restart the application from scratch, we can erase all CometBFT st
 cometbft unsafe-reset-all
 ```
 
-If all goes well, we will see block created in the Fendermint Application log as well the Tendermint log:
+If all goes well, we will see block created in the Fendermint Application log as well the CometBFT log:
 
 <details>
   <summary>Application log</summary>

@@ -26,4 +26,5 @@ ENV FM_ETH__LISTEN__HOST=0.0.0.0
 
 COPY fendermint/app/config $FM_HOME_DIR/config
 COPY docker/.artifacts/bundle.car $FM_HOME_DIR/bundle.car
+COPY docker/.artifacts/contracts $FM_HOME_DIR/contracts
 COPY docker/.artifacts/fendermint /usr/local/bin/fendermint

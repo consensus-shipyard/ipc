@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_vm_actor_interface"
-description = "Re-export interfaces of built-in actors, either copyed versions or from direct project reference."
+description = "Re-export interfaces of built-in actors, either copied versions or from direct project reference."
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true

@@ -20,7 +20,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly
           components: rustfmt
       - name: Check code formatting
         run: make check-fmt
@@ -45,7 +45,7 @@ jobs:
           - name: End-to-End
             task: e2e
         exclude:
-          - rust: nightly
+          - rust: stable
             make:
               name: Lint
           - rust: nightly
@@ -80,6 +80,10 @@ jobs:
         uses: arduino/setup-protoc@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # For compiling Solidity contracts
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
 
       - name: Setup sccache
         uses: hanabi1224/sccache-action@v1.2.0 # https://github.com/hanabi1224/sccache-action used by Forest.
