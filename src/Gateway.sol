@@ -746,6 +746,16 @@ contract Gateway is IGateway, ReentrancyGuard, Voting {
         return messages;
     }
 
+    /// @notice Get the latest applied top down nonce
+    /// @param subnetId - The subnet id to fetch messages from
+    function getAppliedTopDownNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
+        (bool registered, Subnet storage subnet) = _getSubnet(subnetId);
+        if (!registered) {
+            return (false, 0);
+        }
+        return (true, subnet.topDownNonce);
+    }
+
     /// @notice commit bottomup messages for their execution in the subnet. Adds the message to the checkpoint for future execution
     /// @param crossMessage - the cross message to be committed
     function _commitBottomUpMsg(CrossMsg memory crossMessage) internal {
