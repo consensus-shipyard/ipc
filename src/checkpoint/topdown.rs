@@ -109,10 +109,16 @@ impl<P: TopDownHandler, C: TopDownHandler> CheckpointManager for TopDownManager<
             .child_handler
             .applied_topdown_nonce(&self.metadata.child.id)
             .await?;
+        log::info!("latest applied top down nonce for {self:}: {nonce}");
+
         let top_down_msgs = self
             .parent_handler
             .top_down_msgs(&self.metadata.child.id, nonce, epoch)
             .await?;
+        log::info!(
+            "top down messages to execute for {self:}: {:}",
+            top_down_msgs.len()
+        );
 
         // we submit the topdown messages to the CHILD subnet.
         let topdown_checkpoint = TopDownCheckpoint {
@@ -127,7 +133,7 @@ impl<P: TopDownHandler, C: TopDownHandler> CheckpointManager for TopDownManager<
             .submit(validator, topdown_checkpoint)
             .await?;
 
-        log::debug!(
+        log::info!(
             "checkpoint at epoch {:} for manager: {:} published with at epoch: {:?}, executed",
             epoch,
             self,
