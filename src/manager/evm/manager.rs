@@ -38,6 +38,14 @@ const SUBNET_NAME_MAX_LEN: usize = 32;
 // Create type bindings for the IPC Solidity contracts
 abigen!(Gateway, "contracts/Gateway.json");
 abigen!(SubnetContract, "contracts/SubnetActor.json");
+abigen!(
+    SubnetActorGetterFacet,
+    "contracts/SubnetActorGetterFacet.json"
+);
+abigen!(
+    SubnetActorManagerFacet,
+    "contracts/SubnetActorManagerFacet.json"
+);
 abigen!(SubnetRegistry, "contracts/SubnetRegistry.json");
 
 pub struct EthSubnetManager {
@@ -151,11 +159,11 @@ impl SubnetManager for EthSubnetManager {
         );
 
         let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
-        let contract = SubnetContract::new(address, Arc::new(signer));
+        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
 
         let mut txn = contract.join(
             validator_net_addr,
-            subnet_contract::FvmAddress::from(worker_addr),
+            subnet_actor_manager_facet::FvmAddress::from(worker_addr),
         );
         txn.tx.set_value(collateral);
 
@@ -169,7 +177,7 @@ impl SubnetManager for EthSubnetManager {
         log::info!("leaving evm subnet: {subnet:} at contract: {address:}");
 
         let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
-        let contract = SubnetContract::new(address, Arc::new(signer));
+        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
 
         contract.leave().send().await?.await?;
 
@@ -181,7 +189,7 @@ impl SubnetManager for EthSubnetManager {
         log::info!("kill evm subnet: {subnet:} at contract: {address:}");
 
         let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
-        let contract = SubnetContract::new(address, Arc::new(signer));
+        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
 
         contract.kill().send().await?.await?;
 

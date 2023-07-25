@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: MIT
 //! Type conversion between evm and fvm
 
-use crate::manager::evm::manager::{agent_subnet_to_evm_addresses, ethers_address_to_fil_address};
+use crate::manager::evm::manager::{
+    agent_subnet_to_evm_addresses, ethers_address_to_fil_address, subnet_actor_getter_facet,
+    subnet_actor_manager_facet, subnet_contract,
+};
 use crate::manager::SubnetInfo;
 use anyhow::anyhow;
 use ethers::abi::{ParamType, Token};
@@ -18,7 +21,27 @@ use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
 
-impl TryFrom<BottomUpCheckpoint> for crate::manager::evm::subnet_contract::BottomUpCheckpoint {
+/// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
+/// the abigen is creating the same struct but under different modules. Macro rules would save a lot of
+/// code.
+macro_rules! type_conversion {
+    ($module:ident) => {
+        impl From<Address> for $module::FvmAddress {
+            fn from(value: Address) -> Self {
+                $module::FvmAddress {
+                    addr_type: value.protocol() as u8,
+                    payload: addr_payload_to_bytes(value.into_payload()),
+                }
+            }
+        }
+    };
+}
+
+type_conversion!(subnet_contract);
+type_conversion!(subnet_actor_getter_facet);
+type_conversion!(subnet_actor_manager_facet);
+
+impl TryFrom<BottomUpCheckpoint> for subnet_contract::BottomUpCheckpoint {
     type Error = anyhow::Error;
 
     fn try_from(checkpoint: BottomUpCheckpoint) -> Result<Self, Self::Error> {
@@ -28,7 +51,7 @@ impl TryFrom<BottomUpCheckpoint> for crate::manager::evm::subnet_contract::Botto
     }
 }
 
-impl TryFrom<CheckData> for crate::manager::evm::subnet_contract::BottomUpCheckpoint {
+impl TryFrom<CheckData> for subnet_contract::BottomUpCheckpoint {
     type Error = anyhow::Error;
 
     fn try_from(check_data: CheckData) -> Result<Self, Self::Error> {
@@ -244,15 +267,6 @@ impl TryFrom<crate::manager::evm::gateway::FvmAddress> for Address {
         let protocol = value.addr_type;
         let addr = bytes_to_fvm_addr(protocol, &value.payload)?;
         Ok(addr)
-    }
-}
-
-impl From<Address> for crate::manager::evm::subnet_contract::FvmAddress {
-    fn from(value: Address) -> Self {
-        crate::manager::evm::subnet_contract::FvmAddress {
-            addr_type: value.protocol() as u8,
-            payload: addr_payload_to_bytes(value.into_payload()),
-        }
     }
 }
 
