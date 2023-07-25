@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::checkpoint::{CheckpointManager, CheckpointMetadata, CheckpointUtilQuery, VoteQuery};
+use crate::checkpoint::{CheckpointManager, CheckpointMetadata, CheckpointQuery};
 use crate::config::Subnet;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -12,9 +12,7 @@ use std::fmt::{Display, Formatter};
 
 /// The trait that handles the bottom up checkpoint submission data preparation and actual submission.
 #[async_trait]
-pub trait TopDownHandler:
-    Send + Sync + VoteQuery<TopDownCheckpoint> + CheckpointUtilQuery<TopDownCheckpoint>
-{
+pub trait TopDownHandler: Send + Sync + CheckpointQuery<TopDownCheckpoint> {
     /// Checks if the gateway is initialized
     async fn gateway_initialized(&self) -> Result<bool>;
     /// Get the latest applied top down nonce

@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::checkpoint::{
-    create_proof, BottomUpHandler, CheckpointUtilQuery, NativeBottomUpCheckpoint, TopDownHandler,
+    create_proof, BottomUpHandler, CheckpointQuery, NativeBottomUpCheckpoint, TopDownHandler,
     VoteQuery,
 };
 use crate::jsonrpc::JsonRpcClientImpl;
@@ -58,7 +58,7 @@ impl VoteQuery<NativeBottomUpCheckpoint> for FevmSubnetManager {
 }
 
 #[async_trait]
-impl CheckpointUtilQuery<NativeBottomUpCheckpoint> for FevmSubnetManager {
+impl CheckpointQuery<NativeBottomUpCheckpoint> for FevmSubnetManager {
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
         self.evm_subnet_manager
             .subnet_bottom_up_checkpoint_period(subnet_id)
@@ -146,7 +146,7 @@ impl VoteQuery<TopDownCheckpoint> for FevmSubnetManager {
 }
 
 #[async_trait]
-impl CheckpointUtilQuery<TopDownCheckpoint> for FevmSubnetManager {
+impl CheckpointQuery<TopDownCheckpoint> for FevmSubnetManager {
     async fn checkpoint_period(&self, _subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
         self.evm_subnet_manager
             .gateway_top_down_check_period()

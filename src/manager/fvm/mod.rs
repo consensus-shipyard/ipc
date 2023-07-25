@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use crate::checkpoint::{
-    create_proof, BottomUpHandler, CheckpointUtilQuery, NativeBottomUpCheckpoint, TopDownHandler,
+    create_proof, BottomUpHandler, CheckpointQuery, NativeBottomUpCheckpoint, TopDownHandler,
     VoteQuery,
 };
 use anyhow::{anyhow, Result};
@@ -547,7 +547,7 @@ impl<T: JsonRpcClient + Send + Sync> VoteQuery<NativeBottomUpCheckpoint> for Lot
 }
 
 #[async_trait]
-impl<T: JsonRpcClient + Send + Sync> CheckpointUtilQuery<NativeBottomUpCheckpoint>
+impl<T: JsonRpcClient + Send + Sync> CheckpointQuery<NativeBottomUpCheckpoint>
     for LotusSubnetManager<T>
 {
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
@@ -682,9 +682,7 @@ impl<T: JsonRpcClient + Send + Sync> VoteQuery<TopDownCheckpoint> for LotusSubne
 }
 
 #[async_trait]
-impl<T: JsonRpcClient + Send + Sync> CheckpointUtilQuery<TopDownCheckpoint>
-    for LotusSubnetManager<T>
-{
+impl<T: JsonRpcClient + Send + Sync> CheckpointQuery<TopDownCheckpoint> for LotusSubnetManager<T> {
     async fn checkpoint_period(&self, _subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let tip_set = chain_head_cid(&self.lotus_client).await?;
         let state = self

@@ -48,7 +48,7 @@ pub trait VoteQuery<T> {
 
 /// Checkpoint submission utility query trait
 #[async_trait]
-pub trait CheckpointUtilQuery<T> {
+pub trait CheckpointQuery<T>: VoteQuery<T> {
     /// Get the checkpoint period
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
     /// Get the list of validators in the subnet id
