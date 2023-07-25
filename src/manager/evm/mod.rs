@@ -12,7 +12,7 @@ use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
-pub use manager::{gateway, subnet_contract, EthSubnetManager};
+pub use manager::{gateway, subnet_contract, gateway_router_facet, EthSubnetManager};
 
 #[async_trait]
 pub trait EthManager: SubnetManager {
@@ -32,7 +32,7 @@ pub trait EthManager: SubnetManager {
     async fn submit_top_down_checkpoint(
         &self,
         from: &Address,
-        checkpoint: gateway::TopDownCheckpoint,
+        checkpoint: gateway_router_facet::TopDownCheckpoint,
     ) -> anyhow::Result<ChainEpoch>;
 
     /// Submit bottom up checkpoint to the subnet actor.

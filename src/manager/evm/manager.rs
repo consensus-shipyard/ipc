@@ -46,6 +46,9 @@ abigen!(
     SubnetActorManagerFacet,
     "contracts/SubnetActorManagerFacet.json"
 );
+abigen!(GatewayManagerFacet, "contracts/GatewayManagerFacet.json");
+abigen!(GatewayGetterFacet, "contracts/GatewayGetterFacet.json");
+abigen!(GatewayRouterFacet, "contracts/GatewayRouterFacet.json");
 abigen!(SubnetRegistry, "contracts/SubnetRegistry.json");
 
 pub struct EthSubnetManager {
@@ -235,12 +238,16 @@ impl SubnetManager for EthSubnetManager {
 
         log::info!("fund with evm gateway contract: {gateway_addr:} with value: {value:}, original: {amount:?}");
 
-        let evm_subnet_id = gateway::SubnetID::try_from(&subnet)?;
+        let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
         log::debug!("evm subnet id to fund: {evm_subnet_id:?}");
 
         let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
-        let gateway_contract = Gateway::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
-        let mut txn = gateway_contract.fund(evm_subnet_id, gateway::FvmAddress::try_from(to)?);
+        let gateway_contract =
+            GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+        let mut txn = gateway_contract.fund(
+            evm_subnet_id,
+            gateway_manager_facet::FvmAddress::try_from(to)?,
+        );
         txn.tx.set_value(value);
 
         let pending_tx = txn.send().await?;
@@ -266,8 +273,8 @@ impl SubnetManager for EthSubnetManager {
         log::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
         let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
-        let gateway_contract = Gateway::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
-        let mut txn = gateway_contract.release(gateway::FvmAddress::try_from(to)?);
+        let gateway_contract = GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+        let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
 
         let pending_tx = txn.send().await?;
@@ -343,10 +350,10 @@ impl SubnetManager for EthSubnetManager {
         self.ensure_same_gateway(&gateway)?;
 
         // get genesis epoch from gateway
-        let evm_subnet_id = gateway::SubnetID::try_from(subnet_id)?;
+        let evm_subnet_id = gateway_getter_facet::SubnetID::try_from(subnet_id)?;
         log::debug!("evm subnet id: {evm_subnet_id:?}");
 
-        let gateway_contract = Gateway::new(
+        let gateway_contract = GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -396,7 +403,7 @@ impl SubnetManager for EthSubnetManager {
 #[async_trait]
 impl EthManager for EthSubnetManager {
     async fn gateway_last_voting_executed_epoch(&self) -> Result<ChainEpoch> {
-        let gateway_contract = Gateway::new(
+        let gateway_contract = GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -407,7 +414,7 @@ impl EthManager for EthSubnetManager {
     async fn subnet_last_voting_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
         let contract =
-            SubnetContract::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
         let u = contract.last_voting_executed_epoch().call().await?;
         Ok(u as ChainEpoch)
     }
@@ -425,12 +432,12 @@ impl EthManager for EthSubnetManager {
     async fn submit_top_down_checkpoint(
         &self,
         from: &Address,
-        checkpoint: TopDownCheckpoint,
+        checkpoint: gateway_router_facet::TopDownCheckpoint,
     ) -> Result<ChainEpoch> {
         log::debug!("submit top down checkpoint: {:?}", checkpoint);
 
         let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
-        let gateway_contract = Gateway::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+        let gateway_contract = GatewayRouterFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
 
         let txn = gateway_contract.submit_top_down_checkpoint(checkpoint);
         let pending_tx = txn.send().await?;
