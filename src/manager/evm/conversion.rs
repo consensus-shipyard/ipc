@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Type conversion between evm and fvm
 
+use crate::checkpoint::{NativeBottomUpCheckpoint, NativeChildCheck};
 use crate::manager::evm::manager::agent_subnet_to_evm_addresses;
 use crate::manager::SubnetInfo;
 use anyhow::anyhow;
@@ -10,14 +11,145 @@ use ethers::types::U256;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{Address, Payload};
 use fvm_shared::bigint::BigInt;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
-use ipc_gateway::checkpoint::{CheckData, ChildCheck};
+use ipc_gateway::checkpoint::{BatchCrossMsgs, CheckData, ChildCheck};
 use ipc_gateway::{BottomUpCheckpoint, CrossMsg, Status, StorableMsg};
 use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
 use primitives::EthAddress;
 use std::str::FromStr;
+
+impl TryFrom<NativeChildCheck> for crate::manager::evm::subnet_contract::ChildCheck {
+    type Error = anyhow::Error;
+
+    fn try_from(value: NativeChildCheck) -> Result<Self, Self::Error> {
+        let vec_to_array = |v: Vec<u8>| {
+            let bytes = if v.len() > 32 {
+                log::warn!("child check more than 32 bytes, taking only first 32 bytes");
+                &v[0..32]
+            } else {
+                &v
+            };
+
+            let mut array = [0u8; 32];
+            array.copy_from_slice(bytes);
+
+            array
+        };
+        let checks: Vec<[u8; 32]> = value
+            .checks
+            .into_iter()
+            .map(vec_to_array)
+            .collect::<Vec<_>>();
+        Ok(Self {
+            source: crate::manager::evm::subnet_contract::SubnetID::try_from(&value.source)?,
+            checks,
+        })
+    }
+}
+
+impl TryFrom<crate::manager::evm::subnet_contract::ChildCheck> for NativeChildCheck {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: crate::manager::evm::subnet_contract::ChildCheck,
+    ) -> Result<Self, Self::Error> {
+        let checks = value.checks.into_iter().map(|v| v.to_vec()).collect();
+        Ok(Self {
+            source: SubnetID::try_from(value.source)?,
+            checks,
+        })
+    }
+}
+
+impl TryFrom<NativeBottomUpCheckpoint>
+    for crate::manager::evm::subnet_contract::BottomUpCheckpoint
+{
+    type Error = anyhow::Error;
+
+    fn try_from(value: NativeBottomUpCheckpoint) -> Result<Self, Self::Error> {
+        let cross_msgs = value
+            .cross_msgs
+            .cross_msgs
+            .unwrap_or_default()
+            .into_iter()
+            .map(|i| {
+                crate::manager::evm::subnet_contract::CrossMsg::try_from(i)
+                    .map_err(|e| anyhow!("cannot convert cross msg due to: {e:}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let children = value
+            .children
+            .into_iter()
+            .map(|i| {
+                crate::manager::evm::subnet_contract::ChildCheck::try_from(i)
+                    .map_err(|e| anyhow!("cannot convert child check due to: {e:}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut prev_hash = [0u8; 32];
+        if let Some(v) = &value.prev_check {
+            prev_hash.copy_from_slice(v);
+        }
+
+        let proof = if let Some(v) = value.proof {
+            ethers::core::types::Bytes::from(v)
+        } else {
+            ethers::core::types::Bytes::default()
+        };
+
+        let b = crate::manager::evm::subnet_contract::BottomUpCheckpoint {
+            source: crate::manager::evm::subnet_contract::SubnetID::try_from(&value.source)?,
+            epoch: value.epoch as u64,
+            fee: U256::from_str(&value.cross_msgs.fee.atto().to_string())?,
+            cross_msgs,
+            children,
+            prev_hash,
+            proof,
+        };
+        Ok(b)
+    }
+}
+
+impl TryFrom<crate::manager::evm::subnet_contract::BottomUpCheckpoint>
+    for NativeBottomUpCheckpoint
+{
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: crate::manager::evm::subnet_contract::BottomUpCheckpoint,
+    ) -> Result<Self, Self::Error> {
+        let children = value
+            .children
+            .into_iter()
+            .map(NativeChildCheck::try_from)
+            .collect::<anyhow::Result<_>>()?;
+
+        let cross_msgs = value
+            .cross_msgs
+            .into_iter()
+            .map(|i| {
+                CrossMsg::try_from(i).map_err(|e| anyhow!("cannot convert cross msg due to: {e:}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let b = NativeBottomUpCheckpoint {
+            source: SubnetID::try_from(value.source)?,
+            proof: Some(value.proof.to_vec()),
+            epoch: value.epoch as ChainEpoch,
+            prev_check: Some(value.prev_hash.to_vec()),
+            children,
+            cross_msgs: BatchCrossMsgs {
+                cross_msgs: Some(cross_msgs),
+                fee: TokenAmount::from_atto(value.fee.as_u128()),
+            },
+            sig: vec![],
+        };
+        Ok(b)
+    }
+}
 
 impl TryFrom<BottomUpCheckpoint> for crate::manager::evm::subnet_contract::BottomUpCheckpoint {
     type Error = anyhow::Error;
@@ -264,6 +396,21 @@ impl TryFrom<crate::manager::evm::gateway::SubnetID> for SubnetID {
     }
 }
 
+impl TryFrom<crate::manager::evm::subnet_contract::SubnetID> for SubnetID {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: crate::manager::evm::subnet_contract::SubnetID,
+    ) -> Result<Self, Self::Error> {
+        let children = value
+            .route
+            .iter()
+            .map(ethers_address_to_fil_address)
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok(SubnetID::new(value.root, children))
+    }
+}
+
 /// Converts a Rust type FVM address into its underlying payload
 /// so it can be represented internally in a Solidity contract.
 fn addr_payload_to_bytes(payload: Payload) -> ethers::types::Bytes {
@@ -334,6 +481,50 @@ impl TryFrom<crate::manager::evm::gateway::CrossMsg> for CrossMsg {
     type Error = anyhow::Error;
 
     fn try_from(value: crate::manager::evm::gateway::CrossMsg) -> Result<Self, Self::Error> {
+        let c = CrossMsg {
+            wrapped: value.wrapped,
+            msg: StorableMsg::try_from(value.message)?,
+        };
+        Ok(c)
+    }
+}
+
+impl TryFrom<crate::manager::evm::subnet_contract::Ipcaddress> for IPCAddress {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: crate::manager::evm::subnet_contract::Ipcaddress,
+    ) -> Result<Self, Self::Error> {
+        let addr = Address::try_from(value.raw_address)?;
+        let i = IPCAddress::new(&SubnetID::try_from(value.subnet_id)?, &addr)?;
+        Ok(i)
+    }
+}
+
+impl TryFrom<crate::manager::evm::subnet_contract::StorableMsg> for StorableMsg {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: crate::manager::evm::subnet_contract::StorableMsg,
+    ) -> Result<Self, Self::Error> {
+        let s = StorableMsg {
+            from: IPCAddress::try_from(value.from)?,
+            to: IPCAddress::try_from(value.to)?,
+            method: u32::from_be_bytes(value.method) as MethodNum,
+            params: RawBytes::from(value.params.to_vec()),
+            value: TokenAmount::from_atto(value.value.as_u128()),
+            nonce: value.nonce,
+        };
+        Ok(s)
+    }
+}
+
+impl TryFrom<crate::manager::evm::subnet_contract::CrossMsg> for CrossMsg {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: crate::manager::evm::subnet_contract::CrossMsg,
+    ) -> Result<Self, Self::Error> {
         let c = CrossMsg {
             wrapped: value.wrapped,
             msg: StorableMsg::try_from(value.message)?,

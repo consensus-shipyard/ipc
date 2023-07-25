@@ -119,6 +119,6 @@ pub trait SubnetManager: Send + Sync {
     async fn get_validator_set(
         &self,
         subnet_id: &SubnetID,
-        gateway: Address,
+        gateway: Option<Address>,
     ) -> Result<QueryValidatorSetResponse>;
 }
