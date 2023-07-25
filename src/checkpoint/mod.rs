@@ -171,7 +171,7 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
 
 fn handle_err_response(manager: &dyn CheckpointManager, response: anyhow::Result<()>) {
     if response.is_err() {
-        log::error!("manger {manager:} had error: {:}", response.unwrap_err());
+        log::warn!("manager {manager:} had error: {:}", response.unwrap_err());
     }
 }
 

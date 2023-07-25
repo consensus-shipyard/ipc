@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! SendValue subnet handler and parameters
 
+use crate::manager::evm::ethers_address_to_fil_address;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::handlers::manager::{check_subnet, parse_from};
 use crate::server::{handlers, JsonRPCRequestHandler};
@@ -50,7 +51,14 @@ impl JsonRPCRequestHandler for SendValueHandler {
         check_subnet(subnet_config)?;
 
         let from = parse_from(subnet_config, request.from)?;
-        let to = Address::from_str(&request.to)?;
+        let to = match Address::from_str(&request.to) {
+            Ok(addr) => addr,
+            Err(_) => {
+                // we need to check if an 0x address was passed and convert
+                // to a delegated address
+                ethers_address_to_fil_address(&ethers::types::Address::from_str(&request.to)?)?
+            }
+        };
 
         log::debug!("json rpc: received request to send amount: {amount:} from {from:} to {to:}");
 

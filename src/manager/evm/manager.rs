@@ -1,9 +1,10 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
+pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cid::Cid;
@@ -12,6 +13,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{abigen, Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
+use ethers::types::Eip1559TransactionRequest;
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -20,15 +22,18 @@ use ipc_identity::{EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
 use num_traits::ToPrimitive;
-use primitives::EthAddress;
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo, Validator, ValidatorSet};
-use crate::lotus::message::wallet::WalletKeyType;
 use crate::manager::{EthManager, SubnetManager};
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
+
+/// Default polling time used by the Ethers provider to check for pending
+/// transactions and events. Default is 7, and for our child subnets we
+/// can reduce it to the block time (or potentially less)
+const ETH_PROVIDER_POLLING_TIME: Duration = Duration::from_secs(1);
 
 /// The majority vote percentage for checkpoint submission when creating a subnet.
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
@@ -94,10 +99,7 @@ impl SubnetManager for EthSubnetManager {
 
         log::info!("creating subnet on evm with params: {params:?}");
 
-        let evm_from = payload_to_evm_address(from.payload())?;
-        log::debug!("original from address: {from:?}, evm: {evm_from:?}");
-
-        let signer = self.get_signer(&evm_from)?;
+        let signer = self.get_signer(&from)?;
         let registry_contract =
             SubnetRegistry::new(self.ipc_contract_info.registry_addr, Arc::new(signer));
 
@@ -150,7 +152,7 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
+        let signer = self.get_signer(&from)?;
         let contract = SubnetContract::new(address, Arc::new(signer));
 
         let mut txn = contract.join(
@@ -168,7 +170,7 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         log::info!("leaving evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
+        let signer = self.get_signer(&from)?;
         let contract = SubnetContract::new(address, Arc::new(signer));
 
         contract.leave().send().await?.await?;
@@ -180,7 +182,7 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         log::info!("kill evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
+        let signer = self.get_signer(&from)?;
         let contract = SubnetContract::new(address, Arc::new(signer));
 
         contract.kill().send().await?.await?;
@@ -230,7 +232,7 @@ impl SubnetManager for EthSubnetManager {
         let evm_subnet_id = gateway::SubnetID::try_from(&subnet)?;
         log::debug!("evm subnet id to fund: {evm_subnet_id:?}");
 
-        let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
+        let signer = self.get_signer(&from)?;
         let gateway_contract = Gateway::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
         let mut txn = gateway_contract.fund(evm_subnet_id, gateway::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
@@ -257,7 +259,7 @@ impl SubnetManager for EthSubnetManager {
 
         log::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
-        let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
+        let signer = self.get_signer(&from)?;
         let gateway_contract = Gateway::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
         let mut txn = gateway_contract.release(gateway::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
@@ -298,20 +300,30 @@ impl SubnetManager for EthSubnetManager {
     }
 
     /// Send value between two addresses in a subnet
-    async fn send_value(&self, _from: Address, _to: Address, _amount: TokenAmount) -> Result<()> {
-        todo!()
+    async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
+        let tx = Eip1559TransactionRequest::new()
+            .to(payload_to_evm_address(to.payload())?)
+            .value(fil_to_eth_amount(&amount)?);
+
+        let signer = self.get_signer(&from)?;
+        let tx_pending = signer.send_transaction(tx, None).await?;
+
+        log::info!(
+            "sending FIL from {from:} to {to:} in tx {:?}",
+            tx_pending.tx_hash()
+        );
+        tx_pending.await?;
+        Ok(())
     }
 
-    async fn wallet_new(&self, _key_type: WalletKeyType) -> Result<Address> {
-        todo!()
-    }
-
-    async fn wallet_list(&self) -> Result<Vec<Address>> {
-        todo!()
-    }
-
-    async fn wallet_balance(&self, _address: &Address) -> Result<TokenAmount> {
-        todo!()
+    async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount> {
+        let balance = self
+            .ipc_contract_info
+            .provider
+            .clone()
+            .get_balance(payload_to_evm_address(address.payload())?, None)
+            .await?;
+        Ok(TokenAmount::from_atto(balance.as_u128()))
     }
 
     async fn last_topdown_executed(&self, _gateway_addr: &Address) -> Result<ChainEpoch> {
@@ -424,7 +436,7 @@ impl EthManager for EthSubnetManager {
     ) -> Result<ChainEpoch> {
         log::debug!("submit top down checkpoint: {:?}", checkpoint);
 
-        let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
+        let signer = self.get_signer(from)?;
         let gateway_contract = Gateway::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
 
         let txn = gateway_contract.submit_top_down_checkpoint(checkpoint);
@@ -446,7 +458,7 @@ impl EthManager for EthSubnetManager {
             route[route.len() - 1]
         );
 
-        let signer = self.get_signer(&payload_to_evm_address(from.payload())?)?;
+        let signer = self.get_signer(from)?;
         let contract = SubnetContract::new(route[route.len() - 1], Arc::new(signer));
 
         let txn = contract.submit_checkpoint(checkpoint);
@@ -671,10 +683,14 @@ impl EthSubnetManager {
     }
 
     /// Get the ethers singer instance.
-    fn get_signer(&self, addr: &ethers::types::Address) -> Result<DefaultSignerMiddleware> {
+    /// We use filecoin addresses throughout our whole code-base
+    /// and translate them to evm addresses when relevant.
+    fn get_signer(&self, addr: &Address) -> Result<DefaultSignerMiddleware> {
+        // convert to its underlying eth address
+        let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore.read().unwrap();
         let private_key = keystore
-            .get(addr)?
+            .get(&addr)?
             .ok_or_else(|| anyhow!("address {addr:} does not have private key in key store"))?;
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
@@ -706,7 +722,11 @@ impl EthSubnetManager {
             Http::new(url)
         };
 
-        let provider = Provider::new(provider);
+        let mut provider = Provider::new(provider);
+        // set polling interval for provider to fit fast child subnets block times.
+        // TODO: We may want to make it dynamic so it adjusts depending on the type of network
+        // so we don't have a too slow or too fast polling for the underlying block times.
+        provider.set_interval(ETH_PROVIDER_POLLING_TIME);
         let gateway_address = payload_to_evm_address(config.gateway_addr.payload())?;
         let registry_address = payload_to_evm_address(config.registry_addr.payload())?;
 
@@ -718,16 +738,6 @@ impl EthSubnetManager {
             keystore,
         ))
     }
-}
-
-pub(crate) fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> Result<Address> {
-    // subnet_addr.to_string() returns a summary of the actual Ethereum address, not
-    // usable in the actual code.
-    let raw_addr = format!("{addr:?}");
-    log::debug!("raw evm subnet addr: {raw_addr:}");
-
-    let eth_addr = EthAddress::from_str(&raw_addr)?;
-    Ok(Address::from(eth_addr))
 }
 
 /// Get the block number from the transaction receipt
@@ -777,7 +787,7 @@ pub(crate) fn payload_to_evm_address(payload: &Payload) -> Result<ethers::types:
             let slice = delegated.subaddress();
             Ok(ethers::types::Address::from_slice(&slice[0..20]))
         }
-        _ => Err(anyhow!("invalid is invalid")),
+        _ => Err(anyhow!("address provided is not delegated")),
     }
 }
 

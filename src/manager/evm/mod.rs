@@ -11,6 +11,7 @@ use ipc_gateway::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
+pub use conversion::{eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount};
 pub use manager::{gateway, subnet_contract, EthSubnetManager};
 
 #[async_trait]

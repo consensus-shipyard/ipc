@@ -36,7 +36,6 @@ use crate::lotus::message::ipc::{
 };
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
-use crate::lotus::message::wallet::WalletKeyType;
 use crate::lotus::LotusClient;
 
 use super::subnet::SubnetManager;
@@ -321,22 +320,6 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         log::info!("sending FIL from {from:} to {to:}");
 
         Ok(())
-    }
-
-    async fn wallet_new(&self, key_type: WalletKeyType) -> Result<Address> {
-        log::info!("creating new wallet");
-        let addr_str = self.lotus_client.wallet_new(key_type).await?;
-        Address::from_str(&addr_str).map_err(|_| anyhow!("cannot get address from string output"))
-    }
-
-    async fn wallet_list(&self) -> Result<Vec<Address>> {
-        log::info!("list wallet in subnet");
-        self.lotus_client
-            .wallet_list()
-            .await?
-            .iter()
-            .map(|raw| Address::from_str(raw).map_err(|_| anyhow!("invalid addr: {raw:}")))
-            .collect::<Result<_>>()
     }
 
     async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount> {
