@@ -71,7 +71,7 @@ impl<P: TopDownHandler, C: TopDownHandler> Display for TopDownManager<P, C> {
 #[async_trait]
 impl<P: TopDownHandler, C: TopDownHandler> CheckpointManager for TopDownManager<P, C> {
     fn target_subnet(&self) -> &Subnet {
-        &self.metadata.parent
+        &self.metadata.child
     }
 
     /// Getter for the parent subnet this checkpoint manager is handling
