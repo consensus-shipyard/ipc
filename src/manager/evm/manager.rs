@@ -330,9 +330,12 @@ impl SubnetManager for EthSubnetManager {
     async fn get_validator_set(
         &self,
         subnet_id: &SubnetID,
-        gateway: Address,
+        gateway: Option<Address>,
     ) -> Result<QueryValidatorSetResponse> {
-        self.ensure_same_gateway(&gateway)?;
+        // we do optionally check as gateway addr is already part of the struct
+        if let Some(addr) = gateway {
+            self.ensure_same_gateway(&addr)?;
+        }
 
         // get genesis epoch from gateway
         let evm_subnet_id = gateway::SubnetID::try_from(subnet_id)?;

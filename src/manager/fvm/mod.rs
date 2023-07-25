@@ -372,8 +372,10 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
     async fn get_validator_set(
         &self,
         subnet_id: &SubnetID,
-        gateway: Address,
+        gateway: Option<Address>,
     ) -> Result<QueryValidatorSetResponse> {
+        let gateway = gateway.ok_or_else(|| anyhow!("gateway address needed"))?;
+
         let chain_head = self.lotus_client.chain_head().await?;
         let cid_map = chain_head.cids.first().unwrap().clone();
         let tip_set = Cid::try_from(cid_map)?;

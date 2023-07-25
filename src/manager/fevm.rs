@@ -1,3 +1,4 @@
+use std::str::FromStr;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::checkpoint::{
@@ -7,7 +8,7 @@ use crate::checkpoint::{
 use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::manager::evm::subnet_contract;
-use crate::manager::{EthManager, EthSubnetManager};
+use crate::manager::{EthManager, EthSubnetManager, SubnetManager};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fil_actors_runtime::cbor;
@@ -154,7 +155,20 @@ impl CheckpointQuery<TopDownCheckpoint> for FevmSubnetManager {
     }
 
     async fn validators(&self, subnet_id: &SubnetID) -> anyhow::Result<Vec<Address>> {
-        self.evm_subnet_manager.validators(subnet_id).await
+        let r = self
+            .evm_subnet_manager
+            .get_validator_set(subnet_id, None)
+            .await?;
+        if let Some(validators) = r.validator_set.validators {
+            let v = validators
+                .into_iter()
+                .map(|v| Address::from_str(&v.worker_addr.unwrap()))
+                .collect::<Result<Vec<_>, _>>()?;
+            log::debug!("top down validators: {v:?}");
+            Ok(v)
+        } else {
+            Ok(vec![])
+        }
     }
 }
 
