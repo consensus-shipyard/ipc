@@ -58,6 +58,60 @@ async fn parent_fevm_child_fvm(
     Ok(managers)
 }
 
+async fn parent_fvm_child_fvm(
+    parent: &Subnet,
+    child: &Subnet,
+    fvm_wallet_store: Arc<RwLock<Wallet>>,
+) -> anyhow::Result<Vec<Box<dyn CheckpointManager>>> {
+    if parent.network_type() != NetworkType::Fevm || child.network_type() != NetworkType::Fvm {
+        return Err(anyhow!("parent not fevm or child not fvm"));
+    }
+
+    let mut managers = vec![];
+
+    let fvm_p = LotusSubnetManager::new(
+        LotusJsonRPCClient::from_subnet_with_wallet_store(parent, fvm_wallet_store.clone()),
+        parent.gateway_addr(),
+    );
+    let fvm_c = LotusSubnetManager::new(
+        LotusJsonRPCClient::from_subnet_with_wallet_store(child, fvm_wallet_store.clone()),
+        child.gateway_addr(),
+    );
+    let m: Box<dyn CheckpointManager> = Box::new(
+        crate::checkpoint::bottomup::BottomUpManager::new(
+            parent.clone(),
+            child.clone(),
+            fvm_p,
+            fvm_c,
+        )
+        .await?,
+    );
+
+    managers.push(m);
+
+    let fvm_p = LotusSubnetManager::new(
+        LotusJsonRPCClient::from_subnet_with_wallet_store(parent, fvm_wallet_store.clone()),
+        parent.gateway_addr(),
+    );
+    let fvm_c = LotusSubnetManager::new(
+        LotusJsonRPCClient::from_subnet_with_wallet_store(child, fvm_wallet_store),
+        child.gateway_addr(),
+    );
+    let m: Box<dyn CheckpointManager> = Box::new(
+        crate::checkpoint::topdown::TopDownManager::new(
+            parent.clone(),
+            child.clone(),
+            fvm_p,
+            fvm_c,
+        )
+        .await?,
+    );
+
+    managers.push(m);
+
+    Ok(managers)
+}
+
 pub async fn setup_manager_from_subnet(
     subnets: &HashMap<SubnetID, Subnet>,
     s: &Subnet,
@@ -73,7 +127,8 @@ pub async fn setup_manager_from_subnet(
 
     match (parent.network_type(), s.network_type()) {
         (NetworkType::Fvm, NetworkType::Fvm) => {
-            todo!()
+            log::info!("setup parent: {:?} fvm, child: {:?} fvm", parent.id, s.id);
+            parent_fvm_child_fvm(parent, s, fvm_wallet_store).await
         }
         (NetworkType::Fvm, NetworkType::Fevm) => {
             unimplemented!()
