@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Bottom up checkpoint manager
 
-use crate::checkpoint::{CheckpointManager, CheckpointMetadata, VoteQuery};
+use crate::checkpoint::{CheckpointManager, CheckpointMetadata, CheckpointQuery};
 use crate::config::Subnet;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -15,6 +15,8 @@ use std::fmt::{Display, Formatter};
 /// Native bottom up checkpoint struct independent of chain specific implementations.
 /// The goal of this struct is to have a common checkpoint data structure that can be
 /// eventually converted into their runtime-specific representations.
+/// We need this type because some fields take different types in different runtime implementations,
+/// such as `prev_check` is a cid in fvm but bytes in evm.
 #[derive(Debug)]
 pub struct NativeBottomUpCheckpoint {
     pub source: SubnetID,
@@ -35,11 +37,7 @@ pub struct NativeChildCheck {
 
 /// The trait that handles the bottom up checkpoint submission data preparation and actual submission.
 #[async_trait]
-pub trait BottomUpHandler: Send + Sync + VoteQuery<NativeBottomUpCheckpoint> {
-    /// Get the checkpoint period
-    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
-    /// Get the list of validators in the subnet id
-    async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>>;
+pub trait BottomUpHandler: Send + Sync + CheckpointQuery<NativeBottomUpCheckpoint> {
     /// Fetch the checkpoint template at the specified epoch
     async fn checkpoint_template(&self, epoch: ChainEpoch) -> Result<NativeBottomUpCheckpoint>;
     /// Populate previous checkpoint hash for the checkpoint

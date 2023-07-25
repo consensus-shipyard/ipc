@@ -7,6 +7,7 @@ mod manager;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_gateway::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
@@ -61,13 +62,16 @@ pub trait EthManager: SubnetManager {
         epoch: ChainEpoch,
     ) -> anyhow::Result<subnet_contract::BottomUpCheckpoint>;
 
+    /// Get the latest applied top down nonce
+    async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> anyhow::Result<u64>;
+
     /// Get the bottom up checkpoint a certain epoch
     async fn top_down_msgs(
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
         nonce: u64,
-    ) -> anyhow::Result<Vec<gateway::CrossMsg>>;
+    ) -> anyhow::Result<Vec<CrossMsg>>;
 
     /// Get the list of validators in a subnet
     async fn validators(&self, subnet_id: &SubnetID) -> anyhow::Result<Vec<Address>>;

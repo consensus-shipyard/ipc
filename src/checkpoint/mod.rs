@@ -21,13 +21,12 @@ use ipc_identity::PersistentKeyStore;
 use ipc_sdk::subnet_id::SubnetID;
 pub use proof::create_proof;
 use std::fmt::Display;
+pub use topdown::*;
 
 mod bottomup;
-mod fevm;
-mod fevm_fvm;
-pub mod fvm;
 mod proof;
 mod setup;
+mod topdown;
 
 const TASKS_PROCESS_THRESHOLD_SEC: u64 = 15;
 const SUBMISSION_LOOK_AHEAD_EPOCH: ChainEpoch = 50;
@@ -45,6 +44,15 @@ pub trait VoteQuery<T> {
         epoch: ChainEpoch,
         validator: &Address,
     ) -> Result<bool>;
+}
+
+/// Checkpoint submission utility query trait
+#[async_trait]
+pub trait CheckpointQuery<T>: VoteQuery<T> {
+    /// Get the checkpoint period
+    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    /// Get the list of validators in the subnet id
+    async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>>;
 }
 
 #[async_trait]

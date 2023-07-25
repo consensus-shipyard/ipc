@@ -8,5 +8,5 @@ pub use crate::lotus::message::ipc::SubnetInfo;
 
 pub mod evm;
 pub mod fevm;
-mod fvm;
+pub mod fvm;
 mod subnet;
