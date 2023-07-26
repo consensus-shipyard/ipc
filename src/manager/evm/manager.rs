@@ -539,6 +539,7 @@ impl EthManager for EthSubnetManager {
                 "bottom up checkpoint not exists at epoch: {epoch:}"
             ))
         } else {
+            log::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
             let token = checkpoint.into_token();
             let c = subnet_actor_manager_facet::BottomUpCheckpoint::from_token(token)?;
             Ok(c)
