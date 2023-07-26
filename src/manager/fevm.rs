@@ -77,6 +77,8 @@ impl BottomUpHandler for FevmSubnetManager {
         epoch: ChainEpoch,
     ) -> anyhow::Result<NativeBottomUpCheckpoint> {
         let checkpoint = self.evm_subnet_manager.bottom_up_checkpoint(epoch).await?;
+        log::debug!("raw bottom up templated: {checkpoint:?}");
+
         NativeBottomUpCheckpoint::try_from(checkpoint)
     }
 

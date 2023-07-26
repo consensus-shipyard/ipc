@@ -566,9 +566,11 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
                     "error getting bottom-up checkpoint template for epoch:{epoch:} due to {e:}"
                 )
             })?;
+
         let mut checkpoint = BottomUpCheckpoint::new(template.source().clone(), epoch);
         checkpoint.data.children = template.data.children;
         checkpoint.data.cross_msgs = template.data.cross_msgs;
+        log::debug!("raw bottom up templated: {checkpoint:?}");
 
         NativeBottomUpCheckpoint::try_from(checkpoint)
     }
