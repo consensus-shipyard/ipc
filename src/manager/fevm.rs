@@ -109,10 +109,7 @@ impl BottomUpHandler for FevmSubnetManager {
         checkpoint: NativeBottomUpCheckpoint,
     ) -> anyhow::Result<ChainEpoch> {
         self.evm_subnet_manager
-            .submit_bottom_up_checkpoint(
-                validator,
-                checkpoint,
-            )
+            .submit_bottom_up_checkpoint(validator, checkpoint)
             .await
     }
 }

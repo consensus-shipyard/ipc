@@ -3,27 +3,27 @@
 
 //! Type conversion for IPC Agent struct with solidity contract struct
 
-mod bottom_up;
+mod checkpoint;
 
 use crate::manager::evm::manager::agent_subnet_to_evm_addresses;
 use crate::manager::evm::manager::{
-    gateway_getter_facet, gateway_manager_facet, subnet_actor_getter_facet,
+    gateway_getter_facet, gateway_manager_facet, gateway_router_facet, subnet_actor_getter_facet,
     subnet_actor_manager_facet,
 };
-use ipc_sdk::address::IPCAddress;
-use fvm_ipld_encoding::RawBytes;
-use fvm_shared::MethodNum;
 use crate::manager::SubnetInfo;
 use anyhow::anyhow;
 use ethers::abi::{ParamType, Token};
 use ethers::types::U256;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{Address, Payload};
 use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::MethodNum;
+use ipc_gateway::{CrossMsg, Status, StorableMsg};
+use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
 use primitives::EthAddress;
 use std::str::FromStr;
-use ipc_gateway::{CrossMsg, Status, StorableMsg};
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
 /// the abigen is creating the same struct but under different modules. This save a lot of
@@ -75,7 +75,6 @@ macro_rules! base_type_conversion {
     };
 }
 
-
 /// Implement the cross network message types. To use this macro, make sure the $module has already
 /// implemented the base types.
 macro_rules! cross_msg_types {
@@ -86,9 +85,7 @@ macro_rules! cross_msg_types {
             fn try_from(value: IPCAddress) -> Result<Self, Self::Error> {
                 Ok($module::Ipcaddress {
                     subnet_id: $module::SubnetID::try_from(&value.subnet()?)?,
-                    raw_address: $module::FvmAddress::try_from(
-                        value.raw_addr()?,
-                    )?,
+                    raw_address: $module::FvmAddress::try_from(value.raw_addr()?)?,
                 })
             }
         }
@@ -116,8 +113,9 @@ macro_rules! cross_msg_types {
                 );
 
                 let c = $module::StorableMsg {
-                    from: $module::Ipcaddress::try_from(value.from)
-                        .map_err(|e| anyhow!("cannot convert `from` ipc address msg due to: {e:}"))?,
+                    from: $module::Ipcaddress::try_from(value.from).map_err(|e| {
+                        anyhow!("cannot convert `from` ipc address msg due to: {e:}")
+                    })?,
                     to: $module::Ipcaddress::try_from(value.to)
                         .map_err(|e| anyhow!("cannot convert `to`` ipc address due to: {e:}"))?,
                     value: msg_value,
@@ -170,9 +168,10 @@ macro_rules! cross_msg_types {
                 Ok(c)
             }
         }
-    }
+    };
 }
 
+base_type_conversion!(gateway_router_facet);
 base_type_conversion!(subnet_actor_getter_facet);
 base_type_conversion!(gateway_manager_facet);
 base_type_conversion!(subnet_actor_manager_facet);
@@ -180,6 +179,7 @@ base_type_conversion!(gateway_getter_facet);
 
 cross_msg_types!(subnet_actor_manager_facet);
 cross_msg_types!(gateway_getter_facet);
+cross_msg_types!(gateway_router_facet);
 
 impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
     type Error = anyhow::Error;

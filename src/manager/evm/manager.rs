@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use crate::checkpoint::NativeBottomUpCheckpoint;
 pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -17,12 +18,11 @@ use ethers::types::Eip1559TransactionRequest;
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_gateway::BottomUpCheckpoint;
+use ipc_gateway::{BottomUpCheckpoint, TopDownCheckpoint};
 use ipc_identity::{EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
 use num_traits::ToPrimitive;
-use crate::checkpoint::NativeBottomUpCheckpoint;
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
@@ -42,8 +42,6 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 10;
 const SUBNET_NAME_MAX_LEN: usize = 32;
 
 // Create type bindings for the IPC Solidity contracts
-abigen!(Gateway, "contracts/Gateway.json");
-abigen!(SubnetContract, "contracts/SubnetActor.json");
 abigen!(
     SubnetActorGetterFacet,
     "contracts/SubnetActorGetterFacet.json"
@@ -450,8 +448,9 @@ impl EthManager for EthSubnetManager {
     async fn submit_top_down_checkpoint(
         &self,
         from: &Address,
-        checkpoint: gateway_router_facet::TopDownCheckpoint,
+        checkpoint: TopDownCheckpoint,
     ) -> Result<ChainEpoch> {
+        let checkpoint = gateway_router_facet::TopDownCheckpoint::try_from(checkpoint)?;
         log::debug!("submit top down checkpoint: {:?}", checkpoint);
 
         let signer = self.get_signer(from)?;
@@ -497,8 +496,10 @@ impl EthManager for EthSubnetManager {
         let address = contract_address_from_subnet(subnet_id)?;
         let validator = payload_to_evm_address(validator.payload())?;
 
-        let contract =
-            SubnetActorManagerFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = SubnetActorManagerFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
 
         let has_voted = contract
             .has_validator_voted_for_submission(epoch as u64, validator)
@@ -651,8 +652,10 @@ impl EthManager for EthSubnetManager {
         epoch: ChainEpoch,
     ) -> Result<[u8; 32]> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract =
-            SubnetActorManagerFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = SubnetActorManagerFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
         let (exists, hash) = contract
             .bottom_up_checkpoint_hash_at_epoch(epoch as u64)
             .await?;

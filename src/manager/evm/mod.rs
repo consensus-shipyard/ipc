@@ -9,15 +9,15 @@ mod manager;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use ipc_gateway::CrossMsg;
+use ipc_gateway::{CrossMsg, TopDownCheckpoint};
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
-pub use manager::{gateway, gateway_router_facet, subnet_contract, EthSubnetManager};
+pub use manager::EthSubnetManager;
 
-pub use convert::{eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount};
 use crate::checkpoint::NativeBottomUpCheckpoint;
 use crate::manager::evm::manager::subnet_actor_manager_facet;
+pub use convert::{eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount};
 
 #[async_trait]
 pub trait EthManager: SubnetManager {
@@ -37,7 +37,7 @@ pub trait EthManager: SubnetManager {
     async fn submit_top_down_checkpoint(
         &self,
         from: &Address,
-        checkpoint: gateway_router_facet::TopDownCheckpoint,
+        checkpoint: TopDownCheckpoint,
     ) -> anyhow::Result<ChainEpoch>;
 
     /// Submit bottom up checkpoint to the subnet actor.

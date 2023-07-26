@@ -1,14 +1,29 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use crate::checkpoint::{NativeBottomUpCheckpoint, NativeChildCheck};
+use crate::manager::evm::convert::{eth_to_fil_amount, fil_to_eth_amount};
+use crate::manager::evm::manager::{gateway_router_facet, subnet_actor_manager_facet};
 use anyhow::anyhow;
 use fvm_shared::clock::ChainEpoch;
 use ipc_gateway::checkpoint::BatchCrossMsgs;
-use ipc_gateway::CrossMsg;
+use ipc_gateway::{CrossMsg, TopDownCheckpoint};
 use ipc_sdk::subnet_id::SubnetID;
-use crate::checkpoint::{NativeBottomUpCheckpoint, NativeChildCheck};
-use crate::manager::evm::convert::{eth_to_fil_amount, fil_to_eth_amount};
-use crate::manager::evm::manager::subnet_actor_manager_facet;
+
+impl TryFrom<TopDownCheckpoint> for gateway_router_facet::TopDownCheckpoint {
+    type Error = anyhow::Error;
+
+    fn try_from(value: TopDownCheckpoint) -> Result<Self, Self::Error> {
+        Ok(Self {
+            epoch: value.epoch as u64,
+            top_down_msgs: value
+                .top_down_msgs
+                .into_iter()
+                .map(gateway_router_facet::CrossMsg::try_from)
+                .collect::<anyhow::Result<Vec<_>>>()?,
+        })
+    }
+}
 
 // Native child check
 impl TryFrom<NativeChildCheck> for subnet_actor_manager_facet::ChildCheck {
@@ -43,9 +58,7 @@ impl TryFrom<NativeChildCheck> for subnet_actor_manager_facet::ChildCheck {
 impl TryFrom<subnet_actor_manager_facet::ChildCheck> for NativeChildCheck {
     type Error = anyhow::Error;
 
-    fn try_from(
-        value: subnet_actor_manager_facet::ChildCheck,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: subnet_actor_manager_facet::ChildCheck) -> Result<Self, Self::Error> {
         let checks = value.checks.into_iter().map(|v| v.to_vec()).collect();
         Ok(Self {
             source: SubnetID::try_from(value.source)?,
@@ -54,9 +67,7 @@ impl TryFrom<subnet_actor_manager_facet::ChildCheck> for NativeChildCheck {
     }
 }
 
-impl TryFrom<subnet_actor_manager_facet::BottomUpCheckpoint>
-for NativeBottomUpCheckpoint
-{
+impl TryFrom<subnet_actor_manager_facet::BottomUpCheckpoint> for NativeBottomUpCheckpoint {
     type Error = anyhow::Error;
 
     fn try_from(
@@ -92,9 +103,7 @@ for NativeBottomUpCheckpoint
     }
 }
 
-impl TryFrom<NativeBottomUpCheckpoint>
-for subnet_actor_manager_facet::BottomUpCheckpoint
-{
+impl TryFrom<NativeBottomUpCheckpoint> for subnet_actor_manager_facet::BottomUpCheckpoint {
     type Error = anyhow::Error;
 
     fn try_from(value: NativeBottomUpCheckpoint) -> Result<Self, Self::Error> {
