@@ -409,6 +409,62 @@ I[2023-05-19|10:13:54.116] indexed block exents                         module=t
 Note that the first block execution is very slow because we have to load the Wasm engine, as indicated by the first proposal having a timeout,
 but after that the blocks come in fast, one per second.
 
+### Run ETH API
+If we want to use `evm` related API, such as running `fendermint/eth/api/examples/ethers.rs`, we need to start ETH API process. 
+
+The ETH RPC api runs on top of cometbft. Make sure you have cometbft running properly. The architecture is as follows:
+```
++---------------------------+
+| Node                      |
+|                           |
+|   ------------------      |
+|   | fendermint run |      |
+|   |                |      |
+|   | :26658         |      |
+|   ------------------      |
+|     ^                     |
+|     |                     |
+|   ------------------      |
+|   | cometbft       |      |
+|   |                |      |
+|   | :26657         |      |
+|   ------------------      |
+|     |                     |
+| :26657                    |
++---------------------------+
+  ^
+  |
+-----------------------------
+| Ethereum API              |
+|                           |
+|   +-------------------+   |
+|   | fendermint eth run|   |
+|   |                   |   |
+|   | :8545             |   |
+|   +-------------------+   |
+|     |                     |
+| :8545                     |
+-----------------------------
+```
+To start the ethereum RPC api with:
+```
+cargo run -p fendermint_app --release -- eth run
+```
+We will see:
+<details>
+  <summary>ETH API log</summary>
+
+```console
+2023-07-20T12:30:48.385026Z  INFO fendermint::cmd: reading configuration path="/home/admin/.fendermint/config"
+2023-07-20T12:30:48.435387Z  INFO fendermint_eth_api: bound Ethereum API listen_addr=127.0.0.1:8545
+```
+
+</details>
+
+We can try query the chain id by:
+```shell
+curl -X POST -i   -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":0,"method":"eth_chainId","params":[]}'   http://localhost:8545
+```
 
 ## Query the state
 
