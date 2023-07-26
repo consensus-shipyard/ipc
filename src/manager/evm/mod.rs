@@ -1,18 +1,23 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-#[deprecated]
-mod conversion;
+// #[deprecated]
+// mod conversion;
 mod convert;
 mod manager;
 
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_gateway::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
-pub use manager::{gateway, subnet_contract, gateway_router_facet, EthSubnetManager};
+pub use manager::{gateway, gateway_router_facet, subnet_contract, EthSubnetManager};
+
+pub use convert::{eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount};
+use crate::checkpoint::NativeBottomUpCheckpoint;
+use crate::manager::evm::manager::subnet_actor_manager_facet;
 
 #[async_trait]
 pub trait EthManager: SubnetManager {
@@ -39,7 +44,7 @@ pub trait EthManager: SubnetManager {
     async fn submit_bottom_up_checkpoint(
         &self,
         from: &Address,
-        checkpoint: subnet_contract::BottomUpCheckpoint,
+        checkpoint: NativeBottomUpCheckpoint,
     ) -> anyhow::Result<ChainEpoch>;
 
     /// Has the validator voted in subnet contract at epoch
@@ -61,7 +66,10 @@ pub trait EthManager: SubnetManager {
     async fn bottom_up_checkpoint(
         &self,
         epoch: ChainEpoch,
-    ) -> anyhow::Result<subnet_contract::BottomUpCheckpoint>;
+    ) -> anyhow::Result<subnet_actor_manager_facet::BottomUpCheckpoint>;
+
+    /// Get the latest applied top down nonce
+    async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> anyhow::Result<u64>;
 
     /// Get the bottom up checkpoint a certain epoch
     async fn top_down_msgs(
@@ -69,7 +77,7 @@ pub trait EthManager: SubnetManager {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
         nonce: u64,
-    ) -> anyhow::Result<Vec<gateway::CrossMsg>>;
+    ) -> anyhow::Result<Vec<CrossMsg>>;
 
     /// Get the list of validators in a subnet
     async fn validators(&self, subnet_id: &SubnetID) -> anyhow::Result<Vec<Address>>;

@@ -16,15 +16,17 @@ use tokio::select;
 use tokio::time::sleep;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 
-pub use fvm::*;
+pub use bottomup::*;
 use ipc_identity::PersistentKeyStore;
+use ipc_sdk::subnet_id::SubnetID;
+pub use proof::create_proof;
 use std::fmt::Display;
+pub use topdown::*;
 
-mod fevm;
-mod fevm_fvm;
-mod fvm;
+mod bottomup;
 mod proof;
 mod setup;
+mod topdown;
 
 const TASKS_PROCESS_THRESHOLD_SEC: u64 = 15;
 const SUBMISSION_LOOK_AHEAD_EPOCH: ChainEpoch = 50;
@@ -32,6 +34,27 @@ const SUBMISSION_LOOK_AHEAD_EPOCH: ChainEpoch = 50;
 /// Checkpoint manager that handles a specific parent - child - checkpoint type tuple.
 /// For example, we might have `/r123` subnet and `/r123/t01` as child, one implementation of manager
 /// is handling the top-down checkpoint submission for `/r123` to `/r123/t01`.
+#[async_trait]
+pub trait VoteQuery<T> {
+    async fn last_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    async fn current_epoch(&self) -> Result<ChainEpoch>;
+    async fn has_voted(
+        &self,
+        subnet_id: &SubnetID,
+        epoch: ChainEpoch,
+        validator: &Address,
+    ) -> Result<bool>;
+}
+
+/// Checkpoint submission utility query trait
+#[async_trait]
+pub trait CheckpointQuery<T>: VoteQuery<T> {
+    /// Get the checkpoint period
+    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    /// Get the list of validators in the subnet id
+    async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>>;
+}
+
 #[async_trait]
 pub trait CheckpointManager: Display + Send + Sync {
     /// Get the subnet config that this manager is submitting checkpoints to. For example, if it is
@@ -62,15 +85,11 @@ pub trait CheckpointManager: Display + Send + Sync {
     async fn submit_checkpoint(&self, epoch: ChainEpoch, validator: &Address) -> Result<()>;
 
     /// Checks if the validator has already submitted in the epoch
-    async fn should_submit_in_epoch(
-        &self,
-        validator: &Address,
-        epoch: ChainEpoch,
-    ) -> anyhow::Result<bool>;
+    async fn should_submit_in_epoch(&self, validator: &Address, epoch: ChainEpoch) -> Result<bool>;
 
     /// Performs checks to see if the subnet is ready for checkpoint submission. If `true` means the
     /// subnet is ready for submission, else means the subnet is not ready.
-    async fn presubmission_check(&self) -> anyhow::Result<bool>;
+    async fn presubmission_check(&self) -> Result<bool>;
 }
 
 pub struct CheckpointSubsystem {
@@ -152,7 +171,7 @@ impl IntoSubsystem<anyhow::Error> for CheckpointSubsystem {
 
 fn handle_err_response(manager: &dyn CheckpointManager, response: anyhow::Result<()>) {
     if response.is_err() {
-        log::error!("manger {manager:} had error: {:}", response.unwrap_err());
+        log::warn!("manager {manager:} had error: {:}", response.unwrap_err());
     }
 }
 
@@ -196,6 +215,7 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
         .validators()
         .await
         .map_err(|e| anyhow!("cannot get child validators for {manager:} due to {e:}"))?;
+    log::debug!("list of validators from on chain: {validators:?} for manager: {manager:}");
     remove_not_managed(&mut validators, &manager.target_subnet().accounts());
     log::debug!("list of validators: {validators:?} for manager: {manager:}");
 
@@ -210,12 +230,14 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
         .last_executed_epoch()
         .await
         .map_err(|e| anyhow!("cannot get last executed epoch for {manager:} due to {e:}"))?;
+    log::debug!("obtained last executed epoch: {last_executed_epoch:} for manager: {manager:}");
     let current_epoch = manager
         .current_epoch()
         .await
         .map_err(|e| anyhow!("cannot get the current eopch for {manager:} due to {e:}"))?;
+    log::debug!("obtained current epoch: {last_executed_epoch:} for manager: {manager:}");
 
-    log::debug!(
+    log::info!(
         "latest epoch {:?}, last executed epoch: {:?} for checkpointing: {:}",
         current_epoch,
         last_executed_epoch,
@@ -270,4 +292,12 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
 fn remove_not_managed(validators: &mut Vec<Address>, managed_accounts: &[Address]) {
     let set: HashSet<_> = managed_accounts.iter().collect();
     validators.drain_filter(|v| !set.contains(v));
+}
+
+/// Tracks the metadata required for both top down and bottom up checkpoint submissions, such as
+/// parent/child subnet and checkpoint period.
+pub struct CheckpointMetadata {
+    pub(crate) parent: Subnet,
+    pub(crate) child: Subnet,
+    pub(crate) period: ChainEpoch,
 }

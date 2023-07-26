@@ -71,10 +71,10 @@ mod methods {
 }
 
 /// The default state wait confidence value
-/// TODO: we can afford 2 epochs confidence (and even one)
-/// with Mir, but with Filecoin mainnet this should be increased
+/// NOTE: we can afford 0 epochs confidence (and even one)
+/// with instant-finality consensus, but with Filecoin mainnet this should be increased
 /// in case there are reorgs.
-const STATE_WAIT_CONFIDENCE: u8 = 2;
+const STATE_WAIT_CONFIDENCE: u8 = 0;
 /// We dont set a limit on the look back epoch, i.e. check against latest block
 const STATE_WAIT_LOOK_BACK_NO_LIMIT: i8 = -1;
 /// We are not replacing any previous messages.

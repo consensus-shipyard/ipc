@@ -48,7 +48,7 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
         check_subnet(subnet_config)?;
 
         conn.manager()
-            .get_validator_set(&subnet_id, subnet_config.gateway_addr())
+            .get_validator_set(&subnet_id, Some(subnet_config.gateway_addr()))
             .await
     }
 }
