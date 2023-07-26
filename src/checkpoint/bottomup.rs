@@ -70,7 +70,10 @@ impl<P: BottomUpHandler, C: BottomUpHandler> BottomUpManager<P, C> {
         parent_handler: P,
         child_handler: C,
     ) -> Result<Self> {
-        let period = parent_handler.checkpoint_period(&child.id).await?;
+        let period = parent_handler
+            .checkpoint_period(&child.id)
+            .await
+            .map_err(|e| anyhow!("cannot get bottom up checkpoint period: {e}"))?;
         Ok(Self {
             metadata: CheckpointMetadata {
                 parent,
