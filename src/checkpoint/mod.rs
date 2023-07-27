@@ -220,7 +220,9 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
     log::debug!("list of validators: {validators:?} for manager: {manager:}");
 
     if validators.is_empty() {
-        log::info!("no validators: {validators:?} for manager: {manager:}, not submit checkpoints");
+        log::info!(
+            "no validators: {validators:?} for manager: {manager:}, do not submit checkpoints"
+        );
         return Ok(());
     }
 
