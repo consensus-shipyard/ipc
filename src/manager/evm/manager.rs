@@ -345,8 +345,10 @@ impl SubnetManager for EthSubnetManager {
     async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch> {
         self.ensure_same_gateway(gateway_addr)?;
 
-        let gateway_contract =
-            GatewayGetterFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+        let gateway_contract = GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
         let epoch = gateway_contract.last_voting_executed_epoch().call().await?;
 
         Ok(epoch as ChainEpoch)
