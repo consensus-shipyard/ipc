@@ -34,10 +34,17 @@ pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<Signi
 /// transactions and events. Default is 7, and for our child subnets we
 /// can reduce it to the block time (or potentially less)
 const ETH_PROVIDER_POLLING_TIME: Duration = Duration::from_secs(1);
+/// Maximum number of retries to fetch a transaction receipt.
+/// The number of retries should ensure that for the block time
+/// of the network the number of retires considering the polling
+/// time above waits enough tie to get the transaction receipt.
+/// We currently support a low polling time and high number of
+/// retries so these numbers accommodate fast subnets with slow
+/// roots (like Calibration and mainnet).
+const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 
 /// The majority vote percentage for checkpoint submission when creating a subnet.
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
-const TRANSACTION_RECEIPT_RETRIES: usize = 10;
 const SUBNET_NAME_MAX_LEN: usize = 32;
 
 // Create type bindings for the IPC Solidity contracts
