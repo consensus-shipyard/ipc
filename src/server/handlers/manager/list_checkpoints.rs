@@ -57,6 +57,7 @@ impl JsonRPCRequestHandler for ListBottomUpCheckpointsHandler {
             .manager()
             .list_checkpoints(child_subnet_id, request.from_epoch, request.to_epoch)
             .await?;
+        log::debug!("list of bottom up checkpoints: {checkpoints:?}");
 
         Ok(checkpoints)
     }
