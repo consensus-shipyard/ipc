@@ -370,7 +370,10 @@ impl SubnetManager for EthSubnetManager {
         let checkpoints = contract
             .list_bottom_up_checkpoints(from_epoch as u64, to_epoch as u64)
             .call()
-            .await?
+            .await?;
+        log::debug!("list of bottom up checkpoints from evm: {checkpoints:?}");
+
+        let checkpoints = checkpoints
             .into_iter()
             .map(NativeBottomUpCheckpoint::try_from)
             .collect::<Result<Vec<_>>>()?;
