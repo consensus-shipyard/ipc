@@ -310,6 +310,6 @@ mod tests {
             sig: vec![1, 2, 3],
         };
         let v = serde_json::to_string(&cp);
-        assert_eq!(v.is_ok(), true);
+        assert!(v.is_ok());
     }
 }
