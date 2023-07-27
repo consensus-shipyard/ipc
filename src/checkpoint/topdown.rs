@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 use crate::checkpoint::{CheckpointManager, CheckpointMetadata, CheckpointQuery};
 use crate::config::Subnet;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
@@ -45,7 +45,10 @@ impl<P: TopDownHandler, C: TopDownHandler> TopDownManager<P, C> {
         parent_handler: P,
         child_handler: C,
     ) -> Result<Self> {
-        let period = child_handler.checkpoint_period(&child.id).await?;
+        let period = child_handler
+            .checkpoint_period(&child.id)
+            .await
+            .map_err(|e| anyhow!("cannot get bottom up checkpoint period: {e}"))?;
         Ok(Self {
             metadata: CheckpointMetadata {
                 parent,

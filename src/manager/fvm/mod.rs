@@ -344,11 +344,14 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         subnet_id: SubnetID,
         from_epoch: ChainEpoch,
         to_epoch: ChainEpoch,
-    ) -> Result<Vec<BottomUpCheckpoint>> {
+    ) -> Result<Vec<NativeBottomUpCheckpoint>> {
         let checkpoints = self
             .lotus_client
             .ipc_list_checkpoints(subnet_id, from_epoch, to_epoch)
-            .await?;
+            .await?
+            .into_iter()
+            .map(NativeBottomUpCheckpoint::try_from)
+            .collect::<Result<Vec<_>>>()?;
         Ok(checkpoints)
     }
 
@@ -566,9 +569,11 @@ impl<T: JsonRpcClient + Send + Sync> BottomUpHandler for LotusSubnetManager<T> {
                     "error getting bottom-up checkpoint template for epoch:{epoch:} due to {e:}"
                 )
             })?;
+
         let mut checkpoint = BottomUpCheckpoint::new(template.source().clone(), epoch);
         checkpoint.data.children = template.data.children;
         checkpoint.data.cross_msgs = template.data.cross_msgs;
+        log::debug!("raw bottom up templated: {checkpoint:?}");
 
         NativeBottomUpCheckpoint::try_from(checkpoint)
     }

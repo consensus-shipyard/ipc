@@ -11,5 +11,4 @@ pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
 pub mod sdk;
-mod serialization;
 pub mod server;

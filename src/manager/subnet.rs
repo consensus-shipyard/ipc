@@ -3,12 +3,12 @@
 ///! IPC node-specific traits.
 use std::collections::HashMap;
 
+use crate::checkpoint::NativeBottomUpCheckpoint;
 use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_gateway::BottomUpCheckpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
 
@@ -113,7 +113,7 @@ pub trait SubnetManager: Send + Sync {
         subnet_id: SubnetID,
         from_epoch: ChainEpoch,
         to_epoch: ChainEpoch,
-    ) -> Result<Vec<BottomUpCheckpoint>>;
+    ) -> Result<Vec<NativeBottomUpCheckpoint>>;
 
     /// Returns the validator set
     async fn get_validator_set(

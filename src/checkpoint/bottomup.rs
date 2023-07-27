@@ -6,10 +6,14 @@ use crate::checkpoint::{CheckpointManager, CheckpointMetadata, CheckpointQuery};
 use crate::config::Subnet;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use base64::Engine;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_gateway::checkpoint::BatchCrossMsgs;
 use ipc_sdk::subnet_id::SubnetID;
+use num_traits::ToPrimitive;
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 
 /// Native bottom up checkpoint struct independent of chain specific implementations.
@@ -70,7 +74,10 @@ impl<P: BottomUpHandler, C: BottomUpHandler> BottomUpManager<P, C> {
         parent_handler: P,
         child_handler: C,
     ) -> Result<Self> {
-        let period = parent_handler.checkpoint_period(&child.id).await?;
+        let period = parent_handler
+            .checkpoint_period(&child.id)
+            .await
+            .map_err(|e| anyhow!("cannot get bottom up checkpoint period: {e}"))?;
         Ok(Self {
             metadata: CheckpointMetadata {
                 parent,
@@ -175,5 +182,134 @@ impl<P: BottomUpHandler, C: BottomUpHandler> CheckpointManager for BottomUpManag
     /// subnet is ready for submission, else means the subnet is not ready. Bottom up default to true.
     async fn presubmission_check(&self) -> Result<bool> {
         Ok(true)
+    }
+}
+
+// Serialization related
+
+/// A helper struct to serialize struct to json.
+///
+/// Most of the types should have no need to use this struct. But some types that are shared between
+/// actor, which are using cbor tuple serialization and json rpc response. We are using this wrapper
+/// to handle convert to json instead.
+#[derive(Debug)]
+struct SerializeToJson<T>(pub T);
+
+impl Serialize for NativeBottomUpCheckpoint {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let encoding_optional_bytes = |optional: &Option<Vec<u8>>| {
+            if let Some(p) = optional {
+                base64::engine::general_purpose::STANDARD.encode(p)
+            } else {
+                String::from("")
+            }
+        };
+
+        let NativeBottomUpCheckpoint {
+            source,
+            proof,
+            epoch,
+            prev_check,
+            children,
+            cross_msgs,
+            sig,
+        } = self;
+
+        let source = source.to_string();
+
+        let proof = encoding_optional_bytes(proof);
+        let prev_check = encoding_optional_bytes(prev_check);
+
+        let children = children
+            .iter()
+            .map(|c| {
+                let source = c.source.to_string();
+                let checks = c
+                    .checks
+                    .iter()
+                    .map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes))
+                    .collect::<Vec<_>>();
+                serde_json::json!({
+                    "source": source,
+                    "checks": checks,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let cross_msgs = SerializeToJson(cross_msgs);
+
+        let mut state = serializer.serialize_struct("CheckData", 7)?;
+        state.serialize_field("source", &source)?;
+        state.serialize_field("proof", &proof)?;
+        state.serialize_field("epoch", epoch)?;
+        state.serialize_field("prev_check", &prev_check)?;
+        state.serialize_field("children", &children)?;
+        state.serialize_field("cross_msgs", &cross_msgs)?;
+        state.serialize_field(
+            "sig",
+            &base64::engine::general_purpose::STANDARD.encode(sig),
+        )?;
+
+        state.end()
+    }
+}
+
+impl<'a> Serialize for SerializeToJson<&'a BatchCrossMsgs> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let BatchCrossMsgs { cross_msgs, fee } = self.0;
+
+        let mut state = serializer.serialize_struct("BatchCrossMsgs", 2)?;
+        state.serialize_field("fee", fee)?;
+
+        if let Some(cross_msgs) = cross_msgs {
+            let vs = cross_msgs.iter().map(|c| {
+                serde_json::json!({
+                    "from": c.msg.from.to_string().unwrap(), // safe to unwrap
+                    "to": c.msg.to.to_string().unwrap(), // safe to unwrap
+                    "method": c.msg.method,
+                    "params": base64::engine::general_purpose::STANDARD.encode(c.msg.params.bytes()),
+                    "value": c.msg.value.atto().to_u64().unwrap_or_default(),
+                    "nonce": c.msg.nonce,
+                })
+            })
+                .collect::<Vec<_>>();
+            state.serialize_field("cross_msgs", &vs)?;
+        } else {
+            state.serialize_field::<Vec<serde_json::Value>>("cross_msgs", &vec![])?;
+        };
+
+        state.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::checkpoint::{NativeBottomUpCheckpoint, NativeChildCheck};
+    use ipc_gateway::checkpoint::BatchCrossMsgs;
+    use ipc_sdk::subnet_id::SubnetID;
+
+    #[test]
+    fn test_serialization() {
+        let root = SubnetID::new_root(123);
+        let cp = NativeBottomUpCheckpoint {
+            source: root.clone(),
+            proof: Some(vec![1, 2, 3]),
+            epoch: 100,
+            prev_check: Some(vec![2, 3, 4]),
+            children: vec![NativeChildCheck {
+                source: root,
+                checks: vec![vec![1, 2, 3]],
+            }],
+            cross_msgs: BatchCrossMsgs::default(),
+            sig: vec![1, 2, 3],
+        };
+        let v = serde_json::to_string(&cp);
+        assert!(v.is_ok());
     }
 }

@@ -227,6 +227,7 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
     }
 
     let period = manager.checkpoint_period();
+    log::debug!("checkpoint period: {period} for manager: {manager}");
 
     let last_executed_epoch = manager
         .last_executed_epoch()

@@ -7,7 +7,6 @@ use crate::checkpoint::{
 };
 use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::manager::evm::subnet_contract;
 use crate::manager::{EthManager, EthSubnetManager, SubnetManager};
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -78,6 +77,8 @@ impl BottomUpHandler for FevmSubnetManager {
         epoch: ChainEpoch,
     ) -> anyhow::Result<NativeBottomUpCheckpoint> {
         let checkpoint = self.evm_subnet_manager.bottom_up_checkpoint(epoch).await?;
+        log::debug!("raw bottom up templated: {checkpoint:?}");
+
         NativeBottomUpCheckpoint::try_from(checkpoint)
     }
 
@@ -110,10 +111,7 @@ impl BottomUpHandler for FevmSubnetManager {
         checkpoint: NativeBottomUpCheckpoint,
     ) -> anyhow::Result<ChainEpoch> {
         self.evm_subnet_manager
-            .submit_bottom_up_checkpoint(
-                validator,
-                subnet_contract::BottomUpCheckpoint::try_from(checkpoint)?,
-            )
+            .submit_bottom_up_checkpoint(validator, checkpoint)
             .await
     }
 }
