@@ -178,6 +178,7 @@ base_type_conversion!(subnet_actor_manager_facet);
 base_type_conversion!(gateway_getter_facet);
 
 cross_msg_types!(subnet_actor_manager_facet);
+cross_msg_types!(subnet_actor_getter_facet);
 cross_msg_types!(gateway_getter_facet);
 cross_msg_types!(gateway_router_facet);
 

@@ -18,7 +18,7 @@ use ethers::types::Eip1559TransactionRequest;
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_gateway::{BottomUpCheckpoint, TopDownCheckpoint};
+use ipc_gateway::TopDownCheckpoint;
 use ipc_identity::{EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
@@ -214,6 +214,8 @@ impl SubnetManager for EthSubnetManager {
         let mut s = HashMap::new();
 
         let evm_subnets = gateway_contract.list_subnets().call().await?;
+        log::debug!("raw subnet: {evm_subnets:?}");
+
         for subnet in evm_subnets {
             let info = SubnetInfo::try_from(subnet)?;
             s.insert(info.id.clone(), info);
@@ -342,17 +344,41 @@ impl SubnetManager for EthSubnetManager {
         Ok(TokenAmount::from_atto(balance.as_u128()))
     }
 
-    async fn last_topdown_executed(&self, _gateway_addr: &Address) -> Result<ChainEpoch> {
-        todo!()
+    async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch> {
+        self.ensure_same_gateway(gateway_addr)?;
+
+        let gateway_contract = GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let epoch = gateway_contract.last_voting_executed_epoch().call().await?;
+
+        Ok(epoch as ChainEpoch)
     }
 
     async fn list_checkpoints(
         &self,
-        _subnet_id: SubnetID,
-        _from_epoch: ChainEpoch,
-        _to_epoch: ChainEpoch,
-    ) -> Result<Vec<BottomUpCheckpoint>> {
-        todo!()
+        subnet_id: SubnetID,
+        from_epoch: ChainEpoch,
+        to_epoch: ChainEpoch,
+    ) -> Result<Vec<NativeBottomUpCheckpoint>> {
+        let address = contract_address_from_subnet(&subnet_id)?;
+        log::info!("listing checkpoints in evm subnet: {subnet_id} at contract: {address}");
+
+        let contract =
+            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let checkpoints = contract
+            .list_bottom_up_checkpoints(from_epoch as u64, to_epoch as u64)
+            .call()
+            .await?;
+        log::debug!("list of bottom up checkpoints from evm: {checkpoints:?}");
+
+        let checkpoints = checkpoints
+            .into_iter()
+            .map(NativeBottomUpCheckpoint::try_from)
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(checkpoints)
     }
 
     async fn get_validator_set(

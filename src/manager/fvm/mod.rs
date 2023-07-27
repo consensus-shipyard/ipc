@@ -344,11 +344,14 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         subnet_id: SubnetID,
         from_epoch: ChainEpoch,
         to_epoch: ChainEpoch,
-    ) -> Result<Vec<BottomUpCheckpoint>> {
+    ) -> Result<Vec<NativeBottomUpCheckpoint>> {
         let checkpoints = self
             .lotus_client
             .ipc_list_checkpoints(subnet_id, from_epoch, to_epoch)
-            .await?;
+            .await?
+            .into_iter()
+            .map(NativeBottomUpCheckpoint::try_from)
+            .collect::<Result<Vec<_>>>()?;
         Ok(checkpoints)
     }
 

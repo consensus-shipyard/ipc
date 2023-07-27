@@ -29,7 +29,6 @@ impl CommandLineHandler for ListBottomUpCheckpoints {
             .await?;
 
         for c in checkpoints.iter() {
-            let c = &c["data"];
             log::info!(
                 "epoch {} - prev_check={}, cross_msgs={}, child_checks={}",
                 c["epoch"],
