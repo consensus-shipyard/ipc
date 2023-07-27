@@ -1,4 +1,4 @@
-# IPC Quick Start: zero-to-subnet
+# IPC Quick Start: zero-to-subnet (on Spacenet)
 
 >💡 Background and detailed are available in the [README](/README.md).
 

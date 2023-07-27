@@ -26,11 +26,12 @@ Options:
 
 The IPC Agent is the entry point to interacting with IPC. It is a client application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.
 
->💡 **We've prepared a [quick start guide](/docs/quickstart.md) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
+>💡 **We've prepared a [quick start guide](/docs/quickstart-calibration.md) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
 See:
 - [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture
 - [docs/usage.md](docs/usage.md) for instructions on how to use the IPC Agent to interact with subnets
+- [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own IPC root contract and hierarchy
 - [docs/contracts.md](docs/contracts.md) for instructions on how to deploy FEVM actors on subnets
 - [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions
 
@@ -146,7 +147,7 @@ gateway_addr = "t064"
 jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 ```
 
-> 💡 In the current implementation of Spacenet, the gateway is always deployed in the `f064` address. This should be the address always reflected on your config for the gateway. In the future, this will change, and the gateway may be deployed in different addresses.
+> 💡 In the current implementation of Spacenet, the gateway is always deployed in the `t064` address. This should be the address always reflected on your config for the gateway. In the future, this will change, and the gateway may be deployed in different addresses.
 
 > 💡 If you are already running the daemon, then run `./bin/ipc-agent config reload` to pick up the config changes.
 
