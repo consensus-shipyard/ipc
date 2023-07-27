@@ -33,6 +33,18 @@ To deploy the contracts in some other network configured in the Hardhat config y
 ```bash
 make deploy-ipc NETWORK=<network-name>
 ```
+## Branching Strategy
+
+### Production branch
+
+The production branch is `main`.
+The `main` branch is always compatible with the "stable" release of the IPC agent that's running on Spacenet.
+Updates to `main` **always** come from the `dev` branch.
+
+### Development branch
+
+The primary development branch is `dev`.
+`dev` contains the most up-to-date software but may not be compatible with the version of the contracts deployed on spacenet and the `main` branch of the IPC agent. Only use `dev` if doing a full local deployment, but note that the packaged deployment scripts default to checking out `main` branches instead of `dev`.
 
 # Actors overview
 
