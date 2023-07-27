@@ -214,6 +214,8 @@ impl SubnetManager for EthSubnetManager {
         let mut s = HashMap::new();
 
         let evm_subnets = gateway_contract.list_subnets().call().await?;
+        log::debug!("raw subnet: {evm_subnets:?}");
+
         for subnet in evm_subnets {
             let info = SubnetInfo::try_from(subnet)?;
             s.insert(info.id.clone(), info);
