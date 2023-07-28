@@ -110,3 +110,6 @@ or
 ```bash
 make prepare
 ```
+
+# Bugs
+Please report any bugs using the [issue tracker](https://github.com/consensus-shipyard/ipc-solidity-actors/issues).
