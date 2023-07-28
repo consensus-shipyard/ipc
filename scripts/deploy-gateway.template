@@ -2,12 +2,14 @@
 /* eslint prefer-const: "off" */
 
 import hre, { ethers } from "hardhat";
-import { deployContractWithDeployer, getTransactionFees } from './util';
+import {deployContractWithDeployer, getTransactionFees} from './util';
+
+const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
 export async function deploy(libs: { [key in string]: string }) {
     if (!libs || Object.keys(libs).length === 0) throw new Error(`Libraries are missing`);
 
-    // choose chain ID according to the network in 
+    // choose chain ID according to the network in
     // environmental variable
     let chainId = 31415926;
     if (process.env.NETWORK == "calibrationnet") {
@@ -24,6 +26,84 @@ export async function deploy(libs: { [key in string]: string }) {
 
     const txArgs = await getTransactionFees();
 
+    const FacetNames = [
+        'GatewayGetterFacet',
+        'GatewayManagerFacet',
+        'GatewayRouterFacet'
+    ]
+
+    const facetCuts = []
+
+    type Libraries = {
+        [libraryName: string]: string;
+    }
+
+    // ----
+
+    const getterFacetLibs: Libraries = {
+        "CheckpointHelper": libs["CheckpointHelper"],
+        "SubnetIDHelper": libs["SubnetIDHelper"]
+    }
+
+    let getterFacet = await deployContractWithDeployer(
+        deployer,
+        "GatewayGetterFacet",
+        getterFacetLibs, txArgs
+    );
+    await getterFacet.deployed();
+
+    facetCuts.push({
+        facetAddress: getterFacet.address,
+        action: FacetCutAction.Add,
+        functionSelectors: getSelectors(getterFacet)
+    })
+
+    // ----
+
+    const managerFacetLibs: Libraries = {
+        "AccountHelper": libs["AccountHelper"],
+        "CrossMsgHelper": libs["CrossMsgHelper"],
+        "SubnetIDHelper": libs["SubnetIDHelper"]
+    }
+
+    const managerFacet = await deployContractWithDeployer(
+        deployer,
+        "GatewayManagerFacet",
+        managerFacetLibs,
+        txArgs
+    );
+
+    facetCuts.push({
+        facetAddress: managerFacet.address,
+        action: FacetCutAction.Add,
+        functionSelectors: getSelectors(managerFacet)
+    })
+
+    // ----
+
+    const routerFacetLibs: Libraries = {
+        "AccountHelper": libs["AccountHelper"],
+        "CrossMsgHelper": libs["CrossMsgHelper"],
+        "EpochVoteSubmissionHelper": libs["EpochVoteSubmissionHelper"],
+        "ExecutableQueueHelper": libs["ExecutableQueueHelper"],
+        "CheckpointHelper": libs["CheckpointHelper"],
+        "SubnetIDHelper": libs["SubnetIDHelper"],
+        "StorableMsgHelper": libs["StorableMsgHelper"]
+    }
+
+    const routerFacet = await deployContractWithDeployer(
+        deployer,
+        "GatewayRouterFacet",
+        routerFacetLibs,
+        txArgs
+    );
+
+    facetCuts.push({
+        facetAddress: routerFacet.address,
+        action: FacetCutAction.Add,
+        functionSelectors: getSelectors(routerFacet)
+    })
+
     const gatewayConstructorParams = {
         networkName: {
             root: chainId,
@@ -35,11 +115,22 @@ export async function deploy(libs: { [key in string]: string }) {
         majorityPercentage: 66
     }
 
-    const { address: gatewayAddress } = await deployContractWithDeployer(deployer, "Gateway", LIBMAP, gatewayConstructorParams, txArgs);
+    const diamondLibs: Libraries = {
+        "SubnetIDHelper": libs["SubnetIDHelper"]
+    }
 
+    // deploy Diamond
+    const { address: gatewayAddress } = await deployContractWithDeployer(
+        deployer,
+        "GatewayDiamond",
+        diamondLibs,
+        facetCuts, gatewayConstructorParams,
+        txArgs
+    );
+
+    // returning the address of the diamond
     return {
         "ChainID": chainId,
         "Gateway": gatewayAddress
     }
-
 }

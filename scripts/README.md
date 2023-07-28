@@ -16,9 +16,9 @@ npx hardhat deploy-libraries
 npx hardhat deploy-gateway
 ```
 
-## To deploy only the SubnetActor:
+## To deploy only the Gateway Actor:
 ```bash
-npx hardhat deploy-subnet
+npx hardhat deploy-gateway
 ```
 
 ## To deploy only the Registry:

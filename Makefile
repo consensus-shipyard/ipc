@@ -30,10 +30,16 @@ lint:
 format:
 	npx prettier --check -w 'src/**/*.sol' 'test/*.sol'
 
+build:
+	forge build
+
 test:
-	forge test
+	forge test -vvv --ffi
+
+storage:
+	npx hardhat storage-layout --update
 
 prepare: format lint test slither
 
 # ==============================================================================
-.PHONY: deploy-ipc lint format check-subnet slither check-gateway test prepare
+.PHONY: deploy-ipc lint format check-subnet slither check-gateway test prepare storage build

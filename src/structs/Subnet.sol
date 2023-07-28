@@ -16,12 +16,12 @@ struct SubnetID {
 }
 
 struct Subnet {
-    Status status;
-    uint64 topDownNonce;
-    uint64 appliedBottomUpNonce;
     uint256 stake;
     uint256 genesisEpoch;
     uint256 circSupply;
+    uint64 topDownNonce;
+    uint64 appliedBottomUpNonce;
+    Status status;
     SubnetID id;
     BottomUpCheckpoint prevCheckpoint;
     CrossMsg[] topDownMsgs;

@@ -1,7 +1,7 @@
 /* global ethers */
 /* eslint prefer-const: "off" */
 
-import hre, { ethers } from "hardhat";
+import {hre, ethers } from "hardhat";
 import { deployContractWithDeployer, getTransactionFees } from './util';
 
 export async function deploy(gatewayAddress: string, libs: { [key in string]: string }) {

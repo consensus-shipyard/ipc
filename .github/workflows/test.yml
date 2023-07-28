@@ -1,26 +1,31 @@
 name: Tests
 
-on: 
- push:
+on:
+  push:
     branches: [ main ]
- pull_request:
-    branches: [ main ]
+  pull_request:
 
 jobs:
   tests:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           submodules: recursive
-           
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install abi
+        run: pip install eth_abi
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          cache: false
 
       - name: Run tests
-        run: forge test -vvv
+        run: forge test -vvv --ffi

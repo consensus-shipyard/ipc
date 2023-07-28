@@ -7,7 +7,12 @@ import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import "../src/SubnetRegistry.sol";
+import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
+import {SubnetID} from "../src/structs/Subnet.sol";
+import {SubnetRegistry} from "../src/SubnetRegistry.sol";
+import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 
 contract SubnetRegistryTest is Test {
     using SubnetIDHelper for SubnetID;
@@ -17,16 +22,23 @@ contract SubnetRegistryTest is Test {
     bytes32 private constant DEFAULT_NETWORK_NAME = bytes32("test");
     uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
-    string private constant DEFAULT_NET_ADDR = "netAddr";
     bytes private constant GENESIS = EMPTY_BYTES;
-    uint256 constant CROSS_MSG_FEE = 10 gwei;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     uint64 private constant ROOTNET_CHAINID = 123;
 
-    SubnetRegistry sr;
+    SubnetRegistry registry;
 
     function setUp() public {
-        sr = new SubnetRegistry(DEFAULT_IPC_GATEWAY_ADDR);
+        bytes4[] memory mockedSelectors = new bytes4[](1);
+        mockedSelectors[0] = 0x6cb2ecee;
+
+        bytes4[] memory mockedSelectors2 = new bytes4[](1);
+        mockedSelectors2[0] = 0x133f74ea;
+
+        address getter = address(new SubnetActorGetterFacet());
+        address manager = address(new SubnetActorManagerFacet());
+
+        registry = new SubnetRegistry(DEFAULT_IPC_GATEWAY_ADDR, getter, manager, mockedSelectors, mockedSelectors2);
     }
 
     function test_Registry_Deployment_Works() public {
@@ -53,7 +65,7 @@ contract SubnetRegistryTest is Test {
         uint8 _majorityPercentage
     ) public {
         vm.startPrank(DEFAULT_SENDER);
-        SubnetActor.ConstructParams memory params = SubnetActor.ConstructParams({
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             name: _name,
             ipcGatewayAddr: _ipcGatewayAddr,
@@ -65,9 +77,9 @@ contract SubnetRegistryTest is Test {
             majorityPercentage: _majorityPercentage,
             genesis: _genesis
         });
-        sr.newSubnetActor(params);
-        require(sr.latestSubnetDeployed(DEFAULT_SENDER) != address(0));
-        require(sr.subnets(DEFAULT_SENDER, 0) != address(0), "fails");
-        require(sr.getSubnetDeployedByNonce(DEFAULT_SENDER, 0) == sr.latestSubnetDeployed(DEFAULT_SENDER));
+        registry.newSubnetActor(params);
+        require(registry.latestSubnetDeployed(DEFAULT_SENDER) != address(0));
+        require(registry.subnets(DEFAULT_SENDER, 0) != address(0), "fails");
+        require(registry.getSubnetDeployedByNonce(DEFAULT_SENDER, 0) == registry.latestSubnetDeployed(DEFAULT_SENDER));
     }
 }

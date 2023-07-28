@@ -5,14 +5,14 @@ import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
 
 library ExecutableQueueHelper {
     function push(ExecutableQueue storage queue, uint64 epoch) public {
-        if (epoch == 0) {
+        if (epoch == queue.genesisEpoch) {
             return;
         }
 
-        if (queue.first == 0 || queue.first > epoch) {
+        if (queue.first == queue.genesisEpoch || queue.first > epoch) {
             queue.first = epoch;
         }
-        if (queue.last == 0 || queue.last < epoch) {
+        if (queue.last == queue.genesisEpoch || queue.last < epoch) {
             queue.last = epoch;
         }
 

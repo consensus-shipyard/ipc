@@ -19,12 +19,27 @@ contract ExecutableQueueHelperTest is Test {
 
     function setUp() public {
         queue.period = BLOCKS_PER_EPOCH;
+        queue.genesisEpoch = 0;
     }
 
     function test_Push_Works_ZeroEpoch() public {
         queue.push(0);
 
         require(queue.epochs[0] == false);
+    }
+
+    function test_Push_Works_GenesisEpochInvalid() public {
+        queue.genesisEpoch = 10;
+        queue.push(10);
+
+        require(queue.epochs[10] == false);
+    }
+
+    function test_Push_Works_NonGenesisEpochValid() public {
+        queue.genesisEpoch = 10;
+        queue.push(11);
+
+        require(queue.epochs[11]);
     }
 
     function test_Push_Works_OneEpoch() public {

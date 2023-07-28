@@ -1,13 +1,14 @@
 import { HardhatUserConfig, task } from "hardhat/config";
 import '@typechain/hardhat';
+import "hardhat-storage-layout-changes";
 
 import "@nomicfoundation/hardhat-foundry";
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-deploy";
-import 'hardhat-contract-sizer';
+import "hardhat-contract-sizer";
 
-import dotenv from 'dotenv';
-import fs from 'fs';
+import dotenv from "dotenv";
+import fs from "fs";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 dotenv.config();
@@ -47,9 +48,7 @@ async function getDeployments(env: string): Promise<{ [key in string]: string }>
 task('deploy-libraries', 'Build and deploys all libraries on the selected network', async (args, hre: HardhatRuntimeEnvironment) => {
   const { deploy } = await lazyImport('./scripts/deploy-libraries');
   const libsDeployment = await deploy();
-
   console.log(libsDeployment);
-
   await saveDeployments(hre.network.name, libsDeployment, 'libs');
 });
 
@@ -81,10 +80,40 @@ task('deploy-subnet', 'Builds and deploys the SubnetActor contract on the select
   await saveDeployments(network, subnetDeployment);
 });
 
+task('deploy-gw-diamond-and-facets', 'Builds and deploys Gateway Actor diamond and its facets', async (args, hre: HardhatRuntimeEnvironment) => {
+  const network = hre.network.name;
+  const deployments = await getDeployments(network);
+  const { deployDiamond } = await lazyImport('./scripts/deploy-gw-diamond');
+  const gatewayActorDiamond = await deployDiamond(deployments.libs);
+  console.log(gatewayActorDiamond);
+  await saveDeployments(network, gatewayActorDiamond);
+});
+
+task('deploy-sa-diamond-and-facets', 'Builds and deploys Subnet Actor diamond and its facets', async (args, hre: HardhatRuntimeEnvironment) => {
+  const network = hre.network.name;
+  const deployments = await getDeployments(network);
+  const { deployDiamond } = await lazyImport('./scripts/deploy-sa-diamond');
+  const subnetActorDiamond = await deployDiamond(deployments.GatewayActorDiamond,deployments.libs);
+  console.log(subnetActorDiamond);
+  await saveDeployments(network, subnetActorDiamond);
+});
+
 task('deploy', 'Builds and deploys all contracts on the selected network', async (args, hre: HardhatRuntimeEnvironment) => {
   await hre.run('compile');
   await hre.run('deploy-libraries');
   await hre.run('deploy-gateway');
+});
+
+task('deploy-gw-diamond', 'Builds and deploys Gateway Actor diamond', async (args, hre: HardhatRuntimeEnvironment) => {
+  await hre.run('compile');
+  await hre.run('deploy-libraries');
+  await hre.run('deploy-gw-diamond-and-facets');
+});
+
+task('deploy-sa-diamond', 'Builds and deploys Subnet Actor diamond', async (args, hre: HardhatRuntimeEnvironment) => {
+  await hre.run('compile');
+  await hre.run('deploy-libraries');
+  await hre.run('deploy-sa-diamond-and-facets');
 });
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -127,8 +156,19 @@ const config: HardhatUserConfig = {
     outDir: 'typechain',
     target: 'ethers-v5',
   },
+  paths: {
+    storageLayouts: ".storage-layouts",
+  },
+  storageLayoutChanges: {
+    contracts: [
+      'GatewayDiamond',
+      'SubnetActorDiamond',
+      'GatewayActorModifiers',
+      'SubnetActorModifiers',
+    ],
+    fullPath: false,
+  },
 };
-
 
 export default config;
 

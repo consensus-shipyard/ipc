@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import {SubnetActor} from "./SubnetActor.sol";
-import {SubnetID} from "./structs/Subnet.sol";
-import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
+import {SubnetActorDiamond} from "./SubnetActorDiamond.sol";
+import {IDiamond} from "./interfaces/IDiamond.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
-contract SubnetRegistry {
-    using SubnetIDHelper for SubnetID;
+contract SubnetRegistry is ReentrancyGuard {
+    address public immutable gateway;
+
+    /// The getter and manager facet shared by diamond
+    address public getterFacet;
+    address public managerFacet;
+
+    /// The subnet getter facet functions selectors
+    bytes4[] public subnetGetterSelectors;
+    /// The subnet manager facet functions selectors
+    bytes4[] public subnetManagerSelectors;
 
     /// @notice Mapping that tracks the deployed subnet actors per user.
     /// Key is the hash of Subnet ID, values are addresses.
@@ -18,28 +27,67 @@ contract SubnetRegistry {
     /// owner => nonce
     mapping(address => uint64) public userNonces;
 
-    address public immutable gateway;
-
     /// @notice Event emitted when a new subnet is deployed.
     event SubnetDeployed(address subnetAddr);
 
+    error FacetCannotBeZero();
     error WrongGateway();
-    error ZeroGatewayAddress();
+    error CannotFindSubnet();
     error UnknownSubnet();
+    error GatewayCannotBeZero();
 
-    constructor(address _gateway) {
+    constructor(
+        address _gateway,
+        address _getterFacet,
+        address _managerFacet,
+        bytes4[] memory _subnetGetterSelectors,
+        bytes4[] memory _subnetManagerSelectors
+    ) {
         if (_gateway == address(0)) {
-            revert ZeroGatewayAddress();
+            revert GatewayCannotBeZero();
         }
+        if (_getterFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+        if (_managerFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+
         gateway = _gateway;
+        getterFacet = _getterFacet;
+        managerFacet = _managerFacet;
+
+        subnetGetterSelectors = _subnetGetterSelectors;
+        subnetManagerSelectors = _subnetManagerSelectors;
     }
 
-    function newSubnetActor(SubnetActor.ConstructParams calldata params) external returns (address subnetAddr) {
-        if (params.ipcGatewayAddr != gateway) {
+    /// @notice Deploys a new subnet actor.
+    /// @param _params The constructor params for Subnet Actor Diamond.
+    function newSubnetActor(
+        SubnetActorDiamond.ConstructorParams calldata _params
+    ) external nonReentrant returns (address subnetAddr) {
+        if (_params.ipcGatewayAddr != gateway) {
             revert WrongGateway();
         }
 
-        subnetAddr = address(new SubnetActor(params));
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
+
+        // set the diamond cut for subnet getter
+        diamondCut[0] = IDiamond.FacetCut({
+            facetAddress: getterFacet,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: subnetGetterSelectors
+        });
+
+        // set the diamond cut for subnet manager
+        diamondCut[1] = IDiamond.FacetCut({
+            facetAddress: managerFacet,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: subnetManagerSelectors
+        });
+
+        // slither-disable-next-line reentrancy-benign
+        subnetAddr = address(new SubnetActorDiamond(diamondCut, _params));
 
         subnets[msg.sender][userNonces[msg.sender]] = subnetAddr;
         ++userNonces[msg.sender];
@@ -50,9 +98,15 @@ contract SubnetRegistry {
     /// @notice Returns the address of the latest subnet actor
     /// deployed by a user
     function latestSubnetDeployed(address owner) external view returns (address subnet) {
-        subnet = subnets[owner][userNonces[owner] - 1];
+        uint64 nonce = userNonces[owner];
+        // need unchecked when nonce == 0 or else will underflow
+        unchecked {
+            nonce -= 1;
+        }
+
+        subnet = subnets[owner][nonce];
         if (subnet == address(0)) {
-            revert ZeroGatewayAddress();
+            revert CannotFindSubnet();
         }
     }
 
@@ -61,7 +115,7 @@ contract SubnetRegistry {
     function getSubnetDeployedByNonce(address owner, uint64 nonce) external view returns (address subnet) {
         subnet = subnets[owner][nonce];
         if (subnet == address(0)) {
-            revert ZeroGatewayAddress();
+            revert CannotFindSubnet();
         }
     }
 }

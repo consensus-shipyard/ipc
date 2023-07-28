@@ -1,11 +1,10 @@
-import hre, { ethers } from 'hardhat';
-import { getTransactionFees } from './util';
+import { ethers } from 'hardhat';
+import { deployContractWithDeployer, getTransactionFees } from './util';
+
+const { getSelectors } = require('./js/diamond.js')
 
 async function main() {
   try {
-
-    await hre.run('compile');
-
     const [deployer] = await ethers.getSigners();
     const balance = await deployer.getBalance();
 
@@ -15,8 +14,43 @@ async function main() {
     const txArgs = await getTransactionFees();
 
     // deploy
-    const registry = await ethers.getContractFactory('SubnetRegistry', { signer: deployer, libraries: LIBMAP });
-    const contract = await registry.deploy(gatewayAddress, txArgs);
+    const getterFacet = await deployContractWithDeployer(
+      deployer,
+      "SubnetActorGetterFacet",
+      {},
+      txArgs
+    );
+    const getterSelectors = getSelectors(getterFacet);
+    console.log("getter address:", getterFacet.address);
+
+    const managerFacet = await deployContractWithDeployer(
+      deployer,
+      "SubnetActorManagerFacet",
+      {
+        AccountHelper: LIBMAP['AccountHelper'],
+        CheckpointHelper: LIBMAP['CheckpointHelper'],
+        EpochVoteSubmissionHelper: LIBMAP['EpochVoteSubmissionHelper'],
+        ExecutableQueueHelper: LIBMAP['ExecutableQueueHelper'],
+        SubnetIDHelper: LIBMAP['SubnetIDHelper'],
+        CrossMsgHelper: LIBMAP['CrossMsgHelper'],
+      },
+      txArgs
+    );
+    const managerSelectors = getSelectors(managerFacet);
+    console.log("manager address:", managerFacet.address);
+
+    const registry = await ethers.getContractFactory('SubnetRegistry', { signer: deployer, libraries: {
+      "SubnetIDHelper": LIBMAP["SubnetIDHelper"]
+    }});
+
+    const contract = await registry.deploy(
+      gatewayAddress, 
+      getterFacet.address,
+      managerFacet.address,
+      getterSelectors,
+      managerSelectors, 
+      txArgs
+    );
 
     // FEVM: 
     console.log(`registry contract deployed to: ${contract.address}`);

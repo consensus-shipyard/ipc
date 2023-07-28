@@ -2,7 +2,7 @@
 [![SAST](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/sast.yaml/badge.svg)](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/sast.yaml)
 [![Tests](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/test.yml/badge.svg)](https://github.com/consensus-shipyard/ipc-solidity-actors/actions/workflows/test.yml)
 
-**‼️ The IPC Agent, the IPC actors, and Eudico haven't been audited, tested in depth, or otherwise verified.
+**‼️ The IPC Agent, the IPC actors (Rust, Solidity), and Eudico haven't been audited, tested in depth, or otherwise verified.
 Moreover, the system is missing critical recovery functionality in case of crashes.
 There are multiple ways in which you may lose funds moved into an IPC subnet,
 and we strongly advise against deploying IPC on mainnet and/or using it with tokens with real value.**
@@ -13,8 +13,8 @@ These actors are written in Solidity and target Filecoin’s FEVM.
 
 The project accommodates the following main contracts
 
-- `Gateway.sol`: Implementation of the IPC gateway.
-- `SubnetActor.sol`: Reference implementation of an IPC subnet actor.
+- `GatewayDiamond.sol`: Implementation of the IPC Gateway within the Diamond pattern.
+- `SubnetActorDiamond.sol`: Reference implementation of an IPC SubnetActor within the Diamond pattern.
 - `SubnetRegistry.sol`: Registry contract for seamlessly deploying subnet actors.
 
 # Deploying IPC Solidity contracts
@@ -87,7 +87,7 @@ The build artifacts (contracts’ ABI `.json` files), can be found in the `out` 
 To run all repo tests run
 
 ```bash
-forge test
+forge test -vvv --ffi
 ```
 
 And to generate coverage report run
@@ -110,3 +110,5 @@ or
 ```bash
 make prepare
 ```
+
+Use `make storage` to check that the storage layout has not been corrupted.
