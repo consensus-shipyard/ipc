@@ -23,7 +23,7 @@ done
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
   add-account --public-key $KEYS_DIR/alice.pk \
-              --balance 1000000000000000000
+              --balance 1000
 
 # Create a multisig account
 fendermint \
@@ -32,7 +32,7 @@ fendermint \
                 --public-key $KEYS_DIR/charlie.pk \
                 --public-key $KEYS_DIR/dave.pk \
                 --threshold 2 --vesting-start 0 --vesting-duration 1000000 \
-                --balance 3000000000000000000
+                --balance 3000
 
 # Create some Ethereum accounts
 for NAME in emily eric; do
@@ -40,7 +40,7 @@ for NAME in emily eric; do
   fendermint \
     genesis --genesis-file $GENESIS_FILE \
     add-account --public-key $KEYS_DIR/$NAME.pk \
-                --balance 1000000000000000000000 \
+                --balance 1000 \
                 --kind ethereum
 done
 

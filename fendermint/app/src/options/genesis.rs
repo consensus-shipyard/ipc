@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Subcommand, ValueEnum};
 
-use super::parse::{parse_network_version, parse_token_amount};
+use super::parse::{parse_full_fil, parse_network_version, parse_token_amount};
 use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -59,8 +59,8 @@ pub struct GenesisAddAccountArgs {
     /// Path to the Secp256k1 public key exported in base64 format.
     #[arg(long, short)]
     pub public_key: PathBuf,
-    /// Initial balance in atto.
-    #[arg(long, short, value_parser = parse_token_amount)]
+    /// Initial balance in full FIL units.
+    #[arg(long, short, value_parser = parse_full_fil)]
     pub balance: TokenAmount,
     /// Indicate whether the account is a regular or ethereum account.
     #[arg(long, short, default_value = "regular")]
@@ -72,8 +72,8 @@ pub struct GenesisAddMultisigArgs {
     /// Path to the Secp256k1 public key exported in base64 format, one for each signatory.
     #[arg(long, short)]
     pub public_key: Vec<PathBuf>,
-    /// Initial balance in atto.
-    #[arg(long, short, value_parser = parse_token_amount)]
+    /// Initial balance in full FIL units.
+    #[arg(long, short, value_parser = parse_full_fil)]
     pub balance: TokenAmount,
     /// Number of signatures required.
     #[arg(long, short)]

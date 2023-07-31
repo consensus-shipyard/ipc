@@ -59,6 +59,7 @@ jobs:
       SCCACHE_CACHE_SIZE: 10G
       CC: "sccache clang"
       CXX: "sccache clang++"
+      PROFILE: "ci"
 
     steps:
       - name: Check out the project

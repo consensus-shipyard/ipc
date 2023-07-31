@@ -1,5 +1,6 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
+BUILTIN_ACTORS_TAG:=v11.0.0
 BUILTIN_ACTORS_DIR:=../builtin-actors
 BUILTIN_ACTORS_CODE:=$(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs" | grep -v target)
 BUILTIN_ACTORS_BUNDLE:=$(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
@@ -11,6 +12,9 @@ IPC_ACTORS_ABI:=$(IPC_ACTORS_DIR)/out/.compile.abi
 
 FENDERMINT_CODE:=$(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
+# Override PROFILE env var to choose between `local | ci`
+PROFILE?=local
+
 all: test build
 
 build:
@@ -21,7 +25,7 @@ test: $(BUILTIN_ACTORS_BUNDLE)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) cargo test --release --workspace --exclude smoke-test
 
 e2e: docker-build
-	cd fendermint/testing/smoke-test && cargo make
+	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
 
 clean:
 	cargo clean
@@ -49,16 +53,13 @@ docker-build: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE) $(IPC_ACTORS_ABI)
 	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
 	cp $(IPC_ACTORS_DIR)/out/*.json docker/.artifacts/contracts
 
-	if [ -z "$${GITHUB_ACTIONS}" ]; then \
-		DOCKER_FILE=local ; \
-	else \
+	if [ "$(PROFILE)" = "ci" ]; then \
 		$(MAKE) --no-print-directory build && \
-		cp ./target/release/fendermint docker/.artifacts && \
-		DOCKER_FILE=ci ; \
+		cp ./target/release/fendermint docker/.artifacts ; \
 	fi && \
 	DOCKER_BUILDKIT=1 \
 	docker build \
-		-f docker/$${DOCKER_FILE}.Dockerfile \
+		-f docker/$(PROFILE).Dockerfile \
 		-t fendermint:latest $(PWD)
 
 	rm -rf docker/.artifacts
@@ -77,8 +78,7 @@ $(BUILTIN_ACTORS_BUNDLE): $(BUILTIN_ACTORS_CODE)
 		git clone https://github.com/filecoin-project/builtin-actors.git; \
 	fi
 	cd $(BUILTIN_ACTORS_DIR) && \
-	git checkout next && \
-	git pull && \
+	git checkout $(BUILTIN_ACTORS_TAG) && \
 	rustup target add wasm32-unknown-unknown && \
 	cargo run --release -- -o output/$(shell basename $@)
 

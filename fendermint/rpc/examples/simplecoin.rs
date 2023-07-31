@@ -126,17 +126,20 @@ async fn main() {
         .value
         .chain_id;
 
-    let mf = MessageFactory::new(sk, sn, ChainID::from(chain_id)).unwrap();
+    let mf = MessageFactory::new(sk, sn, ChainID::from(chain_id))
+        .expect("failed to create message factor");
 
     let mut client = client.bind(mf);
 
-    run(&mut client).await.unwrap();
+    run(&mut client).await.expect("failed to run example");
 }
 
 async fn run(
     client: &mut (impl TxClient<TxCommit> + QueryClient + CallClient),
 ) -> anyhow::Result<()> {
-    let create_return = deploy_contract(client).await?;
+    let create_return = deploy_contract(client)
+        .await
+        .context("failed to deploy contract")?;
     let contract_addr = create_return.delegated_address();
 
     tracing::info!(
@@ -146,13 +149,18 @@ async fn run(
     );
 
     let owner_addr = client.address();
-    let owner_id = actor_id(client, &owner_addr).await?;
+    let owner_id = actor_id(client, &owner_addr)
+        .await
+        .context("failed to fetch owner ID")?;
     let owner_eth_addr = EthAddress::from_id(owner_id);
 
-    let balance_call =
-        get_balance(client, &create_return.eth_address, &owner_eth_addr, false).await?;
+    let balance_call = get_balance(client, &create_return.eth_address, &owner_eth_addr, false)
+        .await
+        .context("failed to get balance with call")?;
 
-    let balance_tx = get_balance(client, &create_return.eth_address, &owner_eth_addr, true).await?;
+    let balance_tx = get_balance(client, &create_return.eth_address, &owner_eth_addr, true)
+        .await
+        .context("failed to get balance with tx")?;
 
     assert_eq!(
         balance_call, balance_tx,
@@ -172,7 +180,11 @@ async fn run(
 async fn sequence(client: &impl QueryClient, sk: &SecretKey) -> anyhow::Result<u64> {
     let pk = PublicKey::from_secret_key(sk);
     let addr = Address::new_secp256k1(&pk.serialize()).unwrap();
-    let state = client.actor_state(&addr, None).await?;
+    let state = client
+        .actor_state(&addr, None)
+        .await
+        .context("failed to get actor state")?;
+
     match state.value {
         Some((_id, state)) => Ok(state.sequence),
         None => Err(anyhow!("cannot find actor {addr}")),
@@ -180,7 +192,11 @@ async fn sequence(client: &impl QueryClient, sk: &SecretKey) -> anyhow::Result<u
 }
 
 async fn actor_id(client: &impl QueryClient, addr: &Address) -> anyhow::Result<u64> {
-    let state = client.actor_state(addr, None).await?;
+    let state = client
+        .actor_state(addr, None)
+        .await
+        .context("failed to get actor state")?;
+
     match state.value {
         Some((id, _state)) => Ok(id),
         None => Err(anyhow!("cannot find actor {addr}")),
@@ -201,7 +217,10 @@ async fn deploy_contract(client: &mut impl TxClient<TxCommit>) -> anyhow::Result
         .await
         .context("error deploying contract")?;
 
-    let ret = res.return_data.ok_or(anyhow!("no CreateReturn data"))?;
+    let ret = res.return_data.ok_or(anyhow!(
+        "no CreateReturn data; response was {:?}",
+        res.response
+    ))?;
 
     Ok(ret)
 }
@@ -216,7 +235,11 @@ async fn get_balance(
     let contract = coin_contract(contract_eth_addr);
     let owner_h160_addr = eth_addr_to_h160(owner_eth_addr);
     let call = contract.get_balance(owner_h160_addr);
-    let balance = invoke_or_call_contract(client, contract_eth_addr, call, in_transaction).await?;
+
+    let balance = invoke_or_call_contract(client, contract_eth_addr, call, in_transaction)
+        .await
+        .context("failed to call contract")?;
+
     Ok(balance)
 }
 
@@ -243,7 +266,8 @@ async fn invoke_or_call_contract<T: Tokenizable>(
                 TokenAmount::default(),
                 GAS_PARAMS.clone(),
             )
-            .await?;
+            .await
+            .context("failed to invoke FEVM")?;
 
         res.return_data
     } else {
@@ -255,7 +279,8 @@ async fn invoke_or_call_contract<T: Tokenizable>(
                 GAS_PARAMS.clone(),
                 None,
             )
-            .await?;
+            .await
+            .context("failed to call FEVM")?;
 
         res.return_data
     };

@@ -10,14 +10,24 @@ TEST_SCRIPTS_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing
 ACTORS_BUNDLE = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/../builtin-actors/output/bundle.car"
 CMT_HOST_PORT = 26657
 ETHAPI_HOST_PORT = 8545
+# If this wasn't present, any wait task is skipped.
 CARGO_MAKE_WAIT_MILLISECONDS = 5000
+# This wait time seems to work locally.
+CMT_WAIT_MILLIS = 10000
+# Keep example logs to a minimum.
+VERBOSITY = ""
+
+[env.ci]
+CMT_WAIT_MILLIS = 20000
+# Help debug any issues with simplecoin by logging requests and responses.
+VERBOSITY = "--verbose"
 
 # smoke-test infrastructure:
 # cargo install cargo-make
 #
 # cd fendermint/testing/smoke-test
 # - then -
-# cargo make
+# cargo make --profile ci
 # - or -
 # cargo make setup
 # cargo make test
@@ -40,8 +50,11 @@ dependencies = [
   "fendermint-init",
   "fendermint-start",
   "cometbft-start",
+  "cometbft-wait",
   "ethapi-start",
-  "wait",
+  "fendermint-logs",
+  "cometbft-logs",
+  "ethapi-logs",
 ]
 
 [tasks.test]
@@ -67,7 +80,8 @@ run_task = { name = [
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
 cargo run -p fendermint_rpc --release --example simplecoin -- \
-  --secret-key fendermint/testing/smoke-test/test-data/fendermint/keys/alice.sk
+  --secret-key fendermint/testing/smoke-test/test-data/fendermint/keys/alice.sk \
+  ${VERBOSITY}
 """
 
 
@@ -103,6 +117,10 @@ env = { "CMD" = "init", "FLAGS" = "-a STDOUT -a STDERR" }
 [tasks.cometbft-start]
 extend = "cometbft-run"
 env = { "CMD" = "start", "FLAGS" = "-d" }
+
+[tasks.cometbft-wait]
+extend = "wait"
+env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "${CMT_WAIT_MILLIS}" }
 
 [tasks.cometbft-run]
 script = """
@@ -207,6 +225,18 @@ env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
 extend = "docker-stop"
 env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
 
+[tasks.ethapi-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
+
+[tasks.fendermint-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+
+[tasks.cometbft-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
+
 [tasks.docker-stop]
 command = "docker"
 args = ["stop", "${CONTAINER_NAME}"]
@@ -215,4 +245,9 @@ ignore_errors = true
 [tasks.docker-rm]
 command = "docker"
 args = ["rm", "--force", "${CONTAINER_NAME}"]
+ignore_errors = true
+
+[tasks.docker-logs]
+command = "docker"
+args = ["logs", "${CONTAINER_NAME}"]
 ignore_errors = true

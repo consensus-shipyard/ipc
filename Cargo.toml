@@ -63,12 +63,16 @@ tracing-subscriber = "0.3"
 
 
 # Stable FVM dependencies from crates.io
-fvm = { version = "3.4", default-features = false }     # no opencl feature or it fails on CI
+# Using the 3.3 version of the FVM because the newer ones update the IPLD dependencies
+# to version which are different than the ones in the builtin-actors project, and since
+# they are 0.x cargo cannot upgrade them automatically, which leads to version conflicts.
+fvm = { version = "~3.3", default-features = false }     # no opencl feature or it fails on CI
+fvm_shared = { version = "~3.3", features = ["crypto"] }
+
 fvm_ipld_blockstore = "0.1"
 fvm_ipld_encoding = "0.3"
 fvm_ipld_car = "0.6"
 fvm_ipld_hamt = "0.6"
-fvm_shared = { version = "3.3", features = ["crypto"] }
 
 # Using 0.8 because of ref-fvm.
 # 0.9 would be better because of its updated quickcheck dependency.

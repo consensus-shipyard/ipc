@@ -14,6 +14,9 @@ use fvm_shared::{
     version::NetworkVersion,
 };
 
+/// Decimals for filecoin in nano
+const FIL_AMOUNT_NANO_DIGITS: u32 = 9;
+
 pub fn parse_network_version(s: &str) -> Result<NetworkVersion, String> {
     let nv: u32 = s
         .parse()
@@ -29,6 +32,16 @@ pub fn parse_token_amount(s: &str) -> Result<TokenAmount, String> {
     BigInt::from_str_radix(s, 10)
         .map_err(|e| format!("not a token amount: {e}"))
         .map(TokenAmount::from_atto)
+}
+
+pub fn parse_full_fil(s: &str) -> Result<TokenAmount, String> {
+    let f: Result<f64, _> = s.parse();
+    if f.is_err() {
+        return Err("input not a token amount".to_owned());
+    }
+
+    let nano = f64::trunc(f.unwrap() * (10u64.pow(FIL_AMOUNT_NANO_DIGITS) as f64));
+    Ok(TokenAmount::from_nano(nano as u128))
 }
 
 pub fn parse_cid(s: &str) -> Result<Cid, String> {

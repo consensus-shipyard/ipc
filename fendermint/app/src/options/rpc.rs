@@ -10,7 +10,9 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use tendermint_rpc::Url;
 
-use crate::options::parse::{parse_address, parse_bytes, parse_cid, parse_token_amount};
+use crate::options::parse::{
+    parse_address, parse_bytes, parse_cid, parse_full_fil, parse_token_amount,
+};
 
 #[derive(Args, Debug)]
 pub struct RpcArgs {
@@ -145,8 +147,8 @@ pub struct TransArgs {
     /// Name of chain the for which the message will be signed.
     #[arg(long, short, env = "FM_CHAIN_NAME")]
     pub chain_name: String,
-    /// Amount of tokens to send, in atto.
-    #[arg(long, short, value_parser = parse_token_amount, default_value = "0")]
+    /// Amount of tokens to send, in full FIL, not atto.
+    #[arg(long, short, value_parser = parse_full_fil, default_value = "0")]
     pub value: TokenAmount,
     /// Path to the secret key of the sender to sign the transaction.
     #[arg(long, short)]
