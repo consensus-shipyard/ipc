@@ -85,19 +85,21 @@ registry_addr = "0x28337700f4432ff140360BbBEAfE3a80AcaaD1Be"
 ```
 
 
-## Step 3: Set up your primary account
+## Step 3: Set up your owner wallets
 
-In order to interact with through the IPC agent, you'll need to create a set of wallets. Please make a note of the addresses as you go along.
+You'll need to create a set of owner wallets. Please make a note of the addresses as you go along.
 
-* You can create a primary wallet through the following command
+* Create the owner wallets for each validator (OWNER_1, OWNER_2, and OWNER_3) 
 ```bash
+./ipc-agent/bin/ipc-agent wallet new -w evm
+./ipc-agent/bin/ipc-agent wallet new -w evm
 ./ipc-agent/bin/ipc-agent wallet new -w evm
 ```
 
-* Add your new wallet address to `~/.ipc-agent/config.toml`
+* Copy your new wallet addresses into `~/.ipc-agent/config.toml`
 ```toml
 ...
-accounts = ["<PRIMARY_ADDRESS>"]
+accounts = ["<OWNER_1>", "<OWNER_2>", "<OWNER_3>"]
 ...
 ```
 
@@ -106,22 +108,6 @@ accounts = ["<PRIMARY_ADDRESS>"]
 ./ipc-agent/bin/ipc-agent config reload
 ```
 
-* Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to your address. 
-
->💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./ipc-agent/bin/ipc-agent wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./evm-usage.md#key-management).
-
-
-## Step 4: Set up your validator owner wallets
-
-* Create the owner wallets for each validator (OWNER1, OWNER2, and OWNER3) 
-```bash
-./ipc-agent/bin/ipc-agent wallet new -w evm
-./ipc-agent/bin/ipc-agent wallet new -w evm
-./ipc-agent/bin/ipc-agent wallet new -w evm
-```
-
-* Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses 
-
 * Convert the 0x addresses to f4 addresses for later usage (OWNER_1_F4, OWNER_2_F4, and OWNER_3_F4) 
 ```bash
 ./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_1>
@@ -129,10 +115,14 @@ accounts = ["<PRIMARY_ADDRESS>"]
 ./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_3>
 ```
 
+* Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses 
+
+>💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./ipc-agent/bin/ipc-agent wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./evm-usage.md#key-management).
+
 >💡 Note that you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
 
 
-## Step 5: Set up your validator worker wallets
+## Step 4: Set up your validator worker wallets
 
 Mir validators do not support the use of EVM addresses to create new blocks. Therefore, we'll need to create separate worker wallets for each validator.
 
@@ -151,17 +141,17 @@ Mir validators do not support the use of EVM addresses to create new blocks. The
 ```
 
 
-## Step 6: Create a child subnet
+## Step 5: Create a child subnet
 
 * The next step is to create a subnet under `/r314159` in calibration
 ```bash
-./ipc-agent/bin/ipc-agent subnet create --parent /r314159 --name andromeda --min-validator-stake 5 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
+./ipc-agent/bin/ipc-agent subnet create --parent /r314159 --name andromeda --min-validator-stake 10 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
 ```
 
 * Make a note of the address of the subnet you created (`/r314159/<SUBNET_ID>`)
 
 
-## Step 7: Deploy the infrastructure
+## Step 6: Deploy the infrastructure
 
 We can deploy the subnet nodes. Note that each node should be importing a different worker wallet key for their validator, and should be exposing different ports. If these ports are unavailable in your system, please pick different ones.
 
@@ -184,7 +174,7 @@ We can deploy the subnet nodes. Note that each node should be importing a differ
 ```
 
 
-## Step 8: Update the IPC Agent configuration
+## Step 7: Update the IPC Agent configuration
 
 * Edit the IPC agent configuration `config.toml`
 ```bash
@@ -211,7 +201,7 @@ network_type = "fvm"
 ```
 
 
-## Step 9: Join the subnet 
+## Step 8: Join the subnet 
 
 All the infrastructure for the subnet is now deployed, and we can join our validators to the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses providing the validators multiaddress. 
 
@@ -225,7 +215,7 @@ All the infrastructure for the subnet is now deployed, and we can join our valid
 >💡 Make sure to use the f4 addresses for the owner wallets
 
 
-## Step 10: Start validating! 
+## Step 9: Start validating! 
 
 We have everything in place now to start validating. Run the following script for each of the validators [**each in a new session**], passing the container names:
 ```bash
@@ -237,7 +227,7 @@ We have everything in place now to start validating. Run the following script fo
 >💡 When starting mining and reloading the config to include the new subnet, you can sometimes get errors in the agent logs saying that the checkpoint manager couldn't be spawned successfully because the on-chain ID of the validator couldn't be change. This is because the subnet hasn't been fully initialized yet. You can `./ipc-agent/bin/ipc-agent config reload` to re-spawn the checkpoint manager and fix the error.
 
 
-## Step 11: Deploy IPC Gateway [optional]
+## Step 10: Deploy IPC Gateway [optional]
 
 If you'd like to interact with your subnet using Metamask or other tooling, you should deploy a `lotus-gateway` instance for tokenless RPC access.
 
@@ -275,7 +265,7 @@ echo '<AUTH_TOKEN_1>' > ~/.lotus/token
 >💡 You may now use your chain ID and `http://<IP_ADDR>:2346/rpc/v1` as your RPC endpoint in EVM tooling.
 
 
-## Step 12: What now?
+## Step 11: What now?
 * Proceed to the [usage](usage.md) guide to learn how you can test your new subnet.
 * If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc-agent). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience!
 * Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system.
