@@ -61,7 +61,6 @@ contract SubnetActorDiamondTest is Test {
     GatewayRouterFacet gwRouter;
 
     error NotGateway();
-    error NotAccount();
     error CollateralIsZero();
     error CallerHasNoStake();
     error SubnetAlreadyKilled();
@@ -256,15 +255,6 @@ contract SubnetActorDiamondTest is Test {
         saManager.join(DEFAULT_NET_ADDR, FvmAddress({addrType: 1, payload: new bytes(20)}));
     }
 
-    function testSubnetActorDiamond_Join_Fail_NotAccount() public {
-        address contractAddress = address(saManager);
-        vm.deal(contractAddress, 1 gwei);
-        vm.prank(contractAddress);
-        vm.expectRevert(NotAccount.selector);
-
-        saManager.join(DEFAULT_NET_ADDR, FvmAddress({addrType: 1, payload: new bytes(20)}));
-    }
-
     function testSubnetActorDiamond_Join_Fail_AlreadyKilled() public {
         address validator = vm.addr(1235);
 
@@ -383,17 +373,6 @@ contract SubnetActorDiamondTest is Test {
         require(saGetter.status() == Status.Active);
     }
 
-    function testSubnetActorDiamond_Leave_Fail_NotAccount() public payable {
-        address contractAddress = address(saManager);
-        uint256 amount = DEFAULT_MIN_VALIDATOR_STAKE;
-
-        vm.prank(contractAddress);
-        vm.deal(contractAddress, amount);
-        vm.expectRevert(NotAccount.selector);
-
-        saManager.leave();
-    }
-
     function testSubnetActorDiamond_Leave_Fail_AlreadyKilled() public payable {
         address validator = address(1235);
         uint256 amount = DEFAULT_MIN_VALIDATOR_STAKE;
@@ -431,14 +410,6 @@ contract SubnetActorDiamondTest is Test {
 
         require(GATEWAY_ADDRESS.balance == 0);
         require(gwGetter.totalSubnets() == 0);
-    }
-
-    function testSubnetActorDiamond_Kill_Fails_NotAccount() public payable {
-        address contractAddress = address(saManager);
-
-        vm.prank(contractAddress);
-        vm.expectRevert(NotAccount.selector);
-        saManager.kill();
     }
 
     function testSubnetActorDiamond_Kill_Fails_NotAllValidatorsLeft() public payable {
@@ -801,16 +772,6 @@ contract SubnetActorDiamondTest is Test {
         saManager.submitCheckpoint(checkpoint);
     }
 
-    function testSubnetActorDiamond_SubmitCheckpoint_Fails_NotAccount() public {
-        address validator = address(1235);
-
-        BottomUpCheckpoint memory checkpoint = _createBottomUpCheckpoint();
-
-        vm.prank(validator);
-        vm.expectRevert(NotAccount.selector);
-        saManager.submitCheckpoint(checkpoint);
-    }
-
     function testSubnetActorDiamond_SubmitCheckpoint_Fails_SubnetNotActive() public {
         address validator = address(1235);
 
@@ -958,16 +919,6 @@ contract SubnetActorDiamondTest is Test {
         vm.expectRevert(NotEnoughBalanceForRewards.selector);
 
         saManager.reward(1);
-    }
-
-    function testSubnetActorDiamond_Withdraw_Fails_NotAccount() public {
-        address validator = vm.addr(100);
-        _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
-
-        vm.prank(address(this));
-        vm.expectRevert(NotAccount.selector);
-
-        saManager.withdraw();
     }
 
     function testSubnetActorDiamond_Withdraw_Fails_NoRewardToWithdraw() public {

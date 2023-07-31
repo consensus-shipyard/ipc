@@ -136,7 +136,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @notice fund - commit a top-down message releasing funds in a child subnet. There is an associated fee that gets distributed to validators in the subnet as well
     /// @param subnetId - subnet to fund
     /// @param to - the address to send funds to
-    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable signableOnly hasFee {
+    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable hasFee {
         CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg(subnetId, msg.sender, to, msg.value - s.crossMsgFee);
 
         // commit top-down message.
@@ -146,7 +146,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     }
 
     /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds
-    function release(FvmAddress calldata to) external payable signableOnly hasFee {
+    function release(FvmAddress calldata to) external payable hasFee {
         CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg(
             s.networkName,
             msg.sender,

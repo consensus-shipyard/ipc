@@ -81,7 +81,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     address private constant TOPDOWN_VALIDATOR_1 = address(12);
 
     error NotSystemActor();
-    error NotSignableAccount();
     error NotEnoughFee();
     error NotEnoughFunds();
     error NotEnoughFundsToRelease();
@@ -1115,23 +1114,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwManager.fund{value: fundAmount}(SubnetID(ROOTNET_CHAINID, wrongPath), FvmAddressHelper.from(msg.sender));
     }
 
-    function testGatewayDiamond_Fund_Fails_InvalidAccount() public {
-        address validatorAddress = address(100);
-        address invalidAccount = address(saManager);
-        uint256 fundAmount = 1 ether;
-
-        _join(validatorAddress);
-
-        vm.startPrank(invalidAccount);
-        vm.deal(invalidAccount, fundAmount + 1);
-
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(saManager));
-
-        vm.expectRevert(NotSignableAccount.selector);
-
-        gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(msg.sender));
-    }
-
     function testGatewayDiamond_Fund_Fails_NotRegistered() public {
         address validatorAddress = address(100);
         address funderAddress = address(101);
@@ -1191,30 +1173,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.expectRevert(NotEnoughFee.selector);
 
         gwManager.release{value: 0 ether}(FvmAddressHelper.from(msg.sender));
-    }
-
-    function testGatewayDiamond_Release_Fails_InvalidAccount() public {
-        address[] memory path = new address[](2);
-        path[0] = address(1);
-        path[1] = address(2);
-
-        GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
-            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: CROSS_MSG_FEE,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
-        });
-
-        gatewayDiamond = createDiamond(constructorParams);
-
-        address invalidAccount = address(saManager);
-
-        vm.startPrank(invalidAccount);
-        vm.deal(invalidAccount, 1 ether);
-        vm.expectRevert(NotSignableAccount.selector);
-
-        gwManager.release{value: 1 ether}(FvmAddressHelper.from(msg.sender));
     }
 
     function testGatewayDiamond_Release_Works_BLSAccount(uint256 releaseAmount, uint256 crossMsgFee) public {
@@ -1322,33 +1280,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     }),
                     to: IPCAddress({
                         subnetId: SubnetID({root: 0, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    value: CROSS_MSG_FEE + 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0)
-                }),
-                wrapped: false
-            })
-        );
-    }
-
-    function testGatewayDiamond_SendCrossMessage_Fails_NotSignableAccount() public {
-        address caller = address(saManager);
-        vm.startPrank(caller);
-        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
-
-        vm.expectRevert(NotSignableAccount.selector);
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
-            CrossMsg({
-                message: StorableMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
                     }),
                     value: CROSS_MSG_FEE + 1,
@@ -1750,18 +1681,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         addValidator(vm.addr(101), 1000);
 
         require(gwGetter.totalWeight() == 1000);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_NotSignableAccount() public {
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-
-        address validator = vm.addr(400);
-        vm.prank(validator);
-        vm.expectRevert(NotSignableAccount.selector);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
     }
 
     function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_EpochAlreadyExecuted() public {

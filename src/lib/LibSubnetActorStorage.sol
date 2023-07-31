@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {Status} from "../enums/Status.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
-import {NotGateway, NotAccount, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
+import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {EpochVoteSubmission, EpochVoteBottomUpSubmission} from "../structs/EpochVoteSubmission.sol";
 import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
@@ -91,12 +91,6 @@ contract SubnetActorModifiers {
     using CrossMsgHelper for CrossMsg;
     using FvmAddressHelper for FvmAddress;
 
-    function _signableOnly() private view {
-        if (!msg.sender.isAccount()) {
-            revert NotAccount();
-        }
-    }
-
     function _onlyGateway() private view {
         if (msg.sender != s.ipcGatewayAddr) {
             revert NotGateway();
@@ -111,11 +105,6 @@ contract SubnetActorModifiers {
 
     modifier onlyGateway() {
         _onlyGateway();
-        _;
-    }
-
-    modifier signableOnly() {
-        _signableOnly();
         _;
     }
 

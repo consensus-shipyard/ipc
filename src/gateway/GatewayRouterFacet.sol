@@ -89,7 +89,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
     /// @notice allows a validator to submit a batch of messages in a top-down commitment
     /// @param checkpoint - top-down checkpoint
-    function submitTopDownCheckpoint(TopDownCheckpoint calldata checkpoint) external signableOnly {
+    function submitTopDownCheckpoint(TopDownCheckpoint calldata checkpoint) external {
         // use this instead of the validEpochOnly modifier
         LibVoting.applyValidEpochOnly(checkpoint.epoch);
 
@@ -134,7 +134,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
     /// @notice sends an arbitrary cross message from the current subnet to the destination subnet
     /// @param crossMsg - message to send
-    function sendCrossMessage(CrossMsg calldata crossMsg) external payable signableOnly hasFee {
+    function sendCrossMessage(CrossMsg calldata crossMsg) external payable hasFee {
         // There can be many semantics of the (rawAddress, msg.sender) pairs.
         // It depends on who is allowed to call sendCrossMessage method and what we want to get as a result.
         // They can be equal, we can propagate the real sender address only or both.

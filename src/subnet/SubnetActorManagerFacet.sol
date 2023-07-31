@@ -40,7 +40,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice method that allows a validator to join the subnet
     /// @param netAddr - the network address of the validator
-    function join(string calldata netAddr, FvmAddress calldata workerAddr) external payable signableOnly notKilled {
+    function join(string calldata netAddr, FvmAddress calldata workerAddr) external payable notKilled {
         uint256 validatorStake = msg.value;
         address validator = msg.sender;
         if (validatorStake == 0) {
@@ -75,7 +75,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice method that allows a validator to leave the subnet
-    function leave() external nonReentrant signableOnly notKilled {
+    function leave() external nonReentrant notKilled {
         uint256 amount = s.stake[msg.sender];
 
         if (amount == 0) {
@@ -97,8 +97,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         payable(msg.sender).sendValue(amount);
     }
 
-    /// @notice method that allows the subnet no be killed after all validators leave
-    function kill() external signableOnly notKilled {
+    /// @notice method that allows to kill the subnet when all validators left. It is not a privileged operation.
+    function kill() external notKilled {
         if (s.validators.length() != 0 || s.totalStake != 0) {
             revert NotAllValidatorsHaveLeft();
         }
@@ -110,7 +110,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice methods that allows a validator to submit a checkpoint (batch of messages) and vote for it with it's own voting power.
     /// @param checkpoint - the batch messages data
-    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external signableOnly {
+    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
         LibVoting.applyValidEpochOnly(checkpoint.epoch);
 
         if (s.status != Status.Active) {
@@ -167,7 +167,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice method that allows a validator to withdraw it's accumulated rewards using pull-based transfer
-    function withdraw() external signableOnly {
+    function withdraw() external {
         uint256 amount = s.accumulatedRewards[msg.sender];
 
         if (amount == 0) {

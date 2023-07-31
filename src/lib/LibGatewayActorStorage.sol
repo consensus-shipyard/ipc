@@ -5,7 +5,7 @@ import {VoteExecutionStatus} from "../enums/VoteExecutionStatus.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {EpochVoteTopDownSubmission, EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
-import {NotSignableAccount, NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
+import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
 import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
 import {BottomUpCheckpoint, CrossMsg, TopDownCheckpoint, StorableMsg} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
@@ -89,12 +89,6 @@ contract GatewayActorModifiers {
     using ExecutableQueueHelper for ExecutableQueue;
     using EpochVoteSubmissionHelper for EpochVoteSubmission;
 
-    function _signableOnly() private view {
-        if (!msg.sender.isAccount()) {
-            revert NotSignableAccount();
-        }
-    }
-
     function _hasFee() private view {
         if (msg.value < s.crossMsgFee) {
             revert NotEnoughFee();
@@ -105,11 +99,6 @@ contract GatewayActorModifiers {
         if (!msg.sender.isSystemActor()) {
             revert NotSystemActor();
         }
-    }
-
-    modifier signableOnly() {
-        _signableOnly();
-        _;
     }
 
     modifier systemActorOnly() {
