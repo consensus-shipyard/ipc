@@ -144,14 +144,19 @@ contract SubnetActorGetterFacet {
         uint256 length = s.validators.length();
 
         ValidatorInfo[] memory details = new ValidatorInfo[](length);
+        address a;
 
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; ) {
+            a = s.validators.at(i);
             details[i] = ValidatorInfo({
-                addr: s.validators.at(i),
-                weight: s.stake[s.validators.at(i)],
-                workerAddr: s.validatorWorkerAddresses[s.validators.at(i)],
-                netAddresses: s.validatorNetAddresses[s.validators.at(i)]
+                addr: a,
+                weight: s.stake[a],
+                workerAddr: s.validatorWorkerAddresses[a],
+                netAddresses: s.validatorNetAddresses[a]
             });
+            unchecked {
+                ++i;
+            }
         }
 
         return ValidatorSet({validators: details, configurationNumber: s.configurationNumber});
@@ -176,7 +181,7 @@ contract SubnetActorGetterFacet {
         for (uint64 i = 0; i < size; ) {
             out[i] = s.committedCheckpoints[nextEpoch];
             unchecked {
-                i++;
+                ++i;
                 nextEpoch += period;
             }
         }

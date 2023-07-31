@@ -99,8 +99,11 @@ contract GatewayGetterFacet {
 
         uint256 msgLength = totalLength - startingNonce;
         CrossMsg[] memory messages = new CrossMsg[](msgLength);
-        for (uint256 i = 0; i < msgLength; i++) {
+        for (uint256 i = 0; i < msgLength; ) {
             messages[i] = subnet.topDownMsgs[i + startingNonce];
+            unchecked {
+                ++i;
+            }
         }
 
         return messages;

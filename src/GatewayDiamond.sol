@@ -19,7 +19,7 @@ contract GatewayDiamond {
 
     using SubnetIDHelper for SubnetID;
 
-    // uint8 constant MIN_CHECKPOINT_PERIOD = 10;
+    // @notice uint8 constant MIN_CHECKPOINT_PERIOD = 10;
     uint256 public constant MIN_COLLATERAL_AMOUNT = 1 ether;
 
     /// @notice minimum checkpoint period. Values get clamped to this

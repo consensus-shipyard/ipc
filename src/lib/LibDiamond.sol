@@ -55,7 +55,8 @@ library LibDiamond {
     }
 
     function diamondCut(IDiamond.FacetCut[] memory _diamondCut, address _init, bytes memory _calldata) internal {
-        for (uint256 facetIndex = 0; facetIndex < _diamondCut.length; facetIndex++) {
+        uint256 length = _diamondCut.length;
+        for (uint256 facetIndex = 0; facetIndex < length; ) {
             bytes4[] memory functionSelectors = _diamondCut[facetIndex].functionSelectors;
             address facetAddress = _diamondCut[facetIndex].facetAddress;
             if (functionSelectors.length == 0) {
@@ -66,6 +67,9 @@ library LibDiamond {
                 addFunctions(facetAddress, functionSelectors);
             } else {
                 revert IncorrectFacetCutAction(action);
+            }
+            unchecked {
+                ++facetIndex;
             }
         }
         emit DiamondCut(_diamondCut, _init, _calldata);
@@ -79,7 +83,8 @@ library LibDiamond {
         DiamondStorage storage ds = diamondStorage();
         uint16 selectorCount = uint16(ds.selectors.length);
         enforceHasContractCode(_facetAddress, "diamondCut: Add facet has no code");
-        for (uint256 selectorIndex = 0; selectorIndex < _functionSelectors.length; selectorIndex++) {
+        uint256 length = _functionSelectors.length;
+        for (uint256 selectorIndex = 0; selectorIndex < length; ) {
             bytes4 selector = _functionSelectors[selectorIndex];
             address oldFacetAddress = ds.facetAddressAndSelectorPosition[selector].facetAddress;
             if (oldFacetAddress != address(0)) {
@@ -90,7 +95,10 @@ library LibDiamond {
                 selectorCount
             );
             ds.selectors.push(selector);
-            selectorCount++;
+            ++selectorCount;
+            unchecked {
+                ++selectorIndex;
+            }
         }
     }
 

@@ -96,7 +96,7 @@ library LibGateway {
             return;
         }
         // slither-disable-next-line unused-return
-        Address.functionCall(to.normalize(), abi.encodeWithSelector(ISubnetActor.reward.selector, amount));
+        Address.functionCall(to.normalize(), abi.encodeCall(ISubnetActor.reward, amount));
     }
 
     /// @notice returns the subnet created by a validator
