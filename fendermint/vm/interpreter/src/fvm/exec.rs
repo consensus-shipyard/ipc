@@ -24,12 +24,6 @@ pub struct FvmApplyRet {
     pub gas_limit: u64,
 }
 
-impl<DB> Default for FvmMessageInterpreter<DB> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait]
 impl<DB> ExecInterpreter for FvmMessageInterpreter<DB>
 where

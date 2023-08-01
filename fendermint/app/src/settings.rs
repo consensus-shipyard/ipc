@@ -50,10 +50,19 @@ pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
     home_dir: PathBuf,
     data_dir: PathBuf,
+    contracts_dir: PathBuf,
     builtin_actors_bundle: PathBuf,
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub eth: EthSettings,
+}
+
+macro_rules! home_relative {
+    ($name:ident) => {
+        pub fn $name(&self) -> PathBuf {
+            self.expand_path(&self.$name)
+        }
+    };
 }
 
 impl Settings {
@@ -96,13 +105,9 @@ impl Settings {
         expand_tilde(self.home_dir.join(path))
     }
 
-    pub fn data_dir(&self) -> PathBuf {
-        self.expand_path(&self.data_dir)
-    }
-
-    pub fn builtin_actors_bundle(&self) -> PathBuf {
-        self.expand_path(&self.builtin_actors_bundle)
-    }
+    home_relative!(data_dir);
+    home_relative!(contracts_dir);
+    home_relative!(builtin_actors_bundle);
 }
 
 /// Expand paths that begin with "~" to `$HOME`.

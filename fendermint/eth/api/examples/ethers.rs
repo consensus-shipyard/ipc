@@ -78,11 +78,11 @@ abigen!(
 #[derive(Parser, Debug)]
 pub struct Options {
     /// The host of the Fendermint Ethereum API endpoint.
-    #[arg(long, default_value = "127.0.0.1", env = "FM_ETH__HTTP__HOST")]
+    #[arg(long, default_value = "127.0.0.1", env = "FM_ETH__LISTEN__HOST")]
     pub http_host: String,
 
     /// The port of the Fendermint Ethereum API endpoint.
-    #[arg(long, default_value = "8545", env = "FM_ETH__HTTP__PORT")]
+    #[arg(long, default_value = "8545", env = "FM_ETH__LISTEN__PORT")]
     pub http_port: u32,
 
     /// Secret key used to send funds, expected to be in Base64 format.

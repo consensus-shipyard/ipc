@@ -1,6 +1,8 @@
 # Data directory relative to the `--home-dir`, unless given as an absolute path.
 data_dir = "data"
-# Builtin actor bunlde path relative to the `--home-dir`, unless given as an absolute path.
+# Contract directory relative to the `--home-dir`, unless given as an absolute path.
+contracts_dir = "contracts"
+# Builtin actor bundle path relative to the `--home-dir`, unless given as an absolute path.
 builtin_actors_bundle = "bundle.car"
 
 [abci]

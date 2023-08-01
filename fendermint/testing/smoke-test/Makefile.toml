@@ -41,7 +41,7 @@ run_task = { name = [
   "test",
 ], fork = true, cleanup_task = "teardown" }
 
-
+# Waiting before starting the Eth API for the CometBFT websocket to start listening.
 [tasks.setup]
 dependencies = [
   "test-data-dir",
@@ -112,7 +112,7 @@ args = ["pull", "${CMT_DOCKER_IMAGE}"]
 
 [tasks.cometbft-init]
 extend = "cometbft-run"
-env = { "CMD" = "init", "FLAGS" = "-a STDOUT -a STDERR" }
+env = { "CMD" = "init", "FLAGS" = "-a STDOUT -a STDERR --rm" }
 
 [tasks.cometbft-start]
 extend = "cometbft-run"
@@ -126,7 +126,6 @@ env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "${CMT_WAIT_MILLIS}" }
 script = """
 docker run \
   ${FLAGS} \
-  --rm \
   --name ${CMT_CONTAINER_NAME} \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
@@ -142,7 +141,7 @@ dependencies = ["cometbft-pull", "test-data-dir", "network-create"]
 
 [tasks.fendermint-init]
 extend = "fendermint-run"
-env = { "ENTRY" = "/scripts/init.sh", "FLAGS" = "-a STDOUT -a STDERR" }
+env = { "ENTRY" = "/scripts/init.sh", "FLAGS" = "-a STDOUT -a STDERR --rm" }
 
 [tasks.fendermint-start]
 extend = "fendermint-run"
@@ -152,7 +151,6 @@ env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 script = """
 docker run \
   ${FLAGS} \
-  --rm \
   --name ${FM_CONTAINER_NAME} \
   --init \
   --user $(id -u) \
@@ -177,7 +175,6 @@ env = { "CMD" = "eth run", "FLAGS" = "-d" }
 script = """
 docker run \
   ${FLAGS} \
-  --rm \
   --name ${ETHAPI_CONTAINER_NAME} \
   --init \
   --user $(id -u) \

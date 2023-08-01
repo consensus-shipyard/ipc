@@ -1,33 +1,43 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context};
+use std::sync::Arc;
+
+use anyhow::{anyhow, bail, Context};
 use cid::{multihash::Code, Cid};
+use ethers::{abi::Tokenize, core::abi::Abi};
 use fendermint_vm_actor_interface::{
     account::{self, ACCOUNT_ACTOR_CODE_ID},
-    eam,
+    eam::{self, EthAddress},
     ethaccount::ETHACCOUNT_ACTOR_CODE_ID,
-    init,
+    evm,
+    init::{self, eth_builtin_deleg_addr},
     multisig::{self, MULTISIG_ACTOR_CODE_ID},
-    EMPTY_ARR,
+    system, EMPTY_ARR,
 };
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Multisig};
 use fvm::{
+    engine::MultiEngine,
     machine::Manifest,
     state_tree::{ActorState, StateTree},
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::load_car_unchecked;
-use fvm_ipld_encoding::CborStore;
+use fvm_ipld_encoding::{CborStore, RawBytes};
 use fvm_shared::{
     address::{Address, Payload},
     clock::ChainEpoch,
     econ::TokenAmount,
+    message::Message,
     state::StateTreeVersion,
-    ActorID,
+    version::NetworkVersion,
+    ActorID, BLOCK_GAS_LIMIT, METHOD_CONSTRUCTOR,
 };
 use num_traits::Zero;
 use serde::Serialize;
+
+use super::{exec::MachineBlockstore, FvmExecState, FvmStateParams};
 
 /// Create an empty state tree.
 pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<DB>> {
@@ -35,21 +45,35 @@ pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<D
     Ok(state_tree)
 }
 
+/// Initially we can only set up an empty state tree.
+/// Then we have to create the built-in actors' state that the FVM relies on.
+/// Then we can instantiate an FVM execution engine, which we can use to construct FEVM based actors.
+enum Stage<DB: Blockstore + 'static> {
+    Tree(StateTree<DB>),
+    Exec(FvmExecState<DB>),
+}
+
 /// A state we create for the execution of genesis initialisation.
 pub struct FvmGenesisState<DB>
 where
-    DB: Blockstore,
+    DB: Blockstore + 'static,
 {
     pub manifest_data_cid: Cid,
     pub manifest: Manifest,
-    state_tree: StateTree<DB>,
+    store: DB,
+    multi_engine: Arc<MultiEngine>,
+    stage: Stage<DB>,
 }
 
 impl<DB> FvmGenesisState<DB>
 where
-    DB: Blockstore,
+    DB: Blockstore + Clone + 'static,
 {
-    pub async fn new(store: DB, bundle: &[u8]) -> anyhow::Result<Self> {
+    pub async fn new(
+        store: DB,
+        multi_engine: Arc<MultiEngine>,
+        bundle: &[u8],
+    ) -> anyhow::Result<Self> {
         // Load the actor bundle.
         let bundle_roots = load_car_unchecked(&store, bundle).await?;
         let bundle_root = match bundle_roots.as_slice() {
@@ -72,21 +96,62 @@ where
             }
         };
         let manifest = Manifest::load(&store, &manifest_data_cid, manifest_version)?;
-        let state_tree = empty_state_tree(store)?;
+
+        let state_tree = empty_state_tree(store.clone())?;
 
         let state = Self {
             manifest_data_cid,
             manifest,
-            state_tree,
+            store,
+            multi_engine,
+            stage: Stage::Tree(state_tree),
         };
 
         Ok(state)
     }
 
+    /// Instantiate the execution state, once the basic genesis parameters are known.
+    ///
+    /// This must be called before we try to instantiate any EVM actors in genesis.
+    pub fn init_exec_state(
+        &mut self,
+        timestamp: Timestamp,
+        network_version: NetworkVersion,
+        base_fee: TokenAmount,
+        circ_supply: TokenAmount,
+        chain_id: u64,
+    ) -> anyhow::Result<()> {
+        self.stage = match self.stage {
+            Stage::Exec(_) => bail!("execution engine already initialized"),
+            Stage::Tree(ref mut state_tree) => {
+                // We have to flush the data at this point.
+                let state_root = state_tree.flush()?;
+
+                let params = FvmStateParams {
+                    state_root,
+                    timestamp,
+                    network_version,
+                    base_fee,
+                    circ_supply,
+                    chain_id,
+                };
+
+                let exec_state =
+                    FvmExecState::new(self.store.clone(), &self.multi_engine, 1, params)
+                        .context("failed to create exec state")?;
+
+                Stage::Exec(exec_state)
+            }
+        };
+        Ok(())
+    }
+
     /// Flush the data to the block store.
-    pub fn commit(mut self) -> anyhow::Result<Cid> {
-        let root = self.state_tree.flush()?;
-        Ok(root)
+    pub fn commit(self) -> anyhow::Result<Cid> {
+        match self.stage {
+            Stage::Tree(mut state_tree) => Ok(state_tree.flush()?),
+            Stage::Exec(exec_state) => exec_state.commit(),
+        }
     }
 
     /// Creates an actor using code specified in the manifest.
@@ -114,7 +179,10 @@ where
             delegated_address,
         };
 
-        self.state_tree.set_actor(id, actor_state);
+        self.with_state_tree(
+            |s| s.set_actor(id, actor_state.clone()),
+            |s| s.set_actor(id, actor_state.clone()),
+        );
 
         Ok(())
     }
@@ -160,7 +228,10 @@ where
                 .get(&signer.0)
                 .ok_or_else(|| anyhow!("can't find ID for signer {}", signer.0))?;
 
-            if self.state_tree.get_actor(*id)?.is_none() {
+            if self
+                .with_state_tree(|s| s.get_actor(*id), |s| s.get_actor(*id))?
+                .is_none()
+            {
                 self.create_account_actor(Account { owner: signer }, TokenAmount::zero(), ids)?;
             }
 
@@ -169,7 +240,7 @@ where
 
         // Now create a multisig actor that manages group transactions.
         let state = multisig::State::new(
-            self.state_tree.store(),
+            self.store(),
             signers,
             ms.threshold,
             ms.vesting_start as ChainEpoch,
@@ -180,14 +251,118 @@ where
         self.create_actor(MULTISIG_ACTOR_CODE_ID, next_id, &state, balance, None)
     }
 
-    pub fn store(&self) -> &DB {
-        self.state_tree.store()
+    /// Deploy an EVM contract with a fixed ID and some constructor arguments.
+    ///
+    /// Returns the hashed Ethereum address we can use to invoke the contract.
+    pub fn create_evm_actor_with_cons<T: Tokenize>(
+        &mut self,
+        id: ActorID,
+        abi: &Abi,
+        bytecode: Vec<u8>,
+        constructor_params: T,
+    ) -> anyhow::Result<EthAddress> {
+        let constructor = abi
+            .constructor()
+            .ok_or_else(|| anyhow!("contract doesn't have a constructor"))?;
+
+        let initcode = constructor
+            .encode_input(bytecode, &constructor_params.into_tokens())
+            .context("failed to encode constructor input")?;
+
+        self.create_evm_actor(id, initcode)
+    }
+
+    /// Deploy an EVM contract.
+    ///
+    /// Returns the hashed Ethereum address we can use to invoke the contract.
+    pub fn create_evm_actor(
+        &mut self,
+        id: ActorID,
+        initcode: Vec<u8>,
+    ) -> anyhow::Result<EthAddress> {
+        // Here we are circumventing the normal way of creating an actor through the EAM and jump ahead to what the `Init` actor would do:
+        // https://github.com/filecoin-project/builtin-actors/blob/421855a7b968114ac59422c1faeca968482eccf4/actors/init/src/lib.rs#L97-L107
+
+        // Based on how the EAM constructs it.
+        let params = evm::ConstructorParams {
+            // We have to pick someone as creator for these quasi built-in types.
+            creator: EthAddress::from_id(system::SYSTEM_ACTOR_ID),
+            initcode: RawBytes::from(initcode),
+        };
+        let params = RawBytes::serialize(params)?;
+
+        // When a contract is constructed the EVM actor verifies that it has an Ethereum delegated address.
+        // This has been inserted into the Init actor state as well.
+        let f4_addr = eth_builtin_deleg_addr(id);
+        let f0_addr = Address::new_id(id);
+
+        let msg = Message {
+            version: 0,
+            from: init::INIT_ACTOR_ADDR, // asserted by the constructor
+            to: f0_addr,
+            sequence: 0, // We will use implicit execution which doesn't check or modify this.
+            value: TokenAmount::zero(),
+            method_num: METHOD_CONSTRUCTOR,
+            params,
+            gas_limit: BLOCK_GAS_LIMIT,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        // Create an empty actor to receive the call.
+        self.create_actor(
+            evm::EVM_ACTOR_CODE_ID,
+            id,
+            &EMPTY_ARR,
+            TokenAmount::zero(),
+            Some(f4_addr),
+        )
+        .context("failed to create empty actor")?;
+
+        let apply_ret = match self.stage {
+            Stage::Tree(_) => bail!("execution engine not initialized"),
+            Stage::Exec(ref mut exec_state) => exec_state
+                .execute_implicit(msg)
+                .context("failed to execute message")?,
+        };
+
+        if !apply_ret.msg_receipt.exit_code.is_success() {
+            bail!(
+                "failed to deploy EVM actor: {}; {:?}",
+                apply_ret.msg_receipt.exit_code,
+                apply_ret.failure_info
+            );
+        }
+
+        let addr: [u8; 20] = match f4_addr.payload() {
+            Payload::Delegated(addr) => addr.subaddress().try_into().expect("hash is 20 bytes"),
+            other => panic!("not an f4 address: {other:?}"),
+        };
+
+        Ok(EthAddress(addr))
+    }
+
+    pub fn store(&mut self) -> &DB {
+        &self.store
     }
 
     fn put_state(&mut self, state: impl Serialize) -> anyhow::Result<Cid> {
-        self.state_tree
-            .store()
+        self.store()
             .put_cbor(&state, Code::Blake2b256)
             .context("failed to store actor state")
+    }
+
+    /// A horrible way of unifying the state tree under the two different stages.
+    ///
+    /// We only use this a few times, so perhaps it's not that much of a burden to duplicate some code.
+    fn with_state_tree<F, G, T>(&mut self, f: F, g: G) -> T
+    where
+        F: FnOnce(&mut StateTree<DB>) -> T,
+        G: FnOnce(&mut StateTree<MachineBlockstore<DB>>) -> T,
+    {
+        match self.stage {
+            Stage::Tree(ref mut state_tree) => f(state_tree),
+            Stage::Exec(ref mut exec_state) => g(exec_state.state_tree_mut()),
+        }
     }
 }

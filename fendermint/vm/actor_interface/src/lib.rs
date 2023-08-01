@@ -49,6 +49,7 @@ pub mod eam;
 pub mod ethaccount;
 pub mod evm;
 pub mod init;
+pub mod ipc;
 pub mod multisig;
 pub mod placeholder;
 pub mod reward;

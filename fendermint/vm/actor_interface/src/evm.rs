@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
 pub use fil_actors_evm_shared::uints;
+
+use crate::eam::EthAddress;
 
 define_code!(EVM { code_id: 14 });
 
@@ -41,4 +44,12 @@ pub struct GetStorageAtParams {
 #[serde(transparent)]
 pub struct GetStorageAtReturn {
     pub storage: uints::U256,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+pub struct ConstructorParams {
+    /// The actor's "creator" (specified by the EAM).
+    pub creator: EthAddress,
+    /// The initcode that will construct the new EVM actor.
+    pub initcode: RawBytes,
 }

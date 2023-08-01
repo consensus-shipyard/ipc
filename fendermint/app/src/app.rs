@@ -101,7 +101,7 @@ where
     /// Path to the Wasm bundle.
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
-    actor_bundle_path: PathBuf,
+    builtin_actors_bundle: PathBuf,
     /// Namespace to store app state.
     namespace: S::Namespace,
     /// Collection of past state parameters.
@@ -140,7 +140,7 @@ where
     pub fn new(
         db: DB,
         state_store: SS,
-        actor_bundle_path: PathBuf,
+        builtin_actors_bundle: PathBuf,
         app_namespace: S::Namespace,
         state_hist_namespace: S::Namespace,
         state_hist_size: u64,
@@ -150,7 +150,7 @@ where
             db: Arc::new(db),
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
-            actor_bundle_path,
+            builtin_actors_bundle,
             namespace: app_namespace,
             state_hist: KVCollection::new(state_hist_namespace),
             state_hist_size,
@@ -350,13 +350,14 @@ where
 
     /// Called once upon genesis.
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
-        let bundle_path = &self.actor_bundle_path;
-        let bundle = std::fs::read(bundle_path)
-            .map_err(|e| anyhow!("failed to load bundle CAR from {bundle_path:?}: {e}"))?;
+        let bundle = &self.builtin_actors_bundle;
+        let bundle = std::fs::read(bundle)
+            .map_err(|e| anyhow!("failed to load bundle CAR from {bundle:?}: {e}"))?;
 
-        let state = FvmGenesisState::new(self.state_store_clone(), &bundle)
-            .await
-            .context("failed to create genesis state")?;
+        let state =
+            FvmGenesisState::new(self.state_store_clone(), self.multi_engine.clone(), &bundle)
+                .await
+                .context("failed to create genesis state")?;
 
         tracing::info!(
             manifest_root = format!("{}", state.manifest_data_cid),

@@ -7,6 +7,7 @@ use fvm::{
     engine::MultiEngine,
     executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
     machine::{DefaultMachine, Machine, NetworkConfig},
+    state_tree::StateTree,
     DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
@@ -36,6 +37,8 @@ pub struct FvmStateParams {
     pub chain_id: u64,
 }
 
+pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns> as Machine>::Blockstore;
+
 /// A state we create for the execution of all the messages in a block.
 pub struct FvmExecState<DB>
 where
@@ -49,6 +52,10 @@ impl<DB> FvmExecState<DB>
 where
     DB: Blockstore + 'static,
 {
+    /// Create a new FVM execution environment.
+    ///
+    /// Calling this can be very slow unless we run in `--release` mode, because the [DefaultExecutor]
+    /// pre-loads builtin-actor CIDs and wasm in debug mode is slow to instrument.
     pub fn new(
         blockstore: DB,
         multi_engine: &MultiEngine,
@@ -115,6 +122,11 @@ where
     /// The timestamp of the currently executing block.
     pub fn timestamp(&self) -> Timestamp {
         Timestamp(self.executor.context().timestamp)
+    }
+
+    /// Get a mutable reference to the underlying [StateTree].
+    pub fn state_tree_mut(&mut self) -> &mut StateTree<MachineBlockstore<DB>> {
+        self.executor.state_tree_mut()
     }
 }
 

@@ -27,3 +27,15 @@ pub fn bundle_path() -> PathBuf {
 
     PathBuf::from_str(&bundle_path).expect("malformed bundle path")
 }
+
+/// Path to the Solidity contracts, intended to be used in tests.
+pub fn contracts_path() -> PathBuf {
+    let contracts_path = std::env::var("FM_CONTRACTS_DIR").unwrap_or_else(|_| {
+        workspace_dir()
+            .join("../ipc-solidity-actors/out")
+            .to_string_lossy()
+            .into_owned()
+    });
+
+    PathBuf::from_str(&contracts_path).expect("malformed contracts path")
+}
