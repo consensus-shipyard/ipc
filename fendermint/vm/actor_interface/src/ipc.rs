@@ -6,7 +6,6 @@
 // Solidity contracts during genesis.
 
 define_id!(GATEWAY { id: 64 });
-```
 define_id!(SUBNETREGISTRY { id: 65 });
 
 pub mod gateway {
