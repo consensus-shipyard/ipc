@@ -49,6 +49,16 @@ fendermint \
   genesis --genesis-file $GENESIS_FILE \
   add-validator --public-key $KEYS_DIR/bob.pk --power 1
 
+# Enable IPC with some dummy values to test contract deployment.
+fendermint \
+  genesis --genesis-file $GENESIS_FILE \
+  ipc gateway \
+    --subnet-id /r0 \
+    --top-down-check-period 10 \
+    --bottom-up-check-period 10 \
+    --msg-fee 10 \
+    --majority-percentage 66
+
 # Convert FM genesis to CMT
 fendermint \
   genesis --genesis-file $GENESIS_FILE \

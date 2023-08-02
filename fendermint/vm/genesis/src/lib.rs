@@ -16,6 +16,26 @@ use fendermint_vm_encoding::IsHumanReadable;
 #[cfg(feature = "arb")]
 mod arb;
 
+/// The genesis data structure we serialize to JSON and start the chain with.
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Genesis {
+    /// The name of the blockchain.
+    ///
+    /// It will be used to derive a chain ID as well as being
+    /// the network name in the `InitActor`.
+    pub chain_name: String,
+    pub timestamp: Timestamp,
+    pub network_version: NetworkVersion,
+    #[serde_as(as = "IsHumanReadable")]
+    pub base_fee: TokenAmount,
+    pub validators: Vec<Validator>,
+    pub accounts: Vec<Actor>,
+    /// IPC related configuration, if enabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ipc: Option<ipc::IpcParams>,
+}
+
 /// Wrapper around [`Address`] to provide human readable serialization in JSON format.
 ///
 /// An alternative would be the `serde_with` crate.
@@ -95,20 +115,30 @@ pub struct Validator {
     pub power: Power,
 }
 
-#[serde_as]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Genesis {
-    /// The name of the blockchain.
-    ///
-    /// It will be used to derive a chain ID as well as being
-    /// the network name in the `InitActor`
-    pub chain_name: String,
-    pub timestamp: Timestamp,
-    pub network_version: NetworkVersion,
-    #[serde_as(as = "IsHumanReadable")]
-    pub base_fee: TokenAmount,
-    pub validators: Vec<Validator>,
-    pub accounts: Vec<Actor>,
+/// IPC related data structures.
+pub mod ipc {
+    use fendermint_vm_encoding::IsHumanReadable;
+    use fvm_shared::econ::TokenAmount;
+    use ipc_sdk::subnet_id::SubnetID;
+    use serde::{Deserialize, Serialize};
+    use serde_with::serde_as;
+
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+    pub struct IpcParams {
+        pub gateway: GatewayParams,
+    }
+
+    #[serde_as]
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+    pub struct GatewayParams {
+        #[serde_as(as = "IsHumanReadable")]
+        pub subnet_id: SubnetID,
+        pub bottom_up_check_period: u64,
+        pub top_down_check_period: u64,
+        #[serde_as(as = "IsHumanReadable")]
+        pub msg_fee: TokenAmount,
+        pub majority_percentage: u8,
+    }
 }
 
 #[cfg(test)]
@@ -120,7 +150,9 @@ mod tests {
     #[quickcheck]
     fn genesis_json(value0: Genesis) {
         let repr = serde_json::to_string(&value0).expect("failed to encode");
-        let value1: Genesis = serde_json::from_str(&repr).expect("failed to decode");
+        let value1: Genesis = serde_json::from_str(&repr)
+            .map_err(|e| format!("{e}; {repr}"))
+            .expect("failed to decode JSON");
 
         assert_eq!(value1, value0)
     }

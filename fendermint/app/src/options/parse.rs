@@ -63,3 +63,17 @@ pub fn parse_bytes(s: &str) -> Result<Bytes, String> {
         Err(e) => Err(format!("error parsing raw bytes as hex: {e}")),
     }
 }
+
+/// Parse a percentage value [0-100]
+pub fn parse_percentage<T>(s: &str) -> Result<T, String>
+where
+    T: Num + FromStr + PartialOrd + TryFrom<u8>,
+    <T as FromStr>::Err: std::fmt::Display,
+    <T as TryFrom<u8>>::Error: std::fmt::Debug,
+{
+    match T::from_str(s) {
+        Ok(p) if p > T::zero() && p <= T::try_from(100u8).unwrap() => Ok(p),
+        Ok(_) => Err("percentage out of range".to_owned()),
+        Err(e) => Err(format!("error parsing as percentage: {e}")),
+    }
+}

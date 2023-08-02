@@ -9,14 +9,11 @@ use std::path::PathBuf;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{
-    Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Validator, ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Validator, ValidatorKey,
 };
 
 use crate::cmd;
-use crate::options::genesis::{
-    AccountKind, GenesisAddAccountArgs, GenesisAddMultisigArgs, GenesisAddValidatorArgs,
-    GenesisArgs, GenesisCommands, GenesisIntoTendermintArgs, GenesisNewArgs,
-};
+use crate::options::genesis::*;
 
 use super::key::read_public_key;
 
@@ -29,6 +26,7 @@ cmd! {
         GenesisCommands::AddMultisig(args) => args.exec(genesis_file).await,
         GenesisCommands::AddValidator(args) => args.exec(genesis_file).await,
         GenesisCommands::IntoTendermint(args) => args.exec(genesis_file).await,
+        GenesisCommands::Ipc { command } => command.exec(genesis_file).await,
     }
   }
 }
@@ -41,7 +39,8 @@ cmd! {
       network_version: self.network_version,
       base_fee: self.base_fee.clone(),
       validators: Vec::new(),
-      accounts: Vec::new()
+      accounts: Vec::new(),
+      ipc: None
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
@@ -72,6 +71,15 @@ cmd! {
 cmd! {
   GenesisIntoTendermintArgs(self, genesis_file: PathBuf) {
     into_tendermint(&genesis_file, self)
+  }
+}
+
+cmd! {
+  GenesisIpcCommands(self, genesis_file: PathBuf) {
+    match self {
+        GenesisIpcCommands::Gateway(args) =>
+            set_ipc_gateway(&genesis_file, args),
+    }
   }
 }
 
@@ -207,4 +215,30 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
     std::fs::write(&args.out, tmg_json)?;
     Ok(())
+}
+
+fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyhow::Result<()> {
+    update_genesis(genesis_file, |mut genesis| {
+        let gateway_params = ipc::GatewayParams {
+            subnet_id: args.subnet_id.clone(),
+            bottom_up_check_period: args.bottom_up_check_period,
+            top_down_check_period: args.top_down_check_period,
+            msg_fee: args.msg_fee.clone(),
+            majority_percentage: args.majority_percentage,
+        };
+
+        let ipc_params = match genesis.ipc {
+            Some(mut ipc) => {
+                ipc.gateway = gateway_params;
+                ipc
+            }
+            None => ipc::IpcParams {
+                gateway: gateway_params,
+            },
+        };
+
+        genesis.ipc = Some(ipc_params);
+
+        Ok(genesis)
+    })
 }

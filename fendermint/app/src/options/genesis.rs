@@ -4,8 +4,9 @@
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand, ValueEnum};
+use ipc_sdk::subnet_id::SubnetID;
 
-use super::parse::{parse_full_fil, parse_network_version, parse_token_amount};
+use super::parse::{parse_full_fil, parse_network_version, parse_percentage, parse_token_amount};
 use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -24,6 +25,11 @@ pub enum GenesisCommands {
     AddMultisig(GenesisAddMultisigArgs),
     /// Add a validator to the genesis file.
     AddValidator(GenesisAddValidatorArgs),
+    /// IPC commands.
+    Ipc {
+        #[command(subcommand)]
+        command: GenesisIpcCommands,
+    },
     /// Convert the genesis file into the format expected by Tendermint.
     IntoTendermint(GenesisIntoTendermintArgs),
 }
@@ -104,4 +110,30 @@ pub struct GenesisIntoTendermintArgs {
     /// Maximum block size in bytes.
     #[arg(long, default_value_t = 22020096)]
     pub block_max_bytes: u64,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum GenesisIpcCommands {
+    /// Set all gateway parameters.
+    Gateway(GenesisIpcGatewayArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct GenesisIpcGatewayArgs {
+    /// Set the current subnet ID, which is the path from the root to the subnet actor in the parent.
+    #[arg(long, short)]
+    pub subnet_id: SubnetID,
+
+    #[arg(long, short)]
+    pub bottom_up_check_period: u64,
+
+    #[arg(long, short)]
+    pub top_down_check_period: u64,
+
+    /// Message fee in atto.
+    #[arg(long, short = 'f', value_parser = parse_token_amount)]
+    pub msg_fee: TokenAmount,
+
+    #[arg(long, short, value_parser = parse_percentage::<u8>)]
+    pub majority_percentage: u8,
 }

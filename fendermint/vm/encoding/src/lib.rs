@@ -3,6 +3,7 @@
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
+use ipc_sdk::subnet_id::SubnetID;
 use num_traits::Num;
 use serde::de::{DeserializeOwned, Error};
 use serde::{de, Deserialize, Serialize, Serializer};
@@ -26,7 +27,7 @@ use cid::Cid;
 /// ```
 pub struct IsHumanReadable;
 
-fn serialize_str<T, S>(source: &T, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_str<T, S>(source: &T, serializer: S) -> Result<S::Ok, S::Error>
 where
     T: ToString + Serialize,
     S: Serializer,
@@ -40,7 +41,7 @@ where
     }
 }
 
-fn deserialize_str<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+pub fn deserialize_str<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
     T: FromStr + DeserializeOwned,
     <T as FromStr>::Err: Display,
@@ -68,28 +69,31 @@ where
 #[macro_export]
 macro_rules! human_readable_str {
     ($typ: ty) => {
-        impl SerializeAs<$typ> for IsHumanReadable {
+        impl serde_with::SerializeAs<$typ> for $crate::IsHumanReadable {
             fn serialize_as<S>(addr: &$typ, serializer: S) -> Result<S::Ok, S::Error>
             where
-                S: Serializer,
+                S: serde::Serializer,
             {
-                serialize_str(addr, serializer)
+                $crate::serialize_str(addr, serializer)
             }
         }
 
-        impl<'de> DeserializeAs<'de, $typ> for IsHumanReadable {
+        impl<'de> serde_with::DeserializeAs<'de, $typ> for $crate::IsHumanReadable {
             fn deserialize_as<D>(deserializer: D) -> Result<$typ, D::Error>
             where
-                D: de::Deserializer<'de>,
+                D: serde::de::Deserializer<'de>,
             {
-                deserialize_str(deserializer)
+                $crate::deserialize_str(deserializer)
             }
         }
     };
 }
 
+// Defining these here so we don't have to wrap them in structs where we want to use them.
+
 human_readable_str!(Address);
 human_readable_str!(Cid);
+human_readable_str!(SubnetID);
 
 impl SerializeAs<TokenAmount> for IsHumanReadable {
     /// Serialize tokens as human readable decimal string.

@@ -21,6 +21,9 @@ all: test build
 build:
 	cargo build --release
 
+install:
+	cargo install --path fendermint/app
+
 # Using --release for testing because wasm can otherwise be slow.
 test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_ABI)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \

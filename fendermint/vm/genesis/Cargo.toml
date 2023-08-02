@@ -19,6 +19,8 @@ rand = { workspace = true, optional = true }
 
 cid = { workspace = true, optional = true }
 fvm_shared = { workspace = true }
+ipc-sdk = { workspace = true }
+
 fendermint_testing = { path = "../../testing", optional = true }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_encoding = { path = "../encoding" }

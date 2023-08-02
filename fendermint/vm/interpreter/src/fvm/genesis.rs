@@ -16,7 +16,6 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Validator};
-use fendermint_vm_ipc_actors::gateway::SubnetID;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
@@ -94,20 +93,24 @@ where
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
 
-        let eth_contract_ids: HashMap<&str, ActorID> = vec![
-            ("Gateway", ipc::GATEWAY_ACTOR_ID),
-            ("SubnetRegistry", ipc::SUBNETREGISTRY_ACTOR_ID),
-        ]
-        .into_iter()
-        .collect();
+        // Pre-defined IDs for top-level Ethereum contracts.
+        let mut eth_contract_ids: HashMap<&str, ActorID> = Default::default();
+
+        // Only allocate IDs if the contracts are deployed.
+        if genesis.ipc.is_some() {
+            eth_contract_ids.insert("Gateway", ipc::GATEWAY_ACTOR_ID);
+            eth_contract_ids.insert("SubnetRegistry", ipc::SUBNETREGISTRY_ACTOR_ID);
+        }
 
         // Collect dependencies of the main IPC actors.
         let eth_libs = self
             .contracts
-            .library_dependencies(&[
-                ("Gateway.sol", "Gateway"),
-                ("SubnetRegistry.sol", "SubnetRegistry"),
-            ])
+            .library_dependencies(
+                &eth_contract_ids
+                    .keys()
+                    .map(|k| (format!("{k}.sol"), *k))
+                    .collect::<Vec<_>>(),
+            )
             .context("failed to collect EVM contract dependencies")?;
 
         // STAGE 1: First we initialize native built-in actors.
@@ -234,51 +237,44 @@ where
 
         let mut deployer = ContractDeployer::<DB>::new(&self.contracts);
 
-        // IPC libraries.
+        // Deploy Ethereum libraries.
         for (lib_src, lib_name) in eth_libs {
             deployer.deploy_library(&mut state, &mut next_id, lib_src, &lib_name)?;
         }
 
-        // IPC Gateway actor.
-        let gateway_addr = {
-            use fendermint_vm_ipc_actors::gateway::GATEWAY_ABI;
-            use ipc::gateway::ConstructorParameters;
+        if let Some(ipc_params) = genesis.ipc {
+            // IPC Gateway actor.
+            let gateway_addr = {
+                use fendermint_vm_ipc_actors::gateway::GATEWAY_ABI;
+                use ipc::gateway::ConstructorParameters;
 
-            // TODO: Move all these parameters to Genesis.
-            let params = ConstructorParameters {
-                network_name: SubnetID {
-                    root: 0,
-                    route: Vec::new(),
-                },
-                bottom_up_check_period: 10,
-                top_down_check_period: 10,
-                msg_fee: et::U256::from(10),
-                majority_percentage: 66,
+                let params = ConstructorParameters::try_from(ipc_params.gateway)
+                    .context("failed to create gateway constructor")?;
+
+                deployer.deploy_contract(
+                    &mut state,
+                    &eth_contract_ids,
+                    "Gateway.sol",
+                    "Gateway",
+                    &GATEWAY_ABI,
+                    (params,),
+                )?
             };
 
-            deployer.deploy_contract(
-                &mut state,
-                &eth_contract_ids,
-                "Gateway.sol",
-                "Gateway",
-                &GATEWAY_ABI,
-                (params,),
-            )?
-        };
+            // IPC SubnetRegistry actory.
+            {
+                use fendermint_vm_ipc_actors::subnet_registry::SUBNETREGISTRY_ABI;
 
-        // IPC SubnetRegistry actory.
-        {
-            use fendermint_vm_ipc_actors::subnet_registry::SUBNETREGISTRY_ABI;
-
-            deployer.deploy_contract(
-                &mut state,
-                &eth_contract_ids,
-                "SubnetRegistry.sol",
-                "SubnetRegistry",
-                &SUBNETREGISTRY_ABI,
-                (gateway_addr,),
-            )?;
-        };
+                deployer.deploy_contract(
+                    &mut state,
+                    &eth_contract_ids,
+                    "SubnetRegistry.sol",
+                    "SubnetRegistry",
+                    &SUBNETREGISTRY_ABI,
+                    (gateway_addr,),
+                )?;
+            };
+        }
 
         Ok((state, out))
     }

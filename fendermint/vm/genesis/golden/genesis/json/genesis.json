@@ -1,46 +1,108 @@
 {
-  "chain_name": "^M!",
-  "timestamp": 4024807955318227253,
+  "chain_name": "%\u000f抺",
+  "timestamp": 17556149918154920594,
   "network_version": 18,
-  "base_fee": "5916336262849946765170605137278330574918425666194616789959405430528089540441220573896776077721973026532952233743044",
+  "base_fee": "41855804968213567224547853478906320725054875457247406540771499545716837934567817284890561672488119458109166910841919797858872862722356017328064756151166307827869405370407152286801072676024887272960758524035337792904616958075776435777990406039363527010043736240963055342423554029889820661874057923691",
   "validators": [
     {
-      "public_key": "BD3Im00YB0OnR3yXksQDg+j9gRTpJ1eiCyZfSpbI4lUfkJgJr6rYNwLgfKmLr1ElJOR55QLoqpxB3fv270gicKc=",
-      "power": 17725430111949631302
+      "public_key": "BCubQz4K6SeotkzvdtqEKrTdVZWpsf98c0VPITPVCpAG8gV7OmOL+xfSBoi0gCOEOoLPx9GvpKRJkL2LEcYJHx8=",
+      "power": 15779275686418848903
     },
     {
       "public_key": "BD3Im00YB0OnR3yXksQDg+j9gRTpJ1eiCyZfSpbI4lUfkJgJr6rYNwLgfKmLr1ElJOR55QLoqpxB3fv270gicKc=",
-      "power": 1
+      "power": 14628346619981982224
     },
     {
-      "public_key": "BNbRngmvTwKZb1RpZn17OkJTuR+aURGcHlUAzLi2ylZeAJVZ8tFUtntHWDtoS2p/SPSjjE15CY2dbxc606kl1lQ=",
-      "power": 14434590730758431414
+      "public_key": "BDfLujFMKaca779/BxE3vGBWdE6TtQIl/OSpPU8x+KuMFbjLgrw69T5zz4TipKC0hYQAiS+Nr6QMhnabC9rQ7J8=",
+      "power": 6797215775870862706
+    },
+    {
+      "public_key": "BDHNDMK2pHW+2HApYbRpWPPWpmRzhjKP8GYjSnKRf1cwgujg9ygzoFDzZo+4LgZm0K96LbnVdeHjLpBM/yNejAU=",
+      "power": 6366963610665473750
+    },
+    {
+      "public_key": "BOFiTs3ZfvFYVf21NwLsWuwKUCL5be99Gva6CiJkxxMYp3uLF9DcMivRFkT8XFzpPlO815c520h8nx1BZ0KgId4=",
+      "power": 10284199449966294320
+    },
+    {
+      "public_key": "BK6N6hPF3MFi0zTtzlmByvHk8ie5T21iKeSa2p4szJjQKRwbGQA6nrpD6+o/zUS1kvQdfjX7nG+etjE8fgMmdhk=",
+      "power": 17168609063905508543
+    },
+    {
+      "public_key": "BH9ZaAvbBlHCmxR5/mhpK86yckKGadI+dWE6CjqtlhOBJyo/za2zOIe9f3CzX4uHNxha6jibbgERw/zOILGZ75o=",
+      "power": 7161671461606845668
+    },
+    {
+      "public_key": "BDZrO80YaDAxQ2bUXMVOZqikoKE7bIrB7cjIxsESfQQyBGOSjI4OZamQdI4V5o/7wDPwCFC5JrY3vCCyPeZjCpI=",
+      "power": 11892146667892454031
     }
   ],
   "accounts": [
     {
       "meta": {
         "Account": {
-          "owner": "f3rz3lmaouchkm6o3wuiqsjclpgkivxgybe5wfgwmvrx7vgt5wtg476jib5fy6dbyab6iqpkswhj5z7qp7u45a"
+          "owner": "f410f46bd6jqnahki73cu4eqhlde6yn2hul2pbskotey"
         }
       },
       "balance": "0"
     },
     {
       "meta": {
-        "Multisig": {
-          "signers": [
-            "f410474476643915224463fo2ypxufjsamu56yb5d2nnwkhti6jaah7d7q24ainkjjwp7ybtz2ads3d2wvjo",
-            "f012643473654880176368",
-            "f376h52auy2dtrqstoc4alijr5jdlrmap6syhvzupbabaewxsc2qsjtwtkahz3gqqbegmthxp74efqa3jccm4q",
-            "f415662643756092902851fzq3wsli"
-          ],
-          "threshold": 4,
-          "vesting_duration": 10845801392025548499,
-          "vesting_start": 14192652983892898490
+        "Account": {
+          "owner": "f410fjnc3646h4ernuiul475v6otunjsr4esowyravyi"
         }
       },
-      "balance": "41855804968213567224547853478906320725054875457247406540771499545716837934567817284890561672488119458109166910841919797858872862722356017328064756151166307827869404938895459098849491406891848373891549193546244282259457333466915574731002327202044135170567970222038335602851044224516398630275595225520"
+      "balance": "41855804968213567224547853478906320725054875457247406540771499545716837934567817284890561672488119458109166910841919797858872862722356017328064756151166307827869405370407152286801072676024887272960758524035337792904616958003996694820367476618074015623162455459066718767473861097837432316616551465166"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "f1quuqocmwixrmqicq2npq4qhq3vqiguw7bu54oyq"
+        }
+      },
+      "balance": "313786795157767971197652203057867310956247157031907880236679870790457539089214669061551967880103733190162256540813322022073006800863053"
+    },
+    {
+      "meta": {
+        "Multisig": {
+          "signers": [
+            "f1otqnmvuf5fuzbafsyazighlaf7klhjlhy3wqjka",
+            "f1brq6anlvff3gi5f6o54e4mm6e2zfmsxlcofvvqq",
+            "f1rcsucsj67tdrgemgvn33fsujk2p3ry2gaw6rywq",
+            "f1vysigwcxasz3afziyu7v7uymoqgwmzssdiuvypq"
+          ],
+          "threshold": 1,
+          "vesting_duration": 18446744073709551615,
+          "vesting_start": 10621219676790444897
+        }
+      },
+      "balance": "39655773076819850230130007018152811889045792111227225693069967363465604241373865942914591083658032153206642214094765385557380592634973982560806032773111028547025200174648267"
+    },
+    {
+      "meta": {
+        "Multisig": {
+          "signers": [
+            "f1wfd5u5ivabrse3k7h4gjjnhoufiopiwcyngrzba",
+            "f1vgzhkx4qais6bwzsyjyjqmytcpwte6fm7555zui",
+            "f1hfnjnlty6lhfwzwhjmgmwjmx6m72cqr2c4xvsmq",
+            "f1cbtnc6wpzczuppc7eljqo5qfttnedishhpovlyi",
+            "f1kgy6idbnqwpslwr26rv4p6anlvgl7fsmt3k5ogq"
+          ],
+          "threshold": 4,
+          "vesting_duration": 6442248738003593246,
+          "vesting_start": 9888931041805341705
+        }
+      },
+      "balance": "0"
     }
-  ]
+  ],
+  "ipc": {
+    "gateway": {
+      "subnet_id": "/r10533236646311408872/f2abg373j3czdaauey2eoxfsb2rnrlyap7erw2cyi/f417716178507925448049fq2a2bl774372iqbgh4asmiiaag5jxeq2iycurs3x4ruuw/f2x5qacpxmje67kvbso5b6fekiwdcnzsb2iwskgkq",
+      "bottom_up_check_period": 11840891920929344609,
+      "top_down_check_period": 1256166641048974703,
+      "msg_fee": "574817346560345820184733221309175383605250564409273514210688601223203103521657331203130285262096697434476027051343263392960096729783111",
+      "majority_percentage": 1
+    }
+  }
 }

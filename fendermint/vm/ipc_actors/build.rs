@@ -29,7 +29,7 @@ fn main() {
 
     for contract_name in ["Gateway", "SubnetActor", "SubnetRegistry"] {
         let module_name = camel_to_snake(contract_name);
-        let input_path = format!("{ipc_actors_dir}/out/{contract_name}.json");
+        let input_path = format!("{ipc_actors_dir}/out/{contract_name}.sol/{contract_name}.json");
         let output_path = format!("./src/{}.rs", module_name);
 
         ethers::prelude::Abigen::new(contract_name, &input_path)
