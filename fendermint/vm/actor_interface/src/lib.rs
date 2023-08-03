@@ -45,6 +45,7 @@ macro_rules! define_singleton {
 pub mod account;
 pub mod burntfunds;
 pub mod cron;
+pub mod diamond;
 pub mod eam;
 pub mod ethaccount;
 pub mod evm;

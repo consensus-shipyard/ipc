@@ -1,26 +1,28 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_eth_hardhat::{Hardhat, FQN};
+use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
     account, burntfunds, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Validator};
+use fendermint_vm_ipc_actors::i_diamond::FacetCut;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
-use fvm_shared::ActorID;
 use num_traits::Zero;
 
 use crate::GenesisInterpreter;
@@ -94,24 +96,35 @@ where
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
 
         // Pre-defined IDs for top-level Ethereum contracts.
-        let mut eth_contract_ids: HashMap<&str, ActorID> = Default::default();
+        let mut eth_builtin_ids = HashSet::new();
+        let mut eth_root_contracts = Vec::new();
+        let mut eth_contracts = EthContractMap::default();
 
         // Only allocate IDs if the contracts are deployed.
         if genesis.ipc.is_some() {
-            eth_contract_ids.insert("Gateway", ipc::GATEWAY_ACTOR_ID);
-            eth_contract_ids.insert("SubnetRegistry", ipc::SUBNETREGISTRY_ACTOR_ID);
+            eth_contracts.extend(IPC_CONTRACTS.clone().into_iter());
         }
 
+        eth_builtin_ids.extend(eth_contracts.values().map(|c| c.actor_id));
+        eth_root_contracts.extend(eth_contracts.keys());
+        eth_root_contracts.extend(
+            eth_contracts
+                .values()
+                .flat_map(|c| c.facets.iter().map(|f| f.name)),
+        );
         // Collect dependencies of the main IPC actors.
-        let eth_libs = self
+        let mut eth_libs = self
             .contracts
-            .library_dependencies(
-                &eth_contract_ids
-                    .keys()
-                    .map(|k| (format!("{k}.sol"), *k))
+            .dependencies(
+                &eth_root_contracts
+                    .iter()
+                    .map(|n| (contract_src(n), *n))
                     .collect::<Vec<_>>(),
             )
             .context("failed to collect EVM contract dependencies")?;
+
+        // Only keep library dependencies, not contracts with constructors.
+        eth_libs.retain(|(_, d)| !eth_contracts.contains_key(d.as_str()));
 
         // STAGE 1: First we initialize native built-in actors.
 
@@ -133,7 +146,7 @@ where
             state.store(),
             genesis.chain_name.clone(),
             &genesis.accounts,
-            &eth_contract_ids.values().cloned().collect::<Vec<_>>(),
+            &eth_builtin_ids,
             eth_libs.len() as u64,
         )
         .context("failed to create init state")?;
@@ -235,7 +248,7 @@ where
             )
             .context("failed to init exec state")?;
 
-        let mut deployer = ContractDeployer::<DB>::new(&self.contracts);
+        let mut deployer = ContractDeployer::<DB>::new(&self.contracts, &eth_contracts);
 
         // Deploy Ethereum libraries.
         for (lib_src, lib_name) in eth_libs {
@@ -245,33 +258,39 @@ where
         if let Some(ipc_params) = genesis.ipc {
             // IPC Gateway actor.
             let gateway_addr = {
-                use fendermint_vm_ipc_actors::gateway::GATEWAY_ABI;
                 use ipc::gateway::ConstructorParameters;
 
                 let params = ConstructorParameters::try_from(ipc_params.gateway)
                     .context("failed to create gateway constructor")?;
 
-                deployer.deploy_contract(
-                    &mut state,
-                    &eth_contract_ids,
-                    "Gateway.sol",
-                    "Gateway",
-                    &GATEWAY_ABI,
-                    (params,),
-                )?
+                let facets = deployer
+                    .facets("GatewayDiamond")
+                    .context("failed to collect gateway facets")?;
+
+                deployer.deploy_contract(&mut state, "GatewayDiamond", (facets, params))?
             };
 
             // IPC SubnetRegistry actory.
             {
-                use fendermint_vm_ipc_actors::subnet_registry::SUBNETREGISTRY_ABI;
+                let mut facets = deployer
+                    .facets("SubnetRegistry")
+                    .context("failed to collect registry facets")?;
+
+                let manager_facet = facets.remove(1);
+                let getter_facet = facets.remove(0);
+
+                assert!(facets.is_empty(), "SubnetRegistry has 2 facets");
 
                 deployer.deploy_contract(
                     &mut state,
-                    &eth_contract_ids,
-                    "SubnetRegistry.sol",
                     "SubnetRegistry",
-                    &SUBNETREGISTRY_ABI,
-                    (gateway_addr,),
+                    (
+                        gateway_addr,
+                        getter_facet.facet_address,
+                        manager_facet.facet_address,
+                        getter_facet.function_selectors,
+                        manager_facet.function_selectors,
+                    ),
                 )?;
             };
         }
@@ -280,8 +299,13 @@ where
     }
 }
 
+fn contract_src(name: &str) -> PathBuf {
+    PathBuf::from(format!("{name}.sol"))
+}
+
 struct ContractDeployer<'a, DB> {
-    contracts: &'a Hardhat,
+    hardhat: &'a Hardhat,
+    top_contracts: &'a EthContractMap,
     // Assign dynamic ID addresses to libraries, but use fixed addresses for the top level contracts.
     lib_addrs: HashMap<FQN, et::Address>,
     phantom_db: PhantomData<DB>,
@@ -291,9 +315,10 @@ impl<'a, DB> ContractDeployer<'a, DB>
 where
     DB: Blockstore + 'static + Send + Sync + Clone,
 {
-    pub fn new(contracts: &'a Hardhat) -> Self {
+    pub fn new(hardhat: &'a Hardhat, top_contracts: &'a EthContractMap) -> Self {
         Self {
-            contracts,
+            hardhat,
+            top_contracts,
             lib_addrs: Default::default(),
             phantom_db: PhantomData,
         }
@@ -307,10 +332,10 @@ where
         lib_src: impl AsRef<Path>,
         lib_name: &str,
     ) -> anyhow::Result<()> {
-        let fqn = self.contracts.fqn(lib_src.as_ref(), lib_name);
+        let fqn = self.hardhat.fqn(lib_src.as_ref(), lib_name);
 
         let bytecode = self
-            .contracts
+            .hardhat
             .bytecode(&lib_src, lib_name, &self.lib_addrs)
             .with_context(|| format!("failed to load library bytecode {fqn}"))?;
 
@@ -342,24 +367,23 @@ where
     pub fn deploy_contract<T>(
         &self,
         state: &mut FvmGenesisState<DB>,
-        contract_ids: &HashMap<&str, ActorID>,
-        contract_src: impl AsRef<Path>,
         contract_name: &str,
-        contract_abi: &ethers::core::abi::Abi,
         constructor_params: T,
     ) -> anyhow::Result<et::Address>
     where
         T: Tokenize,
     {
-        let contract_id = contract_ids[contract_name];
+        let contract = self.contract(contract_name)?;
+        let contract_id = contract.actor_id;
+        let contract_src = contract_src(contract_name);
 
         let bytecode = self
-            .contracts
+            .hardhat
             .bytecode(contract_src, contract_name, &self.lib_addrs)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
         let eth_addr = state
-            .create_evm_actor_with_cons(contract_id, contract_abi, bytecode, constructor_params)
+            .create_evm_actor_with_cons(contract_id, &contract.abi, bytecode, constructor_params)
             .with_context(|| format!("failed to create {contract_name} actor"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(contract_id).0);
@@ -375,6 +399,46 @@ where
 
         Ok(id_addr)
     }
+
+    /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already deployed library facets.
+    pub fn facets(&self, contract_name: &str) -> anyhow::Result<Vec<FacetCut>> {
+        let contract = self.contract(contract_name)?;
+        let mut facet_cuts = Vec::new();
+
+        for facet in contract.facets.iter() {
+            let facet_name = facet.name;
+            let facet_src = contract_src(facet_name);
+            let facet_fqn = self.hardhat.fqn(&facet_src, facet_name);
+
+            let facet_addr = self
+                .lib_addrs
+                .get(&facet_fqn)
+                .ok_or_else(|| anyhow!("facet {facet_name} has not been deployed"))?;
+
+            let method_sigs = facet
+                .abi
+                .functions()
+                .filter(|f| f.signature() != "init(bytes)")
+                .map(|f| f.short_signature())
+                .collect();
+
+            let facet_cut = FacetCut {
+                facet_address: *facet_addr,
+                action: 0, // Add
+                function_selectors: method_sigs,
+            };
+
+            facet_cuts.push(facet_cut);
+        }
+
+        Ok(facet_cuts)
+    }
+
+    fn contract(&self, contract_name: &str) -> anyhow::Result<&EthContract> {
+        self.top_contracts
+            .get(contract_name)
+            .ok_or(anyhow!("unknown top contract name"))
+    }
 }
 
 /// Sum of balances in the genesis accounts.
@@ -388,7 +452,7 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 mod tests {
     use std::sync::Arc;
 
-    use fendermint_vm_genesis::Genesis;
+    use fendermint_vm_genesis::{ipc::IpcParams, Genesis};
     use fvm::engine::MultiEngine;
     use quickcheck::Arbitrary;
 
@@ -406,7 +470,9 @@ mod tests {
     #[tokio::test]
     async fn load_genesis() {
         let mut g = quickcheck::Gen::new(5);
-        let genesis = Genesis::arbitrary(&mut g);
+        let mut genesis = Genesis::arbitrary(&mut g);
+        genesis.ipc = Some(IpcParams::arbitrary(&mut g));
+
         let bundle = std::fs::read(bundle_path()).expect("failed to read bundle");
         let store = MemoryBlockstore::new();
         let multi_engine = Arc::new(MultiEngine::default());
@@ -423,6 +489,7 @@ mod tests {
             .expect("failed to create actors");
 
         let _state_root = state.commit().expect("failed to commit");
+
         assert_eq!(out.validators, genesis.validators);
     }
 }

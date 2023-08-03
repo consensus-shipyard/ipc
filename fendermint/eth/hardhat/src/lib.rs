@@ -97,20 +97,20 @@ impl Hardhat {
     }
 
     /// Traverse the linked references and return the library contracts to be deployed in topological order.
-    pub fn library_dependencies(
+    ///
+    /// The result will include the top contracts as well, and it's up to the caller to filter them out if
+    /// they have more complicated deployments including constructors. This is because there can be diamond
+    /// facets among them which aren't ABI visible dependencies but should be deployed as libraries.
+    pub fn dependencies(
         &self,
-        top_contracts: &[(impl AsRef<Path>, &str)],
+        root_contracts: &[(impl AsRef<Path>, &str)],
     ) -> anyhow::Result<Vec<ContractSourceAndName>> {
         let mut deps: DependencyTree<ContractSourceAndName> = Default::default();
 
-        let mut queue: VecDeque<ContractSourceAndName> = VecDeque::new();
-
-        let top_contracts = top_contracts
+        let mut queue = root_contracts
             .iter()
             .map(|(s, c)| (PathBuf::from(s.as_ref()), c.to_string()))
-            .collect::<Vec<_>>();
-
-        queue.extend(top_contracts.clone());
+            .collect::<VecDeque<_>>();
 
         // Construct dependency tree by recursive traversal.
         while let Some(sc) = queue.pop_front() {
@@ -131,10 +131,7 @@ impl Hardhat {
         }
 
         // Topo-sort the libraries in the order of deployment.
-        let mut sorted = topo_sort(deps)?;
-
-        // Remove the top contracts, which are assumed to be non-library contracts with potential constructor logic.
-        sorted.retain(|sc| !top_contracts.contains(sc));
+        let sorted = topo_sort(deps)?;
 
         Ok(sorted)
     }
@@ -289,8 +286,8 @@ mod tests {
         Hardhat::new(contracts_path())
     }
 
-    // Based on the `scripts/deploy-libraries.ts` in `ipc-solidity-actors`.
-    const GATEWAY_DEPS: [&str; 7] = [
+    // These are all the libraries based on the `scripts/deploy-libraries.ts` in `ipc-solidity-actors`.
+    const IPC_DEPS: [&str; 7] = [
         "AccountHelper",
         "CheckpointHelper",
         "EpochVoteSubmissionHelper",
@@ -306,12 +303,13 @@ mod tests {
 
         let mut libraries = HashMap::new();
 
-        for lib in GATEWAY_DEPS {
+        for lib in IPC_DEPS {
             libraries.insert(lib.to_owned(), et::Address::default());
         }
 
+        // This one requires a subset of above libraries.
         let _bytecode = hardhat
-            .bytecode("Gateway.sol", "Gateway", &libraries)
+            .bytecode("GatewayManagerFacet.sol", "GatewayManagerFacet", &libraries)
             .unwrap();
     }
 
@@ -319,7 +317,8 @@ mod tests {
     fn bytecode_missing_link() {
         let hardhat = test_hardhat();
 
-        let result = hardhat.bytecode("Gateway.sol", "Gateway", &Default::default());
+        // Not giving any dependency should result in a failure.
+        let result = hardhat.bytecode("GatewayDiamond.sol", "GatewayDiamond", &Default::default());
 
         assert!(result.is_err());
         assert!(result
@@ -332,16 +331,32 @@ mod tests {
     fn library_dependencies() {
         let hardhat = test_hardhat();
 
-        let lib_deps = hardhat
-            .library_dependencies(&[
-                ("Gateway.sol", "Gateway"),
-                ("SubnetRegistry.sol", "SubnetRegistry"),
-            ])
+        let root_contracts: Vec<(String, &str)> = vec![
+            "GatewayDiamond",
+            "GatewayManagerFacet",
+            "GatewayGetterFacet",
+            "GatewayRouterFacet",
+            "SubnetRegistry",
+        ]
+        .into_iter()
+        .map(|c| (format!("{c}.sol"), c))
+        .collect();
+
+        // Name our top level contracts and gather all required libraries.
+        let mut lib_deps = hardhat
+            .dependencies(&root_contracts)
             .expect("failed to compute dependencies");
 
-        eprintln!("Gateway dependencies: {lib_deps:?}");
+        // For the sake of testing, let's remove top libraries from the dependency list.
+        lib_deps.retain(|(_, d)| !root_contracts.iter().any(|(_, c)| c == d));
 
-        assert_eq!(lib_deps.len(), GATEWAY_DEPS.len());
+        eprintln!("IPC dependencies: {lib_deps:?}");
+
+        assert_eq!(
+            lib_deps.len(),
+            IPC_DEPS.len(),
+            "should discover the same dependencies as expected"
+        );
 
         let mut libs = HashMap::default();
 
@@ -353,13 +368,15 @@ mod tests {
             libs.insert(hardhat.fqn(&s, &c), et::Address::default());
         }
 
-        hardhat
-            .bytecode("Gateway.sol", "Gateway", &libs)
-            .expect("failed to produce contract bytecode in topo order");
+        for (src, name) in root_contracts {
+            hardhat
+                .bytecode(src, name, &libs)
+                .expect("failed to produce contract bytecode in topo order");
+        }
     }
 
     #[test]
-    fn sorting() {
+    fn topo_sorting() {
         let mut tree: DependencyTree<u8> = Default::default();
 
         for (k, ds) in [

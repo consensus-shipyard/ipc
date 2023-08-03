@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
@@ -49,7 +49,7 @@ impl State {
         // Accounts from the Genesis file.
         accounts: &[Actor],
         // Pre-defined IDs for top-level EVM contracts.
-        eth_builtin_ids: &[ActorID],
+        eth_builtin_ids: &HashSet<ActorID>,
         // Number of dynamically deployed EVM library contracts.
         eth_library_count: u64,
     ) -> anyhow::Result<(Self, AddressMap)> {

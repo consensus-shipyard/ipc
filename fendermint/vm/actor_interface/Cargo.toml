@@ -11,6 +11,7 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 ethers = { workspace = true }
+lazy_static = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }

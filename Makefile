@@ -5,6 +5,7 @@ BUILTIN_ACTORS_DIR:=../builtin-actors
 BUILTIN_ACTORS_CODE:=$(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs" | grep -v target)
 BUILTIN_ACTORS_BUNDLE:=$(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
 
+IPC_ACTORS_TAG:=origin/dev
 IPC_ACTORS_DIR:=$(shell pwd)/../ipc-solidity-actors
 IPC_ACTORS_CODE:=$(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
 IPC_ACTORS_BUILD:=fendermint/vm/ipc_actors/build.rs
@@ -37,6 +38,7 @@ clean:
 	cargo clean
 	cd $(BUILTIN_ACTORS_DIR) && cargo clean
 	rm $(BUILTIN_ACTORS_BUNDLE)
+	rm $(IPC_ACTORS_ABI)
 
 lint: \
 	license \
@@ -103,7 +105,7 @@ $(IPC_ACTORS_ABI): $(IPC_ACTORS_CODE) | forge
 	fi
 	cd $(IPC_ACTORS_DIR) && \
 	git fetch origin && \
-	git checkout origin/fm-156-ipc-solidity-actors
+	git checkout $(IPC_ACTORS_TAG)
 	make -C $(IPC_ACTORS_DIR) compile-abi
 	touch $@
 
