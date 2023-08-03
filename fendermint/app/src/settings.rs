@@ -36,6 +36,16 @@ pub struct DbSettings {
     pub state_hist_size: u64,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FvmSettings {
+    /// Overestimation rate applied to gas estimations to ensure that the
+    /// message goes through
+    pub gas_overestimation_rate: f64,
+    /// Gas search step increase used to find the optimal gas limit.
+    /// It determines how fine-grained we want the gas estimation to be.
+    pub gas_search_step: f64,
+}
+
 /// Ethereum API facade settings.
 #[serde_as]
 #[derive(Debug, Deserialize)]
@@ -55,6 +65,7 @@ pub struct Settings {
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub eth: EthSettings,
+    pub fvm: FvmSettings,
 }
 
 macro_rules! home_relative {

@@ -36,6 +36,7 @@ pub async fn handle(
     match call_rpc_str(&state.rpc_server, request).await {
         Ok(result) => {
             tracing::debug!(method, id, result, "RPC call success");
+
             (StatusCode::OK, response_headers, result)
         }
         Err(err) => {

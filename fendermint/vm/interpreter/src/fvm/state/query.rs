@@ -91,13 +91,17 @@ where
     }
 
     /// If we know the query is over the state, cache the state tree.
-    fn with_exec_state<T, F>(&self, f: F) -> anyhow::Result<T>
+    /// If `use_cache` is enabled, the result of the execution will be
+    /// buffered in the cache, if not the result is returned but not cached.
+    fn with_exec_state<T, F>(&self, use_cache: bool, f: F) -> anyhow::Result<T>
     where
         F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
     {
         let mut cache = self.exec_state.borrow_mut();
-        if let Some(exec_state) = cache.as_mut() {
-            return f(exec_state);
+        if use_cache {
+            if let Some(exec_state) = cache.as_mut() {
+                return f(exec_state);
+            }
         }
 
         let mut exec_state = FvmExecState::new(
@@ -109,7 +113,9 @@ where
         .context("error creating execution state")?;
 
         let res = f(&mut exec_state);
-        *cache = Some(exec_state);
+        if use_cache {
+            *cache = Some(exec_state);
+        }
         res
     }
 
@@ -142,15 +148,17 @@ where
     ///
     /// The results are never going to be flushed, so it's semantically read-only,
     /// but it might write into the buffered block store the FVM creates. Running
-    /// multiple such messages results in their buffered effects stacking up.
-    pub fn call(&self, mut msg: FvmMessage) -> anyhow::Result<ApplyRet> {
+    /// multiple such messages results in their buffered effects stacking up if
+    /// `use_cache` is enabled. If `use_cache` is not enabled, the results of the
+    /// execution are not cached.
+    pub fn call(&self, mut msg: FvmMessage, use_cache: bool) -> anyhow::Result<ApplyRet> {
         // If the sequence is zero, treat it as a signal to use whatever is in the state.
         if msg.sequence.is_zero() {
             if let Some((_, state)) = self.actor_state(&msg.from)? {
                 msg.sequence = state.sequence;
             }
         }
-        self.with_exec_state(|s| {
+        self.with_exec_state(use_cache, |s| {
             if msg.from == SYSTEM_ACTOR_ADDR {
                 // Explicit execution requires `from` to be an account kind.
                 s.execute_implicit(msg)

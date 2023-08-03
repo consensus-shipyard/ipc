@@ -27,13 +27,21 @@ pub type FvmMessage = fvm_shared::message::Message;
 pub struct FvmMessageInterpreter<DB> {
     contracts: Hardhat,
     _phantom_db: PhantomData<DB>,
+    /// Overestimation rate applied to gas to ensure that the
+    /// message goes through in the gas estimation.
+    gas_overestimation_rate: f64,
+    /// Gas search step increase used to find the optimal gas limit.
+    /// It determines how fine-grained we want the gas estimation to be.
+    gas_search_step: f64,
 }
 
 impl<DB> FvmMessageInterpreter<DB> {
-    pub fn new(contracts_dir: PathBuf) -> Self {
+    pub fn new(contracts_dir: PathBuf, gas_overestimation_rate: f64, gas_search_step: f64) -> Self {
         Self {
             contracts: Hardhat::new(contracts_dir),
             _phantom_db: PhantomData,
+            gas_overestimation_rate,
+            gas_search_step,
         }
     }
 }

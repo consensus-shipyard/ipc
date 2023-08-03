@@ -18,6 +18,15 @@ port = 26658
 # Keep unlimited history by default.
 state_hist_size = 0
 
+# FVM configuration
+[fvm]
+# Overestimation rate applied to gas estimations to ensure that the
+# message goes through
+gas_overestimation_rate = 1.25
+# Gas search step increase used to find the optimal gas limit.
+# It determines how fine-grained we want the gas estimation to be.
+gas_search_step = 1.25
+
 # Ethereum API facade
 [eth]
 # Maximum time allowed between polls for filter changes, in seconds, before the subscription is canceled.

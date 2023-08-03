@@ -541,6 +541,14 @@ where
             },
         };
 
+        if response.code != 0.into() {
+            tracing::info!(
+                "deliver_tx failed: {:?} - {:?}",
+                response.code,
+                response.info
+            );
+        }
+
         Ok(response)
     }
 

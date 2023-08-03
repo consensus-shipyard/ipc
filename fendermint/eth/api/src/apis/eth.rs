@@ -499,7 +499,7 @@ where
     let (tx, sig) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
-    let msg = to_fvm_message(tx)?;
+    let msg = to_fvm_message(tx, false)?;
     let msg = SignedMessage {
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
@@ -520,12 +520,12 @@ where
 /// Executes a new message call immediately without creating a transaction on the block chain.
 pub async fn call<C>(
     data: JsonRpcData<C>,
-    Params((tx, block_id)): Params<(TypedTransaction, et::BlockId)>,
+    Params((tx, block_id)): Params<(TypedTransactionCompat, et::BlockId)>,
 ) -> JsonRpcResult<et::Bytes>
 where
     C: Client + Sync + Send,
 {
-    let msg = to_fvm_message(tx)?;
+    let msg = to_fvm_message(tx.into(), true)?;
     let header = data.header_by_id(block_id).await?;
     let response = data.client.call(msg, Some(header.height)).await?;
     let deliver_tx = response.value;
@@ -556,7 +556,8 @@ where
         EstimateGasParams::One((tx,)) => (tx, et::BlockId::Number(et::BlockNumber::Latest)),
         EstimateGasParams::Two((tx, block_id)) => (tx, block_id),
     };
-    let msg = to_fvm_message(tx).context("failed to convert to FVM message")?;
+
+    let msg = to_fvm_message(tx.into(), true).context("failed to convert to FVM message")?;
 
     let header = data
         .header_by_id(block_id)
@@ -915,12 +916,41 @@ pub async fn unsubscribe<C>(
 
 use params::{EstimateGasParams, SubscribeParams};
 
+use self::params::TypedTransactionCompat;
+
 mod params {
-    use ethers_core::types as et;
     use ethers_core::types::transaction::eip2718::TypedTransaction;
-    use serde::Deserialize;
+    use ethers_core::types::Eip1559TransactionRequest;
+    use ethers_core::types::{self as et, Eip2930TransactionRequest, TransactionRequest};
+    use serde::{Deserialize, Serialize};
 
     use crate::state::WebSocketId;
+
+    #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+    // NOTE: Using untagged so is able to deserialize as a legacy transaction
+    // directly if the type is not set. Needed for backward compatibility.
+    // #[serde(tag = "type")]
+    #[serde(untagged)]
+    pub enum TypedTransactionCompat {
+        // 0x00
+        #[serde(rename = "0x00", alias = "0x0")]
+        Legacy(TransactionRequest),
+        #[serde(rename = "0x02", alias = "0x2")]
+        Eip1559(Eip1559TransactionRequest),
+        // 0x01
+        #[serde(rename = "0x01", alias = "0x1")]
+        Eip2930(Eip2930TransactionRequest),
+    }
+
+    impl From<TypedTransactionCompat> for TypedTransaction {
+        fn from(value: TypedTransactionCompat) -> Self {
+            match value {
+                TypedTransactionCompat::Eip1559(v) => TypedTransaction::Eip1559(v),
+                TypedTransactionCompat::Legacy(v) => TypedTransaction::Legacy(v),
+                TypedTransactionCompat::Eip2930(v) => TypedTransaction::Eip2930(v),
+            }
+        }
+    }
 
     /// The client either sends one or two items in the array, depending on whether a block ID is specified.
     /// This is to keep it backwards compatible with nodes that do not support the block ID parameter.
@@ -928,8 +958,8 @@ mod params {
     #[derive(Deserialize)]
     #[serde(untagged)]
     pub enum EstimateGasParams {
-        One((TypedTransaction,)),
-        Two((TypedTransaction, et::BlockId)),
+        One((TypedTransactionCompat,)),
+        Two((TypedTransactionCompat, et::BlockId)),
     }
 
     /// The client either sends one or two items in the array, depending on whether it's subscribing to block,
@@ -940,5 +970,19 @@ mod params {
     pub enum SubscribeParams {
         One((String, WebSocketId)),
         Two((String, et::Filter, WebSocketId)),
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use crate::apis::eth::params::EstimateGasParams;
+
+        #[test]
+        fn deserialize_estimate_gas_params() {
+            let raw_str = r#"
+            [{"data":"0x6080806040523461001a576101949081610020823930815050f35b600080fdfe608080604052600436101561001357600080fd5b600090813560e01c90816325ca4c9c146100715750635d3f8a691461003757600080fd5b602036600319011261006e576004356001600160a01b0381169081900361006a5760405160ff60981b9091148152602090f35b5080fd5b80fd5b9050602036600319011261006a576004356001600160a01b038116810361015a57803b15918261012f575b826100af575b6020836040519015158152f35b908092503b67ffffffffffffffff80821161011b57601f8201601f19908116603f011683019081118382101761011b579360209460405281835284830180943c5190207fc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a4701438806100a2565b634e487b7160e01b85526041600452602485fd5b7fc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470823f14925061009c565b8280fdfea264697066735822122001bdefe53a9918e1f0e577b34ea5aed929e1b2cb9d7dd151f3a2d35024d5616f64736f6c63430008130033","from":"0x1a79385ead0e873fe0c441c034636d3edf7014cc","maxFeePerGas":"0x596836d0","maxPriorityFeePerGas":"0x59682f00","type":"0x2"}]
+            "#;
+            let r = serde_json::from_str::<EstimateGasParams>(raw_str);
+            assert!(r.is_ok());
+        }
     }
 }
