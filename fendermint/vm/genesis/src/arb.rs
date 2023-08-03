@@ -6,7 +6,12 @@ use crate::{
 use cid::multihash::MultihashDigest;
 use fendermint_testing::arb::ArbTokenAmount;
 use fendermint_vm_core::Timestamp;
-use fvm_shared::{address::Address, version::NetworkVersion};
+use fvm_shared::{
+    address::Address,
+    bigint::{BigInt, Integer},
+    econ::TokenAmount,
+    version::NetworkVersion,
+};
 use ipc_sdk::subnet_id::SubnetID;
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
@@ -119,13 +124,25 @@ impl Arbitrary for ArbSubnetID {
     }
 }
 
+/// `TokenAmount` well within the limits of U256
+#[derive(Debug, Clone)]
+struct ArbFee(TokenAmount);
+
+impl Arbitrary for ArbFee {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let t = ArbTokenAmount::arbitrary(g).0;
+        let (_, t) = t.atto().div_mod_floor(&BigInt::from(u64::MAX));
+        Self(TokenAmount::from_atto(t))
+    }
+}
+
 impl Arbitrary for ipc::GatewayParams {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self {
             subnet_id: ArbSubnetID::arbitrary(g).0,
             bottom_up_check_period: u64::arbitrary(g),
             top_down_check_period: u64::arbitrary(g),
-            msg_fee: ArbTokenAmount::arbitrary(g).0,
+            msg_fee: ArbFee::arbitrary(g).0,
             majority_percentage: u8::arbitrary(g) % 101,
         }
     }

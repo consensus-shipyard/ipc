@@ -11,7 +11,7 @@ pub use subnet_registry::*;
 )]
 pub mod subnet_registry {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_gateway\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"UnknownSubnet\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"WrongGateway\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ZeroGatewayAddress\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"subnetAddr\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"SubnetDeployed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"gateway\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getSubnetDeployedByNonce\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"subnet\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"latestSubnetDeployed\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"subnet\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"struct SubnetActor.ConstructParams\",\"name\":\"params\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"struct SubnetID\",\"name\":\"parentId\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint64\",\"name\":\"root\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"route\",\"type\":\"address[]\",\"components\":[]}]},{\"internalType\":\"bytes32\",\"name\":\"name\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"ipcGatewayAddr\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"enum ConsensusType\",\"name\":\"consensus\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"minActivationCollateral\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"minValidators\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"bottomUpCheckPeriod\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"topDownCheckPeriod\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"majorityPercentage\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"genesis\",\"type\":\"bytes\",\"components\":[]}]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"newSubnetActor\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"subnetAddr\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"subnets\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"userNonces\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\",\"components\":[]}]}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_gateway\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_getterFacet\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_managerFacet\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes4[]\",\"name\":\"_subnetGetterSelectors\",\"type\":\"bytes4[]\",\"components\":[]},{\"internalType\":\"bytes4[]\",\"name\":\"_subnetManagerSelectors\",\"type\":\"bytes4[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"CannotFindSubnet\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"FacetCannotBeZero\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"GatewayCannotBeZero\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ReentrancyGuardReentrantCall\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"UnknownSubnet\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"WrongGateway\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"subnetAddr\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"SubnetDeployed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"gateway\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getSubnetDeployedByNonce\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"subnet\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getterFacet\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"latestSubnetDeployed\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"subnet\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"managerFacet\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"struct SubnetActorDiamond.ConstructorParams\",\"name\":\"_params\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"struct SubnetID\",\"name\":\"parentId\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint64\",\"name\":\"root\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"route\",\"type\":\"address[]\",\"components\":[]}]},{\"internalType\":\"bytes32\",\"name\":\"name\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"ipcGatewayAddr\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"enum ConsensusType\",\"name\":\"consensus\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"minActivationCollateral\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"minValidators\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"bottomUpCheckPeriod\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"topDownCheckPeriod\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"majorityPercentage\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"genesis\",\"type\":\"bytes\",\"components\":[]}]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"newSubnetActor\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"subnetAddr\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"subnetGetterSelectors\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"subnetManagerSelectors\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"subnets\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"userNonces\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\",\"components\":[]}]}]";
     ///The parsed JSON ABI of the contract.
     pub static SUBNETREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
     ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
@@ -76,6 +76,17 @@ pub mod subnet_registry {
                 .method_hash([152, 54, 183, 95], (owner, nonce))
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getterFacet` (0xa0a1ca33) function
+        pub fn getter_facet(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
+            self.0
+                .method_hash([160, 161, 202, 51], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `latestSubnetDeployed` (0x1163dca5) function
         pub fn latest_subnet_deployed(
             &self,
@@ -88,16 +99,45 @@ pub mod subnet_registry {
                 .method_hash([17, 99, 220, 165], owner)
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `managerFacet` (0xd7dbbc48) function
+        pub fn manager_facet(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
+            self.0
+                .method_hash([215, 219, 188, 72], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `newSubnetActor` (0xf9daddd2) function
         pub fn new_subnet_actor(
             &self,
-            params: ConstructParams,
+            params: ConstructorParams,
         ) -> ::ethers::contract::builders::ContractCall<
             M,
             ::ethers::core::types::Address,
         > {
             self.0
                 .method_hash([249, 218, 221, 210], (params,))
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `subnetGetterSelectors` (0x3e2b8ad7) function
+        pub fn subnet_getter_selectors(
+            &self,
+            p0: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([62, 43, 138, 215], p0)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `subnetManagerSelectors` (0x009b5775) function
+        pub fn subnet_manager_selectors(
+            &self,
+            p0: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([0, 155, 87, 117], p0)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `subnets` (0xb67c7b4a) function
@@ -149,6 +189,61 @@ pub mod subnet_registry {
             Self::new(contract.address(), contract.client())
         }
     }
+    ///Custom Error type `CannotFindSubnet` with signature `CannotFindSubnet()` and selector `0x4edce94e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "CannotFindSubnet", abi = "CannotFindSubnet()")]
+    pub struct CannotFindSubnet;
+    ///Custom Error type `FacetCannotBeZero` with signature `FacetCannotBeZero()` and selector `0xf4086a20`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "FacetCannotBeZero", abi = "FacetCannotBeZero()")]
+    pub struct FacetCannotBeZero;
+    ///Custom Error type `GatewayCannotBeZero` with signature `GatewayCannotBeZero()` and selector `0x8b3ddc33`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "GatewayCannotBeZero", abi = "GatewayCannotBeZero()")]
+    pub struct GatewayCannotBeZero;
+    ///Custom Error type `ReentrancyGuardReentrantCall` with signature `ReentrancyGuardReentrantCall()` and selector `0x3ee5aeb5`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "ReentrancyGuardReentrantCall",
+        abi = "ReentrancyGuardReentrantCall()"
+    )]
+    pub struct ReentrancyGuardReentrantCall;
     ///Custom Error type `UnknownSubnet` with signature `UnknownSubnet()` and selector `0x63b0e022`
     #[derive(
         Clone,
@@ -175,25 +270,15 @@ pub mod subnet_registry {
     )]
     #[etherror(name = "WrongGateway", abi = "WrongGateway()")]
     pub struct WrongGateway;
-    ///Custom Error type `ZeroGatewayAddress` with signature `ZeroGatewayAddress()` and selector `0x609a8af9`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "ZeroGatewayAddress", abi = "ZeroGatewayAddress()")]
-    pub struct ZeroGatewayAddress;
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetRegistryErrors {
+        CannotFindSubnet(CannotFindSubnet),
+        FacetCannotBeZero(FacetCannotBeZero),
+        GatewayCannotBeZero(GatewayCannotBeZero),
+        ReentrancyGuardReentrantCall(ReentrancyGuardReentrantCall),
         UnknownSubnet(UnknownSubnet),
         WrongGateway(WrongGateway),
-        ZeroGatewayAddress(ZeroGatewayAddress),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
         RevertString(::std::string::String),
@@ -210,6 +295,24 @@ pub mod subnet_registry {
                 return Ok(Self::RevertString(decoded));
             }
             if let Ok(decoded)
+                = <CannotFindSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::CannotFindSubnet(decoded));
+            }
+            if let Ok(decoded)
+                = <FacetCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::FacetCannotBeZero(decoded));
+            }
+            if let Ok(decoded)
+                = <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::GatewayCannotBeZero(decoded));
+            }
+            if let Ok(decoded)
+                = <ReentrancyGuardReentrantCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::ReentrancyGuardReentrantCall(decoded));
+            }
+            if let Ok(decoded)
                 = <UnknownSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UnknownSubnet(decoded));
             }
@@ -217,23 +320,28 @@ pub mod subnet_registry {
                 = <WrongGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::WrongGateway(decoded));
             }
-            if let Ok(decoded)
-                = <ZeroGatewayAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::ZeroGatewayAddress(decoded));
-            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
     impl ::ethers::core::abi::AbiEncode for SubnetRegistryErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
+                Self::CannotFindSubnet(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FacetCannotBeZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GatewayCannotBeZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ReentrancyGuardReentrantCall(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::UnknownSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::WrongGateway(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ZeroGatewayAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
@@ -245,15 +353,27 @@ pub mod subnet_registry {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
                 _ if selector
+                    == <CannotFindSubnet as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <FacetCannotBeZero as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <GatewayCannotBeZero as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ReentrancyGuardReentrantCall as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <UnknownSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
                     == <WrongGateway as ::ethers::contract::EthError>::selector() => true,
-                _ if selector
-                    == <ZeroGatewayAddress as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
                 _ => false,
             }
         }
@@ -261,11 +381,16 @@ pub mod subnet_registry {
     impl ::core::fmt::Display for SubnetRegistryErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::UnknownSubnet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::WrongGateway(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ZeroGatewayAddress(element) => {
+                Self::CannotFindSubnet(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FacetCannotBeZero(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GatewayCannotBeZero(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::ReentrancyGuardReentrantCall(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::UnknownSubnet(element) => ::core::fmt::Display::fmt(element, f),
+                Self::WrongGateway(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -273,6 +398,26 @@ pub mod subnet_registry {
     impl ::core::convert::From<::std::string::String> for SubnetRegistryErrors {
         fn from(value: String) -> Self {
             Self::RevertString(value)
+        }
+    }
+    impl ::core::convert::From<CannotFindSubnet> for SubnetRegistryErrors {
+        fn from(value: CannotFindSubnet) -> Self {
+            Self::CannotFindSubnet(value)
+        }
+    }
+    impl ::core::convert::From<FacetCannotBeZero> for SubnetRegistryErrors {
+        fn from(value: FacetCannotBeZero) -> Self {
+            Self::FacetCannotBeZero(value)
+        }
+    }
+    impl ::core::convert::From<GatewayCannotBeZero> for SubnetRegistryErrors {
+        fn from(value: GatewayCannotBeZero) -> Self {
+            Self::GatewayCannotBeZero(value)
+        }
+    }
+    impl ::core::convert::From<ReentrancyGuardReentrantCall> for SubnetRegistryErrors {
+        fn from(value: ReentrancyGuardReentrantCall) -> Self {
+            Self::ReentrancyGuardReentrantCall(value)
         }
     }
     impl ::core::convert::From<UnknownSubnet> for SubnetRegistryErrors {
@@ -283,11 +428,6 @@ pub mod subnet_registry {
     impl ::core::convert::From<WrongGateway> for SubnetRegistryErrors {
         fn from(value: WrongGateway) -> Self {
             Self::WrongGateway(value)
-        }
-    }
-    impl ::core::convert::From<ZeroGatewayAddress> for SubnetRegistryErrors {
-        fn from(value: ZeroGatewayAddress) -> Self {
-            Self::ZeroGatewayAddress(value)
         }
     }
     #[derive(
@@ -336,6 +476,19 @@ pub mod subnet_registry {
         pub owner: ::ethers::core::types::Address,
         pub nonce: u64,
     }
+    ///Container type for all input parameters for the `getterFacet` function with signature `getterFacet()` and selector `0xa0a1ca33`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getterFacet", abi = "getterFacet()")]
+    pub struct GetterFacetCall;
     ///Container type for all input parameters for the `latestSubnetDeployed` function with signature `latestSubnetDeployed(address)` and selector `0x1163dca5`
     #[derive(
         Clone,
@@ -351,6 +504,19 @@ pub mod subnet_registry {
     pub struct LatestSubnetDeployedCall {
         pub owner: ::ethers::core::types::Address,
     }
+    ///Container type for all input parameters for the `managerFacet` function with signature `managerFacet()` and selector `0xd7dbbc48`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "managerFacet", abi = "managerFacet()")]
+    pub struct ManagerFacetCall;
     ///Container type for all input parameters for the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),bytes32,address,uint8,uint256,uint64,uint64,uint64,uint8,bytes))` and selector `0xf9daddd2`
     #[derive(
         Clone,
@@ -367,8 +533,34 @@ pub mod subnet_registry {
         abi = "newSubnetActor(((uint64,address[]),bytes32,address,uint8,uint256,uint64,uint64,uint64,uint8,bytes))"
     )]
     pub struct NewSubnetActorCall {
-        pub params: ConstructParams,
+        pub params: ConstructorParams,
     }
+    ///Container type for all input parameters for the `subnetGetterSelectors` function with signature `subnetGetterSelectors(uint256)` and selector `0x3e2b8ad7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "subnetGetterSelectors", abi = "subnetGetterSelectors(uint256)")]
+    pub struct SubnetGetterSelectorsCall(pub ::ethers::core::types::U256);
+    ///Container type for all input parameters for the `subnetManagerSelectors` function with signature `subnetManagerSelectors(uint256)` and selector `0x009b5775`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "subnetManagerSelectors", abi = "subnetManagerSelectors(uint256)")]
+    pub struct SubnetManagerSelectorsCall(pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `subnets` function with signature `subnets(address,uint64)` and selector `0xb67c7b4a`
     #[derive(
         Clone,
@@ -400,8 +592,12 @@ pub mod subnet_registry {
     pub enum SubnetRegistryCalls {
         Gateway(GatewayCall),
         GetSubnetDeployedByNonce(GetSubnetDeployedByNonceCall),
+        GetterFacet(GetterFacetCall),
         LatestSubnetDeployed(LatestSubnetDeployedCall),
+        ManagerFacet(ManagerFacetCall),
         NewSubnetActor(NewSubnetActorCall),
+        SubnetGetterSelectors(SubnetGetterSelectorsCall),
+        SubnetManagerSelectors(SubnetManagerSelectorsCall),
         Subnets(SubnetsCall),
         UserNonces(UserNoncesCall),
     }
@@ -421,14 +617,34 @@ pub mod subnet_registry {
                 return Ok(Self::GetSubnetDeployedByNonce(decoded));
             }
             if let Ok(decoded)
+                = <GetterFacetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::GetterFacet(decoded));
+            }
+            if let Ok(decoded)
                 = <LatestSubnetDeployedCall as ::ethers::core::abi::AbiDecode>::decode(
                     data,
                 ) {
                 return Ok(Self::LatestSubnetDeployed(decoded));
             }
             if let Ok(decoded)
+                = <ManagerFacetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::ManagerFacet(decoded));
+            }
+            if let Ok(decoded)
                 = <NewSubnetActorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NewSubnetActor(decoded));
+            }
+            if let Ok(decoded)
+                = <SubnetGetterSelectorsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::SubnetGetterSelectors(decoded));
+            }
+            if let Ok(decoded)
+                = <SubnetManagerSelectorsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::SubnetManagerSelectors(decoded));
             }
             if let Ok(decoded)
                 = <SubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
@@ -448,10 +664,22 @@ pub mod subnet_registry {
                 Self::GetSubnetDeployedByNonce(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::GetterFacet(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::LatestSubnetDeployed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::ManagerFacet(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NewSubnetActor(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SubnetGetterSelectors(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SubnetManagerSelectors(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::Subnets(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -468,10 +696,18 @@ pub mod subnet_registry {
                 Self::GetSubnetDeployedByNonce(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::GetterFacet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::LatestSubnetDeployed(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::ManagerFacet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewSubnetActor(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SubnetGetterSelectors(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::SubnetManagerSelectors(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::Subnets(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UserNonces(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -487,14 +723,34 @@ pub mod subnet_registry {
             Self::GetSubnetDeployedByNonce(value)
         }
     }
+    impl ::core::convert::From<GetterFacetCall> for SubnetRegistryCalls {
+        fn from(value: GetterFacetCall) -> Self {
+            Self::GetterFacet(value)
+        }
+    }
     impl ::core::convert::From<LatestSubnetDeployedCall> for SubnetRegistryCalls {
         fn from(value: LatestSubnetDeployedCall) -> Self {
             Self::LatestSubnetDeployed(value)
         }
     }
+    impl ::core::convert::From<ManagerFacetCall> for SubnetRegistryCalls {
+        fn from(value: ManagerFacetCall) -> Self {
+            Self::ManagerFacet(value)
+        }
+    }
     impl ::core::convert::From<NewSubnetActorCall> for SubnetRegistryCalls {
         fn from(value: NewSubnetActorCall) -> Self {
             Self::NewSubnetActor(value)
+        }
+    }
+    impl ::core::convert::From<SubnetGetterSelectorsCall> for SubnetRegistryCalls {
+        fn from(value: SubnetGetterSelectorsCall) -> Self {
+            Self::SubnetGetterSelectors(value)
+        }
+    }
+    impl ::core::convert::From<SubnetManagerSelectorsCall> for SubnetRegistryCalls {
+        fn from(value: SubnetManagerSelectorsCall) -> Self {
+            Self::SubnetManagerSelectors(value)
         }
     }
     impl ::core::convert::From<SubnetsCall> for SubnetRegistryCalls {
@@ -533,6 +789,18 @@ pub mod subnet_registry {
     pub struct GetSubnetDeployedByNonceReturn {
         pub subnet: ::ethers::core::types::Address,
     }
+    ///Container type for all return fields from the `getterFacet` function with signature `getterFacet()` and selector `0xa0a1ca33`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetterFacetReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `latestSubnetDeployed` function with signature `latestSubnetDeployed(address)` and selector `0x1163dca5`
     #[derive(
         Clone,
@@ -547,6 +815,18 @@ pub mod subnet_registry {
     pub struct LatestSubnetDeployedReturn {
         pub subnet: ::ethers::core::types::Address,
     }
+    ///Container type for all return fields from the `managerFacet` function with signature `managerFacet()` and selector `0xd7dbbc48`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct ManagerFacetReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),bytes32,address,uint8,uint256,uint64,uint64,uint64,uint8,bytes))` and selector `0xf9daddd2`
     #[derive(
         Clone,
@@ -561,6 +841,30 @@ pub mod subnet_registry {
     pub struct NewSubnetActorReturn {
         pub subnet_addr: ::ethers::core::types::Address,
     }
+    ///Container type for all return fields from the `subnetGetterSelectors` function with signature `subnetGetterSelectors(uint256)` and selector `0x3e2b8ad7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct SubnetGetterSelectorsReturn(pub [u8; 4]);
+    ///Container type for all return fields from the `subnetManagerSelectors` function with signature `subnetManagerSelectors(uint256)` and selector `0x009b5775`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct SubnetManagerSelectorsReturn(pub [u8; 4]);
     ///Container type for all return fields from the `subnets` function with signature `subnets(address,uint64)` and selector `0xb67c7b4a`
     #[derive(
         Clone,
@@ -585,7 +889,7 @@ pub mod subnet_registry {
         Hash
     )]
     pub struct UserNoncesReturn(pub u64);
-    ///`ConstructParams((uint64,address[]),bytes32,address,uint8,uint256,uint64,uint64,uint64,uint8,bytes)`
+    ///`ConstructorParams((uint64,address[]),bytes32,address,uint8,uint256,uint64,uint64,uint64,uint8,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -596,7 +900,7 @@ pub mod subnet_registry {
         Eq,
         Hash
     )]
-    pub struct ConstructParams {
+    pub struct ConstructorParams {
         pub parent_id: SubnetID,
         pub name: [u8; 32],
         pub ipc_gateway_addr: ::ethers::core::types::Address,
