@@ -12,7 +12,6 @@ import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {AccountHelper} from "../lib/AccountHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
 import {ExecutableQueueHelper} from "../lib/ExecutableQueueHelper.sol";
@@ -32,7 +31,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     using CheckpointHelper for BottomUpCheckpoint;
     using FilAddress for address;
     using Address for address payable;
-    using AccountHelper for address;
     using ExecutableQueueHelper for ExecutableQueue;
     using EpochVoteSubmissionHelper for EpochVoteSubmission;
     using CrossMsgHelper for CrossMsg;

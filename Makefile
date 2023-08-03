@@ -39,7 +39,13 @@ test:
 storage:
 	npx hardhat storage-layout --update
 
+clean:
+	rm -rf ./artifacts
+	rm -rf ./cache
+	rm -rf ./cache_hardhat
+	rm -rf ./typechain
+
 prepare: format lint test slither
 
 # ==============================================================================
-.PHONY: deploy-ipc lint format check-subnet slither check-gateway test prepare storage build
+.PHONY: deploy-ipc lint format check-subnet slither check-gateway test prepare storage build clean

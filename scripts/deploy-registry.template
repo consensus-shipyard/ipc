@@ -27,7 +27,6 @@ async function main() {
       deployer,
       "SubnetActorManagerFacet",
       {
-        AccountHelper: LIBMAP['AccountHelper'],
         CheckpointHelper: LIBMAP['CheckpointHelper'],
         EpochVoteSubmissionHelper: LIBMAP['EpochVoteSubmissionHelper'],
         ExecutableQueueHelper: LIBMAP['ExecutableQueueHelper'],

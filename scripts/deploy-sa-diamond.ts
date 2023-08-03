@@ -50,7 +50,6 @@ async function deploySubnetActorDiamond (gatewayDiamondAddress: string, libs: { 
     // ----
 
     const managerFacetLibs: Libraries = {
-        "AccountHelper": libs["AccountHelper"],
         "CrossMsgHelper": libs["CrossMsgHelper"],
         "SubnetIDHelper": libs["SubnetIDHelper"],
         "CheckpointHelper": libs["CheckpointHelper"],

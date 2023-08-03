@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
+import "../src/errors/IPCErrors.sol";
 import {TestUtils} from "./TestUtils.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
@@ -21,6 +22,7 @@ import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {GatewayDiamond} from "../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
 import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
@@ -50,6 +52,7 @@ contract SubnetActorDiamondTest is Test {
     bytes4[] gwRouterSelectors;
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
+    bytes4[] gwMessengerSelectors;
 
     SubnetActorDiamond saDiamond;
     SubnetActorManagerFacet saManager;
@@ -59,25 +62,7 @@ contract SubnetActorDiamondTest is Test {
     GatewayManagerFacet gwManager;
     GatewayGetterFacet gwGetter;
     GatewayRouterFacet gwRouter;
-
-    error NotGateway();
-    error CollateralIsZero();
-    error CallerHasNoStake();
-    error SubnetAlreadyKilled();
-    error NotAllValidatorsHaveLeft();
-    error NotValidator();
-    error SubnetNotActive();
-    error WrongCheckpointSource();
-    error CheckpointNotChained();
-    error NoRewardsSentForDistribution();
-    error NoValidatorsInSubnet();
-    error NotEnoughBalanceForRewards();
-    error EpochAlreadyExecuted();
-    error EpochNotVotable();
-    error ValidatorAlreadyVoted();
-    error MessagesNotSorted();
-    error NoRewardToWithdraw();
-    error GatewayCannotBeZero();
+    GatewayMessengerFacet gwMessenger;
 
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
@@ -86,14 +71,16 @@ contract SubnetActorDiamondTest is Test {
         gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
         gwManagerSelectors = TestUtils.generateSelectors(vm, "GatewayManagerFacet");
+        gwMessengerSelectors = TestUtils.generateSelectors(vm, "GatewayMessengerFacet");
     }
 
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
         gwRouter = new GatewayRouterFacet();
         gwManager = new GatewayManagerFacet();
         gwGetter = new GatewayGetterFacet();
+        gwMessenger = new GatewayMessengerFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](3);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -116,6 +103,14 @@ contract SubnetActorDiamondTest is Test {
                 facetAddress: address(gwGetter),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: gwGetterSelectors
+            })
+        );
+
+        diamondCut[3] = (
+            IDiamond.FacetCut({
+                facetAddress: address(gwMessenger),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwMessengerSelectors
             })
         );
 
@@ -165,6 +160,7 @@ contract SubnetActorDiamondTest is Test {
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
         gwRouter = GatewayRouterFacet(address(gatewayDiamond));
+        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
 
         GATEWAY_ADDRESS = address(gatewayDiamond);
 

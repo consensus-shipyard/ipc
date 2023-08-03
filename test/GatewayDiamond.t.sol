@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
+import "../src/errors/IPCErrors.sol";
 import {TestUtils} from "./TestUtils.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
@@ -24,6 +25,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond} from "../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
 import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
@@ -55,16 +57,19 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     bytes4[] gwRouterSelectors;
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
+    bytes4[] gwMessengerSelectors;
 
     GatewayDiamond gatewayDiamond;
     GatewayManagerFacet gwManager;
     GatewayGetterFacet gwGetter;
     GatewayRouterFacet gwRouter;
+    GatewayMessengerFacet gwMessenger;
 
     GatewayDiamond gatewayDiamond2;
     GatewayManagerFacet gwManager2;
     GatewayGetterFacet gwGetter2;
     GatewayRouterFacet gwRouter2;
+    GatewayMessengerFacet gwMessenger2;
 
     bytes4[] saGetterSelectors;
     bytes4[] saManagerSelectors;
@@ -80,41 +85,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
     address private constant TOPDOWN_VALIDATOR_1 = address(12);
 
-    error NotSystemActor();
-    error NotEnoughFee();
-    error NotEnoughFunds();
-    error NotEnoughFundsToRelease();
-    error CannotReleaseZero();
-    error NotEnoughBalance();
-    error NotInitialized();
-    error NotValidator();
-    error NotEnoughSubnetCircSupply();
-    error NotEmptySubnetCircSupply();
-    error NotRegisteredSubnet();
-    error AlreadyRegisteredSubnet();
-    error AlreadyInitialized();
-    error AlreadyCommittedCheckpoint();
-    error InconsistentPrevCheckpoint();
-    error InvalidPostboxOwner();
-    error InvalidCheckpointEpoch();
-    error InvalidCheckpointSource();
-    error InvalidCrossMsgNonce();
-    error InvalidCrossMsgDestinationSubnet();
-    error InvalidCrossMsgDestinationAddress();
-    error InvalidCrossMsgsSortOrder();
-    error InvalidCrossMsgFromSubnetId();
-    error InvalidCrossMsgFromRawAddress();
-    error CannotSendCrossMsgToItself();
-    error SubnetNotActive();
-    error PostboxNotExist();
-    error ValidatorAlreadyVoted();
-    error MessagesNotSorted();
-    error ValidatorsAndWeightsLengthMismatch();
-    error ValidatorWeightIsZero();
-    error NotEnoughFundsForMembership();
-    error EpochNotVotable();
-    error EpochAlreadyExecuted();
-
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
         saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacet");
@@ -122,6 +92,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
         gwManagerSelectors = TestUtils.generateSelectors(vm, "GatewayManagerFacet");
+        gwMessengerSelectors = TestUtils.generateSelectors(vm, "GatewayMessengerFacet");
 
         louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
     }
@@ -130,8 +101,9 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwRouter = new GatewayRouterFacet();
         gwManager = new GatewayManagerFacet();
         gwGetter = new GatewayGetterFacet();
+        gwMessenger = new GatewayMessengerFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](3);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -154,6 +126,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                 facetAddress: address(gwGetter),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: gwGetterSelectors
+            })
+        );
+
+        diamondCut[3] = (
+            IDiamond.FacetCut({
+                facetAddress: address(gwMessenger),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwMessengerSelectors
             })
         );
 
@@ -183,9 +163,10 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwRouter = new GatewayRouterFacet();
         gwManager = new GatewayManagerFacet();
         gwGetter = new GatewayGetterFacet();
+        gwMessenger = new GatewayMessengerFacet();
         louper = new DiamondLoupeFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](4);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](5);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -213,6 +194,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         gwDiamondCut[3] = (
             IDiamond.FacetCut({
+                facetAddress: address(gwMessenger),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwMessengerSelectors
+            })
+        );
+
+        gwDiamondCut[4] = (
+            IDiamond.FacetCut({
                 facetAddress: address(louper),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: louperSelectors
@@ -223,6 +212,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
         gwRouter = GatewayRouterFacet(address(gatewayDiamond));
+        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
         louper = DiamondLoupeFacet(address(gatewayDiamond));
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
@@ -233,6 +223,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwGetter2 = GatewayGetterFacet(address(gatewayDiamond2));
         gwManager2 = GatewayManagerFacet(address(gatewayDiamond2));
         gwRouter2 = GatewayRouterFacet(address(gatewayDiamond2));
+        gwMessenger2 = GatewayMessengerFacet(address(gatewayDiamond2));
 
         // create a subnet actor.
 
@@ -297,7 +288,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(louper.facets().length == 4);
+        require(louper.facets().length == 5);
     }
 
     function testGatewayDiamond_Deployment_Works_Root(uint64 checkpointPeriod) public {
@@ -1270,8 +1261,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
 
-        vm.expectRevert(InvalidCrossMsgDestinationSubnet.selector);
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1299,7 +1290,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName();
         vm.expectRevert(CannotSendCrossMsgToItself.selector);
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1324,7 +1315,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
         vm.expectRevert(NotEnoughFunds.selector);
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1348,8 +1339,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
-        vm.expectRevert(InvalidCrossMsgDestinationSubnet.selector);
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1367,14 +1358,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         );
     }
 
-    function testGatewayDiamond_SendCrossMessage_Fails_InvalidCrossMsgFromSubnetId() public {
+    function testGatewayDiamond_SendCrossMessage_Fails_InvalidCrossMsgFromSubnet() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
         vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
-        vm.expectRevert(InvalidCrossMsgFromSubnetId.selector);
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        vm.expectRevert(InvalidCrossMsgFromSubnet.selector);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1399,7 +1390,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
         vm.expectRevert(NotEnoughFee.selector);
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE - 1}(
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE - 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1446,7 +1437,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.prank(caller);
         vm.expectCall(receiver, 0, abi.encodeWithSelector(ISubnetActor.reward.selector, CROSS_MSG_FEE), 1);
 
-        gwRouter.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
 
         (SubnetID memory id, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(this));
 
@@ -1491,7 +1482,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         });
 
         vm.prank(caller);
-        gwRouter2.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
+        gwMessenger2.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
 
         require(crossMsg.message.applyType(gwGetter2.getNetworkName()) == IPCMsgType.BottomUp);
         require(gwGetter2.appliedTopDownNonce() == 0);
@@ -1526,7 +1517,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         vm.prank(caller);
 
-        gwRouter2.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
+        gwMessenger2.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
 
         require(gwGetter2.appliedTopDownNonce() == 0);
     }
@@ -1547,7 +1538,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         );
 
         vm.prank(caller);
-        gwRouter.propagate{value: 1 ether}(postboxId);
+        gwMessenger.propagate{value: 1 ether}(postboxId);
 
         require(caller.balance == 1 ether - gwGetter.crossMsgFee());
     }
@@ -1565,7 +1556,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         vm.expectCall(caller, 0, EMPTY_BYTES, 0);
 
-        gwRouter.propagate{value: fee}(postboxId);
+        gwMessenger.propagate{value: fee}(postboxId);
         require(caller.balance == 0, "caller.balance == 0");
     }
 
@@ -1574,7 +1565,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.deal(caller, 1 ether);
 
         vm.expectRevert(NotEnoughFee.selector);
-        gwRouter.propagate(bytes32(""));
+        gwMessenger.propagate(bytes32(""));
     }
 
     function setupWhiteListMethod(address caller) internal returns (bytes32) {
@@ -1856,7 +1847,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwRouter.submitTopDownCheckpoint(checkpoint);
     }
 
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_InvalidCrossMsgDestinationSubnet() public {
+    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_InvalidCrossMsgDstSubnet() public {
         address validator = address(100);
 
         addValidator(validator, 100);
@@ -1887,7 +1878,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         vm.prank(validator);
         vm.deal(validator, 1);
-        vm.expectRevert(InvalidCrossMsgDestinationSubnet.selector);
+        vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
 
         gwRouter.submitTopDownCheckpoint(checkpoint);
     }

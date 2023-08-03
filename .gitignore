@@ -1,4 +1,6 @@
 cache/
+cache_hardhat/
+crytic-export/
 out/
 .vscode
 .idea

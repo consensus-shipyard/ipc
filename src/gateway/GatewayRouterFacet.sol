@@ -2,14 +2,16 @@
 pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
-import {EMPTY_HASH, BURNT_FUNDS_ACTOR, METHOD_SEND} from "../constants/Constants.sol";
+import {EMPTY_HASH, METHOD_SEND} from "../constants/Constants.sol";
 import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {Status} from "../enums/Status.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {InconsistentPrevCheckpoint, CannotSendCrossMsgToItself, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDestinationSubnet} from "../errors/IPCErrors.sol";
-import {InvalidCrossMsgFromSubnetId, MessagesNotSorted, NotInitialized, NotEnoughBalance, NotEnoughFunds, NotRegisteredSubnet, NotValidator, PostboxNotExist, SubnetNotActive} from "../errors/IPCErrors.sol";
+import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet} from "../errors/IPCErrors.sol";
+import {MessagesNotSorted, NotInitialized, NotEnoughBalance, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
+import {NotValidator, SubnetNotActive} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {LibVoting} from "../lib/LibVoting.sol";
@@ -17,11 +19,9 @@ import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
-    using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
     using CheckpointHelper for BottomUpCheckpoint;
@@ -132,57 +132,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         _applyMessages(SubnetID(0, new address[](0)), topDownMsgs);
     }
 
-    /// @notice sends an arbitrary cross message from the current subnet to the destination subnet
-    /// @param crossMsg - message to send
-    function sendCrossMessage(CrossMsg calldata crossMsg) external payable hasFee {
-        // There can be many semantics of the (rawAddress, msg.sender) pairs.
-        // It depends on who is allowed to call sendCrossMessage method and what we want to get as a result.
-        // They can be equal, we can propagate the real sender address only or both.
-        // We are going to use the simplest implementation for now and define the appropriate interpretation later
-        // based on the business requirements.
-        if (crossMsg.message.value != msg.value) {
-            revert NotEnoughFunds();
-        }
-
-        // We disregard the "to" of the message that will be verified in the _commitCrossMessage().
-        // The caller is the one set as the "from" of the message
-        if (!crossMsg.message.from.subnetId.equals(s.networkName)) {
-            revert InvalidCrossMsgFromSubnetId();
-        }
-
-        // commit cross-message for propagation
-        (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(crossMsg);
-
-        _crossMsgSideEffects(
-            crossMsg.message.value,
-            crossMsg.message.to.subnetId.down(s.networkName),
-            shouldBurn,
-            shouldDistributeRewards
-        );
-    }
-
-    /// @notice propagates the populated cross net message for the given cid
-    /// @param msgCid - the cid of the cross-net message
-    function propagate(bytes32 msgCid) external payable hasFee {
-        CrossMsg storage crossMsg = s.postbox[msgCid];
-
-        (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(crossMsg);
-        // We must delete the message first to prevent potential re-entrancies,
-        // and as the message is deleted and we don't have a reference to the object
-        // anymore, we need to pull the data from the message to trigger the side-effects.
-        uint256 v = crossMsg.message.value;
-        SubnetID memory toSubnetId = crossMsg.message.to.subnetId.down(s.networkName);
-        delete s.postbox[msgCid];
-
-        _crossMsgSideEffects(v, toSubnetId, shouldBurn, shouldDistributeRewards);
-
-        uint256 feeRemainder = msg.value - s.crossMsgFee;
-
-        if (feeRemainder > 0) {
-            payable(msg.sender).sendValue(feeRemainder);
-        }
-    }
-
     /// @notice marks a checkpoint as executed based on the last vote that reached majority
     /// @notice voteSubmission - the vote submission data
     /// @return the cross messages that should be executed
@@ -226,76 +175,12 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         }
     }
 
-    /// @notice Commit the cross message to storage. It outputs a flag signaling
-    /// if the committed messages was bottom-up and some funds need to be
-    /// burnt or if a top-down message fee needs to be distributed.
-    ///
-    /// It also validates that destination subnet ID is not empty
-    /// and not equal to the current network.
-    function _commitCrossMessage(
-        CrossMsg memory crossMessage
-    ) internal returns (bool shouldBurn, bool shouldDistributeRewards) {
-        SubnetID memory to = crossMessage.message.to.subnetId;
-        if (to.isEmpty()) {
-            revert InvalidCrossMsgDestinationSubnet();
-        }
-        // destination is the current network, you are better off with a good old message, no cross needed
-        if (to.equals(s.networkName)) {
-            revert CannotSendCrossMsgToItself();
-        }
-
-        SubnetID memory from = crossMessage.message.from.subnetId;
-        IPCMsgType applyType = crossMessage.message.applyType(s.networkName);
-
-        // slither-disable-next-line uninitialized-local
-        bool shouldCommitBottomUp;
-
-        if (applyType == IPCMsgType.BottomUp) {
-            shouldCommitBottomUp = !to.commonParent(from).equals(s.networkName);
-        }
-
-        if (shouldCommitBottomUp) {
-            LibGateway.commitBottomUpMsg(crossMessage);
-
-            return (shouldBurn = crossMessage.message.value > 0, shouldDistributeRewards = false);
-        }
-
-        if (applyType == IPCMsgType.TopDown) {
-            ++s.appliedTopDownNonce;
-        }
-
-        LibGateway.commitTopDownMsg(crossMessage);
-
-        return (shouldBurn = false, shouldDistributeRewards = true);
-    }
-
-    /// @notice transaction side-effects from the commitment of a cross-net message. It burns funds
-    /// and propagates the corresponding rewards.
-    /// @param v - the value of the committed cross-net message
-    /// @param toSubnetId - the destination subnet of the committed cross-net message
-    /// @param shouldBurn - flag if the message should burn funds
-    /// @param shouldDistributeRewards - flag if the message should distribute rewards
-    function _crossMsgSideEffects(
-        uint256 v,
-        SubnetID memory toSubnetId,
-        bool shouldBurn,
-        bool shouldDistributeRewards
-    ) internal {
-        if (shouldBurn) {
-            payable(BURNT_FUNDS_ACTOR).sendValue(v);
-        }
-
-        if (shouldDistributeRewards) {
-            LibGateway.distributeRewards(toSubnetId.getActor(), s.crossMsgFee);
-        }
-    }
-
     /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
     /// @param forwarder - the subnet that handles the cross message
     /// @param crossMsg - the cross message to be executed
     function _applyMsg(SubnetID memory forwarder, CrossMsg memory crossMsg) internal {
         if (crossMsg.message.to.subnetId.isEmpty()) {
-            revert InvalidCrossMsgDestinationSubnet();
+            revert InvalidCrossMsgDstSubnet();
         }
         if (crossMsg.message.method == METHOD_SEND) {
             if (crossMsg.message.value > address(this).balance) {
