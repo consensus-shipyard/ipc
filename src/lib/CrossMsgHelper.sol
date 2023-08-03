@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
 import {METHOD_SEND, EMPTY_BYTES, BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
