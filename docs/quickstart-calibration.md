@@ -249,7 +249,7 @@ echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
 
 * Download and compile eudico (might take a while)
 ```bash
-git clone --branch spacenet https://github.com/consensus-shipyard/lotus.git
+git clone https://github.com/consensus-shipyard/lotus.git
 (cd lotus && make spacenet && make lotus-gateway)
 ```
 
