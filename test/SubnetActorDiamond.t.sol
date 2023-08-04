@@ -203,6 +203,15 @@ contract SubnetActorDiamondTest is Test {
 
         SubnetID memory parent = saGetter.getParent();
         require(parent.isRoot(), "parent.isRoot()");
+
+        require(saGetter.bottomUpCheckPeriod() == _checkPeriod, "bottomUpCheckPeriod");
+
+        require(saGetter.getValidators().length == 0, "empty validators");
+
+        require(saGetter.getValidatorSet().validators.length == 0, "empty validator set");
+
+        BottomUpCheckpoint[] memory l = saGetter.listBottomUpCheckpoints(0, 10);
+        require(l.length == 0, "listBottomUpCheckpoints");
     }
 
     function testSubnetActorDiamond_Deployments_Fail_GatewayCannotBeZero() public {
@@ -283,6 +292,9 @@ contract SubnetActorDiamondTest is Test {
         _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
 
         require(saGetter.validatorCount() == 1);
+        require(saGetter.getValidators().length == 1);
+        require(saGetter.getValidatorSet().validators.length == 1);
+        require(saGetter.getValidatorSet().configurationNumber == 0);
         require(saGetter.validatorAt(0) == validator);
     }
 
@@ -466,6 +478,11 @@ contract SubnetActorDiamondTest is Test {
         require(fee == checkpoint.fee);
         require(prevHash == checkpoint.prevHash);
         require(proof.length == 0);
+        (bool exists, BottomUpCheckpoint memory ch) = saGetter.bottomUpCheckpointAtEpoch(epoch);
+        require(checkpoint.toHash() == ch.toHash());
+        bytes32 hb;
+        (exists, hb) = saGetter.bottomUpCheckpointHashAtEpoch(epoch);
+        require(checkpoint.toHash() == hb);
     }
 
     function testSubnetActorDiamond_SubnetCheckpoint_Works_ExecutedFromQueue() public {

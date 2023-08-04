@@ -27,6 +27,13 @@ contract SubnetRegistryTest is Test {
     uint64 private constant ROOTNET_CHAINID = 123;
 
     SubnetRegistry registry;
+    bytes4[] empty;
+
+    error FacetCannotBeZero();
+    error WrongGateway();
+    error CannotFindSubnet();
+    error UnknownSubnet();
+    error GatewayCannotBeZero();
 
     function setUp() public {
         bytes4[] memory mockedSelectors = new bytes4[](1);
@@ -39,6 +46,76 @@ contract SubnetRegistryTest is Test {
         address manager = address(new SubnetActorManagerFacet());
 
         registry = new SubnetRegistry(DEFAULT_IPC_GATEWAY_ADDR, getter, manager, mockedSelectors, mockedSelectors2);
+    }
+
+    function test_Registry_Deployment_ZeroGetterFacet() public {
+        vm.expectRevert(FacetCannotBeZero.selector);
+        registry = new SubnetRegistry(DEFAULT_IPC_GATEWAY_ADDR, address(0), address(1), empty, empty);
+    }
+
+    function test_Registry_Deployment_ZeroManagerFacet() public {
+        vm.expectRevert(FacetCannotBeZero.selector);
+        registry = new SubnetRegistry(DEFAULT_IPC_GATEWAY_ADDR, address(1), address(0), empty, empty);
+    }
+
+    function test_Registry_Deployment_ZeroGateway() public {
+        vm.expectRevert(GatewayCannotBeZero.selector);
+        registry = new SubnetRegistry(address(0), address(1), address(1), empty, empty);
+    }
+
+    function test_Registry_Deployment_DifferentGateway() public {
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+            name: DEFAULT_NETWORK_NAME,
+            ipcGatewayAddr: address(1),
+            consensus: ConsensusType.Mir,
+            minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesis: GENESIS
+        });
+        vm.expectRevert(WrongGateway.selector);
+        registry.newSubnetActor(params);
+    }
+
+    function test_Registry_LatestSubnetDeploy_Revert() public {
+        vm.startPrank(DEFAULT_SENDER);
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+            name: DEFAULT_NETWORK_NAME,
+            ipcGatewayAddr: DEFAULT_IPC_GATEWAY_ADDR,
+            consensus: ConsensusType.Mir,
+            minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesis: GENESIS
+        });
+        registry.newSubnetActor(params);
+        vm.expectRevert(CannotFindSubnet.selector);
+        registry.latestSubnetDeployed(address(0));
+    }
+
+    function test_Registry_GetSubnetDeployedByNonce_Revert() public {
+        vm.startPrank(DEFAULT_SENDER);
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+            name: DEFAULT_NETWORK_NAME,
+            ipcGatewayAddr: DEFAULT_IPC_GATEWAY_ADDR,
+            consensus: ConsensusType.Mir,
+            minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesis: GENESIS
+        });
+        registry.newSubnetActor(params);
+        vm.expectRevert(CannotFindSubnet.selector);
+        registry.getSubnetDeployedByNonce(address(0), 1);
     }
 
     function test_Registry_Deployment_Works() public {

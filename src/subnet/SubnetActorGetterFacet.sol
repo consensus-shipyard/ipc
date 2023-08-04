@@ -186,4 +186,24 @@ contract SubnetActorGetterFacet {
 
         return out;
     }
+
+    /// @notice returns the committed bottom-up checkpoint at specific epoch
+    /// @param epoch - the epoch to check
+    /// @return exists - whether the checkpoint exists
+    /// @return checkpoint - the checkpoint struct
+    function bottomUpCheckpointAtEpoch(
+        uint64 epoch
+    ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
+        checkpoint = s.committedCheckpoints[epoch];
+        exists = !checkpoint.source.isEmpty();
+    }
+
+    /// @notice returns the historical committed bottom-up checkpoint hash
+    /// @param epoch - the epoch to check
+    /// @return exists - whether the checkpoint exists
+    /// @return hash - the hash of the checkpoint
+    function bottomUpCheckpointHashAtEpoch(uint64 epoch) external view returns (bool, bytes32) {
+        (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
+        return (exists, checkpoint.toHash());
+    }
 }
