@@ -45,7 +45,7 @@ where
         let res = match qry {
             FvmQuery::Ipld(cid) => FvmQueryRet::Ipld(state.store_get(&cid)?),
             FvmQuery::ActorState(addr) => {
-                FvmQueryRet::ActorState(state.actor_state(&addr)?.map(Box::new))
+                FvmQueryRet::ActorState(state.actor_state(false, &addr)?.map(Box::new))
             }
             FvmQuery::Call(msg) => {
                 let from = msg.from;
