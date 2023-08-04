@@ -173,8 +173,16 @@ We can deploy the subnet nodes. Note that each node should be importing a differ
 >>> Validator listening in host port <VALIDATOR_PORT_#>
 ```
 
+## Step 7: Interconnect the validators
 
-## Step 7: Update the IPC Agent configuration
+* Establish pairwise peer connections between all validators
+```bash
+docker exec -it <CONTAINER_NAME_1> eudico net connect `docker exec -it <CONTAINER_NAME_2> eudico net listen | head -n 1 | tr -d '\r'`
+docker exec -it <CONTAINER_NAME_1> eudico net connect `docker exec -it <CONTAINER_NAME_3> eudico net listen | head -n 1 | tr -d '\r'`
+docker exec -it <CONTAINER_NAME_2> eudico net connect `docker exec -it <CONTAINER_NAME_3> eudico net listen | head -n 1 | tr -d '\r'`
+```
+
+## Step 8: Update the IPC Agent configuration
 
 * Edit the IPC agent configuration `config.toml`
 ```bash
@@ -201,7 +209,7 @@ network_type = "fvm"
 ```
 
 
-## Step 8: Join the subnet 
+## Step 9: Join the subnet 
 
 All the infrastructure for the subnet is now deployed, and we can join our validators to the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses providing the validators multiaddress. 
 
@@ -215,7 +223,7 @@ All the infrastructure for the subnet is now deployed, and we can join our valid
 >💡 Make sure to use the f4 addresses for the owner wallets
 
 
-## Step 9: Start validating! 
+## Step 10: Start validating! 
 
 We have everything in place now to start validating. Run the following script for each of the validators [**each in a new session**], passing the container names:
 ```bash
@@ -227,7 +235,7 @@ We have everything in place now to start validating. Run the following script fo
 >💡 When starting mining and reloading the config to include the new subnet, you can sometimes get errors in the agent logs saying that the checkpoint manager couldn't be spawned successfully because the on-chain ID of the validator couldn't be change. This is because the subnet hasn't been fully initialized yet. You can `./ipc-agent/bin/ipc-agent config reload` to re-spawn the checkpoint manager and fix the error.
 
 
-## Step 10: Deploy IPC Gateway [optional]
+## Step 11: Deploy IPC Gateway [optional]
 
 If you'd like to interact with your subnet using Metamask or other tooling, you should deploy a `lotus-gateway` instance for tokenless RPC access.
 
