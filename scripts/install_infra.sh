@@ -6,7 +6,7 @@
 set -e
 
 rm -rf ./lotus
-git clone --branch spacenet https://github.com/consensus-shipyard/lotus.git
+git clone https://github.com/consensus-shipyard/lotus.git
 cd ./lotus
 
 uname=$(uname);

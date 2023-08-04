@@ -59,7 +59,7 @@ git clone https://github.com/consensus-shipyard/ipc-agent.git
 ```
 * Download and compile eudico (might take a while)
 ```bash
-git clone --branch spacenet https://github.com/consensus-shipyard/lotus.git
+git clone https://github.com/consensus-shipyard/lotus.git
 (cd lotus && make spacenet)
 ```
 
