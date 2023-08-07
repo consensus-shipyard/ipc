@@ -17,6 +17,16 @@ The project accommodates the following main contracts
 - `SubnetActorDiamond.sol`: Reference implementation of an IPC SubnetActor within the Diamond pattern.
 - `SubnetRegistry.sol`: Registry contract for seamlessly deploying subnet actors.
 
+# Documentation
+
+## High-level Overview
+
+The original idea of IPC is presented in these [paper](https://research.protocol.ai/publications/hierarchical-consensus-a-horizontal-scaling-framework-for-blockchains/delarocha2022.pdf), [post](https://docs.filecoin.io/basics/interplanetary-consensus/overview/) and [video](https://www.youtube.com/watch?v=G7d5KNRZdp0). The protocol has evolved a lot since the original paper, so take it as a high-level description of the system. 
+
+## Specification
+
+The current specification draft is available [here](https://github.com/consensus-shipyard/IPC-design-reference-spec/blob/main/main.pdf).
+
 # Deploying IPC Solidity contracts
 Before deploying the contract, you'll need to configure the `RPC_URL` and `PRIVATE_KEY` environmental variables
 to point to your network provider and the private key of the address you want to use for the deployment, respectively.
@@ -112,3 +122,6 @@ make prepare
 ```
 
 Use `make storage` to check that the storage layout has not been corrupted.
+
+# Bugs
+Please report any bugs using the [issue tracker](https://github.com/consensus-shipyard/ipc-solidity-actors/issues).
