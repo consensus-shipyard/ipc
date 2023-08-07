@@ -46,6 +46,18 @@ gateway_addr = "0xDcDb352D8397EA50b1b131BBfE49288CDa198591"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
 registry_addr = "0x28337700f4432ff140360BbBEAfE3a80AcaaD1Be"
+
+# Subnet template - uncomment and adjust before using
+# [[subnets]]
+# id = "/r314159/<SUBNET_ID>"
+# network_name = "<NAME>"
+
+# [subnets.config]
+# gateway_addr = "t064"
+# accounts = ["<WORKER_1>", "<WORKER_2>", "<WORKER_3>"]
+# jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
+# auth_token = "<AUTH_TOKEN_1>"
+# network_type = "fvm"
 "#;
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
