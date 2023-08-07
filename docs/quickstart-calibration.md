@@ -117,7 +117,7 @@ accounts = ["<OWNER_1>", "<OWNER_2>", "<OWNER_3>"]
 
 * Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses 
 
->💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./ipc-agent/bin/ipc-agent wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./evm-usage.md#key-management).
+>💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./ipc-agent/bin/ipc-agent wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
 
 >💡 Note that you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
 
