@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {METHOD_SEND, EMPTY_BYTES, BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
+import {METHOD_SEND, EMPTY_BYTES} from "../constants/Constants.sol";
 import {StorableMsg, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -90,7 +90,7 @@ library CrossMsgHelper {
         bytes memory data = abi.encodeWithSelector(crossMsg.message.method, params);
 
         if (value > 0) {
-            return Address.functionCallWithValue(recipient, data, value);
+            return Address.functionCallWithValue({target: recipient, data: data, value: value});
         }
 
         return Address.functionCall(recipient, data);

@@ -137,7 +137,12 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @param subnetId - subnet to fund
     /// @param to - the address to send funds to
     function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable hasFee {
-        CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg(subnetId, msg.sender, to, msg.value - s.crossMsgFee);
+        CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg({
+            subnet: subnetId,
+            signer: msg.sender,
+            to: to,
+            value: msg.value - s.crossMsgFee
+        });
 
         // commit top-down message.
         LibGateway.commitTopDownMsg(crossMsg);
@@ -147,12 +152,12 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
     /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds
     function release(FvmAddress calldata to) external payable hasFee {
-        CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg(
-            s.networkName,
-            msg.sender,
-            to,
-            msg.value - s.crossMsgFee
-        );
+        CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg({
+            subnet: s.networkName,
+            signer: msg.sender,
+            to: to,
+            value: msg.value - s.crossMsgFee
+        });
 
         LibGateway.commitBottomUpMsg(crossMsg);
     }

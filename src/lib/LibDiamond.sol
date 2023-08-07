@@ -72,7 +72,7 @@ library LibDiamond {
                 ++facetIndex;
             }
         }
-        emit DiamondCut(_diamondCut, _init, _calldata);
+        emit DiamondCut({_diamondCut: _diamondCut, _init: _init, _calldata: _calldata});
         initializeDiamondCut(_init, _calldata);
     }
 

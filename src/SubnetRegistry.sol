@@ -6,7 +6,7 @@ import {IDiamond} from "./interfaces/IDiamond.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
 contract SubnetRegistry is ReentrancyGuard {
-    address public immutable gateway;
+    address public immutable GATEWAY;
 
     /// The getter and manager facet shared by diamond
     address public getterFacet;
@@ -53,7 +53,7 @@ contract SubnetRegistry is ReentrancyGuard {
             revert FacetCannotBeZero();
         }
 
-        gateway = _gateway;
+        GATEWAY = _gateway;
         getterFacet = _getterFacet;
         managerFacet = _managerFacet;
 
@@ -66,7 +66,7 @@ contract SubnetRegistry is ReentrancyGuard {
     function newSubnetActor(
         SubnetActorDiamond.ConstructorParams calldata _params
     ) external nonReentrant returns (address subnetAddr) {
-        if (_params.ipcGatewayAddr != gateway) {
+        if (_params.ipcGatewayAddr != GATEWAY) {
             revert WrongGateway();
         }
 

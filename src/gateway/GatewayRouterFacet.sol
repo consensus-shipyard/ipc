@@ -61,7 +61,12 @@ contract GatewayRouterFacet is GatewayActorModifiers {
             checkpoint.epoch = nextCheckEpoch;
         }
 
-        checkpoint.setChildCheck(commit, s.children, s.checks, nextCheckEpoch);
+        checkpoint.setChildCheck({
+            commit: commit,
+            children: s.children,
+            checks: s.checks,
+            currentEpoch: nextCheckEpoch
+        });
 
         uint256 totalValue = 0;
         uint256 crossMsgLength = commit.crossMsgs.length;
@@ -108,7 +113,12 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         EpochVoteTopDownSubmission storage voteSubmission = s.epochVoteSubmissions[checkpoint.epoch];
 
         // submit the vote
-        bool shouldExecuteVote = _submitTopDownVote(voteSubmission, checkpoint, msg.sender, validatorWeight);
+        bool shouldExecuteVote = _submitTopDownVote({
+            voteSubmission: voteSubmission,
+            submission: checkpoint,
+            submitterAddress: msg.sender,
+            submitterWeight: validatorWeight
+        });
 
         // slither-disable-next-line uninitialized-local
         CrossMsg[] memory topDownMsgs;
@@ -160,14 +170,14 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     ) internal returns (bool shouldExecuteVote) {
         bytes32 submissionHash = submission.toHash();
 
-        shouldExecuteVote = LibVoting.submitVote(
-            voteSubmission.vote,
-            submissionHash,
-            submitterAddress,
-            submitterWeight,
-            submission.epoch,
-            s.totalWeight
-        );
+        shouldExecuteVote = LibVoting.submitVote({
+            vote: voteSubmission.vote,
+            submissionHash: submissionHash,
+            submitterAddress: submitterAddress,
+            submitterWeight: submitterWeight,
+            epoch: submission.epoch,
+            totalWeight: s.totalWeight
+        });
 
         // store the submission only the first time
         if (voteSubmission.submissions[submissionHash].isEmpty()) {

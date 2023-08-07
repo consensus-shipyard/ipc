@@ -1,28 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {FvmAddress} from "../structs/FvmAddress.sol";
-import {BottomUpCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
-import {SubnetID} from "../structs/Subnet.sol";
-import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
-import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
-import {EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
-import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
-import {IGateway} from "../interfaces/IGateway.sol";
-import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
-import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
-import {ExecutableQueueHelper} from "../lib/ExecutableQueueHelper.sol";
-import {EpochVoteBottomUpSubmission} from "../structs/EpochVoteSubmission.sol";
-import {ValidatorInfo, ValidatorSet} from "../structs/Validator.sol";
-import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
-import {LibVoting} from "../lib/LibVoting.sol";
-import {Status} from "../enums/Status.sol";
 import {ConsensusType} from "../enums/ConsensusType.sol";
+import {Status} from "../enums/Status.sol";
+import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {SubnetID} from "../structs/Subnet.sol";
+import {ValidatorInfo, ValidatorSet} from "../structs/Validator.sol";
+import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
+import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
+import {LibVoting} from "../lib/LibVoting.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
-import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 
 contract SubnetActorGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -30,10 +20,6 @@ contract SubnetActorGetterFacet {
     using CheckpointHelper for BottomUpCheckpoint;
     using FilAddress for address;
     using Address for address payable;
-    using ExecutableQueueHelper for ExecutableQueue;
-    using EpochVoteSubmissionHelper for EpochVoteSubmission;
-    using CrossMsgHelper for CrossMsg;
-    using FvmAddressHelper for FvmAddress;
 
     // slither-disable-next-line uninitialized-state-variables
     SubnetActorStorage internal s;

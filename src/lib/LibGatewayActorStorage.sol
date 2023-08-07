@@ -1,22 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {VoteExecutionStatus} from "../enums/VoteExecutionStatus.sol";
-import {IGateway} from "../interfaces/IGateway.sol";
-import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
-import {EpochVoteTopDownSubmission, EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
+import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
-import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
-import {BottomUpCheckpoint, CrossMsg, TopDownCheckpoint, StorableMsg} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
-import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
-import {ExecutableQueueHelper} from "../lib/ExecutableQueueHelper.sol";
-import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
-import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
-import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 struct GatewayActorStorage {
     /// @notice List of subnets
@@ -80,14 +70,6 @@ contract GatewayActorModifiers {
     using FilAddress for address;
     using FilAddress for address payable;
     using AccountHelper for address;
-    using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
-    using CheckpointHelper for BottomUpCheckpoint;
-    using CheckpointHelper for TopDownCheckpoint;
-    using ExecutableQueueHelper for ExecutableQueue;
-    using EpochVoteSubmissionHelper for EpochVoteTopDownSubmission;
-    using ExecutableQueueHelper for ExecutableQueue;
-    using EpochVoteSubmissionHelper for EpochVoteSubmission;
 
     function _hasFee() private view {
         if (msg.value < s.crossMsgFee) {

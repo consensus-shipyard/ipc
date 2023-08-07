@@ -1,29 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {IGateway} from "../interfaces/IGateway.sol";
-import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
+import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
-import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg} from "../structs/Checkpoint.sol";
-import {NotRegisteredSubnet, InvalidActorAddress, EpochAlreadyExecuted, EpochNotVotable, ValidatorAlreadyVoted} from "../errors/IPCErrors.sol";
-import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
-import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
+import {CrossMsg, BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {NotRegisteredSubnet, InvalidActorAddress} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
-import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
-import {EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
-import {VoteExecutionStatus} from "../enums/VoteExecutionStatus.sol";
-import {ExecutableQueueHelper} from "../lib/ExecutableQueueHelper.sol";
-import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
-import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
-import {EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
-import {VoteExecutionStatus} from "../enums/VoteExecutionStatus.sol";
-import {ExecutableQueueHelper} from "../lib/ExecutableQueueHelper.sol";
-import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibVoting} from "../lib/LibVoting.sol";
 
@@ -33,11 +19,6 @@ library LibGateway {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
     using CheckpointHelper for BottomUpCheckpoint;
-    using CheckpointHelper for TopDownCheckpoint;
-    using ExecutableQueueHelper for ExecutableQueue;
-    using EpochVoteSubmissionHelper for EpochVoteTopDownSubmission;
-    using ExecutableQueueHelper for ExecutableQueue;
-    using EpochVoteSubmissionHelper for EpochVoteSubmission;
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists

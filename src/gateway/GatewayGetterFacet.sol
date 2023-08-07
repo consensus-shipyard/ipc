@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {Status} from "../enums/Status.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ChildCheck} from "../structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {NotRegisteredSubnet} from "../errors/IPCErrors.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {GatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";

@@ -11,8 +11,10 @@
         "ignoreConstructors": true
       }
     ],
+    "func-named-parameters": ["error",2],
     "no-inline-assembly": ["off"],
     "no-global-import": "error",
+    "no-unused-import": "off",
     "no-unused-vars": "error",
     "const-name-snakecase": "error",
     "contract-name-camelcase": "error",

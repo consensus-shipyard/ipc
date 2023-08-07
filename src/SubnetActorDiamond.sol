@@ -4,13 +4,12 @@ pragma solidity 0.8.19;
 import {SubnetActorStorage} from "./lib/LibSubnetActorStorage.sol";
 import {ConsensusType} from "./enums/ConsensusType.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
-import {GatewayCannotBeZero, NotGateway, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
+import {GatewayCannotBeZero, NotGateway} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibVoting} from "./lib/LibVoting.sol";
-import {SubnetID, Subnet} from "./structs/Subnet.sol";
+import {SubnetID} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 import {Status} from "./enums/Status.sol";
-import {GatewayDiamond} from "./GatewayDiamond.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
@@ -40,7 +39,7 @@ contract SubnetActorDiamond {
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
         LibDiamond.setContractOwner(msg.sender);
-        LibDiamond.diamondCut(_diamondCut, address(0), new bytes(0));
+        LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 
         s.parentId = params.parentId;
         s.name = params.name;

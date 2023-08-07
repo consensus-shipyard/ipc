@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import {SubnetID} from "../structs/Subnet.sol";
 import {StorableMsg} from "../structs/Checkpoint.sol";
-import {EMPTY_BYTES, METHOD_SEND} from "../constants/Constants.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 

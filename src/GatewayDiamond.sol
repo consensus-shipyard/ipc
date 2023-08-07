@@ -5,11 +5,8 @@ import {GatewayActorStorage} from "./lib/LibGatewayActorStorage.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibVoting} from "./lib/LibVoting.sol";
-import {SubnetID, Subnet} from "./structs/Subnet.sol";
+import {SubnetID} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
-import {GatewayManagerFacet} from "./gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "./gateway/GatewayRouterFacet.sol";
-import {GatewayGetterFacet} from "./gateway/GatewayGetterFacet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 error InvalidMajorityPercentage();
@@ -35,7 +32,7 @@ contract GatewayDiamond {
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
         LibDiamond.setContractOwner(msg.sender);
-        LibDiamond.diamondCut(_diamondCut, address(0), new bytes(0));
+        LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 
         s.networkName = params.networkName;
         s.minStake = MIN_COLLATERAL_AMOUNT;

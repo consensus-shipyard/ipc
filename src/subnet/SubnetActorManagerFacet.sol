@@ -1,29 +1,25 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
-import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {FvmAddress} from "../structs/FvmAddress.sol";
-import {BottomUpCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
-import {SubnetID} from "../structs/Subnet.sol";
-import {CollateralIsZero, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, MessageNotSorted, NoRewardToWithdraw} from "../errors/IPCErrors.sol";
-import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
-import {EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
-import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
-import {IGateway} from "../interfaces/IGateway.sol";
-import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
-import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
-import {ExecutableQueueHelper} from "../lib/ExecutableQueueHelper.sol";
-import {EpochVoteBottomUpSubmission} from "../structs/EpochVoteSubmission.sol";
-import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
-import {LibVoting} from "../lib/LibVoting.sol";
 import {Status} from "../enums/Status.sol";
-import {ConsensusType} from "../enums/ConsensusType.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
+import {CollateralIsZero, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw} from "../errors/IPCErrors.sol";
+import {IGateway} from "../interfaces/IGateway.sol";
+import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
+import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {EpochVoteBottomUpSubmission, EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
+import {FvmAddress} from "../structs/FvmAddress.sol";
+import {SubnetID} from "../structs/Subnet.sol";
+import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
+import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
+import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
+import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
+import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
+import {LibVoting} from "../lib/LibVoting.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {Address} from "openzeppelin-contracts/utils/Address.sol";
+import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -31,9 +27,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     using CheckpointHelper for BottomUpCheckpoint;
     using FilAddress for address;
     using Address for address payable;
-    using ExecutableQueueHelper for ExecutableQueue;
     using EpochVoteSubmissionHelper for EpochVoteSubmission;
-    using CrossMsgHelper for CrossMsg;
     using FvmAddressHelper for FvmAddress;
 
     /// @notice method that allows a validator to join the subnet
@@ -127,7 +121,12 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         EpochVoteBottomUpSubmission storage voteSubmission = s.epochVoteSubmissions[checkpoint.epoch];
 
         // submit the vote
-        bool shouldExecuteVote = _submitBottomUpVote(voteSubmission, checkpoint, msg.sender, s.stake[msg.sender]);
+        bool shouldExecuteVote = _submitBottomUpVote({
+            voteSubmission: voteSubmission,
+            submission: checkpoint,
+            submitterAddress: msg.sender,
+            submitterWeight: s.stake[msg.sender]
+        });
 
         if (shouldExecuteVote) {
             _commitCheckpoint(voteSubmission);
@@ -211,14 +210,14 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     ) internal returns (bool shouldExecuteVote) {
         bytes32 submissionHash = submission.toHash();
 
-        shouldExecuteVote = LibVoting.submitVote(
-            voteSubmission.vote,
-            submissionHash,
-            submitterAddress,
-            submitterWeight,
-            submission.epoch,
-            s.totalStake
-        );
+        shouldExecuteVote = LibVoting.submitVote({
+            vote: voteSubmission.vote,
+            submissionHash: submissionHash,
+            submitterAddress: submitterAddress,
+            submitterWeight: submitterWeight,
+            epoch: submission.epoch,
+            totalWeight: s.totalStake
+        });
 
         // store the submission only the first time
         if (voteSubmission.submissions[submissionHash].isEmpty()) {

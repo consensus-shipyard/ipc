@@ -5,7 +5,7 @@ import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {CrossMsg, StorableMsg} from "../structs/Checkpoint.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {SubnetID, Subnet} from "../structs/Subnet.sol";
+import {SubnetID} from "../structs/Subnet.sol";
 import {InvalidCrossMsgFromSubnet, NotEnoughFunds, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
@@ -38,12 +38,12 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         // commit cross-message for propagation
         (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(crossMsg);
 
-        _crossMsgSideEffects(
-            crossMsg.message.value,
-            crossMsg.message.to.subnetId.down(s.networkName),
-            shouldBurn,
-            shouldDistributeRewards
-        );
+        _crossMsgSideEffects({
+            v: crossMsg.message.value,
+            toSubnetId: crossMsg.message.to.subnetId.down(s.networkName),
+            shouldBurn: shouldBurn,
+            shouldDistributeRewards: shouldDistributeRewards
+        });
     }
 
     /// @notice propagates the populated cross net message for the given cid
@@ -59,7 +59,12 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         SubnetID memory toSubnetId = crossMsg.message.to.subnetId.down(s.networkName);
         delete s.postbox[msgCid];
 
-        _crossMsgSideEffects(v, toSubnetId, shouldBurn, shouldDistributeRewards);
+        _crossMsgSideEffects({
+            v: v,
+            toSubnetId: toSubnetId,
+            shouldBurn: shouldBurn,
+            shouldDistributeRewards: shouldDistributeRewards
+        });
 
         uint256 feeRemainder = msg.value - s.crossMsgFee;
 

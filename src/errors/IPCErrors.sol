@@ -20,7 +20,6 @@ error InvalidCrossMsgDstSubnet();
 error InvalidCrossMsgFromSubnet();
 error InvalidCrossMsgNonce();
 error InvalidMajorityPercentage();
-error MessageNotSorted();
 error MessagesNotSorted();
 error NoRewardToWithdraw();
 error NoValidatorsInSubnet();
