@@ -17,11 +17,14 @@ async function main() {
     const getterFacet = await deployContractWithDeployer(
       deployer,
       "SubnetActorGetterFacet",
-      {},
+      {
+        CheckpointHelper: LIBMAP['CheckpointHelper'],
+        SubnetIDHelper: LIBMAP['SubnetIDHelper'],
+      },
       txArgs
     );
     const getterSelectors = getSelectors(getterFacet);
-    console.log("getter address:", getterFacet.address);
+    // console.log("getter address:", getterFacet.address);
 
     const managerFacet = await deployContractWithDeployer(
       deployer,
@@ -36,7 +39,7 @@ async function main() {
       txArgs
     );
     const managerSelectors = getSelectors(managerFacet);
-    console.log("manager address:", managerFacet.address);
+    // console.log("manager address:", managerFacet.address);
 
     const registry = await ethers.getContractFactory('SubnetRegistry', { signer: deployer, libraries: {
       "SubnetIDHelper": LIBMAP["SubnetIDHelper"]
