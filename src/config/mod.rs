@@ -32,29 +32,32 @@ pub const JSON_RPC_VERSION: &str = "2.0";
 
 /// DefaulDEFAULT_CHAIN_IDSUBNET_e
 pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
-    [server]
-    json_rpc_address = "127.0.0.1:3030"
+[server]
+json_rpc_address = "0.0.0.0:3030"
 
-    [[subnets]]
-    id = "/r123"
-    network_name = "test"
+# Default configuration for Filecoin Calibration
+[[subnets]]
+id = "/r314159"
+network_name = "calibration"
 
-    [subnets.config]
-    network_type = "fvm"
-    gateway_addr = "f01"
-    jsonrpc_api_http = "http://127.0.0.1:3030/rpc/v1"
-    accounts = ["f01", "f01"]
+[subnets.config]
+accounts = []
+gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
+network_type = "fevm"
+provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
 
-    [[subnets]]
-    id = "/r1234"
-    network_name = "test2"
+# Subnet template - uncomment and adjust before using
+# [[subnets]]
+# id = "/r314159/<SUBNET_ID>"
+# network_name = "<NAME>"
 
-    [subnets.config]
-    network_type = "fevm"
-    provider_http = "http://127.0.0.1:3030/rpc/v1"
-    registry_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
-    gateway_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
-    accounts = ["0x6be1ccf648c74800380d0520d797a170c808b624", "0x6be1ccf648c74800380d0520d797a170c808b624"]
+# [subnets.config]
+# gateway_addr = "t064"
+# accounts = ["<WORKER_1>", "<WORKER_2>", "<WORKER_3>"]
+# jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
+# auth_token = "<AUTH_TOKEN_1>"
+# network_type = "fvm"
 "#;
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
