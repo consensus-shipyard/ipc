@@ -285,6 +285,11 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             "getNetworkName"
         );
         require(gwGetter.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE, "majorityPercentage");
+
+        (StorableMsg memory storableMsg, bool wrapped) = gwGetter.postbox(0);
+        StorableMsg memory msg1;
+        require(msg1.toHash() == storableMsg.toHash());
+        require(!wrapped);
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
@@ -1447,6 +1452,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         require(circSupply == CROSS_MSG_FEE + 1);
         require(gwGetter.getNetworkName().equals(destinationSubnet.commonParent(from)));
         require(gwGetter.appliedTopDownNonce() == 1);
+
+        CrossMsg[] memory msgs = gwGetter.getTopDownMsgs(id, 0);
+        require(msgs.length == 1);
+        (bool exists, uint64 n) = gwGetter.getAppliedTopDownNonce(id);
+        require(exists);
+        require(n == 1);
     }
 
     function reward(uint256 amount) external view {
@@ -1724,6 +1735,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.expectRevert(ValidatorAlreadyVoted.selector);
 
         gwRouter.submitTopDownCheckpoint(checkpoint);
+        require(gwGetter.hasValidatorVotedForSubmission(DEFAULT_CHECKPOINT_PERIOD, validators[0]));
     }
 
     function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_NotInitialized() public {
