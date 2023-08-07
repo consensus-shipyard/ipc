@@ -297,31 +297,33 @@ impl SubnetManager for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
+    /// Propagate the postbox message key. The key should be `bytes32`.
     async fn propagate(
         &self,
         _subnet: SubnetID,
         gateway_addr: Address,
         from: Address,
-        postbox_msg_cid: Vec<u8>,
+        postbox_msg_key: Vec<u8>,
     ) -> Result<()> {
+        if postbox_msg_key.len() != 32 {
+            return Err(anyhow!(
+                "invalid message cid length, expect 32 but found {}",
+                postbox_msg_key.len()
+            ));
+        }
+
         self.ensure_same_gateway(&gateway_addr)?;
 
-        log::info!("propagate postbox evm gateway contract: {gateway_addr:} with message cid: {postbox_msg_cid:?}");
+        log::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
 
         let signer = self.get_signer(&from)?;
         let gateway_contract =
             GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
 
-        if postbox_msg_cid.len() != 32 {
-            return Err(anyhow!(
-                "invalid message cid length, expect 32 but found {}",
-                postbox_msg_cid.len()
-            ));
-        }
-        let mut cid = [0u8; 32];
-        cid.copy_from_slice(&postbox_msg_cid);
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&postbox_msg_key);
 
-        gateway_contract.propagate(cid).send().await?;
+        gateway_contract.propagate(key).send().await?;
 
         Ok(())
     }

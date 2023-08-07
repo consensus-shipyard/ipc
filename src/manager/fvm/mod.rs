@@ -221,18 +221,20 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         Ok(r.height as ChainEpoch)
     }
 
+    /// Propagate the postbox message key. The key should be a `Cid`.
     async fn propagate(
         &self,
         subnet: SubnetID,
         gateway_addr: Address,
         from: Address,
-        postbox_msg_cid: Vec<u8>,
+        postbox_msg_key: Vec<u8>,
     ) -> Result<()> {
+        let postbox_cid = Cid::try_from(postbox_msg_key.as_slice())?;
+
         if !self.is_network_match(&subnet).await? {
             return Err(anyhow!("propagation not targeting the correct network"));
         }
 
-        let postbox_cid = Cid::try_from(postbox_msg_cid.as_slice())?;
         let params = cbor::serialize(&PropagateParams { postbox_cid }, "propagate params")?;
 
         let message = MpoolPushMessage::new(
