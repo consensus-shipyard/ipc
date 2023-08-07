@@ -17,9 +17,13 @@ use crate::cli::commands::util::UtilCommandsArgs;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::server::{new_evm_keystore_from_path, new_keystore_from_path};
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+
+use clap::{Command, CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Generator, Shell};
 use ipc_identity::{KeyStore, PersistentKeyStore};
+
 use std::fmt::Debug;
+use std::io;
 use subnet::SubnetCommandsArgs;
 use url::Url;
 
@@ -47,18 +51,22 @@ enum Commands {
     Checkpoint(CheckpointCommandsArgs),
     Util(UtilCommandsArgs),
 }
+
 #[derive(Debug, Parser)]
 #[command(
-    name = "ipc",
+    name = "ipc-agent",
     about = "The IPC agent command line tool",
     version = "v0.0.1"
 )]
 #[command(propagate_version = true)]
 struct IPCAgentCliCommands {
+    // If provided, outputs the completion file for given shell
+    #[arg(long = "cli-autocomplete-gen", value_enum)]
+    generator: Option<Shell>,
     #[clap(flatten)]
     global_params: GlobalArguments,
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 /// The `cli` method exposed to handle all the cli commands, ideally from main.
@@ -93,18 +101,32 @@ pub async fn cli() -> anyhow::Result<()> {
     // parse the arguments
     let args = IPCAgentCliCommands::parse();
 
-    let global = &args.global_params;
-    let r = match &args.command {
-        Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
-        Commands::Config(args) => args.handle(global).await,
-        Commands::Subnet(args) => args.handle(global).await,
-        Commands::CrossMsg(args) => args.handle(global).await,
-        Commands::Wallet(args) => args.handle(global).await,
-        Commands::Checkpoint(args) => args.handle(global).await,
-        Commands::Util(args) => args.handle(global).await,
-    };
+    if let Some(generator) = args.generator {
+        let mut cmd = IPCAgentCliCommands::command();
+        print_completions(generator, &mut cmd);
+        Ok(())
+    } else {
+        let global = &args.global_params;
+        if let Some(c) = &args.command {
+            let r = match &c {
+                Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
+                Commands::Config(args) => args.handle(global).await,
+                Commands::Subnet(args) => args.handle(global).await,
+                Commands::CrossMsg(args) => args.handle(global).await,
+                Commands::Wallet(args) => args.handle(global).await,
+                Commands::Checkpoint(args) => args.handle(global).await,
+                Commands::Util(args) => args.handle(global).await,
+            };
 
-    r.with_context(|| format!("error processing command {:?}", args.command))
+            r.with_context(|| format!("error processing command {:?}", args.command))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
 pub(crate) fn get_ipc_agent_url(
