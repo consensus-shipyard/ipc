@@ -15,7 +15,7 @@ use std::sync::Arc;
 pub struct PropagateParams {
     pub subnet: String,
     pub from: Option<String>,
-    pub postbox_msg_cid: Vec<u8>,
+    pub postbox_msg_key: Vec<u8>,
 }
 
 /// The Propagate json rpc method handler.
@@ -52,7 +52,7 @@ impl JsonRPCRequestHandler for PropagateHandler {
                 subnet,
                 subnet_config.gateway_addr(),
                 from,
-                request.postbox_msg_cid,
+                request.postbox_msg_key,
             )
             .await
     }

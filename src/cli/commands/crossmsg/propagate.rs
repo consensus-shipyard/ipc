@@ -26,12 +26,12 @@ impl CommandLineHandler for Propagate {
         let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
-        let postbox_msg_cid =
-            base64::engine::general_purpose::STANDARD.decode(&arguments.postbox_msg_cid)?;
+        let postbox_msg_key =
+            base64::engine::general_purpose::STANDARD.decode(&arguments.postbox_msg_key)?;
         let params = PropagateParams {
             subnet: arguments.subnet.clone(),
             from: arguments.from.clone(),
-            postbox_msg_cid,
+            postbox_msg_key,
         };
         json_rpc_client
             .request::<()>(json_rpc_methods::PROPAGATE, serde_json::to_value(params)?)
@@ -53,5 +53,5 @@ pub(crate) struct PropagateArgs {
     #[arg(long, short, help = "The subnet of the message to propagate")]
     pub subnet: String,
     #[arg(help = "The message cid to propagate")]
-    pub postbox_msg_cid: String,
+    pub postbox_msg_key: String,
 }
