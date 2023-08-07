@@ -7,8 +7,8 @@ mod checkpoint;
 
 use crate::manager::evm::manager::agent_subnet_to_evm_addresses;
 use crate::manager::evm::manager::{
-    gateway_getter_facet, gateway_manager_facet, gateway_router_facet, subnet_actor_getter_facet,
-    subnet_actor_manager_facet,
+    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
+    subnet_actor_getter_facet, subnet_actor_manager_facet,
 };
 use crate::manager::SubnetInfo;
 use anyhow::anyhow;
@@ -176,11 +176,13 @@ base_type_conversion!(subnet_actor_getter_facet);
 base_type_conversion!(gateway_manager_facet);
 base_type_conversion!(subnet_actor_manager_facet);
 base_type_conversion!(gateway_getter_facet);
+base_type_conversion!(gateway_messenger_facet);
 
 cross_msg_types!(subnet_actor_manager_facet);
 cross_msg_types!(subnet_actor_getter_facet);
 cross_msg_types!(gateway_getter_facet);
 cross_msg_types!(gateway_router_facet);
+cross_msg_types!(gateway_messenger_facet);
 
 impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
     type Error = anyhow::Error;

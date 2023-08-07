@@ -8,7 +8,6 @@ use crate::checkpoint::NativeBottomUpCheckpoint;
 pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use cid::Cid;
 use ethers::abi::Tokenizable;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{abigen, Signer, SignerMiddleware};
@@ -60,6 +59,10 @@ abigen!(
 abigen!(GatewayManagerFacet, "contracts/GatewayManagerFacet.json");
 abigen!(GatewayGetterFacet, "contracts/GatewayGetterFacet.json");
 abigen!(GatewayRouterFacet, "contracts/GatewayRouterFacet.json");
+abigen!(
+    GatewayMessengerFacet,
+    "contracts/GatewayMessengerFacet.json"
+);
 abigen!(SubnetRegistry, "contracts/SubnetRegistry.json");
 
 pub struct EthSubnetManager {
@@ -294,14 +297,58 @@ impl SubnetManager for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
+    /// Propagate the postbox message key. The key should be `bytes32`.
     async fn propagate(
         &self,
         _subnet: SubnetID,
-        _gateway_addr: Address,
-        _from: Address,
-        _postbox_msg_cid: Cid,
+        gateway_addr: Address,
+        from: Address,
+        postbox_msg_key: Vec<u8>,
     ) -> Result<()> {
-        todo!()
+        if postbox_msg_key.len() != 32 {
+            return Err(anyhow!(
+                "invalid message cid length, expect 32 but found {}",
+                postbox_msg_key.len()
+            ));
+        }
+
+        self.ensure_same_gateway(&gateway_addr)?;
+
+        log::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
+
+        let signer = self.get_signer(&from)?;
+        let gateway_contract =
+            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&postbox_msg_key);
+
+        gateway_contract.propagate(key).send().await?;
+
+        Ok(())
+    }
+
+    async fn send_cross_message(
+        &self,
+        gateway_addr: Address,
+        from: Address,
+        cross_msg: ipc_gateway::CrossMsg,
+    ) -> Result<()> {
+        self.ensure_same_gateway(&gateway_addr)?;
+
+        log::info!("send evm cross messages to gateway contract: {gateway_addr:} with message: {cross_msg:?}");
+
+        let signer = self.get_signer(&from)?;
+        let gateway_contract =
+            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+
+        let evm_cross_msg = gateway_messenger_facet::CrossMsg::try_from(cross_msg)?;
+        gateway_contract
+            .send_cross_message(evm_cross_msg)
+            .send()
+            .await?;
+
+        Ok(())
     }
 
     async fn set_validator_net_addr(
@@ -309,17 +356,6 @@ impl SubnetManager for EthSubnetManager {
         _subnet: SubnetID,
         _from: Address,
         _validator_net_addr: String,
-    ) -> Result<()> {
-        todo!()
-    }
-
-    async fn whitelist_propagator(
-        &self,
-        _subnet: SubnetID,
-        _gateway_addr: Address,
-        _postbox_msg_cid: Cid,
-        _from: Address,
-        _to_add: Vec<Address>,
     ) -> Result<()> {
         todo!()
     }
