@@ -16,7 +16,7 @@ make build
 
 ## The eudico image is not building successful 
 
-`make install-infra` may fail and not build the `eudico` image if your system is not configured correctly. If this happens, you can always try to build the image yourself to have a finer-grain report of the issues to help you debug them. For this you can [follow these instructions](https://github.com/consensus-shipyard/lotus/blob/spacenet/scripts/ipc/README.md).
+`make install-infra` may fail and not build the `eudico` image if your system is not configured correctly. If this happens, you can always try to build the image yourself to have a finer-grain report of the issues to help you debug them. For this you can [follow these instructions](https://github.com/consensus-shipyard/lotus/blob/main/scripts/ipc/README.md).
 
 High-level you just need to clone the [eudico repo](https://github.com/consensus-shipyard/lotus), and run `docker build -t eudico .` in the root of the repo.
 
