@@ -73,10 +73,10 @@ network_name = "calibration"
 
 [subnets.config]
 accounts = []
-gateway_addr = "0xDcDb352D8397EA50b1b131BBfE49288CDa198591"
+gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-registry_addr = "0x28337700f4432ff140360BbBEAfE3a80AcaaD1Be"
+registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
 ```
 
 * [**In a new session**] Start your IPC Agent
@@ -117,7 +117,7 @@ accounts = ["<OWNER_1>", "<OWNER_2>", "<OWNER_3>"]
 
 * Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses 
 
->💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./ipc-agent/bin/ipc-agent wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./evm-usage.md#key-management).
+>💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./ipc-agent/bin/ipc-agent wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
 
 >💡 Note that you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
 

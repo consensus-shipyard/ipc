@@ -42,13 +42,13 @@ For a detailed overview of the entire IPC stack design, please check the up-to-d
 ### Production branch
 
 The production branch is `main`.
-The `main` branch is always compatible with the "stable" release of eudico that's running on Spacenet.
+The `main` branch is always compatible with the "main" branch of eudico.
 Updates to `main` **always** come from the `dev` branch.
 
 ### Development branch
 
 The primary development branch is `dev`.
-`dev` contains the most up-to-date software but may not be compatible with the version of eudico running on spacenet. Only use `dev` if doing a full local deployment, but note that the packaged deployment scripts default to checking out eudico `spacenet`. 
+`dev` contains the most up-to-date software but may not be compatible with the rest of the stack. Only use `dev` if doing a full local deployment, but note that the packaged deployment scripts default to checking out eudico `main`. 
 
 ## Building
 
@@ -64,11 +64,11 @@ rustup target add wasm32-unknown-unknown
 make build
 ```
 
-This builds the binary of the IPC agent in the `./bin` folder of your repo. If you want to make the command available everywhere, add this folder to the binary `PATH` of your system. To see if the installation was successfully you can run the following command:
+This builds the binary of the IPC agent in the `./bin` folder of your repo. If you want to make the command available everywhere, add this folder to the binary `PATH` of your system. You can run the following command to see if the installation was successful:
 
 ## Eudico
 
-IPC uses [a fork of Lotus](https://github.com/consensus-shipyard/lotus), which we like to call _Eudico_, to connect to the rootnet and run subnets. To ease the deployment of new nodes, Eudico provides [a set of infrastructure scripts](https://github.com/consensus-shipyard/lotus/tree/spacenet/scripts/ipc) that make use of Docker. In order to install Docker, [click this link](https://docs.docker.com/get-docker/) and follow the instructions for your working environment.
+IPC uses [a fork of Lotus](https://github.com/consensus-shipyard/lotus), which we like to call _Eudico_, to connect to the rootnet and run subnets. To ease the deployment of new nodes, Eudico provides [a set of infrastructure scripts](https://github.com/consensus-shipyard/lotus/tree/main/scripts/ipc) that make use of Docker. In order to install Docker, [click this link](https://docs.docker.com/get-docker/) and follow the instructions for your working environment.
 
 >💡 Some users have reported some issues trying to build the required images using Docker Desktop. Consider installing a version of [Docker engine](https://docs.docker.com/engine/install/#server) supported by your system.
 
@@ -82,9 +82,29 @@ newgrp docker
 
 ## Connecting to a rootnet
 
-You can deploy an IPC hierarchy from any compatible rootnet. At this time, your options are to use the public Spacenet testnet or to deploy or your own rootnet. Instructions are provided for both below, but we recommend using Spacenet if possible.
+You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also use the public Spacenet testnet or deploy your own. Instructions are provided for both below, but we recommend using Calibration if possible.
 
-### Option 1: Spacenet
+### Option 1: Calibration
+Calibration is the primary testnet for Filecoin. It already hosts the IPC actors and can be used as a rootnet on which to deploy new subnets. 
+
+In order to use the IPC agent with Calibration we need to have access to a full node syncing with the network. The easiest way to achieve this is to use a [public RPC](https://docs.filecoin.io/networks/calibration/rpcs/). You also need the addresses of the deployed contracts The suggested configuration for the IPC agent is:
+
+```
+# Default configuration for Filecoin Calibration
+[[subnets]]
+id = "/r314159"
+network_name = "calibration"
+[subnets.config]
+accounts = []
+gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
+network_type = "fevm"
+provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
+```
+
+To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).
+
+### Option 2: Spacenet
 Spacenet hosts all the IPC actors and can be used as a rootnet on which to deploy new subnets. For more information, have a look at the [Spacenet repo](https://github.com/consensus-shipyard/spacenet).
 
 In order to use the IPC agent with Spacenet we need to have access to a full node syncing with the network. The easiest way to achieve this is to run your own. Please follow the instructions on the [Spacenet repo](https://github.com/consensus-shipyard/spacenet/blob/main/README.md#getting-started-for-developers) to install the dependencies and set up your node.
@@ -106,7 +126,7 @@ This information will be relevant to configure our agent to connect to this root
 
 To be able to interact with Spacenet and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some Spacenet FIL for your address through the [Spacenet Faucet](https://spacenet.consensus.ninja/).
 
-### Option 2: Local deployment
+### Option 3: Local deployment
 To deploy a Example rootnet locally for testing you can use the IPC scripts installed in `./bin/ipc-infra` by running:
 ```bash
 ./bin/ipc-infra/run-root-docker-1val.sh <lotus-api-port> <validator-libp2p-port>
@@ -126,7 +146,7 @@ This information will be relevant to configure our agent to connect to this root
 
 ## Configuring the agent
 
-The default config path for the agent is `~/.ipc-agent/config.toml`. The agent will always try to pick up the config from this path unless told otherwise. To populate a Example config file in the default path, you can run the following command:
+The default config path for the agent is `~/.ipc-agent/config.toml`. The agent will always try to pick up the config from this path unless told otherwise. To populate an example config file in the default path, you can run the following command:
 ```bash
 ./bin/ipc-agent config init
 ```
@@ -147,7 +167,7 @@ gateway_addr = "t064"
 jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1"
 ```
 
-> 💡 In the current implementation of Spacenet, the gateway is always deployed in the `t064` address. This should be the address always reflected on your config for the gateway. In the future, this will change, and the gateway may be deployed in different addresses.
+> 💡 In the current implementation of subnets, the gateway is always deployed in the `t064` address, but this may change in the future. For Calibration as the parent, the gateay address is provided above.
 
 > 💡 If you are already running the daemon, then run `./bin/ipc-agent config reload` to pick up the config changes.
 

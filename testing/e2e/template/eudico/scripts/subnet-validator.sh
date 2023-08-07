@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# Based on https://github.com/consensus-shipyard/lotus/blob/spacenet/scripts/ipc/src/r31415926-single-validator.sh
+# Based on https://github.com/consensus-shipyard/lotus/blob/main/scripts/ipc/src/r31415926-single-validator.sh
 
-# There is also https://github.com/consensus-shipyard/lotus/blob/spacenet/scripts/ipc/src/subnet-validator.sh
+# There is also https://github.com/consensus-shipyard/lotus/blob/main/scripts/ipc/src/subnet-validator.sh
 # but it looks incomplete at the moment, not starting the validator.
 
 set -e

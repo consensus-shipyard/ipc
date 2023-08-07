@@ -1,6 +1,6 @@
 # Genesis files
 
-These are copied from https://github.com/consensus-shipyard/lotus/tree/spacenet/eudico-core/genesis
+These are copied from https://github.com/consensus-shipyard/lotus/tree/main/eudico-core/genesis
 
 * `genesis.json`: Nothing has any balance
 * `genesis-test.json`: The default wallet which comes in the infra scripts has a starting balance.
