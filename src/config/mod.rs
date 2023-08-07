@@ -42,10 +42,10 @@ network_name = "calibration"
 
 [subnets.config]
 accounts = []
-gateway_addr = "0xDcDb352D8397EA50b1b131BBfE49288CDa198591"
+gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-registry_addr = "0x28337700f4432ff140360BbBEAfE3a80AcaaD1Be"
+registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
 
 # Subnet template - uncomment and adjust before using
 # [[subnets]]
