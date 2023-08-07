@@ -27,7 +27,7 @@ use crate::server::handlers::manager::fund::FundHandler;
 use crate::server::handlers::manager::list_subnets::ListSubnetsHandler;
 use crate::server::handlers::manager::propagate::PropagateHandler;
 use crate::server::handlers::manager::release::ReleaseHandler;
-use crate::server::handlers::manager::whitelist::WhitelistPropagatorHandler;
+use crate::server::handlers::manager::send_cross::SendCrossMsgHandler;
 use crate::server::handlers::send_value::SendValueHandler;
 use crate::server::handlers::validator::QueryValidatorSetHandler;
 use crate::server::handlers::wallet::balances::WalletBalancesHandler;
@@ -123,8 +123,8 @@ impl Handlers {
         let h: Box<dyn HandlerWrapper> = Box::new(PropagateHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::PROPAGATE), h);
 
-        let h: Box<dyn HandlerWrapper> = Box::new(WhitelistPropagatorHandler::new(pool.clone()));
-        handlers.insert(String::from(json_rpc_methods::WHITELIST_PROPAGATOR), h);
+        let h: Box<dyn HandlerWrapper> = Box::new(SendCrossMsgHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::SEND_CROSS_MSG), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(SendValueHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::SEND_VALUE), h);

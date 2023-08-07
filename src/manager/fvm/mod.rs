@@ -21,7 +21,6 @@ use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use ipc_gateway::{
     BottomUpCheckpoint, CrossMsg, FundParams, PropagateParams, ReleaseParams, TopDownCheckpoint,
-    WhitelistPropagatorParams,
 };
 use ipc_identity::Wallet;
 use ipc_sdk::subnet_id::SubnetID;
@@ -227,18 +226,14 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         subnet: SubnetID,
         gateway_addr: Address,
         from: Address,
-        postbox_msg_cid: Cid,
+        postbox_msg_cid: Vec<u8>,
     ) -> Result<()> {
         if !self.is_network_match(&subnet).await? {
             return Err(anyhow!("propagation not targeting the correct network"));
         }
 
-        let params = cbor::serialize(
-            &PropagateParams {
-                postbox_cid: postbox_msg_cid,
-            },
-            "propagate params",
-        )?;
+        let postbox_cid = Cid::try_from(postbox_msg_cid.as_slice())?;
+        let params = cbor::serialize(&PropagateParams { postbox_cid }, "propagate params")?;
 
         let message = MpoolPushMessage::new(
             gateway_addr,
@@ -249,6 +244,15 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
 
         self.mpool_push_and_wait(message).await?;
         Ok(())
+    }
+
+    async fn send_cross_message(
+        &self,
+        _gateway_addr: Address,
+        _from: Address,
+        _cross_msg: CrossMsg,
+    ) -> Result<()> {
+        todo!()
     }
 
     async fn set_validator_net_addr(
@@ -274,37 +278,6 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             subnet.subnet_actor(),
             from,
             ipc_subnet_actor::Method::SetValidatorNetAddr as MethodNum,
-            params.to_vec(),
-        );
-
-        self.mpool_push_and_wait(message).await?;
-        Ok(())
-    }
-
-    async fn whitelist_propagator(
-        &self,
-        subnet: SubnetID,
-        gateway_addr: Address,
-        postbox_msg_cid: Cid,
-        from: Address,
-        to_add: Vec<Address>,
-    ) -> Result<()> {
-        if !self.is_network_match(&subnet).await? {
-            return Err(anyhow!("whitelist not targeting the correct network"));
-        }
-
-        let params = cbor::serialize(
-            &WhitelistPropagatorParams {
-                postbox_cid: postbox_msg_cid,
-                to_add,
-            },
-            "whitelist propagate params",
-        )?;
-
-        let message = MpoolPushMessage::new(
-            gateway_addr,
-            from,
-            ipc_gateway::Method::WhiteListPropagator as MethodNum,
             params.to_vec(),
         );
 

@@ -6,7 +6,6 @@ use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::{check_subnet, parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use cid::Cid;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -16,7 +15,7 @@ use std::sync::Arc;
 pub struct PropagateParams {
     pub subnet: String,
     pub from: Option<String>,
-    pub postbox_msg_cid: Cid,
+    pub postbox_msg_cid: Vec<u8>,
 }
 
 /// The Propagate json rpc method handler.

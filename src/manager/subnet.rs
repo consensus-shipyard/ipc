@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use crate::checkpoint::NativeBottomUpCheckpoint;
 use anyhow::Result;
 use async_trait::async_trait;
-use cid::Cid;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_gateway::{CrossMsg};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
 
@@ -71,13 +71,21 @@ pub trait SubnetManager: Send + Sync {
         amount: TokenAmount,
     ) -> Result<ChainEpoch>;
 
-    /// Propagate a cross-net message forward
+    /// Propagate a cross-net message forward. For `postbox_msg_cid`, we are using bytes because different
+    /// runtime have different representations.
     async fn propagate(
         &self,
         subnet: SubnetID,
         gateway_addr: Address,
         from: Address,
-        postbox_msg_cid: Cid,
+        postbox_msg_cid: Vec<u8>,
+    ) -> Result<()>;
+
+    async fn send_cross_message(
+        &self,
+        gateway_addr: Address,
+        from: Address,
+        cross_msg: CrossMsg,
     ) -> Result<()>;
 
     /// Sets a new net address to an existing validator
@@ -86,16 +94,6 @@ pub trait SubnetManager: Send + Sync {
         subnet: SubnetID,
         from: Address,
         validator_net_addr: String,
-    ) -> Result<()>;
-
-    /// Whitelist a series of addresses as propagator of a cross net message
-    async fn whitelist_propagator(
-        &self,
-        subnet: SubnetID,
-        gateway_addr: Address,
-        postbox_msg_cid: Cid,
-        from: Address,
-        to_add: Vec<Address>,
     ) -> Result<()>;
 
     /// Send value between two addresses in a subnet

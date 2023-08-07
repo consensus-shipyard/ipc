@@ -3,19 +3,19 @@
 use crate::cli::commands::crossmsg::fund::Fund;
 use crate::cli::commands::crossmsg::propagate::Propagate;
 use crate::cli::commands::crossmsg::release::Release;
-use crate::cli::commands::crossmsg::whitelist::WhitelistPropagator;
+use crate::cli::commands::crossmsg::send_cross::SendCrossMsg;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use fund::FundArgs;
 use propagate::PropagateArgs;
 use release::ReleaseArgs;
-use whitelist::WhitelistPropagatorArgs;
+use send_cross::SendCrossMsgsArgs;
 
 use clap::{Args, Subcommand};
 
 pub mod fund;
 pub mod propagate;
 pub mod release;
-pub mod whitelist;
+pub mod send_cross;
 
 #[derive(Debug, Args)]
 #[command(name = "crossmsg", about = "cross network messages related commands")]
@@ -31,7 +31,7 @@ impl CrossMsgsCommandsArgs {
             Commands::Fund(args) => Fund::handle(global, args).await,
             Commands::Release(args) => Release::handle(global, args).await,
             Commands::Propagate(args) => Propagate::handle(global, args).await,
-            Commands::WhitelistPropagator(args) => WhitelistPropagator::handle(global, args).await,
+            Commands::SendCrossMsgs(args) => SendCrossMsg::handle(global, args).await,
         }
     }
 }
@@ -41,5 +41,5 @@ pub(crate) enum Commands {
     Fund(FundArgs),
     Release(ReleaseArgs),
     Propagate(PropagateArgs),
-    WhitelistPropagator(WhitelistPropagatorArgs),
+    SendCrossMsgs(SendCrossMsgsArgs),
 }

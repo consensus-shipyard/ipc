@@ -19,7 +19,7 @@ pub mod json_rpc_methods {
     pub const FUND: &str = "ipc_fund";
     pub const RELEASE: &str = "ipc_release";
     pub const PROPAGATE: &str = "ipc_propagate";
-    pub const WHITELIST_PROPAGATOR: &str = "ipc_whitelistPropagator";
+    pub const SEND_CROSS_MSG: &str = "ipc_sendCrossMessage";
     pub const LIST_CHILD_SUBNETS: &str = "ipc_listChildSubnets";
     pub const RELOAD_CONFIG: &str = "ipc_reloadConfig";
     pub const QUERY_VALIDATOR_SET: &str = "ipc_queryValidatorSet";
