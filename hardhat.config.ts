@@ -93,7 +93,7 @@ task('deploy-sa-diamond-and-facets', 'Builds and deploys Subnet Actor diamond an
   const network = hre.network.name;
   const deployments = await getDeployments(network);
   const { deployDiamond } = await lazyImport('./scripts/deploy-sa-diamond');
-  const subnetActorDiamond = await deployDiamond(deployments.GatewayActorDiamond,deployments.libs);
+  const subnetActorDiamond = await deployDiamond(deployments.GatewayActorDiamond, deployments.libs);
   console.log(subnetActorDiamond);
   await saveDeployments(network, subnetActorDiamond);
 });
@@ -136,6 +136,14 @@ const config: HardhatUserConfig = {
       chainId: 31415926,
       url: process.env.RPC_URL!,
       accounts: [process.env.PRIVATE_KEY!],
+    },
+    // automatically fetch chainID for network
+    auto: {
+      chainId: parseInt(process.env.CHAIN_ID!, 16),
+      url: process.env.RPC_URL!,
+      accounts: [process.env.PRIVATE_KEY!],
+      // timeout to support also slow networks (like calibration/mainnet)
+      timeout: 1000000,
     }
   },
   solidity: {

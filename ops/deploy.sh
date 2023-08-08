@@ -12,6 +12,11 @@ LIB_OUTPUT="libraries.out"
 GATEWAY_OUTPUT="gateway.out"
 NETWORK=$1
 
+if [ "$NETWORK" = "auto" ]; then
+  echo "[*] Automatically getting chainID for network"
+  source ops/chain-id.sh
+fi
+
 echo "[*] Deploying libraries"
 (npx hardhat deploy-libraries --network ${NETWORK} |  sed -n '/{/,/}/p') > scripts/${LIB_OUTPUT}
 echo "const LIBMAP =" | cat - scripts/${LIB_OUTPUT}  > temp && mv temp scripts/${LIB_OUTPUT}

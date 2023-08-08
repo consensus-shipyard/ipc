@@ -1,7 +1,7 @@
 # ==============================================================================
 # Deployment
 
-NETWORK ?= localnet
+NETWORK ?= auto
 OUTPUT ?= ./out
 
 deploy-ipc:

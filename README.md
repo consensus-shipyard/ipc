@@ -38,7 +38,7 @@ To deploy the IPC Solidity contracts in an FEVM network, you can directly run th
 ```bash
 make deploy-ipc
 ```
-The scripts run by `make` make use of hardhat under the hood. The default network for the deployment is `localnet` as configured in `hardhat.config.ts`.
+The scripts run by `make` make use of hardhat under the hood. If no network has been configured, the script will automatically try to fetch the chainID of the target network, and perform the deployment according to the configuration in `hardhat.config.ts`.
 To deploy the contracts in some other network configured in the Hardhat config you can run the following: 
 ```bash
 make deploy-ipc NETWORK=<network-name>
