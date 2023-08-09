@@ -13,7 +13,10 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{abigen, Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::Eip1559TransactionRequest;
+use ethers::types::{Eip1559TransactionRequest, I256, U256};
+use ethers::utils::{
+    self, EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE, EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE,
+};
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -120,10 +123,63 @@ impl SubnetManager for EthSubnetManager {
         log::info!("creating subnet on evm with params: {params:?}");
 
         let signer = self.get_signer(&from)?;
+        let signer = Arc::new(signer);
         let registry_contract =
-            SubnetRegistry::new(self.ipc_contract_info.registry_addr, Arc::new(signer));
+            SubnetRegistry::new(self.ipc_contract_info.registry_addr, signer.clone());
 
         let call = registry_contract.new_subnet_actor(params);
+        ///////////////////////////
+        // let base_fee_per_gas = signer
+        //     .get_block(ethers::types::BlockNumber::Latest)
+        //     .await?
+        //     .ok_or_else(|| Err(anyhow!("Latest block not found")))?
+        //     .base_fee_per_gas
+        //     .ok_or_else(|| Err(anyhow!("EIP-1559 not activated")))?;
+        let latest_block = signer.get_block(ethers::types::BlockNumber::Latest).await?;
+
+        let latest_block = match latest_block {
+            Some(block) => block,
+            None => return Err(anyhow!("Latest block not found")),
+        };
+
+        let base_fee_per_gas = latest_block
+            .base_fee_per_gas
+            .ok_or_else(|| anyhow!("EIP-1559 not activated"))?;
+
+        let fee_history = signer
+            .fee_history(
+                utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
+                ethers::types::BlockNumber::Latest,
+                &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
+            )
+            .await?;
+
+        println!(">>>>> FEE HISTORY:  {:?}", fee_history);
+
+        // use the provided fee estimator function, or fallback to the default implementation.
+        // let max_priority_fee_per_gas = std::cmp::max(
+        //     estimate_priority_fee(fee_history.reward),
+        //     U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE),
+        // );
+
+        let max_priority_fee_per_gas = estimate_priority_fee(fee_history.reward); //overestimate?
+        let potential_max_fee = base_fee_surged(base_fee_per_gas);
+        let max_fee_per_gas = if max_priority_fee_per_gas > potential_max_fee {
+            max_priority_fee_per_gas + potential_max_fee
+        } else {
+            potential_max_fee
+        };
+
+        //////////////////////////
+        let call = call.gas_price(max_priority_fee_per_gas);
+        println!(
+            ">>> MAX_PRIORITY_FEE_PER_GAS: {:?}",
+            max_priority_fee_per_gas
+        );
+        println!(
+            ">>> tx value MAX_PRIORITY_FEE_PER_GAS: {:?}",
+            call.tx.gas_price()
+        );
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
         // in current FEVM that without the retries, events are not picked up.
@@ -832,6 +888,70 @@ impl EthSubnetManager {
             keystore,
         ))
     }
+}
+
+fn base_fee_surged(base_fee_per_gas: U256) -> U256 {
+    if base_fee_per_gas <= U256::from(40_000_000_000u64) {
+        base_fee_per_gas * 2
+    } else if base_fee_per_gas <= U256::from(100_000_000_000u64) {
+        base_fee_per_gas * 16 / 10
+    } else if base_fee_per_gas <= U256::from(200_000_000_000u64) {
+        base_fee_per_gas * 14 / 10
+    } else {
+        base_fee_per_gas * 12 / 10
+    }
+}
+
+fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
+    let mut rewards: Vec<U256> = rewards
+        .iter()
+        .map(|r| r[0])
+        .filter(|r| *r > U256::zero())
+        .collect();
+    if rewards.is_empty() {
+        return U256::zero();
+    }
+    if rewards.len() == 1 {
+        return rewards[0];
+    }
+    // Sort the rewards as we will eventually take the median.
+    rewards.sort();
+
+    // A copy of the same vector is created for convenience to calculate percentage change
+    // between subsequent fee values.
+    let mut rewards_copy = rewards.clone();
+    rewards_copy.rotate_left(1);
+
+    let mut percentage_change: Vec<I256> = rewards
+        .iter()
+        .zip(rewards_copy.iter())
+        .map(|(a, b)| {
+            let a = I256::try_from(*a).expect("priority fee overflow");
+            let b = I256::try_from(*b).expect("priority fee overflow");
+            ((b - a) * 100) / a
+        })
+        .collect();
+    percentage_change.pop();
+
+    // Fetch the max of the percentage change, and that element's index.
+    let max_change = percentage_change.iter().max().unwrap();
+    let max_change_index = percentage_change
+        .iter()
+        .position(|&c| c == *max_change)
+        .unwrap();
+
+    // If we encountered a big change in fees at a certain position, then consider only
+    // the values >= it.
+    let values = if *max_change >= EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE.into()
+        && (max_change_index >= (rewards.len() / 2))
+    {
+        rewards[max_change_index..].to_vec()
+    } else {
+        rewards
+    };
+
+    // Return the median.
+    values[values.len() / 2]
 }
 
 /// Get the block number from the transaction receipt
