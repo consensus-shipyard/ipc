@@ -24,6 +24,7 @@ error InvalidMajorityPercentage();
 error MessagesNotSorted();
 error NoRewardToWithdraw();
 error NoValidatorsInSubnet();
+error NotEnoughValidatorsInSubnet();
 error NotAllValidatorsHaveLeft();
 error NotEmptySubnetCircSupply();
 error NotEnoughBalance();

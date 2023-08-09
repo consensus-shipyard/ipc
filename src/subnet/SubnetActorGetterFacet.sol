@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {Status} from "../enums/Status.sol";
+import {NotEnoughValidatorsInSubnet} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID} from "../structs/Subnet.sol";
@@ -122,7 +123,6 @@ contract SubnetActorGetterFacet {
     }
 
     /// @notice get all the validators in the subnet.
-    /// TODO: we can introduce pagination
     function getValidators() external view returns (address[] memory) {
         uint256 length = s.validators.length();
         address[] memory result = new address[](length);
@@ -135,6 +135,37 @@ contract SubnetActorGetterFacet {
         }
 
         return result;
+    }
+
+    /// @notice get no more than `limit` number of validators starting from the validator with index `offset`
+    /// @dev It returns an empty array[] and 0 if there are no validators to return according to the input parameters
+    /// @param offset The first index of the first validator to return
+    /// @param limit The maximum number of validators to return
+    /// @return the array of validators, the size of that array is no more than `limit`
+    /// @return the next `offset` that needs to query the next range of validators
+    function getRangeOfValidators(uint256 offset, uint256 limit) external view returns (address[] memory, uint256) {
+        uint256 n = s.validators.length();
+        address[] memory empty = new address[](0);
+        if (limit == 0) {
+            return (empty, 0);
+        }
+        if (n <= offset) {
+            return (empty, 0);
+        }
+
+        if (limit > n - offset) {
+            limit = n - offset;
+        }
+        address[] memory result = new address[](limit);
+
+        for (uint256 i = 0; i < limit; ) {
+            result[i] = s.validators.at(i + offset);
+            unchecked {
+                ++i;
+            }
+        }
+
+        return (result, offset + limit);
     }
 
     /// @notice get the full details of the validators, not just their addresses.

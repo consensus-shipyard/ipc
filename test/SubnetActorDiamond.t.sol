@@ -300,6 +300,92 @@ contract SubnetActorDiamondTest is Test {
         require(saGetter.validatorAt(0) == validator);
     }
 
+    function testSubnetActorDiamond_MultipleJoins_Works_GetValidators() public {
+        address validator1 = vm.addr(1231);
+        address validator2 = vm.addr(1232);
+        address validator3 = vm.addr(1233);
+        address validator4 = vm.addr(1234);
+        address validator5 = vm.addr(1235);
+        address validator6 = vm.addr(1236);
+        address validator7 = vm.addr(1237);
+
+        _assertJoin(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(validator3, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(validator4, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(validator5, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(validator6, DEFAULT_MIN_VALIDATOR_STAKE);
+        _assertJoin(validator7, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        require(saGetter.validatorCount() == 7);
+        require(saGetter.getValidators().length == 7);
+        require(saGetter.getValidatorSet().validators.length == 7);
+
+        address[] memory result;
+        uint256 offset;
+
+        (result, offset) = saGetter.getRangeOfValidators(0, 2);
+        require(result.length == 2);
+        require(offset == 2);
+
+        (result, offset) = saGetter.getRangeOfValidators(0, 0);
+        require(result.length == 0);
+        require(offset == 0);
+
+        (result, offset) = saGetter.getRangeOfValidators(10, 0);
+        require(result.length == 0);
+        require(offset == 0);
+
+        (result, offset) = saGetter.getRangeOfValidators(2, 4);
+        require(result.length == 4);
+        require(offset == 6);
+
+        (result, offset) = saGetter.getRangeOfValidators(2, 0);
+        require(result.length == 0);
+        require(offset == 0);
+
+        (result, offset) = saGetter.getRangeOfValidators(6, 10);
+        require(result.length == 1);
+        require(offset == 7);
+
+        (result, offset) = saGetter.getRangeOfValidators(10, 10);
+        require(result.length == 0);
+        require(offset == 0);
+    }
+
+    function testSubnetActorDiamond_MultipleJoins_Fuzz_GetValidators(uint256 offset, uint256 limit, uint256 n) public {
+        offset = bound(offset, 0, 10);
+        limit = bound(limit, 0, 10);
+        n = bound(n, 0, 10);
+
+        console.log("fuzz data:");
+        console.log(offset);
+        console.log(limit);
+        console.log(n);
+
+        for (uint256 i = 0; i < n; i++) {
+            address validator = vm.addr(i + 1000);
+            _assertJoin(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        }
+
+        require(saGetter.validatorCount() == n);
+        require(saGetter.getValidators().length == n);
+        require(saGetter.getValidatorSet().validators.length == n);
+
+        address[] memory result;
+        uint256 newOffset;
+
+        (result, newOffset) = saGetter.getRangeOfValidators(offset, limit);
+        if (limit == 0 || n <= offset) {
+            require(result.length == 0, "result.length == 0");
+        } else {
+            if (limit > n - offset) {
+                limit = n - offset;
+            }
+            require(result.length == limit, "result.length == limit");
+        }
+    }
+
     function testSubnetActorDiamond_Join_Works_CallRegister() public {
         address validator = vm.addr(1235);
 

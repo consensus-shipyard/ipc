@@ -190,18 +190,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
                 totalValidatorsWeight += validatorWeight;
             }
 
-            // initial validators need to be conveniently funded with at least
-            // 1 FIL for them to be able to commit the first few top-down messages.
-            // They should use this FIL to fund their own addresses in the subnet
-            // so they can keep committing top-down messages. If they don't do this,
-            // they won't be able to send cross-net messages in their subnet.
-            // Funds are only distributed in child subnets, where top-down checkpoints need
-            // to be committed. This doesn't apply to the root.
-            // TODO: Once account abstraction is conveniently supported, there will be
-            // no need for this initial funding of validators.
-            // if (block.number == 1 && !_networkName.isRoot())
-            //     payable(validatorAddress).sendValue(INITIAL_VALIDATOR_FUNDS);
-
             unchecked {
                 ++validatorIndex;
             }
