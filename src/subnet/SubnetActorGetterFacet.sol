@@ -4,10 +4,12 @@ pragma solidity 0.8.19;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {Status} from "../enums/Status.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {ValidatorInfo, ValidatorSet} from "../structs/Validator.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
+import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {LibVoting} from "../lib/LibVoting.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
@@ -105,6 +107,18 @@ contract SubnetActorGetterFacet {
     /// @param index - the index of the validator set
     function validatorAt(uint256 index) external view returns (address) {
         return s.validators.at(index);
+    }
+
+    /// @notice get validator network address
+    /// @param addr - validator address
+    function validatorNetAddr(address addr) external view returns (string memory) {
+        return s.validatorNetAddresses[addr];
+    }
+
+    /// @notice get validator worker address
+    /// @param addr - validator address
+    function validatorWorkerAddr(address addr) external view returns (FvmAddress memory) {
+        return s.validatorWorkerAddresses[addr];
     }
 
     /// @notice get all the validators in the subnet.

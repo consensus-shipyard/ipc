@@ -9,6 +9,7 @@ error CannotSendCrossMsgToItself();
 error CheckpointNotChained();
 error CollateralIsZero();
 error CollateralStillLockedInSubnet();
+error EmptyAddress();
 error EpochAlreadyExecuted();
 error EpochNotVotable();
 error GatewayCannotBeZero();
