@@ -17,7 +17,6 @@ pub mod leave;
 pub mod list_checkpoints;
 pub mod list_subnets;
 pub mod net_addr;
-pub mod worker_addr;
 pub mod propagate;
 pub mod release;
 pub mod rpc;
@@ -25,6 +24,7 @@ pub mod send_cross;
 pub mod send_value;
 pub mod subnet;
 pub mod topdown_executed;
+pub mod worker_addr;
 
 pub(crate) fn check_subnet(subnet: &Subnet) -> Result<()> {
     match &subnet.config {

@@ -358,7 +358,9 @@ impl SubnetManager for EthSubnetManager {
         net_addr: String,
     ) -> Result<()> {
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!("set validator net addr: {net_addr:} on evm subnet: {subnet:} at contract: {address:}");
+        log::info!(
+            "set validator net addr: {net_addr:} on evm subnet: {subnet:} at contract: {address:}"
+        );
 
         let signer = self.get_signer(&from)?;
         let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
@@ -382,9 +384,8 @@ impl SubnetManager for EthSubnetManager {
         let signer = self.get_signer(&from)?;
         let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
 
-        let txn = contract.set_validator_worker_addr(
-            subnet_actor_manager_facet::FvmAddress::from(worker_addr)
-        );
+        let txn = contract
+            .set_validator_worker_addr(subnet_actor_manager_facet::FvmAddress::from(worker_addr));
 
         txn.send().await?.await?;
 
@@ -753,10 +754,8 @@ impl EthManager for EthSubnetManager {
         epoch: ChainEpoch,
     ) -> Result<[u8; 32]> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract = SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
+        let contract =
+            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
         let (exists, hash) = contract
             .bottom_up_checkpoint_hash_at_epoch(epoch as u64)
             .await?;
