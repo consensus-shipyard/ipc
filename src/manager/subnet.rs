@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 ///! IPC node-specific traits.
 use std::collections::HashMap;
-use std::ops::Add;
 
 use crate::checkpoint::NativeBottomUpCheckpoint;
 use anyhow::Result;
