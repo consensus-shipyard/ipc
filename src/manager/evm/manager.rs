@@ -353,11 +353,42 @@ impl SubnetManager for EthSubnetManager {
 
     async fn set_validator_net_addr(
         &self,
-        _subnet: SubnetID,
-        _from: Address,
-        _validator_net_addr: String,
+        subnet: SubnetID,
+        from: Address,
+        net_addr: String,
     ) -> Result<()> {
-        todo!()
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!("set validator net addr: {net_addr:} on evm subnet: {subnet:} at contract: {address:}");
+
+        let signer = self.get_signer(&from)?;
+        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
+
+        let txn = contract.set_validator_net_addr(net_addr);
+
+        txn.send().await?.await?;
+
+        Ok(())
+    }
+
+    async fn set_validator_worker_addr(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        worker_addr: Address,
+    ) -> Result<()> {
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!("set validator worker addr: {worker_addr:} on evm subnet: {subnet:} at contract: {address:}");
+
+        let signer = self.get_signer(&from)?;
+        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
+
+        let txn = contract.set_validator_worker_addr(
+            subnet_actor_manager_facet::FvmAddress::from(worker_addr)
+        );
+
+        txn.send().await?.await?;
+
+        Ok(())
     }
 
     /// Send value between two addresses in a subnet
@@ -722,7 +753,7 @@ impl EthManager for EthSubnetManager {
         epoch: ChainEpoch,
     ) -> Result<[u8; 32]> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract = SubnetActorManagerFacet::new(
+        let contract = SubnetActorGetterFacet::new(
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );

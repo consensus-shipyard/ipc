@@ -34,6 +34,7 @@ use crate::server::handlers::wallet::balances::WalletBalancesHandler;
 use crate::server::handlers::wallet::new::WalletNewHandler;
 use crate::server::list_checkpoints::ListBottomUpCheckpointsHandler;
 use crate::server::net_addr::SetValidatorNetAddrHandler;
+use crate::server::worker_addr::SetValidatorWorkerAddrHandler;
 use crate::server::JsonRPCRequestHandler;
 use ipc_identity::Wallet;
 
@@ -165,6 +166,9 @@ impl Handlers {
 
         let h: Box<dyn HandlerWrapper> = Box::new(SetValidatorNetAddrHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::SET_VALIDATOR_NET_ADDR), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(SetValidatorWorkerAddrHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::SET_VALIDATOR_WORKER_ADDR), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 ///! IPC node-specific traits.
 use std::collections::HashMap;
+use std::ops::Add;
 
 use crate::checkpoint::NativeBottomUpCheckpoint;
 use anyhow::Result;
@@ -95,6 +96,14 @@ pub trait SubnetManager: Send + Sync {
         subnet: SubnetID,
         from: Address,
         validator_net_addr: String,
+    ) -> Result<()>;
+
+    /// Sets a new worker address to an existing validator
+    async fn set_validator_worker_addr(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        validator_worker_addr: Address,
     ) -> Result<()>;
 
     /// Send value between two addresses in a subnet

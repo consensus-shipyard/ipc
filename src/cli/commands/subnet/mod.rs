@@ -21,6 +21,7 @@ pub mod list_subnets;
 pub mod net_addr;
 pub mod rpc;
 pub mod send_value;
+pub mod worker_addr;
 
 #[derive(Debug, Args)]
 #[command(
