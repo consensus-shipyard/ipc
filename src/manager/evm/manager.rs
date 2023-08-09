@@ -14,9 +14,6 @@ use ethers::prelude::{abigen, Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{Eip1559TransactionRequest, I256, U256};
-use ethers::utils::{
-    self, EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE, EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE,
-};
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -127,59 +124,9 @@ impl SubnetManager for EthSubnetManager {
         let registry_contract =
             SubnetRegistry::new(self.ipc_contract_info.registry_addr, signer.clone());
 
-        let call = registry_contract.new_subnet_actor(params);
-        ///////////////////////////
-        // let base_fee_per_gas = signer
-        //     .get_block(ethers::types::BlockNumber::Latest)
-        //     .await?
-        //     .ok_or_else(|| Err(anyhow!("Latest block not found")))?
-        //     .base_fee_per_gas
-        //     .ok_or_else(|| Err(anyhow!("EIP-1559 not activated")))?;
-        let latest_block = signer.get_block(ethers::types::BlockNumber::Latest).await?;
-
-        let latest_block = match latest_block {
-            Some(block) => block,
-            None => return Err(anyhow!("Latest block not found")),
-        };
-
-        let base_fee_per_gas = latest_block
-            .base_fee_per_gas
-            .ok_or_else(|| anyhow!("EIP-1559 not activated"))?;
-
-        let fee_history = signer
-            .fee_history(
-                utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
-                ethers::types::BlockNumber::Latest,
-                &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
-            )
+        let call = call_with_premium_estimation(signer, registry_contract.new_subnet_actor(params))
             .await?;
-
-        println!(">>>>> FEE HISTORY:  {:?}", fee_history);
-
-        // use the provided fee estimator function, or fallback to the default implementation.
-        // let max_priority_fee_per_gas = std::cmp::max(
-        //     estimate_priority_fee(fee_history.reward),
-        //     U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE),
-        // );
-
-        let max_priority_fee_per_gas = estimate_priority_fee(fee_history.reward); //overestimate?
-        let potential_max_fee = base_fee_surged(base_fee_per_gas);
-        let max_fee_per_gas = if max_priority_fee_per_gas > potential_max_fee {
-            max_priority_fee_per_gas + potential_max_fee
-        } else {
-            potential_max_fee
-        };
-
-        //////////////////////////
-        let call = call.gas_price(max_priority_fee_per_gas);
-        println!(
-            ">>> MAX_PRIORITY_FEE_PER_GAS: {:?}",
-            max_priority_fee_per_gas
-        );
-        println!(
-            ">>> tx value MAX_PRIORITY_FEE_PER_GAS: {:?}",
-            call.tx.gas_price()
-        );
+        // TODO: Edit call to get estimate premium
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
         // in current FEVM that without the retries, events are not picked up.
@@ -228,14 +175,15 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = self.get_signer(&from)?;
-        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract = SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.join(
             validator_net_addr,
             subnet_actor_manager_facet::FvmAddress::from(worker_addr),
         );
         txn.tx.set_value(collateral);
+        let txn = call_with_premium_estimation(signer, txn).await?;
 
         txn.send().await?.await?;
 
@@ -246,10 +194,14 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         log::info!("leaving evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = self.get_signer(&from)?;
-        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract = SubnetActorManagerFacet::new(address, signer.clone());
 
-        contract.leave().send().await?.await?;
+        call_with_premium_estimation(signer, contract.leave())
+            .await?
+            .send()
+            .await?
+            .await?;
 
         Ok(())
     }
@@ -258,10 +210,14 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         log::info!("kill evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = self.get_signer(&from)?;
-        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract = SubnetActorManagerFacet::new(address, signer.clone());
 
-        contract.kill().send().await?.await?;
+        call_with_premium_estimation(signer, contract.kill())
+            .await?
+            .send()
+            .await?
+            .await?;
 
         Ok(())
     }
@@ -310,15 +266,16 @@ impl SubnetManager for EthSubnetManager {
         let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
         log::debug!("evm subnet id to fund: {evm_subnet_id:?}");
 
-        let signer = self.get_signer(&from)?;
+        let signer = Arc::new(self.get_signer(&from)?);
         let gateway_contract =
-            GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+            GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
 
         let mut txn = gateway_contract.fund(
             evm_subnet_id,
             gateway_manager_facet::FvmAddress::try_from(to)?,
         );
         txn.tx.set_value(value);
+        let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -342,11 +299,12 @@ impl SubnetManager for EthSubnetManager {
 
         log::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
-        let signer = self.get_signer(&from)?;
+        let signer = Arc::new(self.get_signer(&from)?);
         let gateway_contract =
-            GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+            GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
         let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
+        let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -372,14 +330,17 @@ impl SubnetManager for EthSubnetManager {
 
         log::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
 
-        let signer = self.get_signer(&from)?;
+        let signer = Arc::new(self.get_signer(&from)?);
         let gateway_contract =
-            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
 
         let mut key = [0u8; 32];
         key.copy_from_slice(&postbox_msg_key);
 
-        gateway_contract.propagate(key).send().await?;
+        call_with_premium_estimation(signer, gateway_contract.propagate(key))
+            .await?
+            .send()
+            .await?;
 
         Ok(())
     }
@@ -394,13 +355,13 @@ impl SubnetManager for EthSubnetManager {
 
         log::info!("send evm cross messages to gateway contract: {gateway_addr:} with message: {cross_msg:?}");
 
-        let signer = self.get_signer(&from)?;
+        let signer = Arc::new(self.get_signer(&from)?);
         let gateway_contract =
-            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
 
         let evm_cross_msg = gateway_messenger_facet::CrossMsg::try_from(cross_msg)?;
-        gateway_contract
-            .send_cross_message(evm_cross_msg)
+        call_with_premium_estimation(signer, gateway_contract.send_cross_message(evm_cross_msg))
+            .await?
             .send()
             .await?;
 
@@ -418,11 +379,14 @@ impl SubnetManager for EthSubnetManager {
 
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
+        let signer = Arc::new(self.get_signer(&from)?);
+        let (fee, fee_cap) = premium_estimation(signer.clone()).await?;
         let tx = Eip1559TransactionRequest::new()
             .to(payload_to_evm_address(to.payload())?)
-            .value(fil_to_eth_amount(&amount)?);
+            .value(fil_to_eth_amount(&amount)?)
+            .max_priority_fee_per_gas(fee)
+            .max_fee_per_gas(fee_cap);
 
-        let signer = self.get_signer(&from)?;
         let tx_pending = signer.send_transaction(tx, None).await?;
 
         log::info!(
@@ -578,11 +542,12 @@ impl EthManager for EthSubnetManager {
         let checkpoint = gateway_router_facet::TopDownCheckpoint::try_from(checkpoint)?;
         log::debug!("submit top down checkpoint: {:?}", checkpoint);
 
-        let signer = self.get_signer(from)?;
+        let signer = Arc::new(self.get_signer(from)?);
         let gateway_contract =
-            GatewayRouterFacet::new(self.ipc_contract_info.gateway_addr, Arc::new(signer));
+            GatewayRouterFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
 
         let txn = gateway_contract.submit_top_down_checkpoint(checkpoint);
+        let txn = call_with_premium_estimation(signer, txn).await?;
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
@@ -603,10 +568,11 @@ impl EthManager for EthSubnetManager {
             route[route.len() - 1]
         );
 
-        let signer = self.get_signer(from)?;
-        let contract = SubnetActorManagerFacet::new(route[route.len() - 1], Arc::new(signer));
+        let signer = Arc::new(self.get_signer(from)?);
+        let contract = SubnetActorManagerFacet::new(route[route.len() - 1], signer.clone());
 
         let txn = contract.submit_checkpoint(checkpoint);
+        let txn = call_with_premium_estimation(signer, txn).await?;
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
@@ -890,6 +856,57 @@ impl EthSubnetManager {
     }
 }
 
+/// Receives an input `FunctionCall` and returns a new instance
+/// after estimating an optimal `gas_premium` for the transaction
+async fn call_with_premium_estimation<B, D, M>(
+    signer: Arc<DefaultSignerMiddleware>,
+    call: ethers_contract::FunctionCall<B, D, M>,
+) -> Result<ethers_contract::FunctionCall<B, D, M>>
+where
+    B: std::borrow::Borrow<D>,
+    M: ethers::abi::Detokenize,
+{
+    let (max_priority_fee_per_gas, _) = premium_estimation(signer).await?;
+    Ok(call.gas_price(max_priority_fee_per_gas))
+}
+
+/// Returns an estimation of an optimal `gas_premium` and `gas_fee_cap`
+/// for a transaction considering the average premium, base_fee and reward percentile from
+/// past blocks
+/// This is adaptation of ethers' `eip1559_default_estimator`:
+/// https://github.com/gakonst/ethers-rs/blob/5dcd3b7e754174448f9a8cbfc0523896609629f9/ethers-core/src/utils/mod.rs#L476
+async fn premium_estimation(
+    signer: Arc<DefaultSignerMiddleware>,
+) -> Result<(ethers::types::U256, ethers::types::U256)> {
+    let base_fee_per_gas = signer
+        .get_block(ethers::types::BlockNumber::Latest)
+        .await?
+        .ok_or_else(|| anyhow!("Latest block not found"))?
+        .base_fee_per_gas
+        .ok_or_else(|| anyhow!("EIP-1559 not activated"))?;
+
+    let fee_history = signer
+        .fee_history(
+            ethers::utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
+            ethers::types::BlockNumber::Latest,
+            &[ethers::utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
+        )
+        .await?;
+
+    let max_priority_fee_per_gas = estimate_priority_fee(fee_history.reward); //overestimate?
+    let potential_max_fee = base_fee_surged(base_fee_per_gas);
+    let max_fee_per_gas = if max_priority_fee_per_gas > potential_max_fee {
+        max_priority_fee_per_gas + potential_max_fee
+    } else {
+        potential_max_fee
+    };
+
+    Ok((max_priority_fee_per_gas, max_fee_per_gas))
+}
+
+/// Implementation borrowed from
+/// https://github.com/gakonst/ethers-rs/blob/ethers-v2.0.8/ethers-core/src/utils/mod.rs#L582
+/// Refer to the implementation for unit tests
 fn base_fee_surged(base_fee_per_gas: U256) -> U256 {
     if base_fee_per_gas <= U256::from(40_000_000_000u64) {
         base_fee_per_gas * 2
@@ -902,6 +919,9 @@ fn base_fee_surged(base_fee_per_gas: U256) -> U256 {
     }
 }
 
+/// Implementation borrowed from
+/// https://github.com/gakonst/ethers-rs/blob/ethers-v2.0.8/ethers-core/src/utils/mod.rs#L536
+/// Refer to the implementation for unit tests
 fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
     let mut rewards: Vec<U256> = rewards
         .iter()
@@ -942,7 +962,7 @@ fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
 
     // If we encountered a big change in fees at a certain position, then consider only
     // the values >= it.
-    let values = if *max_change >= EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE.into()
+    let values = if *max_change >= ethers::utils::EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE.into()
         && (max_change_index >= (rewards.len() / 2))
     {
         rewards[max_change_index..].to_vec()
