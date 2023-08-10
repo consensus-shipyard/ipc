@@ -379,10 +379,12 @@ impl SubnetManager for EthSubnetManager {
             "set validator net addr: {net_addr:} on evm subnet: {subnet:} at contract: {address:}"
         );
 
-        let signer = self.get_signer(&from)?;
-        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract = SubnetActorManagerFacet::new(address, signer.clone());
 
         let txn = contract.set_validator_net_addr(net_addr);
+
+        let txn = call_with_premium_estimation(signer, txn).await?;
 
         txn.send().await?.await?;
 
@@ -398,11 +400,13 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         log::info!("set validator worker addr: {worker_addr:} on evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = self.get_signer(&from)?;
-        let contract = SubnetActorManagerFacet::new(address, Arc::new(signer));
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract = SubnetActorManagerFacet::new(address, signer.clone());
 
         let txn = contract
             .set_validator_worker_addr(subnet_actor_manager_facet::FvmAddress::from(worker_addr));
+
+        let txn = call_with_premium_estimation(signer, txn).await?;
 
         txn.send().await?.await?;
 
