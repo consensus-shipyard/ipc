@@ -7,6 +7,7 @@ pub use crate::cli::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
 pub use crate::cli::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
 use crate::cli::commands::subnet::list_subnets::{ListSubnets, ListSubnetsArgs};
 use crate::cli::commands::subnet::net_addr::{SetValidatorNetAddr, SetValidatorNetAddrArgs};
+use crate::cli::commands::subnet::worker_addr::{SetValidatorWorkerAddr, SetValidatorWorkerAddrArgs};
 use crate::cli::commands::subnet::send_value::{SendValue, SendValueArgs};
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
@@ -45,6 +46,7 @@ impl SubnetCommandsArgs {
             Commands::Kill(args) => KillSubnet::handle(global, args).await,
             Commands::SendValue(args) => SendValue::handle(global, args).await,
             Commands::SetValidatorNetAddr(args) => SetValidatorNetAddr::handle(global, args).await,
+            Commands::SetValidatorWorkerAddr(args) => SetValidatorWorkerAddr::handle(global, args).await,
         }
     }
 }
@@ -59,4 +61,5 @@ pub(crate) enum Commands {
     Kill(KillSubnetArgs),
     SendValue(SendValueArgs),
     SetValidatorNetAddr(SetValidatorNetAddrArgs),
+    SetValidatorWorkerAddr(SetValidatorWorkerAddrArgs),
 }
