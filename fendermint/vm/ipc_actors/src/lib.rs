@@ -10,6 +10,8 @@ pub mod gateway_getter_facet;
 #[allow(clippy::all)]
 pub mod gateway_router_facet;
 #[allow(clippy::all)]
+pub mod gateway_messenger_facet;
+#[allow(clippy::all)]
 pub mod subnet_actor_diamond;
 #[allow(clippy::all)]
 pub mod subnet_actor_getter_facet;

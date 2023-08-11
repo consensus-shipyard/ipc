@@ -35,6 +35,10 @@ lazy_static! {
                             name: "GatewayRouterFacet",
                             abi: ia::gateway_router_facet::GATEWAYROUTERFACET_ABI.to_owned(),
                         },
+                        EthFacet {
+                            name: "GatewayMessengerFacet",
+                            abi: ia::gateway_messenger_facet::GATEWAYMESSENGERFACET_ABI.to_owned(),
+                        },
                     ],
                 },
             ),

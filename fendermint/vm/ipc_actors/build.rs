@@ -36,6 +36,7 @@ fn main() {
         "GatewayManagerFacet",
         "GatewayGetterFacet",
         "GatewayRouterFacet",
+        "GatewayMessengerFacet",
         "SubnetActorDiamond",
         "SubnetActorGetterFacet",
         "SubnetActorManagerFacet",
