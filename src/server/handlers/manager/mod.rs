@@ -25,6 +25,7 @@ pub mod send_value;
 pub mod subnet;
 pub mod topdown_executed;
 pub mod worker_addr;
+pub mod query_validators;
 
 pub(crate) fn check_subnet(subnet: &Subnet) -> Result<()> {
     match &subnet.config {
