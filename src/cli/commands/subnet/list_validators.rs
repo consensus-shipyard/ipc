@@ -32,7 +32,7 @@ impl CommandLineHandler for ListValidators {
 
         let params = QueryValidatorSetParams {
             gateway_address: arguments.gateway_address.clone(),
-            subnet_id: arguments.subnet.clone(),
+            subnet: arguments.subnet.clone(),
         };
 
         let valset = json_rpc_client
@@ -43,6 +43,7 @@ impl CommandLineHandler for ListValidators {
             .await?;
 
         log::info!("validators number: {}", valset.min_validators);
+        log::info!("validators: {:?}", valset.validator_set);
 
         Ok(())
     }
@@ -50,8 +51,8 @@ impl CommandLineHandler for ListValidators {
 
 #[derive(Debug, Args)]
 #[command(
-    name = "membership",
-    about = "Show the current membership of the subnet"
+    name = "list-validators",
+    about = "Show the validators of the subnet"
 )]
 pub(crate) struct ListValidatorsArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]

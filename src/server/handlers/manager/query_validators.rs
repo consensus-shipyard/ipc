@@ -22,7 +22,7 @@ use std::sync::Arc;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryValidatorSetParams {
     pub gateway_address: String,
-    pub subnet_id: String,
+    pub subnet: String,
 }
 
 /// The list validators json rpc method handler.
@@ -42,8 +42,8 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
     type Response = QueryValidatorSetResponse;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let subnet = SubnetID::from_str(&request.subnet_id)?;
-        let conn = match self.pool.get(&subnet) {
+        let subnet = SubnetID::from_str(&request.subnet)?;
+        let conn = match self.pool.get(&subnegt) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
