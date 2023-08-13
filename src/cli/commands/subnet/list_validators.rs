@@ -1,9 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
-// Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-// Copyright 2022-2023 Protocol Labs
-// SPDX-License-Identifier: MIT
-//! Get membership cli command
+//! List subnet validators cli command
 
 use async_trait::async_trait;
 use clap::Args;
@@ -43,7 +40,7 @@ impl CommandLineHandler for ListValidators {
             .await?;
 
         log::info!("validators number: {}", valset.min_validators);
-        log::info!("validators: {:?}", valset.validator_set);
+        log::info!("validator set: {:?}", valset.validator_set);
 
         Ok(())
     }

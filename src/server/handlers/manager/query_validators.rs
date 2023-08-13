@@ -1,7 +1,4 @@
 // Copyright 2022-2023 Protocol Labs
-// Copyright 2022-2023 Protocol Labs
-// SPDX-License-Identifier: MIT
-// Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! Query the validator set in subnet actor
 
@@ -14,7 +11,6 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
-use serde::de::Unexpected::Option;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -43,7 +39,7 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let subnet = SubnetID::from_str(&request.subnet)?;
-        let conn = match self.pool.get(&subnegt) {
+        let conn = match self.pool.get(&subnet) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
