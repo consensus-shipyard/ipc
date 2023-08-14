@@ -30,6 +30,10 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     using EpochVoteSubmissionHelper for EpochVoteSubmission;
     using FvmAddressHelper for FvmAddress;
 
+    event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
+    event BottomUpCheckpointExecuted(uint64 epoch, address submitter);
+    event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
+
     /// @notice method that allows a validator to join the subnet
     /// @param netAddr - the network address of the validator
     function join(string calldata netAddr, FvmAddress calldata workerAddr) external payable notKilled {
@@ -120,6 +124,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
         EpochVoteBottomUpSubmission storage voteSubmission = s.epochVoteSubmissions[checkpoint.epoch];
 
+        emit BottomUpCheckpointSubmitted(checkpoint, msg.sender);
+
         // submit the vote
         bool shouldExecuteVote = _submitBottomUpVote({
             voteSubmission: voteSubmission,
@@ -129,6 +135,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         });
 
         if (shouldExecuteVote) {
+            emit BottomUpCheckpointExecuted(checkpoint.epoch, msg.sender);
             _commitCheckpoint(voteSubmission);
         } else {
             // try to get the next executable epoch from the queue
@@ -137,6 +144,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
             if (isExecutableEpoch) {
                 EpochVoteBottomUpSubmission storage nextVoteSubmission = s.epochVoteSubmissions[nextExecutableEpoch];
 
+                emit NextBottomUpCheckpointExecuted(nextExecutableEpoch, msg.sender);
                 _commitCheckpoint(nextVoteSubmission);
             }
         }
