@@ -5,8 +5,10 @@ mod check;
 mod exec;
 mod genesis;
 mod query;
+mod snapshot;
 
 pub use check::FvmCheckState;
 pub use exec::{FvmExecState, FvmStateParams};
 pub use genesis::{empty_state_tree, FvmGenesisState};
 pub use query::FvmQueryState;
+pub use snapshot::{Snapshot, V1Snapshot};

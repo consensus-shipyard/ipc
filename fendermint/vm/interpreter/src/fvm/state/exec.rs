@@ -22,7 +22,7 @@ use crate::fvm::externs::FendermintExterns;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 
 /// Parts of the state which evolve during the lifetime of the chain.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct FvmStateParams {
     pub state_root: Cid,
     pub timestamp: Timestamp,
