@@ -13,7 +13,7 @@ runs:
 
   steps:
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@master
       with:
         targets: wasm32-unknown-unknown
         toolchain: ${{ inputs.rust }}
