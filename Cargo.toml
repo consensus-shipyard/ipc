@@ -11,7 +11,7 @@ anyhow = "1.0"
 base64 = "0.21.0"
 blake2b_simd = "1.0"
 bloom = "0.3"
-gcra = "0.3"
+gcra = "0.4"
 lazy_static = "1.4"
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
 libp2p = { version = "0.50", default-features = false, features = [
@@ -61,3 +61,7 @@ ipc_ipld_resolver = { path = ".", features = ["arb"] }
 default = ["arb", "missing_blocks"]
 arb = ["quickcheck", "fvm_shared/arb"]
 missing_blocks = ["fvm_ipld_blockstore"]
+
+[patch.crates-io]
+# Use stable-only features.
+gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
