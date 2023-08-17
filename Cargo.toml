@@ -43,9 +43,12 @@ thiserror = "1.0.38"
 tokio = { version = "1.16", features = ["full"] }
 
 fvm_ipld_encoding = "0.3"
-fvm_shared = { version = "=3.0.0-alpha.17", default-features = false, features = ["crypto"], optional = true }
+fvm_shared = { version = "~3.2", default-features = false, features = ["crypto"], optional = true }
 fvm_ipld_blockstore = { version = "0.1", optional = true }
-ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", tag = "v0.2.0" }
+
+# Using the IPC SDK without the `fil-actor` feature so as not to depend on the actor `Runtime`.
+# Using the `main` branch instead of the highest available tag `v0.3.0` because the latter doesn't have a feature flag for the `Runtime`.
+ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", default-features = false, branch = "main" }
 
 [dev-dependencies]
 quickcheck_macros = "1"

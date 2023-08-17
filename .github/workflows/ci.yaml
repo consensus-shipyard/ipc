@@ -62,10 +62,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          target: wasm32-unknown-unknown
+          targets: wasm32-unknown-unknown
           toolchain: ${{ matrix.rust }}
           components: rustfmt,clippy
 
