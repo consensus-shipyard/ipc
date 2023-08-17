@@ -7,6 +7,12 @@ on:
   pull_request:
     branches:
       - '**'
+    # To add ready_for_review as a trigger we need to list all the defaults.
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 env:
   CARGO_INCREMENTAL: '0'
@@ -39,6 +45,8 @@ jobs:
 
   # Test matrix, running tasks from the Makefile.
   tests:
+    # Skip tests on draft PRs, they take a long time, and drafts are for visibility.
+    if: ${{ !github.event.pull_request.draft }}
     needs: [pre-compile-checks]
     name: ${{ matrix.make.name }} (${{ matrix.os }}, ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
