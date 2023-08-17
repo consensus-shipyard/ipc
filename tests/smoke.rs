@@ -30,7 +30,7 @@ use ipc_ipld_resolver::{
     Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
     NetworkConfig, Service, VoteRecord,
 };
-use ipc_sdk::subnet_id::{SubnetID, ROOTNET_ID};
+use ipc_sdk::subnet_id::SubnetID;
 use libipld::{
     multihash::{Code, MultihashDigest},
     Cid,
@@ -364,7 +364,8 @@ fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
 /// Make a subnet under a rootnet.
 fn make_subnet_id(actor_id: ActorID) -> SubnetID {
     let act = Address::new_id(actor_id);
-    SubnetID::new_from_parent(&ROOTNET_ID, act)
+    let root = SubnetID::new_root(0);
+    SubnetID::new_from_parent(&root, act)
 }
 
 /// Insert a HAMT into the block store of an agent.
