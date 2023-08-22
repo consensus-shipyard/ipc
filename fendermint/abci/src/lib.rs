@@ -3,3 +3,4 @@
 mod application;
 
 pub use application::{AbciResult, Application, ApplicationService};
+pub mod util;

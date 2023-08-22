@@ -7,7 +7,7 @@ use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 
 use crate::{
     signed::{SignedMessageApplyRet, SignedMessageCheckRet},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 
 /// A message a user is not supposed to send.
@@ -31,6 +31,40 @@ pub struct ChainMessageInterpreter<I> {
 impl<I> ChainMessageInterpreter<I> {
     pub fn new(inner: I) -> Self {
         Self { inner }
+    }
+}
+
+#[async_trait]
+impl<I> ProposalInterpreter for ChainMessageInterpreter<I>
+where
+    I: Sync + Send,
+{
+    // TODO: The state can include the IPLD Resolver mempool, for example by using STM
+    // to implement a shared memory space.
+    type State = ();
+    type Message = ChainMessage;
+
+    /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
+    ///
+    /// We could also use this to select the most profitable user transactions, within the gas limit. We can also take into
+    /// account the transactions which are part of top-down or bottom-up checkpoints, to stay within gas limits.
+    async fn prepare(
+        &self,
+        _state: Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<Vec<Self::Message>> {
+        // For now this is just a placeholder.
+        Ok(msgs)
+    }
+
+    /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
+    async fn process(
+        &self,
+        _state: Self::State,
+        _msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<bool> {
+        // For now this is just a placeholder.
+        Ok(true)
     }
 }
 

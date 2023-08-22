@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_vm_genesis::Genesis;
@@ -9,7 +9,7 @@ use fendermint_vm_message::chain::ChainMessage;
 use crate::{
     chain::{ChainMessageApplyRet, ChainMessageCheckRet},
     fvm::{FvmQuery, FvmQueryRet},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 
 pub type BytesMessageApplyRet = Result<ChainMessageApplyRet, fvm_ipld_encoding::Error>;
@@ -19,15 +19,124 @@ pub type BytesMessageQueryRet = Result<FvmQueryRet, fvm_ipld_encoding::Error>;
 /// Close to what the ABCI sends: (Path, Bytes).
 pub type BytesMessageQuery = (String, Vec<u8>);
 
+/// Behavour of proposal preparation. It's an optimisation to cut down needless serialization
+/// when we know we aren't doing anything with the messages.
+#[derive(Debug, Default, Clone)]
+pub enum ProposalPrepareMode {
+    /// Deserialize all messages and pass them to the inner interpreter.
+    #[default]
+    PassThrough,
+    /// Does not pass messages to the inner interpreter, only appends what is returned from it.
+    AppendOnly,
+    /// Does not pass messages to the inner interpreter, only prepends what is returned from it.
+    PrependOnly,
+}
+
 /// Interpreter working on raw bytes.
 #[derive(Clone)]
 pub struct BytesMessageInterpreter<I> {
     inner: I,
+    /// Should we parse and pass on all messages during prepare.
+    prepare_mode: ProposalPrepareMode,
+    /// Should we reject proposals with transactions we cannot parse.
+    reject_malformed_proposal: bool,
 }
 
 impl<I> BytesMessageInterpreter<I> {
-    pub fn new(inner: I) -> Self {
-        Self { inner }
+    pub fn new(
+        inner: I,
+        prepare_mode: ProposalPrepareMode,
+        reject_malformed_proposal: bool,
+    ) -> Self {
+        Self {
+            inner,
+            prepare_mode,
+            reject_malformed_proposal,
+        }
+    }
+}
+
+#[async_trait]
+impl<I> ProposalInterpreter for BytesMessageInterpreter<I>
+where
+    I: ProposalInterpreter<Message = ChainMessage>,
+{
+    type State = I::State;
+    type Message = Vec<u8>;
+
+    /// Parse messages in the mempool and pass them into the inner `ChainMessage` interpreter.
+    async fn prepare(
+        &self,
+        state: Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<Vec<Self::Message>> {
+        // Collect the messages to pass to the inner interpreter.
+        let chain_msgs = match self.prepare_mode {
+            ProposalPrepareMode::PassThrough => {
+                let mut chain_msgs = Vec::new();
+                for msg in msgs.iter() {
+                    match fvm_ipld_encoding::from_slice::<ChainMessage>(msg) {
+                        Err(e) => {
+                            // This should not happen because the `CheckInterpreter` implementation below would
+                            // have rejected any such user transaction.
+                            tracing::warn!(
+                                error = e.to_string(),
+                                "failed to decode message in mempool as ChainMessage"
+                            );
+                        }
+                        Ok(msg) => chain_msgs.push(msg),
+                    }
+                }
+                chain_msgs
+            }
+            ProposalPrepareMode::AppendOnly | ProposalPrepareMode::PrependOnly => Vec::new(),
+        };
+
+        let chain_msgs = self.inner.prepare(state, chain_msgs).await?;
+
+        let chain_msgs = chain_msgs
+            .into_iter()
+            .map(|msg| {
+                fvm_ipld_encoding::to_vec(&msg).context("failed to encode ChainMessage as IPLD")
+            })
+            .collect::<anyhow::Result<Vec<Self::Message>>>()?;
+
+        match self.prepare_mode {
+            ProposalPrepareMode::PassThrough => Ok(chain_msgs),
+            ProposalPrepareMode::AppendOnly => Ok(vec![msgs, chain_msgs].concat()),
+            ProposalPrepareMode::PrependOnly => Ok(vec![chain_msgs, msgs].concat()),
+        }
+    }
+
+    /// Parse messages in the block, reject if unknown format. Pass the rest to the inner `ChainMessage` interpreter.
+    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+        let mut chain_msgs = Vec::new();
+
+        for msg in msgs {
+            match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
+                Err(e) => {
+                    // If we cannot parse a message, then either:
+                    // * The proposer is Byzantine - as an attack this isn't very effective as they could just not send a proposal and cause a timeout.
+                    // * Our or the proposer node have different versions, or contain bugs
+                    // We can either vote for it or not:
+                    // * If we accept, we can punish the validator during block execution, and if it turns out we had a bug, we will have a consensus failure.
+                    // * If we accept, then the serialization error will become visible in the transaction results through RPC.
+                    // * If we reject, the majority can still accept the block, which indicates we had the bug (that way we might even panic during delivery, since we know it got voted on),
+                    //   but a buggy transaction format that fails for everyone would cause liveness issues.
+                    // * If we reject, then the serialization error will only be visible in the logs (and potentially earlier check_tx results).
+                    tracing::warn!(
+                        error = e.to_string(),
+                        "failed to decode message in proposal as ChainMessage"
+                    );
+                    if self.reject_malformed_proposal {
+                        return Ok(false);
+                    }
+                }
+                Ok(msg) => chain_msgs.push(msg),
+            }
+        }
+
+        self.inner.process(state, chain_msgs).await
     }
 }
 
@@ -53,6 +162,14 @@ where
             // There is always the possibility that our codebase is incompatible,
             // but then we'll have a consensus failure later when we don't agree on the ledger.
             {
+                if self.reject_malformed_proposal {
+                    // We could consider panicking here, otherwise if the majority executes this transaction (they voted for it)
+                    // then we will just get a consensu failure after the block.
+                    tracing::warn!(
+                        error = e.to_string(),
+                        "failed to decode delivered message as ChainMessage; we did not vote for it, maybe our node is buggy?"
+                    );
+                }
                 Ok((state, Err(e)))
             }
             Ok(msg) => {

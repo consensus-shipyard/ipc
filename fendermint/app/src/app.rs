@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use cid::Cid;
+use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
@@ -22,7 +23,7 @@ use fendermint_vm_interpreter::fvm::state::{
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
@@ -309,6 +310,15 @@ where
     S::Namespace: Sync + Send,
     DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     SS: Blockstore + Clone + Send + Sync + 'static,
+    I: GenesisInterpreter<
+        State = FvmGenesisState<SS>,
+        Genesis = Vec<u8>,
+        Output = FvmGenesisOutput,
+    >,
+    I: ProposalInterpreter<
+        State = (), // TODO
+        Message = Vec<u8>,
+    >,
     I: ExecInterpreter<
         State = FvmExecState<SS>,
         Message = Vec<u8>,
@@ -325,11 +335,6 @@ where
         State = FvmQueryState<SS>,
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRet,
-    >,
-    I: GenesisInterpreter<
-        State = FvmGenesisState<SS>,
-        Genesis = Vec<u8>,
-        Output = FvmGenesisOutput,
     >,
 {
     /// Provide information about the ABCI application.
@@ -488,6 +493,45 @@ where
         };
 
         Ok(response)
+    }
+
+    /// Amend which transactions to put into the next block proposal.
+    async fn prepare_proposal(
+        &self,
+        request: request::PrepareProposal,
+    ) -> AbciResult<response::PrepareProposal> {
+        let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+
+        let txs = self
+            .interpreter
+            .prepare((), txs)
+            .await
+            .context("failed to prepare proposal")?;
+
+        let txs = txs.into_iter().map(bytes::Bytes::from).collect();
+        let txs = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+
+        Ok(response::PrepareProposal { txs })
+    }
+
+    /// Inspect a proposal and decide whether to vote on it.
+    async fn process_proposal(
+        &self,
+        request: request::ProcessProposal,
+    ) -> AbciResult<response::ProcessProposal> {
+        let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+
+        let accept = self
+            .interpreter
+            .process((), txs)
+            .await
+            .context("failed to process proposal")?;
+
+        if accept {
+            Ok(response::ProcessProposal::Accept)
+        } else {
+            Ok(response::ProcessProposal::Reject)
+        }
     }
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.

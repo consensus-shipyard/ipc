@@ -7,6 +7,53 @@ pub mod chain;
 pub mod fvm;
 pub mod signed;
 
+/// Initialize the chain state.
+///
+/// This could be from the original genesis file, or perhaps a checkpointed snapshot.
+#[async_trait]
+pub trait GenesisInterpreter: Sync + Send {
+    type State: Send;
+    type Genesis: Send;
+    type Output;
+
+    /// Initialize the chain.
+    async fn init(
+        &self,
+        state: Self::State,
+        genesis: Self::Genesis,
+    ) -> anyhow::Result<(Self::State, Self::Output)>;
+}
+
+/// Prepare and process transaction proposals.
+#[async_trait]
+pub trait ProposalInterpreter: Sync + Send {
+    /// State reflects the circumstances under which transactions were proposed, e.g. block height,
+    /// but also any application specific mempool, for example one we can use to resolve CIDs
+    /// in the background.
+    ///
+    /// State is considered read-only, since the proposal might not go through. It should only be
+    /// modified by the delivery of transactions in a finalized bloc; for example that is where
+    /// we would clear out data from our mempool.
+    type State: Send;
+    type Message: Send;
+
+    /// Called when the current validator is about to propose a block.
+    ///
+    /// This is our chance to inject other transactions from our own mempool which we are now able to execute.
+    async fn prepare(
+        &self,
+        state: Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<Vec<Self::Message>>;
+
+    /// Called when the current validator needs to decide whether to vote for a block.
+    ///
+    /// This is our chance check whether CIDs proposed for execution are available.
+    ///
+    /// Return `true` if we can accept this block, `false` to reject it.
+    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool>;
+}
+
 /// The `ExecInterpreter` applies messages on some state, which is
 /// tied to the lifecycle of a block in the ABCI.
 ///
@@ -117,22 +164,5 @@ pub trait QueryInterpreter: Sync + Send {
         &self,
         state: Self::State,
         qry: Self::Query,
-    ) -> anyhow::Result<(Self::State, Self::Output)>;
-}
-
-/// Initialize the chain state.
-///
-/// This could be from the original genesis file, or perhaps a checkpointed snapshot.
-#[async_trait]
-pub trait GenesisInterpreter: Sync + Send {
-    type State: Send;
-    type Genesis: Send;
-    type Output;
-
-    /// Initialize the chain.
-    async fn init(
-        &self,
-        state: Self::State,
-        genesis: Self::Genesis,
     ) -> anyhow::Result<(Self::State, Self::Output)>;
 }

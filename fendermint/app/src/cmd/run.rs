@@ -6,7 +6,9 @@ use fendermint_abci::ApplicationService;
 use fendermint_app::{App, AppStore};
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_interpreter::{
-    bytes::BytesMessageInterpreter, chain::ChainMessageInterpreter, fvm::FvmMessageInterpreter,
+    bytes::{BytesMessageInterpreter, ProposalPrepareMode},
+    chain::ChainMessageInterpreter,
+    fvm::FvmMessageInterpreter,
     signed::SignedMessageInterpreter,
 };
 use tracing::info;
@@ -27,7 +29,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::new(interpreter);
-    let interpreter = BytesMessageInterpreter::new(interpreter);
+    let interpreter =
+        BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::AppendOnly, false);
 
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;

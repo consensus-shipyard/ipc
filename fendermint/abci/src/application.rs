@@ -11,6 +11,8 @@ use tendermint::abci::{request, response, Request, Response};
 use tower::Service;
 use tower_abci::BoxError;
 
+use crate::util::take_until_max_size;
+
 /// Allow returning a result from the methods, so the [`Application`]
 /// implementation doesn't have to be full of `.expect("failed...")`
 /// or `.unwrap()` calls. It is still good practice to use for example
@@ -62,20 +64,12 @@ pub trait Application {
         &self,
         request: request::PrepareProposal,
     ) -> AbciResult<response::PrepareProposal> {
-        let max_tx_bytes: usize = request.max_tx_bytes.try_into().unwrap();
-        let mut size: usize = 0;
-        let mut txs = Vec::new();
-        for tx in request.txs {
-            if size.saturating_add(tx.len()) > max_tx_bytes {
-                break;
-            }
-            size += tx.len();
-            txs.push(tx);
-        }
+        let txs = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
+
         Ok(response::PrepareProposal { txs })
     }
 
-    /// Opporunity for the application to inspect the proposal before voting on it.
+    /// Opportunity for the application to inspect the proposal before voting on it.
     ///
     /// The application should accept the proposal unless there's something wrong with it.
     ///
