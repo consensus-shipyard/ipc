@@ -7,6 +7,7 @@ mod checkpoint;
 mod config;
 mod crossnet;
 mod subnet;
+mod topdown;
 mod wallet;
 
 use crate::jsonrpc::JsonRpcClientImpl;

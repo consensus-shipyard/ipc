@@ -7,6 +7,7 @@ use crate::server::subnet::SubnetManagerPool;
 use crate::server::{check_subnet, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -15,6 +16,7 @@ use std::sync::Arc;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryValidatorSetParams {
     pub subnet: String,
+    pub epoch: Option<ChainEpoch>,
 }
 
 /// The create subnet json rpc method handler.
@@ -48,7 +50,11 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
         check_subnet(subnet_config)?;
 
         conn.manager()
-            .get_validator_set(&subnet_id, Some(subnet_config.gateway_addr()))
+            .get_validator_set(
+                &subnet_id,
+                Some(subnet_config.gateway_addr()),
+                request.epoch,
+            )
             .await
     }
 }

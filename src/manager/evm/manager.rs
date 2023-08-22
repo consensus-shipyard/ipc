@@ -25,7 +25,9 @@ use num_traits::ToPrimitive;
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
+use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo, Validator, ValidatorSet};
+use crate::manager::subnet::TopDownCheckpointQuery;
 use crate::manager::{EthManager, SubnetManager};
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
@@ -76,6 +78,36 @@ struct IPCContractInfo {
     registry_addr: ethers::types::Address,
     chain_id: u64,
     provider: Provider<Http>,
+}
+
+#[async_trait]
+impl TopDownCheckpointQuery for EthSubnetManager {
+    async fn chain_head(&self) -> Result<ChainHeadResponse> {
+        unimplemented!()
+    }
+
+    async fn get_top_down_msgs(
+        &self,
+        subnet_id: &SubnetID,
+        epoch: ChainEpoch,
+        nonce: u64,
+    ) -> Result<Vec<ipc_gateway::CrossMsg>> {
+        self.top_down_msgs(subnet_id, epoch, nonce).await
+    }
+
+    async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>> {
+        let block = self
+            .ipc_contract_info
+            .provider
+            .get_block(height as u64)
+            .await?
+            .ok_or_else(|| anyhow!("height does not exist"))?;
+        Ok(block
+            .hash
+            .ok_or_else(|| anyhow!("block hash is empty"))?
+            .to_fixed_bytes()
+            .to_vec())
+    }
 }
 
 #[async_trait]
@@ -428,6 +460,7 @@ impl SubnetManager for EthSubnetManager {
         &self,
         subnet_id: &SubnetID,
         gateway: Option<Address>,
+        epoch: Option<ChainEpoch>,
     ) -> Result<QueryValidatorSetResponse> {
         // we do optionally check as gateway addr is already part of the struct
         if let Some(addr) = gateway {
@@ -456,7 +489,15 @@ impl SubnetManager for EthSubnetManager {
 
         let contract =
             SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
-        let evm_validator_set = contract.get_validator_set().call().await?;
+        let evm_validator_set = if let Some(epoch) = epoch {
+            contract
+                .get_validator_set()
+                .block(epoch as u64)
+                .call()
+                .await?
+        } else {
+            contract.get_validator_set().call().await?
+        };
 
         let mut validators = vec![];
         for v in evm_validator_set.validators.into_iter() {

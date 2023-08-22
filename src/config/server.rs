@@ -11,6 +11,7 @@ pub struct Server {
 }
 
 pub mod json_rpc_methods {
+    pub const CHAIN_HEAD: &str = "ipc_chainHead";
     pub const CREATE_SUBNET: &str = "ipc_createSubnet";
     pub const JOIN_SUBNET: &str = "ipc_joinSubnet";
     pub const RPC_SUBNET: &str = "ipc_rpcSubnet";
@@ -32,4 +33,6 @@ pub mod json_rpc_methods {
     pub const WALLET_BALANCES: &str = "ipc_walletBalances";
     pub const LIST_BOTTOMUP_CHECKPOINTS: &str = "ipc_listBottomUpCheckpoints";
     pub const LAST_TOPDOWN_EXECUTED: &str = "ipc_lastTopDownCheckpointExecuted";
+    pub const LIST_TOPDOWN_MSGS: &str = "ipc_listTopDownMsgs";
+    pub const GET_BLOCK_HASH: &str = "ipc_getBlockHash";
 }

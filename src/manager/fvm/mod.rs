@@ -29,6 +29,7 @@ use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 use crate::config::Subnet;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
+use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::{
     IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, QueryValidatorSetResponse,
     SubnetInfo,
@@ -36,12 +37,33 @@ use crate::lotus::message::ipc::{
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
 use crate::lotus::LotusClient;
+use crate::manager::subnet::TopDownCheckpointQuery;
 
 use super::subnet::SubnetManager;
 
 pub struct LotusSubnetManager<T: JsonRpcClient> {
     lotus_client: LotusJsonRPCClient<T>,
     gateway_addr: Address,
+}
+
+#[async_trait]
+impl<T: JsonRpcClient + Send + Sync> TopDownCheckpointQuery for LotusSubnetManager<T> {
+    async fn chain_head(&self) -> Result<ChainHeadResponse> {
+        self.lotus_client.chain_head().await
+    }
+
+    async fn get_top_down_msgs(
+        &self,
+        _subnet_id: &SubnetID,
+        _epoch: ChainEpoch,
+        _nonce: u64,
+    ) -> Result<Vec<CrossMsg>> {
+        unimplemented!()
+    }
+
+    async fn get_block_hash(&self, _height: ChainEpoch) -> Result<Vec<u8>> {
+        unimplemented!()
+    }
 }
 
 #[async_trait]
@@ -334,6 +356,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         &self,
         subnet_id: &SubnetID,
         gateway: Option<Address>,
+        _epoch: Option<ChainEpoch>,
     ) -> Result<QueryValidatorSetResponse> {
         let gateway = gateway.ok_or_else(|| anyhow!("gateway address needed"))?;
 

@@ -22,6 +22,8 @@ pub use manager::*;
 
 use crate::config::json_rpc_methods;
 use crate::config::ReloadableConfig;
+use crate::server::block_hash::BlockHashHandler;
+use crate::server::chain_head::ChainHeadHandler;
 use crate::server::handlers::config::ReloadConfigHandler;
 use crate::server::handlers::manager::fund::FundHandler;
 use crate::server::handlers::manager::list_subnets::ListSubnetsHandler;
@@ -34,6 +36,7 @@ use crate::server::handlers::wallet::balances::WalletBalancesHandler;
 use crate::server::handlers::wallet::new::WalletNewHandler;
 use crate::server::list_checkpoints::ListBottomUpCheckpointsHandler;
 use crate::server::net_addr::SetValidatorNetAddrHandler;
+use crate::server::topdown_msgs::TopDownMsgsHandler;
 use crate::server::JsonRPCRequestHandler;
 use ipc_identity::Wallet;
 
@@ -128,6 +131,15 @@ impl Handlers {
 
         let h: Box<dyn HandlerWrapper> = Box::new(SendValueHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::SEND_VALUE), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(ChainHeadHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::CHAIN_HEAD), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(TopDownMsgsHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::LIST_TOPDOWN_MSGS), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(BlockHashHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::GET_BLOCK_HASH), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(WalletNewHandler::new(
             fvm_wallet.clone(),

@@ -1,7 +1,7 @@
 use cid::Cid;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::lotus::message::CIDMap;
@@ -44,7 +44,7 @@ impl GetTipSetByHeightResponse {
 }
 
 /// A simplified struct representing a `ChainHead` response that does not decode the `blocks` field.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ChainHeadResponse {
     #[allow(dead_code)]

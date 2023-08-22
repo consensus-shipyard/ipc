@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 
 use crate::checkpoint::NativeBottomUpCheckpoint;
+use crate::lotus::message::chain::ChainHeadResponse;
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
@@ -17,7 +18,7 @@ use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
-pub trait SubnetManager: Send + Sync {
+pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
     /// The result of the function is the ID address for the subnet actor from which the final
@@ -119,5 +120,22 @@ pub trait SubnetManager: Send + Sync {
         &self,
         subnet_id: &SubnetID,
         gateway: Option<Address>,
+        epoch: Option<ChainEpoch>,
     ) -> Result<QueryValidatorSetResponse>;
+}
+
+/// Trait to interact with a subnet to query the necessary information for top down checkpoint.
+#[async_trait]
+pub trait TopDownCheckpointQuery: Send + Sync {
+    /// Returns the chain head
+    async fn chain_head(&self) -> Result<ChainHeadResponse>;
+    /// Returns the list of top down messages
+    async fn get_top_down_msgs(
+        &self,
+        subnet_id: &SubnetID,
+        epoch: ChainEpoch,
+        nonce: u64,
+    ) -> Result<Vec<CrossMsg>>;
+    /// Get the block hash
+    async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>>;
 }
