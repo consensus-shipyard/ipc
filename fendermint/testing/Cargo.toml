@@ -19,6 +19,7 @@ rand = { workspace = true, optional = true }
 cid = { workspace = true, optional = true }
 fvm_ipld_encoding = { workspace = true, optional = true }
 fvm_shared = { workspace = true, optional = true, features = ["arb"] }
+ipc-sdk = { workspace = true, optional = true }
 
 [dev-dependencies]
 arbtest = { workspace = true }
@@ -30,4 +31,4 @@ fendermint_testing = { path = ".", features = ["smt"] }
 default = []
 smt = ["arbitrary"]
 golden = ["quickcheck", "hex", "serde", "serde_json", "cid", "fvm_ipld_encoding"]
-arb = ["quickcheck", "rand", "cid", "fvm_shared"]
+arb = ["quickcheck", "rand", "cid", "fvm_shared", "ipc-sdk"]

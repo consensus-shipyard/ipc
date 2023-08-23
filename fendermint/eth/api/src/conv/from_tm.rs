@@ -99,7 +99,7 @@ pub fn to_eth_block(
         if let ChainMessage::Signed(msg) = msg {
             let hash = message_hash(data)?;
 
-            let mut tx = to_eth_transaction(hash, *msg, chain_id)
+            let mut tx = to_eth_transaction(hash, msg, chain_id)
                 .context("failed to convert to eth transaction")?;
             tx.transaction_index = Some(et::U64::from(idx));
             transactions.push(tx);

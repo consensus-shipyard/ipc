@@ -97,7 +97,7 @@ impl MessageFactory {
         };
         self.sequence += 1;
         let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id)?;
-        let chain = ChainMessage::Signed(Box::new(signed));
+        let chain = ChainMessage::Signed(signed);
         Ok(chain)
     }
 

@@ -5,7 +5,7 @@
 /// or at least what appears in blocks.
 mod chain {
     use fendermint_testing::golden_cbor;
-    use fendermint_vm_message::chain::ChainMessage;
+    use fendermint_vm_message::{chain::ChainMessage, ipc::IpcMessage};
     use quickcheck::Arbitrary;
 
     golden_cbor! { "chain", signed, |g| {
@@ -17,22 +17,31 @@ mod chain {
       }
     }
 
-    golden_cbor! { "chain", for_execution, |g| {
+    golden_cbor! { "chain", ipc_bottom_up_resolve, |g| {
         loop {
-            if let msg @ ChainMessage::ForExecution(_) = ChainMessage::arbitrary(g) {
+            if let msg @ ChainMessage::Ipc(IpcMessage::BottomUpResolve(_)) = ChainMessage::arbitrary(g) {
                 return msg
             }
         }
       }
     }
 
-    golden_cbor! { "chain", for_resolution, |g| {
+    golden_cbor! { "chain", ipc_bottom_up_exec, |g| {
         loop {
-            if let msg @ ChainMessage::ForResolution(_) = ChainMessage::arbitrary(g) {
+            if let msg @ ChainMessage::Ipc(IpcMessage::BottomUpExec(_)) = ChainMessage::arbitrary(g) {
                 return msg
             }
         }
+      }
     }
+
+    golden_cbor! { "chain", ipc_top_down, |g| {
+        loop {
+            if let msg @ ChainMessage::Ipc(IpcMessage::TopDown) = ChainMessage::arbitrary(g) {
+                return msg
+            }
+        }
+      }
     }
 }
 

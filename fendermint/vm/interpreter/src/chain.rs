@@ -3,7 +3,7 @@ use anyhow::anyhow;
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
 
-use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
+use fendermint_vm_message::{chain::ChainMessage, ipc::IpcMessage, signed::SignedMessage};
 
 use crate::{
     signed::{SignedMessageApplyRet, SignedMessageCheckRet},
@@ -86,14 +86,14 @@ where
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         match msg {
             ChainMessage::Signed(msg) => {
-                let (state, ret) = self.inner.deliver(state, *msg).await?;
+                let (state, ret) = self.inner.deliver(state, msg).await?;
                 Ok((state, ChainMessageApplyRet::Signed(ret)))
             }
-            ChainMessage::ForExecution(_) | ChainMessage::ForResolution(_) => {
+            ChainMessage::Ipc(_) => {
                 // This only happens if a validator is malicious or we have made a programming error.
                 // I expect for now that we don't run with untrusted validators, so it's okay to quit.
                 Err(anyhow!(
-                    "The handling of ForExecution and ForResolution is not yet implemented."
+                    "The handling of IPC messages is not yet implemented."
                 ))
             }
         }
@@ -125,12 +125,19 @@ where
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         match msg {
             ChainMessage::Signed(msg) => {
-                let (state, ret) = self.inner.check(state, *msg, is_recheck).await?;
+                let (state, ret) = self.inner.check(state, msg, is_recheck).await?;
 
                 Ok((state, Ok(ret)))
             }
-            ChainMessage::ForExecution(_) | ChainMessage::ForResolution(_) => {
-                // Users cannot send these messages, only validators can propose them in blocks.
+            ChainMessage::Ipc(IpcMessage::BottomUpResolve(_msg)) => {
+                // TODO: Check the relayer signature and nonce. Don't have to check the quorum certificate, if it's invalid, make the relayer pay.
+                // For `ChainMessage::Signed` this is currently sperad out over the `SignedMessageInterpreter` and the `FvmMessageInterpreter`,
+                // so think about a way to reuse. For now returning illegal as a placeholder.
+                Ok((state, Err(IllegalMessage)))
+            }
+            ChainMessage::Ipc(IpcMessage::TopDown)
+            | ChainMessage::Ipc(IpcMessage::BottomUpExec(_)) => {
+                // Users cannot send some of these messages, only validators can propose them in blocks.
                 Ok((state, Err(IllegalMessage)))
             }
         }

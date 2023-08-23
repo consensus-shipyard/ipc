@@ -239,7 +239,7 @@ where
                     .await?;
 
                 let chain_id = ChainID::from(sp.value.chain_id);
-                let mut tx = to_eth_transaction(hash, *msg, chain_id)
+                let mut tx = to_eth_transaction(hash, msg, chain_id)
                     .context("failed to convert to eth transaction")?;
                 tx.transaction_index = Some(index);
                 tx.block_hash = Some(et::H256::from_slice(block.header.hash().as_bytes()));

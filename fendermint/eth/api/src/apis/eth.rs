@@ -324,7 +324,7 @@ where
                 let header: header::Response = data.tm().header(res.height).await?;
                 let sp = data.client.state_params(Some(res.height)).await?;
                 let chain_id = ChainID::from(sp.value.chain_id);
-                let mut tx = to_eth_transaction(hash, *msg, chain_id)?;
+                let mut tx = to_eth_transaction(hash, msg, chain_id)?;
                 tx.transaction_index = Some(et::U64::from(res.index));
                 tx.block_hash = Some(et::H256::from_slice(header.header.hash().as_bytes()));
                 tx.block_number = Some(et::U64::from(res.height.value()));
@@ -504,7 +504,7 @@ where
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
     };
-    let msg = ChainMessage::Signed(Box::new(msg));
+    let msg = ChainMessage::Signed(msg);
     let bz: Vec<u8> = MessageFactory::serialize(&msg)?;
     let res: tx_sync::Response = data.tm().broadcast_tx_sync(bz).await?;
     if res.code.is_ok() {

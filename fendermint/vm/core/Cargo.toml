@@ -12,6 +12,8 @@ lazy_static = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+arbitrary = { workspace = true, optional = true }
+quickcheck = { workspace = true, optional = true }
 
 cid = { workspace = true }
 fvm_shared = { workspace = true }

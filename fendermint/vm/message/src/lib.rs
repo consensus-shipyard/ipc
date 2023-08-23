@@ -6,6 +6,7 @@ use serde::Serialize;
 
 pub mod chain;
 pub mod conv;
+pub mod ipc;
 pub mod query;
 pub mod signed;
 
