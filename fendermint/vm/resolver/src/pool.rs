@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::hash::Hash;
+use std::{collections::HashSet, hash::Hash};
 
 use async_stm::{
     queues::{tchan::TChan, TQueueLike},
@@ -21,6 +21,8 @@ pub type ResolveKey = (SubnetID, Cid);
 #[derive(Clone)]
 pub struct ResolveStatus<T> {
     /// Indicate whether the content has been resolved.
+    ///
+    /// If needed we can expand on this to include failure states.
     is_resolved: TVar<bool>,
     /// The collection of items that all resolve to the same root CID and subnet.
     items: TVar<im::HashSet<T>>,
@@ -33,7 +35,6 @@ where
     pub fn new(item: T) -> Self {
         let mut items = im::HashSet::new();
         items.insert(item);
-
         Self {
             is_resolved: TVar::new(false),
             items: TVar::new(items),
@@ -90,9 +91,8 @@ where
 
         if items.contains_key(&key) {
             let status = items.get(&key).cloned().unwrap();
-            status.items.update(|mut items| {
+            status.items.update_mut(|items| {
                 items.insert(item);
-                items
             })?;
             Ok(status)
         } else {
@@ -110,7 +110,21 @@ where
         Ok(self.items.read()?.get(&key).cloned())
     }
 
-    // TODO #195: Implement methods to collect resolved items, ready for execution.
+    /// Collect resolved items, ready for execution.
+    ///
+    /// The items removed are not removed, in case they need to be proposed again.
+    pub fn collect_resolved(&self) -> StmResult<HashSet<T>> {
+        let mut resolved = HashSet::new();
+        let items = self.items.read()?;
+        for item in items.values() {
+            if item.is_resolved()? {
+                let items = item.items.read()?;
+                resolved.extend(items.iter().cloned());
+            }
+        }
+        Ok(resolved)
+    }
+
     // TODO #197: Implement methods to remove executed items.
 }
 
@@ -120,7 +134,7 @@ mod tests {
     use cid::Cid;
     use ipc_sdk::subnet_id::SubnetID;
 
-    #[derive(Clone, Hash, Eq, PartialEq)]
+    #[derive(Clone, Hash, Eq, PartialEq, Debug)]
     struct TestItem {
         subnet_id: SubnetID,
         cid: Cid,
@@ -209,6 +223,24 @@ mod tests {
             assert!(status1.items.read()?.contains(&item));
             assert!(status1.is_resolved()?);
             assert!(status2.is_resolved()?);
+            Ok(())
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn collect_resolved() {
+        let pool = ResolvePool::new();
+        let item = TestItem::dummy(0);
+
+        atomically(|| {
+            let status = pool.add(item.clone())?;
+            status.is_resolved.write(true)?;
+
+            let resolved1 = pool.collect_resolved()?;
+            let resolved2 = pool.collect_resolved()?;
+            assert_eq!(resolved1, resolved2);
+            assert!(resolved1.contains(&item));
             Ok(())
         })
         .await;

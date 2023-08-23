@@ -78,16 +78,24 @@ where
     /// account the transactions which are part of top-down or bottom-up checkpoints, to stay within gas limits.
     async fn prepare(
         &self,
-        _state: Self::State,
-        msgs: Vec<Self::Message>,
+        pool: Self::State,
+        mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
-        // TODO #195: Collect resolved CIDs ready to be proposed from the pool.
+        // Collect resolved CIDs ready to be proposed from the pool.
+        let ckpts = atomically(|| pool.collect_resolved()).await;
+
+        // Create transactions ready to be included on the chain.
+        let ckpts = ckpts.into_iter().map(|ckpt| match ckpt {
+            CheckpointPoolItem::BottomUp(ckpt) => ChainMessage::Ipc(IpcMessage::BottomUpExec(ckpt)),
+        });
+
+        // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
+        msgs.extend(ckpts);
         Ok(msgs)
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
-        let pool = state;
+    async fn process(&self, pool: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
         for msg in msgs {
             if let ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) = msg {
                 let item = CheckpointPoolItem::BottomUp(msg);
@@ -129,11 +137,9 @@ where
 
     async fn deliver(
         &self,
-        state: Self::State,
+        (pool, state): Self::State,
         msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
-        let (pool, state) = state;
-
         match msg {
             ChainMessage::Signed(msg) => {
                 let (state, ret) = self
@@ -179,14 +185,18 @@ where
         }
     }
 
-    async fn begin(&self, state: Self::State) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
-        let (pool, state) = state;
+    async fn begin(
+        &self,
+        (pool, state): Self::State,
+    ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         let (state, out) = self.inner.begin(state).await?;
         Ok(((pool, state), out))
     }
 
-    async fn end(&self, state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
-        let (pool, state) = state;
+    async fn end(
+        &self,
+        (pool, state): Self::State,
+    ) -> anyhow::Result<(Self::State, Self::EndOutput)> {
         let (state, out) = self.inner.end(state).await?;
         Ok(((pool, state), out))
     }
