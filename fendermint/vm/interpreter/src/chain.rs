@@ -69,9 +69,7 @@ impl<I> ProposalInterpreter for ChainMessageInterpreter<I>
 where
     I: Sync + Send,
 {
-    // TODO: The state can include the IPLD Resolver mempool, for example by using STM
-    // to implement a shared memory space.
-    type State = ();
+    type State = CheckpointPool;
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
@@ -83,17 +81,33 @@ where
         _state: Self::State,
         msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
-        // For now this is just a placeholder.
+        // TODO #195: Collect resolved CIDs ready to be proposed from the pool.
         Ok(msgs)
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(
-        &self,
-        _state: Self::State,
-        _msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<bool> {
-        // For now this is just a placeholder.
+    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+        let pool = state;
+        for msg in msgs {
+            if let ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) = msg {
+                let item = CheckpointPoolItem::BottomUp(msg);
+
+                // We can just look in memory because when we start the application, we should retrieve any
+                // pending checkpoints (relayed but not executed) from the ledger, so they should be there.
+                // We don't have to validate the checkpoint here, because
+                // 1) we validated it when it was relayed, and
+                // 2) if a validator proposes something invalid, we can make them pay during execution.
+                let is_resolved = atomically(|| match pool.get_status(&item)? {
+                    None => Ok(false),
+                    Some(status) => status.is_resolved(),
+                })
+                .await;
+
+                if !is_resolved {
+                    return Ok(false);
+                }
+            }
+        }
         Ok(true)
     }
 }

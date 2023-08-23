@@ -330,10 +330,7 @@ where
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<
-        State = (), // TODO
-        Message = Vec<u8>,
-    >,
+    I: ProposalInterpreter<State = CheckpointPool, Message = Vec<u8>>,
     I: ExecInterpreter<
         State = (CheckpointPool, FvmExecState<SS>),
         Message = Vec<u8>,
@@ -517,7 +514,7 @@ where
 
         let txs = self
             .interpreter
-            .prepare((), txs)
+            .prepare(self.resolve_pool.clone(), txs)
             .await
             .context("failed to prepare proposal")?;
 
@@ -536,7 +533,7 @@ where
 
         let accept = self
             .interpreter
-            .process((), txs)
+            .process(self.resolve_pool.clone(), txs)
             .await
             .context("failed to process proposal")?;
 
