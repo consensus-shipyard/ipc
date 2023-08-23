@@ -1,15 +1,12 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Query the validator set in subnet actor
+//! Expose the subnet actor validator set
 
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
-
-use crate::server::handlers::manager::check_subnet;
-use crate::server::handlers::manager::subnet::SubnetManagerPool;
-use crate::server::JsonRPCRequestHandler;
+use crate::server::subnet::SubnetManagerPool;
+use crate::server::{check_subnet, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -17,11 +14,10 @@ use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryValidatorSetParams {
-    pub gateway_address: String,
     pub subnet: String,
 }
 
-/// The list validators json rpc method handler.
+/// The create subnet json rpc method handler.
 pub(crate) struct QueryValidatorSetHandler {
     pool: Arc<SubnetManagerPool>,
 }
@@ -38,21 +34,21 @@ impl JsonRPCRequestHandler for QueryValidatorSetHandler {
     type Response = QueryValidatorSetResponse;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
-        let subnet = SubnetID::from_str(&request.subnet)?;
-        let conn = match self.pool.get(&subnet) {
-            None => return Err(anyhow!("target parent subnet not found")),
+        let subnet_id = SubnetID::from_str(&request.subnet)?;
+        let parent = subnet_id
+            .parent()
+            .ok_or_else(|| anyhow!("cannot get for root"))?;
+
+        let conn = match self.pool.get(&parent) {
+            None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
         };
 
         let subnet_config = conn.subnet();
         check_subnet(subnet_config)?;
 
-        let gateway_addr = Address::from_str(&request.gateway_address);
-        let val_set = conn
-            .manager()
-            .get_validator_set(&subnet, gateway_addr.ok())
-            .await?;
-        log::debug!("list of validators: {val_set:?}");
-        Ok(val_set)
+        conn.manager()
+            .get_validator_set(&subnet_id, Some(subnet_config.gateway_addr()))
+            .await
     }
 }

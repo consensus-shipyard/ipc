@@ -27,7 +27,6 @@ impl CommandLineHandler for ListValidators {
         let json_rpc_client = JsonRpcClientImpl::new(url, None);
 
         let params = QueryValidatorSetParams {
-            gateway_address: arguments.gateway_address.clone(),
             subnet: arguments.subnet.clone(),
         };
 
@@ -50,8 +49,6 @@ impl CommandLineHandler for ListValidators {
 pub(crate) struct ListValidatorsArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(long, short, help = "The gateway address to query subnets")]
-    pub gateway_address: String,
     #[arg(long, short, help = "The subnet id to query validators")]
     pub subnet: String,
 }
