@@ -57,7 +57,7 @@ pub struct SignedRelayedMessage<T> {
 }
 
 /// A message with a quorum certificate from a group of validators.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct CertifiedMessage<T> {
     /// The message the validators signed.
     pub message: T,
@@ -66,12 +66,12 @@ pub struct CertifiedMessage<T> {
 }
 
 /// A quorum certificate consisting of a simple multi-sig.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct MultiSig {
     pub signatures: Vec<ValidatorSignature>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ValidatorSignature {
     pub validator: Address,
     pub signature: Signature,
@@ -80,7 +80,7 @@ pub struct ValidatorSignature {
 /// A periodic bottom-up checkpoints contains the source subnet ID (to protect against replay attacks),
 /// a block height (for sequencing), any potential handover to the next validator set, and a pointer
 /// to the messages that need to be resolved and executed by the parent validators.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct BottomUpCheckpoint {
     /// Which subnet is the checkpoint coming from.
     pub subnet_id: SubnetID,

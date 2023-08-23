@@ -21,44 +21,52 @@ license-file = "LICENSE-APACHE"
 
 [workspace.dependencies]
 anyhow = "1"
-arbitrary = {version = "1", features = ["derive"]}
+arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
 async-stm = "0.2"
 async-trait = "0.1"
-axum = {version = "0.6", features = ["ws"]}
+axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
 blake2b_simd = "1.0"
 bytes = "1.4"
-clap = {version = "4.1", features = ["derive", "env"]}
+clap = { version = "4.1", features = ["derive", "env"] }
 config = "0.13"
 dirs = "5.0"
-ethers = {version = "2.0", features = ["abigen", "ws"]}
-ethers-core = {version = "2.0"}
+ethers = { version = "2.0", features = ["abigen", "ws"] }
+ethers-core = { version = "2.0" }
 fnv = "1.0"
 futures = "0.3"
 hex = "0.4"
-jsonrpc-v2 = {version = "0.11", default-features = false, features = ["bytes-v10"]}
+im = "15.1.0"
+jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v10"] }
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
 libsecp256k1 = "0.7"
-multihash = {version = "0.16.1", default-features = false}
+multihash = { version = "0.16.1", default-features = false }
 num-traits = "0.2"
 paste = "1"
-prost = {version = "0.11"}
+prost = { version = "0.11" }
 quickcheck = "1"
 quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
 regex = "1"
-serde = {version = "1", features = ["derive"]}
-serde_json = {version = "1"}
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
 serde_tuple = "0.5"
 serde_with = "2.3"
 tempfile = "3.3"
 thiserror = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-util", "io-std", "sync"] }
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "fs",
+  "io-util",
+  "io-std",
+  "sync",
+] }
 tokio-stream = "0.1.14"
-tokio-util = {version = "0.7.8", features = ["compat"]}
+tokio-util = { version = "0.7.8", features = ["compat"] }
 pin-project = "1.1.2"
 tracing = "0.1"
 tracing-subscriber = "0.3"
@@ -93,7 +101,7 @@ fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-act
 # Using 0.8 because of ref-fvm.
 # 0.9 would be better because of its updated quickcheck dependency.
 # 0.10 breaks some API.
-cid = {version = "0.8", features = ["serde-codec", "std"]}
+cid = { version = "0.8", features = ["serde-codec", "std"] }
 
 # Depending on the release cycle, this dependency might want an earlier version of the FVM.
 # We can work around it by hardcoding the method hashes; currently there is only one.
@@ -107,3 +115,8 @@ tendermint-proto = { version = "0.31" }
 
 # Using the IPC SDK without the `fil-actor` feature so as not to depend on the actor `Runtime`.
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", default-features = false, branch = "main" }
+ipc_ipld_resolver = { git = "https://github.com/consensus-shipyard/ipc-ipld-resolver.git", branch = "main" }
+
+[patch.crates-io]
+# Use stable-only features.
+gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }

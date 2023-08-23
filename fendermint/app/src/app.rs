@@ -16,7 +16,7 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRet, BytesMessageCheckRet, BytesMessageQuery, BytesMessageQueryRet,
 };
-use fendermint_vm_interpreter::chain::{ChainMessageApplyRet, IllegalMessage};
+use fendermint_vm_interpreter::chain::{ChainMessageApplyRet, CheckpointPool, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, FvmCheckState, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
 };
@@ -59,6 +59,7 @@ pub enum AppError {
     NotInitialized = 54,
 }
 
+/// The application state record we keep a history of in the database.
 #[derive(Serialize, Deserialize)]
 pub struct AppState {
     /// Last committed block height.
@@ -80,6 +81,19 @@ impl AppState {
         tendermint::hash::AppHash::try_from(self.state_root().to_bytes())
             .expect("hash can be wrapped")
     }
+}
+
+pub struct AppConfig<S: KVStore> {
+    /// Namespace to store the current app state.
+    pub app_namespace: S::Namespace,
+    /// Namespace to store the app state history.
+    pub state_hist_namespace: S::Namespace,
+    /// Size of state history to keep; 0 means unlimited.
+    pub state_hist_size: u64,
+    /// Path to the Wasm bundle.
+    ///
+    /// Only loaded once during genesis; later comes from the [`StateTree`].
+    pub builtin_actors_bundle: PathBuf,
 }
 
 /// Handle ABCI requests.
@@ -118,6 +132,8 @@ where
     state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
+    /// CID resolution pool.
+    resolve_pool: CheckpointPool,
     /// State accumulating changes during block execution.
     exec_state: Arc<Mutex<Option<FvmExecState<SS>>>>,
     /// Projected partial state accumulating during transaction checks.
@@ -139,23 +155,22 @@ where
     SS: Blockstore + Clone + 'static,
 {
     pub fn new(
+        config: AppConfig<S>,
         db: DB,
         state_store: SS,
-        builtin_actors_bundle: PathBuf,
-        app_namespace: S::Namespace,
-        state_hist_namespace: S::Namespace,
-        state_hist_size: u64,
         interpreter: I,
+        resolve_pool: CheckpointPool,
     ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
-            builtin_actors_bundle,
-            namespace: app_namespace,
-            state_hist: KVCollection::new(state_hist_namespace),
-            state_hist_size,
+            builtin_actors_bundle: config.builtin_actors_bundle,
+            namespace: config.app_namespace,
+            state_hist: KVCollection::new(config.state_hist_namespace),
+            state_hist_size: config.state_hist_size,
             interpreter: Arc::new(interpreter),
+            resolve_pool,
             exec_state: Arc::new(Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
         };
@@ -259,11 +274,11 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce(FvmExecState<SS>) -> R,
-        R: Future<Output = Result<(FvmExecState<SS>, T)>>,
+        F: FnOnce((CheckpointPool, FvmExecState<SS>)) -> R,
+        R: Future<Output = Result<((CheckpointPool, FvmExecState<SS>), T)>>,
     {
         let state = self.take_exec_state();
-        let (state, ret) = f(state).await?;
+        let ((_pool, state), ret) = f((self.resolve_pool.clone(), state)).await?;
         self.put_exec_state(state);
         Ok(ret)
     }
@@ -320,7 +335,7 @@ where
         Message = Vec<u8>,
     >,
     I: ExecInterpreter<
-        State = FvmExecState<SS>,
+        State = (CheckpointPool, FvmExecState<SS>),
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRet,
@@ -611,6 +626,7 @@ where
     async fn commit(&self) -> AbciResult<response::Commit> {
         let exec_state = self.take_exec_state();
 
+        // Commit the execution state to the datastore.
         let mut state = self.committed_state()?;
         state.block_height = exec_state.block_height().try_into()?;
         state.state_params.timestamp = exec_state.timestamp();
@@ -624,6 +640,22 @@ where
             "commit state"
         );
 
+        // TODO: We can defer committing changes the resolution pool to this point.
+        // For example if a checkpoint is successfully executed, that's when we want to remove
+        // that checkpoint from the pool, and not propose it to other validators again.
+        // However, once Tendermint starts delivering the transactions, the commit will surely
+        // follow at the end, so we can also remove these checkpoints from memory at the time
+        // the transaction is delivered, rather than when the whole thing is committed.
+        // It is only important to the persistent database changes as an atomic step in the
+        // commit in case the block execution fails somewhere in the middle for uknown reasons.
+        // But if that happened, we will have to restart the application again anyway, and
+        // repopulate the in-memory checkpoints based on the last committed ledger.
+        // So, while the pool is theoretically part of the evolving state and we can pass
+        // it in and out, unless we want to defer commit to here (which the interpreters aren't
+        // notified about), we could add it to the `ChainMessageInterpreter` as a constructor argument,
+        // a sort of "ambient state", and not worry about in in the `App` at all.
+
+        // Commit app state to the datastore.
         self.set_committed_state(state)?;
 
         // Reset check state.
