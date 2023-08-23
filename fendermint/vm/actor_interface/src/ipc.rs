@@ -78,6 +78,8 @@ pub mod gateway {
 
     use crate::eam::{self, EthAddress};
 
+    pub const METHOD_INVOKE_CONTRACT: u64 = crate::evm::Method::InvokeContract as u64;
+
     // Constructor parameters aren't generated as part of the Rust bindings.
 
     /// Container type `ConstructorParameters`.

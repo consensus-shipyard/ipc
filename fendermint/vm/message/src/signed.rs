@@ -202,7 +202,7 @@ fn sign_secp256k1(sk: &libsecp256k1::SecretKey, hash: &[u8; 32]) -> [u8; SECP_SI
 }
 
 /// Turn a [`ChainID`] into bytes. Uses big-endian encoding.
-fn chain_id_bytes(chain_id: &ChainID) -> [u8; 8] {
+pub fn chain_id_bytes(chain_id: &ChainID) -> [u8; 8] {
     u64::from(*chain_id).to_be_bytes()
 }
 

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fvm_shared::{address::Address, clock::ChainEpoch, crypto::signature::Signature};
+use fvm_shared::{
+    address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
+};
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +41,10 @@ pub struct RelayedMessage<T> {
     pub relayer: Address,
     /// The nonce of the relayer in the current subnet.
     pub sequence: u64,
+    /// The gas the relayer is willing to spend on the verification of the relayed message.
+    pub gas_limit: u64,
+    pub gas_fee_cap: TokenAmount,
+    pub gas_premium: TokenAmount,
 }
 
 /// Relayed messages are signed by the relayer, so we can rightfully charge them message inclusion costs.
@@ -90,7 +96,7 @@ pub struct BottomUpCheckpoint {
 #[cfg(feature = "arb")]
 mod arb {
 
-    use fendermint_testing::arb::{ArbAddress, ArbCid, ArbSubnetID};
+    use fendermint_testing::arb::{ArbAddress, ArbCid, ArbSubnetID, ArbTokenAmount};
     use fvm_shared::crypto::signature::Signature;
     use quickcheck::{Arbitrary, Gen};
 
@@ -124,6 +130,9 @@ mod arb {
                 message: T::arbitrary(g),
                 relayer: ArbAddress::arbitrary(g).0,
                 sequence: u64::arbitrary(g),
+                gas_limit: u64::arbitrary(g),
+                gas_fee_cap: ArbTokenAmount::arbitrary(g).0,
+                gas_premium: ArbTokenAmount::arbitrary(g).0,
             }
         }
     }

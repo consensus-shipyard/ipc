@@ -24,6 +24,7 @@ num-traits = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 
 cid = { workspace = true }
 fvm = { workspace = true }
@@ -42,7 +43,7 @@ pin-project = { workspace = true }
 
 [dev-dependencies]
 quickcheck = { workspace = true }
-fvm = { workspace = true, features= ["arb", "testing"] }
+fvm = { workspace = true, features = ["arb", "testing"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 tempfile = "3.7.0"
 

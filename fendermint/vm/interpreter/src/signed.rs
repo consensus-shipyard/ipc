@@ -4,7 +4,10 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 
 use fendermint_vm_core::chainid::HasChainID;
-use fendermint_vm_message::signed::{SignedMessage, SignedMessageError};
+use fendermint_vm_message::signed::{chain_id_bytes, SignedMessage, SignedMessageError};
+use fvm_ipld_encoding::Error as IpldError;
+use fvm_shared::{chainid::ChainID, crypto::signature::Signature};
+use serde::Serialize;
 
 use crate::{
     fvm::{FvmApplyRet, FvmCheckRet, FvmMessage},
@@ -16,6 +19,67 @@ pub struct InvalidSignature(pub String);
 
 pub type SignedMessageApplyRet = Result<FvmApplyRet, InvalidSignature>;
 pub type SignedMessageCheckRet = Result<FvmCheckRet, InvalidSignature>;
+
+/// Different kinds of signed messages.
+///
+/// This technical construct was introduced so we can have a simple linear interpreter stack
+/// where everything flows through all layers, which means to pass something to the FVM we
+/// have to go through the signature check.
+pub enum VerifiableMessage {
+    /// A normal message sent by a user.
+    Signed(SignedMessage),
+    /// Something we constructed to pass on to the FVM.
+    Synthetic(SyntheticMessage),
+}
+
+impl VerifiableMessage {
+    pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
+        match self {
+            Self::Signed(m) => m.verify(chain_id),
+            Self::Synthetic(m) => m.verify(chain_id),
+        }
+    }
+
+    pub fn into_message(self) -> FvmMessage {
+        match self {
+            Self::Signed(m) => m.into_message(),
+            Self::Synthetic(m) => m.message,
+        }
+    }
+}
+
+pub struct SyntheticMessage {
+    /// The artifical message.
+    message: FvmMessage,
+    /// The CID of the original message (assuming here that that's what was signed).
+    orig_cid: cid::Cid,
+    /// The signature over the original CID.
+    signature: Signature,
+}
+
+impl SyntheticMessage {
+    pub fn new<T: Serialize>(
+        message: FvmMessage,
+        orig: &T,
+        signature: Signature,
+    ) -> Result<Self, IpldError> {
+        let orig_cid = fendermint_vm_message::cid(orig)?;
+        Ok(Self {
+            message,
+            orig_cid,
+            signature,
+        })
+    }
+
+    pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
+        let mut data = self.orig_cid.to_bytes();
+        data.extend(chain_id_bytes(chain_id).iter());
+
+        self.signature
+            .verify(&data, &self.message.from)
+            .map_err(SignedMessageError::InvalidSignature)
+    }
+}
 
 /// Interpreter working on signed messages, validating their signature before sending
 /// the unsigned parts on for execution.
@@ -37,7 +101,7 @@ where
     S: HasChainID + Send + 'static,
 {
     type State = I::State;
-    type Message = SignedMessage;
+    type Message = VerifiableMessage;
     type BeginOutput = I::BeginOutput;
     type DeliverOutput = SignedMessageApplyRet;
     type EndOutput = I::EndOutput;
@@ -61,7 +125,7 @@ where
                 Ok((state, Err(InvalidSignature(s))))
             }
             Ok(()) => {
-                let (state, ret) = self.inner.deliver(state, msg.message).await?;
+                let (state, ret) = self.inner.deliver(state, msg.into_message()).await?;
                 Ok((state, Ok(ret)))
             }
         }
@@ -83,7 +147,7 @@ where
     S: HasChainID + Send + 'static,
 {
     type State = I::State;
-    type Message = SignedMessage;
+    type Message = VerifiableMessage;
     type Output = SignedMessageCheckRet;
 
     async fn check(
@@ -109,7 +173,10 @@ where
                 Ok((state, Err(InvalidSignature(s))))
             }
             Ok(()) => {
-                let (state, ret) = self.inner.check(state, msg.message, is_recheck).await?;
+                let (state, ret) = self
+                    .inner
+                    .check(state, msg.into_message(), is_recheck)
+                    .await?;
                 Ok((state, Ok(ret)))
             }
         }

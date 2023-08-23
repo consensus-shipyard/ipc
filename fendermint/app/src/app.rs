@@ -485,10 +485,8 @@ where
             Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
             Ok(result) => match result {
                 Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
-                Ok(result) => match result {
-                    Err(InvalidSignature(d)) => invalid_check_tx(AppError::InvalidSignature, d),
-                    Ok(ret) => to_check_tx(ret),
-                },
+                Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
+                Ok(Ok(ret)) => to_check_tx(ret),
             },
         };
 
