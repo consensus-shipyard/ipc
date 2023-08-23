@@ -29,7 +29,7 @@ mod setup;
 mod topdown;
 
 const TASKS_PROCESS_THRESHOLD_SEC: u64 = 15;
-const SUBMISSION_LOOK_AHEAD_EPOCH: ChainEpoch = 50;
+const SUBMISSION_LOOK_AHEAD_ROUNDS: i64 = 3;
 
 /// Checkpoint manager that handles a specific parent - child - checkpoint type tuple.
 /// For example, we might have `/r123` subnet and `/r123/t01` as child, one implementation of manager
@@ -250,7 +250,7 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
     let mut next_epoch = last_executed_epoch + period;
     let cut_off_epoch = std::cmp::min(
         current_epoch,
-        SUBMISSION_LOOK_AHEAD_EPOCH + last_executed_epoch,
+        SUBMISSION_LOOK_AHEAD_ROUNDS * period + last_executed_epoch,
     );
 
     // Instead of loop all the way to `current_epoch`, we loop till `cut_off_epoch`.

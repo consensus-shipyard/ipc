@@ -6,7 +6,7 @@ use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::{check_subnet, parse_from, JsonRPCRequestHandler};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use ipc_gateway::CrossMsg;
+use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

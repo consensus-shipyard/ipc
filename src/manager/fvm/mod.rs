@@ -20,9 +20,10 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use ipc_gateway::{
-    BottomUpCheckpoint, CrossMsg, FundParams, PropagateParams, ReleaseParams, TopDownCheckpoint,
+    BottomUpCheckpoint, FundParams, PropagateParams, ReleaseParams, TopDownCheckpoint,
 };
 use ipc_identity::Wallet;
+use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 

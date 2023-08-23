@@ -17,8 +17,7 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
         epoch: ChainEpoch,
         nonce: u64,
     ) -> anyhow::Result<Vec<CrossMsg>> {
-        self
-            .json_rpc_client
+        self.json_rpc_client
             .request::<Vec<CrossMsg>>(
                 json_rpc_methods::LIST_TOPDOWN_MSGS,
                 serde_json::json!({
