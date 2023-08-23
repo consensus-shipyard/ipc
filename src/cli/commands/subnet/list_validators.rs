@@ -12,7 +12,6 @@ use crate::config::json_rpc_methods;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
 use crate::server::query_validators::QueryValidatorSetParams;
-use serde::Deserialize;
 
 /// The command to create a new subnet actor.
 pub(crate) struct ListValidators;
@@ -47,10 +46,7 @@ impl CommandLineHandler for ListValidators {
 }
 
 #[derive(Debug, Args)]
-#[command(
-    name = "list-validators",
-    about = "Show the validators of the subnet"
-)]
+#[command(name = "list-validators", about = "Show the validators of the subnet")]
 pub(crate) struct ListValidatorsArgs {
     #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
