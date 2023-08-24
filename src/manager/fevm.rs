@@ -8,7 +8,6 @@ use crate::checkpoint::{
     VoteQuery,
 };
 use crate::config::Subnet;
-use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
@@ -21,6 +20,7 @@ use fil_actors_runtime::cbor;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use ipc_agent_sdk::jsonrpc::JsonRpcClientImpl;
 use ipc_gateway::{CrossMsg, TopDownCheckpoint};
 use ipc_identity::{PersistentKeyStore, Wallet};
 use ipc_sdk::subnet_id::SubnetID;
@@ -65,10 +65,10 @@ impl TopDownCheckpointQuery for FevmSubnetManager {
     async fn get_top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        nonce: u64,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> anyhow::Result<Vec<CrossMsg>> {
-        self.top_down_msgs(subnet_id, nonce, epoch).await
+        self.top_down_msgs(subnet_id, start_epoch, end_epoch).await
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> anyhow::Result<Vec<u8>> {
@@ -370,11 +370,11 @@ impl TopDownHandler for FevmSubnetManager {
     async fn top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        nonce: u64,
-        epoch: ChainEpoch,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> anyhow::Result<Vec<CrossMsg>> {
         self.evm_subnet_manager
-            .top_down_msgs(subnet_id, epoch, nonce)
+            .top_down_msgs(subnet_id, start_epoch, end_epoch)
             .await
     }
 

@@ -19,8 +19,8 @@ use crate::server::JsonRPCRequestHandler;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopDownMsgsParams {
     pub subnet_id: String,
-    pub epoch: ChainEpoch,
-    pub nonce: u64,
+    pub start_epoch: ChainEpoch,
+    pub end_epoch: ChainEpoch,
 }
 
 /// The epoch of the latest top-down checkpoint executed
@@ -55,7 +55,7 @@ impl JsonRPCRequestHandler for TopDownMsgsHandler {
 
         Ok(conn
             .manager()
-            .get_top_down_msgs(&child_subnet_id, request.epoch, request.nonce)
+            .get_top_down_msgs(&child_subnet_id, request.start_epoch, request.end_epoch)
             .await?)
     }
 }

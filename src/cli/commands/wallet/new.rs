@@ -10,9 +10,9 @@ use std::str::FromStr;
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::wallet::new::{NewFvmWallet, WalletNewParams, WalletNewResponse};
 use crate::server::wallet::WalletType;
+use ipc_agent_sdk::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 pub(crate) struct WalletNew;
 

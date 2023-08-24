@@ -89,10 +89,10 @@ impl TopDownCheckpointQuery for EthSubnetManager {
     async fn get_top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        nonce: u64,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> Result<Vec<ipc_gateway::CrossMsg>> {
-        self.top_down_msgs(subnet_id, epoch, nonce).await
+        self.top_down_msgs(subnet_id, start_epoch, end_epoch).await
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>> {
@@ -662,20 +662,14 @@ impl EthManager for EthSubnetManager {
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let (exists, checkpoint) = gateway_contract
-            .bottom_up_checkpoint_at_epoch(epoch as u64)
+        let checkpoint = gateway_contract
+            .bottom_up_checkpoints(epoch as u64)
             .call()
             .await?;
-        if !exists {
-            Err(anyhow!(
-                "bottom up checkpoint not exists at epoch: {epoch:}"
-            ))
-        } else {
-            log::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
-            let token = checkpoint.into_token();
-            let c = subnet_actor_manager_facet::BottomUpCheckpoint::from_token(token)?;
-            Ok(c)
-        }
+        log::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
+        let token = checkpoint.into_token();
+        let c = subnet_actor_manager_facet::BottomUpCheckpoint::from_token(token)?;
+        Ok(c)
     }
 
     async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> Result<u64> {
@@ -708,8 +702,8 @@ impl EthManager for EthSubnetManager {
     async fn top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        nonce: u64,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> Result<Vec<ipc_sdk::cross::CrossMsg>> {
         let route = agent_subnet_to_evm_addresses(subnet_id)?;
         log::debug!("getting top down messages for route: {route:?}");
@@ -727,11 +721,11 @@ impl EthManager for EthSubnetManager {
                 "getTopDownMsgs",
                 gateway_getter_facet::GetTopDownMsgsCall {
                     subnet_id,
-                    from_nonce: nonce,
+                    from_block: U256::from(start_epoch),
+                    to_block: U256::from(end_epoch),
                 },
             )
             .map_err(|e| anyhow!("cannot create the top down msg call: {e:}"))?
-            .block(epoch as u64)
             .call()
             .await
             .map_err(|e| anyhow!("cannot get evm top down messages: {e:}"))?;

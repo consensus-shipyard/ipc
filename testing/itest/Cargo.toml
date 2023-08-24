@@ -17,3 +17,4 @@ num-traits = { workspace = true }
 serde = { workspace = true }
 ipc-agent = { path = "../.." }
 ipc-identity = { path = "../../identity" }
+ipc-agent-sdk = { path = "../../ipc-agent-sdk" }

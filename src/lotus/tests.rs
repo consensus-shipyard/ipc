@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 use url::Url;
 
-use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::LotusClient;
+use ipc_agent_sdk::jsonrpc::JsonRpcClientImpl;
 
 const HTTP_ENDPOINT: &str = "https://api.node.glif.io/rpc/v0";
 

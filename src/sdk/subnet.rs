@@ -1,12 +1,12 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::JsonRpcClient;
 use crate::sdk::IpcAgentClient;
 use crate::server::create::{CreateSubnetParams, CreateSubnetResponse};
 use crate::server::join::JoinSubnetParams;
 use crate::server::kill::KillSubnetParams;
 use crate::server::leave::LeaveSubnetParams;
+use ipc_agent_sdk::jsonrpc::JsonRpcClient;
 
 impl<T: JsonRpcClient> IpcAgentClient<T> {
     pub async fn create_subnet(&self, params: CreateSubnetParams) -> anyhow::Result<String> {

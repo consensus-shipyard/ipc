@@ -133,8 +133,8 @@ pub trait TopDownCheckpointQuery: Send + Sync {
     async fn get_top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        nonce: u64,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> Result<Vec<CrossMsg>>;
     /// Get the block hash
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>>;

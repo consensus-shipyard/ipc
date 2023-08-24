@@ -22,8 +22,8 @@ pub trait TopDownHandler: Send + Sync + CheckpointQuery<TopDownCheckpoint> {
     async fn top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        nonce: u64,
-        epoch: ChainEpoch,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> Result<Vec<CrossMsg>>;
     /// Submit the checkpoint for validator
     async fn submit(
@@ -108,43 +108,8 @@ impl<P: TopDownHandler, C: TopDownHandler> CheckpointManager for TopDownManager<
         self.parent_handler.current_epoch().await
     }
 
-    async fn submit_checkpoint(&self, epoch: ChainEpoch, validator: &Address) -> Result<()> {
-        let nonce = self
-            .child_handler
-            .applied_topdown_nonce(&self.metadata.child.id)
-            .await?;
-        log::info!("latest applied top down nonce for {self:}: {nonce}");
-
-        let top_down_msgs = self
-            .parent_handler
-            .top_down_msgs(&self.metadata.child.id, nonce, epoch)
-            .await?;
-        log::info!(
-            "top down messages to execute for {self:}: {:}",
-            top_down_msgs.len()
-        );
-
-        // we submit the topdown messages to the CHILD subnet.
-        let topdown_checkpoint = TopDownCheckpoint {
-            epoch,
-            top_down_msgs,
-        };
-
-        log::info!("top down checkpoint to submit: {topdown_checkpoint:?}");
-
-        let submitted_epoch = self
-            .child_handler
-            .submit(validator, topdown_checkpoint)
-            .await?;
-
-        log::info!(
-            "checkpoint at epoch {:} for manager: {:} published with at epoch: {:?}, executed",
-            epoch,
-            self,
-            submitted_epoch,
-        );
-
-        Ok(())
+    async fn submit_checkpoint(&self, _epoch: ChainEpoch, _validator: &Address) -> Result<()> {
+        todo!()
     }
 
     async fn should_submit_in_epoch(&self, validator: &Address, epoch: ChainEpoch) -> Result<bool> {

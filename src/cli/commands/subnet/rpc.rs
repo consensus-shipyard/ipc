@@ -11,8 +11,8 @@ use std::str::FromStr;
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::rpc::RPCSubnetParams;
+use ipc_agent_sdk::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 /// The command to get the RPC endpoint for a subnet
 pub struct RPCSubnet;

@@ -26,7 +26,6 @@ use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 use crate::lotus::json::ToJson;
 use crate::lotus::message::chain::{ChainHeadResponse, GetTipSetByHeightResponse};
 use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
@@ -38,6 +37,7 @@ use crate::lotus::message::wallet::{WalletKeyType, WalletListResponse};
 use crate::lotus::message::CIDMap;
 use crate::lotus::{LotusClient, NetworkVersion};
 use crate::manager::SubnetInfo;
+use ipc_agent_sdk::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 
 pub type DefaultLotusJsonRPCClient = LotusJsonRPCClient<JsonRpcClientImpl>;
 
@@ -87,7 +87,8 @@ const STATE_WAIT_ALLOW_REPLACE: bool = true;
 /// extension.
 /// # Examples
 /// ```no_run
-/// use ipc_agent::{jsonrpc::JsonRpcClientImpl, lotus::LotusClient, lotus::client::LotusJsonRPCClient};
+/// use ipc_agent::{lotus::LotusClient, lotus::client::LotusJsonRPCClient};
+/// use ipc_agent_sdk::jsonrpc::JsonRpcClientImpl;
 /// use ipc_sdk::subnet_id::SubnetID;
 ///
 /// #[tokio::main]
