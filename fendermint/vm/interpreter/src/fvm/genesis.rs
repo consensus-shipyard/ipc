@@ -102,7 +102,7 @@ where
 
         // Only allocate IDs if the contracts are deployed.
         if genesis.ipc.is_some() {
-            eth_contracts.extend(IPC_CONTRACTS.clone().into_iter());
+            eth_contracts.extend(IPC_CONTRACTS.clone());
         }
 
         eth_builtin_ids.extend(eth_contracts.values().map(|c| c.actor_id));

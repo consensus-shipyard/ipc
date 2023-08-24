@@ -103,8 +103,8 @@ where
 
         match self.prepare_mode {
             ProposalPrepareMode::PassThrough => Ok(chain_msgs),
-            ProposalPrepareMode::AppendOnly => Ok(vec![msgs, chain_msgs].concat()),
-            ProposalPrepareMode::PrependOnly => Ok(vec![chain_msgs, msgs].concat()),
+            ProposalPrepareMode::AppendOnly => Ok([msgs, chain_msgs].concat()),
+            ProposalPrepareMode::PrependOnly => Ok([chain_msgs, msgs].concat()),
         }
     }
 

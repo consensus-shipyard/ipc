@@ -418,7 +418,7 @@ where
     for (index, (tx, tx_result)) in block
         .data
         .into_iter()
-        .zip(block_results.txs_results.unwrap_or_default().into_iter())
+        .zip(block_results.txs_results.unwrap_or_default())
         .enumerate()
     {
         let msg = to_chain_message(&tx)?;

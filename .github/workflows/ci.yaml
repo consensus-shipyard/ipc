@@ -39,6 +39,10 @@ jobs:
       - name: Check code formatting
         run: make check-fmt
 
+      # This is so `make license` doesn't say "bad revision origin/main"
+      - name: Fetch origin for diff
+        run: git fetch origin
+
       - name: Check license headers
         run: make license
 
@@ -56,16 +60,17 @@ jobs:
         os: [ubuntu-latest]
         rust: [stable, nightly]
         make:
-          - name: Lint
-            task: lint
+          - name: Clippy
+            task: check-clippy
           - name: Test
             task: test
           - name: End-to-End
             task: e2e
         exclude:
-          - rust: stable
+          # Not running Clippy on nightly because sometimes it seems to give false positives.
+          - rust: nightly
             make:
-              name: Lint
+              name: Clippy
           - rust: nightly
             make:
               name: End-to-end
