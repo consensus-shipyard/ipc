@@ -28,7 +28,7 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
             .await
     }
 
-    pub async fn get_chain_head(&self, subnet_id: String) -> anyhow::Result<ChainHeadResponse> {
+    pub async fn get_chain_head(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainHeadResponse> {
         self.json_rpc_client
             .request::<ChainHeadResponse>(
                 json_rpc_methods::CHAIN_HEAD,
