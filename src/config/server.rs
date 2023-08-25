@@ -24,6 +24,7 @@ pub mod json_rpc_methods {
     pub const RELOAD_CONFIG: &str = "ipc_reloadConfig";
     pub const QUERY_VALIDATOR_SET: &str = "ipc_queryValidatorSet";
     pub const SET_VALIDATOR_NET_ADDR: &str = "ipc_setValidatorNetAddr";
+    pub const SET_VALIDATOR_WORKER_ADDR: &str = "ipc_setValidatorWorkerAddr";
     pub const SEND_VALUE: &str = "ipc_sendValue";
     pub const WALLET_NEW: &str = "ipc_walletNew";
     pub const WALLET_REMOVE: &str = "ipc_walletRemove";

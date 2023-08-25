@@ -97,6 +97,14 @@ pub trait SubnetManager: Send + Sync {
         validator_net_addr: String,
     ) -> Result<()>;
 
+    /// Sets a new worker address to an existing validator
+    async fn set_validator_worker_addr(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        validator_worker_addr: Address,
+    ) -> Result<()>;
+
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()>;
 

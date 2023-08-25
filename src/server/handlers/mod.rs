@@ -26,14 +26,15 @@ use crate::server::handlers::config::ReloadConfigHandler;
 use crate::server::handlers::manager::fund::FundHandler;
 use crate::server::handlers::manager::list_subnets::ListSubnetsHandler;
 use crate::server::handlers::manager::propagate::PropagateHandler;
+use crate::server::handlers::manager::query_validators::QueryValidatorSetHandler;
 use crate::server::handlers::manager::release::ReleaseHandler;
 use crate::server::handlers::manager::send_cross::SendCrossMsgHandler;
 use crate::server::handlers::send_value::SendValueHandler;
-use crate::server::handlers::validator::QueryValidatorSetHandler;
 use crate::server::handlers::wallet::balances::WalletBalancesHandler;
 use crate::server::handlers::wallet::new::WalletNewHandler;
 use crate::server::list_checkpoints::ListBottomUpCheckpointsHandler;
 use crate::server::net_addr::SetValidatorNetAddrHandler;
+use crate::server::worker_addr::SetValidatorWorkerAddrHandler;
 use crate::server::JsonRPCRequestHandler;
 use ipc_identity::Wallet;
 
@@ -47,7 +48,6 @@ use self::wallet::remove::WalletRemoveHandler;
 
 mod config;
 mod manager;
-mod validator;
 pub mod wallet;
 
 pub type Method = String;
@@ -165,6 +165,12 @@ impl Handlers {
 
         let h: Box<dyn HandlerWrapper> = Box::new(SetValidatorNetAddrHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::SET_VALIDATOR_NET_ADDR), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(SetValidatorWorkerAddrHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::SET_VALIDATOR_WORKER_ADDR), h);
+
+        let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool.clone()));
+        handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(ListSubnetsHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::LIST_CHILD_SUBNETS), h);
