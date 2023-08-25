@@ -8,9 +8,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
-use fendermint_rpc::client::FendermintClient;
+use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use futures::{Future, StreamExt};
 use fvm_shared::{address::Address, error::ExitCode};
@@ -88,7 +88,10 @@ impl FilterKind {
     /// cartesian product of all conditions in it and subscribe individually.
     ///
     /// https://docs.tendermint.com/v0.34/rpc/#/Websocket/subscribe
-    pub fn to_queries(&self) -> anyhow::Result<Vec<Query>> {
+    pub async fn to_queries<C>(&self, client: &FendermintClient<C>) -> anyhow::Result<Vec<Query>>
+    where
+        C: Client + Sync + Send,
+    {
         match self {
             FilterKind::NewBlocks => Ok(vec![Query::from(EventType::NewBlock)]),
             // Testing indicates that `EventType::Tx` might only be raised
@@ -115,22 +118,38 @@ impl FilterKind {
                     Some(et::ValueOrArray::Array(addrs)) => addrs.clone(),
                 };
 
+                // We need to turn the Ethereum addresses into ActorIDs because that's
+                // how the event emitter can be filtered.
                 let addrs = addrs
                     .into_iter()
-                    .map(|addr| {
-                        Address::from(EthAddress(addr.0))
-                            .id()
-                            .context("only f0 type addresses are supported")
-                    })
-                    .collect::<Result<Vec<u64>, _>>()?;
+                    .map(|addr| Address::from(EthAddress(addr.0)))
+                    .collect::<Vec<_>>();
 
-                if !addrs.is_empty() {
-                    queries = addrs
+                let mut actor_ids = Vec::new();
+                for addr in addrs {
+                    if let Ok(id) = addr.id() {
+                        actor_ids.push(id);
+                    } else {
+                        let res = client
+                            .actor_state(&addr, None)
+                            .await
+                            .context("failed to look up actor state")?;
+
+                        if let Some((actor_id, _)) = res.value {
+                            actor_ids.push(actor_id);
+                        } else {
+                            bail!("cannot find actor {}", addr);
+                        }
+                    }
+                }
+
+                if !actor_ids.is_empty() {
+                    queries = actor_ids
                         .iter()
-                        .flat_map(|addr| {
+                        .flat_map(|actor_id| {
                             queries
                                 .iter()
-                                .map(|q| q.clone().and_eq("message.emitter", addr.to_string()))
+                                .map(|q| q.clone().and_eq("message.emitter", actor_id.to_string()))
                         })
                         .collect();
                 };
@@ -210,9 +229,15 @@ where
     }
 
     /// Accumulate the events.
-    async fn update<F>(&mut self, event: Event, f: F) -> anyhow::Result<()>
+    async fn update<F, C>(
+        &mut self,
+        event: Event,
+        to_block: F,
+        client: &FendermintClient<C>,
+    ) -> anyhow::Result<()>
     where
         F: FnOnce(tendermint::Block) -> Pin<Box<dyn Future<Output = anyhow::Result<B>> + Send>>,
+        C: Client + Sync + Send,
     {
         match (self, event.data) {
             (
@@ -221,7 +246,7 @@ where
                     block: Some(block), ..
                 },
             ) => {
-                let b: B = f(block).await?;
+                let b: B = to_block(block).await?;
                 blocks.push(b);
             }
             (
@@ -293,13 +318,15 @@ where
                 let log_index_start = Default::default();
 
                 let tx_logs = from_tm::to_logs(
+                    client,
                     &tx_result.result.events,
                     block_hash,
                     block_number,
                     transaction_hash,
                     transaction_index,
                     log_index_start,
-                )?;
+                )
+                .await?;
 
                 logs.extend(tx_logs)
             }
@@ -326,14 +353,15 @@ pub struct FilterDriver<C> {
 }
 
 enum FilterState<C> {
-    Poll(PollState),
+    Poll(PollState<C>),
     Subscription(SubscriptionState<C>),
 }
 
 /// Accumulate changes between polls.
 ///
 /// Polling returns batches.
-struct PollState {
+struct PollState<C> {
+    client: FendermintClient<C>,
     timeout: Duration,
     last_poll: Instant,
     finished: Option<Option<anyhow::Error>>,
@@ -367,6 +395,7 @@ where
                 client,
             }),
             None => FilterState::Poll(PollState {
+                client,
                 timeout,
                 last_poll: Instant::now(),
                 finished: None,
@@ -406,11 +435,17 @@ where
 
                             let res = state
                                 .records
-                                .update(event, |block| {
-                                    Box::pin(async move {
-                                        Ok(et::H256::from_slice(block.header().hash().as_bytes()))
-                                    })
-                                })
+                                .update(
+                                    event,
+                                    |block| {
+                                        Box::pin(async move {
+                                            Ok(et::H256::from_slice(
+                                                block.header().hash().as_bytes(),
+                                            ))
+                                        })
+                                    },
+                                    &state.client,
+                                )
                                 .await;
 
                             if let Err(err) = res {
@@ -444,16 +479,21 @@ where
                     FilterCommand::Update(event) => {
                         let mut records = FilterRecords::<et::Block<et::TxHash>>::new(&state.kind);
 
+                        let client = state.client.clone();
+
                         let res = records
-                            .update(event, |block| {
-                                let client = state.client.clone();
-                                Box::pin(async move {
-                                    let block = enrich_block(&client, block).await?;
-                                    let block: anyhow::Result<et::Block<et::TxHash>> =
-                                        map_rpc_block_txs(block, |tx| Ok(tx.hash()));
-                                    block
-                                })
-                            })
+                            .update(
+                                event,
+                                |block| {
+                                    Box::pin(async move {
+                                        let block = enrich_block(&client, block).await?;
+                                        let block: anyhow::Result<et::Block<et::TxHash>> =
+                                            map_rpc_block_txs(block, |tx| Ok(tx.hash()));
+                                        block
+                                    })
+                                },
+                                &state.client,
+                            )
                             .await;
 
                         match res {
@@ -547,7 +587,7 @@ fn notification(subscription: FilterId, result: serde_json::Value) -> MethodNoti
     }
 }
 
-impl PollState {
+impl<C> PollState<C> {
     /// Take all the accumulated changes.
     ///
     /// If there are no changes but there was an error, return that.
@@ -635,11 +675,13 @@ pub async fn run_subscription(id: FilterId, mut sub: Subscription, tx: Sender<Fi
 #[cfg(test)]
 mod tests {
     use ethers_core::types as et;
+    use fendermint_rpc::client::FendermintClient;
+    use tendermint_rpc::MockRequestMatcher;
 
     use super::FilterKind;
 
-    #[test]
-    fn filter_to_query() {
+    #[tokio::test]
+    async fn filter_to_query() {
         fn hash(s: &str) -> et::H256 {
             et::H256::from(ethers_core::utils::keccak256(s))
         }
@@ -674,8 +716,28 @@ mod tests {
             ]))
         );
 
+        // These tests should not call the API for response resolution because it's just an ID.
+        struct NeverCall;
+
+        impl MockRequestMatcher for NeverCall {
+            fn response_for<R, S>(
+                &self,
+                _request: R,
+            ) -> Option<Result<R::Response, tendermint_rpc::Error>>
+            where
+                R: tendermint_rpc::Request<S>,
+                S: tendermint_rpc::dialect::Dialect,
+            {
+                unimplemented!("don't call")
+            }
+        }
+
+        let (client, _driver) = tendermint_rpc::MockClient::new(NeverCall);
+        let client = FendermintClient::new(client);
+
         let queries = FilterKind::Logs(Box::new(filter))
-            .to_queries()
+            .to_queries(&client)
+            .await
             .expect("failed to convert");
 
         assert_eq!(queries.len(), 4);

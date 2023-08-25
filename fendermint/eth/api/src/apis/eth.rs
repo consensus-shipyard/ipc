@@ -382,12 +382,14 @@ where
             let msg = to_chain_message(&res.tx)?;
             if let ChainMessage::Signed(msg) = msg {
                 let receipt = to_eth_receipt(
+                    &data.client,
                     &msg,
                     &res,
                     &cumulative,
                     &header.header,
                     &state_params.value.base_fee,
                 )
+                .await
                 .context("failed to convert to receipt")?;
 
                 Ok(Some(receipt))
@@ -435,12 +437,14 @@ where
             };
 
             let receipt = to_eth_receipt(
+                &data.client,
                 &msg,
                 &result,
                 &cumulative,
                 &block.header,
                 &state_params.value.base_fee,
-            )?;
+            )
+            .await?;
             receipts.push(receipt)
         }
     }
@@ -748,13 +752,15 @@ where
                     }
 
                     let mut tx_logs = from_tm::to_logs(
+                        &data.client,
                         &tx_result.events,
                         block_hash,
                         block_number,
                         tx_hash,
                         tx_idx,
                         log_index_start,
-                    )?;
+                    )
+                    .await?;
 
                     // Filter by topic.
                     tx_logs.retain(|log| matches_topics(&filter, log));

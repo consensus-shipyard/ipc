@@ -341,7 +341,8 @@ where
         ws_sender: Option<WebSocketSender>,
     ) -> anyhow::Result<FilterId> {
         let queries = kind
-            .to_queries()
+            .to_queries(&self.client)
+            .await
             .context("failed to convert filter to queries")?;
 
         let mut subs = Vec::new();
