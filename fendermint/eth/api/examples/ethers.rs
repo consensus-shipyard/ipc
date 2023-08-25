@@ -42,6 +42,7 @@ use ethers::{
     signers::{Signer, Wallet},
 };
 use ethers_core::{
+    abi::Abi,
     k256::ecdsa::SigningKey,
     types::{
         transaction::eip2718::TypedTransaction, Address, BlockId, BlockNumber, Bytes,
@@ -62,8 +63,8 @@ type TestContractCall<C, T> = ContractCall<TestMiddleware<C>, T>;
 const SIMPLECOIN_HEX: &'static str =
     include_str!("../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin");
 
-const SIMPLECOIN_ABI: &'static str =
-    include_str!("../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi");
+// const SIMPLECOIN_ABI: &'static str =
+//     include_str!("../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi");
 
 /// Gas limit to set for transactions.
 const ENOUGH_GAS: u64 = 10_000_000_000u64;
@@ -470,7 +471,8 @@ where
     let bytecode =
         Bytes::from(hex::decode(SIMPLECOIN_HEX).context("failed to decode contract hex")?);
 
-    let abi = serde_json::from_str::<ethers::core::abi::Abi>(SIMPLECOIN_ABI)?;
+    // let abi = serde_json::from_str::<ethers::core::abi::Abi>(SIMPLECOIN_ABI)?;
+    let abi: Abi = SIMPLECOIN_ABI.clone();
 
     let factory = ContractFactory::new(abi, bytecode.clone(), mw.clone());
     let mut deployer = factory.deploy(())?;
