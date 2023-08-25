@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
-use fendermint_rpc::{client::FendermintClient, query::QueryClient};
+use fendermint_rpc::client::FendermintClient;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use futures::{Future, StreamExt};
 use fvm_shared::{address::Address, error::ExitCode};
@@ -26,6 +26,7 @@ use tokio::sync::{
 };
 
 use crate::{
+    cache::AddressCache,
     conv::from_tm::{self, map_rpc_block_txs},
     error::JsonRpcError,
     handlers::ws::{MethodNotification, Notification},
@@ -88,7 +89,7 @@ impl FilterKind {
     /// cartesian product of all conditions in it and subscribe individually.
     ///
     /// https://docs.tendermint.com/v0.34/rpc/#/Websocket/subscribe
-    pub async fn to_queries<C>(&self, client: &FendermintClient<C>) -> anyhow::Result<Vec<Query>>
+    pub async fn to_queries<C>(&self, addr_cache: &AddressCache<C>) -> anyhow::Result<Vec<Query>>
     where
         C: Client + Sync + Send,
     {
@@ -127,19 +128,10 @@ impl FilterKind {
 
                 let mut actor_ids = Vec::new();
                 for addr in addrs {
-                    if let Ok(id) = addr.id() {
-                        actor_ids.push(id);
+                    if let Some(actor_id) = addr_cache.lookup_id(&addr).await? {
+                        actor_ids.push(actor_id);
                     } else {
-                        let res = client
-                            .actor_state(&addr, None)
-                            .await
-                            .context("failed to look up actor state")?;
-
-                        if let Some((actor_id, _)) = res.value {
-                            actor_ids.push(actor_id);
-                        } else {
-                            bail!("cannot find actor {}", addr);
-                        }
+                        bail!("cannot find actor {}", addr);
                     }
                 }
 
@@ -233,7 +225,7 @@ where
         &mut self,
         event: Event,
         to_block: F,
-        client: &FendermintClient<C>,
+        addr_cache: &AddressCache<C>,
     ) -> anyhow::Result<()>
     where
         F: FnOnce(tendermint::Block) -> Pin<Box<dyn Future<Output = anyhow::Result<B>> + Send>>,
@@ -318,7 +310,7 @@ where
                 let log_index_start = Default::default();
 
                 let tx_logs = from_tm::to_logs(
-                    client,
+                    addr_cache,
                     &tx_result.result.events,
                     block_hash,
                     block_number,
@@ -346,22 +338,21 @@ fn to_json_vec<R: Serialize>(records: &[R]) -> anyhow::Result<Vec<serde_json::Va
     Ok(values)
 }
 
-pub struct FilterDriver<C> {
+pub struct FilterDriver {
     id: FilterId,
-    state: FilterState<C>,
+    state: FilterState,
     rx: Receiver<FilterCommand>,
 }
 
-enum FilterState<C> {
-    Poll(PollState<C>),
-    Subscription(SubscriptionState<C>),
+enum FilterState {
+    Poll(PollState),
+    Subscription(SubscriptionState),
 }
 
 /// Accumulate changes between polls.
 ///
 /// Polling returns batches.
-struct PollState<C> {
-    client: FendermintClient<C>,
+struct PollState {
     timeout: Duration,
     last_poll: Instant,
     finished: Option<Option<anyhow::Error>>,
@@ -369,33 +360,23 @@ struct PollState<C> {
 }
 
 /// Send changes to a WebSocket as soon as they happen, one by one, not in batches.
-struct SubscriptionState<C> {
-    client: FendermintClient<C>,
+struct SubscriptionState {
     kind: FilterKind,
     ws_sender: WebSocketSender,
 }
 
-impl<C> FilterDriver<C>
-where
-    C: Client + Send + Sync + Clone + 'static,
-{
+impl FilterDriver {
     pub fn new(
         id: FilterId,
         timeout: Duration,
         kind: FilterKind,
         ws_sender: Option<WebSocketSender>,
-        client: FendermintClient<C>,
     ) -> (Self, Sender<FilterCommand>) {
         let (tx, rx) = tokio::sync::mpsc::channel(10);
 
         let state = match ws_sender {
-            Some(ws_sender) => FilterState::Subscription(SubscriptionState {
-                kind,
-                ws_sender,
-                client,
-            }),
+            Some(ws_sender) => FilterState::Subscription(SubscriptionState { kind, ws_sender }),
             None => FilterState::Poll(PollState {
-                client,
                 timeout,
                 last_poll: Instant::now(),
                 finished: None,
@@ -415,7 +396,14 @@ where
     /// Consume commands until some end condition is met.
     ///
     /// In the end the filter removes itself from the registry.
-    pub async fn run(mut self, filters: FilterMap) {
+    pub async fn run<C>(
+        mut self,
+        filters: FilterMap,
+        client: FendermintClient<C>,
+        addr_cache: AddressCache<C>,
+    ) where
+        C: Client + Send + Sync + Clone + 'static,
+    {
         let id = self.id;
 
         tracing::info!(?id, "handling filter events");
@@ -444,7 +432,7 @@ where
                                             ))
                                         })
                                     },
-                                    &state.client,
+                                    &addr_cache,
                                 )
                                 .await;
 
@@ -479,12 +467,11 @@ where
                     FilterCommand::Update(event) => {
                         let mut records = FilterRecords::<et::Block<et::TxHash>>::new(&state.kind);
 
-                        let client = state.client.clone();
-
                         let res = records
                             .update(
                                 event,
                                 |block| {
+                                    let client = client.clone();
                                     Box::pin(async move {
                                         let block = enrich_block(&client, block).await?;
                                         let block: anyhow::Result<et::Block<et::TxHash>> =
@@ -492,7 +479,7 @@ where
                                         block
                                     })
                                 },
-                                &state.client,
+                                &addr_cache,
                             )
                             .await;
 
@@ -587,7 +574,7 @@ fn notification(subscription: FilterId, result: serde_json::Value) -> MethodNoti
     }
 }
 
-impl<C> PollState<C> {
+impl PollState {
     /// Take all the accumulated changes.
     ///
     /// If there are no changes but there was an error, return that.
@@ -678,6 +665,8 @@ mod tests {
     use fendermint_rpc::client::FendermintClient;
     use tendermint_rpc::MockRequestMatcher;
 
+    use crate::cache::AddressCache;
+
     use super::FilterKind;
 
     #[tokio::test]
@@ -734,9 +723,10 @@ mod tests {
 
         let (client, _driver) = tendermint_rpc::MockClient::new(NeverCall);
         let client = FendermintClient::new(client);
+        let addr_cache = AddressCache::new(client, 0);
 
         let queries = FilterKind::Logs(Box::new(filter))
-            .to_queries(&client)
+            .to_queries(&addr_cache)
             .await
             .expect("failed to convert");
 

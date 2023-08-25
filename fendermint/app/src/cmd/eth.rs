@@ -29,5 +29,11 @@ cmd! {
 
 /// Run the Ethereum
 async fn run(settings: EthSettings, client: WebSocketClient) -> anyhow::Result<()> {
-    fendermint_eth_api::listen(settings.listen.addr(), client, settings.filter_timeout).await
+    fendermint_eth_api::listen(
+        settings.listen.addr(),
+        client,
+        settings.filter_timeout,
+        settings.cache_capacity,
+    )
+    .await
 }

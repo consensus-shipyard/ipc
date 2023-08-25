@@ -382,7 +382,7 @@ where
             let msg = to_chain_message(&res.tx)?;
             if let ChainMessage::Signed(msg) = msg {
                 let receipt = to_eth_receipt(
-                    &data.client,
+                    &data.addr_cache,
                     &msg,
                     &res,
                     &cumulative,
@@ -437,7 +437,7 @@ where
             };
 
             let receipt = to_eth_receipt(
-                &data.client,
+                &data.addr_cache,
                 &msg,
                 &result,
                 &cumulative,
@@ -752,7 +752,7 @@ where
                     }
 
                     let mut tx_logs = from_tm::to_logs(
-                        &data.client,
+                        &data.addr_cache,
                         &tx_result.events,
                         block_hash,
                         block_number,

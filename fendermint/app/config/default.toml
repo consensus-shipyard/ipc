@@ -31,6 +31,8 @@ gas_search_step = 1.25
 [eth]
 # Maximum time allowed between polls for filter changes, in seconds, before the subscription is canceled.
 filter_timeout = 300
+# Maximum number of entries in the LRU caches.
+cache_capacity = 1000000
 
 [eth.listen]
 # Only accept local connections by default.

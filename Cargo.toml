@@ -43,6 +43,7 @@ jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v1
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
 libsecp256k1 = "0.7"
+lru_time_cache = "0.11"
 multihash = { version = "0.16.1", default-features = false }
 num-traits = "0.2"
 paste = "1"

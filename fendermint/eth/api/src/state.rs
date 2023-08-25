@@ -25,6 +25,7 @@ use tendermint_rpc::{Subscription, SubscriptionClient};
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::RwLock;
 
+use crate::cache::AddressCache;
 use crate::filters::{
     run_subscription, BlockHash, FilterCommand, FilterDriver, FilterId, FilterKind, FilterMap,
     FilterRecords,
@@ -46,23 +47,32 @@ pub type WebSocketSender = UnboundedSender<MethodNotification>;
 // e.g. `fendermint_eth_api::apis::eth::accounts` with some mock client.
 pub struct JsonRpcState<C> {
     pub client: FendermintClient<C>,
+    pub addr_cache: AddressCache<C>,
     filter_timeout: Duration,
     filters: FilterMap,
     next_web_socket_id: AtomicUsize,
     web_sockets: RwLock<HashMap<WebSocketId, WebSocketSender>>,
 }
 
-impl<C> JsonRpcState<C> {
-    pub fn new(client: C, filter_timeout: Duration) -> Self {
+impl<C> JsonRpcState<C>
+where
+    C: Client + Send + Sync + Clone,
+{
+    pub fn new(client: C, filter_timeout: Duration, cache_capacity: usize) -> Self {
+        let client = FendermintClient::new(client);
+        let addr_cache = AddressCache::new(client.clone(), cache_capacity);
         Self {
-            client: FendermintClient::new(client),
+            client,
+            addr_cache,
             filter_timeout,
             filters: Default::default(),
             next_web_socket_id: Default::default(),
             web_sockets: Default::default(),
         }
     }
+}
 
+impl<C> JsonRpcState<C> {
     /// The underlying Tendermint RPC client.
     pub fn tm(&self) -> &C {
         self.client.underlying()
@@ -308,7 +318,7 @@ where
         &self,
         kind: FilterKind,
         ws_sender: Option<WebSocketSender>,
-    ) -> (FilterDriver<C>, Sender<FilterCommand>) {
+    ) -> (FilterDriver, Sender<FilterCommand>) {
         let mut filters = self.filters.write().await;
 
         // Choose an unpredictable filter, so it's not so easy to clear out someone else's logs.
@@ -320,13 +330,7 @@ where
             }
         }
 
-        let (driver, tx) = FilterDriver::new(
-            id,
-            self.filter_timeout,
-            kind,
-            ws_sender,
-            self.client.clone(),
-        );
+        let (driver, tx) = FilterDriver::new(id, self.filter_timeout, kind, ws_sender);
 
         // Inserting happens here, while removal will be handled by the `FilterState` itself.
         filters.insert(id, tx.clone());
@@ -341,7 +345,7 @@ where
         ws_sender: Option<WebSocketSender>,
     ) -> anyhow::Result<FilterId> {
         let queries = kind
-            .to_queries(&self.client)
+            .to_queries(&self.addr_cache)
             .await
             .context("failed to convert filter to queries")?;
 
@@ -360,8 +364,10 @@ where
         let (state, tx) = self.insert_filter_driver(kind, ws_sender).await;
         let id = state.id();
         let filters = self.filters.clone();
+        let client = self.client.clone();
+        let addr_cache = self.addr_cache.clone();
 
-        tokio::spawn(async move { state.run(filters).await });
+        tokio::spawn(async move { state.run(filters, client, addr_cache).await });
 
         for sub in subs {
             let tx = tx.clone();

@@ -53,6 +53,7 @@ pub struct EthSettings {
     pub listen: Address,
     #[serde_as(as = "DurationSeconds<u64>")]
     pub filter_timeout: Duration,
+    pub cache_capacity: usize,
 }
 
 #[derive(Debug, Deserialize)]
