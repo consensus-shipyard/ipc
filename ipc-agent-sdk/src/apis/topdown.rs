@@ -41,7 +41,7 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
 
     pub async fn get_block_hash(
         &self,
-        subnet_id: &str,
+        subnet_id: &SubnetID,
         height: ChainEpoch,
     ) -> anyhow::Result<Vec<u8>> {
         self.json_rpc_client
@@ -57,7 +57,7 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
 
     pub async fn get_validator_set(
         &self,
-        subnet_id: &str,
+        subnet_id: &SubnetID,
         height: Option<ChainEpoch>,
     ) -> anyhow::Result<ValidatorSet> {
         self.json_rpc_client
