@@ -26,6 +26,7 @@ use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
+use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 use crate::lotus::json::ToJson;
 use crate::lotus::message::chain::{ChainHeadResponse, GetTipSetByHeightResponse};
 use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
@@ -37,7 +38,6 @@ use crate::lotus::message::wallet::{WalletKeyType, WalletListResponse};
 use crate::lotus::message::CIDMap;
 use crate::lotus::{LotusClient, NetworkVersion};
 use crate::manager::SubnetInfo;
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 
 pub type DefaultLotusJsonRPCClient = LotusJsonRPCClient<JsonRpcClientImpl>;
 

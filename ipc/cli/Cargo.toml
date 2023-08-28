@@ -1,6 +1,5 @@
 [package]
-name = "ipc-provider"
-description = "The provider to interact with IPC"
+name = "ipc-cli"
 version = "0.1.0"
 edition.workspace = true
 license-file.workspace = true
@@ -38,7 +37,7 @@ clap = { version = "4.1.4", features = ["env", "derive"] }
 clap_complete = "4.2.1"
 thiserror = { workspace = true }
 hex = { workspace = true }
-serde_tuple = "0.5.0"
+serde_tuple = { workspace = true }
 zeroize = "1.6.0"
 
 ethers-contract = { workspace = true }
@@ -52,7 +51,4 @@ fvm_ipld_encoding = { workspace = true }
 primitives = { workspace = true }
 
 ipc-identity = { path = "../identity", features = ["with-ethers"] }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-hex = { workspace = true }
+ipc-provider = { path = "../provider" }

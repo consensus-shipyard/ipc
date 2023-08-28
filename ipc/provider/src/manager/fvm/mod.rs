@@ -28,6 +28,7 @@ use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
 use crate::config::Subnet;
+use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::message::ipc::{
     IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, QueryValidatorSetResponse,
@@ -37,7 +38,6 @@ use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
 use crate::lotus::LotusClient;
 use crate::manager::subnet::TopDownCheckpointQuery;
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 use super::subnet::SubnetManager;
 

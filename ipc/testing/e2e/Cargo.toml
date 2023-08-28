@@ -13,7 +13,7 @@ anyhow = { workspace = true }
 fvm_shared = { workspace = true }
 
 ipc-sdk = { workspace = true }
-ipc-agent = { path = "../../agent" }
+ipc-agent = { path = "../../daemon" }
 
 
 [dev-dependencies]

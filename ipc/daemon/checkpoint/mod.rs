@@ -294,7 +294,8 @@ async fn submit_till_current_epoch(manager: &dyn CheckpointManager) -> Result<()
 /// Removes the not managed accounts from the list of validators
 fn remove_not_managed(validators: &mut Vec<Address>, managed_accounts: &[Address]) {
     let set: HashSet<_> = managed_accounts.iter().collect();
-    validators.drain_filter(|v| !set.contains(v));
+
+    validators.retain(|v| set.contains(v));
 }
 
 /// Tracks the metadata required for both top down and bottom up checkpoint submissions, such as

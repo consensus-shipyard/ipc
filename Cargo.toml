@@ -1,5 +1,14 @@
 [workspace]
-members = ["ipc/agent", "ipc/testing/e2e", "ipc/identity", "ipc/testing/itest", "ipc/provider"]
+resolver = "2"
+members = [
+	# "ipc/daemon", 
+	# "ipc/cli",
+	# "ipc/testing/e2e", 
+	# "ipc/identity", 
+	# "ipc/testing/*",
+	# "ipc/provider",
+	"ipc/sdk"
+]
 
 [workspace.package]
 authors = ["Protocol Labs"]
@@ -21,6 +30,7 @@ cid = { version = "0.8.3", default-features = false, features = ["serde-codec"] 
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 prometheus = "0.13"
 serde = { version = "1.0", features = ["derive"] }
+serde_tuple = "0.5.0"
 tokio = { version = "1.16", features = ["full"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 thiserror = "1.0.38"
@@ -34,6 +44,7 @@ serde_json = { version = "1.0.91", features = ["raw_value"] }
 
 fvm_ipld_blockstore = "0.1.1"
 fvm_ipld_encoding = "0.3.3"
+fvm_ipld_hamt = "0.6"
 fvm_shared = { version = "=3.2.0", default-features = false, features = ["crypto"] }
 fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", features = ["fil-actor"] }
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git" }

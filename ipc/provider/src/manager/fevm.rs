@@ -10,6 +10,7 @@ use crate::checkpoint::{
     VoteQuery,
 };
 use crate::config::Subnet;
+use crate::jsonrpc::JsonRpcClientImpl;
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
 use crate::manager::subnet::TopDownCheckpointQuery;
@@ -22,7 +23,6 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_gateway::{CrossMsg, TopDownCheckpoint};
 use ipc_identity::{PersistentKeyStore, Wallet};
-use ipc_provider::jsonrpc::JsonRpcClientImpl;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::ConstructParams;
 
