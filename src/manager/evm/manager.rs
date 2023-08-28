@@ -97,7 +97,7 @@ impl TopDownCheckpointQuery for EthSubnetManager {
         start_epoch: ChainEpoch,
         end_epoch: ChainEpoch,
     ) -> Result<Vec<ipc_gateway::CrossMsg>> {
-        self.get_top_down_msgs(subnet_id, start_epoch, end_epoch)
+        self.top_down_msgs(subnet_id, start_epoch, end_epoch)
             .await
     }
 
