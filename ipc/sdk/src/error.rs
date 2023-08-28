@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]

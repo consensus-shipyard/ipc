@@ -1,3 +1,5 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! Cross network messages related struct and utility functions.
 
 use crate::address::IPCAddress;
