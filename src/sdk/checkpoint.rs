@@ -3,11 +3,11 @@
 //! Checkpoint related sdk functions
 
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::JsonRpcClient;
 use crate::sdk::IpcAgentClient;
 use crate::server::list_checkpoints::ListBottomUpCheckpointsParams;
 use crate::server::topdown_executed::LastTopDownExecParams;
 use fvm_shared::clock::ChainEpoch;
+use ipc_agent_sdk::jsonrpc::JsonRpcClient;
 
 impl<T: JsonRpcClient> IpcAgentClient<T> {
     pub async fn last_top_down_executed(&self, subnet: &str) -> anyhow::Result<ChainEpoch> {

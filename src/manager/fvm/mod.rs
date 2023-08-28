@@ -28,7 +28,6 @@ use ipc_sdk::subnet_id::SubnetID;
 use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
 use crate::config::Subnet;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::client::LotusJsonRPCClient;
 use crate::lotus::message::ipc::{
     IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, QueryValidatorSetResponse,
@@ -37,12 +36,35 @@ use crate::lotus::message::ipc::{
 use crate::lotus::message::mpool::MpoolPushMessage;
 use crate::lotus::message::state::StateWaitMsgResponse;
 use crate::lotus::LotusClient;
+use crate::manager::subnet::TopDownCheckpointQuery;
+use ipc_agent_sdk::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 use super::subnet::SubnetManager;
 
 pub struct LotusSubnetManager<T: JsonRpcClient> {
     lotus_client: LotusJsonRPCClient<T>,
     gateway_addr: Address,
+}
+
+#[async_trait]
+impl<T: JsonRpcClient + Send + Sync> TopDownCheckpointQuery for LotusSubnetManager<T> {
+    async fn chain_head_height(&self) -> Result<ChainEpoch> {
+        let head = self.lotus_client.chain_head().await?;
+        Ok(head.height as ChainEpoch)
+    }
+
+    async fn get_top_down_msgs(
+        &self,
+        _subnet_id: &SubnetID,
+        _start_epoch: ChainEpoch,
+        _end_epoch: ChainEpoch,
+    ) -> Result<Vec<CrossMsg>> {
+        unimplemented!()
+    }
+
+    async fn get_block_hash(&self, _height: ChainEpoch) -> Result<Vec<u8>> {
+        unimplemented!()
+    }
 }
 
 #[async_trait]
@@ -344,6 +366,7 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
         &self,
         subnet_id: &SubnetID,
         gateway: Option<Address>,
+        _epoch: Option<ChainEpoch>,
     ) -> Result<QueryValidatorSetResponse> {
         let gateway = gateway.ok_or_else(|| anyhow!("gateway address needed"))?;
 
@@ -451,19 +474,6 @@ impl LotusSubnetManager<JsonRpcClientImpl> {
 }
 
 impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {
-    async fn parent_head(&self) -> Result<Cid> {
-        chain_head_cid(&self.lotus_client).await
-    }
-
-    async fn submission_tipset(&self, epoch: ChainEpoch) -> anyhow::Result<Cid> {
-        let submission_tip_set = self
-            .lotus_client
-            .get_tipset_by_height(epoch, self.parent_head().await?)
-            .await?;
-        let cid_map = submission_tip_set.cids.first().unwrap().clone();
-        Cid::try_from(cid_map)
-    }
-
     async fn child_head(&self) -> Result<Cid> {
         chain_head_cid(&self.lotus_client).await
     }
@@ -689,22 +699,11 @@ impl<T: JsonRpcClient + Send + Sync> TopDownHandler for LotusSubnetManager<T> {
 
     async fn top_down_msgs(
         &self,
-        subnet_id: &SubnetID,
-        nonce: u64,
-        epoch: ChainEpoch,
+        _subnet_id: &SubnetID,
+        _start_epoch: ChainEpoch,
+        _end_epoch: ChainEpoch,
     ) -> Result<Vec<CrossMsg>> {
-        let submission_tip_set = self.submission_tipset(epoch).await?;
-        let top_down_msgs = self
-            .lotus_client
-            .ipc_get_topdown_msgs(subnet_id, &self.gateway_addr, submission_tip_set, nonce)
-            .await?;
-
-        log::debug!(
-            "nonce: {:} for submission tip set: {:} at epoch {:} of subnet: {:}, size of top down messages: {:}",
-            nonce, submission_tip_set, epoch, subnet_id, top_down_msgs.len()
-        );
-
-        Ok(top_down_msgs)
+        todo!()
     }
 
     async fn submit(

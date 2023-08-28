@@ -4,7 +4,8 @@
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::{ReloadableConfig, Subnet};
-use crate::manager::{EthSubnetManager, LotusSubnetManager, SubnetManager};
+use crate::manager::fevm::FevmSubnetManager;
+use crate::manager::{LotusSubnetManager, SubnetManager};
 use ipc_identity::PersistentKeyStore;
 use ipc_identity::Wallet;
 use ipc_sdk::subnet_id::SubnetID;
@@ -68,9 +69,10 @@ impl SubnetManagerPool {
                 }
                 SubnetConfig::Fevm(_) => {
                     let manager = Box::new(
-                        EthSubnetManager::from_subnet_with_wallet_store(
+                        FevmSubnetManager::from_subnet_with_wallet_store(
                             subnet,
                             self.evm_keystore.clone(),
+                            self.fvm_wallet.clone(),
                         )
                         .ok()?,
                     );

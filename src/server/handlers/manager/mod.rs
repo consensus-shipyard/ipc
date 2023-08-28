@@ -9,6 +9,8 @@ use fvm_shared::address::Address;
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 
+pub mod block_hash;
+pub mod chain_head;
 pub mod create;
 pub mod fund;
 pub mod join;
@@ -25,6 +27,7 @@ pub mod send_cross;
 pub mod send_value;
 pub mod subnet;
 pub mod topdown_executed;
+pub mod topdown_msgs;
 pub mod worker_addr;
 
 pub(crate) fn check_subnet(subnet: &Subnet) -> Result<()> {

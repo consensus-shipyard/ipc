@@ -44,7 +44,7 @@ type ArcHandlers = Arc<Handlers>;
 /// let path = "PATH TO YOUR CONFIG FILE";
 ///     let config = Arc::new(ReloadableConfig::new(path.to_string()).unwrap());
 ///     let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_wallet_from_config(config.clone()).unwrap())));
-///     let evm_keystore = Arc::new(RwLock::new((new_evm_keystore_from_config(config.clone()).unwrap()));
+///     let evm_keystore = Arc::new(RwLock::new((new_evm_keystore_from_config(config.clone()).unwrap())));
 ///     let server = JsonRPCServer::new(config, fvm_wallet, evm_keystore);
 ///     Toplevel::new()
 ///         .start("JSON-RPC server subsystem", server.into_subsystem())

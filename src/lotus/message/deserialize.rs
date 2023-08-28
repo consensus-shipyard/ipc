@@ -59,7 +59,13 @@ where
                 match key.as_str() {
                     "Root" => {
                         let s = value.get();
-                        let id: u64 = s[1..s.len() - 1].parse().map_err(A::Error::custom)?;
+                        // ideally root should be an integer, if it starts with ", it is sent as a
+                        // string, we strip away the starting and ending quote.
+                        let id: u64 = if s.starts_with('"') {
+                            s[1..s.len() - 1].parse().map_err(A::Error::custom)?
+                        } else {
+                            s.parse().map_err(A::Error::custom)?
+                        };
                         root = Some(id);
                     }
                     "Children" => {

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::checkpoint::NativeBottomUpCheckpoint;
 pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use ethers::abi::Tokenizable;
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -26,6 +26,7 @@ use num_traits::ToPrimitive;
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo, Validator, ValidatorSet};
+use crate::manager::subnet::TopDownCheckpointQuery;
 use crate::manager::{EthManager, SubnetManager};
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
@@ -76,6 +77,43 @@ struct IPCContractInfo {
     registry_addr: ethers::types::Address,
     chain_id: u64,
     provider: Provider<Http>,
+}
+
+#[async_trait]
+impl TopDownCheckpointQuery for EthSubnetManager {
+    async fn chain_head_height(&self) -> Result<ChainEpoch> {
+        let block = self
+            .ipc_contract_info
+            .provider
+            .get_block_number()
+            .await
+            .context("cannot get evm block number")?;
+        Ok(block.as_u64() as ChainEpoch)
+    }
+
+    async fn get_top_down_msgs(
+        &self,
+        subnet_id: &SubnetID,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
+    ) -> Result<Vec<ipc_gateway::CrossMsg>> {
+        self.get_top_down_msgs(subnet_id, start_epoch, end_epoch)
+            .await
+    }
+
+    async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>> {
+        let block = self
+            .ipc_contract_info
+            .provider
+            .get_block(height as u64)
+            .await?
+            .ok_or_else(|| anyhow!("height does not exist"))?;
+        Ok(block
+            .hash
+            .ok_or_else(|| anyhow!("block hash is empty"))?
+            .to_fixed_bytes()
+            .to_vec())
+    }
 }
 
 #[async_trait]
@@ -484,6 +522,7 @@ impl SubnetManager for EthSubnetManager {
         &self,
         subnet_id: &SubnetID,
         gateway: Option<Address>,
+        epoch: Option<ChainEpoch>,
     ) -> Result<QueryValidatorSetResponse> {
         // we do optionally check as gateway addr is already part of the struct
         if let Some(addr) = gateway {
@@ -512,7 +551,15 @@ impl SubnetManager for EthSubnetManager {
 
         let contract =
             SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
-        let evm_validator_set = contract.get_validator_set().call().await?;
+        let evm_validator_set = if let Some(epoch) = epoch {
+            contract
+                .get_validator_set()
+                .block(epoch as u64)
+                .call()
+                .await?
+        } else {
+            contract.get_validator_set().call().await?
+        };
 
         let mut validators = vec![];
         for v in evm_validator_set.validators.into_iter() {
@@ -657,20 +704,14 @@ impl EthManager for EthSubnetManager {
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let (exists, checkpoint) = gateway_contract
-            .bottom_up_checkpoint_at_epoch(epoch as u64)
+        let checkpoint = gateway_contract
+            .bottom_up_checkpoints(epoch as u64)
             .call()
             .await?;
-        if !exists {
-            Err(anyhow!(
-                "bottom up checkpoint not exists at epoch: {epoch:}"
-            ))
-        } else {
-            log::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
-            let token = checkpoint.into_token();
-            let c = subnet_actor_manager_facet::BottomUpCheckpoint::from_token(token)?;
-            Ok(c)
-        }
+        log::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
+        let token = checkpoint.into_token();
+        let c = subnet_actor_manager_facet::BottomUpCheckpoint::from_token(token)?;
+        Ok(c)
     }
 
     async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> Result<u64> {
@@ -703,8 +744,8 @@ impl EthManager for EthSubnetManager {
     async fn top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        nonce: u64,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> Result<Vec<ipc_sdk::cross::CrossMsg>> {
         let route = agent_subnet_to_evm_addresses(subnet_id)?;
         log::debug!("getting top down messages for route: {route:?}");
@@ -722,11 +763,11 @@ impl EthManager for EthSubnetManager {
                 "getTopDownMsgs",
                 gateway_getter_facet::GetTopDownMsgsCall {
                     subnet_id,
-                    from_nonce: nonce,
+                    from_block: U256::from(start_epoch),
+                    to_block: U256::from(end_epoch),
                 },
             )
             .map_err(|e| anyhow!("cannot create the top down msg call: {e:}"))?
-            .block(epoch as u64)
             .call()
             .await
             .map_err(|e| anyhow!("cannot get evm top down messages: {e:}"))?;
@@ -850,9 +891,7 @@ impl EthSubnetManager {
             wallet,
         ))
     }
-}
 
-impl EthSubnetManager {
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
         keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,

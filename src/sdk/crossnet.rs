@@ -3,11 +3,11 @@
 //! Cross net related sdk functions
 
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::JsonRpcClient;
 use crate::sdk::IpcAgentClient;
 use crate::server::fund::FundParams;
 use crate::server::release::ReleaseParams;
 use fvm_shared::clock::ChainEpoch;
+use ipc_agent_sdk::jsonrpc::JsonRpcClient;
 
 impl<T: JsonRpcClient> IpcAgentClient<T> {
     pub async fn fund(

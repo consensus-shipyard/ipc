@@ -9,7 +9,7 @@ mod crossnet;
 mod subnet;
 mod wallet;
 
-use crate::jsonrpc::JsonRpcClientImpl;
+use ipc_agent_sdk::jsonrpc::JsonRpcClientImpl;
 pub use wallet::LotusJsonKeyType;
 
 use url::Url;

@@ -1,14 +1,11 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 
-pub const JSON_RPC_ENDPOINT: &str = "json_rpc";
+mod topdown;
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub struct Server {
-    pub json_rpc_address: SocketAddr,
-}
+use crate::jsonrpc::JsonRpcClientImpl;
+
+use url::Url;
 
 pub mod json_rpc_methods {
     pub const CHAIN_HEAD_HEIGHT: &str = "ipc_chainHeadHeight";
@@ -25,7 +22,6 @@ pub mod json_rpc_methods {
     pub const RELOAD_CONFIG: &str = "ipc_reloadConfig";
     pub const QUERY_VALIDATOR_SET: &str = "ipc_queryValidatorSet";
     pub const SET_VALIDATOR_NET_ADDR: &str = "ipc_setValidatorNetAddr";
-    pub const SET_VALIDATOR_WORKER_ADDR: &str = "ipc_setValidatorWorkerAddr";
     pub const SEND_VALUE: &str = "ipc_sendValue";
     pub const WALLET_NEW: &str = "ipc_walletNew";
     pub const WALLET_REMOVE: &str = "ipc_walletRemove";
@@ -36,4 +32,21 @@ pub mod json_rpc_methods {
     pub const LAST_TOPDOWN_EXECUTED: &str = "ipc_lastTopDownCheckpointExecuted";
     pub const LIST_TOPDOWN_MSGS: &str = "ipc_listTopDownMsgs";
     pub const GET_BLOCK_HASH: &str = "ipc_getBlockHash";
+}
+
+/// The ipc agent client
+pub struct IpcAgentClient<T> {
+    json_rpc_client: T,
+}
+
+impl<T> IpcAgentClient<T> {
+    pub fn new(json_rpc_client: T) -> Self {
+        Self { json_rpc_client }
+    }
+}
+
+impl IpcAgentClient<JsonRpcClientImpl> {
+    pub fn default_from_url(url: Url) -> Self {
+        IpcAgentClient::new(JsonRpcClientImpl::new(url, None))
+    }
 }

@@ -76,8 +76,8 @@ pub trait EthManager: SubnetManager {
     async fn top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        nonce: u64,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> anyhow::Result<Vec<CrossMsg>>;
 
     /// Get the list of validators in a subnet

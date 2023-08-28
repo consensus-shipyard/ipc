@@ -1,9 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::JsonRpcClient;
 use crate::sdk::IpcAgentClient;
 use crate::server::ReloadConfigParams;
+use ipc_agent_sdk::jsonrpc::JsonRpcClient;
 
 impl<T: JsonRpcClient> IpcAgentClient<T> {
     pub async fn reload_config(&self, path: Option<String>) -> anyhow::Result<()> {

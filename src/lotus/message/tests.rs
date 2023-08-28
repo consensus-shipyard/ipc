@@ -31,8 +31,8 @@ fn test_ipc_address_from_map() {
     {
         "From": {
             "SubnetId": {
-                "Parent": "/r123/f01",
-                "Actor": "f064"
+                "Root": 123,
+                "Children": ["f064"]
             },
             "RawAddress": "f064"
         }
@@ -44,7 +44,7 @@ fn test_ipc_address_from_map() {
     assert_eq!(
         w.unwrap().from,
         IPCAddress::new(
-            &SubnetID::from_str("/r123/f01/f064").unwrap(),
+            &SubnetID::from_str("/r123/f064").unwrap(),
             &Address::from_str("f064").unwrap()
         )
         .unwrap()
@@ -67,8 +67,8 @@ fn test_subnet_from_map() {
     let raw_str = r#"
     {
         "ID": {
-            "Parent": "/r123/f01",
-            "Actor": "f064"
+            "Root": 123,
+            "Children": ["f01", "f064"]
         }
     }"#;
 
@@ -93,8 +93,8 @@ fn test_subnet_from_map_error() {
     let raw_str = r#"
     {
         "Id": {
-            "Parent": 65,
-            "Actor": "f064"
+            "Root": 65,
+            "Children": "f064"
         }
     }"#;
 
@@ -142,8 +142,8 @@ fn test_subnet_info_from_str() {
     let raw_str = r#"
     {
         "ID": {
-            "Parent": "/r123",
-            "Actor": "f010000000002"
+            "Root": 123,
+            "Children": ["f010000000002"]
         },
         "Stake": "10000000000000000000",
         "TopDownMsgs": {
@@ -166,8 +166,8 @@ fn test_checkpoint_template_from_str() {
     {
     "Data": {
         "Source": {
-            "Parent": "/r123",
-            "Actor": "f01002"
+            "Root": 123,
+            "Children": ["f01002"]
         },
         "Proof": null,
         "Epoch": 0,

@@ -13,8 +13,8 @@ use std::str::FromStr;
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::list_subnets::ListSubnetsParams;
+use ipc_agent_sdk::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use serde::Deserialize;
 
 /// The command to create a new subnet actor.

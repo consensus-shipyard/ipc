@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use anyhow::{anyhow, Result};
@@ -12,6 +10,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::json;
 use serde_json::Value;
+use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::spawn;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;

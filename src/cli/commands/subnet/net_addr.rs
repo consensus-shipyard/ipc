@@ -5,10 +5,10 @@
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::server::net_addr::SetValidatorNetAddrParams;
 use async_trait::async_trait;
 use clap::Args;
+use ipc_agent_sdk::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 /// Setting the validator net address
 pub(crate) struct SetValidatorNetAddr;

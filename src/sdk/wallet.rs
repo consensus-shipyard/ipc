@@ -3,13 +3,13 @@
 //! Wallet related API calls
 
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::JsonRpcClient;
 use crate::lotus::message::wallet::WalletKeyType;
 use crate::sdk::IpcAgentClient;
 use crate::server::wallet::import::{
     EvmImportParams, FvmImportParams, WalletImportParams, WalletImportResponse,
 };
 use fvm_shared::crypto::signature::SignatureType;
+use ipc_agent_sdk::jsonrpc::JsonRpcClient;
 use ipc_identity::PersistentKeyInfo;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

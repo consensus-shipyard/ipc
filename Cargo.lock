@@ -222,9 +222,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.72"
+version = "0.1.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc6dde6e4ed435a4c1ee4e73592f5ba9da2151af10076cc04858746af9352d09"
+checksum = "bc00ceb34980c03614e35a3a4e218276a0a824e911d07651cd0d858a51e8c0f0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2974,6 +2974,7 @@ dependencies = [
  "fvm_shared",
  "hex",
  "indoc",
+ "ipc-agent-sdk",
  "ipc-gateway",
  "ipc-identity",
  "ipc-sdk",
@@ -2998,6 +2999,26 @@ dependencies = [
  "url",
  "warp",
  "zeroize",
+]
+
+[[package]]
+name = "ipc-agent-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-channel",
+ "async-trait",
+ "cid",
+ "futures-util",
+ "fvm_shared",
+ "ipc-sdk",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite 0.18.0",
+ "url",
 ]
 
 [[package]]
@@ -3169,6 +3190,7 @@ dependencies = [
  "env_logger 0.10.0",
  "fvm_shared",
  "ipc-agent",
+ "ipc-agent-sdk",
  "ipc-identity",
  "ipc-sdk",
  "log",
