@@ -143,7 +143,7 @@ impl CrossMsgs {
 impl CrossMsg {
     pub fn send(
         self,
-        rt: &mut impl fil_actors_runtime::runtime::Runtime,
+        rt: &impl fil_actors_runtime::runtime::Runtime,
         rto: &Address,
     ) -> Result<RawBytes, fil_actors_runtime::ActorError> {
         let blk = if !self.wrapped {
