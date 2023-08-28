@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::checkpoint::NativeBottomUpCheckpoint;
 pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use ethers::abi::Tokenizable;
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -25,7 +25,6 @@ use num_traits::ToPrimitive;
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
-use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo, Validator, ValidatorSet};
 use crate::manager::subnet::TopDownCheckpointQuery;
 use crate::manager::{EthManager, SubnetManager};
@@ -82,8 +81,14 @@ struct IPCContractInfo {
 
 #[async_trait]
 impl TopDownCheckpointQuery for EthSubnetManager {
-    async fn chain_head(&self) -> Result<ChainHeadResponse> {
-        unimplemented!()
+    async fn chain_head_height(&self) -> Result<ChainEpoch> {
+        let block = self
+            .ipc_contract_info
+            .provider
+            .get_block_number()
+            .await
+            .context("cannot get evm block number")?;
+        Ok(block.as_u64() as ChainEpoch)
     }
 
     async fn get_top_down_msgs(
@@ -92,7 +97,8 @@ impl TopDownCheckpointQuery for EthSubnetManager {
         start_epoch: ChainEpoch,
         end_epoch: ChainEpoch,
     ) -> Result<Vec<ipc_gateway::CrossMsg>> {
-        self.top_down_msgs(subnet_id, start_epoch, end_epoch).await
+        self.get_top_down_msgs(subnet_id, start_epoch, end_epoch)
+            .await
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>> {
@@ -851,9 +857,7 @@ impl EthSubnetManager {
             wallet,
         ))
     }
-}
 
-impl EthSubnetManager {
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
         keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,

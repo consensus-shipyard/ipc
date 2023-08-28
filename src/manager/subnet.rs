@@ -4,7 +4,6 @@
 use std::collections::HashMap;
 
 use crate::checkpoint::NativeBottomUpCheckpoint;
-use crate::lotus::message::chain::ChainHeadResponse;
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
@@ -127,8 +126,8 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
 /// Trait to interact with a subnet to query the necessary information for top down checkpoint.
 #[async_trait]
 pub trait TopDownCheckpointQuery: Send + Sync {
-    /// Returns the chain head
-    async fn chain_head(&self) -> Result<ChainHeadResponse>;
+    /// Returns the chain head height
+    async fn chain_head_height(&self) -> Result<ChainEpoch>;
     /// Returns the list of top down messages
     async fn get_top_down_msgs(
         &self,

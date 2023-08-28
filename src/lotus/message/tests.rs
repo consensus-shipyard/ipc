@@ -31,7 +31,7 @@ fn test_ipc_address_from_map() {
     {
         "From": {
             "SubnetId": {
-                "Root": "123",
+                "Root": 123,
                 "Children": ["f064"]
             },
             "RawAddress": "f064"
@@ -67,7 +67,7 @@ fn test_subnet_from_map() {
     let raw_str = r#"
     {
         "ID": {
-            "Root": "123",
+            "Root": 123,
             "Children": ["f01", "f064"]
         }
     }"#;
@@ -142,7 +142,7 @@ fn test_subnet_info_from_str() {
     let raw_str = r#"
     {
         "ID": {
-            "Root": "123",
+            "Root": 123,
             "Children": ["f010000000002"]
         },
         "Stake": "10000000000000000000",
@@ -166,7 +166,7 @@ fn test_checkpoint_template_from_str() {
     {
     "Data": {
         "Source": {
-            "Root": "123",
+            "Root": 123,
             "Children": ["f01002"]
         },
         "Proof": null,

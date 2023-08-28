@@ -29,7 +29,6 @@ use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
 use crate::config::Subnet;
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::{
     IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse, QueryValidatorSetResponse,
     SubnetInfo,
@@ -49,8 +48,9 @@ pub struct LotusSubnetManager<T: JsonRpcClient> {
 
 #[async_trait]
 impl<T: JsonRpcClient + Send + Sync> TopDownCheckpointQuery for LotusSubnetManager<T> {
-    async fn chain_head(&self) -> Result<ChainHeadResponse> {
-        self.lotus_client.chain_head().await
+    async fn chain_head_height(&self) -> Result<ChainEpoch> {
+        let head = self.lotus_client.chain_head().await?;
+        Ok(head.height as ChainEpoch)
     }
 
     async fn get_top_down_msgs(

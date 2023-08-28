@@ -11,9 +11,7 @@ use crate::checkpoint::{
 };
 use crate::config::Subnet;
 use crate::lotus::client::LotusJsonRPCClient;
-use crate::lotus::message::chain::ChainHeadResponse;
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
-use crate::lotus::LotusClient;
 use crate::manager::subnet::TopDownCheckpointQuery;
 use crate::manager::{EthManager, EthSubnetManager, SubnetInfo, SubnetManager};
 use anyhow::anyhow;
@@ -60,8 +58,8 @@ impl FevmSubnetManager {
 
 #[async_trait]
 impl TopDownCheckpointQuery for FevmSubnetManager {
-    async fn chain_head(&self) -> anyhow::Result<ChainHeadResponse> {
-        self.lotus_client.chain_head().await
+    async fn chain_head_height(&self) -> anyhow::Result<ChainEpoch> {
+        self.evm_subnet_manager.chain_head_height().await
     }
 
     async fn get_top_down_msgs(
@@ -70,7 +68,9 @@ impl TopDownCheckpointQuery for FevmSubnetManager {
         start_epoch: ChainEpoch,
         end_epoch: ChainEpoch,
     ) -> anyhow::Result<Vec<CrossMsg>> {
-        self.top_down_msgs(subnet_id, start_epoch, end_epoch).await
+        self.evm_subnet_manager
+            .get_top_down_msgs(subnet_id, start_epoch, end_epoch)
+            .await
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> anyhow::Result<Vec<u8>> {

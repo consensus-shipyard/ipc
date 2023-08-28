@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: MIT
 //! Get the chain head of the subnet
 
-use crate::lotus::message::chain::ChainHeadResponse;
 use crate::server::handlers::manager::check_subnet;
 use crate::server::handlers::manager::subnet::SubnetManagerPool;
 use crate::server::JsonRPCRequestHandler;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -32,7 +32,7 @@ impl ChainHeadHandler {
 #[async_trait]
 impl JsonRPCRequestHandler for ChainHeadHandler {
     type Request = ChainHeadParams;
-    type Response = ChainHeadResponse;
+    type Response = ChainEpoch;
 
     async fn handle(&self, request: Self::Request) -> anyhow::Result<Self::Response> {
         let subnet = SubnetID::from_str(&request.subnet_id)?;
@@ -44,6 +44,6 @@ impl JsonRPCRequestHandler for ChainHeadHandler {
         let subnet_config = conn.subnet();
         check_subnet(subnet_config)?;
 
-        conn.manager().chain_head().await
+        conn.manager().chain_head_height().await
     }
 }
