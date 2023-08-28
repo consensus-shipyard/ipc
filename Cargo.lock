@@ -2974,9 +2974,9 @@ dependencies = [
  "fvm_shared",
  "hex",
  "indoc",
- "ipc-agent-sdk",
  "ipc-gateway",
  "ipc-identity",
+ "ipc-provider",
  "ipc-sdk",
  "ipc-subnet-actor",
  "log",
@@ -2999,26 +2999,6 @@ dependencies = [
  "url",
  "warp",
  "zeroize",
-]
-
-[[package]]
-name = "ipc-agent-sdk"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-channel",
- "async-trait",
- "cid",
- "futures-util",
- "fvm_shared",
- "ipc-sdk",
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tokio-tungstenite 0.18.0",
- "url",
 ]
 
 [[package]]
@@ -3079,6 +3059,26 @@ dependencies = [
  "tokio",
  "xsalsa20poly1305",
  "zeroize",
+]
+
+[[package]]
+name = "ipc-provider"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-channel",
+ "async-trait",
+ "cid",
+ "futures-util",
+ "fvm_shared",
+ "ipc-sdk",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite 0.18.0",
+ "url",
 ]
 
 [[package]]
@@ -3190,8 +3190,8 @@ dependencies = [
  "env_logger 0.10.0",
  "fvm_shared",
  "ipc-agent",
- "ipc-agent-sdk",
  "ipc-identity",
+ "ipc-provider",
  "ipc-sdk",
  "log",
  "num-traits",
