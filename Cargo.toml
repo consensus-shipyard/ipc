@@ -4,9 +4,9 @@ members = [
 	# "ipc/daemon", 
 	# "ipc/cli",
 	# "ipc/testing/e2e", 
-	# "ipc/identity", 
 	# "ipc/testing/*",
 	# "ipc/provider",
+	"ipc/identity", 
 	"ipc/sdk"
 ]
 
