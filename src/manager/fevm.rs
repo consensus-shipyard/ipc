@@ -1,8 +1,10 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
+
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-// Copyright 2022-2023 Protocol Labs
-// SPDX-License-Identifier: MIT
+
 use crate::checkpoint::{
     create_proof, BottomUpHandler, CheckpointQuery, NativeBottomUpCheckpoint, TopDownHandler,
     VoteQuery,
