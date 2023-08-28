@@ -7,6 +7,7 @@ use cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 pub mod chain;
+pub mod ipc;
 
 /// Helper struct to interact with lotus node
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

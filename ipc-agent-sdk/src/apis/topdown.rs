@@ -3,10 +3,10 @@
 
 use crate::apis::{json_rpc_methods, IpcAgentClient};
 use crate::jsonrpc::JsonRpcClient;
+use crate::message::ipc::QueryValidatorSetResponse;
 use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_sdk::ValidatorSet;
 
 impl<T: JsonRpcClient> IpcAgentClient<T> {
     pub async fn get_top_down_msgs(
@@ -58,9 +58,9 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
         &self,
         subnet_id: &SubnetID,
         height: Option<ChainEpoch>,
-    ) -> anyhow::Result<ValidatorSet> {
+    ) -> anyhow::Result<QueryValidatorSetResponse> {
         self.json_rpc_client
-            .request::<ValidatorSet>(
+            .request::<QueryValidatorSetResponse>(
                 json_rpc_methods::QUERY_VALIDATOR_SET,
                 serde_json::json!({
                     "subnet": subnet_id.to_string(),
