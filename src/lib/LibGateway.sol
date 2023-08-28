@@ -50,7 +50,8 @@ library LibGateway {
         crossMessage.message.nonce = subnet.topDownNonce;
         subnet.topDownNonce += 1;
         subnet.circSupply += crossMessage.message.value;
-        subnet.topDownMsgs.push(crossMessage);
+
+        s.topDownMsgs[subnetId.toHash()][block.number].push(crossMessage);
     }
 
     /// @notice commit bottomup messages for their execution in the subnet. Adds the message to the checkpoint for future execution
@@ -75,6 +76,51 @@ library LibGateway {
         }
         // slither-disable-next-line unused-return
         Address.functionCall(to.normalize(), abi.encodeCall(ISubnetActor.reward, amount));
+    }
+
+    /// @notice get the list of top down messages from block number, we may also consider introducing pagination.
+    /// @param subnetId - The subnet id to fetch messages from
+    /// @param fromBlock - The starting block to get top down messages, inclusive.
+    /// @param toBlock - The ending block to get top down messages, inclusive.
+    function getTopDownMsgs(
+        SubnetID calldata subnetId,
+        uint256 fromBlock,
+        uint256 toBlock
+    ) internal view returns (CrossMsg[] memory) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        // invalid from block number
+        if (fromBlock > toBlock) {
+            return new CrossMsg[](0);
+        }
+
+        bytes32 subnetHash = subnetId.toHash();
+        uint256 msgLength = 0;
+        for (uint256 i = fromBlock; i <= toBlock; ) {
+            msgLength += s.topDownMsgs[subnetHash][i].length;
+            unchecked {
+                i++;
+            }
+        }
+
+        CrossMsg[] memory messages = new CrossMsg[](msgLength);
+        uint256 index = 0;
+        for (uint256 i = fromBlock; i <= toBlock; ) {
+            // perform copy
+            for (uint256 j = 0; j < s.topDownMsgs[subnetHash][i].length; ) {
+                messages[index] = s.topDownMsgs[subnetHash][i][j];
+                unchecked {
+                    j++;
+                    index++;
+                }
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+
+        return messages;
     }
 
     /// @notice returns the subnet created by a validator

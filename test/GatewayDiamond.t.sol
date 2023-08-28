@@ -264,12 +264,10 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         saDiamond = new SubnetActorDiamond(saDiamondCut, saConstructorParams);
         saManager = SubnetActorManagerFacet(address(saDiamond));
         saGetter = SubnetActorGetterFacet(address(saDiamond));
-
-        targetContract(address(gatewayDiamond));
     }
 
     function invariant_CrossMsgFee() public view {
-        require(gwGetter.crossMsgFee() == CROSS_MSG_FEE);
+        require(gwGetter.crossMsgFee() == CROSS_MSG_FEE, "gw.crossMsgFee == CROSS_MSG_FEE");
     }
 
     function testGatewayDiamond_Constructor() public view {
@@ -1453,7 +1451,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         require(gwGetter.getNetworkName().equals(destinationSubnet.commonParent(from)));
         require(gwGetter.appliedTopDownNonce() == 1);
 
-        CrossMsg[] memory msgs = gwGetter.getTopDownMsgs(id, 0);
+        CrossMsg[] memory msgs = gwGetter.getTopDownMsgs(id, block.number, block.number);
         require(msgs.length == 1);
         (bool exists, uint64 n) = gwGetter.getAppliedTopDownNonce(id);
         require(exists);
@@ -2263,25 +2261,29 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore, ) = getSubnet(address(saManager));
 
-        uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
-        uint256 expectedNonce = nonceBefore + 1;
-        uint256 expectedCircSupply = circSupplyBefore + fundAmountWithSubtractedFee;
+        uint256 expectedTopDownMsgsLength = 0;
+        {
+            expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
+            uint256 expectedNonce = nonceBefore + 1;
+            uint256 expectedCircSupply = circSupplyBefore + fundAmountWithSubtractedFee;
 
-        require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
+            require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
 
-        // vm.expectCall(address(sa), gwGetter.crossMsgFee(), abi.encodeWithSelector(sa.reward.selector), 1);
+            // vm.expectCall(address(sa), gwGetter.crossMsgFee(), abi.encodeWithSelector(sa.reward.selector), 1);
 
-        gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
+            gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
 
-        (, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(saManager));
+            (, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(saManager));
 
-        require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength);
+            require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength);
 
-        require(nonce == expectedNonce);
-        require(circSupply == expectedCircSupply);
+            require(nonce == expectedNonce);
+            require(circSupply == expectedCircSupply);
+        }
 
+        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(subnetId, block.number, block.number);
         for (uint256 msgIndex = 0; msgIndex < expectedTopDownMsgsLength; msgIndex++) {
-            CrossMsg memory topDownMsg = gwGetter.getSubnetTopDownMsg(subnetId, msgIndex);
+            CrossMsg memory topDownMsg = topDownMsgs[msgIndex];
 
             require(topDownMsg.message.nonce == msgIndex);
             require(topDownMsg.message.value == fundAmountWithSubtractedFee);

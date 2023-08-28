@@ -12,6 +12,9 @@ struct GatewayActorStorage {
     /// @notice List of subnets
     /// SubnetID => Subnet
     mapping(bytes32 => Subnet) subnets;
+    /// @notice a mapping of block number to cross messages
+    /// SubnetID => blockNumber => messages
+    mapping(bytes32 => mapping(uint256 => CrossMsg[])) topDownMsgs;
     /// @notice Postbox keeps track of all the cross-net messages triggered by
     /// an actor that need to be propagated further through the hierarchy.
     /// cross-net message id => CrossMsg
