@@ -20,8 +20,8 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
                 json_rpc_methods::LIST_TOPDOWN_MSGS,
                 serde_json::json!({
                     "subnet_id": subnet_id.to_string(),
-                    "start": start,
-                    "to": to,
+                    "start_epoch": start,
+                    "end_epoch": to,
                 }),
             )
             .await
