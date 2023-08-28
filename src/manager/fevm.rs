@@ -178,6 +178,17 @@ impl SubnetManager for FevmSubnetManager {
             .await
     }
 
+    async fn set_validator_worker_addr(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        validator_worker_addr: Address,
+    ) -> anyhow::Result<()> {
+        self.evm_subnet_manager
+            .set_validator_worker_addr(subnet, from, validator_worker_addr)
+            .await
+    }
+
     async fn send_value(
         &self,
         from: Address,

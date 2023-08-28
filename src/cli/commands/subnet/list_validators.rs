@@ -4,12 +4,12 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use ipc_agent_sdk::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use std::fmt::Debug;
 
 use crate::cli::commands::get_ipc_agent_url;
 use crate::cli::{CommandLineHandler, GlobalArguments};
 use crate::config::json_rpc_methods;
-use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
 use crate::server::query_validators::QueryValidatorSetParams;
 
@@ -28,6 +28,7 @@ impl CommandLineHandler for ListValidators {
 
         let params = QueryValidatorSetParams {
             subnet: arguments.subnet.clone(),
+            epoch: None,
         };
 
         let valset = json_rpc_client
