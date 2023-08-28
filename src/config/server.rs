@@ -11,7 +11,7 @@ pub struct Server {
 }
 
 pub mod json_rpc_methods {
-    pub const CHAIN_HEAD: &str = "ipc_chainHead";
+    pub const CHAIN_HEAD_HEIGHT: &str = "ipc_chainHeadHeight";
     pub const CREATE_SUBNET: &str = "ipc_createSubnet";
     pub const JOIN_SUBNET: &str = "ipc_joinSubnet";
     pub const RPC_SUBNET: &str = "ipc_rpcSubnet";

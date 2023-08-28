@@ -133,7 +133,7 @@ impl Handlers {
         handlers.insert(String::from(json_rpc_methods::SEND_VALUE), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(ChainHeadHandler::new(pool.clone()));
-        handlers.insert(String::from(json_rpc_methods::CHAIN_HEAD), h);
+        handlers.insert(String::from(json_rpc_methods::CHAIN_HEAD_HEIGHT), h);
 
         let h: Box<dyn HandlerWrapper> = Box::new(TopDownMsgsHandler::new(pool.clone()));
         handlers.insert(String::from(json_rpc_methods::LIST_TOPDOWN_MSGS), h);

@@ -3,7 +3,6 @@
 
 use crate::apis::{json_rpc_methods, IpcAgentClient};
 use crate::jsonrpc::JsonRpcClient;
-use crate::message::chain::ChainHeadResponse;
 use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
@@ -28,10 +27,10 @@ impl<T: JsonRpcClient> IpcAgentClient<T> {
             .await
     }
 
-    pub async fn get_chain_head(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainHeadResponse> {
+    pub async fn get_chain_head_height(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
         self.json_rpc_client
-            .request::<ChainHeadResponse>(
-                json_rpc_methods::CHAIN_HEAD,
+            .request::<ChainEpoch>(
+                json_rpc_methods::CHAIN_HEAD_HEIGHT,
                 serde_json::json!({
                     "subnet_id": subnet_id.to_string()
                 }),
