@@ -88,7 +88,7 @@ const STATE_WAIT_ALLOW_REPLACE: bool = true;
 /// # Examples
 /// ```no_run
 /// use ipc_agent::{lotus::LotusClient, lotus::client::LotusJsonRPCClient};
-/// use ipc_provider::jsonrpc::JsonRpcClientImpl;
+/// use ipc_agent_sdk::jsonrpc::JsonRpcClientImpl;
 /// use ipc_sdk::subnet_id::SubnetID;
 ///
 /// #[tokio::main]

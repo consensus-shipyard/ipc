@@ -4,9 +4,8 @@
 
 #![feature(let_chains)]
 
-pub mod apis;
 pub mod checkpoint;
 pub mod config;
+pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
-pub mod message;

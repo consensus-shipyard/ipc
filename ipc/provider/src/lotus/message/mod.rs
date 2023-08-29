@@ -1,13 +1,23 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Contains the RPC request and response messages
+//! This module contains the various response types to be used byt the lotus api.
+
+use std::str::FromStr;
 
 use anyhow::anyhow;
 use cid::Cid;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+
+#[cfg(test)]
+mod tests;
+
 pub mod chain;
+pub mod deserialize;
 pub mod ipc;
+pub mod mpool;
+pub mod serialize;
+pub mod state;
+pub mod wallet;
 
 /// Helper struct to interact with lotus node
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
