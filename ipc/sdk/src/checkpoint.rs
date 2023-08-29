@@ -89,7 +89,7 @@ impl BottomUpCheckpoint {
     /// Agents may set the source of a checkpoint using f2-based subnetIDs, \
     /// but actors are expected to use f0-based subnetIDs, thus the need to enforce
     /// that the source is a f0-based subnetID.
-    pub fn enforce_f0_source(&mut self, rt: &mut impl Runtime) -> anyhow::Result<()> {
+    pub fn enforce_f0_source(&mut self, rt: &impl Runtime) -> anyhow::Result<()> {
         self.data.source = self.source().f0_id(rt);
         Ok(())
     }

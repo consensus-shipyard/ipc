@@ -33,6 +33,8 @@ hex = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 log = { workspace = true }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 
 [features]
 with-ethers = ["ethers"]

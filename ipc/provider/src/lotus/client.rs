@@ -87,8 +87,8 @@ const STATE_WAIT_ALLOW_REPLACE: bool = true;
 /// extension.
 /// # Examples
 /// ```no_run
-/// use ipc_agent::{lotus::LotusClient, lotus::client::LotusJsonRPCClient};
-/// use ipc_agent_sdk::jsonrpc::JsonRpcClientImpl;
+/// use ipc_provider::{lotus::LotusClient, lotus::client::LotusJsonRPCClient};
+/// use ipc_provider::jsonrpc::JsonRpcClientImpl;
 /// use ipc_sdk::subnet_id::SubnetID;
 ///
 /// #[tokio::main]
@@ -97,7 +97,7 @@ const STATE_WAIT_ALLOW_REPLACE: bool = true;
 ///     let n = LotusJsonRPCClient::new(h, SubnetID::default());
 ///     println!(
 ///         "wallets: {:?}",
-///         n.wallet_new(ipc_agent::lotus::message::wallet::WalletKeyType::Secp256k1).await
+///         n.wallet_new(ipc_provider::lotus::message::wallet::WalletKeyType::Secp256k1).await
 ///     );
 /// }
 /// ```
