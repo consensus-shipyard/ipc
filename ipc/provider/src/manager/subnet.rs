@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-///! IPC node-specific traits.
+
 use std::collections::HashMap;
 
 use crate::checkpoint::NativeBottomUpCheckpoint;
