@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
-pub mod apis;
+#![feature(let_chains)]
+
+pub mod checkpoint;
+pub mod config;
 pub mod jsonrpc;
-pub mod message;
+pub mod lotus;
+pub mod manager;

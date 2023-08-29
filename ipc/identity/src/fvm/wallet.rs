@@ -200,7 +200,7 @@ pub fn find_key(addr: &Address, keystore: &KeyStore) -> Result<Key, Error> {
     Ok(new_key)
 }
 
-pub fn try_find(addr: &Address, keystore: &mut KeyStore) -> Result<KeyInfo, Error> {
+pub fn try_find(addr: &Address, keystore: &KeyStore) -> Result<KeyInfo, Error> {
     let key_string = format!("wallet-{addr}");
     match keystore.get(&key_string) {
         Ok(k) => Ok(k),
