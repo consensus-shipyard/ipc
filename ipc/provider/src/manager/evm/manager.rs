@@ -1,5 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -17,10 +18,11 @@ use ethers::types::{Eip1559TransactionRequest, I256, U256};
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_gateway::TopDownCheckpoint;
 use ipc_identity::{EvmKeyStore, PersistentKeyStore};
+use ipc_sdk::checkpoint::TopDownCheckpoint;
+use ipc_sdk::cross::CrossMsg;
+use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_subnet_actor::ConstructParams;
 use num_traits::ToPrimitive;
 
 use crate::config::subnet::SubnetConfig;
@@ -96,7 +98,7 @@ impl TopDownCheckpointQuery for EthSubnetManager {
         subnet_id: &SubnetID,
         start_epoch: ChainEpoch,
         end_epoch: ChainEpoch,
-    ) -> Result<Vec<ipc_gateway::CrossMsg>> {
+    ) -> Result<Vec<ipc_sdk::cross::CrossMsg>> {
         self.top_down_msgs(subnet_id, start_epoch, end_epoch).await
     }
 
@@ -386,7 +388,7 @@ impl SubnetManager for EthSubnetManager {
         &self,
         gateway_addr: Address,
         from: Address,
-        cross_msg: ipc_sdk::cross::CrossMsg,
+        cross_msg: CrossMsg,
     ) -> Result<()> {
         self.ensure_same_gateway(&gateway_addr)?;
 

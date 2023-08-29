@@ -10,7 +10,7 @@ use cid::Cid;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use ipc_gateway::{BottomUpCheckpoint, TopDownCheckpoint};
+use ipc_sdk::checkpoint::{BottomUpCheckpoint, TopDownCheckpoint};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::de::DeserializeOwned;

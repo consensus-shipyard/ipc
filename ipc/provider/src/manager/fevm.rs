@@ -21,10 +21,11 @@ use fil_actors_runtime::cbor;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use ipc_gateway::{CrossMsg, TopDownCheckpoint};
 use ipc_identity::{PersistentKeyStore, Wallet};
+use ipc_sdk::checkpoint::TopDownCheckpoint;
+use ipc_sdk::cross::CrossMsg;
+use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_subnet_actor::ConstructParams;
 
 pub struct FevmSubnetManager {
     evm_subnet_manager: EthSubnetManager,

@@ -6,8 +6,11 @@ use fvm_shared::{address::Address, econ::TokenAmount};
 use integer_encoding::VarInt;
 
 pub mod address;
+pub mod checkpoint;
 pub mod cross;
 pub mod error;
+pub mod gateway;
+pub mod subnet;
 pub mod subnet_id;
 
 /// Encodes the a ChainEpoch as a varInt for its use

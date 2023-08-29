@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use ipc_gateway::checkpoint::BatchCrossMsgs;
+use ipc_sdk::checkpoint::BatchCrossMsgs;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
 use serde::ser::SerializeStruct;
@@ -291,7 +291,7 @@ impl<'a> Serialize for SerializeToJson<&'a BatchCrossMsgs> {
 #[cfg(test)]
 mod tests {
     use crate::checkpoint::{NativeBottomUpCheckpoint, NativeChildCheck};
-    use ipc_gateway::checkpoint::BatchCrossMsgs;
+    use ipc_sdk::checkpoint::BatchCrossMsgs;
     use ipc_sdk::subnet_id::SubnetID;
 
     #[test]

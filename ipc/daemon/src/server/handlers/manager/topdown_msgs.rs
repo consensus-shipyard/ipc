@@ -8,7 +8,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
-use ipc_gateway::CrossMsg;
+use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 

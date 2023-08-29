@@ -9,7 +9,7 @@ mod manager;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use ipc_gateway::TopDownCheckpoint;
+use ipc_sdk::checkpoint::TopDownCheckpoint;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 

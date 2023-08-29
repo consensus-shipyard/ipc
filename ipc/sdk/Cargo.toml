@@ -20,6 +20,8 @@ fvm_shared = { workspace = true }
 integer-encoding = { version = "3.0.3", default-features = false }
 lazy_static = { workspace = true }
 log = { workspace = true }
+cid = { workspace = true }
+primitives = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }

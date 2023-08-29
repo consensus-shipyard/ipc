@@ -6,9 +6,10 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
-use ipc_gateway::checkpoint::BatchCrossMsgs;
-use ipc_gateway::{BottomUpCheckpoint, Status};
+use ipc_gateway::Status;
 use ipc_sdk::address::IPCAddress;
+use ipc_sdk::checkpoint::BatchCrossMsgs;
+use ipc_sdk::checkpoint::BottomUpCheckpoint;
 use ipc_sdk::cross::{CrossMsg, StorableMsg};
 use ipc_sdk::subnet_id::SubnetID;
 use primitives::TCid;
@@ -233,7 +234,7 @@ impl TryFrom<BottomUpCheckpointWrapper> for BottomUpCheckpoint {
                         .map(|cid_map| Cid::try_from(cid_map).map(TCid::from))
                         .collect();
 
-                    Ok(ipc_gateway::checkpoint::ChildCheck {
+                    Ok(ipc_sdk::checkpoint::ChildCheck {
                         source: c.source,
                         checks: checks?,
                     })
@@ -251,7 +252,7 @@ impl TryFrom<BottomUpCheckpointWrapper> for BottomUpCheckpoint {
         };
         log::debug!("cross_msgs: {cross_msgs:?}");
 
-        let data = ipc_gateway::checkpoint::CheckData {
+        let data = ipc_sdk::checkpoint::CheckData {
             source: checkpoint_response.data.source,
             proof: checkpoint_response.data.proof.unwrap_or_default(),
             epoch: checkpoint_response.data.epoch,

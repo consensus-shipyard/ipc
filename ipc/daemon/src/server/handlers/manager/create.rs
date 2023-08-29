@@ -9,7 +9,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_subnet_actor::{ConsensusType, ConstructParams};
+use ipc_sdk::subnet::{ConsensusType, ConstructParams};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;

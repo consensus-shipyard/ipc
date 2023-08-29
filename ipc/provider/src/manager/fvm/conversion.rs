@@ -3,8 +3,8 @@
 
 use crate::checkpoint::{NativeBottomUpCheckpoint, NativeChildCheck};
 use cid::Cid;
-use ipc_gateway::checkpoint::{CheckData, ChildCheck};
-use ipc_gateway::BottomUpCheckpoint;
+use ipc_sdk::checkpoint::BottomUpCheckpoint;
+use ipc_sdk::checkpoint::{CheckData, ChildCheck};
 use primitives::TCid;
 
 impl TryFrom<&NativeBottomUpCheckpoint> for BottomUpCheckpoint {

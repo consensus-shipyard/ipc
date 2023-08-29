@@ -44,9 +44,6 @@ ethers-contract = { workspace = true }
 ethers = { workspace = true }
 fvm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true }
-ipc-sdk = { workspace = true }
-ipc-subnet-actor = { workspace = true }
-ipc-gateway = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 primitives = { workspace = true }
 

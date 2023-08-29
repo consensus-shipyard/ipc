@@ -8,8 +8,8 @@ use crate::manager::evm::manager::{
 };
 use anyhow::anyhow;
 use fvm_shared::clock::ChainEpoch;
-use ipc_gateway::checkpoint::BatchCrossMsgs;
-use ipc_gateway::TopDownCheckpoint;
+use ipc_sdk::checkpoint::BatchCrossMsgs;
+use ipc_sdk::checkpoint::TopDownCheckpoint;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 

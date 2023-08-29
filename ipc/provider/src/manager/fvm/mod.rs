@@ -19,13 +19,12 @@ use fil_actors_runtime::{builtin::singletons::INIT_ACTOR_ADDR, cbor};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_SEND;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
-use ipc_gateway::{
-    BottomUpCheckpoint, FundParams, PropagateParams, ReleaseParams, TopDownCheckpoint,
-};
 use ipc_identity::Wallet;
+use ipc_sdk::checkpoint::{BottomUpCheckpoint, TopDownCheckpoint};
 use ipc_sdk::cross::CrossMsg;
+use ipc_sdk::gateway::{FundParams, PropagateParams, ReleaseParams};
+use ipc_sdk::subnet::{ConstructParams, JoinParams, MANIFEST_ID};
 use ipc_sdk::subnet_id::SubnetID;
-use ipc_subnet_actor::{types::MANIFEST_ID, ConstructParams, JoinParams};
 
 use crate::config::Subnet;
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
