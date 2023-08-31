@@ -1,1 +1,1 @@
-ActorState(Address { payload: ID(6447182068707681890) })
+ActorState { address: Address { payload: Actor([93, 69, 55, 39, 232, 255, 217, 7, 156, 65, 255, 19, 229, 113, 88, 59, 1, 6, 251, 179]) }, pending: true }

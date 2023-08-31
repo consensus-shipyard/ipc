@@ -8,13 +8,16 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
-use ethers_core::types::{self as et, BlockId};
+use ethers_core::types::{self as et, BlockId, BlockNumber};
 use fendermint_rpc::client::{FendermintClient, TendermintClient};
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::{evm, system};
+use fendermint_vm_message::query::ActorState;
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_message::{chain::ChainMessage, conv::from_eth::to_fvm_address};
 use fvm_ipld_encoding::{de::DeserializeOwned, RawBytes};
+use fvm_shared::address::Address;
+use fvm_shared::ActorID;
 use fvm_shared::{chainid::ChainID, econ::TokenAmount, error::ExitCode, message::Message};
 use rand::Rng;
 use tendermint::block::Height;
@@ -209,6 +212,25 @@ where
                 format!("block {block_hash} not found"),
             ),
         }
+    }
+
+    /// Get the state of an actor at either a specific block, or the latest, or the pending tag.
+    pub async fn actor_state_by_block_id(
+        &self,
+        block_id: BlockId,
+        addr: Address,
+    ) -> JsonRpcResult<Option<(ActorID, ActorState)>> {
+        let res = match block_id {
+            BlockId::Number(BlockNumber::Pending) => self.client.pending_state(&addr).await?,
+            BlockId::Number(BlockNumber::Latest | BlockNumber::Finalized | BlockNumber::Safe) => {
+                self.client.actor_state(&addr, None).await?
+            }
+            _ => {
+                let header = self.header_by_id(block_id).await?;
+                self.client.actor_state(&addr, Some(header.height)).await?
+            }
+        };
+        Ok(res.value)
     }
 
     /// Fetch transaction results to produce the full block.

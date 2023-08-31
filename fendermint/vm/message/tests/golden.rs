@@ -71,7 +71,7 @@ mod query {
 
         golden_cbor! { "query/request", actor_state, |g| {
             loop {
-                if let msg @ FvmQuery::ActorState(_) = FvmQuery::arbitrary(g) {
+                if let msg @ FvmQuery::ActorState { .. } = FvmQuery::arbitrary(g) {
                     return msg
                 }
             }

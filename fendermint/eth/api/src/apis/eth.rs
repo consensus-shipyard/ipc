@@ -210,12 +210,10 @@ pub async fn get_balance<C>(
 where
     C: Client + Sync + Send,
 {
-    let header = data.header_by_id(block_id).await?;
-    let height = header.height;
     let addr = to_fvm_address(addr);
-    let res = data.client.actor_state(&addr, Some(height)).await?;
+    let res = data.actor_state_by_block_id(block_id, addr).await?;
 
-    match res.value {
+    match res {
         Some((_, state)) => Ok(to_eth_tokens(&state.balance)?),
         None => error(ExitCode::USR_NOT_FOUND, format!("actor {addr} not found")),
     }
@@ -345,12 +343,10 @@ pub async fn get_transaction_count<C>(
 where
     C: Client + Sync + Send,
 {
-    let header = data.header_by_id(block_id).await?;
-    let height = header.height;
     let addr = to_fvm_address(addr);
-    let res = data.client.actor_state(&addr, Some(height)).await?;
+    let res = data.actor_state_by_block_id(block_id, addr).await?;
 
-    match res.value {
+    match res {
         Some((_, state)) => {
             let nonce = state.sequence;
             Ok(et::U64::from(nonce))

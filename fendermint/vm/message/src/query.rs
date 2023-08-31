@@ -22,8 +22,12 @@ pub enum FvmQuery {
     Ipld(Cid),
     /// Query the state of an actor.
     ///
+    /// The `pending` flag can be used so that the query takes the check state into account.
+    /// It is only effective in combination with querying the latest height. The reason it
+    /// has to be asked for explicitly is because it involves locking.
+    ///
     /// The response is IPLD encoded `ActorState`.
-    ActorState(Address),
+    ActorState { address: Address, pending: bool },
     /// Immediately execute an FVM message, without adding it to the blockchain.
     ///
     /// The main motivation for this method is to facilitate `eth_call`.
@@ -113,7 +117,10 @@ mod arb {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match u8::arbitrary(g) % 5 {
                 0 => FvmQuery::Ipld(ArbCid::arbitrary(g).0),
-                1 => FvmQuery::ActorState(ArbAddress::arbitrary(g).0),
+                1 => FvmQuery::ActorState {
+                    address: ArbAddress::arbitrary(g).0,
+                    pending: bool::arbitrary(g),
+                },
                 2 => FvmQuery::Call(Box::new(SignedMessage::arbitrary(g).into_message())),
                 3 => FvmQuery::EstimateGas(Box::new(SignedMessage::arbitrary(g).into_message())),
                 _ => FvmQuery::StateParams,

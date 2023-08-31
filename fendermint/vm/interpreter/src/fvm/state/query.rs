@@ -9,14 +9,18 @@ use cid::Cid;
 use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::query::ActorState;
+use fvm::state_tree::StateTree;
 use fvm::{engine::MultiEngine, executor::ApplyRet};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, chainid::ChainID, clock::ChainEpoch, ActorID};
 use num_traits::Zero;
 
+use crate::fvm::state::FvmCheckState;
 use crate::fvm::{store::ReadOnlyBlockstore, FvmMessage};
 
 use super::{FvmExecState, FvmStateParams};
+
+type CheckState<DB> = Arc<tokio::sync::Mutex<Option<FvmCheckState<DB>>>>;
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
@@ -35,6 +39,8 @@ where
     state_params: FvmStateParams,
     /// Lazy loaded execution state.
     exec_state: RefCell<Option<FvmExecState<ReadOnlyBlockstore<DB>>>>,
+    /// Lazy locked check state.
+    check_state: CheckState<DB>,
 }
 
 impl<DB> FvmQueryState<DB>
@@ -46,6 +52,7 @@ where
         multi_engine: Arc<MultiEngine>,
         block_height: ChainEpoch,
         state_params: FvmStateParams,
+        check_state: CheckState<DB>,
     ) -> anyhow::Result<Self> {
         // Sanity check that the blockstore contains the supplied state root.
         if !blockstore
@@ -64,6 +71,7 @@ where
             block_height,
             state_params,
             exec_state: RefCell::new(None),
+            check_state,
         };
 
         Ok(state)
@@ -111,21 +119,44 @@ where
     ) -> anyhow::Result<Option<(ActorID, ActorState)>> {
         self.with_exec_state(use_cache, |exec_state| {
             let state_tree = exec_state.state_tree_mut();
-            if let Some(id) = state_tree.lookup_id(addr)? {
-                Ok(state_tree.get_actor(id)?.map(|st| {
-                    let st = ActorState {
-                        code: st.code,
-                        state: st.state,
-                        sequence: st.sequence,
-                        balance: st.balance,
-                        delegated_address: st.delegated_address,
-                    };
-                    (id, st)
-                }))
-            } else {
-                Ok(None)
-            }
+            get_actor_state(state_tree, addr)
         })
+    }
+
+    /// Get the pending state of an actor, which is what we use for checking transaction submissions
+    /// and gets reset after reach block commit.
+    ///
+    /// This is very similar to the `actor_state` method, but works on the `check_state`,
+    /// so that we can take transactions in the mempool into account. The drawback is that
+    /// it involves locking a single instance of an in-memory `StateTree` (it cannot be
+    /// cloned or shared between threads), and therefore we should only use it if we really
+    /// need to.
+    ///
+    /// If there is no check state (because nobody sent a transaction), fall back on actor state.
+    pub async fn pending_state(
+        // Consumed because `.lock().await` would not work if this was just a reference,
+        // since `FvmQueryState` is not `Sync`.
+        self,
+        addr: &Address,
+    ) -> anyhow::Result<(Self, Option<(ActorID, ActorState)>)> {
+        // Release the lock ASAP.
+        let state = {
+            let mut guard = self.check_state.lock().await;
+
+            if let Some(check_state) = guard.as_mut() {
+                get_actor_state(check_state.state_tree_mut(), addr).map(Some)?
+            } else {
+                None
+            }
+        };
+
+        let ret = if let Some(ret) = state {
+            ret
+        } else {
+            self.actor_state(false, addr)?
+        };
+
+        Ok((self, ret))
     }
 
     /// Run a "read-only" message.
@@ -167,5 +198,28 @@ where
 {
     fn chain_id(&self) -> ChainID {
         ChainID::from(self.state_params.chain_id)
+    }
+}
+
+fn get_actor_state<DB>(
+    state_tree: &StateTree<DB>,
+    addr: &Address,
+) -> anyhow::Result<Option<(ActorID, ActorState)>>
+where
+    DB: Blockstore,
+{
+    if let Some(id) = state_tree.lookup_id(addr)? {
+        Ok(state_tree.get_actor(id)?.map(|st| {
+            let st = ActorState {
+                code: st.code,
+                state: st.state,
+                sequence: st.sequence,
+                balance: st.balance,
+                delegated_address: st.delegated_address,
+            };
+            (id, st)
+        }))
+    } else {
+        Ok(None)
     }
 }

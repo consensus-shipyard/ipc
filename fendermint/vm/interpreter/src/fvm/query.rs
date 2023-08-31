@@ -39,13 +39,22 @@ where
 
     async fn query(
         &self,
-        state: Self::State,
+        mut state: Self::State,
         qry: Self::Query,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         let res = match qry {
             FvmQuery::Ipld(cid) => FvmQueryRet::Ipld(state.store_get(&cid)?),
-            FvmQuery::ActorState(addr) => {
-                FvmQueryRet::ActorState(state.actor_state(false, &addr)?.map(Box::new))
+            FvmQuery::ActorState {
+                address,
+                pending: false,
+            } => FvmQueryRet::ActorState(state.actor_state(false, &address)?.map(Box::new)),
+            FvmQuery::ActorState {
+                address,
+                pending: true,
+            } => {
+                let (st, ret) = state.pending_state(&address).await?;
+                state = st;
+                FvmQueryRet::ActorState(ret.map(Box::new))
             }
             FvmQuery::Call(msg) => {
                 let from = msg.from;

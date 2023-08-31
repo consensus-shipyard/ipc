@@ -40,17 +40,47 @@ pub trait QueryClient: Sync {
         address: &Address,
         height: Option<Height>,
     ) -> anyhow::Result<QueryResponse<Option<(ActorID, ActorState)>>> {
-        let res = self.perform(FvmQuery::ActorState(*address), height).await?;
+        let res = self
+            .perform(
+                FvmQuery::ActorState {
+                    address: *address,
+                    pending: false,
+                },
+                height,
+            )
+            .await?;
         let height = res.height;
-        let value = extract_opt(res, |res| {
-            let state: ActorState =
-                fvm_ipld_encoding::from_slice(&res.value).context("failed to decode state")?;
+        let value = extract_actor_state(res)?;
+        Ok(QueryResponse { height, value })
+    }
 
-            let id: ActorID =
-                fvm_ipld_encoding::from_slice(&res.key).context("failed to decode ID")?;
-
-            Ok((id, state))
-        })?;
+    /// Query the the potentially pending state of an actor.
+    ///
+    /// This takes into account any pending state changes in the check state,
+    /// which can affect the balance and the nonce. If there are no pending
+    /// changes it behaves like the `actor_state` method called with no `height`,
+    /// however, it is much less efficient because it involves locking the
+    /// check state, and so it should only be called by clients that rapidly
+    /// wish to send transactions to the API and don't want to track their
+    /// own nonce. Otherwise it's much better to use `actor_state` only.
+    ///
+    /// Note that the other parts of the state, namely the state root,
+    /// will not change, because we don't execute transactions during checks.
+    async fn pending_state(
+        &self,
+        address: &Address,
+    ) -> anyhow::Result<QueryResponse<Option<(ActorID, ActorState)>>> {
+        let res = self
+            .perform(
+                FvmQuery::ActorState {
+                    address: *address,
+                    pending: true,
+                },
+                None,
+            )
+            .await?;
+        let height = res.height;
+        let value = extract_actor_state(res)?;
         Ok(QueryResponse { height, value })
     }
 
@@ -142,6 +172,17 @@ where
     } else {
         f(res)
     }
+}
+
+fn extract_actor_state(res: AbciQuery) -> anyhow::Result<Option<(ActorID, ActorState)>> {
+    extract_opt(res, |res| {
+        let state: ActorState =
+            fvm_ipld_encoding::from_slice(&res.value).context("failed to decode state")?;
+
+        let id: ActorID = fvm_ipld_encoding::from_slice(&res.key).context("failed to decode ID")?;
+
+        Ok((id, state))
+    })
 }
 
 fn is_not_found(res: &AbciQuery) -> bool {

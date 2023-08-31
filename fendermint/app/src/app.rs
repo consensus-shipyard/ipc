@@ -447,6 +447,7 @@ where
             self.multi_engine.clone(),
             block_height.try_into()?,
             state_params,
+            self.check_state.clone(),
         )
         .context("error creating query state")?;
 
