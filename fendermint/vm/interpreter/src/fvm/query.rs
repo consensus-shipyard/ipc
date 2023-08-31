@@ -78,14 +78,20 @@ where
                 // Populate gas message parameters.
                 let est = match self.estimate_gassed_msg(&state, &mut msg)? {
                     Some(ret) => {
-                        // return immediately if there is something is returned,
+                        // return immediately if something is returned,
                         // it means that the message failed to execute so there's
                         // no point on estimating the gas.
                         ret
                     }
                     None => {
                         // perform a gas search for an accurate value
-                        self.gas_search(&state, &msg)?
+                        let mut gas = self.gas_search(&state, &msg)?;
+                        // we need an additional overestimation for the case where
+                        // the exact value is returned as part of the gas search
+                        // (for some reason with subsequent calls sometimes this is the case).
+                        gas.gas_limit =
+                            (gas.gas_limit as f64 * self.gas_overestimation_rate) as u64;
+                        gas
                     }
                 };
 
