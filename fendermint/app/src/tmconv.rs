@@ -79,6 +79,7 @@ pub fn to_deliver_tx(ret: FvmApplyRet, domain_hash: Option<DomainHash>) -> respo
             .apply_ret
             .failure_info
             .map(|i| i.to_string())
+            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| to_error_msg(receipt.exit_code).to_owned()),
         gas_wanted,
         gas_used,
@@ -92,6 +93,7 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
         code: to_code(ret.exit_code),
         info: ret
             .info
+            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| to_error_msg(ret.exit_code).to_owned()),
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),

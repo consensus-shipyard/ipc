@@ -52,17 +52,32 @@ where
             return checked(
                 state,
                 ExitCode::SYS_ASSERTION_FAILED,
-                Some(format!("{:#}", e)),
+                Some(format!("pre-check failure: {:#}", e)),
             );
         }
 
         // NOTE: This would be a great place for let-else, but clippy runs into a compilation bug.
         let state_tree = state.state_tree_mut();
+
         if let Some(id) = state_tree.lookup_id(&msg.from)? {
             if let Some(mut actor) = state_tree.get_actor(id)? {
                 let balance_needed = msg.gas_fee_cap * msg.gas_limit;
-                if actor.balance < balance_needed || actor.sequence != msg.sequence {
-                    return checked(state, ExitCode::SYS_SENDER_STATE_INVALID, None);
+                if actor.balance < balance_needed {
+                    return checked(
+                        state,
+                        ExitCode::SYS_SENDER_STATE_INVALID,
+                        Some(
+                            format! {"actor balance {} less than needed {}", actor.balance, balance_needed},
+                        ),
+                    );
+                } else if actor.sequence != msg.sequence {
+                    return checked(
+                        state,
+                        ExitCode::SYS_SENDER_STATE_INVALID,
+                        Some(
+                            format! {"expected sequence {}, got {}", actor.sequence, msg.sequence},
+                        ),
+                    );
                 } else {
                     actor.sequence += 1;
                     actor.balance -= balance_needed;
@@ -71,6 +86,11 @@ where
                 }
             }
         }
-        return checked(state, ExitCode::SYS_SENDER_INVALID, None);
+
+        checked(
+            state,
+            ExitCode::SYS_SENDER_INVALID,
+            Some(format! {"cannot find actor {}", msg.from}),
+        )
     }
 }
