@@ -5,16 +5,18 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_vm_genesis::Genesis;
 use fendermint_vm_message::chain::ChainMessage;
+use fvm_ipld_encoding::Error as IpldError;
 
 use crate::{
-    chain::{ChainMessageApplyRet, ChainMessageCheckRet},
+    chain::{ChainMessageApplyRet, ChainMessageCheckRes},
     fvm::{FvmQuery, FvmQueryRet},
+    signed::SignedMessageApplyRet,
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 
-pub type BytesMessageApplyRet = Result<ChainMessageApplyRet, fvm_ipld_encoding::Error>;
-pub type BytesMessageCheckRet = Result<ChainMessageCheckRet, fvm_ipld_encoding::Error>;
-pub type BytesMessageQueryRet = Result<FvmQueryRet, fvm_ipld_encoding::Error>;
+pub type BytesMessageApplyRes = Result<ChainMessageApplyRet, IpldError>;
+pub type BytesMessageCheckRes = Result<ChainMessageCheckRes, IpldError>;
+pub type BytesMessageQueryRes = Result<FvmQueryRet<SignedMessageApplyRet>, IpldError>;
 
 /// Close to what the ABCI sends: (Path, Bytes).
 pub type BytesMessageQuery = (String, Vec<u8>);
@@ -148,7 +150,7 @@ where
     type State = I::State;
     type Message = Vec<u8>;
     type BeginOutput = I::BeginOutput;
-    type DeliverOutput = BytesMessageApplyRet;
+    type DeliverOutput = BytesMessageApplyRes;
     type EndOutput = I::EndOutput;
 
     async fn deliver(
@@ -191,11 +193,11 @@ where
 #[async_trait]
 impl<I> CheckInterpreter for BytesMessageInterpreter<I>
 where
-    I: CheckInterpreter<Message = ChainMessage, Output = ChainMessageCheckRet>,
+    I: CheckInterpreter<Message = ChainMessage, Output = ChainMessageCheckRes>,
 {
     type State = I::State;
     type Message = Vec<u8>;
-    type Output = BytesMessageCheckRet;
+    type Output = BytesMessageCheckRes;
 
     async fn check(
         &self,
@@ -220,11 +222,11 @@ where
 #[async_trait]
 impl<I> QueryInterpreter for BytesMessageInterpreter<I>
 where
-    I: QueryInterpreter<Query = FvmQuery, Output = FvmQueryRet>,
+    I: QueryInterpreter<Query = FvmQuery, Output = FvmQueryRet<SignedMessageApplyRet>>,
 {
     type State = I::State;
     type Query = BytesMessageQuery;
-    type Output = BytesMessageQueryRet;
+    type Output = BytesMessageQueryRes;
 
     async fn query(
         &self,

@@ -4,7 +4,10 @@
 use anyhow::{anyhow, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::Validator;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet};
+use fendermint_vm_interpreter::{
+    fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet},
+    signed::SignedMessageApplyRet,
+};
 use fvm_shared::{error::ExitCode, event::StampedEvent};
 use prost::Message;
 use std::num::NonZeroU32;
@@ -52,7 +55,8 @@ pub fn invalid_query(err: AppError, description: String) -> response::Query {
     }
 }
 
-pub fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
+pub fn to_deliver_tx(ret: SignedMessageApplyRet) -> response::DeliverTx {
+    let SignedMessageApplyRet { fvm: ret, sig_hash } = ret;
     let receipt = ret.apply_ret.msg_receipt;
 
     // Based on the sanity check in the `DefaultExecutor`.
@@ -63,7 +67,10 @@ pub fn to_deliver_tx(ret: FvmApplyRet) -> response::DeliverTx {
     let gas_used: i64 = receipt.gas_used.try_into().unwrap_or(i64::MAX);
 
     let data: bytes::Bytes = receipt.return_data.to_vec().into();
-    let events = to_events("message", ret.apply_ret.events);
+    let mut events = to_events("message", ret.apply_ret.events);
+
+    // Emit an event which causes Tendermint to index our transaction with a custom hash.
+    events.push(to_sig_hash_event(&sig_hash));
 
     response::DeliverTx {
         code: to_code(receipt.exit_code),
@@ -155,8 +162,23 @@ pub fn to_events(kind: &str, stamped_events: Vec<StampedEvent>) -> Vec<Event> {
         .collect()
 }
 
+/// Construct an indexable event from a custom signature hash.
+pub fn to_sig_hash_event(sig_hash: &[u8]) -> Event {
+    Event::new(
+        "sig",
+        vec![EventAttribute {
+            key: "hash".to_string(),
+            value: hex::encode(sig_hash),
+            index: true,
+        }],
+    )
+}
+
 /// Map to query results.
-pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<response::Query> {
+pub fn to_query(
+    ret: FvmQueryRet<SignedMessageApplyRet>,
+    block_height: BlockHeight,
+) -> anyhow::Result<response::Query> {
     let exit_code = match ret {
         FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => ExitCode::USR_NOT_FOUND,
         FvmQueryRet::Ipld(_) | FvmQueryRet::ActorState(_) => ExitCode::OK,

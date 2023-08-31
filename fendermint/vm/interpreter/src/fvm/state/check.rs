@@ -59,7 +59,7 @@ impl<DB> HasChainID for FvmCheckState<DB>
 where
     DB: Blockstore + 'static,
 {
-    fn chain_id(&self) -> &ChainID {
-        &self.chain_id
+    fn chain_id(&self) -> ChainID {
+        self.chain_id
     }
 }

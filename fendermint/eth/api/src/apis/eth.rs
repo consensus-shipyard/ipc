@@ -31,8 +31,8 @@ use tendermint_rpc::{
     Client,
 };
 
-use crate::conv::from_eth::{to_fvm_message, to_tm_hash};
-use crate::conv::from_tm::{self, message_hash, to_chain_message, to_cumulative};
+use crate::conv::from_eth::to_fvm_message;
+use crate::conv::from_tm::{self, find_sig_hash, to_chain_message, to_cumulative};
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
 use crate::{
     conv::{
@@ -314,27 +314,24 @@ pub async fn get_transaction_by_hash<C>(
 where
     C: Client + Sync + Send,
 {
-    let hash = to_tm_hash(&tx_hash)?;
+    if let Some(res) = data.tx_by_hash(tx_hash).await? {
+        let msg = to_chain_message(&res.tx)?;
 
-    match data.tm().tx(hash, false).await {
-        Ok(res) => {
-            let msg = to_chain_message(&res.tx)?;
-
-            if let ChainMessage::Signed(msg) = msg {
-                let header: header::Response = data.tm().header(res.height).await?;
-                let sp = data.client.state_params(Some(res.height)).await?;
-                let chain_id = ChainID::from(sp.value.chain_id);
-                let mut tx = to_eth_transaction(hash, msg, chain_id)?;
-                tx.transaction_index = Some(et::U64::from(res.index));
-                tx.block_hash = Some(et::H256::from_slice(header.header.hash().as_bytes()));
-                tx.block_number = Some(et::U64::from(res.height.value()));
-                Ok(Some(tx))
-            } else {
-                error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
-            }
+        if let ChainMessage::Signed(msg) = msg {
+            let header: header::Response = data.tm().header(res.height).await?;
+            let sp = data.client.state_params(Some(res.height)).await?;
+            let chain_id = ChainID::from(sp.value.chain_id);
+            let sig_hash = find_sig_hash(&res.tx_result.events);
+            let mut tx = to_eth_transaction(msg, chain_id, sig_hash)?;
+            tx.transaction_index = Some(et::U64::from(res.index));
+            tx.block_hash = Some(et::H256::from_slice(header.header.hash().as_bytes()));
+            tx.block_number = Some(et::U64::from(res.height.value()));
+            Ok(Some(tx))
+        } else {
+            error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
         }
-        Err(e) if e.to_string().contains("not found") => Ok(None),
-        Err(e) => error(ExitCode::USR_UNSPECIFIED, e),
+    } else {
+        Ok(None)
     }
 }
 
@@ -370,35 +367,31 @@ pub async fn get_transaction_receipt<C>(
 where
     C: Client + Sync + Send,
 {
-    let hash = to_tm_hash(&tx_hash)?;
+    if let Some(res) = data.tx_by_hash(tx_hash).await? {
+        let header: header::Response = data.tm().header(res.height).await?;
+        let block_results: block_results::Response = data.tm().block_results(res.height).await?;
+        let cumulative = to_cumulative(&block_results);
+        let state_params = data.client.state_params(Some(res.height)).await?;
+        let msg = to_chain_message(&res.tx)?;
+        if let ChainMessage::Signed(msg) = msg {
+            let receipt = to_eth_receipt(
+                &data.addr_cache,
+                &msg,
+                &res,
+                &cumulative,
+                &header.header,
+                &state_params.value.base_fee,
+                &ChainID::from(state_params.value.chain_id),
+            )
+            .await
+            .context("failed to convert to receipt")?;
 
-    match data.tm().tx(hash, false).await {
-        Ok(res) => {
-            let header: header::Response = data.tm().header(res.height).await?;
-            let block_results: block_results::Response =
-                data.tm().block_results(res.height).await?;
-            let cumulative = to_cumulative(&block_results);
-            let state_params = data.client.state_params(Some(res.height)).await?;
-            let msg = to_chain_message(&res.tx)?;
-            if let ChainMessage::Signed(msg) = msg {
-                let receipt = to_eth_receipt(
-                    &data.addr_cache,
-                    &msg,
-                    &res,
-                    &cumulative,
-                    &header.header,
-                    &state_params.value.base_fee,
-                )
-                .await
-                .context("failed to convert to receipt")?;
-
-                Ok(Some(receipt))
-            } else {
-                error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
-            }
+            Ok(Some(receipt))
+        } else {
+            error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
         }
-        Err(e) if e.to_string().contains("not found") => Ok(None),
-        Err(e) => error(ExitCode::USR_UNSPECIFIED, e),
+    } else {
+        Ok(None)
     }
 }
 
@@ -425,10 +418,8 @@ where
     {
         let msg = to_chain_message(&tx)?;
         if let ChainMessage::Signed(msg) = msg {
-            let hash = message_hash(&tx)?;
-
             let result = endpoint::tx::Response {
-                hash,
+                hash: Default::default(), // Shouldn't use this anyway.
                 height,
                 index: index as u32,
                 tx_result,
@@ -443,6 +434,7 @@ where
                 &cumulative,
                 &block.header,
                 &state_params.value.base_fee,
+                &ChainID::from(state_params.value.chain_id),
             )
             .await?;
             receipts.push(receipt)
@@ -503,6 +495,10 @@ where
     let (tx, sig) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
+    let sighash = tx.sighash();
+
+    tracing::debug!(?sighash, "received raw transaction");
+
     let msg = to_fvm_message(tx, false)?;
     let msg = SignedMessage {
         message: msg,
@@ -512,7 +508,10 @@ where
     let bz: Vec<u8> = MessageFactory::serialize(&msg)?;
     let res: tx_sync::Response = data.tm().broadcast_tx_sync(bz).await?;
     if res.code.is_ok() {
-        Ok(et::TxHash::from_slice(res.hash.as_bytes()))
+        // The following hash would be okay for ethers-rs,and we could use it to look up the TX with Tendermint,
+        // but ethers.js would reject it because it doesn't match what Ethereum would use.
+        // Ok(et::TxHash::from_slice(res.hash.as_bytes()))
+        Ok(sighash)
     } else {
         error(
             ExitCode::new(res.code.value()),
@@ -738,7 +737,7 @@ where
 
                 let mut log_index_start = 0usize;
                 for ((tx_idx, tx_result), tx) in tx_results.iter().enumerate().zip(block.data()) {
-                    let tx_hash = from_tm::message_hash(tx)?;
+                    let tx_hash = find_sig_hash(&tx_result.events).unwrap_or_default();
                     let tx_hash = et::H256::from_slice(tx_hash.as_bytes());
                     let tx_idx = et::U64::from(tx_idx);
 

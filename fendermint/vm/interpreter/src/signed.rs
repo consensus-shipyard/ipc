@@ -4,21 +4,29 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 
 use fendermint_vm_core::chainid::HasChainID;
-use fendermint_vm_message::signed::{chain_id_bytes, SignedMessage, SignedMessageError};
+use fendermint_vm_message::{
+    query::FvmQuery,
+    signed::{chain_id_bytes, SignedMessage, SignedMessageError},
+};
 use fvm_ipld_encoding::Error as IpldError;
 use fvm_shared::{chainid::ChainID, crypto::signature::Signature};
 use serde::Serialize;
 
 use crate::{
-    fvm::{FvmApplyRet, FvmCheckRet, FvmMessage},
+    fvm::{FvmApplyRet, FvmCheckRet, FvmMessage, FvmQueryRet},
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, QueryInterpreter,
 };
 
 /// Message validation failed due to an invalid signature.
 pub struct InvalidSignature(pub String);
 
-pub type SignedMessageApplyRet = Result<FvmApplyRet, InvalidSignature>;
-pub type SignedMessageCheckRet = Result<FvmCheckRet, InvalidSignature>;
+pub struct SignedMessageApplyRet {
+    pub fvm: FvmApplyRet,
+    pub sig_hash: [u8; 32],
+}
+
+pub type SignedMessageApplyRes = Result<SignedMessageApplyRet, InvalidSignature>;
+pub type SignedMessageCheckRes = Result<FvmCheckRet, InvalidSignature>;
 
 /// Different kinds of signed messages.
 ///
@@ -95,15 +103,15 @@ impl<I> SignedMessageInterpreter<I> {
 }
 
 #[async_trait]
-impl<I, S> ExecInterpreter for SignedMessageInterpreter<I>
+impl<I> ExecInterpreter for SignedMessageInterpreter<I>
 where
-    I: ExecInterpreter<Message = FvmMessage, DeliverOutput = FvmApplyRet, State = S>,
-    S: HasChainID + Send + 'static,
+    I: ExecInterpreter<Message = FvmMessage, DeliverOutput = FvmApplyRet>,
+    I::State: HasChainID,
 {
     type State = I::State;
     type Message = VerifiableMessage;
     type BeginOutput = I::BeginOutput;
-    type DeliverOutput = SignedMessageApplyRet;
+    type DeliverOutput = SignedMessageApplyRes;
     type EndOutput = I::EndOutput;
 
     async fn deliver(
@@ -115,7 +123,7 @@ where
         // async call to `inner.deliver` would be inside a match holding a reference to `state`.
         let chain_id = state.chain_id();
 
-        match msg.verify(chain_id) {
+        match msg.verify(&chain_id) {
             Err(SignedMessageError::Ipld(e)) => Err(anyhow!(e)),
             Err(SignedMessageError::Ethereum(e)) => {
                 Ok((state, Err(InvalidSignature(e.to_string()))))
@@ -125,7 +133,10 @@ where
                 Ok((state, Err(InvalidSignature(s))))
             }
             Ok(()) => {
-                let (state, ret) = self.inner.deliver(state, msg.into_message()).await?;
+                let msg = msg.into_message();
+                let sig_hash = SignedMessage::sig_hash(&msg, &chain_id)?;
+                let (state, ret) = self.inner.deliver(state, msg).await?;
+                let ret = SignedMessageApplyRet { fvm: ret, sig_hash };
                 Ok((state, Ok(ret)))
             }
         }
@@ -141,14 +152,14 @@ where
 }
 
 #[async_trait]
-impl<I, S> CheckInterpreter for SignedMessageInterpreter<I>
+impl<I> CheckInterpreter for SignedMessageInterpreter<I>
 where
-    I: CheckInterpreter<Message = FvmMessage, Output = FvmCheckRet, State = S>,
-    S: HasChainID + Send + 'static,
+    I: CheckInterpreter<Message = FvmMessage, Output = FvmCheckRet>,
+    I::State: HasChainID + Send + 'static,
 {
     type State = I::State;
     type Message = VerifiableMessage;
-    type Output = SignedMessageCheckRet;
+    type Output = SignedMessageCheckRes;
 
     async fn check(
         &self,
@@ -159,7 +170,7 @@ where
         let verify_result = if is_recheck {
             Ok(())
         } else {
-            msg.verify(state.chain_id())
+            msg.verify(&state.chain_id())
         };
 
         match verify_result {
@@ -186,18 +197,37 @@ where
 #[async_trait]
 impl<I> QueryInterpreter for SignedMessageInterpreter<I>
 where
-    I: QueryInterpreter,
+    I: QueryInterpreter<Query = FvmQuery, Output = FvmQueryRet>,
+    I::State: HasChainID,
 {
     type State = I::State;
     type Query = I::Query;
-    type Output = I::Output;
+    type Output = FvmQueryRet<SignedMessageApplyRet>;
 
     async fn query(
         &self,
         state: Self::State,
         qry: Self::Query,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
-        self.inner.query(state, qry).await
+        let sig_hash = match qry {
+            FvmQuery::Call(ref msg) => SignedMessage::sig_hash(msg, &state.chain_id()).ok(),
+            _ => None,
+        };
+
+        let (state, ret) = self.inner.query(state, qry).await?;
+
+        let ret = match ret {
+            FvmQueryRet::Ipld(x) => FvmQueryRet::Ipld(x),
+            FvmQueryRet::ActorState(x) => FvmQueryRet::ActorState(x),
+            FvmQueryRet::EstimateGas(x) => FvmQueryRet::EstimateGas(x),
+            FvmQueryRet::StateParams(x) => FvmQueryRet::StateParams(x),
+            FvmQueryRet::Call(x) => FvmQueryRet::Call(SignedMessageApplyRet {
+                fvm: x,
+                sig_hash: sig_hash.unwrap_or_default(),
+            }),
+        };
+
+        Ok((state, ret))
     }
 }
 

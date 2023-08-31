@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::{
     fvm::FvmMessage,
-    signed::{SignedMessageApplyRet, SignedMessageCheckRet, SyntheticMessage, VerifiableMessage},
+    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use anyhow::Context;
@@ -45,11 +45,11 @@ pub struct IllegalMessage;
 
 // For now this is the only option, later we can expand.
 pub enum ChainMessageApplyRet {
-    Signed(SignedMessageApplyRet),
+    Signed(SignedMessageApplyRes),
 }
 
 /// We only allow signed messages into the mempool.
-pub type ChainMessageCheckRet = Result<SignedMessageCheckRet, IllegalMessage>;
+pub type ChainMessageCheckRes = Result<SignedMessageCheckRes, IllegalMessage>;
 
 /// Interpreter working on chain messages; in the future it will schedule
 /// CID lookups to turn references into self-contained user or cross messages.
@@ -123,7 +123,7 @@ where
 #[async_trait]
 impl<I> ExecInterpreter for ChainMessageInterpreter<I>
 where
-    I: ExecInterpreter<Message = VerifiableMessage, DeliverOutput = SignedMessageApplyRet>,
+    I: ExecInterpreter<Message = VerifiableMessage, DeliverOutput = SignedMessageApplyRes>,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
     // state which the inner interpreter uses. This is a technical solution because the pool doesn't
@@ -161,7 +161,7 @@ where
 
                     // If successful, add the CID to the background resolution pool.
                     let is_success = match ret {
-                        Ok(ref ret) => ret.apply_ret.msg_receipt.exit_code.is_success(),
+                        Ok(ref ret) => ret.fvm.apply_ret.msg_receipt.exit_code.is_success(),
                         Err(_) => false,
                     };
 
@@ -205,11 +205,11 @@ where
 #[async_trait]
 impl<I> CheckInterpreter for ChainMessageInterpreter<I>
 where
-    I: CheckInterpreter<Message = VerifiableMessage, Output = SignedMessageCheckRet>,
+    I: CheckInterpreter<Message = VerifiableMessage, Output = SignedMessageCheckRes>,
 {
     type State = I::State;
     type Message = ChainMessage;
-    type Output = ChainMessageCheckRet;
+    type Output = ChainMessageCheckRes;
 
     async fn check(
         &self,

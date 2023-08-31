@@ -69,6 +69,9 @@ const SIMPLECOIN_HEX: &'static str =
 /// Gas limit to set for transactions.
 const ENOUGH_GAS: u64 = 10_000_000_000u64;
 
+/// Disabling filters helps when inspecting docker logs. The background data received for filters is rather noisy.
+const FILTERS_ENABLED: bool = true;
+
 // Generate a statically typed interface for the contract.
 // An example of what it looks like is at https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs
 abigen!(
@@ -129,11 +132,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_max_level(opts.log_level())
         .init();
 
-    tracing::info!("Running the tests over HTTP...");
     let provider = Provider::<Http>::try_from(opts.http_endpoint())?;
     run_http(provider, &opts).await?;
 
-    tracing::info!("Running the tests over WS...");
     let provider = Provider::<Ws>::connect(opts.ws_endpoint()).await?;
     run_ws(provider, &opts).await?;
 
@@ -251,28 +252,42 @@ where
     // Set up filters to collect events.
     let mut filter_ids = Vec::new();
 
-    let logs_filter_id = request(
-        "eth_newFilter",
-        provider
-            .new_filter(FilterKind::Logs(&Filter::default()))
-            .await,
-        |_| true,
-    )?;
-    filter_ids.push(logs_filter_id);
+    let (logs_filter_id, blocks_filter_id, txs_filter_id): (
+        Option<U256>,
+        Option<U256>,
+        Option<U256>,
+    ) = if FILTERS_ENABLED {
+        let logs_filter_id = request(
+            "eth_newFilter",
+            provider
+                .new_filter(FilterKind::Logs(&Filter::default()))
+                .await,
+            |_| true,
+        )?;
+        filter_ids.push(logs_filter_id);
 
-    let blocks_filter_id = request(
-        "eth_newBlockFilter",
-        provider.new_filter(FilterKind::NewBlocks).await,
-        |id| *id != logs_filter_id,
-    )?;
-    filter_ids.push(blocks_filter_id);
+        let blocks_filter_id = request(
+            "eth_newBlockFilter",
+            provider.new_filter(FilterKind::NewBlocks).await,
+            |id| *id != logs_filter_id,
+        )?;
+        filter_ids.push(blocks_filter_id);
 
-    let txs_filter_id = request(
-        "eth_newPendingTransactionFilter",
-        provider.new_filter(FilterKind::PendingTransactions).await,
-        |id| *id != logs_filter_id,
-    )?;
-    filter_ids.push(txs_filter_id);
+        let txs_filter_id = request(
+            "eth_newPendingTransactionFilter",
+            provider.new_filter(FilterKind::PendingTransactions).await,
+            |id| *id != logs_filter_id,
+        )?;
+        filter_ids.push(txs_filter_id);
+
+        (
+            Some(logs_filter_id),
+            Some(blocks_filter_id),
+            Some(txs_filter_id),
+        )
+    } else {
+        (None, None, None)
+    };
 
     request("web3_clientVersion", provider.client_version().await, |v| {
         v.starts_with("fendermint/")
@@ -386,6 +401,12 @@ where
 
     tracing::info!(height = ?bn, ?tx_hash, "example transfer");
 
+    // This equivalence is not required for ethers-rs, it's happy to use the return value from `eth_sendRawTransaction` for transaction hash.
+    // However, ethers.js actually asserts this and we cannot disable it, rendering that, or any similar tool, unusable if we rely on
+    // the default Tendermint transaction hash, which is a Sha256 hash of the entire payload (which includes the signature),
+    // not a Keccak256 of the unsigned RLP.
+    assert_eq!(tx_hash, transfer.sighash(), "Ethereum hash should match");
+
     // Get a block with transactions by number.
     let block = request(
         "eth_getBlockByNumber w/ txns",
@@ -396,8 +417,8 @@ where
     )?;
 
     assert_eq!(
-        block.unwrap().transactions[0].hash,
         tx_hash,
+        block.unwrap().transactions[0].hash,
         "computed hash should match"
     );
 
@@ -559,6 +580,8 @@ where
         |receipt| !receipt.logs.is_empty(),
     )?;
 
+    tracing::info!(tx_hash = ?receipt.transaction_hash, "coin sent");
+
     request(
         "eth_getLogs",
         mw.get_logs(&Filter::new().at_block_hash(receipt.block_hash.unwrap()))
@@ -567,51 +590,58 @@ where
     )?;
 
     // See what kind of events were logged.
-    request(
-        "eth_getFilterChanges (blocks)",
-        mw.get_filter_changes(blocks_filter_id).await,
-        |block_hashes: &Vec<H256>| {
-            [bh, deploy_receipt.block_hash.unwrap()]
-                .iter()
-                .all(|h| block_hashes.contains(h))
-        },
-    )?;
 
-    request(
-        "eth_getFilterChanges (txs)",
-        mw.get_filter_changes(txs_filter_id).await,
-        |tx_hashes: &Vec<H256>| {
-            [&tx_hash, &deploy_receipt.transaction_hash]
-                .iter()
-                .all(|h| tx_hashes.contains(h))
-        },
-    )?;
+    if let Some(blocks_filter_id) = blocks_filter_id {
+        request(
+            "eth_getFilterChanges (blocks)",
+            mw.get_filter_changes(blocks_filter_id).await,
+            |block_hashes: &Vec<H256>| {
+                [bh, deploy_receipt.block_hash.unwrap()]
+                    .iter()
+                    .all(|h| block_hashes.contains(h))
+            },
+        )?;
+    }
 
-    let logs = request(
-        "eth_getFilterChanges (logs)",
-        mw.get_filter_changes(logs_filter_id).await,
-        |logs: &Vec<Log>| !logs.is_empty(),
-    )?;
+    if let Some(txs_filter_id) = txs_filter_id {
+        request(
+            "eth_getFilterChanges (txs)",
+            mw.get_filter_changes(txs_filter_id).await,
+            |tx_hashes: &Vec<H256>| {
+                [&tx_hash, &deploy_receipt.transaction_hash]
+                    .iter()
+                    .all(|h| tx_hashes.contains(h))
+            },
+        )?;
+    }
 
-    // eprintln!("LOGS = {logs:?}");
+    if let Some(logs_filter_id) = logs_filter_id {
+        let logs = request(
+            "eth_getFilterChanges (logs)",
+            mw.get_filter_changes(logs_filter_id).await,
+            |logs: &Vec<Log>| !logs.is_empty(),
+        )?;
 
-    // Parse `Transfer` events from the logs with the SimpleCoin contract.
-    // Based on https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/fevm_features/common.rs#L616
-    //      and https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/fevm_features/simple_coin.rs#L26
-    //      and https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs#L103
+        // eprintln!("LOGS = {logs:?}");
 
-    // The contract has methods like `.transfer_filter()` which allows querying logs, but here we just test parsing to make sure the data is correct.
-    let transfer_events = logs
-        .into_iter()
-        .filter(|log| log.address == contract.address())
-        .map(|log| contract.decode_event::<TransferFilter>("Transfer", log.topics, log.data))
-        .collect::<Result<Vec<_>, _>>()
-        .context("failed to parse logs to transfer events")?;
+        // Parse `Transfer` events from the logs with the SimpleCoin contract.
+        // Based on https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/fevm_features/common.rs#L616
+        //      and https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/fevm_features/simple_coin.rs#L26
+        //      and https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs#L103
 
-    assert!(!transfer_events.is_empty());
-    assert_eq!(transfer_events[0].from, from.eth_addr);
-    assert_eq!(transfer_events[0].to, to.eth_addr);
-    assert_eq!(transfer_events[0].value, coin_send_value);
+        // The contract has methods like `.transfer_filter()` which allows querying logs, but here we just test parsing to make sure the data is correct.
+        let transfer_events = logs
+            .into_iter()
+            .filter(|log| log.address == contract.address())
+            .map(|log| contract.decode_event::<TransferFilter>("Transfer", log.topics, log.data))
+            .collect::<Result<Vec<_>, _>>()
+            .context("failed to parse logs to transfer events")?;
+
+        assert!(!transfer_events.is_empty());
+        assert_eq!(transfer_events[0].from, from.eth_addr);
+        assert_eq!(transfer_events[0].to, to.eth_addr);
+        assert_eq!(transfer_events[0].value, coin_send_value);
+    }
 
     // Uninstall all filters.
     for id in filter_ids {
@@ -625,8 +655,11 @@ where
 
 /// The HTTP interface provides JSON-RPC request/response endpoints.
 async fn run_http(mut provider: Provider<Http>, opts: &Options) -> anyhow::Result<()> {
+    tracing::info!("Running the tests over HTTP...");
     adjust_provider(&mut provider);
-    run(&provider, opts).await
+    run(&provider, opts).await?;
+    tracing::info!("HTTP tests finished");
+    Ok(())
 }
 
 /// The WebSocket interface provides JSON-RPC request/response interactions
@@ -635,34 +668,43 @@ async fn run_http(mut provider: Provider<Http>, opts: &Options) -> anyhow::Resul
 /// We subscribe to notifications first, then run the same suite of request/responses
 /// as the HTTP case, finally check that we have collected events over the subscriptions.
 async fn run_ws(mut provider: Provider<Ws>, opts: &Options) -> anyhow::Result<()> {
+    tracing::info!("Running the tests over WS...");
     adjust_provider(&mut provider);
 
     // Subscriptions as well.
-    let mut block_sub = provider.subscribe_blocks().await?;
-    let mut txs_sub = provider.subscribe_pending_txs().await?;
-    let mut log_sub = provider.subscribe_logs(&Filter::default()).await?;
+    let subs = if FILTERS_ENABLED {
+        let block_sub = provider.subscribe_blocks().await?;
+        let txs_sub = provider.subscribe_pending_txs().await?;
+        let log_sub = provider.subscribe_logs(&Filter::default()).await?;
+        Some((block_sub, txs_sub, log_sub))
+    } else {
+        None
+    };
 
     run(&provider, opts).await?;
 
-    assert!(block_sub.next().await.is_some(), "blocks should arrive");
-    assert!(txs_sub.next().await.is_some(), "transactions should arrive");
-    assert!(log_sub.next().await.is_some(), "logs should arrive");
+    if let Some((mut block_sub, mut txs_sub, mut log_sub)) = subs {
+        assert!(block_sub.next().await.is_some(), "blocks should arrive");
+        assert!(txs_sub.next().await.is_some(), "transactions should arrive");
+        assert!(log_sub.next().await.is_some(), "logs should arrive");
 
-    block_sub
-        .unsubscribe()
-        .await
-        .context("failed to unsubscribe blocks")?;
+        block_sub
+            .unsubscribe()
+            .await
+            .context("failed to unsubscribe blocks")?;
 
-    txs_sub
-        .unsubscribe()
-        .await
-        .context("failed to unsubscribe txs")?;
+        txs_sub
+            .unsubscribe()
+            .await
+            .context("failed to unsubscribe txs")?;
 
-    log_sub
-        .unsubscribe()
-        .await
-        .context("failed to unsubscribe logs")?;
+        log_sub
+            .unsubscribe()
+            .await
+            .context("failed to unsubscribe logs")?;
+    }
 
+    tracing::info!("WS tests finished.");
     Ok(())
 }
 

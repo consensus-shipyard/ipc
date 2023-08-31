@@ -90,18 +90,18 @@ pub fn to_eth_block(
     // assume that all we have is signed transactions.
     for (idx, data) in block.data().iter().enumerate() {
         size += et::U256::from(data.len());
+        let mut sig_hash = None;
 
         if let Some(result) = transaction_results.get(idx) {
             gas_used += et::U256::from(result.gas_used);
             gas_limit += et::U256::from(result.gas_wanted);
+            sig_hash = find_sig_hash(&result.events);
         }
 
         let msg = to_chain_message(data)?;
 
         if let ChainMessage::Signed(msg) = msg {
-            let hash = message_hash(data)?;
-
-            let mut tx = to_eth_transaction(hash, msg, chain_id)
+            let mut tx = to_eth_transaction(msg, chain_id, sig_hash)
                 .context("failed to convert to eth transaction")?;
             tx.transaction_index = Some(et::U64::from(idx));
             transactions.push(tx);
@@ -140,14 +140,21 @@ pub fn to_eth_block(
 }
 
 pub fn to_eth_transaction(
-    hash: tendermint::Hash,
     msg: SignedMessage,
     chain_id: ChainID,
+    // If a pre-calculated hash is available, pass it in to save some time.
+    hash: Option<et::TxHash>,
 ) -> anyhow::Result<et::Transaction> {
     // Based on https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2048
     let sig = to_eth_signature(msg.signature()).context("failed to convert to eth signature")?;
-    let hash = et::H256::from_slice(hash.as_bytes());
     let msg = msg.message;
+    let hash = if let Some(h) = hash {
+        h
+    } else {
+        SignedMessage::sig_hash(&msg, &chain_id)
+            .map(et::TxHash::from)
+            .map_err(|e| anyhow!(e))?
+    };
 
     let tx = et::Transaction {
         hash,
@@ -200,14 +207,21 @@ pub async fn to_eth_receipt<C>(
     cumulative: &[(et::U256, usize)],
     header: &tendermint::block::Header,
     base_fee: &TokenAmount,
+    chain_id: &ChainID,
 ) -> anyhow::Result<et::TransactionReceipt>
 where
     C: Client + Sync + Send,
 {
     let block_hash = et::H256::from_slice(header.hash().as_bytes());
     let block_number = et::U64::from(result.height.value());
-    let transaction_hash = et::H256::from_slice(result.hash.as_bytes());
     let transaction_index = et::U64::from(result.index);
+    let transaction_hash = find_sig_hash(&result.tx_result.events)
+        .or_else(|| {
+            SignedMessage::sig_hash(msg.message(), chain_id)
+                .ok()
+                .map(et::H256::from)
+        })
+        .unwrap_or_default();
 
     let msg = &msg.message;
     // Lotus effective gas price is based on total spend divided by gas used,
@@ -377,7 +391,7 @@ where
     C: Client + Sync + Send,
 {
     let mut logs = Vec::new();
-    for (idx, event) in events.iter().enumerate() {
+    for (idx, event) in events.iter().filter(|e| e.kind == "message").enumerate() {
         // Lotus looks up an Ethereum address based on the actor ID:
         // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L1987
         let actor_id = event
@@ -460,9 +474,23 @@ pub fn to_chain_message(tx: &[u8]) -> anyhow::Result<ChainMessage> {
 
 /// Hash the transaction payload the way Tendermint does,
 /// to calculate the transaction hash which is otherwise unavailable.
-pub fn message_hash(tx: &[u8]) -> anyhow::Result<tendermint::Hash> {
+///
+/// This is here for reference only and should not be returned to Ethereum tools which expect
+/// the hash to be based on RLP and Keccak256.
+pub fn _message_hash(tx: &[u8]) -> anyhow::Result<tendermint::Hash> {
     // based on how `tendermint::Header::hash` works.
     let hash = tendermint::crypto::default::Sha256::digest(tx);
     let hash = tendermint::Hash::Sha256(hash);
     Ok(hash)
+}
+
+/// Best effort to find and parse the `sig.hash` attribute emitted among the events.
+pub fn find_sig_hash(events: &[abci::Event]) -> Option<et::TxHash> {
+    events
+        .iter()
+        .find(|e| e.kind == "sig")
+        .and_then(|e| e.attributes.iter().find(|a| a.key == "hash"))
+        .and_then(|a| hex::decode(&a.value).ok())
+        .filter(|bz| bz.len() == 32)
+        .map(|bz| et::TxHash::from_slice(&bz))
 }

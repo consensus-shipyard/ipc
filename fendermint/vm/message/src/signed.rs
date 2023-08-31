@@ -141,6 +141,26 @@ impl SignedMessage {
         }
     }
 
+    /// Calculate the exact hash that the client would have to sign.
+    ///
+    /// Some Ethereum clients expects this to be the transaction hash,
+    /// but it's different from the Tendermint transaction hash.
+    pub fn sig_hash(message: &Message, chain_id: &ChainID) -> Result<[u8; 32], SignedMessageError> {
+        match Self::signable(message, chain_id)? {
+            Signable::Ethereum((hash, _)) => Ok(hash.0),
+            Signable::Regular(data) => {
+                // blake2b 256 hash
+                let hash = blake2b_simd::Params::new()
+                    .hash_length(32)
+                    .to_state()
+                    .update(&data)
+                    .finalize();
+
+                Ok(hash.as_bytes().try_into().expect("should be 32 bytes"))
+            }
+        }
+    }
+
     /// Verifies that the from address of the message generated the signature.
     pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
         Self::verify_signature(&self.message, &self.signature, chain_id)

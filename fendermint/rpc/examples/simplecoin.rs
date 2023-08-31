@@ -19,7 +19,7 @@ use bytes::Bytes;
 use clap::Parser;
 use ethers::abi::Tokenizable;
 use ethers::prelude::{abigen, decode_function_data};
-use ethers::types::H160;
+use ethers::types::{H160, U256};
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 use fvm_shared::address::Address;
@@ -173,6 +173,10 @@ async fn run(
         "owner balance"
     );
 
+    let _sufficient = send_coin(client, &create_return.eth_address, &owner_eth_addr, 100)
+        .await
+        .context("failed to send coin")?;
+
     Ok(())
 }
 
@@ -217,6 +221,8 @@ async fn deploy_contract(client: &mut impl TxClient<TxCommit>) -> anyhow::Result
         .await
         .context("error deploying contract")?;
 
+    tracing::info!(tx_hash = ?res.response.hash, "deployment transaction");
+
     let ret = res.return_data.ok_or(anyhow!(
         "no CreateReturn data; response was {:?}",
         res.response
@@ -241,6 +247,24 @@ async fn get_balance(
         .context("failed to call contract")?;
 
     Ok(balance)
+}
+
+/// Invoke or call SimpleCoin to send some coins to self.
+async fn send_coin(
+    client: &mut (impl TxClient<TxCommit> + CallClient),
+    contract_eth_addr: &EthAddress,
+    owner_eth_addr: &EthAddress,
+    value: u32,
+) -> anyhow::Result<bool> {
+    let contract = coin_contract(contract_eth_addr);
+    let owner_h160_addr = eth_addr_to_h160(owner_eth_addr);
+    let call = contract.send_coin(owner_h160_addr, U256::from(value));
+
+    let sufficient: bool = invoke_or_call_contract(client, contract_eth_addr, call, true)
+        .await
+        .context("failed to call contract")?;
+
+    Ok(sufficient)
 }
 
 /// Invoke FEVM through Tendermint with the calldata encoded by ethers, decoding the result into the expected type.
@@ -268,6 +292,8 @@ async fn invoke_or_call_contract<T: Tokenizable>(
             )
             .await
             .context("failed to invoke FEVM")?;
+
+        tracing::info!(tx_hash = ?res.response.hash, "invoked transaction");
 
         res.return_data
     } else {

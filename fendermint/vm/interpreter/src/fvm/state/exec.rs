@@ -134,8 +134,8 @@ impl<DB> HasChainID for FvmExecState<DB>
 where
     DB: Blockstore,
 {
-    fn chain_id(&self) -> &ChainID {
-        &self.executor.context().network.chain_id
+    fn chain_id(&self) -> ChainID {
+        self.executor.context().network.chain_id
     }
 }
 

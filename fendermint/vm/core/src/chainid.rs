@@ -75,7 +75,7 @@ pub fn from_str_hashed(name: &str) -> Result<ChainID, ChainIDError> {
 
 /// Anything that has a [`ChainID`].
 pub trait HasChainID {
-    fn chain_id(&self) -> &ChainID;
+    fn chain_id(&self) -> ChainID;
 }
 
 /// Extract the root chain ID _iff_ the name is in the format of "/r<chain-id>".

@@ -7,10 +7,11 @@ use anyhow::{anyhow, Context};
 
 use cid::Cid;
 use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
+use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::query::ActorState;
 use fvm::{engine::MultiEngine, executor::ApplyRet};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, clock::ChainEpoch, ActorID};
+use fvm_shared::{address::Address, chainid::ChainID, clock::ChainEpoch, ActorID};
 use num_traits::Zero;
 
 use crate::fvm::{store::ReadOnlyBlockstore, FvmMessage};
@@ -157,5 +158,14 @@ where
 
     pub fn state_params(&self) -> &FvmStateParams {
         &self.state_params
+    }
+}
+
+impl<DB> HasChainID for FvmQueryState<DB>
+where
+    DB: Blockstore + 'static,
+{
+    fn chain_id(&self) -> ChainID {
+        ChainID::from(self.state_params.chain_id)
     }
 }
