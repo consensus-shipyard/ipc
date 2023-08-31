@@ -4,10 +4,8 @@
 use anyhow::{anyhow, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::Validator;
-use fendermint_vm_interpreter::{
-    fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet},
-    signed::SignedMessageApplyRet,
-};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet};
+use fendermint_vm_message::signed::DomainHash;
 use fvm_shared::{error::ExitCode, event::StampedEvent};
 use prost::Message;
 use std::num::NonZeroU32;
@@ -55,8 +53,7 @@ pub fn invalid_query(err: AppError, description: String) -> response::Query {
     }
 }
 
-pub fn to_deliver_tx(ret: SignedMessageApplyRet) -> response::DeliverTx {
-    let SignedMessageApplyRet { fvm: ret, sig_hash } = ret;
+pub fn to_deliver_tx(ret: FvmApplyRet, domain_hash: Option<DomainHash>) -> response::DeliverTx {
     let receipt = ret.apply_ret.msg_receipt;
 
     // Based on the sanity check in the `DefaultExecutor`.
@@ -70,7 +67,9 @@ pub fn to_deliver_tx(ret: SignedMessageApplyRet) -> response::DeliverTx {
     let mut events = to_events("message", ret.apply_ret.events);
 
     // Emit an event which causes Tendermint to index our transaction with a custom hash.
-    events.push(to_sig_hash_event(&sig_hash));
+    if let Some(h) = domain_hash {
+        events.push(to_domain_hash_event(&h));
+    }
 
     response::DeliverTx {
         code: to_code(receipt.exit_code),
@@ -162,23 +161,23 @@ pub fn to_events(kind: &str, stamped_events: Vec<StampedEvent>) -> Vec<Event> {
         .collect()
 }
 
-/// Construct an indexable event from a custom signature hash.
-pub fn to_sig_hash_event(sig_hash: &[u8]) -> Event {
+/// Construct an indexable event from a custom transaction hash.
+pub fn to_domain_hash_event(domain_hash: &DomainHash) -> Event {
+    let (k, v) = match domain_hash {
+        DomainHash::Eth(h) => ("eth", hex::encode(h)),
+    };
     Event::new(
-        "sig",
+        k,
         vec![EventAttribute {
             key: "hash".to_string(),
-            value: hex::encode(sig_hash),
+            value: v,
             index: true,
         }],
     )
 }
 
 /// Map to query results.
-pub fn to_query(
-    ret: FvmQueryRet<SignedMessageApplyRet>,
-    block_height: BlockHeight,
-) -> anyhow::Result<response::Query> {
+pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<response::Query> {
     let exit_code = match ret {
         FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => ExitCode::USR_NOT_FOUND,
         FvmQueryRet::Ipld(_) | FvmQueryRet::ActorState(_) => ExitCode::OK,
@@ -205,7 +204,7 @@ pub fn to_query(
             // Send back an entire Tendermint deliver_tx response, encoded as IPLD.
             // This is so there is a single representation of a call result, instead
             // of a normal delivery being one way and a query exposing `FvmApplyRet`.
-            let dtx = to_deliver_tx(ret);
+            let dtx = to_deliver_tx(ret, None);
             let dtx = tendermint_proto::abci::ResponseDeliverTx::from(dtx);
             let mut buf = bytes::BytesMut::new();
             dtx.encode(&mut buf)?;

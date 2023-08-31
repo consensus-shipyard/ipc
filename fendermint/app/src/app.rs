@@ -590,7 +590,7 @@ where
                         method_num = ret.fvm.method_num,
                         "tx delivered"
                     );
-                    to_deliver_tx(ret)
+                    to_deliver_tx(ret.fvm, ret.domain_hash)
                 }
             },
         };

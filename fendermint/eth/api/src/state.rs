@@ -12,6 +12,7 @@ use ethers_core::types::{self as et, BlockId};
 use fendermint_rpc::client::{FendermintClient, TendermintClient};
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::{evm, system};
+use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_message::{chain::ChainMessage, conv::from_eth::to_fvm_address};
 use fvm_ipld_encoding::{de::DeserializeOwned, RawBytes};
 use fvm_shared::{chainid::ChainID, econ::TokenAmount, error::ExitCode, message::Message};
@@ -247,7 +248,14 @@ where
                     .await?;
 
                 let chain_id = ChainID::from(sp.value.chain_id);
-                let mut tx = to_eth_transaction(msg, chain_id, None)
+
+                let hash = if let Ok(Some(DomainHash::Eth(h))) = msg.domain_hash(&chain_id) {
+                    et::TxHash::from(h)
+                } else {
+                    return error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction");
+                };
+
+                let mut tx = to_eth_transaction(msg, chain_id, hash)
                     .context("failed to convert to eth transaction")?;
                 tx.transaction_index = Some(index);
                 tx.block_hash = Some(et::H256::from_slice(block.header.hash().as_bytes()));
@@ -271,7 +279,7 @@ where
         // CometBFT indexing capabilities.
 
         // Doesn't work with `Query::from(EventType::Tx).and_eq()`
-        let query = Query::eq("sig.hash", hex::encode(tx_hash.as_bytes()));
+        let query = Query::eq("eth.hash", hex::encode(tx_hash.as_bytes()));
 
         match self
             .tm()

@@ -10,13 +10,12 @@ use fvm_ipld_encoding::Error as IpldError;
 use crate::{
     chain::{ChainMessageApplyRet, ChainMessageCheckRes},
     fvm::{FvmQuery, FvmQueryRet},
-    signed::SignedMessageApplyRet,
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 
 pub type BytesMessageApplyRes = Result<ChainMessageApplyRet, IpldError>;
 pub type BytesMessageCheckRes = Result<ChainMessageCheckRes, IpldError>;
-pub type BytesMessageQueryRes = Result<FvmQueryRet<SignedMessageApplyRet>, IpldError>;
+pub type BytesMessageQueryRes = Result<FvmQueryRet, IpldError>;
 
 /// Close to what the ABCI sends: (Path, Bytes).
 pub type BytesMessageQuery = (String, Vec<u8>);
@@ -222,7 +221,7 @@ where
 #[async_trait]
 impl<I> QueryInterpreter for BytesMessageInterpreter<I>
 where
-    I: QueryInterpreter<Query = FvmQuery, Output = FvmQueryRet<SignedMessageApplyRet>>,
+    I: QueryInterpreter<Query = FvmQuery, Output = FvmQueryRet>,
 {
     type State = I::State;
     type Query = BytesMessageQuery;

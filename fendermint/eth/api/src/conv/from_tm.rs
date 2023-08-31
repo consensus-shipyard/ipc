@@ -13,7 +13,7 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::{bigint::BigInt, econ::TokenAmount};
 use lazy_static::lazy_static;
 use tendermint::abci::response::DeliverTx;
-use tendermint::abci::{self, EventAttribute};
+use tendermint::abci::{self, Event, EventAttribute};
 use tendermint::crypto::sha256::Sha256;
 use tendermint_rpc::{endpoint, Client};
 
@@ -89,21 +89,25 @@ pub fn to_eth_block(
     // potentially through multiple hops. Let's leave that for the future and for now
     // assume that all we have is signed transactions.
     for (idx, data) in block.data().iter().enumerate() {
-        size += et::U256::from(data.len());
-        let mut sig_hash = None;
+        let result = match transaction_results.get(idx) {
+            Some(result) => result,
+            None => continue,
+        };
 
-        if let Some(result) = transaction_results.get(idx) {
-            gas_used += et::U256::from(result.gas_used);
-            gas_limit += et::U256::from(result.gas_wanted);
-            sig_hash = find_sig_hash(&result.events);
-        }
+        size += et::U256::from(data.len());
+        gas_used += et::U256::from(result.gas_used);
+        gas_limit += et::U256::from(result.gas_wanted);
 
         let msg = to_chain_message(data)?;
 
         if let ChainMessage::Signed(msg) = msg {
-            let mut tx = to_eth_transaction(msg, chain_id, sig_hash)
+            let hash = msg_hash(&result.events, data);
+
+            let mut tx = to_eth_transaction(msg, chain_id, hash)
                 .context("failed to convert to eth transaction")?;
+
             tx.transaction_index = Some(et::U64::from(idx));
+
             transactions.push(tx);
         }
     }
@@ -142,19 +146,11 @@ pub fn to_eth_block(
 pub fn to_eth_transaction(
     msg: SignedMessage,
     chain_id: ChainID,
-    // If a pre-calculated hash is available, pass it in to save some time.
-    hash: Option<et::TxHash>,
+    hash: et::TxHash,
 ) -> anyhow::Result<et::Transaction> {
     // Based on https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2048
     let sig = to_eth_signature(msg.signature()).context("failed to convert to eth signature")?;
     let msg = msg.message;
-    let hash = if let Some(h) = hash {
-        h
-    } else {
-        SignedMessage::sig_hash(&msg, &chain_id)
-            .map(et::TxHash::from)
-            .map_err(|e| anyhow!(e))?
-    };
 
     let tx = et::Transaction {
         hash,
@@ -207,7 +203,6 @@ pub async fn to_eth_receipt<C>(
     cumulative: &[(et::U256, usize)],
     header: &tendermint::block::Header,
     base_fee: &TokenAmount,
-    chain_id: &ChainID,
 ) -> anyhow::Result<et::TransactionReceipt>
 where
     C: Client + Sync + Send,
@@ -215,13 +210,7 @@ where
     let block_hash = et::H256::from_slice(header.hash().as_bytes());
     let block_number = et::U64::from(result.height.value());
     let transaction_index = et::U64::from(result.index);
-    let transaction_hash = find_sig_hash(&result.tx_result.events)
-        .or_else(|| {
-            SignedMessage::sig_hash(msg.message(), chain_id)
-                .ok()
-                .map(et::H256::from)
-        })
-        .unwrap_or_default();
+    let transaction_hash = msg_hash(&result.tx_result.events, &result.tx);
 
     let msg = &msg.message;
     // Lotus effective gas price is based on total spend divided by gas used,
@@ -477,20 +466,29 @@ pub fn to_chain_message(tx: &[u8]) -> anyhow::Result<ChainMessage> {
 ///
 /// This is here for reference only and should not be returned to Ethereum tools which expect
 /// the hash to be based on RLP and Keccak256.
-pub fn _message_hash(tx: &[u8]) -> anyhow::Result<tendermint::Hash> {
+fn message_hash(tx: &[u8]) -> tendermint::Hash {
     // based on how `tendermint::Header::hash` works.
     let hash = tendermint::crypto::default::Sha256::digest(tx);
-    let hash = tendermint::Hash::Sha256(hash);
-    Ok(hash)
+    tendermint::Hash::Sha256(hash)
 }
 
-/// Best effort to find and parse the `sig.hash` attribute emitted among the events.
-pub fn find_sig_hash(events: &[abci::Event]) -> Option<et::TxHash> {
+/// Best effort to find and parse any `eco.hash` attribute emitted among the events.
+fn find_eth_hash(events: &[abci::Event]) -> Option<et::TxHash> {
     events
         .iter()
-        .find(|e| e.kind == "sig")
+        .find(|e| e.kind == "eth")
         .and_then(|e| e.attributes.iter().find(|a| a.key == "hash"))
         .and_then(|a| hex::decode(&a.value).ok())
         .filter(|bz| bz.len() == 32)
         .map(|bz| et::TxHash::from_slice(&bz))
+}
+
+// Calculate some kind of hash for the message, preferrably one the tools expect.
+pub fn msg_hash(events: &[Event], tx: &[u8]) -> et::TxHash {
+    if let Some(h) = find_eth_hash(events) {
+        h
+    } else {
+        // Return the default hash, at least there is something
+        et::TxHash::from_slice(message_hash(tx).as_bytes())
+    }
 }

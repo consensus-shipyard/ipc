@@ -46,8 +46,8 @@ use ethers_core::{
     k256::ecdsa::SigningKey,
     types::{
         transaction::eip2718::TypedTransaction, Address, BlockId, BlockNumber, Bytes,
-        Eip1559TransactionRequest, Filter, Log, SyncingStatus, TransactionReceipt, H160, H256,
-        U256, U64,
+        Eip1559TransactionRequest, Filter, Log, SyncingStatus, TransactionReceipt, TxHash, H160,
+        H256, U256, U64,
     },
 };
 use fendermint_rpc::message::MessageFactory;
@@ -405,7 +405,18 @@ where
     // However, ethers.js actually asserts this and we cannot disable it, rendering that, or any similar tool, unusable if we rely on
     // the default Tendermint transaction hash, which is a Sha256 hash of the entire payload (which includes the signature),
     // not a Keccak256 of the unsigned RLP.
-    assert_eq!(tx_hash, transfer.sighash(), "Ethereum hash should match");
+
+    let expected_hash = {
+        let sig = mw
+            .signer()
+            .sign_transaction(&transfer)
+            .await
+            .context("failed to sign transaction")?;
+
+        let rlp = transfer.rlp_signed(&sig);
+        TxHash::from(ethers_core::utils::keccak256(rlp))
+    };
+    assert_eq!(tx_hash, expected_hash, "Ethereum hash should match");
 
     // Get a block with transactions by number.
     let block = request(

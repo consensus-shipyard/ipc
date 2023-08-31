@@ -15,13 +15,13 @@ use super::{state::FvmQueryState, FvmApplyRet, FvmMessageInterpreter};
 /// and sent over the wire as it is, only its internal parts are
 /// sent in the response. The client has to know what to expect,
 /// depending on the kind of query it sent.
-pub enum FvmQueryRet<C = FvmApplyRet> {
+pub enum FvmQueryRet {
     /// Bytes from the IPLD store retult, if found.
     Ipld(Option<Vec<u8>>),
     /// The full state of an actor, if found.
     ActorState(Option<Box<(ActorID, ActorState)>>),
     /// The results of a read-only message application.
-    Call(C),
+    Call(FvmApplyRet),
     /// The estimated gas limit.
     EstimateGas(GasEstimate),
     /// Current state parameters.

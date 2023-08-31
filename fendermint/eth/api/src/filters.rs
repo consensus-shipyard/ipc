@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
+use fendermint_vm_message::{chain::ChainMessage, signed::DomainHash};
 use futures::{Future, StreamExt};
 use fvm_shared::{address::Address, chainid::ChainID, error::ExitCode};
 use serde::Serialize;
@@ -28,7 +28,7 @@ use tokio::sync::{
 
 use crate::{
     cache::AddressCache,
-    conv::from_tm::{self, find_sig_hash, map_rpc_block_txs},
+    conv::from_tm::{self, map_rpc_block_txs, msg_hash},
     error::JsonRpcError,
     handlers::ws::{MethodNotification, Notification},
     state::{enrich_block, WebSocketSender},
@@ -258,7 +258,7 @@ where
             ) => {
                 for tx in &block.data {
                     if let Ok(ChainMessage::Signed(msg)) = fvm_ipld_encoding::from_slice(tx) {
-                        if let Ok(h) = SignedMessage::sig_hash(msg.message(), chain_id) {
+                        if let Ok(Some(DomainHash::Eth(h))) = msg.domain_hash(chain_id) {
                             hashes.push(et::TxHash::from(h))
                         }
                     }
@@ -311,7 +311,7 @@ where
                 let block_hash = et::H256::default();
                 let block_number = et::U64::from(tx_result.height);
 
-                let transaction_hash = find_sig_hash(&tx_result.result.events).unwrap_or_default();
+                let transaction_hash = msg_hash(&tx_result.result.events, &tx_result.tx);
 
                 // TODO: The transaction index comes as None.
                 let transaction_index = et::U64::from(tx_result.index.unwrap_or_default());

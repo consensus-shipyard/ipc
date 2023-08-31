@@ -6,14 +6,14 @@ use async_trait::async_trait;
 use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::{
     query::FvmQuery,
-    signed::{chain_id_bytes, SignedMessage, SignedMessageError},
+    signed::{chain_id_bytes, DomainHash, SignedMessage, SignedMessageError},
 };
 use fvm_ipld_encoding::Error as IpldError;
 use fvm_shared::{chainid::ChainID, crypto::signature::Signature};
 use serde::Serialize;
 
 use crate::{
-    fvm::{FvmApplyRet, FvmCheckRet, FvmMessage, FvmQueryRet},
+    fvm::{FvmApplyRet, FvmCheckRet, FvmMessage},
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, QueryInterpreter,
 };
 
@@ -22,7 +22,7 @@ pub struct InvalidSignature(pub String);
 
 pub struct SignedMessageApplyRet {
     pub fvm: FvmApplyRet,
-    pub sig_hash: [u8; 32],
+    pub domain_hash: Option<DomainHash>,
 }
 
 pub type SignedMessageApplyRes = Result<SignedMessageApplyRet, InvalidSignature>;
@@ -52,6 +52,16 @@ impl VerifiableMessage {
         match self {
             Self::Signed(m) => m.into_message(),
             Self::Synthetic(m) => m.message,
+        }
+    }
+
+    pub fn domain_hash(
+        &self,
+        chain_id: &ChainID,
+    ) -> Result<Option<DomainHash>, SignedMessageError> {
+        match self {
+            Self::Signed(m) => m.domain_hash(chain_id),
+            Self::Synthetic(_) => Ok(None),
         }
     }
 }
@@ -133,10 +143,12 @@ where
                 Ok((state, Err(InvalidSignature(s))))
             }
             Ok(()) => {
-                let msg = msg.into_message();
-                let sig_hash = SignedMessage::sig_hash(&msg, &chain_id)?;
-                let (state, ret) = self.inner.deliver(state, msg).await?;
-                let ret = SignedMessageApplyRet { fvm: ret, sig_hash };
+                let domain_hash = msg.domain_hash(&chain_id)?;
+                let (state, ret) = self.inner.deliver(state, msg.into_message()).await?;
+                let ret = SignedMessageApplyRet {
+                    fvm: ret,
+                    domain_hash,
+                };
                 Ok((state, Ok(ret)))
             }
         }
@@ -197,37 +209,18 @@ where
 #[async_trait]
 impl<I> QueryInterpreter for SignedMessageInterpreter<I>
 where
-    I: QueryInterpreter<Query = FvmQuery, Output = FvmQueryRet>,
-    I::State: HasChainID,
+    I: QueryInterpreter<Query = FvmQuery>,
 {
     type State = I::State;
     type Query = I::Query;
-    type Output = FvmQueryRet<SignedMessageApplyRet>;
+    type Output = I::Output;
 
     async fn query(
         &self,
         state: Self::State,
         qry: Self::Query,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
-        let sig_hash = match qry {
-            FvmQuery::Call(ref msg) => SignedMessage::sig_hash(msg, &state.chain_id()).ok(),
-            _ => None,
-        };
-
-        let (state, ret) = self.inner.query(state, qry).await?;
-
-        let ret = match ret {
-            FvmQueryRet::Ipld(x) => FvmQueryRet::Ipld(x),
-            FvmQueryRet::ActorState(x) => FvmQueryRet::ActorState(x),
-            FvmQueryRet::EstimateGas(x) => FvmQueryRet::EstimateGas(x),
-            FvmQueryRet::StateParams(x) => FvmQueryRet::StateParams(x),
-            FvmQueryRet::Call(x) => FvmQueryRet::Call(SignedMessageApplyRet {
-                fvm: x,
-                sig_hash: sig_hash.unwrap_or_default(),
-            }),
-        };
-
-        Ok((state, ret))
+        self.inner.query(state, qry).await
     }
 }
 
