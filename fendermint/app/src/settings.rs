@@ -54,6 +54,7 @@ pub struct EthSettings {
     #[serde_as(as = "DurationSeconds<u64>")]
     pub filter_timeout: Duration,
     pub cache_capacity: usize,
+    pub gas: fendermint_eth_api::GasOpt,
 }
 
 #[derive(Debug, Deserialize)]

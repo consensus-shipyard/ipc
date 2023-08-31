@@ -34,6 +34,7 @@ async fn run(settings: EthSettings, client: WebSocketClient) -> anyhow::Result<(
         client,
         settings.filter_timeout,
         settings.cache_capacity,
+        settings.gas,
     )
     .await
 }

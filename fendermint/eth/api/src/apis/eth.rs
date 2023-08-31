@@ -21,9 +21,12 @@ use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
+use fvm_shared::bigint::BigInt;
 use fvm_shared::crypto::signature::Signature;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
+use rand::Rng;
 use tendermint_rpc::endpoint::{self, status};
 use tendermint_rpc::SubscriptionClient;
 use tendermint_rpc::{
@@ -42,8 +45,6 @@ use crate::{
     },
     error, JsonRpcData, JsonRpcResult,
 };
-
-const MAX_FEE_HIST_SIZE: usize = 1024;
 
 /// Returns a list of addresses owned by client.
 ///
@@ -81,6 +82,88 @@ where
     Ok(version.to_string())
 }
 
+/// Returns a fee per gas that is an estimate of how much you can pay as a
+/// priority fee, or 'tip', to get a transaction included in the current block.
+pub async fn max_priority_fee_per_gas<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U256>
+where
+    C: Client + Sync + Send,
+{
+    // get the latest block
+    let res: block::Response = data.tm().latest_block().await?;
+    let latest_h = res.block.header.height;
+
+    // get consensus params to fetch block gas limit
+    // (this just needs to be done once as we assume that is constant
+    // for all blocks)
+    let consensus_params: consensus_params::Response = data
+        .tm()
+        .consensus_params(latest_h)
+        .await
+        .context("failed to get consensus params")?;
+    let mut block_gas_limit = consensus_params.consensus_params.block.max_gas;
+    if block_gas_limit <= 0 {
+        block_gas_limit =
+            i64::try_from(fvm_shared::BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
+    };
+
+    let mut premiums = Vec::new();
+    // iterate through the blocks in the range
+    // we may be able to de-duplicate a lot of this code from fee_history
+    let latest_h: u64 = latest_h.into();
+    let mut blk = latest_h;
+    while blk > latest_h - data.gas_opt.num_blocks_max_prio_fee {
+        let block = data
+            .block_by_height(blk.into())
+            .await
+            .context("failed to get block")?;
+
+        let height = block.header().height;
+
+        // Genesis has height 1, but no relevant fees.
+        if height.value() <= 1 {
+            break;
+        }
+        let state_params = data.client.state_params(Some(height)).await?;
+        let base_fee = &state_params.value.base_fee;
+
+        // The latest block might not have results yet.
+        if let Ok(block_results) = data.tm().block_results(height).await {
+            let txs_results = block_results.txs_results.unwrap_or_default();
+
+            for (tx, txres) in block.data().iter().zip(txs_results) {
+                let msg = fvm_ipld_encoding::from_slice::<ChainMessage>(tx)
+                    .context("failed to decode tx as ChainMessage")?;
+
+                if let ChainMessage::Signed(msg) = msg {
+                    let premium = crate::gas::effective_gas_premium(&msg.message, base_fee);
+                    premiums.push((premium, txres.gas_used));
+                }
+            }
+        }
+        blk -= 1;
+    }
+
+    // compute median gas price
+    let mut median = crate::gas::median_gas_premium(&mut premiums, block_gas_limit);
+    let min_premium = TokenAmount::from_atto(BigInt::from(data.gas_opt.min_gas_premium));
+    if median < min_premium {
+        median = min_premium;
+    }
+
+    // add some noise to normalize behaviour of message selection
+    // mean 1, stddev 0.005 => 95% within +-1%
+    const PRECISION: u32 = 32;
+    let mut rng = rand::thread_rng();
+    let noise: f64 = 1.0 + rng.gen::<f64>() * 0.005;
+    let precision: i64 = 32;
+    let coeff: u64 = ((noise * (1 << precision) as f64) as u64) + 1;
+
+    median *= BigInt::from(coeff);
+    median.div_ceil(BigInt::from(1 << PRECISION));
+
+    Ok(to_eth_tokens(&median)?)
+}
+
 /// Returns transaction base fee per gas and effective priority fee per gas for the requested/supported block range.
 pub async fn fee_history<C>(
     data: JsonRpcData<C>,
@@ -93,7 +176,7 @@ pub async fn fee_history<C>(
 where
     C: Client + Sync + Send,
 {
-    if block_count > et::U256::from(MAX_FEE_HIST_SIZE) {
+    if block_count > et::U256::from(data.gas_opt.max_fee_hist_size) {
         return error(
             ExitCode::USR_ILLEGAL_ARGUMENT,
             "block_count must be <= 1024",

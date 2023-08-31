@@ -508,167 +508,10 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                 ],
                                             ),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                        ::std::boxed::Box::new(
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                        ),
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                ],
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                        ::std::boxed::Box::new(
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                        ),
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                ],
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Bool,
-                                                        ],
-                                                    ),
-                                                ),
-                                            ),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("struct Subnet"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("getSubnetTopDownMsg"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "getSubnetTopDownMsg",
-                            ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("subnetId"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                        ::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("struct SubnetID"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("index"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                        ::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                        ::std::boxed::Box::new(
-                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                        ),
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                ],
-                                                            ),
-                                                        ],
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                        ::std::boxed::Box::new(
-                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                        ),
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                ],
-                                                            ),
-                                                        ],
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                ],
-                                            ),
-                                            ::ethers::core::abi::ethabi::ParamType::Bool,
-                                        ],
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("struct CrossMsg"),
                                     ),
                                 },
                             ],
@@ -741,10 +584,21 @@ pub mod gateway_getter_facet {
                                     ),
                                 },
                                 ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("fromNonce"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    name: ::std::borrow::ToOwned::to_owned("fromBlock"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
                                     internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("toBlock"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -1024,63 +878,6 @@ pub mod gateway_getter_facet {
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                        ::std::boxed::Box::new(
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                        ::std::vec![
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                                ::std::boxed::Box::new(
-                                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                                ),
-                                                                                            ),
-                                                                                        ],
-                                                                                    ),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                        ::std::vec![
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                        ],
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                        ::std::vec![
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                                ::std::boxed::Box::new(
-                                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                                ),
-                                                                                            ),
-                                                                                        ],
-                                                                                    ),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                        ::std::vec![
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                        ],
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Bool,
-                                                                ],
-                                                            ),
-                                                        ),
-                                                    ),
                                                 ],
                                             ),
                                         ),
@@ -1356,63 +1153,6 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                 ],
                                             ),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                        ::std::boxed::Box::new(
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                        ),
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                ],
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                        ::std::boxed::Box::new(
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                        ),
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                ],
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Bool,
-                                                        ],
-                                                    ),
-                                                ),
-                                            ),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
@@ -1620,16 +1360,6 @@ pub mod gateway_getter_facet {
                 .method_hash([198, 108, 102, 161], (subnet_id,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getSubnetTopDownMsg` (0x0ea746f2) function
-        pub fn get_subnet_top_down_msg(
-            &self,
-            subnet_id: SubnetID,
-            index: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, CrossMsg> {
-            self.0
-                .method_hash([14, 167, 70, 242], (subnet_id, index))
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `getSubnetTopDownMsgsLength` (0x9d3070b5) function
         pub fn get_subnet_top_down_msgs_length(
             &self,
@@ -1639,14 +1369,15 @@ pub mod gateway_getter_facet {
                 .method_hash([157, 48, 112, 181], (subnet_id,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getTopDownMsgs` (0x13549315) function
+        ///Calls the contract's `getTopDownMsgs` (0x77296bb1) function
         pub fn get_top_down_msgs(
             &self,
             subnet_id: SubnetID,
-            from_nonce: u64,
+            from_block: ::ethers::core::types::U256,
+            to_block: ::ethers::core::types::U256,
         ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<CrossMsg>> {
             self.0
-                .method_hash([19, 84, 147, 21], (subnet_id, from_nonce))
+                .method_hash([119, 41, 107, 177], (subnet_id, from_block, to_block))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `hasValidatorVotedForSubmission` (0x66d7bbbc) function
@@ -1887,25 +1618,6 @@ pub mod gateway_getter_facet {
     pub struct GetSubnetCall {
         pub subnet_id: SubnetID,
     }
-    ///Container type for all input parameters for the `getSubnetTopDownMsg` function with signature `getSubnetTopDownMsg((uint64,address[]),uint256)` and selector `0x0ea746f2`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(
-        name = "getSubnetTopDownMsg",
-        abi = "getSubnetTopDownMsg((uint64,address[]),uint256)"
-    )]
-    pub struct GetSubnetTopDownMsgCall {
-        pub subnet_id: SubnetID,
-        pub index: ::ethers::core::types::U256,
-    }
     ///Container type for all input parameters for the `getSubnetTopDownMsgsLength` function with signature `getSubnetTopDownMsgsLength((uint64,address[]))` and selector `0x9d3070b5`
     #[derive(
         Clone,
@@ -1924,7 +1636,7 @@ pub mod gateway_getter_facet {
     pub struct GetSubnetTopDownMsgsLengthCall {
         pub subnet_id: SubnetID,
     }
-    ///Container type for all input parameters for the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint64)` and selector `0x13549315`
+    ///Container type for all input parameters for the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint256,uint256)` and selector `0x77296bb1`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1937,11 +1649,12 @@ pub mod gateway_getter_facet {
     )]
     #[ethcall(
         name = "getTopDownMsgs",
-        abi = "getTopDownMsgs((uint64,address[]),uint64)"
+        abi = "getTopDownMsgs((uint64,address[]),uint256,uint256)"
     )]
     pub struct GetTopDownMsgsCall {
         pub subnet_id: SubnetID,
-        pub from_nonce: u64,
+        pub from_block: ::ethers::core::types::U256,
+        pub to_block: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `hasValidatorVotedForSubmission` function with signature `hasValidatorVotedForSubmission(uint64,address)` and selector `0x66d7bbbc`
     #[derive(
@@ -2109,7 +1822,6 @@ pub mod gateway_getter_facet {
         GetGenesisEpoch(GetGenesisEpochCall),
         GetNetworkName(GetNetworkNameCall),
         GetSubnet(GetSubnetCall),
-        GetSubnetTopDownMsg(GetSubnetTopDownMsgCall),
         GetSubnetTopDownMsgsLength(GetSubnetTopDownMsgsLengthCall),
         GetTopDownMsgs(GetTopDownMsgsCall),
         HasValidatorVotedForSubmission(HasValidatorVotedForSubmissionCall),
@@ -2176,12 +1888,6 @@ pub mod gateway_getter_facet {
             if let Ok(decoded)
                 = <GetSubnetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetSubnet(decoded));
-            }
-            if let Ok(decoded)
-                = <GetSubnetTopDownMsgCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
-                return Ok(Self::GetSubnetTopDownMsg(decoded));
             }
             if let Ok(decoded)
                 = <GetSubnetTopDownMsgsLengthCall as ::ethers::core::abi::AbiDecode>::decode(
@@ -2281,9 +1987,6 @@ pub mod gateway_getter_facet {
                 Self::GetSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::GetSubnetTopDownMsg(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::GetSubnetTopDownMsgsLength(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -2343,9 +2046,6 @@ pub mod gateway_getter_facet {
                 Self::GetGenesisEpoch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetNetworkName(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetSubnet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetSubnetTopDownMsg(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
                 Self::GetSubnetTopDownMsgsLength(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -2420,11 +2120,6 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<GetSubnetCall> for GatewayGetterFacetCalls {
         fn from(value: GetSubnetCall) -> Self {
             Self::GetSubnet(value)
-        }
-    }
-    impl ::core::convert::From<GetSubnetTopDownMsgCall> for GatewayGetterFacetCalls {
-        fn from(value: GetSubnetTopDownMsgCall) -> Self {
-            Self::GetSubnetTopDownMsg(value)
         }
     }
     impl ::core::convert::From<GetSubnetTopDownMsgsLengthCall>
@@ -2614,18 +2309,6 @@ pub mod gateway_getter_facet {
         Hash
     )]
     pub struct GetSubnetReturn(pub bool, pub Subnet);
-    ///Container type for all return fields from the `getSubnetTopDownMsg` function with signature `getSubnetTopDownMsg((uint64,address[]),uint256)` and selector `0x0ea746f2`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct GetSubnetTopDownMsgReturn(pub CrossMsg);
     ///Container type for all return fields from the `getSubnetTopDownMsgsLength` function with signature `getSubnetTopDownMsgsLength((uint64,address[]))` and selector `0x9d3070b5`
     #[derive(
         Clone,
@@ -2638,7 +2321,7 @@ pub mod gateway_getter_facet {
         Hash
     )]
     pub struct GetSubnetTopDownMsgsLengthReturn(pub ::ethers::core::types::U256);
-    ///Container type for all return fields from the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint64)` and selector `0x13549315`
+    ///Container type for all return fields from the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint256,uint256)` and selector `0x77296bb1`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2886,7 +2569,7 @@ pub mod gateway_getter_facet {
         pub method: [u8; 4],
         pub params: ::ethers::core::types::Bytes,
     }
-    ///`Subnet(uint256,uint256,uint256,uint64,uint64,uint8,(uint64,address[]),((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes),((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[])`
+    ///`Subnet(uint256,uint256,uint256,uint64,uint64,uint8,(uint64,address[]),((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes))`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2906,7 +2589,6 @@ pub mod gateway_getter_facet {
         pub status: u8,
         pub id: SubnetID,
         pub prev_checkpoint: BottomUpCheckpoint,
-        pub top_down_msgs: ::std::vec::Vec<CrossMsg>,
     }
     ///`SubnetID(uint64,address[])`
     #[derive(

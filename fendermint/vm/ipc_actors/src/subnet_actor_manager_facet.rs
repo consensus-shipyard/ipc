@@ -202,6 +202,55 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("setValidatorNetAddr"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "setValidatorNetAddr",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("newNetAddr"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::String,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("string"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("setValidatorWorkerAddr"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "setValidatorWorkerAddr",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("newWorkerAddr"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct FvmAddress"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("submitCheckpoint"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -333,7 +382,174 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
             ]),
-            events: ::std::collections::BTreeMap::new(),
+            events: ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("BottomUpCheckpointExecuted"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "BottomUpCheckpointExecuted",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("epoch"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("submitter"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("BottomUpCheckpointSubmitted"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "BottomUpCheckpointSubmitted",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("checkpoint"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                        ::std::boxed::Box::new(
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                        ::std::boxed::Box::new(
+                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                        ),
+                                                                                    ),
+                                                                                ],
+                                                                            ),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                                ],
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                        ::std::boxed::Box::new(
+                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                        ),
+                                                                                    ),
+                                                                                ],
+                                                                            ),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                                ],
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Bool,
+                                                        ],
+                                                    ),
+                                                ),
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                        ::std::boxed::Box::new(
+                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                        ),
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                ::std::boxed::Box::new(
+                                                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                                                ),
+                                                            ),
+                                                        ],
+                                                    ),
+                                                ),
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],
+                                    ),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("submitter"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("NextBottomUpCheckpointExecuted"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NextBottomUpCheckpointExecuted",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("epoch"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("submitter"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+            ]),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
@@ -359,6 +575,15 @@ pub mod subnet_actor_manager_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("CollateralIsZero"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("EmptyAddress"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("EmptyAddress"),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -619,6 +844,24 @@ pub mod subnet_actor_manager_facet {
                 .method_hash([169, 251, 118, 60], amount)
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `setValidatorNetAddr` (0x7cc4fc43) function
+        pub fn set_validator_net_addr(
+            &self,
+            new_net_addr: ::std::string::String,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([124, 196, 252, 67], new_net_addr)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `setValidatorWorkerAddr` (0xe8ef872f) function
+        pub fn set_validator_worker_addr(
+            &self,
+            new_worker_addr: FvmAddress,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([232, 239, 135, 47], (new_worker_addr,))
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `submitCheckpoint` (0xf6fd8381) function
         pub fn submit_checkpoint(
             &self,
@@ -633,6 +876,46 @@ pub mod subnet_actor_manager_facet {
             self.0
                 .method_hash([60, 207, 214, 11], ())
                 .expect("method not found (this should never happen)")
+        }
+        ///Gets the contract's `BottomUpCheckpointExecuted` event
+        pub fn bottom_up_checkpoint_executed_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            BottomUpCheckpointExecutedFilter,
+        > {
+            self.0.event()
+        }
+        ///Gets the contract's `BottomUpCheckpointSubmitted` event
+        pub fn bottom_up_checkpoint_submitted_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            BottomUpCheckpointSubmittedFilter,
+        > {
+            self.0.event()
+        }
+        ///Gets the contract's `NextBottomUpCheckpointExecuted` event
+        pub fn next_bottom_up_checkpoint_executed_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NextBottomUpCheckpointExecutedFilter,
+        > {
+            self.0.event()
+        }
+        /// Returns an `Event` builder for all the events of this contract.
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            SubnetActorManagerFacetEvents,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
@@ -672,6 +955,19 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "CollateralIsZero", abi = "CollateralIsZero()")]
     pub struct CollateralIsZero;
+    ///Custom Error type `EmptyAddress` with signature `EmptyAddress()` and selector `0x7138356f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "EmptyAddress", abi = "EmptyAddress()")]
+    pub struct EmptyAddress;
     ///Custom Error type `EpochAlreadyExecuted` with signature `EpochAlreadyExecuted()` and selector `0x7cc3318c`
     #[derive(
         Clone,
@@ -875,6 +1171,7 @@ pub mod subnet_actor_manager_facet {
     pub enum SubnetActorManagerFacetErrors {
         AddressInsufficientBalance(AddressInsufficientBalance),
         CollateralIsZero(CollateralIsZero),
+        EmptyAddress(EmptyAddress),
         EpochAlreadyExecuted(EpochAlreadyExecuted),
         EpochNotVotable(EpochNotVotable),
         FailedInnerCall(FailedInnerCall),
@@ -914,6 +1211,10 @@ pub mod subnet_actor_manager_facet {
             if let Ok(decoded)
                 = <CollateralIsZero as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CollateralIsZero(decoded));
+            }
+            if let Ok(decoded)
+                = <EmptyAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::EmptyAddress(decoded));
             }
             if let Ok(decoded)
                 = <EpochAlreadyExecuted as ::ethers::core::abi::AbiDecode>::decode(
@@ -999,6 +1300,9 @@ pub mod subnet_actor_manager_facet {
                 Self::CollateralIsZero(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::EmptyAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::EpochAlreadyExecuted(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1060,6 +1364,8 @@ pub mod subnet_actor_manager_facet {
                     == <CollateralIsZero as ::ethers::contract::EthError>::selector() => {
                     true
                 }
+                _ if selector
+                    == <EmptyAddress as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <EpochAlreadyExecuted as ::ethers::contract::EthError>::selector() => {
                     true
@@ -1127,6 +1433,7 @@ pub mod subnet_actor_manager_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::CollateralIsZero(element) => ::core::fmt::Display::fmt(element, f),
+                Self::EmptyAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EpochAlreadyExecuted(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1176,6 +1483,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<CollateralIsZero> for SubnetActorManagerFacetErrors {
         fn from(value: CollateralIsZero) -> Self {
             Self::CollateralIsZero(value)
+        }
+    }
+    impl ::core::convert::From<EmptyAddress> for SubnetActorManagerFacetErrors {
+        fn from(value: EmptyAddress) -> Self {
+            Self::EmptyAddress(value)
         }
     }
     impl ::core::convert::From<EpochAlreadyExecuted> for SubnetActorManagerFacetErrors {
@@ -1253,6 +1565,128 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<WrongCheckpointSource> for SubnetActorManagerFacetErrors {
         fn from(value: WrongCheckpointSource) -> Self {
             Self::WrongCheckpointSource(value)
+        }
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(
+        name = "BottomUpCheckpointExecuted",
+        abi = "BottomUpCheckpointExecuted(uint64,address)"
+    )]
+    pub struct BottomUpCheckpointExecutedFilter {
+        pub epoch: u64,
+        pub submitter: ::ethers::core::types::Address,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(
+        name = "BottomUpCheckpointSubmitted",
+        abi = "BottomUpCheckpointSubmitted(((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes),address)"
+    )]
+    pub struct BottomUpCheckpointSubmittedFilter {
+        pub checkpoint: BottomUpCheckpoint,
+        pub submitter: ::ethers::core::types::Address,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(
+        name = "NextBottomUpCheckpointExecuted",
+        abi = "NextBottomUpCheckpointExecuted(uint64,address)"
+    )]
+    pub struct NextBottomUpCheckpointExecutedFilter {
+        pub epoch: u64,
+        pub submitter: ::ethers::core::types::Address,
+    }
+    ///Container type for all of the contract's events
+    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
+    pub enum SubnetActorManagerFacetEvents {
+        BottomUpCheckpointExecutedFilter(BottomUpCheckpointExecutedFilter),
+        BottomUpCheckpointSubmittedFilter(BottomUpCheckpointSubmittedFilter),
+        NextBottomUpCheckpointExecutedFilter(NextBottomUpCheckpointExecutedFilter),
+    }
+    impl ::ethers::contract::EthLogDecode for SubnetActorManagerFacetEvents {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+            if let Ok(decoded) = BottomUpCheckpointExecutedFilter::decode_log(log) {
+                return Ok(
+                    SubnetActorManagerFacetEvents::BottomUpCheckpointExecutedFilter(
+                        decoded,
+                    ),
+                );
+            }
+            if let Ok(decoded) = BottomUpCheckpointSubmittedFilter::decode_log(log) {
+                return Ok(
+                    SubnetActorManagerFacetEvents::BottomUpCheckpointSubmittedFilter(
+                        decoded,
+                    ),
+                );
+            }
+            if let Ok(decoded) = NextBottomUpCheckpointExecutedFilter::decode_log(log) {
+                return Ok(
+                    SubnetActorManagerFacetEvents::NextBottomUpCheckpointExecutedFilter(
+                        decoded,
+                    ),
+                );
+            }
+            Err(::ethers::core::abi::Error::InvalidData)
+        }
+    }
+    impl ::core::fmt::Display for SubnetActorManagerFacetEvents {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+            match self {
+                Self::BottomUpCheckpointExecutedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::BottomUpCheckpointSubmittedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NextBottomUpCheckpointExecutedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+            }
+        }
+    }
+    impl ::core::convert::From<BottomUpCheckpointExecutedFilter>
+    for SubnetActorManagerFacetEvents {
+        fn from(value: BottomUpCheckpointExecutedFilter) -> Self {
+            Self::BottomUpCheckpointExecutedFilter(value)
+        }
+    }
+    impl ::core::convert::From<BottomUpCheckpointSubmittedFilter>
+    for SubnetActorManagerFacetEvents {
+        fn from(value: BottomUpCheckpointSubmittedFilter) -> Self {
+            Self::BottomUpCheckpointSubmittedFilter(value)
+        }
+    }
+    impl ::core::convert::From<NextBottomUpCheckpointExecutedFilter>
+    for SubnetActorManagerFacetEvents {
+        fn from(value: NextBottomUpCheckpointExecutedFilter) -> Self {
+            Self::NextBottomUpCheckpointExecutedFilter(value)
         }
     }
     ///Container type for all input parameters for the `committedCheckpoints` function with signature `committedCheckpoints(uint64)` and selector `0x98903748`
@@ -1346,6 +1780,39 @@ pub mod subnet_actor_manager_facet {
     pub struct RewardCall {
         pub amount: ::ethers::core::types::U256,
     }
+    ///Container type for all input parameters for the `setValidatorNetAddr` function with signature `setValidatorNetAddr(string)` and selector `0x7cc4fc43`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "setValidatorNetAddr", abi = "setValidatorNetAddr(string)")]
+    pub struct SetValidatorNetAddrCall {
+        pub new_net_addr: ::std::string::String,
+    }
+    ///Container type for all input parameters for the `setValidatorWorkerAddr` function with signature `setValidatorWorkerAddr((uint8,bytes))` and selector `0xe8ef872f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "setValidatorWorkerAddr",
+        abi = "setValidatorWorkerAddr((uint8,bytes))"
+    )]
+    pub struct SetValidatorWorkerAddrCall {
+        pub new_worker_addr: FvmAddress,
+    }
     ///Container type for all input parameters for the `submitCheckpoint` function with signature `submitCheckpoint(((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes))` and selector `0xf6fd8381`
     #[derive(
         Clone,
@@ -1386,6 +1853,8 @@ pub mod subnet_actor_manager_facet {
         Kill(KillCall),
         Leave(LeaveCall),
         Reward(RewardCall),
+        SetValidatorNetAddr(SetValidatorNetAddrCall),
+        SetValidatorWorkerAddr(SetValidatorWorkerAddrCall),
         SubmitCheckpoint(SubmitCheckpointCall),
         Withdraw(WithdrawCall),
     }
@@ -1423,6 +1892,18 @@ pub mod subnet_actor_manager_facet {
                 return Ok(Self::Reward(decoded));
             }
             if let Ok(decoded)
+                = <SetValidatorNetAddrCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::SetValidatorNetAddr(decoded));
+            }
+            if let Ok(decoded)
+                = <SetValidatorWorkerAddrCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::SetValidatorWorkerAddr(decoded));
+            }
+            if let Ok(decoded)
                 = <SubmitCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
                     data,
                 ) {
@@ -1448,6 +1929,12 @@ pub mod subnet_actor_manager_facet {
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Leave(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Reward(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SetValidatorNetAddr(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SetValidatorWorkerAddr(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::SubmitCheckpoint(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1470,6 +1957,12 @@ pub mod subnet_actor_manager_facet {
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Leave(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Reward(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SetValidatorNetAddr(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::SetValidatorWorkerAddr(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::SubmitCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Withdraw(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -1505,6 +1998,18 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<RewardCall> for SubnetActorManagerFacetCalls {
         fn from(value: RewardCall) -> Self {
             Self::Reward(value)
+        }
+    }
+    impl ::core::convert::From<SetValidatorNetAddrCall>
+    for SubnetActorManagerFacetCalls {
+        fn from(value: SetValidatorNetAddrCall) -> Self {
+            Self::SetValidatorNetAddr(value)
+        }
+    }
+    impl ::core::convert::From<SetValidatorWorkerAddrCall>
+    for SubnetActorManagerFacetCalls {
+        fn from(value: SetValidatorWorkerAddrCall) -> Self {
+            Self::SetValidatorWorkerAddr(value)
         }
     }
     impl ::core::convert::From<SubmitCheckpointCall> for SubnetActorManagerFacetCalls {

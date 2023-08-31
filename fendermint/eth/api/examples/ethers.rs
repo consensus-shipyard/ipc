@@ -210,6 +210,7 @@ impl TestAccount {
 // - eth_getTransactionByHash
 // - eth_getTransactionReceipt
 // - eth_feeHistory
+// - eth_maxPriorityFeePerGas
 // - eth_sendRawTransaction
 // - eth_call
 // - eth_estimateGas
@@ -496,6 +497,12 @@ where
         "eth_estimateGas w/o height",
         provider.estimate_gas(&probe_tx, None).await,
         |gas: &U256| !gas.is_zero(),
+    )?;
+
+    request(
+        "eth_maxPriorityFeePerGas",
+        provider.request("eth_maxPriorityFeePerGas", ()).await,
+        |premium: &U256| !premium.is_zero(),
     )?;
 
     tracing::info!("deploying SimpleCoin");
