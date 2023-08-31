@@ -129,7 +129,7 @@ pub fn to_eth_block(
         uncles_hash: *EMPTY_UNCLE_HASH,
         receipts_root: *EMPTY_ROOT_HASH,
         extra_data: et::Bytes::default(),
-        logs_bloom: None,
+        logs_bloom: Some(et::Bloom::from_slice(&*EMPTY_ETH_BLOOM)),
         withdrawals_root: None,
         withdrawals: None,
         seal_fields: Vec::new(),
