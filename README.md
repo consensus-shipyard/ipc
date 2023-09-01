@@ -108,6 +108,8 @@ forge coverage
 
 # Development
 
+Run `make install-dev` to install all necessary dependencies for development.
+
 Before committing:
 
 ```bash
