@@ -4,7 +4,7 @@
 FROM rust:1.69 as builder
 
 RUN apt-get update && \
-  apt-get install -y build-essential clang cmake && \
+  apt-get install -y build-essential clang cmake protobuf-compiler && \
   rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
