@@ -2,12 +2,12 @@
 pragma solidity 0.8.19;
 
 interface IDiamond {
+    // Add=0, Replace=1, Remove=2
     enum FacetCutAction {
         Add,
         Replace,
         Remove
     }
-    // Add=0, Replace=1, Remove=2
 
     struct FacetCut {
         address facetAddress;

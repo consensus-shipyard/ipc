@@ -6,8 +6,6 @@ import {FvmAddress} from "./FvmAddress.sol";
 import {BottomUpCheckpoint, CrossMsg} from "./Checkpoint.sol";
 import {Status} from "../enums/Status.sol";
 
-/// @title Subnet id struct
-/// @author LimeChain team
 struct SubnetID {
     /// @notice chainID of the root subnet
     uint64 root;

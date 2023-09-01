@@ -87,7 +87,7 @@ library CrossMsgHelper {
             params = abi.encode(crossMsg);
         }
 
-        bytes memory data = abi.encodeWithSelector(crossMsg.message.method, params);
+        bytes memory data = bytes.concat(crossMsg.message.method, params);
 
         if (value > 0) {
             return Address.functionCallWithValue({target: recipient, data: data, value: value});

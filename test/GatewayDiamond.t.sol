@@ -31,6 +31,8 @@ import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
+import {DummyERC20} from "./ERC20Helper.sol";
+import {ERC20TokenMessenger} from "../examples/contracts/cross-token/ERC20TokenMessenger.sol";
 
 contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     using SubnetIDHelper for SubnetID;
@@ -141,6 +143,11 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         return gatewayDiamond;
     }
+
+    // We need this to be able to send values in the tests.
+    fallback() external payable {}
+
+    receive() external payable {}
 
     function setUp() public {
         address[] memory path = new address[](1);
@@ -1276,7 +1283,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                         subnetId: SubnetID({root: 0, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
                     }),
-                    value: CROSS_MSG_FEE + 1,
+                    value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0)
@@ -1301,7 +1308,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                         rawAddress: FvmAddressHelper.from(caller)
                     }),
                     to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                    value: CROSS_MSG_FEE + 1,
+                    value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0)
@@ -1351,7 +1358,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                         rawAddress: FvmAddressHelper.from(caller)
                     }),
                     to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                    value: CROSS_MSG_FEE + 1,
+                    value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0)
@@ -1376,7 +1383,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                         rawAddress: FvmAddressHelper.from(caller)
                     }),
                     to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                    value: CROSS_MSG_FEE + 1,
+                    value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0)
@@ -1429,7 +1436,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             message: StorableMsg({
                 from: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(caller)}),
                 to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(receiver)}),
-                value: CROSS_MSG_FEE + 1,
+                value: 1,
                 nonce: 0,
                 method: METHOD_SEND,
                 params: new bytes(0)
@@ -1447,7 +1454,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         require(crossMsg.message.applyType(gwGetter.getNetworkName()) == IPCMsgType.TopDown);
         require(id.equals(destinationSubnet));
         require(nonce == 1);
-        require(circSupply == CROSS_MSG_FEE + 1);
+        require(circSupply == 1);
         require(gwGetter.getNetworkName().equals(destinationSubnet.commonParent(from)));
         require(gwGetter.appliedTopDownNonce() == 1);
 
@@ -1482,7 +1489,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             message: StorableMsg({
                 from: IPCAddress({subnetId: network2, rawAddress: FvmAddressHelper.from(caller)}),
                 to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(receiver)}),
-                value: CROSS_MSG_FEE + 1,
+                value: 1,
                 nonce: 0,
                 method: METHOD_SEND,
                 params: new bytes(0)
@@ -1514,7 +1521,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             message: StorableMsg({
                 from: IPCAddress({subnetId: network2, rawAddress: FvmAddressHelper.from(caller)}),
                 to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(receiver)}),
-                value: CROSS_MSG_FEE + 1,
+                value: 1,
                 nonce: 0,
                 method: METHOD_SEND,
                 params: new bytes(0)
@@ -1766,6 +1773,197 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.deal(validator, 1);
         vm.expectRevert(NotInitialized.selector);
         gwRouter.submitTopDownCheckpoint(checkpoint);
+    }
+
+    function testGatewayDiamond_SendCrossMessage_SendValue() public {
+        uint256 targetValue = 3;
+
+        address sender = vm.addr(100);
+        vm.deal(sender, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + targetValue);
+        vm.prank(sender);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, sender);
+
+        address receiver = address(this);
+        vm.prank(receiver);
+        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
+
+        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(receiver);
+
+        GatewayDiamond destinationGWDiamond = createGWForSubnet(destinationSubnet);
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gwGetter.getNetworkName(),
+                    rawAddress: FvmAddressHelper.from(address(sender))
+                }),
+                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(receiver))}),
+                value: targetValue,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: EMPTY_BYTES
+            }),
+            wrapped: false
+        });
+
+        vm.startPrank(sender);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + targetValue}(crossMsg);
+        vm.stopPrank();
+
+        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(destinationSubnet, block.number, block.number);
+        require(topDownMsgs.length == 1, "topDownMsgs.length == 1");
+
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
+            epoch: DEFAULT_CHECKPOINT_PERIOD,
+            topDownMsgs: topDownMsgs
+        });
+
+        vm.deal(address(destinationGWDiamond), CROSS_MSG_FEE);
+        destinationSubmitTopDownCheckpoint(destinationGWDiamond, checkpoint);
+
+        console.log("receiver balance:", address(receiver).balance);
+        require(address(receiver).balance == targetValue, "receiver.balance==targetValue");
+    }
+
+    function testGatewayDiamond_SendCrossMessage_ExecuteUnwrappedMessage() public {
+        uint256 targetTokenValue = 123;
+
+        address user = vm.addr(300);
+        console.log("user addr", user);
+        vm.deal(user, CROSS_MSG_FEE + MIN_COLLATERAL_AMOUNT);
+        vm.prank(user);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, user);
+
+        address dstTokenOwner = vm.addr(406);
+        vm.startPrank(dstTokenOwner);
+        DummyERC20 dstToken = new DummyERC20("DstToken", "DST", 20 ether);
+        console.log("dstToken addr", address(dstToken));
+        vm.deal(address(dstToken), 10 ether);
+        vm.stopPrank();
+
+        address receiver = address(this);
+        vm.prank(receiver);
+        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
+
+        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(receiver);
+
+        GatewayDiamond destinationGWDiamond = createGWForSubnet(destinationSubnet);
+
+        vm.startPrank(dstTokenOwner);
+        dstToken.transfer(address(destinationGWDiamond), targetTokenValue);
+        vm.stopPrank();
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: gwGetter.getNetworkName(),
+                    rawAddress: FvmAddressHelper.from(address(user))
+                }),
+                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(dstToken))}),
+                value: 0,
+                nonce: 0,
+                method: bytes4(keccak256("transfer(address,uint256)")),
+                params: abi.encode(user, targetTokenValue)
+            }),
+            wrapped: false
+        });
+
+        console.log("user balance on destination subnet before:", dstToken.balanceOf(user));
+
+        vm.startPrank(user);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE}(crossMsg);
+        vm.stopPrank();
+
+        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(destinationSubnet, block.number, block.number);
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
+            epoch: DEFAULT_CHECKPOINT_PERIOD,
+            topDownMsgs: topDownMsgs
+        });
+
+        vm.deal(address(destinationGWDiamond), CROSS_MSG_FEE);
+
+        destinationSubmitTopDownCheckpoint(destinationGWDiamond, checkpoint);
+
+        console.log("user balance on destination subnet after:", dstToken.balanceOf(user));
+        require(dstToken.balanceOf(user) == targetTokenValue, "dstToken.balanceOf(user) == targetTokenValue");
+    }
+
+    function testGatewayDiamond_SendCrossMessage_ExampleTokenContract() public {
+        uint256 targetTokenValue = 321;
+
+        address user = vm.addr(300);
+        console.log("user addr", user);
+        vm.deal(user, CROSS_MSG_FEE + MIN_COLLATERAL_AMOUNT);
+        vm.prank(user);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, user);
+
+        vm.startPrank(user);
+        DummyERC20 srcToken = new DummyERC20("SrcToken", "SRC", 20 ether);
+        vm.deal(address(srcToken), 10 ether);
+        srcToken.transfer(user, 2 ether);
+        vm.stopPrank();
+
+        address dstTokenOwner = vm.addr(406);
+        vm.startPrank(dstTokenOwner);
+        DummyERC20 dstToken = new DummyERC20("DstToken", "DST", 20 ether);
+        console.log("dstToken addr", address(dstToken));
+        vm.deal(address(dstToken), 10 ether);
+        vm.stopPrank();
+
+        address receiver = address(this);
+        vm.prank(receiver);
+        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
+        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
+
+        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(receiver);
+
+        GatewayDiamond destinationGWDiamond = createGWForSubnet(destinationSubnet);
+
+        vm.startPrank(dstTokenOwner);
+        dstToken.transfer(address(destinationGWDiamond), CROSS_MSG_FEE);
+        vm.stopPrank();
+
+        ERC20TokenMessenger tokenMessenger = newTokenMessenger(address(gatewayDiamond));
+
+        console.log("user balance on destination subnet before:", dstToken.balanceOf(user));
+        vm.startPrank(user);
+        srcToken.approve(address(tokenMessenger), targetTokenValue);
+        tokenMessenger.sendToken{value: CROSS_MSG_FEE}(
+            address(srcToken),
+            destinationSubnet,
+            address(dstToken),
+            user,
+            targetTokenValue
+        );
+        vm.stopPrank();
+
+        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(destinationSubnet, block.number, block.number);
+        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
+            epoch: DEFAULT_CHECKPOINT_PERIOD,
+            topDownMsgs: topDownMsgs
+        });
+
+        vm.deal(user, MIN_COLLATERAL_AMOUNT + 100 ether);
+        destinationSubmitTopDownCheckpoint(destinationGWDiamond, checkpoint);
+
+        require(dstToken.balanceOf(user) == targetTokenValue, "dstToken.balanceOf(user) == targetTokenValue");
+    }
+
+    function newTokenMessenger(address gw) public returns (ERC20TokenMessenger) {
+        address user = vm.addr(300);
+
+        GatewayGetterFacet dstgwGetter = new GatewayGetterFacet();
+        dstgwGetter = GatewayGetterFacet(address(gw));
+
+        vm.startPrank(user);
+        ERC20TokenMessenger tokenMessenger = new ERC20TokenMessenger(gw);
+        vm.stopPrank();
+
+        vm.deal(address(tokenMessenger), 1 ether);
+
+        return tokenMessenger;
     }
 
     function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_NotValidator() public {
@@ -2237,6 +2435,34 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         return validators;
     }
 
+    function setupValidatorsViaGateway(GatewayDiamond gw) internal returns (address[] memory) {
+        GatewayManagerFacet dstGWManager = new GatewayManagerFacet();
+        dstGWManager = GatewayManagerFacet(address(gw));
+
+        address validator1 = vm.addr(2001);
+        address validator2 = vm.addr(2002);
+        address validator3 = vm.addr(2003);
+        address[] memory validators = new address[](3);
+        uint256[] memory weights = new uint256[](3);
+
+        vm.deal(validator1, 10);
+        vm.deal(validator2, 10);
+        vm.deal(validator3, 10);
+
+        validators[0] = validator1;
+        validators[1] = validator2;
+        validators[2] = validator3;
+
+        weights[0] = 100;
+        weights[1] = 100;
+        weights[2] = 100;
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        dstGWManager.setMembership(validators, weights);
+
+        return validators;
+    }
+
     function addValidator(address validator) internal {
         addValidator(validator, 100);
     }
@@ -2250,6 +2476,91 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.deal(validator, 1);
         vm.prank(FilAddress.SYSTEM_ACTOR);
         gwManager.setMembership(validators, weights);
+    }
+
+    function destinationSubmitTopDownCheckpoint(GatewayDiamond gw, TopDownCheckpoint memory checkpoint) public {
+        GatewayRouterFacet dstGWRouter = new GatewayRouterFacet();
+        GatewayManagerFacet dstGWManager = new GatewayManagerFacet();
+
+        dstGWRouter = GatewayRouterFacet(address(gw));
+        dstGWManager = GatewayManagerFacet(address(gw));
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        dstGWManager.initGenesisEpoch(0);
+
+        address[] memory validators = setupValidatorsViaGateway(gw);
+        vm.prank(validators[0]);
+        dstGWRouter.submitTopDownCheckpoint(checkpoint);
+
+        vm.prank(validators[1]);
+        dstGWRouter.submitTopDownCheckpoint(checkpoint);
+
+        vm.prank(validators[2]);
+        dstGWRouter.submitTopDownCheckpoint(checkpoint);
+    }
+
+    function createGWForSubnet(SubnetID memory subnetId) public returns (GatewayDiamond) {
+        address[] memory path = new address[](1);
+        path[0] = ROOTNET_ADDRESS;
+
+        address[] memory path2 = new address[](2);
+        path2[0] = CHILD_NETWORK_ADDRESS;
+        path2[1] = CHILD_NETWORK_ADDRESS_2;
+
+        GatewayDiamond.ConstructorParams memory gwConstructorParams = GatewayDiamond.ConstructorParams({
+            networkName: subnetId,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: CROSS_MSG_FEE,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+        });
+
+        GatewayDiamond subnetGWDiamond = createNewDiamond(gwConstructorParams);
+
+        return subnetGWDiamond;
+    }
+
+    function createNewDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
+        GatewayRouterFacet nr = new GatewayRouterFacet();
+        GatewayManagerFacet nm = new GatewayManagerFacet();
+        GatewayGetterFacet ng = new GatewayGetterFacet();
+        GatewayMessengerFacet nmes = new GatewayMessengerFacet();
+
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
+
+        diamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: address(nr),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwRouterSelectors
+            })
+        );
+
+        diamondCut[1] = (
+            IDiamond.FacetCut({
+                facetAddress: address(nm),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwManagerSelectors
+            })
+        );
+
+        diamondCut[2] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ng),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwGetterSelectors
+            })
+        );
+
+        diamondCut[3] = (
+            IDiamond.FacetCut({
+                facetAddress: address(nmes),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwMessengerSelectors
+            })
+        );
+
+        return new GatewayDiamond(diamondCut, params);
     }
 
     function callback() public view {
@@ -2364,25 +2675,24 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     }
 
     function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) internal {
-        gwRouter = GatewayRouterFacet(address(gw));
-        gwManager = GatewayManagerFacet(address(gw));
-        gwGetter = GatewayGetterFacet(address(gw));
+        GatewayManagerFacet tmpManager = GatewayManagerFacet(address(gw));
+        GatewayGetterFacet tmpGetter = GatewayGetterFacet(address(gw));
 
-        gwManager.register{value: collateral}();
+        tmpManager.register{value: collateral}();
 
         (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply, Status status) = getSubnetGW(
             subnetAddress,
             gw
         );
 
-        SubnetID memory parentNetwork = gwGetter.getNetworkName();
+        SubnetID memory parentNetwork = tmpGetter.getNetworkName();
 
         require(
             id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
             "id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash()"
         );
         require(stake == collateral, "stake == collateral");
-        require(topDownNonce == 0, "nonce == 0");
+        require(topDownNonce == 0, "topDownNonce == 0");
         require(circSupply == 0, "circSupply == 0");
         require(status == Status.Active, "status == Status.Active");
     }
@@ -2394,14 +2704,10 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     function getSubnetGW(
         address subnetAddress,
         GatewayDiamond gw
-    ) internal returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
-        gwRouter = GatewayRouterFacet(address(gw));
-        gwManager = GatewayManagerFacet(address(gw));
-        gwGetter = GatewayGetterFacet(address(gw));
-
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
-
-        Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
+    ) internal view returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
+        GatewayGetterFacet tmpGWGetter = GatewayGetterFacet(address(gw));
+        SubnetID memory subnetId = tmpGWGetter.getNetworkName().createSubnetId(subnetAddress);
+        Subnet memory subnet = tmpGWGetter.subnets(subnetId.toHash());
 
         return (
             subnet.id,
@@ -2415,7 +2721,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
     function getSubnet(
         address subnetAddress
-    ) internal returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
+    ) internal view returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
     }
 }
