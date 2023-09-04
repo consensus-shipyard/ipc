@@ -5,7 +5,7 @@ use std::{collections::HashSet, hash::Hash};
 
 use async_stm::{
     queues::{tchan::TChan, TQueueLike},
-    StmResult, TVar,
+    Stm, TVar,
 };
 use cid::Cid;
 use ipc_sdk::subnet_id::SubnetID;
@@ -41,7 +41,7 @@ where
         }
     }
 
-    pub fn is_resolved(&self) -> StmResult<bool> {
+    pub fn is_resolved(&self) -> Stm<bool> {
         self.is_resolved.read_clone()
     }
 }
@@ -85,7 +85,7 @@ where
     /// Add an item to the resolution targets.
     ///
     /// If the item is new, enqueue it from background resolution, otherwise just return its existing status.
-    pub fn add(&self, item: T) -> StmResult<ResolveStatus<T>> {
+    pub fn add(&self, item: T) -> Stm<ResolveStatus<T>> {
         let key = ResolveKey::from(&item);
         let mut items = self.items.read_clone()?;
 
@@ -105,7 +105,7 @@ where
     }
 
     /// Return the status of an item. It can be queried for completion.
-    pub fn get_status(&self, item: &T) -> StmResult<Option<ResolveStatus<T>>> {
+    pub fn get_status(&self, item: &T) -> Stm<Option<ResolveStatus<T>>> {
         let key = ResolveKey::from(item);
         Ok(self.items.read()?.get(&key).cloned())
     }
@@ -113,7 +113,7 @@ where
     /// Collect resolved items, ready for execution.
     ///
     /// The items removed are not removed, in case they need to be proposed again.
-    pub fn collect_resolved(&self) -> StmResult<HashSet<T>> {
+    pub fn collect_resolved(&self) -> Stm<HashSet<T>> {
         let mut resolved = HashSet::new();
         let items = self.items.read()?;
         for item in items.values() {

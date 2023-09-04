@@ -24,7 +24,7 @@ license-file = "LICENSE-APACHE"
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
-async-stm = "0.3"
+async-stm = "0.4"
 async-trait = "0.1"
 axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
