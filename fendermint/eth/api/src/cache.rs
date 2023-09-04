@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Context;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::query::QueryClient;
+use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::{
     address::{Address, Payload},
     ActorID,
@@ -42,22 +43,26 @@ where
             return Ok(Some(id));
         }
 
+        // Using committed height because pending could change.
         let res = self
             .client
-            .actor_state(addr, None)
+            .actor_state(addr, FvmQueryHeight::Committed)
             .await
             .context("failed to lookup actor state")?;
 
-        match res.value {
-            Some((id, _)) => {
-                self.set_id(*addr, id);
-                if let Payload::Delegated(_) = addr.payload() {
-                    self.set_addr(id, *addr)
-                }
-                Ok(Some(id))
+        if let Some((id, _)) = res.value {
+            self.set_id(*addr, id);
+            if let Payload::Delegated(_) = addr.payload() {
+                self.set_addr(id, *addr)
             }
-            None => Ok(None),
+            return Ok(Some(id));
         }
+        tracing::info!(
+            addr = addr.to_string(),
+            height = res.height.value(),
+            "actor not found"
+        );
+        Ok(None)
     }
 
     /// Look up the delegated address of an ID, if any.
@@ -68,7 +73,7 @@ where
 
         let res = self
             .client
-            .actor_state(&Address::new_id(*id), None)
+            .actor_state(&Address::new_id(*id), FvmQueryHeight::Committed)
             .await
             .context("failed to lookup actor state")?;
 
@@ -79,7 +84,7 @@ where
                 return Ok(Some(addr));
             }
         }
-
+        tracing::info!(id, height = res.height.value(), "actor not found");
         Ok(None)
     }
 

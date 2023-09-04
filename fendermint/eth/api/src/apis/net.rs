@@ -4,6 +4,7 @@
 use anyhow::Context;
 use ethers_core::types as et;
 use fendermint_rpc::query::QueryClient;
+use fendermint_vm_message::query::FvmQueryHeight;
 use tendermint_rpc::endpoint::net_info;
 use tendermint_rpc::Client;
 
@@ -16,7 +17,7 @@ pub async fn version<C>(data: JsonRpcData<C>) -> JsonRpcResult<String>
 where
     C: Client + Sync + Send,
 {
-    let res = data.client.state_params(None).await?;
+    let res = data.client.state_params(FvmQueryHeight::default()).await?;
     let version: u32 = res.value.network_version.into();
     Ok(version.to_string())
 }

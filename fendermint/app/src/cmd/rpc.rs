@@ -15,6 +15,7 @@ use fendermint_rpc::tx::{
 };
 use fendermint_vm_core::chainid;
 use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
@@ -78,13 +79,14 @@ async fn query(
     height: Height,
     command: RpcQueryCommands,
 ) -> anyhow::Result<()> {
+    let height = FvmQueryHeight::from(height.value());
     match command {
-        RpcQueryCommands::Ipld { cid } => match client.ipld(&cid).await? {
+        RpcQueryCommands::Ipld { cid } => match client.ipld(&cid, height).await? {
             Some(data) => println!("{}", to_b64(&data)),
             None => eprintln!("CID not found"),
         },
         RpcQueryCommands::ActorState { address } => {
-            match client.actor_state(&address, Some(height)).await?.value {
+            match client.actor_state(&address, height).await?.value {
                 Some((id, state)) => {
                     let out = json! ({
                       "id": id,
@@ -98,7 +100,7 @@ async fn query(
             }
         }
         RpcQueryCommands::StateParams => {
-            let res = client.state_params(Some(height)).await?;
+            let res = client.state_params(height).await?;
             let json = json!({ "response": res });
             print_json(&json)?;
         }
@@ -240,10 +242,11 @@ async fn fevm_call(
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let value = args.value;
+    let height = FvmQueryHeight::from(height.value());
 
     let res = client
         .inner
-        .fevm_call(contract, calldata, value, gas_params, Some(height))
+        .fevm_call(contract, calldata, value, gas_params, height)
         .await?;
 
     let return_data = res
@@ -269,10 +272,11 @@ async fn fevm_estimate_gas(
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let value = args.value;
+    let height = FvmQueryHeight::from(height.value());
 
     let res = client
         .inner
-        .fevm_estmiate_gas(contract, calldata, value, gas_params, Some(height))
+        .fevm_estmiate_gas(contract, calldata, value, gas_params, height)
         .await?;
 
     let json = json!({ "response": res });

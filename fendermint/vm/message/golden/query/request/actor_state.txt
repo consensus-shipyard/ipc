@@ -1,1 +1,1 @@
-ActorState { address: Address { payload: Actor([93, 69, 55, 39, 232, 255, 217, 7, 156, 65, 255, 19, 229, 113, 88, 59, 1, 6, 251, 179]) }, pending: true }
+ActorState(Address { payload: Secp256k1([0, 196, 77, 53, 68, 215, 254, 248, 107, 250, 78, 198, 144, 150, 5, 1, 0, 183, 15, 17]) })

@@ -8,11 +8,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use ethers_core::types as et;
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_message::{chain::ChainMessage, signed::DomainHash};
+use fendermint_vm_message::{chain::ChainMessage, query::FvmQueryHeight, signed::DomainHash};
 use futures::{Future, StreamExt};
 use fvm_shared::{address::Address, chainid::ChainID, error::ExitCode};
 use serde::Serialize;
@@ -27,7 +27,6 @@ use tokio::sync::{
 };
 
 use crate::{
-    cache::AddressCache,
     conv::from_tm::{self, map_rpc_block_txs, msg_hash},
     error::JsonRpcError,
     handlers::ws::{MethodNotification, Notification},
@@ -90,15 +89,12 @@ impl FilterKind {
     /// cartesian product of all conditions in it and subscribe individually.
     ///
     /// https://docs.tendermint.com/v0.34/rpc/#/Websocket/subscribe
-    pub async fn to_queries<C>(&self, addr_cache: &AddressCache<C>) -> anyhow::Result<Vec<Query>>
-    where
-        C: Client + Sync + Send,
-    {
+    pub fn to_queries(&self) -> Vec<Query> {
         match self {
-            FilterKind::NewBlocks => Ok(vec![Query::from(EventType::NewBlock)]),
+            FilterKind::NewBlocks => vec![Query::from(EventType::NewBlock)],
             // Testing indicates that `EventType::Tx` might only be raised
             // if there are events emitted by the transaction itself.
-            FilterKind::PendingTransactions => Ok(vec![Query::from(EventType::NewBlock)]),
+            FilterKind::PendingTransactions => vec![Query::from(EventType::NewBlock)],
             FilterKind::Logs(filter) => {
                 // `Query::from(EventType::Tx)` doesn't seem to combine well with non-standard keys.
                 // But `Query::default()` doesn't return anything if we subscribe to `Filter::default()`.
@@ -127,29 +123,25 @@ impl FilterKind {
                     Some(et::ValueOrArray::Array(addrs)) => addrs.clone(),
                 };
 
-                // We need to turn the Ethereum addresses into ActorIDs because that's
-                // how the event emitter can be filtered.
+                // We need to turn the Ethereum addresses f410 addresses, which is something we asked CometBFT to index
+                // so that we can use it for filtering.
                 let addrs = addrs
                     .into_iter()
                     .map(|addr| Address::from(EthAddress(addr.0)))
                     .collect::<Vec<_>>();
 
-                let mut actor_ids = Vec::new();
-                for addr in addrs {
-                    if let Some(actor_id) = addr_cache.lookup_id(&addr).await? {
-                        actor_ids.push(actor_id);
-                    } else {
-                        bail!("cannot find actor {}", addr);
-                    }
-                }
-
-                if !actor_ids.is_empty() {
-                    queries = actor_ids
+                if !addrs.is_empty() {
+                    queries = addrs
                         .iter()
-                        .flat_map(|actor_id| {
-                            queries
-                                .iter()
-                                .map(|q| q.clone().and_eq("message.emitter", actor_id.to_string()))
+                        .flat_map(|addr| {
+                            queries.iter().map(|q| {
+                                if let Ok(id) = addr.id() {
+                                    // If it was a masked ID.
+                                    q.clone().and_eq("message.emitter.id", id.to_string())
+                                } else {
+                                    q.clone().and_eq("message.emitter.deleg", addr.to_string())
+                                }
+                            })
                         })
                         .collect();
                 };
@@ -175,7 +167,7 @@ impl FilterKind {
                     }
                 }
 
-                Ok(queries)
+                queries
             }
         }
     }
@@ -229,16 +221,14 @@ where
     }
 
     /// Accumulate the events.
-    async fn update<F, C>(
+    async fn update<F>(
         &mut self,
         event: Event,
         to_block: F,
-        addr_cache: &AddressCache<C>,
         chain_id: &ChainID,
     ) -> anyhow::Result<()>
     where
         F: FnOnce(tendermint::Block) -> Pin<Box<dyn Future<Output = anyhow::Result<B>> + Send>>,
-        C: Client + Sync + Send,
     {
         match (self, event.data) {
             (
@@ -281,7 +271,7 @@ where
                 //                     Event {
                 //                         kind: "message",
                 //                         attributes: [
-                //                             EventAttribute { key: "emitter", value: "108", index: true },
+                //                             EventAttribute { key: "emitter.id", value: "108", index: true },
                 //                             EventAttribute { key: "t1", value: "dd...b3ef", index: true },
                 //                             EventAttribute { key: "t2", value: "00...362f", index: true },
                 //                             EventAttribute { key: "t3", value: "00...44eb", index: true },
@@ -295,7 +285,7 @@ where
                 //     events: Some(
                 //     {
                 //         "message.d": ["00...0064"],
-                //         "message.emitter": ["108"],
+                //         "message.emitter.id": ["108"],
                 //         "message.t1": ["dd...b3ef"],
                 //         "message.t2": ["00...362f"],
                 //         "message.t3": ["00...44eb"],
@@ -320,15 +310,13 @@ where
                 let log_index_start = Default::default();
 
                 let tx_logs = from_tm::to_logs(
-                    addr_cache,
                     &tx_result.result.events,
                     block_hash,
                     block_number,
                     transaction_hash,
                     transaction_index,
                     log_index_start,
-                )
-                .await?;
+                )?;
 
                 logs.extend(tx_logs)
             }
@@ -406,12 +394,8 @@ impl FilterDriver {
     /// Consume commands until some end condition is met.
     ///
     /// In the end the filter removes itself from the registry.
-    pub async fn run<C>(
-        mut self,
-        filters: FilterMap,
-        client: FendermintClient<C>,
-        addr_cache: AddressCache<C>,
-    ) where
+    pub async fn run<C>(mut self, filters: FilterMap, client: FendermintClient<C>)
+    where
         C: Client + Send + Sync + Clone + 'static,
     {
         let id = self.id;
@@ -420,7 +404,7 @@ impl FilterDriver {
 
         // Get the Chain ID once. In practice it will not change and will last the entire session.
         let chain_id = client
-            .state_params(None)
+            .state_params(FvmQueryHeight::default())
             .await
             .map(|state_params| ChainID::from(state_params.value.chain_id));
 
@@ -451,7 +435,6 @@ impl FilterDriver {
                                                     ))
                                                 })
                                             },
-                                            &addr_cache,
                                             chain_id,
                                         )
                                         .await
@@ -504,7 +487,6 @@ impl FilterDriver {
                                                 block
                                             })
                                         },
-                                        &addr_cache,
                                         chain_id,
                                     )
                                     .await
@@ -595,7 +577,9 @@ fn send_error(ws_sender: &WebSocketSender, exit_code: ExitCode, msg: String, id:
 fn notification(subscription: FilterId, result: serde_json::Value) -> MethodNotification {
     MethodNotification {
         // We know this is the only one at the moment.
-        method: "eth_subscribe".into(),
+        // The go-ethereum client checks that the suffix is "_subscription":
+        // https://github.com/ethereum/go-ethereum/blob/92b8f28df3255c6cef9605063850d77b46146763/rpc/handler.go#L236C42-L236C42
+        method: "eth_subscription".into(),
         notification: Notification {
             subscription,
             result,
@@ -691,52 +675,21 @@ pub async fn run_subscription(id: FilterId, mut sub: Subscription, tx: Sender<Fi
 #[cfg(test)]
 mod tests {
     use ethers_core::types as et;
-    use fendermint_rpc::client::FendermintClient;
-    use tendermint_rpc::{MockClient, MockRequestMatcher};
-
-    use crate::cache::AddressCache;
 
     use super::FilterKind;
 
-    // These tests should not call the API for response resolution because it's just an ID.
-    struct NeverCall;
-
-    impl MockRequestMatcher for NeverCall {
-        fn response_for<R, S>(
-            &self,
-            _request: R,
-        ) -> Option<Result<R::Response, tendermint_rpc::Error>>
-        where
-            R: tendermint_rpc::Request<S>,
-            S: tendermint_rpc::dialect::Dialect,
-        {
-            unimplemented!("don't call")
-        }
-    }
-
-    fn mock_add_cache() -> AddressCache<MockClient<NeverCall>> {
-        let (client, _driver) = tendermint_rpc::MockClient::new(NeverCall);
-        let client = FendermintClient::new(client);
-        AddressCache::new(client, 0)
-    }
-
-    #[tokio::test]
-    async fn default_filter_to_query() {
+    #[test]
+    fn default_filter_to_query() {
         let filter = et::Filter::default();
 
-        let addr_cache = mock_add_cache();
-
-        let queries = FilterKind::Logs(Box::new(filter))
-            .to_queries(&addr_cache)
-            .await
-            .expect("failed to convert");
+        let queries = FilterKind::Logs(Box::new(filter)).to_queries();
 
         assert_eq!(queries.len(), 1);
         assert_eq!(queries[0].to_string(), "tm.event = 'Tx'");
     }
 
-    #[tokio::test]
-    async fn filter_to_query() {
+    #[test]
+    fn filter_to_query() {
         fn hash(s: &str) -> et::H256 {
             et::H256::from(ethers_core::utils::keccak256(s))
         }
@@ -771,12 +724,7 @@ mod tests {
             ]))
         );
 
-        let addr_cache = mock_add_cache();
-
-        let queries = FilterKind::Logs(Box::new(filter))
-            .to_queries(&addr_cache)
-            .await
-            .expect("failed to convert");
+        let queries = FilterKind::Logs(Box::new(filter)).to_queries();
 
         assert_eq!(queries.len(), 4);
 
@@ -790,7 +738,7 @@ mod tests {
         .enumerate()
         {
             let q = queries[i].to_string();
-            let e = format!("tx.height >= 1234 AND message.emitter = '100' AND message.t1 = '{}' AND message.t2 = '{}' AND message.t3 = '{}'", hash_hex(t1), hash_hex("Alice"), hash_hex(t3));
+            let e = format!("tx.height >= 1234 AND message.emitter.id = '100' AND message.t1 = '{}' AND message.t2 = '{}' AND message.t3 = '{}'", hash_hex(t1), hash_hex("Alice"), hash_hex(t3));
             assert_eq!(q, e, "combination {i}");
         }
     }

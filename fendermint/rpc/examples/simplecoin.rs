@@ -22,6 +22,7 @@ use ethers::prelude::{abigen, decode_function_data};
 use ethers::types::{H160, U256};
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
+use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use lazy_static::lazy_static;
@@ -120,7 +121,7 @@ async fn main() {
     // Query the chain ID, so it doesn't need to be passed as an arg.
     // We could the chain name using `client.underlying().genesis().await?.chain_id.as_str()` as well.
     let chain_id = client
-        .state_params(None)
+        .state_params(FvmQueryHeight::default())
         .await
         .expect("error getting state params")
         .value
@@ -185,7 +186,7 @@ async fn sequence(client: &impl QueryClient, sk: &SecretKey) -> anyhow::Result<u
     let pk = PublicKey::from_secret_key(sk);
     let addr = Address::new_secp256k1(&pk.serialize()).unwrap();
     let state = client
-        .actor_state(&addr, None)
+        .actor_state(&addr, FvmQueryHeight::default())
         .await
         .context("failed to get actor state")?;
 
@@ -197,7 +198,7 @@ async fn sequence(client: &impl QueryClient, sk: &SecretKey) -> anyhow::Result<u
 
 async fn actor_id(client: &impl QueryClient, addr: &Address) -> anyhow::Result<u64> {
     let state = client
-        .actor_state(addr, None)
+        .actor_state(addr, FvmQueryHeight::default())
         .await
         .context("failed to get actor state")?;
 
@@ -303,7 +304,7 @@ async fn invoke_or_call_contract<T: Tokenizable>(
                 calldata.0,
                 TokenAmount::default(),
                 GAS_PARAMS.clone(),
-                None,
+                FvmQueryHeight::default(),
             )
             .await
             .context("failed to call FEVM")?;

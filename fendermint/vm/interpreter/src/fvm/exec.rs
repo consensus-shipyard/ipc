@@ -1,12 +1,14 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 
 use fendermint_vm_actor_interface::{cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, MethodNum, BLOCK_GAS_LIMIT};
+use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 
 use crate::ExecInterpreter;
 
@@ -22,6 +24,8 @@ pub struct FvmApplyRet {
     pub to: Address,
     pub method_num: MethodNum,
     pub gas_limit: u64,
+    /// Delegated addresses of event emitters, if they have one.
+    pub emitters: HashMap<ActorID, Address>,
 }
 
 #[async_trait]
@@ -62,7 +66,7 @@ where
             gas_premium: Default::default(),
         };
 
-        let apply_ret = state.execute_implicit(msg)?;
+        let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
         // Failing cron would be fatal.
         if let Some(err) = apply_ret.failure_info {
@@ -75,6 +79,7 @@ where
             to,
             method_num,
             gas_limit,
+            emitters,
         };
 
         Ok((state, ret))
@@ -90,7 +95,16 @@ where
         let method_num = msg.method_num;
         let gas_limit = msg.gas_limit;
 
-        let apply_ret = state.execute_explicit(msg)?;
+        let (apply_ret, emitters) = state.execute_explicit(msg)?;
+
+        tracing::info!(
+            height = state.block_height(),
+            from = from.to_string(),
+            to = to.to_string(),
+            method_num = method_num,
+            exit_code = apply_ret.msg_receipt.exit_code.value(),
+            "tx delivered"
+        );
 
         let ret = FvmApplyRet {
             apply_ret,
@@ -98,6 +112,7 @@ where
             to,
             method_num,
             gas_limit,
+            emitters,
         };
 
         Ok((state, ret))

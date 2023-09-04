@@ -8,7 +8,7 @@ mod externs;
 mod genesis;
 mod query;
 pub mod state;
-mod store;
+pub mod store;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
@@ -33,15 +33,24 @@ pub struct FvmMessageInterpreter<DB> {
     /// Gas search step increase used to find the optimal gas limit.
     /// It determines how fine-grained we want the gas estimation to be.
     gas_search_step: f64,
+    /// Indicate whether transactions should be fully executed during the checks performed
+    /// when they are added to the mempool, or just the most basic ones are performed.
+    exec_in_check: bool,
 }
 
 impl<DB> FvmMessageInterpreter<DB> {
-    pub fn new(contracts_dir: PathBuf, gas_overestimation_rate: f64, gas_search_step: f64) -> Self {
+    pub fn new(
+        contracts_dir: PathBuf,
+        gas_overestimation_rate: f64,
+        gas_search_step: f64,
+        exec_in_check: bool,
+    ) -> Self {
         Self {
             contracts: Hardhat::new(contracts_dir),
             _phantom_db: PhantomData,
             gas_overestimation_rate,
             gas_search_step,
+            exec_in_check,
         }
     }
 }

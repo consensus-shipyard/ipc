@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
 use std::{cell::RefCell, sync::Arc};
 
 use anyhow::{anyhow, Context};
@@ -9,18 +10,16 @@ use cid::Cid;
 use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::query::ActorState;
+use fvm::engine::MultiEngine;
+use fvm::executor::ApplyRet;
 use fvm::state_tree::StateTree;
-use fvm::{engine::MultiEngine, executor::ApplyRet};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, chainid::ChainID, clock::ChainEpoch, ActorID};
 use num_traits::Zero;
 
-use crate::fvm::state::FvmCheckState;
 use crate::fvm::{store::ReadOnlyBlockstore, FvmMessage};
 
-use super::{FvmExecState, FvmStateParams};
-
-type CheckState<DB> = Arc<tokio::sync::Mutex<Option<FvmCheckState<DB>>>>;
+use super::{CheckStateRef, FvmExecState, FvmStateParams};
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
@@ -40,7 +39,9 @@ where
     /// Lazy loaded execution state.
     exec_state: RefCell<Option<FvmExecState<ReadOnlyBlockstore<DB>>>>,
     /// Lazy locked check state.
-    check_state: CheckState<DB>,
+    check_state: CheckStateRef<DB>,
+    /// Whether to try ot use the check state or not.
+    pending: bool,
 }
 
 impl<DB> FvmQueryState<DB>
@@ -52,7 +53,8 @@ where
         multi_engine: Arc<MultiEngine>,
         block_height: ChainEpoch,
         state_params: FvmStateParams,
-        check_state: CheckState<DB>,
+        check_state: CheckStateRef<DB>,
+        pending: bool,
     ) -> anyhow::Result<Self> {
         // Sanity check that the blockstore contains the supplied state root.
         if !blockstore
@@ -72,23 +74,58 @@ where
             state_params,
             exec_state: RefCell::new(None),
             check_state,
+            pending,
         };
 
         Ok(state)
     }
 
-    /// If we know the query is over the state, cache the state tree.
-    /// If `use_cache` is enabled, the result of the execution will be
-    /// buffered in the cache, if not the result is returned but not cached.
-    fn with_exec_state<T, F>(&self, use_cache: bool, f: F) -> anyhow::Result<T>
+    /// Do not make the changes in the call persistent. They should be run on top of
+    /// transactions added to the mempool, but they can run independent of each other.
+    ///
+    /// There is no way to specify stacking in the API and only transactions should modify things.
+    fn with_revert<T, F>(
+        &self,
+        exec_state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        f: F,
+    ) -> anyhow::Result<T>
     where
         F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
     {
-        let mut cache = self.exec_state.borrow_mut();
-        if use_cache {
-            if let Some(exec_state) = cache.as_mut() {
-                return f(exec_state);
+        exec_state.state_tree_mut().begin_transaction();
+
+        let res = f(exec_state);
+
+        exec_state
+            .state_tree_mut()
+            .end_transaction(true)
+            .expect("we just started a transaction");
+        res
+    }
+
+    /// If we know the query is over the state, cache the state tree.
+    async fn with_exec_state<T, F>(self, f: F) -> anyhow::Result<(Self, T)>
+    where
+        F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
+    {
+        if self.pending {
+            // XXX: This will block all `check_tx` from going through and also all other queries.
+            let mut guard = self.check_state.lock().await;
+
+            if let Some(ref mut exec_state) = *guard {
+                let res = self.with_revert(exec_state, f);
+                drop(guard);
+                return res.map(|r| (self, r));
             }
+        }
+
+        // Not using pending, or there is no pending state.
+        let mut cache = self.exec_state.borrow_mut();
+
+        if let Some(exec_state) = cache.as_mut() {
+            let res = self.with_revert(exec_state, f);
+            drop(cache);
+            return res.map(|r| (self, r));
         }
 
         let mut exec_state = FvmExecState::new(
@@ -99,11 +136,12 @@ where
         )
         .context("error creating execution state")?;
 
-        let res = f(&mut exec_state);
-        if use_cache {
-            *cache = Some(exec_state);
-        }
-        res
+        let res = self.with_revert(&mut exec_state, f);
+
+        *cache = Some(exec_state);
+        drop(cache);
+
+        res.map(|r| (self, r))
     }
 
     /// Read a CID from the underlying IPLD store.
@@ -112,62 +150,28 @@ where
     }
 
     /// Get the state of an actor, if it exists.
-    pub fn actor_state(
-        &self,
-        use_cache: bool,
-        addr: &Address,
-    ) -> anyhow::Result<Option<(ActorID, ActorState)>> {
-        self.with_exec_state(use_cache, |exec_state| {
-            let state_tree = exec_state.state_tree_mut();
-            get_actor_state(state_tree, addr)
-        })
-    }
-
-    /// Get the pending state of an actor, which is what we use for checking transaction submissions
-    /// and gets reset after reach block commit.
-    ///
-    /// This is very similar to the `actor_state` method, but works on the `check_state`,
-    /// so that we can take transactions in the mempool into account. The drawback is that
-    /// it involves locking a single instance of an in-memory `StateTree` (it cannot be
-    /// cloned or shared between threads), and therefore we should only use it if we really
-    /// need to.
-    ///
-    /// If there is no check state (because nobody sent a transaction), fall back on actor state.
-    pub async fn pending_state(
-        // Consumed because `.lock().await` would not work if this was just a reference,
-        // since `FvmQueryState` is not `Sync`.
+    pub async fn actor_state(
         self,
         addr: &Address,
     ) -> anyhow::Result<(Self, Option<(ActorID, ActorState)>)> {
-        // Release the lock ASAP.
-        let state = {
-            let mut guard = self.check_state.lock().await;
-
-            if let Some(check_state) = guard.as_mut() {
-                get_actor_state(check_state.state_tree_mut(), addr).map(Some)?
-            } else {
-                None
-            }
-        };
-
-        let ret = if let Some(ret) = state {
-            ret
-        } else {
-            self.actor_state(false, addr)?
-        };
-
-        Ok((self, ret))
+        self.with_exec_state(|exec_state| {
+            let state_tree = exec_state.state_tree_mut();
+            get_actor_state(state_tree, addr)
+        })
+        .await
     }
 
     /// Run a "read-only" message.
     ///
     /// The results are never going to be flushed, so it's semantically read-only,
     /// but it might write into the buffered block store the FVM creates. Running
-    /// multiple such messages results in their buffered effects stacking up if
-    /// `use_cache` is enabled. If `use_cache` is not enabled, the results of the
-    /// execution are not cached.
-    pub fn call(&self, mut msg: FvmMessage, use_cache: bool) -> anyhow::Result<ApplyRet> {
-        self.with_exec_state(use_cache, |s| {
+    /// multiple such messages results in their buffered effects stacking up,
+    /// unless it's called with `revert`.
+    pub async fn call(
+        self,
+        mut msg: FvmMessage,
+    ) -> anyhow::Result<(Self, (ApplyRet, HashMap<u64, Address>))> {
+        self.with_exec_state(|s| {
             // If the sequence is zero, treat it as a signal to use whatever is in the state.
             if msg.sequence.is_zero() {
                 let state_tree = s.state_tree_mut();
@@ -185,10 +189,19 @@ where
                 s.execute_explicit(msg)
             }
         })
+        .await
     }
 
     pub fn state_params(&self) -> &FvmStateParams {
         &self.state_params
+    }
+
+    pub fn block_height(&self) -> ChainEpoch {
+        self.block_height
+    }
+
+    pub fn pending(&self) -> bool {
+        self.pending
     }
 }
 

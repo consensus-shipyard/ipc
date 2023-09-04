@@ -9,15 +9,14 @@ use anyhow::{anyhow, Context};
 use ethers_core::types::{self as et};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
+use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::{bigint::BigInt, econ::TokenAmount};
 use lazy_static::lazy_static;
 use tendermint::abci::response::DeliverTx;
 use tendermint::abci::{self, Event, EventAttribute};
 use tendermint::crypto::sha256::Sha256;
-use tendermint_rpc::{endpoint, Client};
-
-use crate::cache::AddressCache;
+use tendermint_rpc::endpoint;
 
 use super::from_fvm::{to_eth_address, to_eth_signature, to_eth_tokens};
 
@@ -196,17 +195,13 @@ pub fn to_cumulative(block_results: &endpoint::block_results::Response) -> Vec<(
 
 // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2174
 // https://github.com/evmos/ethermint/blob/07cf2bd2b1ce9bdb2e44ec42a39e7239292a14af/rpc/backend/tx_info.go#L147
-pub async fn to_eth_receipt<C>(
-    addr_cache: &AddressCache<C>,
+pub async fn to_eth_receipt(
     msg: &SignedMessage,
     result: &endpoint::tx::Response,
     cumulative: &[(et::U256, usize)],
     header: &tendermint::block::Header,
     base_fee: &TokenAmount,
-) -> anyhow::Result<et::TransactionReceipt>
-where
-    C: Client + Sync + Send,
-{
+) -> anyhow::Result<et::TransactionReceipt> {
     let block_hash = et::H256::from_slice(header.hash().as_bytes());
     let block_number = et::U64::from(result.height.value());
     let transaction_index = et::U64::from(result.index);
@@ -231,7 +226,6 @@ where
     let log_index_start = cumulative_event_count.saturating_sub(result.tx_result.events.len());
 
     let logs = to_logs(
-        addr_cache,
         &result.tx_result.events,
         block_hash,
         block_number,
@@ -239,7 +233,6 @@ where
         transaction_index,
         log_index_start,
     )
-    .await
     .context("failed to collect logs")?;
 
     // See if the return value is an Ethereum contract creation.
@@ -367,36 +360,31 @@ fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {
 /// Turn Events into Ethereum logs.
 ///
 /// We need to turn Actor IDs into Ethereum addresses because that's what the tooling expects.
-pub async fn to_logs<C>(
-    addr_cache: &AddressCache<C>,
+pub fn to_logs(
     events: &[abci::Event],
     block_hash: et::H256,
     block_number: et::U64,
     transaction_hash: et::H256,
     transaction_index: et::U64,
     log_index_start: usize,
-) -> anyhow::Result<Vec<et::Log>>
-where
-    C: Client + Sync + Send,
-{
+) -> anyhow::Result<Vec<et::Log>> {
     let mut logs = Vec::new();
     for (idx, event) in events.iter().filter(|e| e.kind == "message").enumerate() {
         // Lotus looks up an Ethereum address based on the actor ID:
         // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L1987
+
+        let addr = event
+            .attributes
+            .iter()
+            .find(|a| a.key == "emitter.deleg")
+            .and_then(|a| a.value.parse::<Address>().ok());
+
         let actor_id = event
             .attributes
             .iter()
-            .find(|a| a.key == "emitter")
+            .find(|a| a.key == "emitter.id")
             .and_then(|a| a.value.parse::<u64>().ok())
-            .ok_or_else(|| anyhow!("cannot find the 'emitter' key"))?;
-
-        // By turning the ID address into an Ethereum address we can align it with the Ethereum address we return from
-        // contract creation in `maybe_contract_address`. If the two were different then it's impossible to use the
-        // contract ID for filtering for the events of those contracts.
-        let addr = addr_cache
-            .lookup_addr(&actor_id)
-            .await
-            .context("failed to look up address")?;
+            .ok_or_else(|| anyhow!("cannot find the 'emitter.id' key"))?;
 
         let address = addr
             .and_then(|a| to_eth_address(&a))
@@ -450,7 +438,7 @@ fn to_topics_and_data(attrs: &Vec<EventAttribute>) -> anyhow::Result<(Vec<et::H2
                 topics[i] = h;
             }
             "d" => data = Some(et::Bytes::from(decode_value()?)),
-            _ => {} // e.g. "emitter"
+            _ => {} // e.g. "emitter.*"
         }
     }
     Ok((topics, data.unwrap_or_default()))

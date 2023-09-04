@@ -1,6 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::{HashMap, HashSet};
+
 use cid::Cid;
 use fvm::{
     call_manager::DefaultCallManager,
@@ -13,13 +15,18 @@ use fvm::{
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
-    chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode, message::Message,
-    receipt::Receipt, version::NetworkVersion,
+    address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
+    message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::fvm::externs::FendermintExterns;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
+
+pub type ActorAddressMap = HashMap<ActorID, Address>;
+
+/// The result of the message application bundled with any delegated addresses of event emitters.
+pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -84,23 +91,25 @@ where
     }
 
     /// Execute message implicitly.
-    pub fn execute_implicit(&mut self, msg: Message) -> anyhow::Result<ApplyRet> {
+    pub fn execute_implicit(&mut self, msg: Message) -> ExecResult {
         self.execute_message(msg, ApplyKind::Implicit)
     }
 
     /// Execute message explicitly.
-    pub fn execute_explicit(&mut self, msg: Message) -> anyhow::Result<ApplyRet> {
+    pub fn execute_explicit(&mut self, msg: Message) -> ExecResult {
         self.execute_message(msg, ApplyKind::Explicit)
     }
 
-    pub fn execute_message(&mut self, msg: Message, kind: ApplyKind) -> anyhow::Result<ApplyRet> {
+    pub fn execute_message(&mut self, msg: Message, kind: ApplyKind) -> ExecResult {
         if let Err(e) = msg.check() {
             return Ok(check_error(e));
         }
 
         // TODO: We could preserve the message length by changing the input type.
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
-        self.executor.execute_message(msg, kind, raw_length)
+        let ret = self.executor.execute_message(msg, kind, raw_length)?;
+        let addrs = self.emitter_delegated_addresses(&ret)?;
+        Ok((ret, addrs))
     }
 
     /// Commit the state. It must not fail, but we're returning a result so that error
@@ -128,6 +137,27 @@ where
     pub fn state_tree_mut(&mut self) -> &mut StateTree<MachineBlockstore<DB>> {
         self.executor.state_tree_mut()
     }
+
+    /// Collect all the event emitters' delegated addresses, for those who have any.
+    fn emitter_delegated_addresses(&self, apply_ret: &ApplyRet) -> anyhow::Result<ActorAddressMap> {
+        let emitter_ids = apply_ret
+            .events
+            .iter()
+            .map(|e| e.emitter)
+            .collect::<HashSet<_>>();
+
+        let mut emitters = HashMap::default();
+
+        for id in emitter_ids {
+            if let Some(actor) = self.executor.state_tree().get_actor(id)? {
+                if let Some(addr) = actor.delegated_address {
+                    emitters.insert(id, addr);
+                }
+            }
+        }
+
+        Ok(emitters)
+    }
 }
 
 impl<DB> HasChainID for FvmExecState<DB>
@@ -146,9 +176,9 @@ where
 /// because such messages can be included by malicious validators or user queries. We could
 /// use ABCI++ to filter out messages from blocks, but that doesn't affect queries, so we
 /// might as well encode it as an error. To keep the types simpler, let's fabricate an `ApplyRet`.
-fn check_error(e: anyhow::Error) -> ApplyRet {
+fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
     let zero = TokenAmount::from_atto(0);
-    ApplyRet {
+    let ret = ApplyRet {
         msg_receipt: Receipt {
             exit_code: ExitCode::SYS_ASSERTION_FAILED,
             return_data: RawBytes::default(),
@@ -165,5 +195,6 @@ fn check_error(e: anyhow::Error) -> ApplyRet {
         failure_info: Some(ApplyFailure::PreValidation(format!("{:#}", e))),
         exec_trace: Vec::new(),
         events: Vec::new(),
-    }
+    };
+    (ret, Default::default())
 }

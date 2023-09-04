@@ -11,7 +11,7 @@ use tendermint::block::Height;
 use tendermint_rpc::{endpoint::abci_query::AbciQuery, Client, HttpClient, Scheme, Url};
 use tendermint_rpc::{WebSocketClient, WebSocketClientDriver};
 
-use fendermint_vm_message::query::FvmQuery;
+use fendermint_vm_message::query::{FvmQuery, FvmQueryHeight};
 
 use crate::message::MessageFactory;
 use crate::query::QueryClient;
@@ -118,7 +118,7 @@ impl<C> QueryClient for FendermintClient<C>
 where
     C: Client + Sync + Send,
 {
-    async fn perform(&self, query: FvmQuery, height: Option<Height>) -> anyhow::Result<AbciQuery> {
+    async fn perform(&self, query: FvmQuery, height: FvmQueryHeight) -> anyhow::Result<AbciQuery> {
         perform_query(&self.inner, query, height).await
     }
 }
@@ -155,7 +155,7 @@ impl<C> QueryClient for BoundFendermintClient<C>
 where
     C: Client + Sync + Send,
 {
-    async fn perform(&self, query: FvmQuery, height: Option<Height>) -> anyhow::Result<AbciQuery> {
+    async fn perform(&self, query: FvmQuery, height: FvmQueryHeight) -> anyhow::Result<AbciQuery> {
         perform_query(&self.inner, query, height).await
     }
 }
@@ -236,14 +236,17 @@ where
 async fn perform_query<C>(
     client: &C,
     query: FvmQuery,
-    height: Option<Height>,
+    height: FvmQueryHeight,
 ) -> anyhow::Result<AbciQuery>
 where
     C: Client + Sync + Send,
 {
+    tracing::debug!(?query, ?height, "perform ABCI query");
     let data = fvm_ipld_encoding::to_vec(&query).context("failed to encode query")?;
+    let height: u64 = height.into();
+    let height = Height::try_from(height).context("failed to conver to Height")?;
 
-    let res = client.abci_query(None, data, height, false).await?;
+    let res = client.abci_query(None, data, Some(height), false).await?;
 
     Ok(res)
 }

@@ -44,6 +44,12 @@ pub struct FvmSettings {
     /// Gas search step increase used to find the optimal gas limit.
     /// It determines how fine-grained we want the gas estimation to be.
     pub gas_search_step: f64,
+    /// Indicate whether transactions should be fully executed during the checks performed
+    /// when they are added to the mempool, or just the most basic ones are performed.
+    ///
+    /// Enabling this option is required to fully support "pending" queries in the Ethereum API,
+    /// otherwise only the nonces and balances are projected into a partial state.
+    pub exec_in_check: bool,
 }
 
 /// Ethereum API facade settings.

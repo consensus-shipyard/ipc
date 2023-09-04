@@ -14,7 +14,9 @@ use cid::Cid;
 use fvm_shared::ActorID;
 use fvm_shared::{address::Address, error::ExitCode};
 
-use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate, StateParams};
+use fendermint_vm_message::query::{
+    ActorState, FvmQuery, FvmQueryHeight, GasEstimate, StateParams,
+};
 
 use crate::response::encode_data;
 
@@ -29,8 +31,8 @@ pub struct QueryResponse<T> {
 #[async_trait]
 pub trait QueryClient: Sync {
     /// Query the contents of a CID from the IPLD store.
-    async fn ipld(&self, cid: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
-        let res = self.perform(FvmQuery::Ipld(*cid), None).await?;
+    async fn ipld(&self, cid: &Cid, height: FvmQueryHeight) -> anyhow::Result<Option<Vec<u8>>> {
+        let res = self.perform(FvmQuery::Ipld(*cid), height).await?;
         extract_opt(res, |res| Ok(res.value))
     }
 
@@ -38,47 +40,9 @@ pub trait QueryClient: Sync {
     async fn actor_state(
         &self,
         address: &Address,
-        height: Option<Height>,
+        height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<Option<(ActorID, ActorState)>>> {
-        let res = self
-            .perform(
-                FvmQuery::ActorState {
-                    address: *address,
-                    pending: false,
-                },
-                height,
-            )
-            .await?;
-        let height = res.height;
-        let value = extract_actor_state(res)?;
-        Ok(QueryResponse { height, value })
-    }
-
-    /// Query the the potentially pending state of an actor.
-    ///
-    /// This takes into account any pending state changes in the check state,
-    /// which can affect the balance and the nonce. If there are no pending
-    /// changes it behaves like the `actor_state` method called with no `height`,
-    /// however, it is much less efficient because it involves locking the
-    /// check state, and so it should only be called by clients that rapidly
-    /// wish to send transactions to the API and don't want to track their
-    /// own nonce. Otherwise it's much better to use `actor_state` only.
-    ///
-    /// Note that the other parts of the state, namely the state root,
-    /// will not change, because we don't execute transactions during checks.
-    async fn pending_state(
-        &self,
-        address: &Address,
-    ) -> anyhow::Result<QueryResponse<Option<(ActorID, ActorState)>>> {
-        let res = self
-            .perform(
-                FvmQuery::ActorState {
-                    address: *address,
-                    pending: true,
-                },
-                None,
-            )
-            .await?;
+        let res = self.perform(FvmQuery::ActorState(*address), height).await?;
         let height = res.height;
         let value = extract_actor_state(res)?;
         Ok(QueryResponse { height, value })
@@ -88,7 +52,7 @@ pub trait QueryClient: Sync {
     async fn call(
         &self,
         message: Message,
-        height: Option<Height>,
+        height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<response::DeliverTx>> {
         let res = self
             .perform(FvmQuery::Call(Box::new(message)), height)
@@ -116,7 +80,7 @@ pub trait QueryClient: Sync {
     async fn estimate_gas(
         &self,
         message: Message,
-        height: Option<Height>,
+        height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<GasEstimate>> {
         let res = self
             .perform(FvmQuery::EstimateGas(Box::new(message)), height)
@@ -132,7 +96,7 @@ pub trait QueryClient: Sync {
     /// Slowly changing state parameters.
     async fn state_params(
         &self,
-        height: Option<Height>,
+        height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<StateParams>> {
         let res = self.perform(FvmQuery::StateParams, height).await?;
         let height = res.height;
@@ -144,7 +108,7 @@ pub trait QueryClient: Sync {
     }
 
     /// Run an ABCI query.
-    async fn perform(&self, query: FvmQuery, height: Option<Height>) -> anyhow::Result<AbciQuery>;
+    async fn perform(&self, query: FvmQuery, height: FvmQueryHeight) -> anyhow::Result<AbciQuery>;
 }
 
 /// Extract some value from the query result, unless it's not found or other error.

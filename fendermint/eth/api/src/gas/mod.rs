@@ -67,7 +67,7 @@ pub fn median_gas_premium(
         }
     }
 
-    let mut premium = prev1.clone();
+    let mut premium = prev1;
 
     if prev2 != TokenAmount::zero() {
         premium += &prev2;

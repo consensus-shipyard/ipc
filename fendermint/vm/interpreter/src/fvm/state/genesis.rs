@@ -319,7 +319,7 @@ where
         )
         .context("failed to create empty actor")?;
 
-        let apply_ret = match self.stage {
+        let (apply_ret, _) = match self.stage {
             Stage::Tree(_) => bail!("execution engine not initialized"),
             Stage::Exec(ref mut exec_state) => exec_state
                 .execute_implicit(msg)

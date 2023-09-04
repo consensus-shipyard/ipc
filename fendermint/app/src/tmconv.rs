@@ -6,9 +6,9 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::Validator;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet};
 use fendermint_vm_message::signed::DomainHash;
-use fvm_shared::{error::ExitCode, event::StampedEvent};
+use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
 use prost::Message;
-use std::num::NonZeroU32;
+use std::{collections::HashMap, num::NonZeroU32};
 use tendermint::abci::{response, Code, Event, EventAttribute};
 
 use crate::{app::AppError, BlockHeight};
@@ -64,7 +64,7 @@ pub fn to_deliver_tx(ret: FvmApplyRet, domain_hash: Option<DomainHash>) -> respo
     let gas_used: i64 = receipt.gas_used.try_into().unwrap_or(i64::MAX);
 
     let data: bytes::Bytes = receipt.return_data.to_vec().into();
-    let mut events = to_events("message", ret.apply_ret.events);
+    let mut events = to_events("message", ret.apply_ret.events, ret.emitters);
 
     // Emit an event which causes Tendermint to index our transaction with a custom hash.
     if let Some(h) = domain_hash {
@@ -114,7 +114,7 @@ pub fn to_end_block(_ret: ()) -> response::EndBlock {
 
 /// Map the return values from cron operations.
 pub fn to_begin_block(ret: FvmApplyRet) -> response::BeginBlock {
-    let events = to_events("begin", ret.apply_ret.events);
+    let events = to_events("begin", ret.apply_ret.events, ret.emitters);
 
     response::BeginBlock { events }
 }
@@ -138,17 +138,31 @@ pub fn to_begin_block(ret: FvmApplyRet) -> response::BeginBlock {
 /// * "t2" will be the first indexed argument, i.e. _from  (cbor encoded byte array; needs padding to 32 bytes to work with ethers)
 /// * "t3" will be the second indexed argument, i.e. _to (cbor encoded byte array; needs padding to 32 bytes to work with ethers)
 /// * "d" is a cbor encoded byte array of all the remaining arguments
-pub fn to_events(kind: &str, stamped_events: Vec<StampedEvent>) -> Vec<Event> {
+pub fn to_events(
+    kind: &str,
+    stamped_events: Vec<StampedEvent>,
+    emitters: HashMap<ActorID, Address>,
+) -> Vec<Event> {
     stamped_events
         .into_iter()
         .map(|se| {
             let mut attrs = Vec::new();
 
             attrs.push(EventAttribute {
-                key: "emitter".to_string(),
+                key: "emitter.id".to_string(),
                 value: se.emitter.to_string(),
                 index: true,
             });
+
+            // This is emitted because some clients might want to subscribe to events
+            // based on the deterministic Ethereum address even before a contract is created.
+            if let Some(deleg_addr) = emitters.get(&se.emitter) {
+                attrs.push(EventAttribute {
+                    key: "emitter.deleg".to_string(),
+                    value: deleg_addr.to_string(),
+                    index: true,
+                });
+            }
 
             for e in se.event.entries {
                 attrs.push(EventAttribute {

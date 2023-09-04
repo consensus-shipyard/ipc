@@ -6,9 +6,8 @@ use std::marker::PhantomData;
 use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
-use fendermint_vm_message::query::GasEstimate;
+use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
-use tendermint::block::Height;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
 use fvm_ipld_encoding::RawBytes;
@@ -116,7 +115,7 @@ pub trait CallClient: QueryClient + BoundClient {
         calldata: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
-        height: Option<Height>,
+        height: FvmQueryHeight,
     ) -> anyhow::Result<CallResponse<Vec<u8>>> {
         let msg = self
             .message_factory_mut()
@@ -147,7 +146,7 @@ pub trait CallClient: QueryClient + BoundClient {
         calldata: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
-        height: Option<Height>,
+        height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<GasEstimate>> {
         let msg = self
             .message_factory_mut()

@@ -39,22 +39,33 @@ where
 
     async fn query(
         &self,
-        mut state: Self::State,
+        state: Self::State,
         qry: Self::Query,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
-        let res = match qry {
-            FvmQuery::Ipld(cid) => FvmQueryRet::Ipld(state.store_get(&cid)?),
-            FvmQuery::ActorState {
-                address,
-                pending: false,
-            } => FvmQueryRet::ActorState(state.actor_state(false, &address)?.map(Box::new)),
-            FvmQuery::ActorState {
-                address,
-                pending: true,
-            } => {
-                let (st, ret) = state.pending_state(&address).await?;
-                state = st;
-                FvmQueryRet::ActorState(ret.map(Box::new))
+        match qry {
+            FvmQuery::Ipld(cid) => {
+                let data = state.store_get(&cid)?;
+                tracing::info!(
+                    height = state.block_height(),
+                    pending = state.pending(),
+                    cid = cid.to_string(),
+                    found = data.is_some(),
+                    "query IPLD"
+                );
+                let out = FvmQueryRet::Ipld(data);
+                Ok((state, out))
+            }
+            FvmQuery::ActorState(address) => {
+                let (state, ret) = state.actor_state(&address).await?;
+                tracing::info!(
+                    height = state.block_height(),
+                    pending = state.pending(),
+                    addr = address.to_string(),
+                    found = ret.is_some(),
+                    "query actor state"
+                );
+                let out = FvmQueryRet::ActorState(ret.map(Box::new));
+                Ok((state, out))
             }
             FvmQuery::Call(msg) => {
                 let from = msg.from;
@@ -62,7 +73,19 @@ where
                 let method_num = msg.method_num;
                 let gas_limit = msg.gas_limit;
 
-                let apply_ret = state.call(*msg, true)?;
+                // Do not stack effects
+                let (state, (apply_ret, emitters)) = state.call(*msg).await?;
+
+                tracing::info!(
+                    height = state.block_height(),
+                    pending = state.pending(),
+                    to = to.to_string(),
+                    from = from.to_string(),
+                    method_num,
+                    exit_code = apply_ret.msg_receipt.exit_code.value(),
+                    data = hex::encode(apply_ret.msg_receipt.return_data.bytes()),
+                    "query call"
+                );
 
                 let ret = FvmApplyRet {
                     apply_ret,
@@ -70,32 +93,42 @@ where
                     to,
                     method_num,
                     gas_limit,
+                    emitters,
                 };
 
-                FvmQueryRet::Call(ret)
+                let out = FvmQueryRet::Call(ret);
+                Ok((state, out))
             }
             FvmQuery::EstimateGas(mut msg) => {
+                tracing::info!(
+                    height = state.block_height(),
+                    pending = state.pending(),
+                    to = msg.to.to_string(),
+                    from = msg.from.to_string(),
+                    method_num = msg.method_num,
+                    "query estimate gas"
+                );
                 // Populate gas message parameters.
-                let est = match self.estimate_gassed_msg(&state, &mut msg)? {
-                    Some(ret) => {
+
+                match self.estimate_gassed_msg(state, &mut msg).await? {
+                    (state, Some(est)) => {
                         // return immediately if something is returned,
                         // it means that the message failed to execute so there's
                         // no point on estimating the gas.
-                        ret
+                        Ok((state, FvmQueryRet::EstimateGas(est)))
                     }
-                    None => {
+                    (state, None) => {
                         // perform a gas search for an accurate value
-                        let mut gas = self.gas_search(&state, &msg)?;
+                        let (state, mut est) = self.gas_search(state, &msg).await?;
                         // we need an additional overestimation for the case where
                         // the exact value is returned as part of the gas search
                         // (for some reason with subsequent calls sometimes this is the case).
-                        gas.gas_limit =
-                            (gas.gas_limit as f64 * self.gas_overestimation_rate) as u64;
-                        gas
-                    }
-                };
+                        est.gas_limit =
+                            (est.gas_limit as f64 * self.gas_overestimation_rate) as u64;
 
-                FvmQueryRet::EstimateGas(est)
+                        Ok((state, FvmQueryRet::EstimateGas(est)))
+                    }
+                }
             }
             FvmQuery::StateParams => {
                 let state_params = state.state_params();
@@ -105,10 +138,9 @@ where
                     chain_id: state_params.chain_id,
                     network_version: state_params.network_version,
                 };
-                FvmQueryRet::StateParams(state_params)
+                Ok((state, FvmQueryRet::StateParams(state_params)))
             }
-        };
-        Ok((state, res))
+        }
     }
 }
 
@@ -116,24 +148,28 @@ impl<DB> FvmMessageInterpreter<DB>
 where
     DB: Blockstore + 'static + Send + Sync + Clone,
 {
-    fn estimate_gassed_msg(
+    async fn estimate_gassed_msg(
         &self,
-        state: &FvmQueryState<DB>,
+        state: FvmQueryState<DB>,
         msg: &mut Message,
-    ) -> anyhow::Result<Option<GasEstimate>> {
+    ) -> anyhow::Result<(FvmQueryState<DB>, Option<GasEstimate>)> {
         // Setting BlockGasLimit as initial limit for gas estimation
         msg.gas_limit = BLOCK_GAS_LIMIT;
 
         // estimate the gas limit and assign it to the message
-        // do not reuse the cache
-        let ret = state.call(msg.clone(), false)?;
+        // revert any changes because we'll repeat the estimation
+        let (state, (ret, _)) = state.call(msg.clone()).await?;
+
         if !ret.msg_receipt.exit_code.is_success() {
             // if the message fail we can't estimate the gas.
-            return Ok(Some(GasEstimate {
-                exit_code: ret.msg_receipt.exit_code,
-                info: ret.failure_info.map(|x| x.to_string()).unwrap_or_default(),
-                gas_limit: 0,
-            }));
+            return Ok((
+                state,
+                Some(GasEstimate {
+                    exit_code: ret.msg_receipt.exit_code,
+                    info: ret.failure_info.map(|x| x.to_string()).unwrap_or_default(),
+                    gas_limit: 0,
+                }),
+            ));
         }
 
         msg.gas_limit = (ret.msg_receipt.gas_used as f64 * self.gas_overestimation_rate) as u64;
@@ -157,27 +193,38 @@ where
             msg.gas_fee_cap = msg.gas_premium.clone();
         }
 
-        Ok(None)
+        Ok((state, None))
     }
 
     // This function performs a simpler implementation of the gas search than the one used in Lotus.
     // Instead of using historical information of the gas limit for other messages, it searches
     // for a valid gas limit for the current message in isolation.
-    fn gas_search(&self, state: &FvmQueryState<DB>, msg: &Message) -> anyhow::Result<GasEstimate> {
+    async fn gas_search(
+        &self,
+        mut state: FvmQueryState<DB>,
+        msg: &Message,
+    ) -> anyhow::Result<(FvmQueryState<DB>, GasEstimate)> {
         let mut curr_limit = msg.gas_limit;
 
         loop {
-            if let Some(ret) = self.estimation_call_with_limit(state, msg.clone(), curr_limit)? {
-                return Ok(ret);
+            let (st, est) = self
+                .estimation_call_with_limit(state, msg.clone(), curr_limit)
+                .await?;
+
+            if let Some(est) = est {
+                return Ok((st, est));
+            } else {
+                state = st;
             }
 
             curr_limit = (curr_limit as f64 * self.gas_search_step) as u64;
             if curr_limit > BLOCK_GAS_LIMIT {
-                return Ok(GasEstimate {
+                let est = GasEstimate {
                     exit_code: ExitCode::OK,
                     info: "".to_string(),
                     gas_limit: BLOCK_GAS_LIMIT,
-                });
+                };
+                return Ok((state, est));
             }
         }
 
@@ -188,17 +235,17 @@ where
         // At this point, I don't think is worth being that accurate as long as it works.
     }
 
-    fn estimation_call_with_limit(
+    async fn estimation_call_with_limit(
         &self,
-        state: &FvmQueryState<DB>,
+        state: FvmQueryState<DB>,
         mut msg: Message,
         limit: u64,
-    ) -> anyhow::Result<Option<GasEstimate>> {
+    ) -> anyhow::Result<(FvmQueryState<DB>, Option<GasEstimate>)> {
         msg.gas_limit = limit;
         // set message nonce to zero so the right one is picked up
         msg.sequence = 0;
 
-        let apply_ret = state.call(msg, false)?;
+        let (state, (apply_ret, _)) = state.call(msg).await?;
 
         let ret = GasEstimate {
             exit_code: apply_ret.msg_receipt.exit_code,
@@ -213,9 +260,9 @@ where
         // immediately return as we either succeeded finding the right gas estimation,
         // or something non-related happened.
         if ret.exit_code == ExitCode::OK || ret.exit_code != ExitCode::SYS_OUT_OF_GAS {
-            return Ok(Some(ret));
+            return Ok((state, Some(ret)));
         }
 
-        Ok(None)
+        Ok((state, None))
     }
 }

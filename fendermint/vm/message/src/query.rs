@@ -10,6 +10,44 @@ use serde_with::serde_as;
 
 use fendermint_vm_encoding::IsHumanReadable;
 
+/// Height at which to run a query.
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Default)]
+pub enum FvmQueryHeight {
+    /// Choose whatever the latest committed state is.
+    #[default]
+    Committed,
+    /// Take pending changes (ie. the "check state") into account,
+    /// or if there are not pending changes then use the latest commit.
+    ///
+    /// This option is less performant because a shared state needs to be locked.
+    Pending,
+    /// Run it on some historical block height, if it's still available.
+    /// Otherwise use the latest commit.
+    Height(u64),
+}
+
+impl From<u64> for FvmQueryHeight {
+    fn from(value: u64) -> Self {
+        match value {
+            0 => FvmQueryHeight::Committed,
+            // Tendermint's `Height` type makes sure it fits in `i64`.
+            // 0 is used as default height in queries; we can use MAX for pending.
+            n if n >= i64::MAX as u64 => FvmQueryHeight::Pending,
+            n => FvmQueryHeight::Height(n),
+        }
+    }
+}
+
+impl From<FvmQueryHeight> for u64 {
+    fn from(value: FvmQueryHeight) -> Self {
+        match value {
+            FvmQueryHeight::Committed => 0,
+            FvmQueryHeight::Pending => i64::MAX as u64,
+            FvmQueryHeight::Height(n) => n,
+        }
+    }
+}
+
 /// Queries over the IPLD blockstore or the state tree.
 ///
 /// Maybe we can have some common queries over the known state of built-in actors,
@@ -22,12 +60,8 @@ pub enum FvmQuery {
     Ipld(Cid),
     /// Query the state of an actor.
     ///
-    /// The `pending` flag can be used so that the query takes the check state into account.
-    /// It is only effective in combination with querying the latest height. The reason it
-    /// has to be asked for explicitly is because it involves locking.
-    ///
     /// The response is IPLD encoded `ActorState`.
-    ActorState { address: Address, pending: bool },
+    ActorState(Address),
     /// Immediately execute an FVM message, without adding it to the blockchain.
     ///
     /// The main motivation for this method is to facilitate `eth_call`.
@@ -117,10 +151,7 @@ mod arb {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match u8::arbitrary(g) % 5 {
                 0 => FvmQuery::Ipld(ArbCid::arbitrary(g).0),
-                1 => FvmQuery::ActorState {
-                    address: ArbAddress::arbitrary(g).0,
-                    pending: bool::arbitrary(g),
-                },
+                1 => FvmQuery::ActorState(ArbAddress::arbitrary(g).0),
                 2 => FvmQuery::Call(Box::new(SignedMessage::arbitrary(g).into_message())),
                 3 => FvmQuery::EstimateGas(Box::new(SignedMessage::arbitrary(g).into_message())),
                 _ => FvmQuery::StateParams,

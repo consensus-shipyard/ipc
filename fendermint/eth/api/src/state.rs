@@ -8,16 +8,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
-use ethers_core::types::{self as et, BlockId, BlockNumber};
+use ethers_core::types::{self as et};
 use fendermint_rpc::client::{FendermintClient, TendermintClient};
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::{evm, system};
-use fendermint_vm_message::query::ActorState;
+use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_message::{chain::ChainMessage, conv::from_eth::to_fvm_address};
 use fvm_ipld_encoding::{de::DeserializeOwned, RawBytes};
-use fvm_shared::address::Address;
-use fvm_shared::ActorID;
 use fvm_shared::{chainid::ChainID, econ::TokenAmount, error::ExitCode, message::Message};
 use rand::Rng;
 use tendermint::block::Height;
@@ -133,8 +131,7 @@ where
             | et::BlockNumber::Latest
             | et::BlockNumber::Safe
             | et::BlockNumber::Pending => {
-                // Using 1 block less than `latest_block` so if this is followed up by `block_results`
-                // then we don't get an error.
+                // Using 1 block less than latest so if this is followed up by `block_results` then we don't get an error.
                 let commit: commit::Response = self.tm().latest_commit().await?;
                 let height = commit.signed_header.header.height.value();
                 let height = Height::try_from((height.saturating_sub(1)).max(1))
@@ -166,6 +163,9 @@ where
             | et::BlockNumber::Latest
             | et::BlockNumber::Safe
             | et::BlockNumber::Pending => {
+                // `.latest_commit()` actually points at the block before the last one,
+                // because the commit is attached to the next block.
+                // Not using `.latest_block().header` because this is a lighter query.
                 let res: commit::Response = self.tm().latest_commit().await?;
                 res.signed_header.header
             }
@@ -185,6 +185,25 @@ where
         match block_id {
             et::BlockId::Number(n) => self.header_by_height(n).await,
             et::BlockId::Hash(h) => self.header_by_hash(h).await,
+        }
+    }
+
+    /// Return the height of a block which we should send with a query,
+    /// or None if it's the latest, to let the node figure it out.
+    pub async fn query_height(&self, block_id: et::BlockId) -> JsonRpcResult<FvmQueryHeight> {
+        match block_id {
+            et::BlockId::Number(bn) => match bn {
+                et::BlockNumber::Number(height) => Ok(FvmQueryHeight::from(height.as_u64())),
+                et::BlockNumber::Finalized | et::BlockNumber::Latest | et::BlockNumber::Safe => {
+                    Ok(FvmQueryHeight::Committed)
+                }
+                et::BlockNumber::Pending => Ok(FvmQueryHeight::Pending),
+                et::BlockNumber::Earliest => Ok(FvmQueryHeight::Height(1)),
+            },
+            et::BlockId::Hash(h) => {
+                let header = self.header_by_hash(h).await?;
+                Ok(FvmQueryHeight::Height(header.height.value()))
+            }
         }
     }
 
@@ -222,25 +241,6 @@ where
         }
     }
 
-    /// Get the state of an actor at either a specific block, or the latest, or the pending tag.
-    pub async fn actor_state_by_block_id(
-        &self,
-        block_id: BlockId,
-        addr: Address,
-    ) -> JsonRpcResult<Option<(ActorID, ActorState)>> {
-        let res = match block_id {
-            BlockId::Number(BlockNumber::Pending) => self.client.pending_state(&addr).await?,
-            BlockId::Number(BlockNumber::Latest | BlockNumber::Finalized | BlockNumber::Safe) => {
-                self.client.actor_state(&addr, None).await?
-            }
-            _ => {
-                let header = self.header_by_id(block_id).await?;
-                self.client.actor_state(&addr, Some(header.height)).await?
-            }
-        };
-        Ok(res.value)
-    }
-
     /// Fetch transaction results to produce the full block.
     pub async fn enrich_block(
         &self,
@@ -274,7 +274,7 @@ where
             if let ChainMessage::Signed(msg) = msg {
                 let sp = self
                     .client
-                    .state_params(Some(block.header().height))
+                    .state_params(FvmQueryHeight::from(index.as_u64()))
                     .await?;
 
                 let chain_id = ChainID::from(sp.value.chain_id);
@@ -322,17 +322,20 @@ where
     }
 
     /// Send a message by the system actor to an EVM actor for a read-only query.
+    ///
+    /// If the actor doesn't exist then the FVM will create a placeholder actor,
+    /// which will not respond to any queries. In that case `None` is returned.
     pub async fn read_evm_actor<T>(
         &self,
         address: et::H160,
         method: evm::Method,
         params: RawBytes,
-        block_id: BlockId,
-    ) -> JsonRpcResult<T>
+        height: FvmQueryHeight,
+    ) -> JsonRpcResult<Option<T>>
     where
         T: DeserializeOwned,
     {
-        let header = self.header_by_id(block_id).await?;
+        let method_num = method as u64;
 
         // We send off a read-only query to an EVM actor at the given address.
         let message = Message {
@@ -341,7 +344,7 @@ where
             to: to_fvm_address(address),
             sequence: 0,
             value: TokenAmount::from_atto(0),
-            method_num: method as u64,
+            method_num,
             params,
             gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
             gas_fee_cap: TokenAmount::from_atto(0),
@@ -350,7 +353,7 @@ where
 
         let result = self
             .client
-            .call(message, Some(header.height))
+            .call(message, height)
             .await
             .context("failed to call contract")?;
 
@@ -358,12 +361,19 @@ where
             return error(ExitCode::new(result.value.code.value()), result.value.info);
         }
 
+        tracing::debug!(addr = ?address, method_num, data = hex::encode(&result.value.data), "evm actor response");
+
         let data = fendermint_rpc::response::decode_bytes(&result.value)
             .context("failed to decode data as bytes")?;
 
-        let data: T = fvm_ipld_encoding::from_slice(&data).context("failed to decode as IPLD")?;
+        if data.is_empty() {
+            Ok(None)
+        } else {
+            let data: T =
+                fvm_ipld_encoding::from_slice(&data).context("failed to decode as IPLD")?;
 
-        Ok(data)
+            Ok(Some(data))
+        }
     }
 }
 
@@ -402,10 +412,7 @@ where
         kind: FilterKind,
         ws_sender: Option<WebSocketSender>,
     ) -> anyhow::Result<FilterId> {
-        let queries = kind
-            .to_queries(&self.addr_cache)
-            .await
-            .context("failed to convert filter to queries")?;
+        let queries = kind.to_queries();
 
         let mut subs = Vec::new();
 
@@ -423,9 +430,8 @@ where
         let id = state.id();
         let filters = self.filters.clone();
         let client = self.client.clone();
-        let addr_cache = self.addr_cache.clone();
 
-        tokio::spawn(async move { state.run(filters, client, addr_cache).await });
+        tokio::spawn(async move { state.run(filters, client).await });
 
         for sub in subs {
             let tx = tx.clone();
@@ -496,7 +502,10 @@ where
 {
     let height = block.header().height;
 
-    let state_params = client.state_params(Some(height)).await?;
+    let state_params = client
+        .state_params(FvmQueryHeight::Height(height.value()))
+        .await?;
+
     let base_fee = state_params.value.base_fee;
     let chain_id = ChainID::from(state_params.value.chain_id);
 

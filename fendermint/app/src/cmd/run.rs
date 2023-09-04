@@ -26,6 +26,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.contracts_dir(),
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
+        settings.fvm.exec_in_check,
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::new(interpreter);
