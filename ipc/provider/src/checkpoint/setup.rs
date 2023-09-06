@@ -7,8 +7,8 @@ use crate::lotus::client::LotusJsonRPCClient;
 use crate::manager::fevm::FevmSubnetManager;
 use crate::manager::{EthSubnetManager, LotusSubnetManager};
 use anyhow::anyhow;
-use ipc_identity::PersistentKeyStore;
 use ipc_identity::Wallet;
+use ipc_identity::{EthKeyAddress, PersistentKeyStore};
 use ipc_sdk::subnet_id::SubnetID;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -17,7 +17,7 @@ async fn parent_fevm_child_fvm(
     parent: &Subnet,
     child: &Subnet,
     fvm_wallet_store: Arc<RwLock<Wallet>>,
-    evm_wallet_store: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_wallet_store: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 ) -> anyhow::Result<Vec<Box<dyn CheckpointManager>>> {
     if parent.network_type() != NetworkType::Fevm || child.network_type() != NetworkType::Fvm {
         return Err(anyhow!("parent not fevm or child not fvm"));
@@ -116,7 +116,7 @@ pub async fn setup_manager_from_subnet(
     subnets: &HashMap<SubnetID, Subnet>,
     s: &Subnet,
     fvm_wallet_store: Arc<RwLock<Wallet>>,
-    evm_wallet_store: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_wallet_store: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 ) -> anyhow::Result<Vec<Box<dyn CheckpointManager>>> {
     let parent = if let Some(p) = s.id.parent() && subnets.contains_key(&p) {
         subnets.get(&p).unwrap()
@@ -146,7 +146,7 @@ pub async fn setup_manager_from_subnet(
 pub async fn setup_managers_from_config(
     subnets: &HashMap<SubnetID, Subnet>,
     fvm_wallet_store: Arc<RwLock<Wallet>>,
-    evm_wallet_store: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_wallet_store: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 ) -> anyhow::Result<Vec<Box<dyn CheckpointManager>>> {
     let mut managers = vec![];
 

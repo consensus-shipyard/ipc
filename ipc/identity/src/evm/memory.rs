@@ -11,12 +11,14 @@ use std::hash::Hash;
 use super::Defaultable;
 
 #[derive(Default)]
-pub struct MemoryKeyStore<T: Defaultable> {
+pub struct MemoryKeyStore<T: Defaultable + ToString> {
     pub(crate) data: HashMap<T, KeyInfo>,
     pub(crate) default: Option<T>,
 }
 
-impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable> KeyStore for MemoryKeyStore<T> {
+impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable + ToString> KeyStore
+    for MemoryKeyStore<T>
+{
     type Key = T;
 
     fn get(&self, addr: &Self::Key) -> Result<Option<KeyInfo>> {
@@ -37,7 +39,7 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable> KeyStore for MemoryK
     fn remove(&mut self, addr: &Self::Key) -> Result<()> {
         // if the address is the default, remove also from the
         // default key
-        if self.default == Some(*addr) {
+        if self.default == Some(addr.clone()) {
             self.default = None;
             self.remove(&Self::Key::default_key())?;
         }
@@ -56,19 +58,19 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable> KeyStore for MemoryK
         Ok(())
     }
 
-    fn get_default(&mut self) -> Result<Self::Key> {
+    fn get_default(&mut self) -> Result<Option<Self::Key>> {
         // check the map if it doesn't exists
         if self.default.is_none() {
             if let Some(info) = self.get(&Self::Key::default_key())? {
                 self.default = Some(
                     Self::Key::try_from(info)
-                        .map_err(|_| Err(anyhow!("couldn't get address from key info"))),
+                        .map_err(|_| anyhow!("couldn't get address from key info"))?,
                 );
-                return Ok(self.default.unwrap());
+                return Ok(self.default.clone());
             }
         }
 
         // if it exists return it directly
-        Ok(self.default.unwrap())
+        Ok(self.default.clone())
     }
 }

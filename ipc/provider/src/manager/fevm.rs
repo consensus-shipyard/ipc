@@ -21,7 +21,7 @@ use fil_actors_runtime::cbor;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use ipc_identity::{PersistentKeyStore, Wallet};
+use ipc_identity::{EthKeyAddress, PersistentKeyStore, Wallet};
 use ipc_sdk::checkpoint::TopDownCheckpoint;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet::ConstructParams;
@@ -35,7 +35,7 @@ pub struct FevmSubnetManager {
 impl FevmSubnetManager {
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
         fvm_wallet: Arc<RwLock<Wallet>>,
     ) -> anyhow::Result<Self> {
         let eth = EthSubnetManager::from_subnet_with_wallet_store(subnet, evm_keystore)?;

@@ -157,7 +157,7 @@ pub(crate) fn get_fvm_store(path: Option<String>) -> Result<KeyStore> {
 
 pub(crate) fn get_evm_keystore(
     path: &Option<String>,
-) -> Result<PersistentKeyStore<ethers::types::Address>> {
+) -> Result<PersistentKeyStore<EthKeyAddress>> {
     match path {
         Some(p) => new_evm_keystore_from_path(p),
         None => new_evm_keystore_from_path(&default_repo_path()),

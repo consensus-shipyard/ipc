@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use checkpoint::NativeBottomUpCheckpoint;
 use config::ReloadableConfig;
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
-use ipc_identity::{KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet};
+use ipc_identity::{EthKeyAddress, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet};
 use ipc_sdk::{
     cross::CrossMsg,
     subnet::{ConsensusType, ConstructParams},
@@ -53,14 +53,14 @@ pub struct IpcProvider {
     sender: Option<Address>,
     config: Arc<ReloadableConfig>,
     fvm_wallet: Arc<RwLock<Wallet>>,
-    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 }
 
 impl IpcProvider {
     pub fn new(
         config: Arc<ReloadableConfig>,
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             sender: None,
@@ -374,7 +374,7 @@ fn new_fvm_wallet_from_config(config: Arc<ReloadableConfig>) -> anyhow::Result<K
 
 fn new_evm_keystore_from_config(
     config: Arc<ReloadableConfig>,
-) -> anyhow::Result<PersistentKeyStore<ethers::types::Address>> {
+) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo_str = config.get_config_repo();
     if let Some(repo_str) = repo_str {
         new_evm_keystore_from_path(&repo_str)
@@ -383,9 +383,7 @@ fn new_evm_keystore_from_config(
     }
 }
 
-fn new_evm_keystore_from_path(
-    repo_str: &str,
-) -> anyhow::Result<PersistentKeyStore<ethers::types::Address>> {
+fn new_evm_keystore_from_path(repo_str: &str) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo = std::path::Path::new(&repo_str).join(ipc_identity::DEFAULT_KEYSTORE_NAME);
     PersistentKeyStore::new(repo).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }

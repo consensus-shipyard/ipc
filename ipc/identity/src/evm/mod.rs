@@ -30,7 +30,7 @@ pub trait KeyStore {
     /// Set default wallet
     fn set_default(&mut self, addr: &Self::Key) -> Result<()>;
     /// Get default wallet
-    fn get_default(&mut self) -> Result<Self::Key>;
+    fn get_default(&mut self) -> Result<Option<Self::Key>>;
 }
 
 /// The struct that contains evm private key info
@@ -59,7 +59,7 @@ impl Drop for KeyInfo {
 
 /// This trait is use to determine the key chosen for a specific
 /// key in a general way.
-trait Defaultable {
+pub trait Defaultable {
     fn default_key() -> Self;
 }
 
@@ -78,4 +78,51 @@ impl TryFrom<KeyInfo> for ethers::types::Address {
 pub fn random_key_info() -> KeyInfo {
     let key = ethers::core::k256::SecretKey::random(&mut rand::thread_rng());
     KeyInfo::new(key.to_bytes().to_vec())
+}
+
+#[cfg(feature = "with-ethers")]
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct EthKeyAddress {
+    inner: ethers::types::Address,
+}
+
+#[cfg(feature = "with-ethers")]
+impl From<ethers::types::Address> for EthKeyAddress {
+    fn from(inner: ethers::types::Address) -> Self {
+        EthKeyAddress { inner }
+    }
+}
+
+#[cfg(feature = "with-ethers")]
+impl From<EthKeyAddress> for ethers::types::Address {
+    fn from(val: EthKeyAddress) -> Self {
+        val.inner
+    }
+}
+
+#[cfg(feature = "with-ethers")]
+impl Defaultable for EthKeyAddress {
+    fn default_key() -> Self {
+        Self {
+            inner: ethers::types::Address::default(),
+        }
+    }
+}
+
+#[cfg(feature = "with-ethers")]
+impl ToString for EthKeyAddress {
+    fn to_string(&self) -> String {
+        self.inner.to_string()
+    }
+}
+
+#[cfg(feature = "with-ethers")]
+impl TryFrom<KeyInfo> for EthKeyAddress {
+    type Error = anyhow::Error;
+
+    fn try_from(value: KeyInfo) -> std::result::Result<Self, Self::Error> {
+        Ok(Self {
+            inner: ethers::types::Address::try_from(value)?,
+        })
+    }
 }
