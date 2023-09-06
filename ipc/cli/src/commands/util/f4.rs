@@ -9,7 +9,7 @@ use primitives::EthAddress;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::{CommandLineHandler, GlobalArguments};
 
 pub(crate) struct EthToF4Addr;
 

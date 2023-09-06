@@ -4,13 +4,14 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
+use std::str::FromStr;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::sdk::IpcAgentClient;
-use crate::server::create::CreateSubnetParams;
+use crate::commands::get_ipc_provider;
+use crate::{f64_to_token_amount, CommandLineHandler, GlobalArguments};
 
 /// The command to create a new subnet actor.
 pub struct CreateSubnet;
@@ -20,19 +21,26 @@ impl CreateSubnet {
         global: &GlobalArguments,
         arguments: &CreateSubnetArgs,
     ) -> anyhow::Result<String> {
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let params = CreateSubnetParams {
-            from: arguments.from.clone(),
-            parent: arguments.parent.clone(),
-            name: arguments.name.clone(),
-            min_validator_stake: arguments.min_validator_stake,
-            min_validators: arguments.min_validators,
-            bottomup_check_period: arguments.bottomup_check_period,
-            topdown_check_period: arguments.topdown_check_period,
+        let provider = get_ipc_provider(global)?;
+        let parent = SubnetID::from_str(&arguments.parent)?;
+        let from = match &arguments.from {
+            Some(address) => Some(Address::from_str(&address)?),
+            None => None,
         };
 
-        let client = IpcAgentClient::default_from_url(url);
-        client.create_subnet(params).await
+        let addr = provider
+            .create_subnet(
+                from,
+                &parent,
+                arguments.name.clone(),
+                arguments.min_validators,
+                f64_to_token_amount(arguments.min_validator_stake)?,
+                arguments.bottomup_check_period,
+                arguments.topdown_check_period,
+            )
+            .await?;
+
+        Ok(addr.to_string())
     }
 }
 

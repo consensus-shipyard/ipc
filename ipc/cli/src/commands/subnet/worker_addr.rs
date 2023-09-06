@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 //! The command to set the validator worker address
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::config::json_rpc_methods;
 use crate::server::worker_addr::SetValidatorWorkerAddrParams;
+use crate::{CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
 use clap::Args;
 use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};

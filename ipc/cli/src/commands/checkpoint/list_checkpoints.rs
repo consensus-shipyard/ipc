@@ -8,9 +8,9 @@ use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::clock::ChainEpoch;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::sdk::IpcAgentClient;
+use crate::{CommandLineHandler, GlobalArguments};
 
 /// The command to list checkpoints committed in a subnet actor.
 pub(crate) struct ListBottomUpCheckpoints;

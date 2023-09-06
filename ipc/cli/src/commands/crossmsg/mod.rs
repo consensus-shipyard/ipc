@@ -1,9 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::cli::commands::crossmsg::fund::Fund;
-use crate::cli::commands::crossmsg::propagate::Propagate;
-use crate::cli::commands::crossmsg::release::Release;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::crossmsg::fund::Fund;
+use crate::commands::crossmsg::propagate::Propagate;
+use crate::commands::crossmsg::release::Release;
+use crate::{CommandLineHandler, GlobalArguments};
 use fund::FundArgs;
 use propagate::PropagateArgs;
 use release::ReleaseArgs;

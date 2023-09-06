@@ -7,10 +7,10 @@ use base64::Engine;
 use clap::Args;
 use std::fmt::Debug;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::config::json_rpc_methods;
 use crate::server::propagate::PropagateParams;
+use crate::{CommandLineHandler, GlobalArguments};
 use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 /// The command to propagate a message in the postbox.

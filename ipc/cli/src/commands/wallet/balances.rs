@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use clap::Args;
 use std::fmt::Debug;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::config::json_rpc_methods;
 use crate::server::wallet::balances::{WalletBalancesParams, WalletBalancesResponse};
+use crate::{CommandLineHandler, GlobalArguments};
 use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 pub(crate) struct WalletBalances;

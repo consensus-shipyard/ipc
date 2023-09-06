@@ -7,11 +7,11 @@ use clap::Args;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::config::json_rpc_methods;
 use crate::server::wallet::new::{NewFvmWallet, WalletNewParams, WalletNewResponse};
 use crate::server::wallet::WalletType;
+use crate::{CommandLineHandler, GlobalArguments};
 use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 pub(crate) struct WalletNew;

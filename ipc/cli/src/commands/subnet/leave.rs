@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use clap::Args;
 use std::fmt::Debug;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::sdk::IpcAgentClient;
 use crate::server::leave::LeaveSubnetParams;
+use crate::{CommandLineHandler, GlobalArguments};
 
 /// The command to leave a new subnet.
 pub struct LeaveSubnet;

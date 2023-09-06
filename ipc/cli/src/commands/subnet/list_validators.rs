@@ -7,11 +7,11 @@ use clap::Args;
 use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 use std::fmt::Debug;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::config::json_rpc_methods;
 use crate::lotus::message::ipc::QueryValidatorSetResponse;
 use crate::server::query_validators::QueryValidatorSetParams;
+use crate::{CommandLineHandler, GlobalArguments};
 
 /// The command to create a new subnet actor.
 pub(crate) struct ListValidators;

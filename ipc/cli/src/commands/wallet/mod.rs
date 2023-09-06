@@ -1,9 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::{CommandLineHandler, GlobalArguments};
 
-use crate::cli::commands::wallet::balances::{WalletBalances, WalletBalancesArgs};
-use crate::cli::commands::wallet::new::{WalletNew, WalletNewArgs};
+use crate::commands::wallet::balances::{WalletBalances, WalletBalancesArgs};
+use crate::commands::wallet::new::{WalletNew, WalletNewArgs};
 use clap::{Args, Subcommand};
 
 use self::export::{WalletExport, WalletExportArgs};

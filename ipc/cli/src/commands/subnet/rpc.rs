@@ -8,10 +8,10 @@ use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::config::json_rpc_methods;
 use crate::server::rpc::RPCSubnetParams;
+use crate::{CommandLineHandler, GlobalArguments};
 use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
 
 /// The command to get the RPC endpoint for a subnet

@@ -11,7 +11,7 @@ use std::fmt::Debug;
 use std::io::Write;
 use std::str::FromStr;
 
-use crate::cli::get_evm_keystore;
+use crate::get_evm_keystore;
 use crate::sdk::LotusJsonKeyType;
 use crate::server::wallet::WalletType;
 use crate::{

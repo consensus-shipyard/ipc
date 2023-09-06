@@ -7,10 +7,10 @@ use clap::Args;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::sdk::{IpcAgentClient, LotusJsonKeyType};
 use crate::server::wallet::WalletType;
+use crate::{CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletImport;
 

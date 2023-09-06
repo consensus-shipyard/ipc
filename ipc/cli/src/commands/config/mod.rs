@@ -8,9 +8,9 @@ mod reload;
 use clap::{Args, Subcommand};
 use std::fmt::Debug;
 
-use crate::cli::commands::config::init::{InitConfig, InitConfigArgs};
-use crate::cli::commands::config::reload::{ReloadConfig, ReloadConfigArgs};
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::config::init::{InitConfig, InitConfigArgs};
+use crate::commands::config::reload::{ReloadConfig, ReloadConfigArgs};
+use crate::{CommandLineHandler, GlobalArguments};
 
 #[derive(Debug, Args)]
 #[command(name = "config", about = "config related commands")]

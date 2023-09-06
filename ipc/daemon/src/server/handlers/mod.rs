@@ -54,8 +54,6 @@ mod manager;
 pub mod wallet;
 
 pub type Method = String;
-/// We only support up to 9 decimal digits for transaction
-const FIL_AMOUNT_NANO_DIGITS: u32 = 9;
 /// The collection of all json rpc handlers
 pub struct Handlers {
     handlers: HashMap<Method, Box<dyn HandlerWrapper>>,
@@ -207,23 +205,5 @@ impl Handlers {
         } else {
             Err(anyhow!("method not supported"))
         }
-    }
-}
-
-pub(crate) fn f64_to_token_amount(f: f64) -> anyhow::Result<TokenAmount> {
-    // no rounding, just the integer part
-    let nano = f64::trunc(f * (10u64.pow(FIL_AMOUNT_NANO_DIGITS) as f64));
-    Ok(TokenAmount::from_nano(nano as u128))
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::server::handlers::f64_to_token_amount;
-    use fvm_shared::econ::TokenAmount;
-
-    #[test]
-    fn test_amount() {
-        let amount = f64_to_token_amount(1000000.1f64).unwrap();
-        assert_eq!(amount, TokenAmount::from_nano(1000000100000000u128));
     }
 }

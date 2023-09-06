@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use clap::Args;
 use std::fmt::Debug;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::get_ipc_agent_url;
 use crate::sdk::IpcAgentClient;
+use crate::{CommandLineHandler, GlobalArguments};
 
 /// The command to release funds from a child to a parent
 pub(crate) struct Release;
