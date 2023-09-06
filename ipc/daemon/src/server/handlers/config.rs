@@ -53,7 +53,7 @@ pub fn new_fvm_wallet_from_config(config: Arc<ReloadableConfig>) -> anyhow::Resu
 
 pub fn new_evm_keystore_from_config(
     config: Arc<ReloadableConfig>,
-) -> anyhow::Result<PersistentKeyStore<ethers::types::Address>> {
+) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo_str = config.get_config_repo();
     if let Some(repo_str) = repo_str {
         new_evm_keystore_from_path(&repo_str)
@@ -64,7 +64,7 @@ pub fn new_evm_keystore_from_config(
 
 pub fn new_evm_keystore_from_path(
     repo_str: &str,
-) -> anyhow::Result<PersistentKeyStore<ethers::types::Address>> {
+) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo = Path::new(&repo_str).join(DEFAULT_KEYSTORE_NAME);
     PersistentKeyStore::new(repo).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }

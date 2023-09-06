@@ -31,14 +31,14 @@ pub type WalletBalancesResponse = HashMap<String, String>;
 pub(crate) struct WalletBalancesHandler {
     pool: Arc<SubnetManagerPool>,
     fvm_wallet: Arc<RwLock<Wallet>>,
-    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 }
 
 impl WalletBalancesHandler {
     pub(crate) fn new(
         pool: Arc<SubnetManagerPool>,
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             pool,

@@ -55,13 +55,13 @@ pub struct WalletImportResponse {
 /// Send value between two addresses within a subnet
 pub(crate) struct WalletImportHandler {
     fvm_wallet: Arc<RwLock<Wallet>>,
-    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 }
 
 impl WalletImportHandler {
     pub(crate) fn new(
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             fvm_wallet,

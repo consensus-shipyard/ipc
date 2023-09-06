@@ -8,7 +8,7 @@
 // mod daemon;
 mod subnet;
 mod util;
-// pub mod wallet;
+mod wallet;
 
 // use crate::commands::checkpoint::CheckpointCommandsArgs;
 // use crate::commands::crossmsg::CrossMsgsCommandsArgs;
@@ -139,9 +139,16 @@ pub(crate) fn f64_to_token_amount(f: f64) -> anyhow::Result<TokenAmount> {
     Ok(TokenAmount::from_nano(nano as u128))
 }
 
+// pub(crate) fn get_evm_keystore(path: &Option<String>) -> Result<PersistentKeyStore<EthKeyAddress>> {
+//     match path {
+//         Some(p) => new_evm_keystore_from_path(p),
+//         None => new_evm_keystore_from_path(&default_repo_path()),
+//     }
+// }
+
 #[cfg(test)]
 mod tests {
-    use crate::server::handlers::f64_to_token_amount;
+    use crate::f64_to_token_amount;
     use fvm_shared::econ::TokenAmount;
 
     #[test]

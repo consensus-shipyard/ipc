@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use futures_util::future::join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use ipc_identity::Wallet;
+use ipc_identity::{EthKeyAddress, Wallet};
 use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
@@ -97,7 +97,7 @@ pub struct CheckpointSubsystem {
     /// management are those in the latest version of the config.
     config: Arc<ReloadableConfig>,
     fvm_wallet: Arc<RwLock<Wallet>>,
-    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 }
 
 impl CheckpointSubsystem {
@@ -105,7 +105,7 @@ impl CheckpointSubsystem {
     pub fn new(
         config: Arc<ReloadableConfig>,
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             config,

@@ -18,7 +18,7 @@ use ethers::types::{Eip1559TransactionRequest, I256, U256};
 use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_identity::{EvmKeyStore, PersistentKeyStore};
+use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::checkpoint::TopDownCheckpoint;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet::ConstructParams;
@@ -69,7 +69,7 @@ abigen!(
 abigen!(SubnetRegistry, "contracts/SubnetRegistry.json");
 
 pub struct EthSubnetManager {
-    keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ipc_contract_info: IPCContractInfo,
 }
 
@@ -852,7 +852,7 @@ impl EthSubnetManager {
         registry_addr: ethers::types::Address,
         chain_id: u64,
         provider: Provider<Http>,
-        keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             keystore,
@@ -882,7 +882,7 @@ impl EthSubnetManager {
         let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore.read().unwrap();
         let private_key = keystore
-            .get(&addr)?
+            .get(&addr.into())?
             .ok_or_else(|| anyhow!("address {addr:} does not have private key in key store"))?;
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
@@ -895,7 +895,7 @@ impl EthSubnetManager {
 
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
-        keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Result<Self> {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();
