@@ -16,8 +16,10 @@ use std::io::{BufReader, BufWriter, ErrorKind};
 use std::path::PathBuf;
 use zeroize::Zeroize;
 
+use super::Defaultable;
+
 #[derive(Default)]
-pub struct PersistentKeyStore<T> {
+pub struct PersistentKeyStore<T: Defaultable> {
     memory: MemoryKeyStore<T>,
     file_path: PathBuf,
 }
@@ -51,7 +53,9 @@ impl Drop for PersistentKeyInfo {
     }
 }
 
-impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> KeyStore for PersistentKeyStore<T> {
+impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo> + Defaultable> KeyStore
+    for PersistentKeyStore<T>
+{
     type Key = T;
 
     fn get(&self, addr: &Self::Key) -> Result<Option<KeyInfo>> {
@@ -72,9 +76,21 @@ impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> KeyStore for Persist
         self.memory.remove(addr)?;
         self.flush_no_encryption()
     }
+
+    fn set_default(&mut self, addr: &Self::Key) -> Result<()> {
+        self.memory.set_default(addr)?;
+        self.flush_no_encryption();
+        Ok(())
+    }
+
+    fn get_default(&mut self) -> Result<Self::Key> {
+        let default = self.memory.get_default();
+        self.flush_no_encryption();
+        Ok(default)
+    }
 }
 
-impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> PersistentKeyStore<T> {
+impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo> + Defaultable> PersistentKeyStore<T> {
     pub fn new(path: PathBuf) -> Result<Self> {
         if let Some(p) = path.parent() && !p.exists() {
             return Err(anyhow!("parent does not exist for key store"));
@@ -88,6 +104,7 @@ impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> PersistentKeyStore<T
                     Ok(Self {
                         memory: MemoryKeyStore {
                             data: Default::default(),
+                            default: None,
                         },
                         file_path: path,
                     })
@@ -117,8 +134,17 @@ impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> PersistentKeyStore<T
             key_infos.insert(addr, key_info);
         }
 
+        // check if there is default in the keystore
+        let default = match key_infos.get(&T::default_key()) {
+            Some(i) => Some(Self::Key::try_from(i)?),
+            None => None,
+        };
+
         Ok(Self {
-            memory: MemoryKeyStore { data: key_infos },
+            memory: MemoryKeyStore {
+                data: key_infos,
+                default,
+            },
             file_path: path,
         })
     }

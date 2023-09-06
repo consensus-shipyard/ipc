@@ -27,6 +27,10 @@ pub trait KeyStore {
     fn put(&mut self, info: KeyInfo) -> Result<Self::Key>;
     /// Remove address from the key store
     fn remove(&mut self, addr: &Self::Key) -> Result<()>;
+    /// Set default wallet
+    fn set_default(&mut self, addr: &Self::Key) -> Result<()>;
+    /// Get default wallet
+    fn get_default(&mut self) -> Result<Self::Key>;
 }
 
 /// The struct that contains evm private key info
@@ -51,6 +55,12 @@ impl Drop for KeyInfo {
     fn drop(&mut self) {
         self.private_key.zeroize();
     }
+}
+
+/// This trait is use to determine the key chosen for a specific
+/// key in a general way.
+trait Defaultable {
+    fn default_key() -> Self;
 }
 
 #[cfg(feature = "with-ethers")]
