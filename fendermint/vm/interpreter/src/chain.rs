@@ -166,8 +166,12 @@ where
                     };
 
                     if is_success {
+                        // For now try to get it from the child subnet. If the same comes up for execution, include own.
                         atomically(|| {
-                            pool.add(CheckpointPoolItem::BottomUp(msg.message.message.clone()))
+                            pool.add(
+                                CheckpointPoolItem::BottomUp(msg.message.message.clone()),
+                                false,
+                            )
                         })
                         .await;
                     }

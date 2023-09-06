@@ -66,10 +66,23 @@ where
 
 /// Create [`SerializeAs`] and [`DeserializeAs`] instances for `IsHumanReadable` for the
 /// given type assuming it implements [`ToString`] and [`FromStr`].
+///
+/// # Example
+///
+/// ```ignore
+/// struct IsHumanReadable;
+///
+/// human_readable_str!(Address);
+///
+/// struct MyStruct {
+///   #[serde_as(as = "Option<IsHumanReadable>")]
+///   pub delegated_address: Option<Address>,
+/// }
+/// ```
 #[macro_export]
 macro_rules! human_readable_str {
-    ($typ: ty) => {
-        impl serde_with::SerializeAs<$typ> for $crate::IsHumanReadable {
+    ($mark:ty, $typ: ty) => {
+        impl serde_with::SerializeAs<$typ> for $mark {
             fn serialize_as<S>(addr: &$typ, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -78,7 +91,7 @@ macro_rules! human_readable_str {
             }
         }
 
-        impl<'de> serde_with::DeserializeAs<'de, $typ> for $crate::IsHumanReadable {
+        impl<'de> serde_with::DeserializeAs<'de, $typ> for $mark {
             fn deserialize_as<D>(deserializer: D) -> Result<$typ, D::Error>
             where
                 D: serde::de::Deserializer<'de>,
@@ -86,6 +99,10 @@ macro_rules! human_readable_str {
                 $crate::deserialize_str(deserializer)
             }
         }
+    };
+
+    ($typ: ty) => {
+        human_readable_str!(IsHumanReadable, $typ);
     };
 }
 

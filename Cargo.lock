@@ -2752,6 +2752,7 @@ dependencies = [
  "fendermint_storage",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
+ "fendermint_vm_encoding",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
@@ -2763,8 +2764,13 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-sdk",
+ "ipc_ipld_resolver",
  "k256 0.11.6",
+ "libipld",
+ "libp2p",
+ "libp2p-bitswap",
  "libsecp256k1",
+ "multiaddr 0.16.0",
  "num-traits",
  "prost",
  "quickcheck 1.0.3",
@@ -3069,6 +3075,7 @@ dependencies = [
  "ipc-sdk",
  "ipc_ipld_resolver",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

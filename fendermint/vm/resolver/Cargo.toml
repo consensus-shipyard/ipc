@@ -11,6 +11,8 @@ license.workspace = true
 [dependencies]
 async-stm = { workspace = true }
 im = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
 
 cid = { workspace = true }
 ipc-sdk = { workspace = true }

@@ -42,8 +42,12 @@ im = "15.1.0"
 jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v10"] }
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
+libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
+libp2p = "0.50"
+libp2p-bitswap = "0.25.1"
 libsecp256k1 = "0.7"
 lru_time_cache = "0.11"
+multiaddr = "0.16"
 multihash = { version = "0.16.1", default-features = false }
 num-traits = "0.2"
 paste = "1"

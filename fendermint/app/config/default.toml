@@ -1,11 +1,17 @@
-# Data directory relative to the `--home-dir`, unless given as an absolute path.
+# All file and directory paths can be either:
+# * an absolute path, starting with "/", e.g. "/foo/bar"
+# * a path relative to the system `$HOME` directory, starting with "~", e.g. "~/foo/bar"
+# * a path relative to the `--home-dir` directory passed to the CLI, e.g. "foo/bar"
+
+# Database files.
 data_dir = "data"
-# Contract directory relative to the `--home-dir`, unless given as an absolute path.
+# Solidity contracts.
 contracts_dir = "contracts"
-# Builtin actor bundle path relative to the `--home-dir`, unless given as an absolute path.
+# Builtin actor bundle CAR file.
 builtin_actors_bundle = "bundle.car"
 
 [abci]
+# Number of concurrent requests allowed to reach the application.
 bound = 1
 
 [abci.listen]
@@ -56,3 +62,86 @@ host = "127.0.0.1"
 # The default port where the Ethereum API will listen to
 # JSON-RPC (POST) and WebSockets (GET) requests.
 port = 8545
+
+
+# IPLD Resolver Configuration
+[resolver]
+# Time to wait between attempts to resolve a CID after an error.
+retry_delay = 10
+
+# The current subnet ID for which this node can serve data.
+# TODO #231: Remove this and unify handling with the IPC settings.
+subnet_id = "/r0"
+
+# Network Identity
+[resolver.network]
+# Secp256k1 private key used for signing network messages.
+local_key = "keys/network.sk"
+
+# Network name is used to differentiate the IPLD Resolver peer group.
+# The entire hierarchy should be in one peer group connected by GossipSub,
+# so we can derive a name using the rootnet ID and use this as an override.
+network_name = ""
+
+
+# Peer Discovery
+[resolver.discovery]
+# Bootstrap node addresses for peer discovery, or the entire list for a static network
+# if peer discovery is disabled. The addresses must end with a `/p2p/<peer-id>` part.
+# If there are no static addresses to connect to, this node can still act as a bootstrap
+# node for others, but if Kademlia is also disabled, then it will never find peers.
+static_addresses = []
+
+# Number of connections at which point we pause further discovery lookups.
+target_connections = 50
+
+# Option to disable Kademlia, for example in a fixed static network.
+enable_kademlia = true
+
+
+# IPC Subnet Membership
+[resolver.membership]
+# User defined list of subnets which will never be pruned from the cache.
+static_subnets = []
+
+# Maximum number of subnets to track in the cache.
+# This is set to avoid filling the memory with non-existing subnet adverts from malicious peers.
+max_subnets = 100
+
+# Publish interval for supported subnets, in seconds.
+# This is how often the node will announce to others which subnets it is able to serve data for.
+publish_interval = 60
+
+# Minimum time between publishing own provider record in reaction to new joiners, in seconds.
+# This is to avoid bursts of messages after new joiners arrive.
+min_time_between_publish = 5
+
+# Maximum age of provider records before the peer is removed without an update, in seconds.
+max_provider_age = 300
+
+# Network Connectivity
+[resolver.connection]
+# The address where we will listen to incoming connections.
+# Leaving it empty disables the IPLD Resolver.
+listen_addr = ""
+
+# Maximum number of incoming connections.
+max_incoming = 30
+
+# Expected number of peers, for sizing the Bloom filter.
+expected_peer_count = 10000
+
+# Maximum number of peers to send Bitswap requests to in a single attempt.
+max_peers_per_query = 5
+
+# Maximum number of events in the push-based broadcast channel before a slow
+# consumer gets an error because it's falling behind.
+event_buffer_capacity = 100
+
+
+# Serving Content
+[resolver.content]
+# Number of bytes that can be consumed by remote peers in a time period. 0 means no limit.
+rate_limit_bytes = 0
+# Length of the time period at which the consumption limit fills. 0 means no limit.
+rate_limit_period = 0

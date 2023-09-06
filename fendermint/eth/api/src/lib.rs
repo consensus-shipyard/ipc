@@ -32,7 +32,7 @@ pub struct AppState {
     pub rpc_state: Arc<JsonRpcState<WebSocketClient>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GasOpt {
     pub min_gas_premium: u64,
     pub num_blocks_max_prio_fee: u64,

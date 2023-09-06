@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use config::{Config, ConfigError, Environment, File};
+use ipc_sdk::subnet_id::SubnetID;
 use serde::Deserialize;
 use serde_with::{serde_as, DurationSeconds};
 use std::{
@@ -9,7 +10,20 @@ use std::{
     time::Duration,
 };
 
-#[derive(Debug, Deserialize)]
+use fendermint_vm_encoding::human_readable_str;
+
+use self::resolver::ResolverSettings;
+
+pub mod resolver;
+
+/// Marker to be used with the `human_readable_str!` macro.
+///
+/// We can't use the one in `fendermint_vm_encoding` because we can't implement traits for it here.
+struct IsHumanReadable;
+
+human_readable_str!(IsHumanReadable, SubnetID);
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Address {
     pub host: String,
     pub port: u32,
@@ -21,14 +35,14 @@ impl Address {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AbciSettings {
     pub listen: Address,
     /// Queue size for each ABCI component.
     pub bound: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DbSettings {
     /// Length of the app state history to keep in the database before pruning; 0 means unlimited.
     ///
@@ -36,7 +50,7 @@ pub struct DbSettings {
     pub state_hist_size: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FvmSettings {
     /// Overestimation rate applied to gas estimations to ensure that the
     /// message goes through
@@ -54,7 +68,7 @@ pub struct FvmSettings {
 
 /// Ethereum API facade settings.
 #[serde_as]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct EthSettings {
     pub listen: Address,
     #[serde_as(as = "DurationSeconds<u64>")]
@@ -63,28 +77,49 @@ pub struct EthSettings {
     pub gas: fendermint_eth_api::GasOpt,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
     home_dir: PathBuf,
+    /// Database files.
     data_dir: PathBuf,
+    /// Solidity contracts.
     contracts_dir: PathBuf,
+    /// Builtin-actors CAR file.
     builtin_actors_bundle: PathBuf,
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub eth: EthSettings,
     pub fvm: FvmSettings,
+    pub resolver: ResolverSettings,
 }
 
+#[macro_export]
 macro_rules! home_relative {
-    ($name:ident) => {
-        pub fn $name(&self) -> PathBuf {
-            self.expand_path(&self.$name)
+    // Using this inside something that has a `.home_dir()` function.
+    ($($name:ident),+) => {
+        $(
+        pub fn $name(&self) -> std::path::PathBuf {
+            expand_path(&self.home_dir(), &self.$name)
         }
+        )+
+    };
+
+    // Using this outside something that requires a `home_dir` parameter to be passed to it.
+    ($settings:ty { $($name:ident),+ } ) => {
+      impl $settings {
+        $(
+        pub fn $name(&self, home_dir: &std::path::Path) -> std::path::PathBuf {
+            $crate::settings::expand_path(home_dir, &self.$name)
+        }
+        )+
+      }
     };
 }
 
 impl Settings {
+    home_relative!(data_dir, contracts_dir, builtin_actors_bundle);
+
     /// Load the default configuration from a directory,
     /// then potential overrides specific to the run mode,
     /// then overrides from the local environment.
@@ -113,20 +148,30 @@ impl Settings {
         c.try_deserialize()
     }
 
-    /// Make the path relative to `--home-dir`, unless it's an absolute path, then expand any `~` in the beginning.
-    fn expand_path(&self, path: &PathBuf) -> PathBuf {
-        if path.starts_with("/") {
-            return path.clone();
-        }
-        if path.starts_with("~") {
-            return expand_tilde(path);
-        }
-        expand_tilde(self.home_dir.join(path))
+    /// The configured home directory.
+    pub fn home_dir(&self) -> &Path {
+        &self.home_dir
     }
 
-    home_relative!(data_dir);
-    home_relative!(contracts_dir);
-    home_relative!(builtin_actors_bundle);
+    /// Indicate whether we have configured the IPLD Resolver to run.
+    pub fn resolver_enabled(&self) -> bool {
+        !self.resolver.connection.listen_addr.is_empty()
+            && self.resolver.subnet_id != *ipc_sdk::subnet_id::UNDEF
+    }
+}
+
+/// Expand a path which can either be :
+/// * absolute, e.g. "/foo/bar"
+/// * relative to the system `$HOME` directory, e.g. "~/foo/bar"
+/// * relative to the configured `--home-dir` directory, e.g. "foo/bar"
+pub fn expand_path(home_dir: &Path, path: &Path) -> PathBuf {
+    if path.starts_with("/") {
+        PathBuf::from(path)
+    } else if path.starts_with("~") {
+        expand_tilde(path)
+    } else {
+        expand_tilde(home_dir.join(path))
+    }
 }
 
 /// Expand paths that begin with "~" to `$HOME`.
@@ -154,15 +199,29 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::str::FromStr;
+
+    use ipc_sdk::subnet_id::SubnetID;
 
     use super::expand_tilde;
     use super::Settings;
 
-    #[test]
-    fn parse_default() {
+    fn parse_config(run_mode: &str) -> Settings {
         let current_dir = PathBuf::from(".");
         let default_dir = PathBuf::from("config");
-        Settings::new(&default_dir, &current_dir, "test").unwrap();
+        Settings::new(&default_dir, &current_dir, run_mode).unwrap()
+    }
+
+    #[test]
+    fn parse_default_config() {
+        let settings = parse_config("");
+        assert!(!settings.resolver_enabled());
+    }
+
+    #[test]
+    fn parse_test_config() {
+        let settings = parse_config("test");
+        assert!(settings.resolver_enabled());
     }
 
     #[test]
@@ -172,5 +231,18 @@ mod tests {
         assert_eq!(expand_tilde("~/.project"), home_project);
         assert_eq!(expand_tilde("/foo/bar"), PathBuf::from("/foo/bar"));
         assert_eq!(expand_tilde("~foo/bar"), PathBuf::from("~foo/bar"));
+    }
+
+    #[test]
+    fn parse_subnet_id() {
+        // NOTE: It would not work with `t` prefix addresses unless the current network is changed.
+        let id = "/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq";
+        SubnetID::from_str(id).unwrap();
+    }
+
+    #[test]
+    #[ignore = "https://github.com/consensus-shipyard/ipc-agent/issues/303"]
+    fn parse_empty_subnet_id() {
+        assert!(SubnetID::from_str("").is_err())
     }
 }
