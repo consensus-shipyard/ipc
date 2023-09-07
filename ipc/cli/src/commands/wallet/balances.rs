@@ -66,7 +66,7 @@ impl CommandLineHandler for WalletBalances {
                         let subnet = subnet.clone();
                         async move {
                             provider
-                                .wallet_balance(&subnet, &addr)
+                                .wallet_balance(&subnet, addr)
                                 .await
                                 .map(|balance| (balance, addr))
                         }

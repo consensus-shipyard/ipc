@@ -180,16 +180,16 @@ impl IpcProvider {
         from: Option<Address>,
     ) -> anyhow::Result<Address> {
         // if there is from use that.
-        if from.is_some() {
-            return Ok(from.unwrap());
+        if let Some(from) = from {
+            return Ok(from);
         }
 
         // if not use the sender.
-        if self.sender.is_some() {
-            return Ok(self.sender.unwrap().clone());
+        if let Some(sender) = self.sender {
+            return Ok(sender);
         }
 
-        // and finally, if there is no sender, use the deafult and
+        // and finally, if there is no sender, use the default and
         // set it as the default sender.
         match &subnet.config {
             config::subnet::SubnetConfig::Fvm(_) => {
@@ -387,7 +387,7 @@ impl IpcProvider {
 
         let subnet_config = conn.subnet();
         self.check_subnet(subnet_config)?;
-        conn.manager().wallet_balance(&address).await
+        conn.manager().wallet_balance(address).await
     }
 
     /// Returns the epoch of the latest top-down checkpoint executed

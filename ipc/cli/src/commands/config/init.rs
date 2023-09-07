@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 use crate::{CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
-use ipld_provider::config::DEFAULT_CONFIG_TEMPLATE;
+use ipc_provider::config::DEFAULT_CONFIG_TEMPLATE;
 use std::io::Write;
 
 use clap::Args;

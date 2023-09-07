@@ -3,7 +3,7 @@
 //! This mod contains the different command line implementations.
 
 // mod checkpoint;
-// mod config;
+mod config;
 // mod crossmsg;
 // mod daemon;
 mod subnet;
@@ -25,9 +25,9 @@ use fvm_shared::econ::TokenAmount;
 use std::fmt::Debug;
 use std::io;
 
-use subnet::SubnetCommandsArgs;
-// use crate::commands::config::ConfigCommandsArgs;
+use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
+use subnet::SubnetCommandsArgs;
 
 // pub use subnet::*;
 
@@ -38,13 +38,8 @@ const FIL_AMOUNT_NANO_DIGITS: u32 = 9;
 /// to the current mode. Register a new command accordingly.
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Launch the ipc agent daemon.
-    ///
-    /// Note that, technically speaking, this just launches the ipc agent node and runs in the foreground
-    /// and not in the background as what daemon processes are. Still, this struct contains `Daemon`
-    /// due to the convention from `lotus` and the expected behavior from the filecoin user group.
     // Daemon(LaunchDaemonArgs),
-    // Config(ConfigCommandsArgs),
+    Config(ConfigCommandsArgs),
     Subnet(SubnetCommandsArgs),
     Wallet(WalletCommandsArgs),
     // CrossMsg(CrossMsgsCommandsArgs),
@@ -110,7 +105,7 @@ pub async fn cli() -> anyhow::Result<()> {
         if let Some(c) = &args.command {
             let r = match &c {
                 // Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
-                // Commands::Config(args) => args.handle(global).await,
+                Commands::Config(args) => args.handle(global).await,
                 Commands::Subnet(args) => args.handle(global).await,
                 // Commands::CrossMsg(args) => args.handle(global).await,
                 Commands::Wallet(args) => args.handle(global).await,
