@@ -3034,6 +3034,7 @@ dependencies = [
  "libc",
  "libsecp256k1",
  "log",
+ "primitives",
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",

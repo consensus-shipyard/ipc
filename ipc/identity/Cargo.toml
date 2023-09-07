@@ -24,6 +24,7 @@ serde = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 fvm_shared = { workspace = true }
+primitives = { workspace = true }
 
 zeroize = "1.6.0"
 ethers = { workspace = true, optional = true }

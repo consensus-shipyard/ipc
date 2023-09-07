@@ -15,7 +15,7 @@ mod wallet;
 // use crate::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::commands::util::UtilCommandsArgs;
 // use crate::server::{new_evm_keystore_from_path, new_keystore_from_path};
-use crate::{CommandLineHandler, GlobalArguments};
+use crate::GlobalArguments;
 use anyhow::{Context, Result};
 
 use clap::{Command, CommandFactory, Parser, Subcommand};
@@ -27,7 +27,7 @@ use std::io;
 
 use subnet::SubnetCommandsArgs;
 // use crate::commands::config::ConfigCommandsArgs;
-// use crate::commands::wallet::WalletCommandsArgs;
+use crate::commands::wallet::WalletCommandsArgs;
 
 // pub use subnet::*;
 
@@ -46,7 +46,7 @@ enum Commands {
     // Daemon(LaunchDaemonArgs),
     // Config(ConfigCommandsArgs),
     Subnet(SubnetCommandsArgs),
-    // Wallet(WalletCommandsArgs),
+    Wallet(WalletCommandsArgs),
     // CrossMsg(CrossMsgsCommandsArgs),
     // Checkpoint(CheckpointCommandsArgs),
     Util(UtilCommandsArgs),
@@ -113,7 +113,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 // Commands::Config(args) => args.handle(global).await,
                 Commands::Subnet(args) => args.handle(global).await,
                 // Commands::CrossMsg(args) => args.handle(global).await,
-                // Commands::Wallet(args) => args.handle(global).await,
+                Commands::Wallet(args) => args.handle(global).await,
                 // Commands::Checkpoint(args) => args.handle(global).await,
                 Commands::Util(args) => args.handle(global).await,
             };

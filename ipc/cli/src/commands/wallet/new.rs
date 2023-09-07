@@ -4,15 +4,12 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use ipc_identity::WalletType;
+use ipc_provider::lotus::message::wallet::WalletKeyType;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::commands::get_ipc_agent_url;
-use crate::config::json_rpc_methods;
-use crate::server::wallet::new::{NewFvmWallet, WalletNewParams, WalletNewResponse};
-use crate::server::wallet::WalletType;
-use crate::{CommandLineHandler, GlobalArguments};
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletNew;
 
@@ -23,25 +20,23 @@ impl CommandLineHandler for WalletNew {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("create new wallet with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
+        let provider = get_ipc_provider(global)?;
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
-        let params = match wallet_type {
-            WalletType::Evm => WalletNewParams::Evm,
-            WalletType::Fvm => WalletNewParams::Fvm(NewFvmWallet {
-                key_type: arguments.key_type.clone().expect("key type not specified"),
-            }),
+        match wallet_type {
+            WalletType::Evm => {
+                println!("{:?}", provider.new_evm_key()?.to_string());
+            }
+            WalletType::Fvm => {
+                let tp = WalletKeyType::from_str(
+                    &arguments
+                        .key_type
+                        .clone()
+                        .expect("fvm key type not specified"),
+                )?;
+                println!("{:?}", provider.new_fvm_key(tp)?)
+            }
         };
-
-        let addr = json_rpc_client
-            .request::<WalletNewResponse>(
-                json_rpc_methods::WALLET_NEW,
-                serde_json::to_value(params)?,
-            )
-            .await?;
-
-        log::info!("created new wallet with address {:?}", addr,);
 
         Ok(())
     }
@@ -50,8 +45,6 @@ impl CommandLineHandler for WalletNew {
 #[derive(Debug, Args)]
 #[command(about = "Create new wallet in subnet")]
 pub(crate) struct WalletNewArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(
         long,
         short,

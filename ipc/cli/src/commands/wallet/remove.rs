@@ -4,15 +4,11 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use ipc_identity::{EvmKeyStore, WalletType};
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::commands::get_ipc_agent_url;
-use crate::config::json_rpc_methods;
-use crate::server::wallet::remove::WalletRemoveParams;
-use crate::server::wallet::WalletType;
-use crate::{CommandLineHandler, GlobalArguments};
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletRemove;
 
@@ -23,33 +19,28 @@ impl CommandLineHandler for WalletRemove {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("remove wallet with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
-
+        let provider = get_ipc_provider(global)?;
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
-        let params = WalletRemoveParams {
-            wallet_type,
-            address: arguments.address.clone(),
-        };
 
-        json_rpc_client
-            .request::<()>(
-                json_rpc_methods::WALLET_REMOVE,
-                serde_json::to_value(params)?,
-            )
-            .await?;
-
-        log::info!("remove wallet keys for address {:?}", arguments.address);
-
+        match wallet_type {
+            WalletType::Evm => {
+                let wallet = provider.evm_wallet();
+                let addr = ipc_identity::EthKeyAddress::from_str(&arguments.address)?;
+                wallet.write().unwrap().remove(&addr)?;
+            }
+            WalletType::Fvm => {
+                let wallet = provider.fvm_wallet();
+                let addr = fvm_shared::address::Address::from_str(&arguments.address)?;
+                wallet.write().unwrap().remove(&addr)?;
+            }
+        }
         Ok(())
     }
 }
 
 #[derive(Debug, Args)]
-#[command(about = "Create new wallet in subnet")]
+#[command(about = "Remove wallet from keystore")]
 pub(crate) struct WalletRemoveArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "Address of the key to remove")]
     pub address: String,
     #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]

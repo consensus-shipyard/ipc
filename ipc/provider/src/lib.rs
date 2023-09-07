@@ -5,22 +5,34 @@
 #![feature(let_chains)]
 
 use anyhow::anyhow;
+use base64::Engine;
 use checkpoint::NativeBottomUpCheckpoint;
 use config::ReloadableConfig;
-use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
-use ipc_identity::{EthKeyAddress, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet};
+use fvm_shared::{
+    address::{set_current_network, Address, Network},
+    clock::ChainEpoch,
+    crypto::signature::SignatureType,
+    econ::TokenAmount,
+};
+use ipc_identity::{
+    EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
+};
 use ipc_sdk::{
     cross::CrossMsg,
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
-use lotus::message::ipc::QueryValidatorSetResponse;
+use lotus::message::{ipc::QueryValidatorSetResponse, wallet::WalletKeyType};
 use manager::{fevm::FevmSubnetManager, LotusSubnetManager, SubnetInfo, SubnetManager};
+use num_traits::FromPrimitive;
+use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     collections::HashMap,
+    str::FromStr,
     sync::{Arc, RwLock},
 };
+use zeroize::Zeroize;
 
 pub mod checkpoint;
 pub mod config;
@@ -30,6 +42,16 @@ pub mod manager;
 
 const DEFAULT_REPO_PATH: &str = ".ipc-agent";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
+
+pub fn set_fil_network_from_env() {
+    let network_raw: u8 = std::env::var("LOTUS_NETWORK")
+        // default to testnet
+        .unwrap_or_else(|_| String::from("1"))
+        .parse()
+        .unwrap();
+    let network = Network::from_u8(network_raw).unwrap();
+    set_current_network(network);
+}
 
 /// The subnet manager connection that holds the subnet config and the manager instance.
 pub struct Connection {
@@ -49,6 +71,7 @@ impl Connection {
     }
 }
 
+#[derive(Clone)]
 pub struct IpcProvider {
     sender: Option<Address>,
     config: Arc<ReloadableConfig>,
@@ -126,18 +149,14 @@ impl IpcProvider {
         self.sender = Some(from);
     }
 
-    fn call_sender(&self, from: Option<Address>) -> anyhow::Result<Address> {
-        if from.is_none() {
-            // get default account
-            if self.sender.is_none() {
-                return Err(anyhow!(
-                    "default account not found for provider. Use `with_sender` to set it up."
-                ));
-            } else {
-                return Ok(self.sender.unwrap());
-            }
-        }
-        Ok(from.unwrap())
+    // FIXME: Reconcile these into a single wallet method that
+    // accepts an `ipc_identity::WalletType` as an input.
+    pub fn evm_wallet(&self) -> Arc<RwLock<PersistentKeyStore<EthKeyAddress>>> {
+        self.evm_keystore.clone()
+    }
+
+    pub fn fvm_wallet(&self) -> Arc<RwLock<Wallet>> {
+        self.fvm_wallet.clone()
     }
 
     fn check_subnet(&self, subnet: &config::Subnet) -> anyhow::Result<()> {
@@ -149,10 +168,52 @@ impl IpcProvider {
                 }
             }
             config::subnet::SubnetConfig::Fevm(_) => {
-                // TODO: add more checks later
+                // TODO: More checks to come
             }
         }
         Ok(())
+    }
+
+    fn check_sender(
+        &mut self,
+        subnet: &config::Subnet,
+        from: Option<Address>,
+    ) -> anyhow::Result<Address> {
+        // if there is from use that.
+        if from.is_some() {
+            return Ok(from.unwrap());
+        }
+
+        // if not use the sender.
+        if self.sender.is_some() {
+            return Ok(self.sender.unwrap().clone());
+        }
+
+        // and finally, if there is no sender, use the deafult and
+        // set it as the default sender.
+        match &subnet.config {
+            config::subnet::SubnetConfig::Fvm(_) => {
+                if self.sender.is_none() {
+                    let wallet = self.fvm_wallet();
+                    let addr = wallet.write().unwrap().get_default()?;
+                    self.sender = Some(addr);
+                    return Ok(addr);
+                }
+            }
+            config::subnet::SubnetConfig::Fevm(_) => {
+                if self.sender.is_none() {
+                    let wallet = self.evm_wallet();
+                    let addr = match wallet.write().unwrap().get_default()? {
+                        None => return Err(anyhow!("no default evm account configured")),
+                        Some(addr) => Address::try_from(addr)?,
+                    };
+                    self.sender = Some(addr);
+                    return Ok(addr);
+                }
+            }
+        };
+
+        Err(anyhow!("error fetching a valid sender"))
     }
 }
 
@@ -167,7 +228,7 @@ impl IpcProvider {
     // remove this allow
     #[allow(clippy::too_many_arguments)]
     pub async fn create_subnet(
-        &self,
+        &mut self,
         from: Option<Address>,
         parent: &SubnetID,
         subnet_name: String,
@@ -183,6 +244,7 @@ impl IpcProvider {
 
         let subnet_config = conn.subnet();
         self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
 
         let constructor_params = ConstructParams {
             parent: parent.clone(),
@@ -197,7 +259,7 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .create_subnet(self.call_sender(from)?, constructor_params)
+            .create_subnet(sender, constructor_params)
             .await
     }
 
@@ -313,8 +375,19 @@ impl IpcProvider {
     }
 
     /// Get the balance of an address
-    pub async fn wallet_balance(&self, _address: &Address) -> anyhow::Result<TokenAmount> {
-        todo!()
+    pub async fn wallet_balance(
+        &self,
+        subnet: &SubnetID,
+        address: &Address,
+    ) -> anyhow::Result<TokenAmount> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        conn.manager().wallet_balance(&address).await
     }
 
     /// Returns the epoch of the latest top-down checkpoint executed
@@ -360,6 +433,89 @@ impl IpcProvider {
 
     pub async fn get_block_hash(&self, _height: ChainEpoch) -> anyhow::Result<Vec<u8>> {
         todo!()
+    }
+}
+
+/// Lotus JSON keytype format
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct LotusJsonKeyType {
+    pub r#type: String,
+    pub private_key: String,
+}
+
+impl FromStr for LotusJsonKeyType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let v = serde_json::from_str(s)?;
+        Ok(v)
+    }
+}
+
+impl Drop for LotusJsonKeyType {
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
+}
+
+// Here I put in some other category the wallet-related
+// function so we can reconcile them easily when we decide to tackle
+// https://github.com/consensus-shipyard/ipc-agent/issues/308
+// This should become its own module within the provider, we should have different
+// categories for each group of commands
+impl IpcProvider {
+    pub fn new_fvm_key(&self, tp: WalletKeyType) -> anyhow::Result<Address> {
+        let tp = match tp {
+            WalletKeyType::BLS => SignatureType::BLS,
+            WalletKeyType::Secp256k1 => SignatureType::Secp256k1,
+            WalletKeyType::Secp256k1Ledger => return Err(anyhow!("ledger key type not supported")),
+        };
+
+        self.fvm_wallet().write().unwrap().generate_addr(tp)
+    }
+
+    pub fn new_evm_key(&self) -> anyhow::Result<EthKeyAddress> {
+        let key_info = ipc_identity::random_eth_key_info();
+        self.evm_wallet().write().unwrap().put(key_info)
+    }
+
+    pub fn import_fvm_key(&self, keyinfo: String) -> anyhow::Result<Address> {
+        let mut wallet = self.fvm_wallet.write().unwrap();
+        let keyinfo = LotusJsonKeyType::from_str(&keyinfo)?;
+
+        let key_type = if WalletKeyType::from_str(&keyinfo.r#type)? == WalletKeyType::BLS {
+            SignatureType::BLS
+        } else {
+            SignatureType::Secp256k1
+        };
+
+        let key_info = ipc_identity::json::KeyInfoJson(ipc_identity::KeyInfo::new(
+            key_type,
+            base64::engine::general_purpose::STANDARD.decode(&keyinfo.private_key)?,
+        ));
+        let key_info = ipc_identity::KeyInfo::try_from(key_info)
+            .map_err(|_| anyhow!("couldn't get fvm key info from string"))?;
+        Ok(wallet.import(key_info)?)
+    }
+
+    pub fn import_evm_key_from_privkey(
+        &self,
+        private_key: String,
+    ) -> anyhow::Result<EthKeyAddress> {
+        let mut keystore = self.evm_keystore.write().unwrap();
+
+        let private_key = if !private_key.starts_with("0x") {
+            hex::decode(&private_key)?
+        } else {
+            hex::decode(&private_key.as_str()[2..])?
+        };
+        keystore.put(ipc_identity::EvmKeyInfo::new(private_key))
+    }
+
+    pub fn import_evm_key_from_json(&self, keyinfo: String) -> anyhow::Result<EthKeyAddress> {
+        let persisted: ipc_identity::PersistentKeyInfo = serde_json::from_str(&keyinfo)?;
+        self.import_evm_key_from_privkey(persisted.private_key().parse()?)
     }
 }
 

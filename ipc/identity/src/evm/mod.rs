@@ -7,7 +7,7 @@ mod memory;
 mod persistent;
 
 use anyhow::Result;
-use std::hash::Hash;
+use std::{hash::Hash, str::FromStr};
 use zeroize::Zeroize;
 
 pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
@@ -75,7 +75,17 @@ impl TryFrom<KeyInfo> for ethers::types::Address {
 }
 
 #[cfg(feature = "with-ethers")]
-pub fn random_key_info() -> KeyInfo {
+impl FromStr for EthKeyAddress {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let inner = ethers::types::Address::from_str(s)?;
+        Ok(EthKeyAddress { inner })
+    }
+}
+
+#[cfg(feature = "with-ethers")]
+pub fn random_eth_key_info() -> KeyInfo {
     let key = ethers::core::k256::SecretKey::random(&mut rand::thread_rng());
     KeyInfo::new(key.to_bytes().to_vec())
 }
@@ -90,6 +100,16 @@ pub struct EthKeyAddress {
 impl From<ethers::types::Address> for EthKeyAddress {
     fn from(inner: ethers::types::Address) -> Self {
         EthKeyAddress { inner }
+    }
+}
+
+impl TryFrom<EthKeyAddress> for fvm_shared::address::Address {
+    type Error = hex::FromHexError;
+
+    fn try_from(value: EthKeyAddress) -> std::result::Result<Self, Self::Error> {
+        Ok(fvm_shared::address::Address::from(
+            &primitives::EthAddress::from_str(&value.to_string())?,
+        ))
     }
 }
 
@@ -112,7 +132,10 @@ impl Defaultable for EthKeyAddress {
 #[cfg(feature = "with-ethers")]
 impl ToString for EthKeyAddress {
     fn to_string(&self) -> String {
-        self.inner.to_string()
+        if self == &Self::default_key() {
+            return String::from("default-key");
+        }
+        format!("{:?}", self.inner)
     }
 }
 

@@ -21,10 +21,10 @@ impl CreateSubnet {
         global: &GlobalArguments,
         arguments: &CreateSubnetArgs,
     ) -> anyhow::Result<String> {
-        let provider = get_ipc_provider(global)?;
+        let mut provider = get_ipc_provider(global)?;
         let parent = SubnetID::from_str(&arguments.parent)?;
         let from = match &arguments.from {
-            Some(address) => Some(Address::from_str(&address)?),
+            Some(address) => Some(Address::from_str(address)?),
             None => None,
         };
 
