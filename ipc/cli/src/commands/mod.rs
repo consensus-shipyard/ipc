@@ -4,26 +4,27 @@
 
 // mod checkpoint;
 mod config;
-// mod crossmsg;
+mod crossmsg;
 // mod daemon;
 mod subnet;
 mod util;
 mod wallet;
 
 // use crate::commands::checkpoint::CheckpointCommandsArgs;
-// use crate::commands::crossmsg::CrossMsgsCommandsArgs;
+use crate::commands::crossmsg::CrossMsgsCommandsArgs;
 // use crate::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::commands::util::UtilCommandsArgs;
-// use crate::server::{new_evm_keystore_from_path, new_keystore_from_path};
 use crate::GlobalArguments;
 use anyhow::{Context, Result};
 
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
+use ipc_provider::manager::evm::ethers_address_to_fil_address;
 
 use std::fmt::Debug;
 use std::io;
+use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
@@ -42,7 +43,7 @@ enum Commands {
     Config(ConfigCommandsArgs),
     Subnet(SubnetCommandsArgs),
     Wallet(WalletCommandsArgs),
-    // CrossMsg(CrossMsgsCommandsArgs),
+    CrossMsg(CrossMsgsCommandsArgs),
     // Checkpoint(CheckpointCommandsArgs),
     Util(UtilCommandsArgs),
 }
@@ -107,7 +108,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 // Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
                 Commands::Config(args) => args.handle(global).await,
                 Commands::Subnet(args) => args.handle(global).await,
-                // Commands::CrossMsg(args) => args.handle(global).await,
+                Commands::CrossMsg(args) => args.handle(global).await,
                 Commands::Wallet(args) => args.handle(global).await,
                 // Commands::Checkpoint(args) => args.handle(global).await,
                 Commands::Util(args) => args.handle(global).await,
@@ -134,12 +135,19 @@ pub(crate) fn f64_to_token_amount(f: f64) -> anyhow::Result<TokenAmount> {
     Ok(TokenAmount::from_nano(nano as u128))
 }
 
-// pub(crate) fn get_evm_keystore(path: &Option<String>) -> Result<PersistentKeyStore<EthKeyAddress>> {
-//     match path {
-//         Some(p) => new_evm_keystore_from_path(p),
-//         None => new_evm_keystore_from_path(&default_repo_path()),
-//     }
-// }
+/// Receives a f/eth-address as an input and returns the corresponding
+/// filecoin or delegated address, respectively
+pub(crate) fn require_fil_addr_from_str(s: &str) -> anyhow::Result<fvm_shared::address::Address> {
+    let addr = match fvm_shared::address::Address::from_str(s) {
+        Err(_) => {
+            // see if it is an eth address
+            let addr = ethers::types::Address::from_str(s)?;
+            ethers_address_to_fil_address(&addr)?
+        }
+        Ok(addr) => addr,
+    };
+    Ok(addr)
+}
 
 #[cfg(test)]
 mod tests {

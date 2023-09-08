@@ -5,11 +5,13 @@
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
-use ipc_provider::manager::evm::ethers_address_to_fil_address;
 use ipc_sdk::subnet_id::SubnetID;
 use std::{fmt::Debug, str::FromStr};
 
-use crate::{f64_to_token_amount, get_ipc_provider, CommandLineHandler, GlobalArguments};
+use crate::{
+    f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str, CommandLineHandler,
+    GlobalArguments,
+};
 
 pub(crate) struct SendValue;
 
@@ -27,20 +29,13 @@ impl CommandLineHandler for SendValue {
             None => None,
         };
 
-        // try to get the `to` as an FVM address and an Eth
-        // address. We should include a wrapper type to make
-        // this easier through the whole code base.
-        let to = match Address::from_str(&arguments.to) {
-            Err(_) => {
-                // see if it is an eth address
-                let addr = ethers::types::Address::from_str(&arguments.to)?;
-                ethers_address_to_fil_address(&addr)?
-            }
-            Ok(addr) => addr,
-        };
-
         provider
-            .send_value(&subnet, from, to, f64_to_token_amount(arguments.amount)?)
+            .send_value(
+                &subnet,
+                from,
+                require_fil_addr_from_str(&arguments.to)?,
+                f64_to_token_amount(arguments.amount)?,
+            )
             .await
     }
 }
