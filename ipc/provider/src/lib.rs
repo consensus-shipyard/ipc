@@ -230,14 +230,14 @@ impl IpcProvider {
     pub async fn create_subnet(
         &mut self,
         from: Option<Address>,
-        parent: &SubnetID,
+        parent: SubnetID,
         subnet_name: String,
         min_validators: u64,
         min_validator_stake: TokenAmount,
         bottomup_check_period: ChainEpoch,
         topdown_check_period: ChainEpoch,
     ) -> anyhow::Result<Address> {
-        let conn = match self.connection(parent) {
+        let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
@@ -247,7 +247,7 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
 
         let constructor_params = ConstructParams {
-            parent: parent.clone(),
+            parent,
             name: subnet_name,
             ipc_gateway_addr: subnet_config.gateway_addr(),
             consensus: ConsensusType::Mir,
@@ -263,63 +263,144 @@ impl IpcProvider {
             .await
     }
 
-    /// Performs the call to join a subnet from a wallet address and staking an amount
-    /// of collateral. This function, as well as all of the ones on this trait, can infer
-    /// the specific subnet and actors on which to perform the relevant calls from the
-    /// SubnetID given as an argument.
     pub async fn join_subnet(
-        &self,
-        _subnet: SubnetID,
-        _from: Address,
-        _collateral: TokenAmount,
-        _validator_net_addr: String,
-        _worker_addr: Address,
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        collateral: TokenAmount,
+        validator_net_addr: String,
+        worker_addr: Option<Address>,
     ) -> anyhow::Result<()> {
-        todo!()
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        let worker = match worker_addr {
+            None => sender,
+            Some(addr) => addr,
+        };
+        conn.manager()
+            .join_subnet(subnet, sender, collateral, validator_net_addr, worker)
+            .await
     }
 
-    /// Sends a request to leave a subnet from a wallet address.
-    pub async fn leave_subnet(&self, _subnet: SubnetID, _from: Address) -> anyhow::Result<()> {
-        todo!()
+    pub async fn leave_subnet(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().leave_subnet(subnet, sender).await
     }
 
-    /// Sends a signal to kill a subnet
-    pub async fn kill_subnet(&self, _subnet: SubnetID, _from: Address) -> anyhow::Result<()> {
-        todo!()
+    pub async fn kill_subnet(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().kill_subnet(subnet, sender).await
     }
 
-    /// Lists all the registered children in a gateway.
     pub async fn list_child_subnets(
         &self,
-        _gateway_addr: Address,
+        gateway_addr: Option<Address>,
+        subnet: &SubnetID,
     ) -> anyhow::Result<HashMap<SubnetID, SubnetInfo>> {
-        todo!()
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        let gateway_addr = match gateway_addr {
+            None => subnet_config.gateway_addr(),
+            Some(addr) => addr,
+        };
+
+        conn.manager().list_child_subnets(gateway_addr).await
     }
 
-    /// Fund injects new funds from an account of the parent chain to a subnet.
-    /// Returns the epoch that the fund is executed in the parent.
     pub async fn fund(
-        &self,
-        _subnet: SubnetID,
-        _gateway_addr: Address,
-        _from: Address,
-        _to: Address,
-        _amount: TokenAmount,
+        &mut self,
+        subnet: SubnetID,
+        gateway_addr: Option<Address>,
+        from: Option<Address>,
+        to: Address,
+        amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        let gateway_addr = match gateway_addr {
+            None => subnet_config.gateway_addr(),
+            Some(addr) => addr,
+        };
+
+        conn.manager()
+            .fund(subnet, gateway_addr, sender, to, amount)
+            .await
     }
 
-    /// Release creates a new check message to release funds in parent chain
-    /// Returns the epoch that the released is executed in the child.
     pub async fn release(
-        &self,
-        _subnet: SubnetID,
-        _gateway_addr: Address,
-        _from: Address,
-        _to: Address,
-        _amount: TokenAmount,
+        &mut self,
+        subnet: SubnetID,
+        gateway_addr: Option<Address>,
+        from: Option<Address>,
+        to: Address,
+        amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        let conn = match self.connection(&subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        let gateway_addr = match gateway_addr {
+            None => subnet_config.gateway_addr(),
+            Some(addr) => addr,
+        };
+
+        conn.manager()
+            .release(subnet, gateway_addr, sender, to, amount)
+            .await
     }
 
     /// Propagate a cross-net message forward. For `postbox_msg_key`, we are using bytes because different
@@ -346,32 +427,103 @@ impl IpcProvider {
 
     /// Sets a new net address to an existing validator
     pub async fn set_validator_net_addr(
-        &self,
-        _subnet: SubnetID,
-        _from: Address,
-        _validator_net_addr: String,
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        validator_net_addr: String,
     ) -> anyhow::Result<()> {
-        todo!()
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager()
+            .set_validator_net_addr(subnet, sender, validator_net_addr)
+            .await
     }
 
     /// Sets a new worker address to an existing validator
     pub async fn set_validator_worker_addr(
-        &self,
-        _subnet: SubnetID,
-        _from: Address,
-        _validator_worker_addr: Address,
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        worker_addr: Address,
     ) -> anyhow::Result<()> {
-        todo!()
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager()
+            .set_validator_worker_addr(subnet, sender, worker_addr)
+            .await
+    }
+
+    /// Returns the validator set
+    pub async fn get_validator_set(
+        &self,
+        subnet: &SubnetID,
+        gateway_addr: Option<Address>,
+        epoch: Option<ChainEpoch>,
+    ) -> anyhow::Result<QueryValidatorSetResponse> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        // FIXME: get_validator_set should not acception `Option<Address>` as
+        // the type for gateway_addr. This requires changes in all implementations
+        // of the trait.
+        conn.manager()
+            .get_validator_set(subnet, gateway_addr, epoch)
+            .await
     }
 
     /// Send value between two addresses in a subnet
     pub async fn send_value(
-        &self,
-        _from: Address,
-        _to: Address,
-        _amount: TokenAmount,
+        &mut self,
+        subnet: &SubnetID,
+        from: Option<Address>,
+        to: Address,
+        amount: TokenAmount,
     ) -> anyhow::Result<()> {
-        todo!()
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+        let sender = self.check_sender(subnet_config, from)?;
+
+        // FIXME: This limits that only value to f-addresses can be sent
+        // with the provider (which requires translating eth-addresses into
+        // their corresponding delegated address). This should be fixed with the
+        // new address wrapper type planned: https://github.com/consensus-shipyard/ipc-agent/issues/263
+        // let to = match Address::from_str(&request.to) {
+        //     Ok(addr) => addr,
+        //     Err(_) => {
+        //         // we need to check if an 0x address was passed and convert
+        //         // to a delegated address
+        //         ethers_address_to_fil_address(&ethers::types::Address::from_str(&request.to)?)?
+        //     }
+        // };
+
+        conn.manager().send_value(sender, to, amount).await
     }
 
     /// Get the balance of an address
@@ -381,7 +533,7 @@ impl IpcProvider {
         address: &Address,
     ) -> anyhow::Result<TokenAmount> {
         let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target parent subnet not found")),
+            None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
         };
 
@@ -393,9 +545,23 @@ impl IpcProvider {
     /// Returns the epoch of the latest top-down checkpoint executed
     pub async fn last_topdown_executed(
         &self,
-        _gateway_addr: &Address,
+        subnet: &SubnetID,
+        gateway_addr: Option<Address>,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        let gateway_addr = match gateway_addr {
+            None => subnet_config.gateway_addr(),
+            Some(addr) => addr,
+        };
+
+        conn.manager().last_topdown_executed(&gateway_addr).await
     }
 
     /// Returns the list of checkpoints from a subnet actor for the given epoch range.
@@ -408,31 +574,52 @@ impl IpcProvider {
         todo!()
     }
 
-    /// Returns the validator set
-    pub async fn get_validator_set(
-        &self,
-        _subnet_id: &SubnetID,
-        _gateway: Option<Address>,
-        _epoch: Option<ChainEpoch>,
-    ) -> anyhow::Result<QueryValidatorSetResponse> {
-        todo!()
-    }
+    pub async fn chain_head(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
 
-    pub async fn chain_head_height(&self) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        conn.manager().chain_head_height().await
     }
 
     pub async fn get_top_down_msgs(
         &self,
-        _subnet_id: &SubnetID,
-        _start_epoch: ChainEpoch,
-        _end_epoch: ChainEpoch,
+        subnet: &SubnetID,
+        start_epoch: ChainEpoch,
+        end_epoch: ChainEpoch,
     ) -> anyhow::Result<Vec<CrossMsg>> {
-        todo!()
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        conn.manager()
+            .get_top_down_msgs(subnet, start_epoch, end_epoch)
+            .await
     }
 
-    pub async fn get_block_hash(&self, _height: ChainEpoch) -> anyhow::Result<Vec<u8>> {
-        todo!()
+    pub async fn get_block_hash(
+        &self,
+        subnet: &SubnetID,
+        height: ChainEpoch,
+    ) -> anyhow::Result<Vec<u8>> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        conn.manager().get_block_hash(height).await
     }
 }
 
