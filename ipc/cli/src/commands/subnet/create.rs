@@ -31,7 +31,7 @@ impl CreateSubnet {
         let addr = provider
             .create_subnet(
                 from,
-                &parent,
+                parent,
                 arguments.name.clone(),
                 arguments.min_validators,
                 f64_to_token_amount(arguments.min_validator_stake)?,
