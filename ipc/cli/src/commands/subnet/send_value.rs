@@ -4,13 +4,12 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use std::fmt::Debug;
+use fvm_shared::address::Address;
+use ipc_provider::manager::evm::ethers_address_to_fil_address;
+use ipc_sdk::subnet_id::SubnetID;
+use std::{fmt::Debug, str::FromStr};
 
-use crate::commands::get_ipc_agent_url;
-use crate::config::json_rpc_methods;
-use crate::server::send_value::SendValueParams;
-use crate::{CommandLineHandler, GlobalArguments};
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
+use crate::{f64_to_token_amount, get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct SendValue;
 
@@ -21,33 +20,34 @@ impl CommandLineHandler for SendValue {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("send value in subnet with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
-
-        // The json rpc server will handle directing the request to
-        // the correct parent.
-        let params = SendValueParams {
-            subnet: arguments.subnet.clone(),
-            from: arguments.from.clone(),
-            to: arguments.to.clone(),
-            amount: arguments.amount,
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(Address::from_str(address)?),
+            None => None,
         };
 
-        json_rpc_client
-            .request::<()>(json_rpc_methods::SEND_VALUE, serde_json::to_value(params)?)
-            .await?;
+        // try to get the `to` as an FVM address and an Eth
+        // address. We should include a wrapper type to make
+        // this easier through the whole code base.
+        let to = match Address::from_str(&arguments.to) {
+            Err(_) => {
+                // see if it is an eth address
+                let addr = ethers::types::Address::from_str(&arguments.to)?;
+                ethers_address_to_fil_address(&addr)?
+            }
+            Ok(addr) => addr,
+        };
 
-        log::info!("sending value in subnet: {:}", arguments.subnet);
-
-        Ok(())
+        provider
+            .send_value(&subnet, from, to, f64_to_token_amount(arguments.amount)?)
+            .await
     }
 }
 
 #[derive(Debug, Args)]
 #[command(about = "Send value to an address within a subnet")]
 pub(crate) struct SendValueArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address to send value from")]
     pub from: Option<String>,
     #[arg(long, short, help = "The address to send value to")]
