@@ -24,6 +24,19 @@ library FvmAddressHelper {
         fvmAddress = FvmAddress({addrType: DELEGATED, payload: payload});
     }
 
+    /// @notice Obtains the hash of the fvm address
+    function toHash(FvmAddress memory fvmAddress) internal pure returns (bytes32) {
+        return keccak256(abi.encode(fvmAddress));
+    }
+
+    /// @notice Checks if two fvm addresses are equal
+    function equal(FvmAddress memory a, FvmAddress memory b) internal pure returns (bool) {
+        return
+            a.addrType == b.addrType &&
+            a.payload.length == b.payload.length &&
+            keccak256(a.payload) == keccak256(b.payload);
+    }
+
     function extractEvmAddress(FvmAddress memory fvmAddress) internal pure returns (address addr) {
         if (fvmAddress.addrType != DELEGATED) {
             revert NotDelegatedEvmAddress();

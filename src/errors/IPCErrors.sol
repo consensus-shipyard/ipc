@@ -46,3 +46,5 @@ error ValidatorWeightIsZero();
 error ValidatorsAndWeightsLengthMismatch();
 error WorkerAddressInvalid();
 error WrongCheckpointSource();
+error ParentFinalityAlreadyCommitted();
+error InvalidCrossMsgValue();

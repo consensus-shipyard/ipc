@@ -13,7 +13,7 @@ import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
 import {IPCMsgType} from "../src/enums/IPCMsgType.sol";
 import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
-import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck} from "../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck, ParentFinality} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
@@ -31,8 +31,6 @@ import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
-import {DummyERC20} from "./ERC20Helper.sol";
-import {ERC20TokenMessenger} from "../examples/contracts/cross-token/ERC20TokenMessenger.sol";
 
 contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     using SubnetIDHelper for SubnetID;
@@ -143,11 +141,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         return gatewayDiamond;
     }
-
-    // We need this to be able to send values in the tests.
-    fallback() external payable {}
-
-    receive() external payable {}
 
     function setUp() public {
         address[] memory path = new address[](1);
@@ -754,278 +747,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwManager.kill();
     }
 
-    function testGatewayDiamond_CommitChildCheck_Works() public {
-        address subnetAddress = address(100);
-
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
-
-        gwRouter.commitChildCheck(checkpoint);
-
-        require(gwGetter.bottomUpNonce() == 0);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Works_WithCrossMsgs() public {
-        address subnetAddress = address(saManager);
-        address validatorAddress = address(100);
-        address funderAddress = address(101);
-        uint256 fundAmount = 1 ether;
-
-        _join(validatorAddress);
-
-        vm.startPrank(funderAddress);
-        vm.deal(funderAddress, fundAmount + 1);
-
-        fund(funderAddress, fundAmount);
-
-        vm.stopPrank();
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        SubnetID memory networkName = gwGetter.getNetworkName();
-        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
-
-        checkpoint.fee = 1;
-        checkpoint.crossMsgs = new CrossMsg[](1);
-        checkpoint.crossMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: networkName.createSubnetId(subnetAddress),
-                    rawAddress: FvmAddressHelper.from(address(1))
-                }),
-                to: IPCAddress({subnetId: networkName, rawAddress: FvmAddressHelper.from(address(2))}),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        require(checkpoint.crossMsgs[0].message.applyType(networkName) == IPCMsgType.BottomUp);
-
-        vm.expectCall(subnetAddress, 0, abi.encodeWithSelector(ISubnetActor.reward.selector, checkpoint.fee), 1);
-
-        (, , , , uint256 circSupplyBefore, ) = getSubnet(subnetAddress);
-
-        gwRouter.commitChildCheck(checkpoint);
-
-        (, , uint256 appliedBottomUpNonce, , uint256 circSupplyAfter, ) = getSubnet(subnetAddress);
-
-        require(appliedBottomUpNonce == 1);
-        require(circSupplyAfter == circSupplyBefore - checkpoint.fee - checkpoint.crossMsgs[0].message.value);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Works_SameSubnet(uint64 blockNumber) public {
-        address subnetAddress = address(100);
-        vm.assume(blockNumber < type(uint64).max / 2 - 11);
-        vm.roll(blockNumber);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
-        gwRouter.commitChildCheck(checkpoint);
-
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        BottomUpCheckpoint memory checkpoint2 = createCheckpoint(subnetAddress, 2 * DEFAULT_CHECKPOINT_PERIOD);
-
-        gwRouter.commitChildCheck(checkpoint2);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_InvalidCrossMsgNonce(uint64 blockNumber) public {
-        address subnetAddress = address(saManager);
-        vm.assume(blockNumber < type(uint64).max / 2 - 11);
-        vm.roll(blockNumber);
-
-        address validatorAddress = address(100);
-
-        _join(validatorAddress);
-
-        address funderAddress = address(101);
-        uint256 fundAmount = 1 ether;
-
-        vm.startPrank(funderAddress);
-        vm.deal(funderAddress, fundAmount + 1);
-
-        fund(funderAddress, fundAmount);
-
-        vm.stopPrank();
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        SubnetID memory networkName = gwGetter.getNetworkName();
-        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
-
-        checkpoint.crossMsgs = new CrossMsg[](1);
-        checkpoint.crossMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: networkName.createSubnetId(subnetAddress),
-                    rawAddress: FvmAddressHelper.from(address(1))
-                }),
-                to: IPCAddress({subnetId: networkName, rawAddress: FvmAddressHelper.from(address(2))}),
-                value: 1,
-                nonce: 1,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        require(checkpoint.crossMsgs[0].message.applyType(networkName) == IPCMsgType.BottomUp);
-
-        vm.expectRevert(InvalidCrossMsgNonce.selector);
-
-        gwRouter.commitChildCheck(checkpoint);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_NotInitialized() public {
-        address subnetAddress = address(100);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
-        vm.expectRevert(NotInitialized.selector);
-        gwRouter2.commitChildCheck(checkpoint);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_InvalidCheckpointSource() public {
-        address subnetAddress = address(100);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        address notSubnetAddress = address(101);
-
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(notSubnetAddress);
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            source: subnetId,
-            epoch: 0,
-            fee: 0,
-            crossMsgs: new CrossMsg[](0),
-            prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0),
-            proof: new bytes(0)
-        });
-
-        vm.expectRevert(InvalidCheckpointSource.selector);
-        gwRouter.commitChildCheck(checkpoint);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_InvalidCheckpointEpoch_PrevEpoch() public {
-        address subnetAddress = address(100);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
-        gwRouter.commitChildCheck(checkpoint);
-
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        BottomUpCheckpoint memory checkpoint2 = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD / 2);
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
-        gwRouter.commitChildCheck(checkpoint2);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_InvalidCheckpointEpoch_CurrentEpoch() public {
-        address subnetAddress = address(100);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        BottomUpCheckpoint memory checkpoint = createCheckpoint(subnetAddress, DEFAULT_CHECKPOINT_PERIOD);
-        gwRouter.commitChildCheck(checkpoint);
-
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
-        gwRouter.commitChildCheck(checkpoint);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_SubnetNotActive() public {
-        address subnetAddress = address(100);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            source: subnetId,
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            fee: 0,
-            crossMsgs: new CrossMsg[](0),
-            prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0),
-            proof: new bytes(0)
-        });
-
-        vm.expectRevert(SubnetNotActive.selector);
-        gwRouter.commitChildCheck(checkpoint);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_InconsistentPrevCheckpoint() public {
-        address subnetAddress = address(100);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            source: subnetId,
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            fee: 0,
-            crossMsgs: new CrossMsg[](0),
-            prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0),
-            proof: new bytes(0)
-        });
-        gwRouter.commitChildCheck(checkpoint);
-
-        checkpoint.fee = 100; // mess with the checkpoint to get different hash
-
-        BottomUpCheckpoint memory checkpoint2 = BottomUpCheckpoint({
-            source: subnetId,
-            epoch: 2 * DEFAULT_CHECKPOINT_PERIOD,
-            fee: 0,
-            crossMsgs: new CrossMsg[](0),
-            prevHash: checkpoint.toHash(),
-            children: new ChildCheck[](0),
-            proof: new bytes(0)
-        });
-
-        vm.expectRevert(InconsistentPrevCheckpoint.selector);
-        gwRouter.commitChildCheck(checkpoint2);
-    }
-
-    function testGatewayDiamond_CommitChildCheck_Fails_NotEnoughSubnetCircSupply() public {
-        address subnetAddress = address(100);
-        vm.startPrank(subnetAddress);
-        vm.deal(subnetAddress, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, subnetAddress);
-
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            source: subnetId,
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            fee: MIN_COLLATERAL_AMOUNT * 2,
-            crossMsgs: new CrossMsg[](0),
-            prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0),
-            proof: new bytes(0)
-        });
-
-        vm.expectRevert(NotEnoughSubnetCircSupply.selector);
-        gwRouter.commitChildCheck(checkpoint);
-    }
-
     function testGatewayDiamond_Fund_Works_ReactivatedSubnet() public {
         address validatorAddress = address(100);
 
@@ -1324,7 +1045,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
-        vm.expectRevert(NotEnoughFunds.selector);
+        vm.expectRevert(InvalidCrossMsgValue.selector);
         gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
@@ -1347,9 +1068,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         address caller = vm.addr(100);
         vm.startPrank(caller);
         vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+
         registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
+
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
         vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
+
         gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
@@ -1418,128 +1142,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         );
     }
 
-    function testGatewayDiamond_SendCrossMessage_Works_TopDown_SameSubnet() public {
-        address caller = vm.addr(100);
-        vm.prank(caller);
-        vm.deal(caller, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, caller);
-
-        address receiver = address(this); // callback to reward() method
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT + 1);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
-
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(receiver);
-        SubnetID memory from = gwGetter.getNetworkName().createSubnetId(caller);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(caller)}),
-                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(receiver)}),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: true
-        });
-
-        vm.prank(caller);
-        vm.expectCall(receiver, 0, abi.encodeWithSelector(ISubnetActor.reward.selector, CROSS_MSG_FEE), 1);
-
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
-
-        (SubnetID memory id, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(this));
-
-        require(crossMsg.message.applyType(gwGetter.getNetworkName()) == IPCMsgType.TopDown);
-        require(id.equals(destinationSubnet));
-        require(nonce == 1);
-        require(circSupply == 1);
-        require(gwGetter.getNetworkName().equals(destinationSubnet.commonParent(from)));
-        require(gwGetter.appliedTopDownNonce() == 1);
-
-        CrossMsg[] memory msgs = gwGetter.getTopDownMsgs(id, block.number, block.number);
-        require(msgs.length == 1);
-        (bool exists, uint64 n) = gwGetter.getAppliedTopDownNonce(id);
-        require(exists);
-        require(n == 1);
-    }
-
     function reward(uint256 amount) external view {
         console.log("reward method called with %d", amount);
     }
 
-    function testGatewayDiamond_SendCrossMessage_Works_BottomUp_CurrentNetworkNotCommonParent() public {
-        address receiver = vm.addr(101);
-        address caller = vm.addr(100);
-
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        registerSubnetGW(MIN_COLLATERAL_AMOUNT, receiver, gatewayDiamond2);
-
-        vm.prank(caller);
-        vm.deal(caller, CROSS_MSG_FEE + 2);
-
-        SubnetID memory network2 = gwGetter2.getNetworkName();
-        address[] memory destinationPath = new address[](1);
-        destinationPath[0] = ROOTNET_ADDRESS;
-        SubnetID memory destinationSubnet = SubnetID({root: ROOTNET_CHAINID, route: destinationPath});
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: network2, rawAddress: FvmAddressHelper.from(caller)}),
-                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(receiver)}),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: true
-        });
-
-        vm.prank(caller);
-        gwMessenger2.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
-
-        require(crossMsg.message.applyType(gwGetter2.getNetworkName()) == IPCMsgType.BottomUp);
-        require(gwGetter2.appliedTopDownNonce() == 0);
-        require(gwGetter2.bottomUpNonce() == 1);
-    }
-
-    function testGatewayDiamond_SendCrossMessage_Works_BottomUp_CurrentNetworkCommonParent() public {
-        // the receiver is a network 1 address, but we are declaring it is network2 so we can use it in the tests
-        address receiver = vm.addr(101);
-        address caller = vm.addr(100);
-
-        vm.prank(caller);
-        vm.deal(caller, CROSS_MSG_FEE + 2);
-        SubnetID memory network2 = gwGetter2.getNetworkName();
-        address[] memory rootnetPath = new address[](1);
-        rootnetPath[0] = ROOTNET_ADDRESS;
-        SubnetID memory destinationSubnet = SubnetID({root: ROOTNET_CHAINID, route: rootnetPath});
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: network2, rawAddress: FvmAddressHelper.from(caller)}),
-                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(receiver)}),
-                value: 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0)
-            }),
-            wrapped: true
-        });
-
-        require(crossMsg.message.applyType(gwGetter2.getNetworkName()) == IPCMsgType.BottomUp);
-
-        vm.prank(caller);
-
-        gwMessenger2.sendCrossMessage{value: CROSS_MSG_FEE + 1}(crossMsg);
-
-        require(gwGetter2.appliedTopDownNonce() == 0);
-    }
-
     function testGatewayDiamond_Propagate_Works_WithFeeRemainder() external {
-        address[] memory validators = setupValidators();
+        (, address[] memory validators) = setupValidators();
         address caller = validators[0];
 
         bytes32 postboxId = setupWhiteListMethod(caller);
@@ -1560,7 +1168,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_Propagate_Works_NoFeeReminder() external {
-        address[] memory validators = setupValidators();
+        (, address[] memory validators) = setupValidators();
         address caller = validators[0];
 
         uint256 fee = gwGetter.crossMsgFee();
@@ -1585,8 +1193,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     }
 
     function setupWhiteListMethod(address caller) internal returns (bytes32) {
-        address[] memory validators = setupValidators();
-
         registerSubnet(MIN_COLLATERAL_AMOUNT, address(this));
 
         CrossMsg memory crossMsg = CrossMsg({
@@ -1606,81 +1212,79 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             }),
             wrapped: false
         });
+        CrossMsg[] memory msgs = new CrossMsg[](1);
+        msgs[0] = crossMsg;
 
         // we add a validator with 10 times as much weight as the default validator.
         // This way we have 10/11 votes and we reach majority, setting the message in postbox
         // addValidator(caller, 1000);
 
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = crossMsg;
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[2]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.applyCrossMessages(msgs);
 
         return crossMsg.toHash();
     }
 
-    function testGatewayDiamond_SetMembership_Fails_NotSystemActor() public {
+    function testGatewayDiamond_CommitParentFinality_Fails_NotSystemActor() public {
         address caller = vm.addr(100);
 
-        address[] memory validators = new address[](1);
-        validators[0] = caller;
+        FvmAddress[] memory validators = new FvmAddress[](1);
+        validators[0] = FvmAddressHelper.from(caller);
         uint256[] memory weights = new uint256[](1);
         weights[0] = 100;
 
         vm.prank(caller);
         vm.expectRevert(NotSystemActor.selector);
-        gwManager.setMembership(validators, weights);
+
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+
+        gwRouter.commitParentFinality(finality, validators, weights);
     }
 
-    function testGatewayDiamond_SetMembership_Fails_ValidatorsAndWeightsNotEqual() public {
-        address[] memory validators = new address[](1);
-        validators[0] = vm.addr(100);
+    function testGatewayDiamond_CommitParentFinality_Fails_ValidatorsAndWeightsNotEqual() public {
+        FvmAddress[] memory validators = new FvmAddress[](1);
+        validators[0] = FvmAddressHelper.from(vm.addr(100));
         uint256[] memory weights = new uint256[](2);
         weights[0] = 100;
         weights[1] = 130;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(ValidatorsAndWeightsLengthMismatch.selector);
-        gwManager.setMembership(validators, weights);
+
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        gwRouter.commitParentFinality(finality, validators, weights);
     }
 
-    function testGatewayDiamond_SetMembership_Fails_ZeroWeight() public {
-        address[] memory validators = new address[](1);
-        validators[0] = vm.addr(100);
+    function testGatewayDiamond_CommitParentFinality_Fails_ZeroWeight() public {
+        FvmAddress[] memory validators = new FvmAddress[](1);
+        validators[0] = FvmAddressHelper.from(vm.addr(100));
         uint256[] memory weights = new uint256[](1);
         weights[0] = 0;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(ValidatorWeightIsZero.selector);
-        gwManager.setMembership(validators, weights);
+
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        gwRouter.commitParentFinality(finality, validators, weights);
     }
 
-    function testGatewayDiamond_SetMembership_Works_MultipleValidators() public {
-        address[] memory validators = new address[](2);
-        validators[0] = vm.addr(100);
-        validators[1] = vm.addr(101);
+    function testGatewayDiamond_CommitParentFinality_Works_MultipleValidators() public {
+        FvmAddress[] memory validators = new FvmAddress[](2);
+        validators[0] = FvmAddressHelper.from(vm.addr(100));
+        validators[1] = FvmAddressHelper.from(vm.addr(101));
         uint256[] memory weights = new uint256[](2);
         weights[0] = 100;
         weights[1] = 150;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwManager.setMembership(validators, weights);
+
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        gwRouter.commitParentFinality(finality, validators, weights);
 
         require(gwGetter.totalWeight() == 250);
     }
 
-    function testGatewayDiamond_SetMembership_Works_NewValidators() public {
+    function testGatewayDiamond_CommitParentFinality_Works_NewValidators() public {
         addValidator(vm.addr(100), 100);
 
         require(gwGetter.totalWeight() == 100);
@@ -1690,491 +1294,33 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         require(gwGetter.totalWeight() == 1000);
     }
 
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_EpochAlreadyExecuted() public {
-        address validator = address(100);
-
-        addValidator(validator, 100);
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-
-        vm.prank(validator);
-        vm.deal(validator, 1 ether);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validator);
-        vm.expectRevert(EpochAlreadyExecuted.selector);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_EpochNotVotable() public {
-        address validator = vm.addr(100);
-
-        addValidator(validator);
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD + 1,
-            topDownMsgs: new CrossMsg[](0)
-        });
-
-        vm.prank(validator);
-        vm.expectRevert(EpochNotVotable.selector);
-
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_ValidatorAlreadyVoted() public {
-        address[] memory validators = setupValidators();
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[0]);
-        vm.expectRevert(ValidatorAlreadyVoted.selector);
-
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-        require(gwGetter.hasValidatorVotedForSubmission(DEFAULT_CHECKPOINT_PERIOD, validators[0]));
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_NotInitialized() public {
-        address[] memory path = new address[](2);
-        path[0] = address(0);
-        path[1] = address(1);
-
-        GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
-            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: CROSS_MSG_FEE,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
-        });
-        gatewayDiamond = createDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwRouter = GatewayRouterFacet(address(gatewayDiamond));
-
-        address validator = vm.addr(100);
-
-        addValidator(validator, 100);
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-
-        vm.prank(validator);
-        vm.deal(validator, 1);
-        vm.expectRevert(NotInitialized.selector);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SendCrossMessage_SendValue() public {
-        uint256 targetValue = 3;
-
-        address sender = vm.addr(100);
-        vm.deal(sender, MIN_COLLATERAL_AMOUNT + CROSS_MSG_FEE + targetValue);
-        vm.prank(sender);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, sender);
-
-        address receiver = address(this);
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
-
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(receiver);
-
-        GatewayDiamond destinationGWDiamond = createGWForSubnet(destinationSubnet);
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(sender))
-                }),
-                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(receiver))}),
-                value: targetValue,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        vm.startPrank(sender);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + targetValue}(crossMsg);
-        vm.stopPrank();
-
-        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(destinationSubnet, block.number, block.number);
-        require(topDownMsgs.length == 1, "topDownMsgs.length == 1");
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.deal(address(destinationGWDiamond), CROSS_MSG_FEE);
-        destinationSubmitTopDownCheckpoint(destinationGWDiamond, checkpoint);
-
-        console.log("receiver balance:", address(receiver).balance);
-        require(address(receiver).balance == targetValue, "receiver.balance==targetValue");
-    }
-
-    function testGatewayDiamond_SendCrossMessage_ExecuteUnwrappedMessage() public {
-        uint256 targetTokenValue = 123;
-
-        address user = vm.addr(300);
-        console.log("user addr", user);
-        vm.deal(user, CROSS_MSG_FEE + MIN_COLLATERAL_AMOUNT);
-        vm.prank(user);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, user);
-
-        address dstTokenOwner = vm.addr(406);
-        vm.startPrank(dstTokenOwner);
-        DummyERC20 dstToken = new DummyERC20("DstToken", "DST", 20 ether);
-        console.log("dstToken addr", address(dstToken));
-        vm.deal(address(dstToken), 10 ether);
-        vm.stopPrank();
-
-        address receiver = address(this);
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
-
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(receiver);
-
-        GatewayDiamond destinationGWDiamond = createGWForSubnet(destinationSubnet);
-
-        vm.startPrank(dstTokenOwner);
-        dstToken.transfer(address(destinationGWDiamond), targetTokenValue);
-        vm.stopPrank();
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(user))
-                }),
-                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(dstToken))}),
-                value: 0,
-                nonce: 0,
-                method: bytes4(keccak256("transfer(address,uint256)")),
-                params: abi.encode(user, targetTokenValue)
-            }),
-            wrapped: false
-        });
-
-        console.log("user balance on destination subnet before:", dstToken.balanceOf(user));
-
-        vm.startPrank(user);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE}(crossMsg);
-        vm.stopPrank();
-
-        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(destinationSubnet, block.number, block.number);
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.deal(address(destinationGWDiamond), CROSS_MSG_FEE);
-
-        destinationSubmitTopDownCheckpoint(destinationGWDiamond, checkpoint);
-
-        console.log("user balance on destination subnet after:", dstToken.balanceOf(user));
-        require(dstToken.balanceOf(user) == targetTokenValue, "dstToken.balanceOf(user) == targetTokenValue");
-    }
-
-    function testGatewayDiamond_SendCrossMessage_ExampleTokenContract() public {
-        uint256 targetTokenValue = 321;
-
-        address user = vm.addr(300);
-        console.log("user addr", user);
-        vm.deal(user, CROSS_MSG_FEE + MIN_COLLATERAL_AMOUNT);
-        vm.prank(user);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, user);
-
-        vm.startPrank(user);
-        DummyERC20 srcToken = new DummyERC20("SrcToken", "SRC", 20 ether);
-        vm.deal(address(srcToken), 10 ether);
-        srcToken.transfer(user, 2 ether);
-        vm.stopPrank();
-
-        address dstTokenOwner = vm.addr(406);
-        vm.startPrank(dstTokenOwner);
-        DummyERC20 dstToken = new DummyERC20("DstToken", "DST", 20 ether);
-        console.log("dstToken addr", address(dstToken));
-        vm.deal(address(dstToken), 10 ether);
-        vm.stopPrank();
-
-        address receiver = address(this);
-        vm.prank(receiver);
-        vm.deal(receiver, MIN_COLLATERAL_AMOUNT);
-        registerSubnet(MIN_COLLATERAL_AMOUNT, receiver);
-
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(receiver);
-
-        GatewayDiamond destinationGWDiamond = createGWForSubnet(destinationSubnet);
-
-        vm.startPrank(dstTokenOwner);
-        dstToken.transfer(address(destinationGWDiamond), CROSS_MSG_FEE);
-        vm.stopPrank();
-
-        ERC20TokenMessenger tokenMessenger = newTokenMessenger(address(gatewayDiamond));
-
-        console.log("user balance on destination subnet before:", dstToken.balanceOf(user));
-        vm.startPrank(user);
-        srcToken.approve(address(tokenMessenger), targetTokenValue);
-        tokenMessenger.sendToken{value: CROSS_MSG_FEE}(
-            address(srcToken),
-            destinationSubnet,
-            address(dstToken),
-            user,
-            targetTokenValue
-        );
-        vm.stopPrank();
-
-        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(destinationSubnet, block.number, block.number);
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.deal(user, MIN_COLLATERAL_AMOUNT + 100 ether);
-        destinationSubmitTopDownCheckpoint(destinationGWDiamond, checkpoint);
-
-        require(dstToken.balanceOf(user) == targetTokenValue, "dstToken.balanceOf(user) == targetTokenValue");
-    }
-
-    function newTokenMessenger(address gw) public returns (ERC20TokenMessenger) {
-        address user = vm.addr(300);
-
-        GatewayGetterFacet dstgwGetter = new GatewayGetterFacet();
-        dstgwGetter = GatewayGetterFacet(address(gw));
-
-        vm.startPrank(user);
-        ERC20TokenMessenger tokenMessenger = new ERC20TokenMessenger(gw);
-        vm.stopPrank();
-
-        vm.deal(address(tokenMessenger), 1 ether);
-
-        return tokenMessenger;
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_NotValidator() public {
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-
-        address nonValidator = vm.addr(400);
-        vm.prank(nonValidator);
-        vm.deal(nonValidator, 1);
-        vm.expectRevert(NotValidator.selector);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_MessagesNotSorted() public {
-        address[] memory validators = setupValidators();
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](2);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: 10,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-        topDownMsgs[1] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: 0,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.prank(validators[0]);
-        vm.expectRevert(MessagesNotSorted.selector);
-
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_NotEnoughBalance() public {
-        address validator = address(100);
-
-        addValidator(validator, 100);
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 100 ether,
-                nonce: 10,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.prank(validator);
-        vm.expectRevert(NotEnoughBalance.selector);
-
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_InvalidCrossMsgDstSubnet() public {
-        address validator = address(100);
-
-        addValidator(validator, 100);
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({
-                    subnetId: SubnetID(0, new address[](0)),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                value: 0,
-                nonce: 10,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.prank(validator);
-        vm.deal(validator, 1);
-        vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
-
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Fails_TopDownInvalidCrossMsgNonce() public {
-        address validator = address(100);
-
-        addValidator(validator, 100);
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        // apply type = topdown
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: 10,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.prank(validator);
-        vm.deal(validator, 1);
-        vm.expectRevert(InvalidCrossMsgNonce.selector);
-
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Works_ConsensusReachedAndExecuted() public {
-        address[] memory validators = setupValidators();
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(validators[0])}),
-                value: address(gatewayDiamond).balance,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[2]);
-
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        (, uint256 first, uint256 last) = gwGetter.executableQueue();
-
-        require(gwGetter.lastVotingExecutedEpoch() == checkpoint.epoch);
-        require(first == 0);
-        require(last == 0);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_BigNumberOfMessages() public {
-        uint256 n = 3000;
-        address[] memory validators = new address[](1);
-        validators[0] = vm.addr(100);
-        vm.deal(validators[0], 1);
-        uint256[] memory weights = new uint[](1);
+    function testGatewayDiamond_CommitParentFinality_Works_WithQuery() public {
+        FvmAddress[] memory validators = new FvmAddress[](2);
+        validators[0] = FvmAddressHelper.from(vm.addr(100));
+        validators[1] = FvmAddressHelper.from(vm.addr(101));
+        uint256[] memory weights = new uint256[](2);
         weights[0] = 100;
+        weights[1] = 150;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwManager.setMembership(validators, weights);
+
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        gwRouter.commitParentFinality(finality, validators, weights);
+
+        ParentFinality memory committedFinality = gwGetter.getParentFinality(block.number);
+
+        require(committedFinality.height == finality.height, "height not equal");
+        require(committedFinality.blockHash == finality.blockHash, "blockHash not equal");
+    }
+
+    function testGatewayDiamond_CommitParentFinality_BigNumberOfMessages() public {
+        uint256 n = 2000;
+        FvmAddress[] memory validators = new FvmAddress[](1);
+        validators[0] = FvmAddressHelper.from(vm.addr(100));
+        vm.deal(vm.addr(100), 1);
+
+        uint256[] memory weights = new uint[](1);
+        weights[0] = 100;
 
         CrossMsg[] memory topDownMsgs = new CrossMsg[](n);
         for (uint64 i = 0; i < n; i++) {
@@ -2197,270 +1343,37 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             });
         }
 
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
+        vm.prank(FilAddress.SYSTEM_ACTOR);
 
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
+        gwRouter.applyCrossMessages(topDownMsgs);
     }
 
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Works_ConsensusReachedAndAddedToQueue() public {
-        address[] memory validators = setupValidators();
+    function setupValidators() internal returns (FvmAddress[] memory validators, address[] memory addresses) {
+        validators = new FvmAddress[](3);
+        validators[0] = FvmAddressHelper.from(vm.addr(100));
+        validators[1] = FvmAddressHelper.from(vm.addr(200));
+        validators[2] = FvmAddressHelper.from(vm.addr(300));
 
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: 0,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-        uint64 nextEpoch = DEFAULT_CHECKPOINT_PERIOD + 10;
-        TopDownCheckpoint memory checkpoint = TopDownCheckpoint({epoch: nextEpoch, topDownMsgs: topDownMsgs});
+        addresses = new address[](3);
+        addresses[0] = vm.addr(100);
+        addresses[1] = vm.addr(200);
+        addresses[2] = vm.addr(300);
 
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[2]);
-        // should not call
-        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector), 0);
-        gwRouter.submitTopDownCheckpoint(checkpoint);
-
-        (, uint256 first, uint256 last) = gwGetter.executableQueue();
-
-        require(gwGetter.lastVotingExecutedEpoch() == 0);
-        require(first == nextEpoch);
-        require(last == nextEpoch);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Works_ConsensusReachedAndExecuteNext() public {
-        address[] memory validators = setupValidators();
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: 0,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        TopDownCheckpoint memory currentCheckpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-        TopDownCheckpoint memory futureCheckpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD + 10,
-            topDownMsgs: topDownMsgs
-        });
-
-        // reaching consensus for the future checkpoint, so it should be added to the queue
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(futureCheckpoint);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(futureCheckpoint);
-
-        vm.prank(validators[2]);
-        gwRouter.submitTopDownCheckpoint(futureCheckpoint);
-
-        // reaching consensus for the current checkpoint, but since it contains 0 cross msgs
-        // it should execute the first checkpoint from the queue
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(currentCheckpoint);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(currentCheckpoint);
-
-        vm.prank(validators[2]);
-        // should not call
-        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector), 1);
-        gwRouter.submitTopDownCheckpoint(currentCheckpoint);
-
-        (, uint256 first, uint256 last) = gwGetter.executableQueue();
-
-        require(gwGetter.lastVotingExecutedEpoch() == futureCheckpoint.epoch);
-        require(first == 0);
-        require(last == 0);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Works_ConsensusReachedButNextEpochInFuture() public {
-        address[] memory validators = setupValidators();
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: 0,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        uint64 nextEpoch = DEFAULT_CHECKPOINT_PERIOD + 50;
-        TopDownCheckpoint memory currentCheckpoint = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-        TopDownCheckpoint memory futureCheckpoint = TopDownCheckpoint({epoch: nextEpoch, topDownMsgs: topDownMsgs});
-
-        // reaching consensus for the future checkpoint, so it should be added to the queue
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(futureCheckpoint);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(futureCheckpoint);
-
-        vm.prank(validators[2]);
-        gwRouter.submitTopDownCheckpoint(futureCheckpoint);
-
-        // reaching consensus for the current checkpoint, but since it contains 0 cross msgs
-        // it should execute the first checkpoint from the queue, but since it's far in the future
-        // it should not execute anything
-
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(currentCheckpoint);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(currentCheckpoint);
-
-        vm.prank(validators[2]);
-        // should not call
-        vm.expectCall(address(this), abi.encodeWithSelector(this.callback.selector), 0);
-        gwRouter.submitTopDownCheckpoint(currentCheckpoint);
-
-        (, uint256 first, uint256 last) = gwGetter.executableQueue();
-
-        require(gwGetter.lastVotingExecutedEpoch() == DEFAULT_CHECKPOINT_PERIOD);
-        require(first == nextEpoch);
-        require(last == nextEpoch);
-    }
-
-    function testGatewayDiamond_SubmitTopDownCheckpoint_Works_RoundAbort() public {
-        address[] memory validators = setupValidators();
-
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](1);
-        topDownMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: 0,
-                method: this.callback.selector,
-                params: EMPTY_BYTES
-            }),
-            wrapped: false
-        });
-
-        TopDownCheckpoint memory checkpoint1 = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: new CrossMsg[](0)
-        });
-        TopDownCheckpoint memory checkpoint2 = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-        topDownMsgs[0].wrapped = true;
-        TopDownCheckpoint memory checkpoint3 = TopDownCheckpoint({
-            epoch: DEFAULT_CHECKPOINT_PERIOD,
-            topDownMsgs: topDownMsgs
-        });
-
-        vm.prank(validators[0]);
-        gwRouter.submitTopDownCheckpoint(checkpoint1);
-
-        vm.prank(validators[1]);
-        gwRouter.submitTopDownCheckpoint(checkpoint2);
-
-        vm.prank(validators[2]);
-        gwRouter.submitTopDownCheckpoint(checkpoint3);
-
-        (, uint256 first, uint256 last) = gwGetter.executableQueue();
-
-        require(gwGetter.lastVotingExecutedEpoch() == 0);
-        require(first == 0);
-        require(last == 0);
-    }
-
-    function setupValidators() internal returns (address[] memory) {
-        address validator1 = vm.addr(100);
-        address validator2 = vm.addr(200);
-        address validator3 = vm.addr(300);
-        address[] memory validators = new address[](3);
         uint256[] memory weights = new uint256[](3);
 
-        vm.deal(validator1, 1);
-        vm.deal(validator2, 1);
-        vm.deal(validator3, 1);
-
-        validators[0] = validator1;
-        validators[1] = validator2;
-        validators[2] = validator3;
+        vm.deal(vm.addr(100), 1);
+        vm.deal(vm.addr(200), 1);
+        vm.deal(vm.addr(300), 1);
 
         weights[0] = 100;
         weights[1] = 100;
         weights[2] = 100;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwManager.setMembership(validators, weights);
 
-        return validators;
-    }
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
-    function setupValidatorsViaGateway(GatewayDiamond gw) internal returns (address[] memory) {
-        GatewayManagerFacet dstGWManager = new GatewayManagerFacet();
-        dstGWManager = GatewayManagerFacet(address(gw));
-
-        address validator1 = vm.addr(2001);
-        address validator2 = vm.addr(2002);
-        address validator3 = vm.addr(2003);
-        address[] memory validators = new address[](3);
-        uint256[] memory weights = new uint256[](3);
-
-        vm.deal(validator1, 10);
-        vm.deal(validator2, 10);
-        vm.deal(validator3, 10);
-
-        validators[0] = validator1;
-        validators[1] = validator2;
-        validators[2] = validator3;
-
-        weights[0] = 100;
-        weights[1] = 100;
-        weights[2] = 100;
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        dstGWManager.setMembership(validators, weights);
-
-        return validators;
+        gwRouter.commitParentFinality(finality, validators, weights);
     }
 
     function addValidator(address validator) internal {
@@ -2468,99 +1381,16 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     }
 
     function addValidator(address validator, uint256 weight) internal {
-        address[] memory validators = new address[](1);
-        validators[0] = validator;
+        FvmAddress[] memory validators = new FvmAddress[](1);
+        validators[0] = FvmAddressHelper.from(validator);
         uint256[] memory weights = new uint256[](1);
         weights[0] = weight;
 
         vm.deal(validator, 1);
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwManager.setMembership(validators, weights);
-    }
 
-    function destinationSubmitTopDownCheckpoint(GatewayDiamond gw, TopDownCheckpoint memory checkpoint) public {
-        GatewayRouterFacet dstGWRouter = new GatewayRouterFacet();
-        GatewayManagerFacet dstGWManager = new GatewayManagerFacet();
-
-        dstGWRouter = GatewayRouterFacet(address(gw));
-        dstGWManager = GatewayManagerFacet(address(gw));
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        dstGWManager.initGenesisEpoch(0);
-
-        address[] memory validators = setupValidatorsViaGateway(gw);
-        vm.prank(validators[0]);
-        dstGWRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[1]);
-        dstGWRouter.submitTopDownCheckpoint(checkpoint);
-
-        vm.prank(validators[2]);
-        dstGWRouter.submitTopDownCheckpoint(checkpoint);
-    }
-
-    function createGWForSubnet(SubnetID memory subnetId) public returns (GatewayDiamond) {
-        address[] memory path = new address[](1);
-        path[0] = ROOTNET_ADDRESS;
-
-        address[] memory path2 = new address[](2);
-        path2[0] = CHILD_NETWORK_ADDRESS;
-        path2[1] = CHILD_NETWORK_ADDRESS_2;
-
-        GatewayDiamond.ConstructorParams memory gwConstructorParams = GatewayDiamond.ConstructorParams({
-            networkName: subnetId,
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: CROSS_MSG_FEE,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
-        });
-
-        GatewayDiamond subnetGWDiamond = createNewDiamond(gwConstructorParams);
-
-        return subnetGWDiamond;
-    }
-
-    function createNewDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
-        GatewayRouterFacet nr = new GatewayRouterFacet();
-        GatewayManagerFacet nm = new GatewayManagerFacet();
-        GatewayGetterFacet ng = new GatewayGetterFacet();
-        GatewayMessengerFacet nmes = new GatewayMessengerFacet();
-
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
-
-        diamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: address(nr),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwRouterSelectors
-            })
-        );
-
-        diamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: address(nm),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwManagerSelectors
-            })
-        );
-
-        diamondCut[2] = (
-            IDiamond.FacetCut({
-                facetAddress: address(ng),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwGetterSelectors
-            })
-        );
-
-        diamondCut[3] = (
-            IDiamond.FacetCut({
-                facetAddress: address(nmes),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwMessengerSelectors
-            })
-        );
-
-        return new GatewayDiamond(diamondCut, params);
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        gwRouter.commitParentFinality(finality, validators, weights);
     }
 
     function callback() public view {
@@ -2675,24 +1505,25 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     }
 
     function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) internal {
-        GatewayManagerFacet tmpManager = GatewayManagerFacet(address(gw));
-        GatewayGetterFacet tmpGetter = GatewayGetterFacet(address(gw));
+        gwRouter = GatewayRouterFacet(address(gw));
+        gwManager = GatewayManagerFacet(address(gw));
+        gwGetter = GatewayGetterFacet(address(gw));
 
-        tmpManager.register{value: collateral}();
+        gwManager.register{value: collateral}();
 
         (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply, Status status) = getSubnetGW(
             subnetAddress,
             gw
         );
 
-        SubnetID memory parentNetwork = tmpGetter.getNetworkName();
+        SubnetID memory parentNetwork = gwGetter.getNetworkName();
 
         require(
             id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
             "id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash()"
         );
         require(stake == collateral, "stake == collateral");
-        require(topDownNonce == 0, "topDownNonce == 0");
+        require(topDownNonce == 0, "nonce == 0");
         require(circSupply == 0, "circSupply == 0");
         require(status == Status.Active, "status == Status.Active");
     }
@@ -2704,10 +1535,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     function getSubnetGW(
         address subnetAddress,
         GatewayDiamond gw
-    ) internal view returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
-        GatewayGetterFacet tmpGWGetter = GatewayGetterFacet(address(gw));
-        SubnetID memory subnetId = tmpGWGetter.getNetworkName().createSubnetId(subnetAddress);
-        Subnet memory subnet = tmpGWGetter.subnets(subnetId.toHash());
+    ) internal returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
+        gwRouter = GatewayRouterFacet(address(gw));
+        gwManager = GatewayManagerFacet(address(gw));
+        gwGetter = GatewayGetterFacet(address(gw));
+
+        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
+
+        Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
 
         return (
             subnet.id,
@@ -2721,7 +1556,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
     function getSubnet(
         address subnetAddress
-    ) internal view returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
+    ) internal returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
     }
 }

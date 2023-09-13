@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {EMPTY_HASH, METHOD_SEND} from "../constants/Constants.sol";
-import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg} from "../structs/Checkpoint.sol";
+import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {Status} from "../enums/Status.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
@@ -18,15 +18,28 @@ import {LibVoting} from "../lib/LibVoting.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
+import {FvmAddress} from "../structs/FvmAddress.sol";
+import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
     using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
     using CheckpointHelper for BottomUpCheckpoint;
-    using CheckpointHelper for TopDownCheckpoint;
+    using CrossMsgHelper for CrossMsg;
+    using FvmAddressHelper for FvmAddress;
     using StorableMsgHelper for StorableMsg;
+
+    /// @notice commit the ipc parent finality into storage
+    function commitParentFinality(
+        ParentFinality calldata finality,
+        FvmAddress[] calldata validators,
+        uint256[] calldata weights
+    ) external systemActorOnly {
+        LibGateway.commitParentFinality(finality);
+
+        LibGateway.setMembership(validators, weights);
+    }
 
     /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
     function commitChildCheck(BottomUpCheckpoint calldata commit) external {
@@ -92,97 +105,9 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         LibGateway.distributeRewards(msg.sender, commit.fee);
     }
 
-    /// @notice allows a validator to submit a batch of messages in a top-down commitment
-    /// @param checkpoint - top-down checkpoint
-    function submitTopDownCheckpoint(TopDownCheckpoint calldata checkpoint) external {
-        // use this instead of the validEpochOnly modifier
-        LibVoting.applyValidEpochOnly(checkpoint.epoch);
-
-        uint256 validatorWeight = s.validatorSet[s.validatorNonce][msg.sender];
-
-        if (!s.initialized) {
-            revert NotInitialized();
-        }
-        if (validatorWeight == 0) {
-            revert NotValidator();
-        }
-        if (!CrossMsgHelper.isSorted(checkpoint.topDownMsgs)) {
-            revert MessagesNotSorted();
-        }
-
-        EpochVoteTopDownSubmission storage voteSubmission = s.epochVoteSubmissions[checkpoint.epoch];
-
-        // submit the vote
-        bool shouldExecuteVote = _submitTopDownVote({
-            voteSubmission: voteSubmission,
-            submission: checkpoint,
-            submitterAddress: msg.sender,
-            submitterWeight: validatorWeight
-        });
-
-        // slither-disable-next-line uninitialized-local
-        CrossMsg[] memory topDownMsgs;
-
-        if (shouldExecuteVote) {
-            topDownMsgs = _markMostVotedSubmissionExecuted(voteSubmission);
-        }
-
-        // no messages executed in the current submission, let's get the next executable epoch from the queue to see if it can be executed already
-        if (topDownMsgs.length == 0) {
-            (uint64 nextExecutableEpoch, bool isExecutableEpoch) = LibVoting.getNextExecutableEpoch();
-
-            if (isExecutableEpoch) {
-                EpochVoteTopDownSubmission storage nextVoteSubmission = s.epochVoteSubmissions[nextExecutableEpoch];
-
-                topDownMsgs = _markMostVotedSubmissionExecuted(nextVoteSubmission);
-            }
-        }
-
-        //only execute the messages and update the last executed checkpoint when we have majority
-        _applyMessages(SubnetID(0, new address[](0)), topDownMsgs);
-    }
-
-    /// @notice marks a checkpoint as executed based on the last vote that reached majority
-    /// @notice voteSubmission - the vote submission data
-    /// @return the cross messages that should be executed
-    function _markMostVotedSubmissionExecuted(
-        EpochVoteTopDownSubmission storage voteSubmission
-    ) internal returns (CrossMsg[] storage) {
-        TopDownCheckpoint storage mostVotedSubmission = voteSubmission.submissions[
-            voteSubmission.vote.mostVotedSubmission
-        ];
-
-        LibVoting.markSubmissionExecuted(mostVotedSubmission.epoch);
-
-        return mostVotedSubmission.topDownMsgs;
-    }
-
-    /// @notice submits a vote for a checkpoint
-    /// @param voteSubmission - the vote submission data
-    /// @param submitterAddress - the validator that submits the vote
-    /// @param submitterWeight - the weight of the validator
-    /// @return shouldExecuteVote - flag if the checkpoint should be executed based on the vote
-    function _submitTopDownVote(
-        EpochVoteTopDownSubmission storage voteSubmission,
-        TopDownCheckpoint calldata submission,
-        address submitterAddress,
-        uint256 submitterWeight
-    ) internal returns (bool shouldExecuteVote) {
-        bytes32 submissionHash = submission.toHash();
-
-        shouldExecuteVote = LibVoting.submitVote({
-            vote: voteSubmission.vote,
-            submissionHash: submissionHash,
-            submitterAddress: submitterAddress,
-            submitterWeight: submitterWeight,
-            epoch: submission.epoch,
-            totalWeight: s.totalWeight
-        });
-
-        // store the submission only the first time
-        if (voteSubmission.submissions[submissionHash].isEmpty()) {
-            voteSubmission.submissions[submissionHash] = submission;
-        }
+    /// @notice apply cross messages
+    function applyCrossMessages(CrossMsg[] calldata crossMsgs) external systemActorOnly {
+        _applyMessages(SubnetID(0, new address[](0)), crossMsgs);
     }
 
     /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further

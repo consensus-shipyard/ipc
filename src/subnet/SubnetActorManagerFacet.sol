@@ -2,11 +2,10 @@
 pragma solidity 0.8.19;
 
 import {Status} from "../enums/Status.sol";
-import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, InconsistentPrevCheckpoint} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
-import {EpochVoteBottomUpSubmission, EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
@@ -27,7 +26,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     using CheckpointHelper for BottomUpCheckpoint;
     using FilAddress for address;
     using Address for address payable;
-    using EpochVoteSubmissionHelper for EpochVoteSubmission;
     using FvmAddressHelper for FvmAddress;
 
     event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
@@ -104,52 +102,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         IGateway(s.ipcGatewayAddr).kill();
     }
 
-    /// @notice methods that allows a validator to submit a checkpoint (batch of messages) and vote for it with it's own voting power.
-    /// @param checkpoint - the batch messages data
-    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
-        LibVoting.applyValidEpochOnly(checkpoint.epoch);
-
-        if (s.status != Status.Active) {
-            revert SubnetNotActive();
-        }
-        if (!s.validators.contains(msg.sender)) {
-            revert NotValidator();
-        }
-        if (checkpoint.source.toHash() != s.currentSubnetHash) {
-            revert WrongCheckpointSource();
-        }
-        if (!CrossMsgHelper.isSorted(checkpoint.crossMsgs)) {
-            revert MessagesNotSorted();
-        }
-
-        EpochVoteBottomUpSubmission storage voteSubmission = s.epochVoteSubmissions[checkpoint.epoch];
-
-        emit BottomUpCheckpointSubmitted(checkpoint, msg.sender);
-
-        // submit the vote
-        bool shouldExecuteVote = _submitBottomUpVote({
-            voteSubmission: voteSubmission,
-            submission: checkpoint,
-            submitterAddress: msg.sender,
-            submitterWeight: s.stake[msg.sender]
-        });
-
-        if (shouldExecuteVote) {
-            emit BottomUpCheckpointExecuted(checkpoint.epoch, msg.sender);
-            _commitCheckpoint(voteSubmission);
-        } else {
-            // try to get the next executable epoch from the queue
-            (uint64 nextExecutableEpoch, bool isExecutableEpoch) = LibVoting.getNextExecutableEpoch();
-
-            if (isExecutableEpoch) {
-                EpochVoteBottomUpSubmission storage nextVoteSubmission = s.epochVoteSubmissions[nextExecutableEpoch];
-
-                emit NextBottomUpCheckpointExecuted(nextExecutableEpoch, msg.sender);
-                _commitCheckpoint(nextVoteSubmission);
-            }
-        }
-    }
-
     /// @notice method that distributes the rewards for the subnet to validators.
     function reward(uint256 amount) external onlyGateway {
         uint256 validatorsLength = s.validators.length();
@@ -197,15 +149,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         proof = s.committedCheckpoints[e].proof;
     }
 
-    /// @notice whether a validator has voted for a checkpoint submission during an epoch
-    /// @param epoch - the epoch to check
-    /// @param submitter - the validator to check
-    function hasValidatorVotedForSubmission(uint64 epoch, address submitter) external view returns (bool) {
-        EpochVoteBottomUpSubmission storage voteSubmission = s.epochVoteSubmissions[epoch];
-
-        return voteSubmission.vote.submitters[voteSubmission.vote.nonce][submitter];
-    }
-
     function setValidatorNetAddr(string calldata newNetAddr) external {
         address validator = msg.sender;
         if (!s.validators.contains(validator)) {
@@ -225,46 +168,32 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         s.validatorWorkerAddresses[validator] = newWorkerAddr;
     }
 
-    /// @notice submits a vote for a checkpoint
-    /// @param voteSubmission - the vote submission data
-    /// @param submitterAddress - the validator that submits the vote
-    /// @param submitterWeight - the weight of the validator
-    function _submitBottomUpVote(
-        EpochVoteBottomUpSubmission storage voteSubmission,
-        BottomUpCheckpoint calldata submission,
-        address submitterAddress,
-        uint256 submitterWeight
-    ) internal returns (bool shouldExecuteVote) {
-        bytes32 submissionHash = submission.toHash();
-
-        shouldExecuteVote = LibVoting.submitVote({
-            vote: voteSubmission.vote,
-            submissionHash: submissionHash,
-            submitterAddress: submitterAddress,
-            submitterWeight: submitterWeight,
-            epoch: submission.epoch,
-            totalWeight: s.totalStake
-        });
-
-        // store the submission only the first time
-        if (voteSubmission.submissions[submissionHash].isEmpty()) {
-            voteSubmission.submissions[submissionHash] = submission;
+    /// @notice methods that allows a validator to submit a checkpoint (batch of messages) and vote for it with it's own voting power.
+    /// @param checkpoint - the batch messages data
+    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
+        if (s.status != Status.Active) {
+            revert SubnetNotActive();
         }
+        if (!s.validators.contains(msg.sender)) {
+            revert NotValidator();
+        }
+        if (checkpoint.source.toHash() != s.currentSubnetHash) {
+            revert WrongCheckpointSource();
+        }
+        if (!CrossMsgHelper.isSorted(checkpoint.crossMsgs)) {
+            revert MessagesNotSorted();
+        }
+
+        _commitCheckpoint(checkpoint);
     }
 
     /// @notice method that commits a checkpoint after reaching majority
-    /// @param voteSubmission - the last vote submission that reached majority for commit
-    function _commitCheckpoint(EpochVoteBottomUpSubmission storage voteSubmission) internal {
-        BottomUpCheckpoint storage checkpoint = voteSubmission.submissions[voteSubmission.vote.mostVotedSubmission];
+    /// @param checkpoint - the batch messages data
+    function _commitCheckpoint(BottomUpCheckpoint calldata checkpoint) internal {
         /// Ensures the checkpoints are chained. If not, should abort the current checkpoint.
-
         if (s.prevExecutedCheckpointHash != checkpoint.prevHash) {
-            voteSubmission.vote.reset();
-            LibVoting.removeFromExecutableQueue(checkpoint.epoch);
-            return;
+            revert InconsistentPrevCheckpoint();
         }
-
-        LibVoting.markSubmissionExecuted(checkpoint.epoch);
 
         s.committedCheckpoints[checkpoint.epoch] = checkpoint;
         s.prevExecutedCheckpointHash = checkpoint.toHash();

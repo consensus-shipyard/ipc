@@ -30,11 +30,9 @@ async function main() {
       deployer,
       "SubnetActorManagerFacet",
       {
-        CheckpointHelper: LIBMAP['CheckpointHelper'],
-        EpochVoteSubmissionHelper: LIBMAP['EpochVoteSubmissionHelper'],
-        ExecutableQueueHelper: LIBMAP['ExecutableQueueHelper'],
-        SubnetIDHelper: LIBMAP['SubnetIDHelper'],
-        CrossMsgHelper: LIBMAP['CrossMsgHelper'],
+        "CrossMsgHelper": LIBMAP["CrossMsgHelper"],
+        "SubnetIDHelper": LIBMAP["SubnetIDHelper"],
+        "CheckpointHelper": LIBMAP["CheckpointHelper"]
       },
       txArgs
     );

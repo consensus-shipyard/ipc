@@ -3,6 +3,14 @@ pragma solidity 0.8.19;
 
 import {SubnetID, IPCAddress} from "./Subnet.sol";
 
+/// @notice The parent finality for IPC parent at certain height.
+struct ParentFinality {
+    uint256 height;
+    bytes32 blockHash;
+}
+
+/// @title BottomUpCheckpoint struct
+/// @author LimeChain team
 struct BottomUpCheckpoint {
     SubnetID source;
     uint64 epoch;

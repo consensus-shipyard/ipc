@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
@@ -51,6 +51,14 @@ contract GatewayGetterFacet {
 
     function bottomUpCheckpoints(uint64 e) external view returns (BottomUpCheckpoint memory) {
         return s.bottomUpCheckpoints[e];
+    }
+
+    function getParentFinality(uint256 blockNumber) external view returns (ParentFinality memory) {
+        return LibGateway.getParentFinality(blockNumber);
+    }
+
+    function getLatestParentFinality() external view returns (ParentFinality memory) {
+        return LibGateway.getLatestParentFinality();
     }
 
     /// @notice returns the subnet with the given id

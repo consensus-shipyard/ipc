@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg, ParentFinality} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -15,6 +15,10 @@ struct GatewayActorStorage {
     /// @notice a mapping of block number to cross messages
     /// SubnetID => blockNumber => messages
     mapping(bytes32 => mapping(uint256 => CrossMsg[])) topDownMsgs;
+    /// @notice The parent finalities. Key is the block number, value is the finality struct.
+    mapping(uint256 => ParentFinality) finalitiesMap;
+    /// @notice The latest parent height committed.
+    uint256 latestParentHeight;
     /// @notice Postbox keeps track of all the cross-net messages triggered by
     /// an actor that need to be propagated further through the hierarchy.
     /// cross-net message id => CrossMsg
@@ -23,8 +27,8 @@ struct GatewayActorStorage {
     // slither-disable-next-line uninitialized-state
     mapping(uint64 => BottomUpCheckpoint) bottomUpCheckpoints;
     /// @notice List of validators and how many votes of the total each validator has for top-down messages
-    // validatorNonce => validator => weight
-    mapping(uint256 => mapping(address => uint256)) validatorSet;
+    // validatorNonce => validator fvm address => weight
+    mapping(uint256 => mapping(bytes32 => uint256)) validatorSet;
     /// @notice epoch => SubnetID => [childIndex, exists(0 - no, 1 - yes)]
     mapping(uint64 => mapping(bytes32 => uint256[2])) children;
     /// @notice epoch => SubnetID => check => exists

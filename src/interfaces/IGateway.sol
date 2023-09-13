@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg, ParentFinality} from "../structs/Checkpoint.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
@@ -60,7 +60,10 @@ interface IGateway {
     /// Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;
 
-    function submitTopDownCheckpoint(TopDownCheckpoint calldata topdownCheckpoint) external;
-
-    function setMembership(address[] memory validatorsToSet, uint256[] memory weights) external;
+    /// @notice commit the ipc parent finality into storage
+    function commitParentFinality(
+        ParentFinality calldata finality,
+        FvmAddress[] calldata validators,
+        uint256[] calldata weights
+    ) external;
 }

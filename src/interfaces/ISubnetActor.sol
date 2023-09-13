@@ -18,13 +18,9 @@ interface ISubnetActor {
     /// Unregister the subnet from the hierarchy, making it no longer discoverable.
     function kill() external;
 
-    /// SubmitCheckpoint accepts signed checkpoint votes for miners.
-    ///
-    /// This functions verifies that the checkpoint is valid before
-    /// propagating it for commitment to the IPC gateway. It expects at least
-    /// votes from 2/3 of miners with collateral.
-    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external;
-
     /// Tracks the accumulated rewards for each validator.
     function reward(uint256 amount) external;
+
+    /// SubmitCheckpoint accepts signed checkpoint votes for validators.
+    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external;
 }

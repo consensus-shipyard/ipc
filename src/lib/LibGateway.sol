@@ -4,18 +4,21 @@ pragma solidity 0.8.19;
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {CrossMsg, BottomUpCheckpoint} from "../structs/Checkpoint.sol";
-import {NotRegisteredSubnet, InvalidActorAddress} from "../errors/IPCErrors.sol";
+import {CrossMsg, BottomUpCheckpoint, ParentFinality} from "../structs/Checkpoint.sol";
+import {NotRegisteredSubnet, InvalidActorAddress, ValidatorWeightIsZero, ValidatorsAndWeightsLengthMismatch, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibVoting} from "../lib/LibVoting.sol";
+import {FvmAddress} from "../structs/FvmAddress.sol";
+import {FvmAddressHelper} from "./FvmAddressHelper.sol";
 
 library LibGateway {
     using FilAddress for address;
     using FilAddress for address payable;
+    using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
     using CheckpointHelper for BottomUpCheckpoint;
@@ -33,6 +36,70 @@ library LibGateway {
         epoch = LibVoting.getNextEpoch(block.number, s.bottomUpCheckPeriod);
         checkpoint = s.bottomUpCheckpoints[epoch];
         exists = !checkpoint.source.isEmpty();
+    }
+
+    /// @notice obtain the ipc parent finality at certain block number
+    /// @param blockNumber - the block number to obtain the finality
+    function getParentFinality(uint256 blockNumber) internal view returns (ParentFinality memory) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        return s.finalitiesMap[blockNumber];
+    }
+
+    /// @notice obtain the latest committed ipc parent finality
+    function getLatestParentFinality() internal view returns (ParentFinality memory) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        return getParentFinality(s.latestParentHeight);
+    }
+
+    /// @notice commit the ipc parent finality into storage
+    /// @param finality - the finality to be committed
+    function commitParentFinality(ParentFinality calldata finality) internal {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        if (s.latestParentHeight > finality.height) {
+            revert ParentFinalityAlreadyCommitted();
+        }
+        s.finalitiesMap[finality.height] = finality;
+        s.latestParentHeight = finality.height;
+    }
+
+    /// @notice set up the top-down validators and their voting power
+    /// @param validators - list of validator addresses
+    /// @param weights - list of validators voting powers
+    function setMembership(FvmAddress[] memory validators, uint256[] memory weights) internal {
+        if (validators.length != weights.length) {
+            revert ValidatorsAndWeightsLengthMismatch();
+        }
+
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        // invalidate the previous validator set
+        ++s.validatorNonce;
+
+        uint256 totalValidatorsWeight = 0;
+
+        // setup the new validator set
+        uint256 validatorsLength = validators.length;
+        FvmAddress memory zero = FvmAddressHelper.from(address(0));
+        for (uint256 validatorIndex = 0; validatorIndex < validatorsLength; ) {
+            if (!FvmAddressHelper.equal(validators[validatorIndex], zero)) {
+                uint256 validatorWeight = weights[validatorIndex];
+
+                if (validatorWeight == 0) {
+                    revert ValidatorWeightIsZero();
+                }
+
+                s.validatorSet[s.validatorNonce][validators[validatorIndex].toHash()] = validatorWeight;
+
+                totalValidatorsWeight += validatorWeight;
+            }
+
+            unchecked {
+                ++validatorIndex;
+            }
+        }
+
+        s.totalWeight = totalValidatorsWeight;
     }
 
     /// @notice commit topdown messages for their execution in the subnet. Adds the message to the subnet struct for future execution

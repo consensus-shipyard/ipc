@@ -6,7 +6,7 @@ import {CrossMsg} from "../structs/Checkpoint.sol";
 import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {AlreadyInitialized, AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet, ValidatorsAndWeightsLengthMismatch, ValidatorWeightIsZero} from "../errors/IPCErrors.sol";
+import {AlreadyInitialized, AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -160,40 +160,5 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         });
 
         LibGateway.commitBottomUpMsg(crossMsg);
-    }
-
-    /// @notice set up the top-down validators and their voting power
-    /// @param validators - list of validator addresses
-    /// @param weights - list of validators voting powers
-    function setMembership(address[] memory validators, uint256[] memory weights) external systemActorOnly {
-        if (validators.length != weights.length) {
-            revert ValidatorsAndWeightsLengthMismatch();
-        }
-        // invalidate the previous validator set
-        ++s.validatorNonce;
-
-        uint256 totalValidatorsWeight = 0;
-
-        // setup the new validator set
-        uint256 validatorsLength = validators.length;
-        for (uint256 validatorIndex = 0; validatorIndex < validatorsLength; ) {
-            address validatorAddress = validators[validatorIndex];
-            if (validatorAddress != address(0)) {
-                uint256 validatorWeight = weights[validatorIndex];
-
-                if (validatorWeight == 0) {
-                    revert ValidatorWeightIsZero();
-                }
-
-                s.validatorSet[s.validatorNonce][validatorAddress] = validatorWeight;
-
-                totalValidatorsWeight += validatorWeight;
-            }
-
-            unchecked {
-                ++validatorIndex;
-            }
-        }
-        s.totalWeight = totalValidatorsWeight;
     }
 }
