@@ -87,43 +87,6 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("hasValidatorVotedForSubmission"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "hasValidatorVotedForSubmission",
-                            ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("epoch"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("submitter"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("address"),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bool"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("join"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -589,30 +552,21 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("EpochAlreadyExecuted"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "EpochAlreadyExecuted",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("EpochNotVotable"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("EpochNotVotable"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("InconsistentPrevCheckpoint"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InconsistentPrevCheckpoint",
+                            ),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -716,17 +670,6 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("ValidatorAlreadyVoted"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "ValidatorAlreadyVoted",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("WrongCheckpointSource"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -801,16 +744,6 @@ pub mod subnet_actor_manager_facet {
         > {
             self.0
                 .method_hash([152, 144, 55, 72], e)
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `hasValidatorVotedForSubmission` (0x66d7bbbc) function
-        pub fn has_validator_voted_for_submission(
-            &self,
-            epoch: u64,
-            submitter: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
-            self.0
-                .method_hash([102, 215, 187, 188], (epoch, submitter))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `join` (0x6cf6970a) function
@@ -968,32 +901,6 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "EmptyAddress", abi = "EmptyAddress()")]
     pub struct EmptyAddress;
-    ///Custom Error type `EpochAlreadyExecuted` with signature `EpochAlreadyExecuted()` and selector `0x7cc3318c`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "EpochAlreadyExecuted", abi = "EpochAlreadyExecuted()")]
-    pub struct EpochAlreadyExecuted;
-    ///Custom Error type `EpochNotVotable` with signature `EpochNotVotable()` and selector `0xb4f68f97`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "EpochNotVotable", abi = "EpochNotVotable()")]
-    pub struct EpochNotVotable;
     ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
     #[derive(
         Clone,
@@ -1007,6 +914,22 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
     pub struct FailedInnerCall;
+    ///Custom Error type `InconsistentPrevCheckpoint` with signature `InconsistentPrevCheckpoint()` and selector `0x24465cba`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "InconsistentPrevCheckpoint",
+        abi = "InconsistentPrevCheckpoint()"
+    )]
+    pub struct InconsistentPrevCheckpoint;
     ///Custom Error type `MessagesNotSorted` with signature `MessagesNotSorted()` and selector `0x0bd9169f`
     #[derive(
         Clone,
@@ -1140,19 +1063,6 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "SubnetNotActive", abi = "SubnetNotActive()")]
     pub struct SubnetNotActive;
-    ///Custom Error type `ValidatorAlreadyVoted` with signature `ValidatorAlreadyVoted()` and selector `0x6e271ebe`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "ValidatorAlreadyVoted", abi = "ValidatorAlreadyVoted()")]
-    pub struct ValidatorAlreadyVoted;
     ///Custom Error type `WrongCheckpointSource` with signature `WrongCheckpointSource()` and selector `0x75ecc72d`
     #[derive(
         Clone,
@@ -1172,9 +1082,8 @@ pub mod subnet_actor_manager_facet {
         AddressInsufficientBalance(AddressInsufficientBalance),
         CollateralIsZero(CollateralIsZero),
         EmptyAddress(EmptyAddress),
-        EpochAlreadyExecuted(EpochAlreadyExecuted),
-        EpochNotVotable(EpochNotVotable),
         FailedInnerCall(FailedInnerCall),
+        InconsistentPrevCheckpoint(InconsistentPrevCheckpoint),
         MessagesNotSorted(MessagesNotSorted),
         NoRewardToWithdraw(NoRewardToWithdraw),
         NoValidatorsInSubnet(NoValidatorsInSubnet),
@@ -1185,7 +1094,6 @@ pub mod subnet_actor_manager_facet {
         ReentrancyError(ReentrancyError),
         SubnetAlreadyKilled(SubnetAlreadyKilled),
         SubnetNotActive(SubnetNotActive),
-        ValidatorAlreadyVoted(ValidatorAlreadyVoted),
         WrongCheckpointSource(WrongCheckpointSource),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
@@ -1217,18 +1125,14 @@ pub mod subnet_actor_manager_facet {
                 return Ok(Self::EmptyAddress(decoded));
             }
             if let Ok(decoded)
-                = <EpochAlreadyExecuted as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
-                return Ok(Self::EpochAlreadyExecuted(decoded));
-            }
-            if let Ok(decoded)
-                = <EpochNotVotable as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::EpochNotVotable(decoded));
-            }
-            if let Ok(decoded)
                 = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::FailedInnerCall(decoded));
+            }
+            if let Ok(decoded)
+                = <InconsistentPrevCheckpoint as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::InconsistentPrevCheckpoint(decoded));
             }
             if let Ok(decoded)
                 = <MessagesNotSorted as ::ethers::core::abi::AbiDecode>::decode(data) {
@@ -1277,12 +1181,6 @@ pub mod subnet_actor_manager_facet {
                 return Ok(Self::SubnetNotActive(decoded));
             }
             if let Ok(decoded)
-                = <ValidatorAlreadyVoted as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
-                return Ok(Self::ValidatorAlreadyVoted(decoded));
-            }
-            if let Ok(decoded)
                 = <WrongCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(
                     data,
                 ) {
@@ -1303,13 +1201,10 @@ pub mod subnet_actor_manager_facet {
                 Self::EmptyAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::EpochAlreadyExecuted(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::EpochNotVotable(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::FailedInnerCall(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InconsistentPrevCheckpoint(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::MessagesNotSorted(element) => {
@@ -1342,9 +1237,6 @@ pub mod subnet_actor_manager_facet {
                 Self::SubnetNotActive(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::ValidatorAlreadyVoted(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::WrongCheckpointSource(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1367,15 +1259,11 @@ pub mod subnet_actor_manager_facet {
                 _ if selector
                     == <EmptyAddress as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
-                    == <EpochAlreadyExecuted as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <EpochNotVotable as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InconsistentPrevCheckpoint as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1415,10 +1303,6 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
-                    == <ValidatorAlreadyVoted as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <WrongCheckpointSource as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1434,11 +1318,10 @@ pub mod subnet_actor_manager_facet {
                 }
                 Self::CollateralIsZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EmptyAddress(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EpochAlreadyExecuted(element) => {
+                Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InconsistentPrevCheckpoint(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::EpochNotVotable(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MessagesNotSorted(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoRewardToWithdraw(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -1459,9 +1342,6 @@ pub mod subnet_actor_manager_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::SubnetNotActive(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorAlreadyVoted(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
                 Self::WrongCheckpointSource(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1490,19 +1370,15 @@ pub mod subnet_actor_manager_facet {
             Self::EmptyAddress(value)
         }
     }
-    impl ::core::convert::From<EpochAlreadyExecuted> for SubnetActorManagerFacetErrors {
-        fn from(value: EpochAlreadyExecuted) -> Self {
-            Self::EpochAlreadyExecuted(value)
-        }
-    }
-    impl ::core::convert::From<EpochNotVotable> for SubnetActorManagerFacetErrors {
-        fn from(value: EpochNotVotable) -> Self {
-            Self::EpochNotVotable(value)
-        }
-    }
     impl ::core::convert::From<FailedInnerCall> for SubnetActorManagerFacetErrors {
         fn from(value: FailedInnerCall) -> Self {
             Self::FailedInnerCall(value)
+        }
+    }
+    impl ::core::convert::From<InconsistentPrevCheckpoint>
+    for SubnetActorManagerFacetErrors {
+        fn from(value: InconsistentPrevCheckpoint) -> Self {
+            Self::InconsistentPrevCheckpoint(value)
         }
     }
     impl ::core::convert::From<MessagesNotSorted> for SubnetActorManagerFacetErrors {
@@ -1555,11 +1431,6 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<SubnetNotActive> for SubnetActorManagerFacetErrors {
         fn from(value: SubnetNotActive) -> Self {
             Self::SubnetNotActive(value)
-        }
-    }
-    impl ::core::convert::From<ValidatorAlreadyVoted> for SubnetActorManagerFacetErrors {
-        fn from(value: ValidatorAlreadyVoted) -> Self {
-            Self::ValidatorAlreadyVoted(value)
         }
     }
     impl ::core::convert::From<WrongCheckpointSource> for SubnetActorManagerFacetErrors {
@@ -1704,25 +1575,6 @@ pub mod subnet_actor_manager_facet {
     pub struct CommittedCheckpointsCall {
         pub e: u64,
     }
-    ///Container type for all input parameters for the `hasValidatorVotedForSubmission` function with signature `hasValidatorVotedForSubmission(uint64,address)` and selector `0x66d7bbbc`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(
-        name = "hasValidatorVotedForSubmission",
-        abi = "hasValidatorVotedForSubmission(uint64,address)"
-    )]
-    pub struct HasValidatorVotedForSubmissionCall {
-        pub epoch: u64,
-        pub submitter: ::ethers::core::types::Address,
-    }
     ///Container type for all input parameters for the `join` function with signature `join(string,(uint8,bytes))` and selector `0x6cf6970a`
     #[derive(
         Clone,
@@ -1848,7 +1700,6 @@ pub mod subnet_actor_manager_facet {
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorManagerFacetCalls {
         CommittedCheckpoints(CommittedCheckpointsCall),
-        HasValidatorVotedForSubmission(HasValidatorVotedForSubmissionCall),
         Join(JoinCall),
         Kill(KillCall),
         Leave(LeaveCall),
@@ -1868,12 +1719,6 @@ pub mod subnet_actor_manager_facet {
                     data,
                 ) {
                 return Ok(Self::CommittedCheckpoints(decoded));
-            }
-            if let Ok(decoded)
-                = <HasValidatorVotedForSubmissionCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
-                return Ok(Self::HasValidatorVotedForSubmission(decoded));
             }
             if let Ok(decoded)
                 = <JoinCall as ::ethers::core::abi::AbiDecode>::decode(data) {
@@ -1922,9 +1767,6 @@ pub mod subnet_actor_manager_facet {
                 Self::CommittedCheckpoints(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::HasValidatorVotedForSubmission(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::Join(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Leave(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -1950,9 +1792,6 @@ pub mod subnet_actor_manager_facet {
                 Self::CommittedCheckpoints(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::HasValidatorVotedForSubmission(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
                 Self::Join(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Leave(element) => ::core::fmt::Display::fmt(element, f),
@@ -1972,12 +1811,6 @@ pub mod subnet_actor_manager_facet {
     for SubnetActorManagerFacetCalls {
         fn from(value: CommittedCheckpointsCall) -> Self {
             Self::CommittedCheckpoints(value)
-        }
-    }
-    impl ::core::convert::From<HasValidatorVotedForSubmissionCall>
-    for SubnetActorManagerFacetCalls {
-        fn from(value: HasValidatorVotedForSubmissionCall) -> Self {
-            Self::HasValidatorVotedForSubmission(value)
         }
     }
     impl ::core::convert::From<JoinCall> for SubnetActorManagerFacetCalls {
@@ -2040,18 +1873,6 @@ pub mod subnet_actor_manager_facet {
         pub prev_hash: [u8; 32],
         pub proof: ::ethers::core::types::Bytes,
     }
-    ///Container type for all return fields from the `hasValidatorVotedForSubmission` function with signature `hasValidatorVotedForSubmission(uint64,address)` and selector `0x66d7bbbc`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct HasValidatorVotedForSubmissionReturn(pub bool);
     ///`BottomUpCheckpoint((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes)`
     #[derive(
         Clone,

@@ -209,19 +209,21 @@ pub mod gateway_messenger_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
+                    ::std::borrow::ToOwned::to_owned("InvalidCrossMsgValue"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidCrossMsgValue",
+                            ),
                             inputs: ::std::vec![],
                         },
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                    ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -424,6 +426,19 @@ pub mod gateway_messenger_facet {
     )]
     #[etherror(name = "InvalidCrossMsgFromSubnet", abi = "InvalidCrossMsgFromSubnet()")]
     pub struct InvalidCrossMsgFromSubnet;
+    ///Custom Error type `InvalidCrossMsgValue` with signature `InvalidCrossMsgValue()` and selector `0xc1d89cd6`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "InvalidCrossMsgValue", abi = "InvalidCrossMsgValue()")]
+    pub struct InvalidCrossMsgValue;
     ///Custom Error type `NotEnoughFee` with signature `NotEnoughFee()` and selector `0x688e55ae`
     #[derive(
         Clone,
@@ -437,19 +452,6 @@ pub mod gateway_messenger_facet {
     )]
     #[etherror(name = "NotEnoughFee", abi = "NotEnoughFee()")]
     pub struct NotEnoughFee;
-    ///Custom Error type `NotEnoughFunds` with signature `NotEnoughFunds()` and selector `0x81b5ad68`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "NotEnoughFunds", abi = "NotEnoughFunds()")]
-    pub struct NotEnoughFunds;
     ///Custom Error type `NotRegisteredSubnet` with signature `NotRegisteredSubnet()` and selector `0xe991abd0`
     #[derive(
         Clone,
@@ -474,8 +476,8 @@ pub mod gateway_messenger_facet {
         InsufficientFunds(InsufficientFunds),
         InvalidCrossMsgDstSubnet(InvalidCrossMsgDstSubnet),
         InvalidCrossMsgFromSubnet(InvalidCrossMsgFromSubnet),
+        InvalidCrossMsgValue(InvalidCrossMsgValue),
         NotEnoughFee(NotEnoughFee),
-        NotEnoughFunds(NotEnoughFunds),
         NotRegisteredSubnet(NotRegisteredSubnet),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
@@ -533,12 +535,14 @@ pub mod gateway_messenger_facet {
                 return Ok(Self::InvalidCrossMsgFromSubnet(decoded));
             }
             if let Ok(decoded)
-                = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::NotEnoughFee(decoded));
+                = <InvalidCrossMsgValue as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::InvalidCrossMsgValue(decoded));
             }
             if let Ok(decoded)
-                = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::NotEnoughFunds(decoded));
+                = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::NotEnoughFee(decoded));
             }
             if let Ok(decoded)
                 = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
@@ -574,10 +578,10 @@ pub mod gateway_messenger_facet {
                 Self::InvalidCrossMsgFromSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEnoughFee(element) => {
+                Self::InvalidCrossMsgValue(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEnoughFunds(element) => {
+                Self::NotEnoughFee(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotRegisteredSubnet(element) => {
@@ -622,11 +626,11 @@ pub mod gateway_messenger_facet {
                     true
                 }
                 _ if selector
-                    == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
-                _ if selector
-                    == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidCrossMsgValue as ::ethers::contract::EthError>::selector() => {
                     true
                 }
+                _ if selector
+                    == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
                     true
@@ -654,8 +658,10 @@ pub mod gateway_messenger_facet {
                 Self::InvalidCrossMsgFromSubnet(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::InvalidCrossMsgValue(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotEnoughFee(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotRegisteredSubnet(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -712,14 +718,14 @@ pub mod gateway_messenger_facet {
             Self::InvalidCrossMsgFromSubnet(value)
         }
     }
+    impl ::core::convert::From<InvalidCrossMsgValue> for GatewayMessengerFacetErrors {
+        fn from(value: InvalidCrossMsgValue) -> Self {
+            Self::InvalidCrossMsgValue(value)
+        }
+    }
     impl ::core::convert::From<NotEnoughFee> for GatewayMessengerFacetErrors {
         fn from(value: NotEnoughFee) -> Self {
             Self::NotEnoughFee(value)
-        }
-    }
-    impl ::core::convert::From<NotEnoughFunds> for GatewayMessengerFacetErrors {
-        fn from(value: NotEnoughFunds) -> Self {
-            Self::NotEnoughFunds(value)
         }
     }
     impl ::core::convert::From<NotRegisteredSubnet> for GatewayMessengerFacetErrors {
