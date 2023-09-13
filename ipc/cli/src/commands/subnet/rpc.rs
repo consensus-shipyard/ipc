@@ -28,7 +28,7 @@ impl CommandLineHandler for RPCSubnet {
         };
 
         println!("rpc: {:?}", conn.subnet().rpc_http().to_string());
-        println!("chainID: {:?}", subnet.chain_id());
+        println!("chainID: {:?}", conn.manager().get_chain_id().await?);
         Ok(())
     }
 }

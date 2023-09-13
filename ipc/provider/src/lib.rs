@@ -625,6 +625,18 @@ impl IpcProvider {
 
         conn.manager().get_block_hash(height).await
     }
+
+    pub async fn get_chain_id(&self, subnet: &SubnetID) -> anyhow::Result<String> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        conn.manager().get_chain_id().await
+    }
 }
 
 /// Lotus JSON keytype format
