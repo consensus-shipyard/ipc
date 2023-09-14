@@ -57,14 +57,14 @@ type ArcHandlers = Arc<Handlers>;
 pub struct JsonRPCServer {
     config: Arc<ReloadableConfig>,
     fvm_wallet: Arc<RwLock<Wallet>>,
-    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 }
 
 impl JsonRPCServer {
     pub fn new(
         config: Arc<ReloadableConfig>,
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             config,

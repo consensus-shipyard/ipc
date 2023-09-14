@@ -4,14 +4,10 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use std::fmt::Debug;
+use ipc_sdk::subnet_id::SubnetID;
+use std::{fmt::Debug, str::FromStr};
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::json_rpc_methods;
-use crate::lotus::message::ipc::QueryValidatorSetResponse;
-use crate::server::query_validators::QueryValidatorSetParams;
+use crate::{get_ipc_provider, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
 /// The command to create a new subnet actor.
 pub(crate) struct ListValidators;
@@ -23,23 +19,20 @@ impl CommandLineHandler for ListValidators {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("list validators with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
+        let provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        let params = QueryValidatorSetParams {
-            subnet: arguments.subnet.clone(),
-            epoch: None,
+        let gateway_addr = match &arguments.gateway_address {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
         };
 
-        let valset = json_rpc_client
-            .request::<QueryValidatorSetResponse>(
-                json_rpc_methods::QUERY_VALIDATOR_SET,
-                serde_json::to_value(params)?,
-            )
+        let valset = provider
+            .get_validator_set(&subnet, gateway_addr, None)
             .await?;
 
-        log::info!("validators number: {}", valset.min_validators);
-        log::info!("validator set: {:?}", valset.validator_set);
+        println!("minimum number of validators: {}", valset.min_validators);
+        println!("validator set: {:?}", valset.validator_set);
 
         Ok(())
     }
@@ -48,8 +41,8 @@ impl CommandLineHandler for ListValidators {
 #[derive(Debug, Args)]
 #[command(name = "list-validators", about = "Show the validators of the subnet")]
 pub(crate) struct ListValidatorsArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
+    #[arg(long, short, help = "The gateway address to query subnets")]
+    pub gateway_address: Option<String>,
     #[arg(long, short, help = "The subnet id to query validators")]
     pub subnet: String,
 }

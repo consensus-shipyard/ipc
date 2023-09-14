@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
 	# "ipc/daemon", 
-	# "ipc/cli",
+	"ipc/cli",
 	# "ipc/testing/e2e", 
 	# "ipc/testing/*",
 	"ipc/provider",

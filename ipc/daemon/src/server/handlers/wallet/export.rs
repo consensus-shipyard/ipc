@@ -43,13 +43,13 @@ pub enum WalletExportResponse {
 /// Send value between two addresses within a subnet
 pub(crate) struct WalletExportHandler {
     fvm_wallet: Arc<RwLock<Wallet>>,
-    evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+    evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
 }
 
 impl WalletExportHandler {
     pub(crate) fn new(
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<ethers::types::Address>>>,
+        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             fvm_wallet,
