@@ -347,12 +347,14 @@ impl IpcProvider {
         conn.manager().list_child_subnets(gateway_addr).await
     }
 
+    /// Funds an account in a child subnet, if `to` is `None`, the self account
+    /// is funded.
     pub async fn fund(
         &mut self,
         subnet: SubnetID,
         gateway_addr: Option<Address>,
         from: Option<Address>,
-        to: Address,
+        to: Option<Address>,
         amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
@@ -371,16 +373,18 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .fund(subnet, gateway_addr, sender, to, amount)
+            .fund(subnet, gateway_addr, sender, to.unwrap_or(sender), amount)
             .await
     }
 
+    /// Release to an account in a child subnet, if `to` is `None`, the self account
+    /// is funded.
     pub async fn release(
         &mut self,
         subnet: SubnetID,
         gateway_addr: Option<Address>,
         from: Option<Address>,
-        to: Address,
+        to: Option<Address>,
         amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
         let conn = match self.connection(&subnet) {
@@ -398,7 +402,7 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .release(subnet, gateway_addr, sender, to, amount)
+            .release(subnet, gateway_addr, sender, to.unwrap_or(sender), amount)
             .await
     }
 
@@ -619,6 +623,18 @@ impl IpcProvider {
         self.check_subnet(subnet_config)?;
 
         conn.manager().get_block_hash(height).await
+    }
+
+    pub async fn get_chain_id(&self, subnet: &SubnetID) -> anyhow::Result<String> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        self.check_subnet(subnet_config)?;
+
+        conn.manager().get_chain_id().await
     }
 }
 

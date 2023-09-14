@@ -4,12 +4,11 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use std::fmt::Debug;
+use fvm_shared::address::Address;
+use ipc_sdk::subnet_id::SubnetID;
+use std::{fmt::Debug, str::FromStr};
 
-use crate::commands::get_ipc_agent_url;
-use crate::sdk::IpcAgentClient;
-use crate::server::kill::KillSubnetParams;
-use crate::{CommandLineHandler, GlobalArguments};
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 /// The command to kill an existing subnet.
 pub struct KillSubnet;
@@ -21,26 +20,20 @@ impl CommandLineHandler for KillSubnet {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("kill subnet with args: {:?}", arguments);
 
-        let params = KillSubnetParams {
-            subnet: arguments.subnet.clone(),
-            from: arguments.from.clone(),
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(Address::from_str(address)?),
+            None => None,
         };
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let client = IpcAgentClient::default_from_url(url);
-        client.kill_subnet(params).await?;
-
-        log::info!("killed subnet: {:}", arguments.subnet);
-
-        Ok(())
+        provider.kill_subnet(subnet, from).await
     }
 }
 
 #[derive(Debug, Args)]
 #[command(name = "kill", about = "Kill an existing subnet")]
 pub struct KillSubnetArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that kills the subnet")]
     pub from: Option<String>,
     #[arg(long, short, help = "The subnet to kill")]

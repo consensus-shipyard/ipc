@@ -66,8 +66,6 @@ impl CommandLineHandler for CreateSubnet {
 #[derive(Debug, Args)]
 #[command(name = "create", about = "Create a new subnet actor")]
 pub struct CreateSubnetArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that creates the subnet")]
     pub from: Option<String>,
     #[arg(long, short, help = "The parent subnet to create the new actor in")]

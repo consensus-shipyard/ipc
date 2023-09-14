@@ -230,6 +230,10 @@ impl SubnetManager for FevmSubnetManager {
             .get_validator_set(subnet_id, gateway, epoch)
             .await
     }
+
+    async fn get_chain_id(&self) -> anyhow::Result<String> {
+        self.evm_subnet_manager.get_chain_id().await
+    }
 }
 
 #[async_trait]
