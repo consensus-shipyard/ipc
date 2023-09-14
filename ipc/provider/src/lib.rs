@@ -350,6 +350,7 @@ impl IpcProvider {
     pub async fn fund(
         &mut self,
         subnet: SubnetID,
+        gateway_addr: Option<Address>,
         from: Option<Address>,
         to: Address,
         amount: TokenAmount,
@@ -363,6 +364,11 @@ impl IpcProvider {
         let subnet_config = conn.subnet();
         self.check_subnet(subnet_config)?;
         let sender = self.check_sender(subnet_config, from)?;
+
+        let gateway_addr = match gateway_addr {
+            None => subnet_config.gateway_addr(),
+            Some(addr) => addr,
+        };
 
         conn.manager()
             .fund(subnet, gateway_addr, sender, to, amount)
