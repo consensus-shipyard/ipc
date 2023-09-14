@@ -49,3 +49,4 @@ primitives = { workspace = true }
 
 ipc-identity = { path = "../identity", features = ["with-ethers"] }
 ipc-provider = { path = "../provider" }
+ipc-sdk = { path = "../sdk" }

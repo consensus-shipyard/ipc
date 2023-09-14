@@ -51,7 +51,9 @@ impl Drop for PersistentKeyInfo {
     }
 }
 
-impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> KeyStore for PersistentKeyStore<T> {
+impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> KeyStore
+    for PersistentKeyStore<T>
+{
     type Key = T;
 
     fn get(&self, addr: &Self::Key) -> Result<Option<KeyInfo>> {
@@ -72,9 +74,20 @@ impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> KeyStore for Persist
         self.memory.remove(addr)?;
         self.flush_no_encryption()
     }
+
+    fn set_default(&mut self, addr: &Self::Key) -> Result<()> {
+        self.memory.set_default(addr)?;
+        self.flush_no_encryption()
+    }
+
+    fn get_default(&mut self) -> Result<Option<Self::Key>> {
+        let default = self.memory.get_default()?;
+        self.flush_no_encryption()?;
+        Ok(default)
+    }
 }
 
-impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> PersistentKeyStore<T> {
+impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKeyStore<T> {
     pub fn new(path: PathBuf) -> Result<Self> {
         if let Some(p) = path.parent() && !p.exists() {
             return Err(anyhow!("parent does not exist for key store"));
@@ -88,6 +101,7 @@ impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> PersistentKeyStore<T
                     Ok(Self {
                         memory: MemoryKeyStore {
                             data: Default::default(),
+                            default: None,
                         },
                         file_path: path,
                     })
@@ -111,14 +125,29 @@ impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> PersistentKeyStore<T
             let key_info = KeyInfo {
                 private_key: hex::decode(&info.private_key)?,
             };
-            let addr = T::try_from(key_info.clone())
-                .map_err(|_| anyhow!("cannot convert private key to address"))?;
+            let mut addr = T::default();
+            // only infer the address if this is not the default key
+            if info.address != addr.to_string() {
+                addr = T::try_from(key_info.clone())
+                    .map_err(|_| anyhow!("cannot convert private key to address"))?;
+            }
 
             key_infos.insert(addr, key_info);
         }
 
+        // check if there is default in the keystore
+        let default = match key_infos.get(&T::default()) {
+            Some(i) => Some(
+                T::try_from(i.clone()).map_err(|_| anyhow!("couldn't get info for default key"))?,
+            ),
+            None => None,
+        };
+
         Ok(Self {
-            memory: MemoryKeyStore { data: key_infos },
+            memory: MemoryKeyStore {
+                data: key_infos,
+                default,
+            },
             file_path: path,
         })
     }
@@ -143,8 +172,8 @@ impl<T: Clone + Eq + Hash + AsRef<[u8]> + TryFrom<KeyInfo>> PersistentKeyStore<T
             .data
             .iter()
             .map(|(key, val)| {
-                let address = hex::encode(key.as_ref());
                 let private_key = hex::encode(&val.private_key);
+                let address = key.to_string();
                 PersistentKeyInfo {
                     address,
                     private_key,
@@ -164,7 +193,7 @@ mod tests {
     use crate::evm::KeyInfo;
     use crate::{EvmKeyStore, PersistentKeyStore};
 
-    #[derive(Clone, Eq, PartialEq, Hash)]
+    #[derive(Clone, Eq, PartialEq, Hash, Debug)]
     struct Key {
         data: String,
     }
@@ -179,9 +208,17 @@ mod tests {
         }
     }
 
-    impl AsRef<[u8]> for Key {
-        fn as_ref(&self) -> &[u8] {
-            self.data.as_bytes()
+    impl Default for Key {
+        fn default() -> Self {
+            Self {
+                data: String::from("default-key"),
+            }
+        }
+    }
+
+    impl ToString for Key {
+        fn to_string(&self) -> String {
+            self.data.clone()
         }
     }
 
@@ -208,5 +245,43 @@ mod tests {
         let key_from_store = ks.get(&addr).unwrap();
         assert!(key_from_store.is_some());
         assert_eq!(key_from_store.unwrap(), key_info);
+    }
+
+    #[test]
+    fn test_default() {
+        let keystore_folder = tempfile::tempdir().unwrap().into_path();
+        let keystore_location = keystore_folder.join("eth_keystore");
+
+        let mut ks = PersistentKeyStore::new(keystore_location.clone()).unwrap();
+
+        let key_info = KeyInfo {
+            private_key: vec![0, 1, 2],
+        };
+        let addr = Key::try_from(key_info.clone()).unwrap();
+
+        // can't set default if the key hasn't been put yet.
+        assert!(ks.set_default(&addr).is_err());
+        ks.put(key_info.clone()).unwrap();
+        ks.set_default(&addr).unwrap();
+        assert_eq!(ks.get_default().unwrap().unwrap(), addr);
+
+        // set other default
+        let new_key = KeyInfo {
+            private_key: vec![0, 1, 3],
+        };
+        let new_addr = Key::try_from(new_key.clone()).unwrap();
+        ks.put(new_key.clone()).unwrap();
+        ks.set_default(&new_addr).unwrap();
+        assert_eq!(ks.get_default().unwrap().unwrap(), new_addr);
+
+        // Create the key store again
+        let mut ks = PersistentKeyStore::new(keystore_location).unwrap();
+        let key_from_store = ks.get(&addr).unwrap();
+        assert!(key_from_store.is_some());
+        assert_eq!(key_from_store.unwrap(), key_info);
+        let key_from_store = ks.get(&Key::default()).unwrap();
+        assert!(key_from_store.is_some());
+        // the default is also recovered from persistent storage
+        assert_eq!(ks.get_default().unwrap().unwrap(), new_addr);
     }
 }

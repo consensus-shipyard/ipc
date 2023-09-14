@@ -4,13 +4,14 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use std::fmt::Debug;
+use futures_util::future::join_all;
+use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_identity::{EthKeyAddress, EvmKeyStore, WalletType};
+use ipc_provider::manager::evm::ethers_address_to_fil_address;
+use ipc_sdk::subnet_id::SubnetID;
+use std::{fmt::Debug, str::FromStr};
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::json_rpc_methods;
-use crate::server::wallet::balances::{WalletBalancesParams, WalletBalancesResponse};
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletBalances;
 
@@ -21,26 +22,66 @@ impl CommandLineHandler for WalletBalances {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("list wallets with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
+        let provider = get_ipc_provider(global)?;
 
-        let params = WalletBalancesParams {
-            subnet: arguments.subnet.clone(),
+        let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        match wallet_type {
+            WalletType::Evm => {
+                let wallet = provider.evm_wallet();
+                let addresses = wallet.read().unwrap().list()?;
+                let r = addresses
+                    .iter()
+                    .map(|addr| {
+                        let provider = provider.clone();
+                        let subnet = subnet.clone();
+                        async move {
+                            provider
+                                .wallet_balance(
+                                    &subnet,
+                                    &ethers_address_to_fil_address(&(addr.clone()).into())?,
+                                )
+                                .await
+                                .map(|balance| (balance, addr))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let r = join_all(r)
+                    .await
+                    .into_iter()
+                    .collect::<anyhow::Result<Vec<(TokenAmount, &EthKeyAddress)>>>()?;
+
+                for (balance, addr) in r {
+                    println!("{:?} - Balance: {}", addr.to_string(), balance);
+                }
+            }
+            WalletType::Fvm => {
+                let wallet = provider.fvm_wallet();
+                let addresses = wallet.read().unwrap().list_addrs()?;
+                let r = addresses
+                    .iter()
+                    .map(|addr| {
+                        let provider = provider.clone();
+                        let subnet = subnet.clone();
+                        async move {
+                            provider
+                                .wallet_balance(&subnet, addr)
+                                .await
+                                .map(|balance| (balance, addr))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let r = join_all(r)
+                    .await
+                    .into_iter()
+                    .collect::<anyhow::Result<Vec<(TokenAmount, &Address)>>>()?;
+                for (balance, addr) in r {
+                    println!("{:?} - Balance: {}", addr, balance);
+                }
+            }
         };
-
-        let addrs = json_rpc_client
-            .request::<WalletBalancesResponse>(
-                json_rpc_methods::WALLET_BALANCES,
-                serde_json::to_value(params)?,
-            )
-            .await?;
-
-        log::info!("wallets in subnet {:} are:", arguments.subnet);
-
-        // iterate through addresses and pretty print balances
-        for (addr, balance) in addrs {
-            log::info!("{}: {}", addr, balance);
-        }
 
         Ok(())
     }
@@ -49,8 +90,8 @@ impl CommandLineHandler for WalletBalances {
 #[derive(Debug, Args)]
 #[command(about = "List balance of wallets in a subnet")]
 pub(crate) struct WalletBalancesArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The subnet to list wallets from")]
     pub subnet: String,
+    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    pub wallet_type: String,
 }

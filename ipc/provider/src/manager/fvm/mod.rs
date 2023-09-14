@@ -395,6 +395,10 @@ impl<T: JsonRpcClient + Send + Sync> SubnetManager for LotusSubnetManager<T> {
             genesis_epoch,
         })
     }
+
+    async fn get_chain_id(&self) -> Result<String> {
+        unimplemented!()
+    }
 }
 
 impl<T: JsonRpcClient + Send + Sync> LotusSubnetManager<T> {

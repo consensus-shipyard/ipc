@@ -1,8 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::config::DEFAULT_CONFIG_TEMPLATE;
+use crate::{CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
+use ipc_provider::config::DEFAULT_CONFIG_TEMPLATE;
 use std::io::Write;
 
 use clap::Args;

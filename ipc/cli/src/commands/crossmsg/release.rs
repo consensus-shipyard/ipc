@@ -4,11 +4,14 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use std::fmt::Debug;
+use fvm_shared::address::Address;
+use ipc_sdk::subnet_id::SubnetID;
+use std::{fmt::Debug, str::FromStr};
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::sdk::IpcAgentClient;
+use crate::{
+    f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str, CommandLineHandler,
+    GlobalArguments,
+};
 
 /// The command to release funds from a child to a parent
 pub(crate) struct Release;
@@ -20,18 +23,33 @@ impl CommandLineHandler for Release {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("release operation with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let client = IpcAgentClient::default_from_url(url);
-        let epoch = client
-            .release(
-                &arguments.subnet,
-                arguments.from.clone(),
-                arguments.to.clone(),
-                arguments.amount,
-            )
-            .await?;
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(Address::from_str(address)?),
+            None => None,
+        };
+        let to = match &arguments.to {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
+        let gateway_addr = match &arguments.gateway_address {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
 
-        log::info!("released subnet: {:} at epoch {epoch:}", arguments.subnet);
+        println!(
+            "release performed in epoch: {:?}",
+            provider
+                .release(
+                    subnet,
+                    gateway_addr,
+                    from,
+                    to,
+                    f64_to_token_amount(arguments.amount)?,
+                )
+                .await?,
+        );
 
         Ok(())
     }
@@ -40,8 +58,8 @@ impl CommandLineHandler for Release {
 #[derive(Debug, Args)]
 #[command(about = "Release operation in the gateway actor")]
 pub(crate) struct ReleaseArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
+    #[arg(long, short, help = "The gateway address of the subnet")]
+    pub gateway_address: Option<String>,
     #[arg(long, short, help = "The address that releases funds")]
     pub from: Option<String>,
     #[arg(

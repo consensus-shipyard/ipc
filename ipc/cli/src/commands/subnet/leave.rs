@@ -4,12 +4,11 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use std::fmt::Debug;
+use fvm_shared::address::Address;
+use ipc_sdk::subnet_id::SubnetID;
+use std::{fmt::Debug, str::FromStr};
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::sdk::IpcAgentClient;
-use crate::server::leave::LeaveSubnetParams;
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 /// The command to leave a new subnet.
 pub struct LeaveSubnet;
@@ -21,27 +20,19 @@ impl CommandLineHandler for LeaveSubnet {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("leave subnet with args: {:?}", arguments);
 
-        let params = LeaveSubnetParams {
-            subnet: arguments.subnet.clone(),
-            from: arguments.from.clone(),
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(Address::from_str(address)?),
+            None => None,
         };
-
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-
-        let client = IpcAgentClient::default_from_url(url);
-        client.leave_subnet(params).await?;
-
-        log::info!("left subnet: {:}", arguments.subnet);
-
-        Ok(())
+        provider.leave_subnet(subnet, from).await
     }
 }
 
 #[derive(Debug, Args)]
 #[command(name = "leave", about = "Leaving a subnet")]
 pub struct LeaveSubnetArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that leaves the subnet")]
     pub from: Option<String>,
     #[arg(long, short, help = "The subnet to leave")]

@@ -3,14 +3,12 @@
 //! This mod triggers a config reload in the IPC-Agent Json RPC server.
 
 mod init;
-mod reload;
 
 use clap::{Args, Subcommand};
 use std::fmt::Debug;
 
-use crate::cli::commands::config::init::{InitConfig, InitConfigArgs};
-use crate::cli::commands::config::reload::{ReloadConfig, ReloadConfigArgs};
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::commands::config::init::{InitConfig, InitConfigArgs};
+use crate::{CommandLineHandler, GlobalArguments};
 
 #[derive(Debug, Args)]
 #[command(name = "config", about = "config related commands")]
@@ -23,7 +21,6 @@ pub(crate) struct ConfigCommandsArgs {
 impl ConfigCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
-            Commands::Reload(args) => ReloadConfig::handle(global, args).await,
             Commands::Init(args) => InitConfig::handle(global, args).await,
         }
     }
@@ -31,6 +28,5 @@ impl ConfigCommandsArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
-    Reload(ReloadConfigArgs),
     Init(InitConfigArgs),
 }
