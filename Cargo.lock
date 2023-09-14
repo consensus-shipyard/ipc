@@ -2742,10 +2742,10 @@ dependencies = [
  "base64 0.21.2",
  "bytes",
  "cid",
- "clap 4.3.23",
  "config 0.13.3",
  "dirs",
  "fendermint_abci",
+ "fendermint_app_options",
  "fendermint_eth_api",
  "fendermint_rocksdb",
  "fendermint_rpc",
@@ -2787,6 +2787,22 @@ dependencies = [
  "tower-abci",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "fendermint_app_options"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "cid",
+ "clap 4.3.23",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex",
+ "ipc-sdk",
+ "num-traits",
+ "tendermint-rpc",
+ "tracing",
 ]
 
 [[package]]

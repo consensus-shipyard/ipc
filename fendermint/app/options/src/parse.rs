@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use bytes::Bytes;
 use cid::Cid;
-use num_traits::Num;
+use num_traits::{FromPrimitive, Num};
 
 use fvm_shared::{
     address::{set_current_network, Address, Network},
@@ -75,5 +75,22 @@ where
         Ok(p) if p > T::zero() && p <= T::try_from(100u8).unwrap() => Ok(p),
         Ok(_) => Err("percentage out of range".to_owned()),
         Err(e) => Err(format!("error parsing as percentage: {e}")),
+    }
+}
+
+/// Parse the FVM network and set the global value.
+pub fn parse_network(s: &str) -> Result<Network, String> {
+    match s.to_lowercase().as_str() {
+        "main" | "mainnet" | "f" => Ok(Network::Mainnet),
+        "test" | "testnet" | "t" => Ok(Network::Testnet),
+        n => {
+            let n: u8 = n
+                .parse()
+                .map_err(|e| format!("expected 0 or 1 for network: {e}"))?;
+
+            let n = Network::from_u8(n).ok_or_else(|| format!("unexpected network: {s}"))?;
+
+            Ok(n)
+        }
     }
 }

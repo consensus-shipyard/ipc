@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "fendermint/abci",
   "fendermint/app",
+  "fendermint/app/options",
   "fendermint/eth/*",
   "fendermint/rocksdb",
   "fendermint/rpc",

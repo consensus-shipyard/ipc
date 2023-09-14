@@ -315,13 +315,15 @@ pub enum BroadcastResponse<T> {
     Commit(CommitResponse<T>),
 }
 
-impl fendermint_rpc::tx::BroadcastMode for BroadcastMode {
+struct BroadcastModeWrapper(BroadcastMode);
+
+impl fendermint_rpc::tx::BroadcastMode for BroadcastModeWrapper {
     type Response<T> = BroadcastResponse<T>;
 }
 
 struct TransClient {
     inner: BoundFendermintClient<HttpClient>,
-    broadcast_mode: BroadcastMode,
+    broadcast_mode: BroadcastModeWrapper,
 }
 
 impl TransClient {
@@ -332,7 +334,7 @@ impl TransClient {
         let client = client.bind(mf);
         let client = Self {
             inner: client,
-            broadcast_mode: args.broadcast_mode,
+            broadcast_mode: BroadcastModeWrapper(args.broadcast_mode),
         };
         Ok(client)
     }
@@ -345,13 +347,13 @@ impl BoundClient for TransClient {
 }
 
 #[async_trait]
-impl TxClient<BroadcastMode> for TransClient {
+impl TxClient<BroadcastModeWrapper> for TransClient {
     async fn perform<F, T>(&self, msg: ChainMessage, f: F) -> anyhow::Result<BroadcastResponse<T>>
     where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
         T: Sync + Send,
     {
-        match self.broadcast_mode {
+        match self.broadcast_mode.0 {
             BroadcastMode::Async => {
                 let res = TxClient::<TxAsync>::perform(&self.inner, msg, f).await?;
                 Ok(BroadcastResponse::Async(res))

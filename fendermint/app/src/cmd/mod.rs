@@ -5,7 +5,7 @@
 
 use crate::{
     options::{Commands, Options},
-    settings::Settings,
+    settings::{expand_tilde, Settings},
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -90,7 +90,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
 
 /// Try to parse the settings in the configuration directory.
 fn settings(opts: &Options) -> anyhow::Result<Settings> {
-    let config_dir = match opts.config_dir() {
+    let config_dir = match expand_tilde(opts.config_dir()) {
         d if !d.exists() => return Err(anyhow!("'{d:?}' does not exist")),
         d if !d.is_dir() => return Err(anyhow!("'{d:?}' is a not a directory")),
         d => d,
