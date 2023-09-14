@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! This mod contains the different command line implementations.
 
-// mod checkpoint;
+mod checkpoint;
 mod config;
 mod crossmsg;
 // mod daemon;
@@ -10,7 +10,7 @@ mod subnet;
 mod util;
 mod wallet;
 
-// use crate::commands::checkpoint::CheckpointCommandsArgs;
+use crate::commands::checkpoint::CheckpointCommandsArgs;
 use crate::commands::crossmsg::CrossMsgsCommandsArgs;
 // use crate::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::commands::util::UtilCommandsArgs;
@@ -44,7 +44,7 @@ enum Commands {
     Subnet(SubnetCommandsArgs),
     Wallet(WalletCommandsArgs),
     CrossMsg(CrossMsgsCommandsArgs),
-    // Checkpoint(CheckpointCommandsArgs),
+    Checkpoint(CheckpointCommandsArgs),
     Util(UtilCommandsArgs),
 }
 
@@ -110,7 +110,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Subnet(args) => args.handle(global).await,
                 Commands::CrossMsg(args) => args.handle(global).await,
                 Commands::Wallet(args) => args.handle(global).await,
-                // Commands::Checkpoint(args) => args.handle(global).await,
+                Commands::Checkpoint(args) => args.handle(global).await,
                 Commands::Util(args) => args.handle(global).await,
             };
 
