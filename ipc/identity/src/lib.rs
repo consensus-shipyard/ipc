@@ -11,10 +11,10 @@ mod evm;
 mod fvm;
 
 #[cfg(feature = "with-ethers")]
-pub use crate::evm::random_eth_key_info;
+pub use crate::evm::{random_key_info, EthKeyAddress};
 pub use crate::evm::{
-    Defaultable, EthKeyAddress, KeyInfo as EvmKeyInfo, KeyStore as EvmKeyStore, PersistentKeyInfo,
-    PersistentKeyStore, DEFAULT_KEYSTORE_NAME,
+    KeyInfo as EvmKeyInfo, KeyStore as EvmKeyStore, PersistentKeyInfo, PersistentKeyStore,
+    DEFAULT_KEYSTORE_NAME,
 };
 pub use crate::fvm::*;
 

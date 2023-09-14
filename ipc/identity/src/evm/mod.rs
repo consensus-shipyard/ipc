@@ -59,8 +59,8 @@ impl Drop for KeyInfo {
 
 /// This trait is use to determine the key chosen for a specific
 /// key in a general way.
-pub trait Defaultable {
-    fn default_key() -> Self;
+pub trait WithDefaultKey {
+    fn default() -> Self;
 }
 
 #[cfg(feature = "with-ethers")]
@@ -91,7 +91,7 @@ pub fn random_eth_key_info() -> KeyInfo {
 }
 
 #[cfg(feature = "with-ethers")]
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq, Default)]
 pub struct EthKeyAddress {
     inner: ethers::types::Address,
 }
@@ -117,15 +117,6 @@ impl TryFrom<EthKeyAddress> for fvm_shared::address::Address {
 impl From<EthKeyAddress> for ethers::types::Address {
     fn from(val: EthKeyAddress) -> Self {
         val.inner
-    }
-}
-
-#[cfg(feature = "with-ethers")]
-impl Defaultable for EthKeyAddress {
-    fn default_key() -> Self {
-        Self {
-            inner: ethers::types::Address::default(),
-        }
     }
 }
 
