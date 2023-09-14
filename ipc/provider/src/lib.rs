@@ -331,9 +331,8 @@ impl IpcProvider {
         gateway_addr: Option<Address>,
         subnet: &SubnetID,
     ) -> anyhow::Result<HashMap<SubnetID, SubnetInfo>> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
         };
 
@@ -353,7 +352,6 @@ impl IpcProvider {
     pub async fn fund(
         &mut self,
         subnet: SubnetID,
-        gateway_addr: Option<Address>,
         from: Option<Address>,
         to: Option<Address>,
         amount: TokenAmount,
@@ -367,11 +365,6 @@ impl IpcProvider {
         let subnet_config = conn.subnet();
         self.check_subnet(subnet_config)?;
         let sender = self.check_sender(subnet_config, from)?;
-
-        let gateway_addr = match gateway_addr {
-            None => subnet_config.gateway_addr(),
-            Some(addr) => addr,
-        };
 
         conn.manager()
             .fund(subnet, gateway_addr, sender, to.unwrap_or(sender), amount)
