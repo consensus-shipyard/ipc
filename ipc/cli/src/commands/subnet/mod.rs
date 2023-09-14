@@ -1,21 +1,18 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-pub use crate::cli::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
-pub use crate::cli::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
-pub use crate::cli::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
-pub use crate::cli::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
-use crate::cli::commands::subnet::list_subnets::{ListSubnets, ListSubnetsArgs};
-use crate::cli::commands::subnet::list_validators::{ListValidators, ListValidatorsArgs};
-use crate::cli::commands::subnet::net_addr::{SetValidatorNetAddr, SetValidatorNetAddrArgs};
-use crate::cli::commands::subnet::send_value::{SendValue, SendValueArgs};
-use crate::cli::commands::subnet::worker_addr::{
-    SetValidatorWorkerAddr, SetValidatorWorkerAddrArgs,
-};
-use crate::cli::{CommandLineHandler, GlobalArguments};
+pub use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
+pub use crate::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
+pub use crate::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
+pub use crate::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
+use crate::commands::subnet::list_subnets::{ListSubnets, ListSubnetsArgs};
+use crate::commands::subnet::list_validators::{ListValidators, ListValidatorsArgs};
+use crate::commands::subnet::net_addr::{SetValidatorNetAddr, SetValidatorNetAddrArgs};
+use crate::commands::subnet::rpc::{RPCSubnet, RPCSubnetArgs};
+use crate::commands::subnet::send_value::{SendValue, SendValueArgs};
+use crate::commands::subnet::worker_addr::{SetValidatorWorkerAddr, SetValidatorWorkerAddrArgs};
+use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
-
-use self::rpc::{RPCSubnet, RPCSubnetArgs};
 
 pub mod create;
 pub mod join;

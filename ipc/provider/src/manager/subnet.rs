@@ -129,6 +129,11 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
         gateway: Option<Address>,
         epoch: Option<ChainEpoch>,
     ) -> Result<QueryValidatorSetResponse>;
+
+    /// Get chainID for the network.
+    /// Returning as a `String` because the maximum value for an EVM
+    /// networks is a `U256` that wouldn't fit in an integer type.
+    async fn get_chain_id(&self) -> Result<String>;
 }
 
 /// Trait to interact with a subnet to query the necessary information for top down checkpoint.

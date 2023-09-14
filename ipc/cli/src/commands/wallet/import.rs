@@ -4,13 +4,11 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use ipc_identity::WalletType;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::cli::commands::get_ipc_agent_url;
-use crate::cli::{CommandLineHandler, GlobalArguments};
-use crate::sdk::{IpcAgentClient, LotusJsonKeyType};
-use crate::server::wallet::WalletType;
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletImport;
 
@@ -21,14 +19,21 @@ impl CommandLineHandler for WalletImport {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("import wallet with args: {:?}", arguments);
 
+        let provider = get_ipc_provider(global)?;
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let client = IpcAgentClient::default_from_url(url);
-
-        let addr = if matches!(wallet_type, WalletType::Evm) && let Some(key) = &arguments.private_key {
-            let p = if let Some(stripped) = key.strip_prefix("0x") { stripped } else { key };
-            client.import_evm_from_private_key(String::from(p)).await?
+        if matches!(wallet_type, WalletType::Evm) {
+            if let Some(key) = &arguments.private_key {
+                println!(
+                    "{:?}",
+                    provider
+                        .import_evm_key_from_privkey(key.to_string())?
+                        .to_string()
+                );
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!("no private key supported"))
+            }
         } else {
             // Get keyinfo from file or stdin
             let keyinfo = if arguments.path.is_some() {
@@ -39,25 +44,20 @@ impl CommandLineHandler for WalletImport {
             };
 
             match wallet_type {
-                WalletType::Fvm => {
-                    let key_type = LotusJsonKeyType::from_str(&keyinfo)?;
-                    client.import_lotus_json(key_type).await?
-                }
-                WalletType::Evm => client.import_evm_from_json(keyinfo).await?,
-            }
-        };
-
-        log::info!("imported wallet with address {:?}", addr);
-
-        Ok(())
+                WalletType::Fvm => println!("{:?}", provider.import_fvm_key(keyinfo)?),
+                WalletType::Evm => println!(
+                    "{:?}",
+                    provider.import_evm_key_from_json(keyinfo)?.to_string()
+                ),
+            };
+            Ok(())
+        }
     }
 }
 
 #[derive(Debug, Args)]
 #[command(about = "Import a key into the agent's wallet")]
 pub(crate) struct WalletImportArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
     #[arg(long, short, help = "Path of key info file for the key to import")]

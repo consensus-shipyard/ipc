@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::{CommandLineHandler, GlobalArguments};
 
 use clap::{Args, Subcommand};
 

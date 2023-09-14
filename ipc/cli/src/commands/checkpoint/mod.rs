@@ -1,9 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use crate::cli::commands::checkpoint::list_checkpoints::{
+use crate::commands::checkpoint::list_checkpoints::{
     ListBottomUpCheckpoints, ListBottomUpCheckpointsArgs,
 };
-use crate::cli::{CommandLineHandler, GlobalArguments};
+use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
 use self::topdown_executed::{LastTopDownExec, LastTopDownExecArgs};
