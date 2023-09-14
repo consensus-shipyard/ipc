@@ -123,7 +123,7 @@ impl From<EthKeyAddress> for ethers::types::Address {
 #[cfg(feature = "with-ethers")]
 impl ToString for EthKeyAddress {
     fn to_string(&self) -> String {
-        if self == &Self::default_key() {
+        if self == &Self::default() {
             return String::from("default-key");
         }
         format!("{:?}", self.inner)
