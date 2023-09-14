@@ -4,11 +4,10 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
 use std::{fmt::Debug, str::FromStr};
 
-use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
+use crate::{get_ipc_provider, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
 /// The command to create a new subnet actor.
 pub(crate) struct ListValidators;
@@ -24,7 +23,7 @@ impl CommandLineHandler for ListValidators {
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
         let gateway_addr = match &arguments.gateway_address {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
 

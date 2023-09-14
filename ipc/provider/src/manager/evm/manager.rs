@@ -587,6 +587,15 @@ impl SubnetManager for EthSubnetManager {
             genesis_epoch,
         })
     }
+
+    async fn get_chain_id(&self) -> Result<String> {
+        Ok(self
+            .ipc_contract_info
+            .provider
+            .get_chainid()
+            .await?
+            .to_string())
+    }
 }
 
 #[async_trait]
