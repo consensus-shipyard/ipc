@@ -9,7 +9,7 @@ use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, WalletType};
 use ipc_provider::manager::evm::ethers_address_to_fil_address;
 use ipc_sdk::subnet_id::SubnetID;
-use std::{fmt::Debug, str::FromStr, sync::Arc};
+use std::{fmt::Debug, str::FromStr};
 
 use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
@@ -25,7 +25,7 @@ impl CommandLineHandler for WalletBalances {
         let provider = get_ipc_provider(global)?;
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
-        let subnet = Arc::new(SubnetID::from_str(&arguments.subnet)?);
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
         match wallet_type {
             WalletType::Evm => {
                 let wallet = provider.evm_wallet();

@@ -16,10 +16,8 @@ use std::io::{BufReader, BufWriter, ErrorKind};
 use std::path::PathBuf;
 use zeroize::Zeroize;
 
-use super::Defaultable;
-
 #[derive(Default)]
-pub struct PersistentKeyStore<T: Defaultable + ToString> {
+pub struct PersistentKeyStore<T> {
     memory: MemoryKeyStore<T>,
     file_path: PathBuf,
 }
@@ -53,7 +51,7 @@ impl Drop for PersistentKeyInfo {
     }
 }
 
-impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable + ToString> KeyStore
+impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> KeyStore
     for PersistentKeyStore<T>
 {
     type Key = T;
@@ -89,7 +87,7 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable + ToString> KeyStore
     }
 }
 
-impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable + ToString> PersistentKeyStore<T> {
+impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKeyStore<T> {
     pub fn new(path: PathBuf) -> Result<Self> {
         if let Some(p) = path.parent() && !p.exists() {
             return Err(anyhow!("parent does not exist for key store"));
@@ -127,7 +125,7 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable + ToString> Persisten
             let key_info = KeyInfo {
                 private_key: hex::decode(&info.private_key)?,
             };
-            let mut addr = T::default_key();
+            let mut addr = T::default();
             // only infer the address if this is not the default key
             if info.address != addr.to_string() {
                 addr = T::try_from(key_info.clone())
@@ -138,7 +136,7 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable + ToString> Persisten
         }
 
         // check if there is default in the keystore
-        let default = match key_infos.get(&T::default_key()) {
+        let default = match key_infos.get(&T::default()) {
             Some(i) => Some(
                 T::try_from(i.clone()).map_err(|_| anyhow!("couldn't get info for default key"))?,
             ),
@@ -192,7 +190,7 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Defaultable + ToString> Persisten
 
 #[cfg(test)]
 mod tests {
-    use crate::evm::{Defaultable, KeyInfo};
+    use crate::evm::KeyInfo;
     use crate::{EvmKeyStore, PersistentKeyStore};
 
     #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -210,8 +208,8 @@ mod tests {
         }
     }
 
-    impl Defaultable for Key {
-        fn default_key() -> Self {
+    impl Default for Key {
+        fn default() -> Self {
             Self {
                 data: String::from("default-key"),
             }
@@ -281,7 +279,7 @@ mod tests {
         let key_from_store = ks.get(&addr).unwrap();
         assert!(key_from_store.is_some());
         assert_eq!(key_from_store.unwrap(), key_info);
-        let key_from_store = ks.get(&Key::default_key()).unwrap();
+        let key_from_store = ks.get(&Key::default()).unwrap();
         assert!(key_from_store.is_some());
         // the default is also recovered from persistent storage
         assert_eq!(ks.get_default().unwrap().unwrap(), new_addr);
