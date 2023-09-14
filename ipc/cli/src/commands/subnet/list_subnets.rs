@@ -4,18 +4,12 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
-use std::collections::HashMap;
+use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::commands::get_ipc_agent_url;
-use crate::config::json_rpc_methods;
-use crate::server::list_subnets::ListSubnetsParams;
-use crate::{CommandLineHandler, GlobalArguments};
-use ipc_provider::jsonrpc::{JsonRpcClient, JsonRpcClientImpl};
-use serde::Deserialize;
+use crate::{get_ipc_provider, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
 /// The command to create a new subnet actor.
 pub(crate) struct ListSubnets;
@@ -27,32 +21,23 @@ impl CommandLineHandler for ListSubnets {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("list subnets with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-        let json_rpc_client = JsonRpcClientImpl::new(url, None);
+        let provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        let params = ListSubnetsParams {
-            gateway_address: arguments.gateway_address.clone(),
-            subnet_id: arguments.subnet.clone(),
+        let gateway_addr = match &arguments.gateway_address {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
         };
 
-        let subnets = json_rpc_client
-            .request::<HashMap<String, SubnetInfoWrapper>>(
-                json_rpc_methods::LIST_CHILD_SUBNETS,
-                serde_json::to_value(params)?,
-            )
-            .await?;
+        let ls = provider.list_child_subnets(gateway_addr, &subnet).await?;
 
-        for (_, s) in subnets.iter() {
-            let u = BigInt::from_str(&s.stake).unwrap();
-            let stake = TokenAmount::from_atto(u);
-            let u = BigInt::from_str(&s.circ_supply).unwrap();
-            let supply = TokenAmount::from_atto(u);
-            log::info!(
-                "{} - status: {}, collateral: {} FIL, circ.supply: {} FIL",
+        for (_, s) in ls.iter() {
+            println!(
+                "{:?} - status: {:?}, collateral: {:?} FIL, circ.supply: {:?} FIL",
                 s.id,
                 s.status,
-                stake,
-                supply,
+                TokenAmount::from_whole(s.stake.atto().clone()),
+                TokenAmount::from_whole(s.circ_supply.atto().clone()),
             );
         }
 
@@ -66,26 +51,8 @@ impl CommandLineHandler for ListSubnets {
     about = "List all child subnets registered in the gateway (i.e. that have provided enough collateral)"
 )]
 pub(crate) struct ListSubnetsArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The gateway address to query subnets")]
-    pub gateway_address: String,
+    pub gateway_address: Option<String>,
     #[arg(long, short, help = "The subnet id to query child subnets")]
     pub subnet: String,
-}
-
-/// A simplified wrapper for Subnet Info response. The SubnetInfo struct is deserialized differently
-/// as that struct is targeting deserialization from Actor. SubnetInfoWrapper is targeting ipc-agent
-/// rpc server, it is using different data structure and casing, i.e. id in actor is represented as
-/// a map, but in ipc-agent rpc server, it is a string.
-#[derive(Debug, Deserialize)]
-struct SubnetInfoWrapper {
-    #[allow(dead_code)]
-    id: String,
-    #[allow(dead_code)]
-    stake: String,
-    #[allow(dead_code)]
-    circ_supply: String,
-    #[allow(dead_code)]
-    status: i32,
 }

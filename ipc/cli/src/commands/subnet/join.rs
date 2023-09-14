@@ -4,12 +4,11 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use std::fmt::Debug;
+use fvm_shared::address::Address;
+use ipc_sdk::subnet_id::SubnetID;
+use std::{fmt::Debug, str::FromStr};
 
-use crate::commands::get_ipc_agent_url;
-use crate::sdk::IpcAgentClient;
-use crate::server::join::JoinSubnetParams;
-use crate::{CommandLineHandler, GlobalArguments};
+use crate::{f64_to_token_amount, get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 /// The command to join a subnet
 pub struct JoinSubnet;
@@ -21,32 +20,32 @@ impl CommandLineHandler for JoinSubnet {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("join subnet with args: {:?}", arguments);
 
-        let url = get_ipc_agent_url(&arguments.ipc_agent_url, global)?;
-
-        // The json rpc server will handle directing the request to
-        // the correct parent.
-        let params = JoinSubnetParams {
-            subnet: arguments.subnet.clone(),
-            from: arguments.from.clone(),
-            collateral: arguments.collateral,
-            validator_net_addr: arguments.validator_net_addr.clone(),
-            worker_addr: arguments.worker_addr.clone(),
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(Address::from_str(address)?),
+            None => None,
+        };
+        let worker_addr = match &arguments.worker_addr {
+            Some(address) => Some(Address::from_str(address)?),
+            None => None,
         };
 
-        let client = IpcAgentClient::default_from_url(url);
-        client.join_subnet(params).await?;
-
-        log::info!("joined subnet: {:}", arguments.subnet);
-
-        Ok(())
+        provider
+            .join_subnet(
+                subnet,
+                from,
+                f64_to_token_amount(arguments.collateral)?,
+                arguments.validator_net_addr.clone(),
+                worker_addr,
+            )
+            .await
     }
 }
 
 #[derive(Debug, Args)]
 #[command(name = "join", about = "Join a subnet")]
 pub struct JoinSubnetArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
     #[arg(long, short, help = "The address that joins the subnet")]
     pub from: Option<String>,
     #[arg(long, short, help = "The subnet to join")]
