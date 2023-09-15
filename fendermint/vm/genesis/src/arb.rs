@@ -118,6 +118,7 @@ impl Arbitrary for ipc::GatewayParams {
             subnet_id: ArbSubnetID::arbitrary(g).0,
             bottom_up_check_period: u64::arbitrary(g),
             top_down_check_period: u64::arbitrary(g),
+            min_collateral: ArbFee::arbitrary(g).0 + TokenAmount::from_whole(1),
             msg_fee: ArbFee::arbitrary(g).0,
             majority_percentage: u8::arbitrary(g) % 101,
         }

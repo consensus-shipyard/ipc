@@ -5,8 +5,8 @@
 //!
 //! ```text
 //! cargo run --example network -- --help
-//! cargo run --example network -- --network 1 genesis --genesis-file ./genesis.json ipc gateway --subnet-id /r123/t0456 -b 10 -t 10 -f 10 -m 65
-//! FVM_NETWORK=testnet cargo run --example network -- genesis --genesis-file ./genesis.json ipc gateway --subnet-id /r123/t0456 -b 10 -t 10 -f 10 -m 65
+//! cargo run --example network -- --network 1 genesis --genesis-file ./genesis.json ipc gateway --subnet-id /r123/t0456 -b 10 -t 10 -c 1.5 -f 10 -m 65
+//! FVM_NETWORK=testnet cargo run --example network -- genesis --genesis-file ./genesis.json ipc gateway --subnet-id /r123/t0456 -b 10 -t 10 -c 1.5 -f 10 -m 65
 //! ```
 
 use clap::Parser;

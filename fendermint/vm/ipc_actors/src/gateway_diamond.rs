@@ -55,6 +55,7 @@ pub mod gateway_diamond {
                                 ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
                             ],
                         ),
@@ -66,54 +67,7 @@ pub mod gateway_diamond {
                     },
                 ],
             }),
-            functions: ::core::convert::From::from([
-                (
-                    ::std::borrow::ToOwned::to_owned("MIN_CHECKPOINT_PERIOD"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "MIN_CHECKPOINT_PERIOD",
-                            ),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint8"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("MIN_COLLATERAL_AMOUNT"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "MIN_COLLATERAL_AMOUNT",
-                            ),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-            ]),
+            functions: ::std::collections::BTreeMap::new(),
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
@@ -231,11 +185,31 @@ pub mod gateway_diamond {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("InvalidCollateral"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("InvalidCollateral"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("InvalidMajorityPercentage"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned(
                                 "InvalidMajorityPercentage",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("InvalidSubmissionPeriod"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidSubmissionPeriod",
                             ),
                             inputs: ::std::vec![],
                         },
@@ -298,7 +272,7 @@ pub mod gateway_diamond {
         __abi,
     );
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R`\x046\x10\x15`\x15W[6`qW`qV[`\0\x805`\xE0\x1C\x80c\x91\xBEMA\x14`PWc\xA1\xAD\xA3\x03\x14`4WP`\rV[4`MW\x80`\x03\x196\x01\x12`MW` `@Q`\n\x81R\xF3[\x80\xFD[P4`MW\x80`\x03\x196\x01\x12`MWg\r\xE0\xB6\xB3\xA7d\0\0`\x80R` `\x80\xF3[`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`\xD7WP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`\xD3W=\x90\xF3[=\x90\xFD[`$\x90`@Q\x90c\n\x82\xDDs`\xE3\x1B\x82R`\x04\x82\x01R\xFD\xFE\xA2dipfsX\"\x12  \xCD\xBF*\xB8\xE1\xCE\x16sG\xE7\x12V\xCA\xF9\x1355B\xED=\xC5\x9B\xE4\x7Fy\xDCm\xB4\xCB\xEE\x15dsolcC\0\x08\x13\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x87W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`oWP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[=\x90\xFD[`$\x90`@Q\x90c\n\x82\xDDs`\xE3\x1B\x82R`\x04\x82\x01R\xFD[`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`\xE9WP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[c\n\x82\xDDs`\xE3\x1B`\x80R`\x84R`$`\x80\xFD\xFE\xA2dipfsX\"\x12 7#\x08y\xE7\x8Bv\xA8\xF5^\xD5\xAB\x1D\xBB=\xE2\x81z\xE0H.;\x99\x1D\x066\x93\xF3m\r\xE5#dsolcC\0\x08\x13\x003";
     /// The deployed bytecode of the contract.
     pub static GATEWAYDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
         __DEPLOYED_BYTECODE,
@@ -341,22 +315,6 @@ pub mod gateway_diamond {
                     client,
                 ),
             )
-        }
-        ///Calls the contract's `MIN_CHECKPOINT_PERIOD` (0xa1ada303) function
-        pub fn min_checkpoint_period(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, u8> {
-            self.0
-                .method_hash([161, 173, 163, 3], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `MIN_COLLATERAL_AMOUNT` (0x91be4d41) function
-        pub fn min_collateral_amount(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([145, 190, 77, 65], ())
-                .expect("method not found (this should never happen)")
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
@@ -450,6 +408,19 @@ pub mod gateway_diamond {
         pub initialization_contract_address: ::ethers::core::types::Address,
         pub calldata: ::ethers::core::types::Bytes,
     }
+    ///Custom Error type `InvalidCollateral` with signature `InvalidCollateral()` and selector `0xd1ef4cea`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "InvalidCollateral", abi = "InvalidCollateral()")]
+    pub struct InvalidCollateral;
     ///Custom Error type `InvalidMajorityPercentage` with signature `InvalidMajorityPercentage()` and selector `0x75c3b427`
     #[derive(
         Clone,
@@ -463,6 +434,19 @@ pub mod gateway_diamond {
     )]
     #[etherror(name = "InvalidMajorityPercentage", abi = "InvalidMajorityPercentage()")]
     pub struct InvalidMajorityPercentage;
+    ///Custom Error type `InvalidSubmissionPeriod` with signature `InvalidSubmissionPeriod()` and selector `0x312f8e05`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "InvalidSubmissionPeriod", abi = "InvalidSubmissionPeriod()")]
+    pub struct InvalidSubmissionPeriod;
     ///Custom Error type `NoBytecodeAtAddress` with signature `NoBytecodeAtAddress(address,string)` and selector `0x919834b9`
     #[derive(
         Clone,
@@ -510,7 +494,9 @@ pub mod gateway_diamond {
         FunctionNotFound(FunctionNotFound),
         IncorrectFacetCutAction(IncorrectFacetCutAction),
         InitializationFunctionReverted(InitializationFunctionReverted),
+        InvalidCollateral(InvalidCollateral),
         InvalidMajorityPercentage(InvalidMajorityPercentage),
+        InvalidSubmissionPeriod(InvalidSubmissionPeriod),
         NoBytecodeAtAddress(NoBytecodeAtAddress),
         NoSelectorsProvidedForFacetForCut(NoSelectorsProvidedForFacetForCut),
         /// The standard solidity revert string, with selector
@@ -557,10 +543,20 @@ pub mod gateway_diamond {
                 return Ok(Self::InitializationFunctionReverted(decoded));
             }
             if let Ok(decoded)
+                = <InvalidCollateral as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::InvalidCollateral(decoded));
+            }
+            if let Ok(decoded)
                 = <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(
                     data,
                 ) {
                 return Ok(Self::InvalidMajorityPercentage(decoded));
+            }
+            if let Ok(decoded)
+                = <InvalidSubmissionPeriod as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::InvalidSubmissionPeriod(decoded));
             }
             if let Ok(decoded)
                 = <NoBytecodeAtAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
@@ -593,7 +589,13 @@ pub mod gateway_diamond {
                 Self::InitializationFunctionReverted(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::InvalidCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidMajorityPercentage(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidSubmissionPeriod(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NoBytecodeAtAddress(element) => {
@@ -631,7 +633,15 @@ pub mod gateway_diamond {
                     true
                 }
                 _ if selector
+                    == <InvalidCollateral as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <InvalidMajorityPercentage as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidSubmissionPeriod as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -662,7 +672,11 @@ pub mod gateway_diamond {
                 Self::InitializationFunctionReverted(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::InvalidCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidMajorityPercentage(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidSubmissionPeriod(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NoBytecodeAtAddress(element) => {
@@ -707,9 +721,19 @@ pub mod gateway_diamond {
             Self::InitializationFunctionReverted(value)
         }
     }
+    impl ::core::convert::From<InvalidCollateral> for GatewayDiamondErrors {
+        fn from(value: InvalidCollateral) -> Self {
+            Self::InvalidCollateral(value)
+        }
+    }
     impl ::core::convert::From<InvalidMajorityPercentage> for GatewayDiamondErrors {
         fn from(value: InvalidMajorityPercentage) -> Self {
             Self::InvalidMajorityPercentage(value)
+        }
+    }
+    impl ::core::convert::From<InvalidSubmissionPeriod> for GatewayDiamondErrors {
+        fn from(value: InvalidSubmissionPeriod) -> Self {
+            Self::InvalidSubmissionPeriod(value)
         }
     }
     impl ::core::convert::From<NoBytecodeAtAddress> for GatewayDiamondErrors {
@@ -723,114 +747,4 @@ pub mod gateway_diamond {
             Self::NoSelectorsProvidedForFacetForCut(value)
         }
     }
-    ///Container type for all input parameters for the `MIN_CHECKPOINT_PERIOD` function with signature `MIN_CHECKPOINT_PERIOD()` and selector `0xa1ada303`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(name = "MIN_CHECKPOINT_PERIOD", abi = "MIN_CHECKPOINT_PERIOD()")]
-    pub struct MinCheckpointPeriodCall;
-    ///Container type for all input parameters for the `MIN_COLLATERAL_AMOUNT` function with signature `MIN_COLLATERAL_AMOUNT()` and selector `0x91be4d41`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(name = "MIN_COLLATERAL_AMOUNT", abi = "MIN_COLLATERAL_AMOUNT()")]
-    pub struct MinCollateralAmountCall;
-    ///Container type for all of the contract's call
-    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
-    pub enum GatewayDiamondCalls {
-        MinCheckpointPeriod(MinCheckpointPeriodCall),
-        MinCollateralAmount(MinCollateralAmountCall),
-    }
-    impl ::ethers::core::abi::AbiDecode for GatewayDiamondCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
-            let data = data.as_ref();
-            if let Ok(decoded)
-                = <MinCheckpointPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
-                return Ok(Self::MinCheckpointPeriod(decoded));
-            }
-            if let Ok(decoded)
-                = <MinCollateralAmountCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
-                return Ok(Self::MinCollateralAmount(decoded));
-            }
-            Err(::ethers::core::abi::Error::InvalidData.into())
-        }
-    }
-    impl ::ethers::core::abi::AbiEncode for GatewayDiamondCalls {
-        fn encode(self) -> Vec<u8> {
-            match self {
-                Self::MinCheckpointPeriod(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::MinCollateralAmount(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-            }
-        }
-    }
-    impl ::core::fmt::Display for GatewayDiamondCalls {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-            match self {
-                Self::MinCheckpointPeriod(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::MinCollateralAmount(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-            }
-        }
-    }
-    impl ::core::convert::From<MinCheckpointPeriodCall> for GatewayDiamondCalls {
-        fn from(value: MinCheckpointPeriodCall) -> Self {
-            Self::MinCheckpointPeriod(value)
-        }
-    }
-    impl ::core::convert::From<MinCollateralAmountCall> for GatewayDiamondCalls {
-        fn from(value: MinCollateralAmountCall) -> Self {
-            Self::MinCollateralAmount(value)
-        }
-    }
-    ///Container type for all return fields from the `MIN_CHECKPOINT_PERIOD` function with signature `MIN_CHECKPOINT_PERIOD()` and selector `0xa1ada303`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct MinCheckpointPeriodReturn(pub u8);
-    ///Container type for all return fields from the `MIN_COLLATERAL_AMOUNT` function with signature `MIN_COLLATERAL_AMOUNT()` and selector `0x91be4d41`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct MinCollateralAmountReturn(pub ::ethers::core::types::U256);
 }

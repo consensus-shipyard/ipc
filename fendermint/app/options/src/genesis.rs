@@ -130,6 +130,10 @@ pub struct GenesisIpcGatewayArgs {
     #[arg(long, short)]
     pub top_down_check_period: u64,
 
+    /// Minimum collateral requirement for subnet in full FIL units.
+    #[arg(long, short = 'c', value_parser = parse_full_fil)]
+    pub min_collateral: TokenAmount,
+
     /// Message fee in atto.
     #[arg(long, short = 'f', value_parser = parse_token_amount)]
     pub msg_fee: TokenAmount,

@@ -223,6 +223,7 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
             subnet_id: args.subnet_id.clone(),
             bottom_up_check_period: args.bottom_up_check_period,
             top_down_check_period: args.top_down_check_period,
+            min_collateral: args.min_collateral.clone(),
             msg_fee: args.msg_fee.clone(),
             majority_percentage: args.majority_percentage,
         };

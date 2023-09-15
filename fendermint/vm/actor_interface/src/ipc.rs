@@ -84,12 +84,13 @@ pub mod gateway {
 
     /// Container type `ConstructorParameters`.
     ///
-    /// See [Gateway.sol](https://github.com/consensus-shipyard/ipc-solidity-actors/blob/v0.1.0/src/Gateway.sol#L176)
+    /// See [GatewayDiamond.sol](https://github.com/consensus-shipyard/ipc-solidity-actors/blob/932c1c2b42c13fd734f6778a6f0ef9c99040c84f/src/GatewayDiamond.sol#L20)
     #[derive(Clone, EthAbiType, EthAbiCodec, Default, Debug, PartialEq, Eq, Hash)]
     pub struct ConstructorParameters {
         pub network_name: SubnetID,
         pub bottom_up_check_period: u64,
         pub top_down_check_period: u64,
+        pub min_collateral: U256,
         pub msg_fee: U256,
         pub majority_percentage: u8,
     }
@@ -118,6 +119,7 @@ pub mod gateway {
                 },
                 bottom_up_check_period: value.bottom_up_check_period,
                 top_down_check_period: value.top_down_check_period,
+                min_collateral: tokens_to_u256(value.min_collateral),
                 msg_fee: tokens_to_u256(value.msg_fee),
                 majority_percentage: value.majority_percentage,
             })
@@ -149,6 +151,7 @@ pub mod gateway {
                 },
                 bottom_up_check_period: 100,
                 top_down_check_period: 100,
+                min_collateral: U256::from(1),
                 msg_fee: U256::from(0),
                 majority_percentage: 67,
             };
