@@ -154,6 +154,7 @@ contract SubnetActorDiamondTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
+            minCollateral: 1,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
 

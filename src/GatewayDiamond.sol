@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {GatewayActorStorage} from "./lib/LibGatewayActorStorage.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
+import {InvalidCollateral, InvalidSubmissionPeriod} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibVoting} from "./lib/LibVoting.sol";
 import {SubnetID} from "./structs/Subnet.sol";
@@ -16,32 +17,32 @@ contract GatewayDiamond {
 
     using SubnetIDHelper for SubnetID;
 
-    // @notice uint8 constant MIN_CHECKPOINT_PERIOD = 10;
-    uint256 public constant MIN_COLLATERAL_AMOUNT = 1 ether;
-
-    /// @notice minimum checkpoint period. Values get clamped to this
-    uint8 public constant MIN_CHECKPOINT_PERIOD = 10;
-
     struct ConstructorParams {
         SubnetID networkName;
         uint64 bottomUpCheckPeriod;
         uint64 topDownCheckPeriod;
+        uint256 minCollateral;
         uint256 msgFee;
         uint8 majorityPercentage;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
+        if (params.minCollateral == 0) {
+            revert InvalidCollateral();
+        }
+        // topDownCheckPeriod can be equal 0, since validators can propose anything they want.
+        // The bottomUpCheckPeriod should be non-zero for now.
+        if (params.bottomUpCheckPeriod == 0) {
+            revert InvalidSubmissionPeriod();
+        }
+
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 
         s.networkName = params.networkName;
-        s.minStake = MIN_COLLATERAL_AMOUNT;
-        s.bottomUpCheckPeriod = params.bottomUpCheckPeriod < MIN_CHECKPOINT_PERIOD
-            ? MIN_CHECKPOINT_PERIOD
-            : params.bottomUpCheckPeriod;
-        s.topDownCheckPeriod = params.topDownCheckPeriod < MIN_CHECKPOINT_PERIOD
-            ? MIN_CHECKPOINT_PERIOD
-            : params.topDownCheckPeriod;
+        s.minStake = params.minCollateral;
+        s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
+        s.topDownCheckPeriod = params.topDownCheckPeriod;
         s.crossMsgFee = params.msgFee;
 
         // the root doesn't need to be explicitly initialized

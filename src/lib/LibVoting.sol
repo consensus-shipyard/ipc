@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {VoteExecutionStatus} from "../enums/VoteExecutionStatus.sol";
-import {EpochAlreadyExecuted, EpochNotVotable, InvalidMajorityPercentage, EpochNotVotable, ValidatorAlreadyVoted} from "../errors/IPCErrors.sol";
+import {EpochAlreadyExecuted, EpochNotVotable, InvalidMajorityPercentage, EpochNotVotable, ValidatorAlreadyVoted, InvalidSubmissionPeriod} from "../errors/IPCErrors.sol";
 import {ExecutableQueue} from "../structs/ExecutableQueue.sol";
 import {EpochVoteSubmission} from "../structs/EpochVoteSubmission.sol";
 import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
@@ -26,9 +26,6 @@ struct VotingStorage {
 library LibVoting {
     using ExecutableQueueHelper for ExecutableQueue;
     using EpochVoteSubmissionHelper for EpochVoteSubmission;
-
-    /// @notice minimum checkpoint period. Values get clamped to this
-    uint8 public constant MIN_CHECKPOINT_PERIOD = 10;
 
     bytes32 private constant VOTING_STORAGE_POSITION = keccak256("libvoting.lib.diamond.storage");
 
@@ -66,9 +63,12 @@ library LibVoting {
         if (_majorityPercentage > 100) {
             revert InvalidMajorityPercentage();
         }
+        if (_submissionPeriod == 0) {
+            revert InvalidSubmissionPeriod();
+        }
 
         s.majorityPercentage = _majorityPercentage;
-        s.submissionPeriod = _submissionPeriod < MIN_CHECKPOINT_PERIOD ? MIN_CHECKPOINT_PERIOD : _submissionPeriod;
+        s.submissionPeriod = _submissionPeriod;
 
         s.executableQueue.period = s.submissionPeriod;
     }

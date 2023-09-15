@@ -9,7 +9,6 @@ import "../src/lib/LibVoting.sol";
 contract LibVotingTest is Test {
     function test_basic() public {
         LibVoting.initVoting(50, 10);
-        require(LibVoting.MIN_CHECKPOINT_PERIOD == 10, "checkpoint period correct");
 
         require(LibVoting.getSubmissionPeriod() == 10, "submission period correct");
 

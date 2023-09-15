@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {SubnetActorStorage} from "./lib/LibSubnetActorStorage.sol";
 import {ConsensusType} from "./enums/ConsensusType.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
-import {GatewayCannotBeZero, NotGateway} from "./errors/IPCErrors.sol";
+import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibVoting} from "./lib/LibVoting.sol";
 import {SubnetID} from "./structs/Subnet.sol";
@@ -17,12 +17,6 @@ contract SubnetActorDiamond {
     SubnetActorStorage internal s;
 
     using SubnetIDHelper for SubnetID;
-
-    // uint8 constant MIN_CHECKPOINT_PERIOD = 10;
-    uint256 public constant MIN_COLLATERAL_AMOUNT = 1 ether;
-
-    /// @notice minimum checkpoint period. Values get clamped to this
-    uint8 public constant MIN_CHECKPOINT_PERIOD = 10;
 
     struct ConstructorParams {
         SubnetID parentId;
@@ -38,26 +32,30 @@ contract SubnetActorDiamond {
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
+        if (params.ipcGatewayAddr == address(0)) {
+            revert GatewayCannotBeZero();
+        }
+        // topDownCheckPeriod can be equal 0, since validators can propose anything they want.
+        // The bottomUpCheckPeriod should be non-zero for now.
+        if (params.bottomUpCheckPeriod == 0) {
+            revert InvalidSubmissionPeriod();
+        }
+        if (params.minActivationCollateral == 0) {
+            revert InvalidCollateral();
+        }
+
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 
         s.parentId = params.parentId;
         s.name = params.name;
-        if (params.ipcGatewayAddr == address(0)) {
-            revert GatewayCannotBeZero();
-        }
         s.ipcGatewayAddr = params.ipcGatewayAddr;
         s.consensus = params.consensus;
-        s.minActivationCollateral = params.minActivationCollateral < MIN_COLLATERAL_AMOUNT
-            ? MIN_COLLATERAL_AMOUNT
-            : params.minActivationCollateral;
+        s.minActivationCollateral = params.minActivationCollateral;
         s.minValidators = params.minValidators;
-        s.topDownCheckPeriod = params.topDownCheckPeriod < MIN_CHECKPOINT_PERIOD
-            ? MIN_CHECKPOINT_PERIOD
-            : params.topDownCheckPeriod;
+        s.topDownCheckPeriod = params.topDownCheckPeriod;
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.status = Status.Instantiated;
-
         s.genesis = params.genesis;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
         // NOTE: we currently use 0 as the genesisEpoch for subnets so checkpoints
