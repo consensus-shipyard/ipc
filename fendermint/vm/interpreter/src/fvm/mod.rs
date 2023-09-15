@@ -18,15 +18,19 @@ pub use exec::FvmApplyRet;
 use fendermint_eth_hardhat::Hardhat;
 pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
+use libsecp256k1::{PublicKey, SecretKey};
 pub use query::FvmQueryRet;
 
 pub type FvmMessage = fvm_shared::message::Message;
 
 /// Interpreter working on already verified unsigned messages.
 #[derive(Clone)]
-pub struct FvmMessageInterpreter<DB> {
+pub struct FvmMessageInterpreter<DB, C> {
     contracts: Hardhat,
-    _phantom_db: PhantomData<DB>,
+    /// Tendermint client for broadcasting transactions and run API queries.
+    _client: C,
+    /// If this is a validator node, this should be the key we can use to sign transactions.
+    _validator_key: Option<(SecretKey, PublicKey)>,
     /// Overestimation rate applied to gas to ensure that the
     /// message goes through in the gas estimation.
     gas_overestimation_rate: f64,
@@ -36,21 +40,28 @@ pub struct FvmMessageInterpreter<DB> {
     /// Indicate whether transactions should be fully executed during the checks performed
     /// when they are added to the mempool, or just the most basic ones are performed.
     exec_in_check: bool,
+    _phantom_db: PhantomData<DB>,
 }
 
-impl<DB> FvmMessageInterpreter<DB> {
+impl<DB, C> FvmMessageInterpreter<DB, C> {
     pub fn new(
+        client: C,
+        validator_key: Option<SecretKey>,
         contracts_dir: PathBuf,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
     ) -> Self {
+        // Derive the public keys so it's available to check whether this node is a validator at any point in time.
+        let validator_key = validator_key.map(|sk| (sk, PublicKey::from_secret_key(&sk)));
         Self {
+            _client: client,
+            _validator_key: validator_key,
             contracts: Hardhat::new(contracts_dir),
-            _phantom_db: PhantomData,
             gas_overestimation_rate,
             gas_search_step,
             exec_in_check,
+            _phantom_db: PhantomData,
         }
     }
 }

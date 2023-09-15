@@ -40,9 +40,10 @@ pub struct FvmGenesisOutput {
 }
 
 #[async_trait]
-impl<DB> GenesisInterpreter for FvmMessageInterpreter<DB>
+impl<DB, TC> GenesisInterpreter for FvmMessageInterpreter<DB, TC>
 where
     DB: Blockstore + 'static + Send + Sync + Clone,
+    TC: Send + Sync + 'static,
 {
     type State = FvmGenesisState<DB>;
     type Genesis = Genesis;
@@ -486,7 +487,11 @@ mod tests {
             .await
             .expect("failed to create state");
 
-        let interpreter = FvmMessageInterpreter::new(contracts_path(), 1.05, 1.05, false);
+        let (client, _) =
+            tendermint_rpc::MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default());
+
+        let interpreter =
+            FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false);
 
         let (mut state, out) = interpreter
             .init(state, genesis.clone())

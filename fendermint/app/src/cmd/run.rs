@@ -29,7 +29,22 @@ cmd! {
 ///
 /// This method acts as our composition root.
 async fn run(settings: Settings) -> anyhow::Result<()> {
-    let interpreter = FvmMessageInterpreter::<NamespaceBlockstore>::new(
+    let client = tendermint_rpc::HttpClient::new(settings.tendermint_rpc_url()?)
+        .context("failed to create Tendermint client")?;
+
+    let validator_key = {
+        let sk = settings.validator_key();
+        if sk.exists() && sk.is_file() {
+            Some(read_secret_key(&sk).context("failed to read validator key")?)
+        } else {
+            tracing::debug!("validator key not configured");
+            None
+        }
+    };
+
+    let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
+        client,
+        validator_key,
         settings.contracts_dir(),
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,

@@ -22,9 +22,12 @@ async-stm = { workspace = true }
 anyhow = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
+libsecp256k1 = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tendermint = { workspace = true }
+tendermint-rpc = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 

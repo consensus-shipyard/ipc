@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::Context;
 use config::{Config, ConfigError, Environment, File};
 use ipc_sdk::subnet_id::SubnetID;
 use serde::Deserialize;
@@ -9,6 +10,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+use tendermint_rpc::Url;
 
 use fendermint_vm_encoding::human_readable_str;
 
@@ -87,6 +89,10 @@ pub struct Settings {
     contracts_dir: PathBuf,
     /// Builtin-actors CAR file.
     builtin_actors_bundle: PathBuf,
+    /// Where to reach CometBFT for queries or broadcasting transactions.
+    tendermint_rpc_url: Url,
+    /// Secp256k1 private key used for signing transactions. Leave empty if not validating.
+    validator_key: PathBuf,
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub eth: EthSettings,
@@ -118,7 +124,12 @@ macro_rules! home_relative {
 }
 
 impl Settings {
-    home_relative!(data_dir, contracts_dir, builtin_actors_bundle);
+    home_relative!(
+        data_dir,
+        contracts_dir,
+        builtin_actors_bundle,
+        validator_key
+    );
 
     /// Load the default configuration from a directory,
     /// then potential overrides specific to the run mode,
@@ -157,6 +168,15 @@ impl Settings {
     pub fn resolver_enabled(&self) -> bool {
         !self.resolver.connection.listen_addr.is_empty()
             && self.resolver.subnet_id != *ipc_sdk::subnet_id::UNDEF
+    }
+
+    /// Tendermint RPC URL from the environment or the config file.
+    pub fn tendermint_rpc_url(&self) -> anyhow::Result<Url> {
+        // Prefer the "standard" env var used in the CLI.
+        match std::env::var("TENDERMINT_RPC_URL").ok() {
+            Some(url) => url.parse::<Url>().context("invalid Tendermint URL"),
+            None => Ok(self.tendermint_rpc_url.clone()),
+        }
     }
 }
 

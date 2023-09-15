@@ -29,9 +29,10 @@ pub enum FvmQueryRet {
 }
 
 #[async_trait]
-impl<DB> QueryInterpreter for FvmMessageInterpreter<DB>
+impl<DB, TC> QueryInterpreter for FvmMessageInterpreter<DB, TC>
 where
     DB: Blockstore + 'static + Send + Sync + Clone,
+    TC: Send + Sync + 'static,
 {
     type State = FvmQueryState<DB>;
     type Query = FvmQuery;
@@ -144,7 +145,7 @@ where
     }
 }
 
-impl<DB> FvmMessageInterpreter<DB>
+impl<DB, TC> FvmMessageInterpreter<DB, TC>
 where
     DB: Blockstore + 'static + Send + Sync + Clone,
 {

@@ -20,9 +20,10 @@ pub struct FvmCheckRet {
 }
 
 #[async_trait]
-impl<DB> CheckInterpreter for FvmMessageInterpreter<DB>
+impl<DB, TC> CheckInterpreter for FvmMessageInterpreter<DB, TC>
 where
     DB: Blockstore + 'static + Send + Sync,
+    TC: Send + Sync + 'static,
 {
     // We simulate the full pending state so that client can call methods on
     // contracts that haven't been deployed yet.
