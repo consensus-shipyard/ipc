@@ -3,7 +3,9 @@
 
 mod check;
 mod exec;
+pub mod fevm;
 mod genesis;
+pub mod ipc;
 mod query;
 mod snapshot;
 

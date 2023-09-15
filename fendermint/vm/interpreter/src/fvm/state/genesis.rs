@@ -346,6 +346,13 @@ where
         &self.store
     }
 
+    pub fn exec_state(&mut self) -> Option<&mut FvmExecState<DB>> {
+        match self.stage {
+            Stage::Tree(_) => None,
+            Stage::Exec(ref mut exec) => Some(exec),
+        }
+    }
+
     fn put_state(&mut self, state: impl Serialize) -> anyhow::Result<Cid> {
         self.store()
             .put_cbor(&state, Code::Blake2b256)

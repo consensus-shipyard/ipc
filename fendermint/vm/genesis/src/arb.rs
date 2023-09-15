@@ -116,9 +116,11 @@ impl Arbitrary for ipc::GatewayParams {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self {
             subnet_id: ArbSubnetID::arbitrary(g).0,
-            bottom_up_check_period: u64::arbitrary(g),
+            // Gateway constructor would reject 0.
+            bottom_up_check_period: u64::arbitrary(g).max(1),
             top_down_check_period: u64::arbitrary(g),
-            min_collateral: ArbFee::arbitrary(g).0 + TokenAmount::from_whole(1),
+            // Gateway constructor would reject 0.
+            min_collateral: ArbFee::arbitrary(g).0.max(TokenAmount::from_atto(1)),
             msg_fee: ArbFee::arbitrary(g).0,
             majority_percentage: u8::arbitrary(g) % 101,
         }

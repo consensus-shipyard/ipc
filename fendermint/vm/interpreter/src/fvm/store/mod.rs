@@ -4,7 +4,6 @@ use cid::Cid;
 use fvm::EMPTY_ARR_CID;
 use fvm_ipld_blockstore::Blockstore;
 
-#[cfg(test)]
 pub mod memory;
 
 #[derive(Clone)]

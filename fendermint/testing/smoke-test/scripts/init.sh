@@ -56,6 +56,7 @@ fendermint \
     --subnet-id /r0 \
     --top-down-check-period 10 \
     --bottom-up-check-period 10 \
+    --min-collateral 1 \
     --msg-fee 10 \
     --majority-percentage 66
 

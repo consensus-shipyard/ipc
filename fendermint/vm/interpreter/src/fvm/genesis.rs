@@ -459,6 +459,7 @@ mod tests {
     use crate::{
         fvm::{
             bundle::{bundle_path, contracts_path},
+            state::ipc::GatewayCaller,
             store::memory::MemoryBlockstore,
             FvmMessageInterpreter,
         },
@@ -471,7 +472,11 @@ mod tests {
     async fn load_genesis() {
         let mut g = quickcheck::Gen::new(5);
         let mut genesis = Genesis::arbitrary(&mut g);
+
+        // Make sure we have IPC enabled.
         genesis.ipc = Some(IpcParams::arbitrary(&mut g));
+
+        eprintln!("genesis = {genesis:?}");
 
         let bundle = std::fs::read(bundle_path()).expect("failed to read bundle");
         let store = MemoryBlockstore::new();
@@ -483,13 +488,23 @@ mod tests {
 
         let interpreter = FvmMessageInterpreter::new(contracts_path(), 1.05, 1.05, false);
 
-        let (state, out) = interpreter
+        let (mut state, out) = interpreter
             .init(state, genesis.clone())
             .await
             .expect("failed to create actors");
 
-        let _state_root = state.commit().expect("failed to commit");
-
         assert_eq!(out.validators, genesis.validators);
+
+        // Try calling a method on the IPC Gateway.
+        let exec_state = state.exec_state().expect("should be in exec stage");
+        let caller = GatewayCaller::new();
+
+        let period = caller
+            .bottom_up_check_period(exec_state)
+            .expect("error calling the gateway");
+
+        assert_eq!(period, genesis.ipc.unwrap().gateway.bottom_up_check_period);
+
+        let _state_root = state.commit().expect("failed to commit");
     }
 }
