@@ -82,7 +82,7 @@ newgrp docker
 
 ## Connecting to a rootnet
 
-You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also use the public Spacenet testnet or deploy your own. Instructions are provided for both below, but we recommend using Calibration if possible.
+You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also deploy your own. 
 
 ### Option 1: Calibration
 Calibration is the primary testnet for Filecoin. It already hosts the IPC actors and can be used as a rootnet on which to deploy new subnets. 
@@ -104,29 +104,7 @@ registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
 
 To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).
 
-### Option 2: Spacenet
-Spacenet hosts all the IPC actors and can be used as a rootnet on which to deploy new subnets. For more information, have a look at the [Spacenet repo](https://github.com/consensus-shipyard/spacenet).
-
-In order to use the IPC agent with Spacenet we need to have access to a full node syncing with the network. The easiest way to achieve this is to run your own. Please follow the instructions on the [Spacenet repo](https://github.com/consensus-shipyard/spacenet/blob/main/README.md#getting-started-for-developers) to install the dependencies and set up your node.
-
-With the node running, you are ready to connect the IPC agent to Spacenet. For this, you'll need to get an authentication token for your node and create a wallet for the interaction.
-
-*Example*:
-```console
-# Generate auth token to node
-$ ./eudico auth token create --perm admin
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.8vIV7pCrWx-nxOBAAw_IayDzrGf22kMjagRYmj_8Qqw
-
-# Create new wallet
-$ ./eudico wallet new
-t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq
-```
-
-This information will be relevant to configure our agent to connect to this rootnet node.
-
-To be able to interact with Spacenet and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some Spacenet FIL for your address through the [Spacenet Faucet](https://spacenet.consensus.ninja/).
-
-### Option 3: Local deployment
+### Option 2: Local deployment
 To deploy a Example rootnet locally for testing you can use the IPC scripts installed in `./bin/ipc-infra` by running:
 ```bash
 ./bin/ipc-infra/run-root-docker-1val.sh <lotus-api-port> <validator-libp2p-port>
