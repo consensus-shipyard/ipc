@@ -1,0 +1,58 @@
+// Copyright 2022-2023 Protocol Labs
+// SPDX-License-Identifier: MIT
+//! List subnets cli command
+
+use async_trait::async_trait;
+use clap::Args;
+use fvm_shared::econ::TokenAmount;
+use ipc_sdk::subnet_id::SubnetID;
+use std::fmt::Debug;
+use std::str::FromStr;
+
+use crate::{get_ipc_provider, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
+
+/// The command to create a new subnet actor.
+pub(crate) struct ListSubnets;
+
+#[async_trait]
+impl CommandLineHandler for ListSubnets {
+    type Arguments = ListSubnetsArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("list subnets with args: {:?}", arguments);
+
+        let provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+
+        let gateway_addr = match &arguments.gateway_address {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
+
+        let ls = provider.list_child_subnets(gateway_addr, &subnet).await?;
+
+        for (_, s) in ls.iter() {
+            println!(
+                "{:?} - status: {:?}, collateral: {:?} FIL, circ.supply: {:?} FIL",
+                s.id,
+                s.status,
+                TokenAmount::from_whole(s.stake.atto().clone()),
+                TokenAmount::from_whole(s.circ_supply.atto().clone()),
+            );
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(
+    name = "list",
+    about = "List all child subnets registered in the gateway (i.e. that have provided enough collateral)"
+)]
+pub(crate) struct ListSubnetsArgs {
+    #[arg(long, short, help = "The gateway address to query subnets")]
+    pub gateway_address: Option<String>,
+    #[arg(long, short, help = "The subnet id to query child subnets")]
+    pub subnet: String,
+}
