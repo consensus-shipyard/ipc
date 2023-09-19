@@ -317,7 +317,7 @@ fn select_non_ephemeral(mut addr: Multiaddr) -> Multiaddr {
         }
     }
     keep.reverse();
-    Multiaddr::from_iter(keep.into_iter())
+    Multiaddr::from_iter(keep)
 }
 
 #[cfg(test)]

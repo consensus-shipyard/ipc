@@ -43,7 +43,7 @@ pub struct SubnetProviderCache {
 impl SubnetProviderCache {
     pub fn new(max_subnets: usize, static_subnets: Vec<SubnetID>) -> Self {
         Self {
-            pinned_subnets: HashSet::from_iter(static_subnets.into_iter()),
+            pinned_subnets: HashSet::from_iter(static_subnets),
             max_subnets,
             routable_peers: Default::default(),
             subnet_providers: Default::default(),

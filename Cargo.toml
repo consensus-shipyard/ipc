@@ -48,7 +48,7 @@ fvm_ipld_blockstore = { version = "0.1", optional = true }
 
 # Using the IPC SDK without the `fil-actor` feature so as not to depend on the actor `Runtime`.
 # Using the `main` branch instead of the highest available tag `v0.3.0` because the latter doesn't have a feature flag for the `Runtime`.
-ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-actors.git", default-features = false, branch = "main" }
+ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-agent.git", default-features = false, branch = "dev" }
 
 [dev-dependencies]
 quickcheck_macros = "1"
