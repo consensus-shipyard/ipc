@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use fvm_shared::address::Address;
+use ipc_sdk::gateway::Status;
 use std::str::FromStr;
 
 use crate::lotus::message::deserialize::{
@@ -10,7 +11,6 @@ use crate::lotus::message::deserialize::{
 use crate::lotus::message::ipc::BottomUpCheckpointWrapper;
 use crate::manager::SubnetInfo;
 use fvm_shared::econ::TokenAmount;
-use ipc_gateway::Status;
 use ipc_sdk::address::IPCAddress;
 use ipc_sdk::subnet_id::SubnetID;
 

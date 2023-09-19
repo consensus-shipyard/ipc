@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use crate::checkpoint::NativeBottomUpCheckpoint;
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
@@ -113,14 +112,6 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
 
     /// Returns the epoch of the latest top-down checkpoint executed
     async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch>;
-
-    /// Returns the list of checkpoints from a subnet actor for the given epoch range.
-    async fn list_checkpoints(
-        &self,
-        subnet_id: SubnetID,
-        from_epoch: ChainEpoch,
-        to_epoch: ChainEpoch,
-    ) -> Result<Vec<NativeBottomUpCheckpoint>>;
 
     /// Returns the validator set
     async fn get_validator_set(

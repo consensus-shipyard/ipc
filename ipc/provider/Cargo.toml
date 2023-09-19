@@ -11,19 +11,15 @@ license-file.workspace = true
 anyhow = { workspace = true }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
-futures = "0.3.28"
 futures-util = { workspace = true }
 reqwest = { workspace = true }
 
-indoc = "2.0.0"
 log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 cid = { workspace = true }
 tokio = { workspace = true }
-tokio-graceful-shutdown = "0.12.1"
 tokio-tungstenite = { workspace = true }
-derive_builder = "0.12.0"
 num-traits = { workspace = true }
 num-derive = "0.3.3"
 base64 = { workspace = true }
@@ -41,8 +37,6 @@ ethers-contract = { workspace = true }
 ethers = { workspace = true }
 fvm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true }
-ipc-subnet-actor = { workspace = true }
-ipc-gateway = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 primitives = { workspace = true }
 
@@ -52,3 +46,4 @@ ipc-sdk = { path = "../sdk" }
 [dev-dependencies]
 tempfile = { workspace = true }
 hex = { workspace = true }
+indoc = "2.0.0"

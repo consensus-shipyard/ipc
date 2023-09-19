@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use crate::checkpoint::NativeBottomUpCheckpoint;
 pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -19,7 +18,6 @@ use fvm_shared::address::Payload;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
-use ipc_sdk::checkpoint::TopDownCheckpoint;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
@@ -494,31 +492,6 @@ impl SubnetManager for EthSubnetManager {
         Ok(epoch as ChainEpoch)
     }
 
-    async fn list_checkpoints(
-        &self,
-        subnet_id: SubnetID,
-        from_epoch: ChainEpoch,
-        to_epoch: ChainEpoch,
-    ) -> Result<Vec<NativeBottomUpCheckpoint>> {
-        let address = contract_address_from_subnet(&subnet_id)?;
-        log::info!("listing checkpoints in evm subnet: {subnet_id} at contract: {address}");
-
-        let contract =
-            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
-        let checkpoints = contract
-            .list_bottom_up_checkpoints(from_epoch as u64, to_epoch as u64)
-            .call()
-            .await?;
-        log::debug!("list of bottom up checkpoints from evm: {checkpoints:?}");
-
-        let checkpoints = checkpoints
-            .into_iter()
-            .map(NativeBottomUpCheckpoint::try_from)
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(checkpoints)
-    }
-
     async fn get_validator_set(
         &self,
         subnet_id: &SubnetID,
@@ -625,85 +598,6 @@ impl EthManager for EthSubnetManager {
             .await?
             .as_u64();
         Ok(block_number as ChainEpoch)
-    }
-
-    async fn submit_top_down_checkpoint(
-        &self,
-        from: &Address,
-        checkpoint: TopDownCheckpoint,
-    ) -> Result<ChainEpoch> {
-        let checkpoint = gateway_router_facet::TopDownCheckpoint::try_from(checkpoint)?;
-        log::debug!("submit top down checkpoint: {:?}", checkpoint);
-
-        let signer = Arc::new(self.get_signer(from)?);
-        let gateway_contract =
-            GatewayRouterFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
-
-        let txn = gateway_contract.submit_top_down_checkpoint(checkpoint);
-        let txn = call_with_premium_estimation(signer, txn).await?;
-        let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
-    }
-
-    async fn submit_bottom_up_checkpoint(
-        &self,
-        from: &Address,
-        checkpoint: NativeBottomUpCheckpoint,
-    ) -> Result<ChainEpoch> {
-        let checkpoint = subnet_actor_manager_facet::BottomUpCheckpoint::try_from(checkpoint)?;
-
-        let route = &checkpoint.source.route;
-
-        log::debug!(
-            "submit bottom up checkpoint: {:?} to address: {:?}",
-            checkpoint,
-            route[route.len() - 1]
-        );
-
-        let signer = Arc::new(self.get_signer(from)?);
-        let contract = SubnetActorManagerFacet::new(route[route.len() - 1], signer.clone());
-
-        let txn = contract.submit_checkpoint(checkpoint);
-        let txn = call_with_premium_estimation(signer, txn).await?;
-        let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
-    }
-
-    async fn has_voted_in_subnet(
-        &self,
-        subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        validator: &Address,
-    ) -> Result<bool> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let validator = payload_to_evm_address(validator.payload())?;
-
-        let contract = SubnetActorManagerFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-
-        let has_voted = contract
-            .has_validator_voted_for_submission(epoch as u64, validator)
-            .call()
-            .await?;
-        Ok(has_voted)
-    }
-
-    async fn has_voted_in_gateway(&self, epoch: ChainEpoch, validator: &Address) -> Result<bool> {
-        let address = payload_to_evm_address(validator.payload())?;
-
-        let gateway_contract = GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let has_voted = gateway_contract
-            .has_validator_voted_for_submission(epoch as u64, address)
-            .call()
-            .await?;
-        Ok(has_voted)
     }
 
     async fn bottom_up_checkpoint(
@@ -909,11 +803,7 @@ impl EthSubnetManager {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();
 
-        let config = if let SubnetConfig::Fevm(config) = &subnet.config {
-            config
-        } else {
-            return Err(anyhow!("not evm config"));
-        };
+        let SubnetConfig::Fevm(config) = &subnet.config;
 
         let provider = if auth_token.is_some() {
             Http::new_with_auth(url, Authorization::Bearer(auth_token.unwrap()))?

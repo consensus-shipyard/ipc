@@ -10,26 +10,20 @@ use async_trait::async_trait;
 use base64::Engine;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
-use fil_actors_runtime::cbor;
 use fvm_ipld_encoding::{to_vec, RawBytes};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
-use fvm_shared::MethodNum;
 use ipc_identity::Wallet;
-use ipc_sdk::checkpoint::{BottomUpCheckpoint, TopDownCheckpoint};
-use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
-use crate::lotus::json::ToJson;
 use crate::lotus::message::chain::{ChainHeadResponse, GetTipSetByHeightResponse};
-use crate::lotus::message::ipc::{IPCReadGatewayStateResponse, IPCReadSubnetActorStateResponse};
 use crate::lotus::message::mpool::{
     EstimateGasResponse, MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
@@ -37,7 +31,6 @@ use crate::lotus::message::state::{ReadStateResponse, StateWaitMsgResponse};
 use crate::lotus::message::wallet::{WalletKeyType, WalletListResponse};
 use crate::lotus::message::CIDMap;
 use crate::lotus::{LotusClient, NetworkVersion};
-use crate::manager::SubnetInfo;
 
 pub type DefaultLotusJsonRPCClient = LotusJsonRPCClient<JsonRpcClientImpl>;
 
@@ -58,17 +51,6 @@ mod methods {
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
     pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
-    pub const IPC_GET_PREV_CHECKPOINT_FOR_CHILD: &str = "Filecoin.IPCGetPrevCheckpointForChild";
-    pub const IPC_GET_CHECKPOINT_TEMPLATE: &str = "Filecoin.IPCGetCheckpointTemplateSerialized";
-    pub const IPC_GET_CHECKPOINT: &str = "Filecoin.IPCGetCheckpointSerialized";
-    pub const IPC_READ_GATEWAY_STATE: &str = "Filecoin.IPCReadGatewayState";
-    pub const IPC_READ_SUBNET_ACTOR_STATE: &str = "Filecoin.IPCReadSubnetActorState";
-    pub const IPC_LIST_CHILD_SUBNETS: &str = "Filecoin.IPCListChildSubnets";
-    pub const IPC_VALIDATOR_HAS_VOTED_BOTTOMUP: &str = "Filecoin.IPCHasVotedBottomUpCheckpoint";
-    pub const IPC_VALIDATOR_HAS_VOTED_TOPDOWN: &str = "Filecoin.IPCHasVotedTopDownCheckpoint";
-    pub const IPC_LIST_BOTTOMUP_CHECKPOINTS: &str = "Filecoin.IPCListCheckpointsSerialized";
-    pub const IPC_GET_TOPDOWN_MESSAGES: &str = "Filecoin.IPCGetTopDownMsgsSerialized";
-    pub const IPC_GENESIS_EPOCH_FOR_SUBNET: &str = "Filecoin.IPCGetGenesisEpochForSubnet";
 }
 
 /// The default state wait confidence value
@@ -365,231 +347,6 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .await?;
         log::debug!("received get_tipset_by_height response: {r:?}");
         Ok(r)
-    }
-
-    async fn ipc_submit_top_down_checkpoint(
-        &self,
-        gateway_addr: Address,
-        validator: &Address,
-        checkpoint: TopDownCheckpoint,
-    ) -> Result<ChainEpoch> {
-        let epoch = checkpoint.epoch;
-
-        let message = MpoolPushMessage::new(
-            gateway_addr,
-            *validator,
-            ipc_gateway::Method::SubmitTopDownCheckpoint as MethodNum,
-            cbor::serialize(&checkpoint, "topdown_checkpoint")?.to_vec(),
-        );
-        let message_cid = self.mpool_push(message).await.map_err(|e| {
-            log::error!("error submitting top down checkpoint at epoch {epoch:} at gateway: {gateway_addr:}");
-            e
-        })?;
-
-        self.state_wait_msg(message_cid)
-            .await
-            .map(|r| r.height as ChainEpoch)
-    }
-
-    async fn ipc_get_prev_checkpoint_for_child(
-        &self,
-        gateway_addr: &Address,
-        child_subnet_id: &SubnetID,
-    ) -> Result<Option<CIDMap>> {
-        if child_subnet_id.parent().is_none() {
-            return Err(anyhow!("The child_subnet_id must be a valid child subnet"));
-        }
-        let params = json!([gateway_addr.to_string(), child_subnet_id.to_json()]);
-
-        let r = self
-            .client
-            .request::<Option<CIDMap>>(methods::IPC_GET_PREV_CHECKPOINT_FOR_CHILD, params)
-            .await?;
-        Ok(r)
-    }
-
-    async fn ipc_get_checkpoint_template(
-        &self,
-        gateway_addr: &Address,
-        epoch: ChainEpoch,
-    ) -> Result<BottomUpCheckpoint> {
-        let r = self
-            .client
-            .request::<String>(
-                methods::IPC_GET_CHECKPOINT_TEMPLATE,
-                json!([gateway_addr.to_string(), epoch]),
-            )
-            .await?;
-
-        let bytes = base64::engine::general_purpose::STANDARD.decode(r)?;
-        let checkpoint = cbor::deserialize(&RawBytes::new(bytes), "checkpoint")?;
-
-        Ok(checkpoint)
-    }
-
-    async fn ipc_get_checkpoint(
-        &self,
-        subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-    ) -> Result<BottomUpCheckpoint> {
-        let params = json!([subnet_id.to_json(), epoch]);
-        let r = self
-            .client
-            .request::<String>(methods::IPC_GET_CHECKPOINT, params)
-            .await
-            .map_err(|e| {
-                log::debug!(
-                    "error getting checkpoint for epoch {epoch:} in subnet {:?}: {}",
-                    subnet_id,
-                    e.to_string()
-                );
-                e
-            })?;
-
-        let bytes = base64::engine::general_purpose::STANDARD.decode(r)?;
-        let checkpoint = cbor::deserialize(&RawBytes::new(bytes), "checkpoint")?;
-        Ok(checkpoint)
-    }
-
-    async fn ipc_read_gateway_state(
-        &self,
-        gateway_addr: &Address,
-        tip_set: Cid,
-    ) -> Result<IPCReadGatewayStateResponse> {
-        let params = json!([gateway_addr.to_string(), [CIDMap::from(tip_set)]]);
-        let r = self
-            .client
-            .request::<IPCReadGatewayStateResponse>(methods::IPC_READ_GATEWAY_STATE, params)
-            .await?;
-        Ok(r)
-    }
-
-    async fn ipc_read_subnet_actor_state(
-        &self,
-        subnet_id: &SubnetID,
-        tip_set: Cid,
-    ) -> Result<IPCReadSubnetActorStateResponse> {
-        let params = json!([subnet_id.to_json(), [CIDMap::from(tip_set)]]);
-        log::debug!("sending {params:?}");
-
-        let r = self
-            .client
-            .request::<IPCReadSubnetActorStateResponse>(
-                methods::IPC_READ_SUBNET_ACTOR_STATE,
-                params,
-            )
-            .await?;
-        Ok(r)
-    }
-
-    async fn ipc_list_child_subnets(&self, gateway_addr: Address) -> Result<Vec<SubnetInfo>> {
-        let params = json!([gateway_addr.to_string()]);
-        let r = self
-            .client
-            .request::<Option<Vec<SubnetInfo>>>(methods::IPC_LIST_CHILD_SUBNETS, params)
-            .await?;
-        Ok(r.unwrap_or_default())
-    }
-
-    async fn ipc_validator_has_voted_bottomup(
-        &self,
-        subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        validator: &Address,
-    ) -> Result<bool> {
-        let params = json!([subnet_id.to_json(), epoch, validator.to_string()]);
-        let r = self
-            .client
-            .request::<bool>(methods::IPC_VALIDATOR_HAS_VOTED_BOTTOMUP, params)
-            .await?;
-        Ok(r)
-    }
-
-    async fn ipc_validator_has_voted_topdown(
-        &self,
-        gateway_addr: &Address,
-        epoch: ChainEpoch,
-        validator: &Address,
-    ) -> Result<bool> {
-        let params = json!([gateway_addr.to_string(), epoch, validator.to_string()]);
-        let r = self
-            .client
-            .request::<bool>(methods::IPC_VALIDATOR_HAS_VOTED_TOPDOWN, params)
-            .await?;
-        Ok(r)
-    }
-
-    async fn ipc_get_topdown_msgs(
-        &self,
-        subnet_id: &SubnetID,
-        gateway_addr: &Address,
-        tip_set: Cid,
-        nonce: u64,
-    ) -> Result<Vec<CrossMsg>> {
-        let params = json!([
-            gateway_addr.to_string(),
-            subnet_id.to_json(),
-            [CIDMap::from(tip_set)],
-            nonce
-        ]);
-        let r = self
-            .client
-            .request::<Vec<String>>(methods::IPC_GET_TOPDOWN_MESSAGES, params)
-            .await?;
-
-        let msgs = r
-            .iter()
-            .map(|x| {
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(x)
-                    .map_err(|_| anyhow!("cannot decode cross-msgs base64 string"))?;
-
-                cbor::deserialize::<CrossMsg>(&RawBytes::new(bytes), "checkpoint")
-                    .map_err(|_| anyhow!("cannot decode cross-msgs base64 string"))
-            })
-            .collect::<Result<_>>()?;
-
-        Ok(msgs)
-    }
-
-    async fn ipc_get_genesis_epoch_for_subnet(
-        &self,
-        subnet_id: &SubnetID,
-        gateway_addr: Address,
-    ) -> Result<ChainEpoch> {
-        let params = json!([gateway_addr.to_string(), subnet_id.to_json()]);
-        let r = self
-            .client
-            .request::<ChainEpoch>(methods::IPC_GENESIS_EPOCH_FOR_SUBNET, params)
-            .await?;
-        Ok(r)
-    }
-
-    async fn ipc_list_checkpoints(
-        &self,
-        subnet_id: SubnetID,
-        from_epoch: ChainEpoch,
-        to_epoch: ChainEpoch,
-    ) -> Result<Vec<BottomUpCheckpoint>> {
-        let params = json!([subnet_id.to_json(), from_epoch, to_epoch]);
-        let r = self
-            .client
-            .request::<Vec<String>>(methods::IPC_LIST_BOTTOMUP_CHECKPOINTS, params)
-            .await?;
-
-        let checkpoints = r
-            .iter()
-            .map(|x| {
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(x)
-                    .map_err(|_| anyhow!("cannot decode checkpoint base64 string"))?;
-
-                cbor::deserialize::<BottomUpCheckpoint>(&RawBytes::new(bytes), "checkpoint")
-                    .map_err(|_| anyhow!("cannot decode checkpoint base64 string"))
-            })
-            .collect::<Result<_>>()?;
-
-        Ok(checkpoints)
     }
 }
 

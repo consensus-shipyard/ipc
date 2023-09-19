@@ -3,8 +3,6 @@
 
 //! Type conversion for IPC Agent struct with solidity contract struct
 
-mod checkpoint;
-
 use crate::manager::evm::manager::agent_subnet_to_evm_addresses;
 use crate::manager::evm::manager::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
@@ -19,9 +17,9 @@ use fvm_shared::address::{Address, Payload};
 use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
-use ipc_gateway::Status;
 use ipc_sdk::address::IPCAddress;
 use ipc_sdk::cross::{CrossMsg, StorableMsg};
+use ipc_sdk::gateway::Status;
 use ipc_sdk::subnet_id::SubnetID;
 use primitives::EthAddress;
 use std::str::FromStr;

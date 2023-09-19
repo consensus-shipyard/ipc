@@ -87,7 +87,7 @@ fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::subnet::{EVMSubnet, FVMSubnet, SubnetConfig};
+    use crate::config::subnet::{EVMSubnet, SubnetConfig};
     use crate::config::{Config, Server, Subnet};
     use fvm_shared::address::Address;
     use ipc_sdk::subnet_id::SubnetID;
@@ -139,20 +139,6 @@ mod tests {
             subnets: Default::default(),
         };
 
-        let subnet1 = Subnet {
-            id: SubnetID::new_root(123),
-            network_name: "test".to_string(),
-            config: SubnetConfig::Fvm(FVMSubnet {
-                gateway_addr: Address::from_str("f01").unwrap(),
-                jsonrpc_api_http: "http://127.0.0.1:3030/rpc/v1".parse().unwrap(),
-                auth_token: None,
-                accounts: vec![
-                    Address::from_str("f01").unwrap(),
-                    Address::from_str("f01").unwrap(),
-                ],
-            }),
-        };
-
         let eth_addr1 = EthAddress::from_str("0x6BE1Ccf648c74800380d0520D797a170c808b624").unwrap();
         let subnet2 = Subnet {
             id: SubnetID::new_root(1234),
@@ -165,7 +151,6 @@ mod tests {
                 registry_addr: Address::from(eth_addr1),
             }),
         };
-        config.add_subnet(subnet1);
         config.add_subnet(subnet2);
         assert!(toml::to_string(&config).is_ok());
     }

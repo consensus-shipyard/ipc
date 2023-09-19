@@ -10,19 +10,14 @@ license-file.workspace = true
 anyhow = { workspace = true }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
-futures = "0.3.28"
 futures-util = { workspace = true }
 reqwest = { workspace = true }
-indoc = "2.0.0"
 log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 cid = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = "0.1.12"
-tokio-graceful-shutdown = "0.12.1"
 tokio-tungstenite = { workspace = true }
-derive_builder = "0.12.0"
 num-traits = { workspace = true }
 num-derive = "0.3.3"
 env_logger = "0.10.0"
@@ -30,7 +25,6 @@ base64 = { workspace = true }
 strum = { version = "0.24", features = ["derive"] }
 toml = "0.7.2"
 url = { workspace = true }
-warp = "0.3.3"
 bytes = "1.4.0"
 serde_bytes = "0.11.9"
 clap = { version = "4.1.4", features = ["env", "derive"] }

@@ -27,8 +27,6 @@ pub struct Subnet {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "network_type")]
 pub enum SubnetConfig {
-    #[serde(rename = "fvm")]
-    Fvm(FVMSubnet),
     #[serde(rename = "fevm")]
     Fevm(EVMSubnet),
 }
@@ -36,42 +34,36 @@ pub enum SubnetConfig {
 /// A helper enum to differentiate the different network types
 #[derive(PartialEq, Eq)]
 pub enum NetworkType {
-    Fvm,
     Fevm,
 }
 
 impl Subnet {
     pub fn network_type(&self) -> NetworkType {
         match &self.config {
-            SubnetConfig::Fvm(_) => NetworkType::Fvm,
             SubnetConfig::Fevm(_) => NetworkType::Fevm,
         }
     }
 
     pub fn auth_token(&self) -> Option<String> {
         match &self.config {
-            SubnetConfig::Fvm(s) => s.auth_token.clone(),
             SubnetConfig::Fevm(s) => s.auth_token.clone(),
         }
     }
 
     pub fn rpc_http(&self) -> &Url {
         match &self.config {
-            SubnetConfig::Fvm(s) => &s.jsonrpc_api_http,
             SubnetConfig::Fevm(s) => &s.provider_http,
         }
     }
 
     pub fn gateway_addr(&self) -> Address {
         match &self.config {
-            SubnetConfig::Fvm(s) => s.gateway_addr,
             SubnetConfig::Fevm(s) => s.gateway_addr,
         }
     }
 
     pub fn accounts(&self) -> Vec<Address> {
         match &self.config {
-            SubnetConfig::Fvm(s) => s.accounts.clone(),
             SubnetConfig::Fevm(s) => s.accounts.clone(),
         }
     }

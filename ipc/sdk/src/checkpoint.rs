@@ -228,14 +228,6 @@ impl Validators {
     }
 }
 
-/// Checkpoints propagated from parent to child to signal the "final view" of the parent chain
-/// from the different validators in the subnet.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple, PartialEq, Eq)]
-pub struct TopDownCheckpoint {
-    pub epoch: ChainEpoch,
-    pub top_down_msgs: Vec<CrossMsg>,
-}
-
 impl Serialize for BatchCrossMsgs {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

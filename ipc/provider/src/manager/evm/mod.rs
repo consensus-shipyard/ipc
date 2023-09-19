@@ -9,14 +9,12 @@ mod manager;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use ipc_sdk::checkpoint::TopDownCheckpoint;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
 pub use manager::EthSubnetManager;
 
-use crate::checkpoint::NativeBottomUpCheckpoint;
 use crate::manager::evm::manager::subnet_actor_manager_facet;
 pub use convert::{eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount};
 
@@ -33,35 +31,6 @@ pub trait EthManager: SubnetManager {
 
     /// The current epoch/block number of the blockchain that the manager connects to.
     async fn current_epoch(&self) -> anyhow::Result<ChainEpoch>;
-
-    /// Submit top down checkpoint the gateway.
-    async fn submit_top_down_checkpoint(
-        &self,
-        from: &Address,
-        checkpoint: TopDownCheckpoint,
-    ) -> anyhow::Result<ChainEpoch>;
-
-    /// Submit bottom up checkpoint to the subnet actor.
-    async fn submit_bottom_up_checkpoint(
-        &self,
-        from: &Address,
-        checkpoint: NativeBottomUpCheckpoint,
-    ) -> anyhow::Result<ChainEpoch>;
-
-    /// Has the validator voted in subnet contract at epoch
-    async fn has_voted_in_subnet(
-        &self,
-        subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-        validator: &Address,
-    ) -> anyhow::Result<bool>;
-
-    /// Has the validator voted in the gateway for an epoch
-    async fn has_voted_in_gateway(
-        &self,
-        epoch: ChainEpoch,
-        validator: &Address,
-    ) -> anyhow::Result<bool>;
 
     /// Get all the top down messages till a certain epoch
     async fn bottom_up_checkpoint(
