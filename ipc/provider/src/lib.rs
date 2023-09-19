@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
-#![feature(let_chains)]
-
 use anyhow::anyhow;
 use base64::Engine;
 use config::ReloadableConfig;

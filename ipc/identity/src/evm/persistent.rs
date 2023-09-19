@@ -89,8 +89,10 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> KeyStore
 
 impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKeyStore<T> {
     pub fn new(path: PathBuf) -> Result<Self> {
-        if let Some(p) = path.parent() && !p.exists() {
-            return Err(anyhow!("parent does not exist for key store"));
+        if let Some(p) = path.parent() {
+            if !p.exists() {
+                return Err(anyhow!("parent does not exist for key store"));
+            }
         }
 
         let p = match File::open(&path) {

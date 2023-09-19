@@ -10,6 +10,8 @@ pub mod checkpoint;
 pub mod cross;
 pub mod error;
 pub mod gateway;
+#[cfg(feature = "fil-actor")]
+mod runtime;
 pub mod subnet;
 pub mod subnet_id;
 

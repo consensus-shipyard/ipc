@@ -1,6 +1,5 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-#![feature(try_blocks)]
 use ipc_provider::set_fil_network_from_env;
 
 #[tokio::main]

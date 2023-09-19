@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! Cross network messages related struct and utility functions.
-//!
+
 use crate::cross::CrossMsg;
 use crate::subnet_id::SubnetID;
 use crate::ValidatorSet;
@@ -9,10 +9,8 @@ use anyhow::anyhow;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
-use fil_actors_runtime::runtime::Runtime;
 use fvm_ipld_encoding::DAG_CBOR;
 use fvm_ipld_encoding::{serde_bytes, to_vec};
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use lazy_static::lazy_static;
@@ -84,14 +82,6 @@ impl BottomUpCheckpoint {
     /// and replace with None.
     pub fn cross_msgs(&mut self) -> Option<Vec<CrossMsg>> {
         self.data.cross_msgs.cross_msgs.clone()
-    }
-
-    /// Agents may set the source of a checkpoint using f2-based subnetIDs, \
-    /// but actors are expected to use f0-based subnetIDs, thus the need to enforce
-    /// that the source is a f0-based subnetID.
-    pub fn enforce_f0_source(&mut self, rt: &impl Runtime) -> anyhow::Result<()> {
-        self.data.source = self.source().f0_id(rt);
-        Ok(())
     }
 
     /// Get the sum of values in cross messages
@@ -212,19 +202,6 @@ impl Validators {
             validators,
             total_weight: weight,
         }
-    }
-
-    /// Get the weight of a validator
-    /// It expects ID addresses as an input
-    pub fn get_validator_weight(&self, rt: &impl Runtime, addr: &Address) -> Option<TokenAmount> {
-        self.validators
-            .validators()
-            .iter()
-            .find(|x| match rt.resolve_address(&x.addr) {
-                Some(id) => id == *addr,
-                None => false,
-            })
-            .map(|v| v.weight.clone())
     }
 }
 
