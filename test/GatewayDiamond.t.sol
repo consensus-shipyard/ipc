@@ -13,9 +13,11 @@ import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
 import {IPCMsgType} from "../src/enums/IPCMsgType.sol";
 import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
-import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck, ParentFinality} from "../src/structs/Checkpoint.sol";
+import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, BottomUpCheckpointNew, TopDownCheckpoint, StorableMsg, ChildCheck, ParentFinality} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress} from "../src/structs/Subnet.sol";
+import {ValidatorSet, ValidatorInfo, Membership, Validator} from "../src/structs/Validator.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CheckpointHelper} from "../src/lib/CheckpointHelper.sol";
@@ -31,6 +33,7 @@ import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
+import {MerkleTreeHelper} from "./MerkleTreeHelper.sol";
 
 contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     using SubnetIDHelper for SubnetID;
@@ -216,8 +219,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
         louper = DiamondLoupeFacet(address(gatewayDiamond));
 
-        addValidator(TOPDOWN_VALIDATOR_1, 100);
-
         gwConstructorParams.networkName = SubnetID({root: ROOTNET_CHAINID, route: path2});
 
         gatewayDiamond2 = new GatewayDiamond(gwDiamondCut, gwConstructorParams);
@@ -265,6 +266,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         saDiamond = new SubnetActorDiamond(saDiamondCut, saConstructorParams);
         saManager = SubnetActorManagerFacet(address(saDiamond));
         saGetter = SubnetActorGetterFacet(address(saDiamond));
+
+        addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
 
     function invariant_CrossMsgFee() public view {
@@ -1240,12 +1243,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         uint256[] memory weights = new uint256[](1);
         weights[0] = 100;
 
+        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+
         vm.prank(caller);
         vm.expectRevert(NotSystemActor.selector);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
-        gwRouter.commitParentFinality(finality, validators, weights);
+        gwRouter.commitParentFinality(finality, n, validators, weights);
     }
 
     function testGatewayDiamond_CommitParentFinality_Fails_ValidatorsAndWeightsNotEqual() public {
@@ -1255,11 +1260,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         weights[0] = 100;
         weights[1] = 130;
 
+        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
         vm.prank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(ValidatorsAndWeightsLengthMismatch.selector);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        gwRouter.commitParentFinality(finality, validators, weights);
+        gwRouter.commitParentFinality(finality, n, validators, weights);
     }
 
     function testGatewayDiamond_CommitParentFinality_Fails_ZeroWeight() public {
@@ -1268,11 +1274,13 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         uint256[] memory weights = new uint256[](1);
         weights[0] = 0;
 
-        vm.prank(FilAddress.SYSTEM_ACTOR);
+        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(ValidatorWeightIsZero.selector);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        gwRouter.commitParentFinality(finality, validators, weights);
+        gwRouter.commitParentFinality(finality, n, validators, weights);
     }
 
     function testGatewayDiamond_CommitParentFinality_Works_MultipleValidators() public {
@@ -1283,22 +1291,24 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         weights[0] = 100;
         weights[1] = 150;
 
-        vm.prank(FilAddress.SYSTEM_ACTOR);
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        gwRouter.commitParentFinality(finality, validators, weights);
 
-        require(gwGetter.totalWeight() == 250);
+        gwRouter.commitParentFinality(finality, gwGetter.getLastConfigurationNumber() + 1, validators, weights);
+        gwManager.updateMembership();
+
+        require(gwGetter.getCurrentTotalWeight() == 250);
     }
 
     function testGatewayDiamond_CommitParentFinality_Works_NewValidators() public {
         addValidator(vm.addr(100), 100);
 
-        require(gwGetter.totalWeight() == 100);
+        require(gwGetter.getLastTotalWeight() == 100);
 
         addValidator(vm.addr(101), 1000);
 
-        require(gwGetter.totalWeight() == 1000);
+        require(gwGetter.getLastTotalWeight() == 1000);
     }
 
     function testGatewayDiamond_CommitParentFinality_Works_WithQuery() public {
@@ -1309,10 +1319,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         weights[0] = 100;
         weights[1] = 150;
 
-        vm.prank(FilAddress.SYSTEM_ACTOR);
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        gwRouter.commitParentFinality(finality, validators, weights);
+
+        gwRouter.commitParentFinality(finality, gwGetter.getLastConfigurationNumber() + 1, validators, weights);
+        gwManager.updateMembership();
 
         ParentFinality memory committedFinality = gwGetter.getParentFinality(block.number);
 
@@ -1355,6 +1367,174 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwRouter.applyCrossMessages(topDownMsgs);
     }
 
+    function testGatewayDiamond_Membership() public {
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+
+        Membership memory lastMb;
+        Membership memory curMb;
+
+        uint64 initConfigurationNumber = gwGetter.getLastConfigurationNumber();
+        uint64 newConfigurationNumber = initConfigurationNumber;
+
+        // new configuration
+        FvmAddress[] memory validators = new FvmAddress[](2);
+        validators[0] = FvmAddressHelper.from(address(this));
+        validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
+
+        uint256[] memory weights = new uint256[](2);
+        weights[0] = 100;
+        weights[1] = 200;
+
+        gwManager.newMembership(++newConfigurationNumber, validators, weights);
+        lastMb = gwGetter.getLastMembership();
+        require(gwGetter.getLastConfigurationNumber() == newConfigurationNumber, "last n correct");
+        require(gwGetter.getCurrentConfigurationNumber() != newConfigurationNumber, "current n correct");
+        require(lastMb.configurationNumber == newConfigurationNumber, "lastMb.n correct");
+        require(lastMb.validators.length == 2, "lastMb.validators.length correct");
+        require(lastMb.totalWeight == 300, "lastMb.totalWeight correct");
+
+        // new configuration
+        validators = new FvmAddress[](3);
+        validators[0] = FvmAddressHelper.from(address(this));
+        validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
+        validators[2] = FvmAddressHelper.from(address(vm.addr(301)));
+
+        weights = new uint256[](3);
+        weights[0] = 100;
+        weights[1] = 200;
+        weights[2] = 300;
+
+        gwManager.newMembership(++newConfigurationNumber, validators, weights);
+        lastMb = gwGetter.getLastMembership();
+        require(lastMb.configurationNumber == newConfigurationNumber, "nlast.configurationNumber correct");
+        require(lastMb.validators.length == 3, "lastMb.validators.length correct");
+        require(lastMb.totalWeight == 600, "lastMb.totalWeight correct");
+
+        // update
+        curMb = gwManager.updateMembership();
+        require(gwGetter.getCurrentConfigurationNumber() == newConfigurationNumber, "current n correct");
+        require(curMb.configurationNumber == newConfigurationNumber, "curMb.configurationNumber correct");
+        require(curMb.validators.length == 3, "curMb.validators.length correct");
+        require(curMb.totalWeight == 600, "curMb.totalWeight correct");
+    }
+
+    function testGatewayDiamond_createBottomUpCheckpoint() public {
+        (, address[] memory addrs, uint256[] memory weights) = setupValidatorsForCheckpoint();
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+
+        BottomUpCheckpointNew memory checkpoint = BottomUpCheckpointNew({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: 1,
+            blockHash: keccak256("block"),
+            nextConfigurationNumber: 1,
+            crossMessagesHash: keccak256("messages")
+        });
+
+        // failed to create a checkpoint with zero membership weight
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(ZeroMembershipWeight.selector);
+        gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, 0);
+        vm.stopPrank();
+
+        // create a checkpoint
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+        vm.stopPrank();
+
+        // failed to create a checkpoint with the same height
+        checkpoint = BottomUpCheckpointNew({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: 1,
+            blockHash: keccak256("block"),
+            nextConfigurationNumber: 2,
+            crossMessagesHash: keccak256("newmessages")
+        });
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(CheckpointAlreadyExists.selector);
+        gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_addCheckpointSignature() public {
+        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = setupValidatorsForCheckpoint();
+
+        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+            .createMerkleProofsForValidators(addrs, weights);
+
+        BottomUpCheckpointNew memory checkpoint = BottomUpCheckpointNew({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: 1,
+            blockHash: keccak256("block"),
+            nextConfigurationNumber: 1,
+            crossMessagesHash: keccak256("messages")
+        });
+
+        // create a checkpoint
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+        vm.stopPrank();
+
+        // adds signatures
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        bytes memory signature;
+
+        for (uint64 i = 0; i < 3; i++) {
+            (v, r, s) = vm.sign(privKeys[i], keccak256(abi.encode(checkpoint)));
+            signature = abi.encodePacked(r, s, v);
+
+            vm.startPrank(vm.addr(privKeys[i]));
+            gwRouter.addCheckpointSignature(1, membershipProofs[i], weights[i], signature);
+            vm.stopPrank();
+        }
+
+        require(gwGetter.getCheckpointCurrentWeight(1) == totalWeight(weights), "checkpoint weight was updated");
+    }
+
+    function testGatewayDiamond_addCheckpointSignature_notAuthorized() public {
+        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = setupValidatorsForCheckpoint();
+
+        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+            .createMerkleProofsForValidators(addrs, weights);
+
+        BottomUpCheckpointNew memory checkpoint = BottomUpCheckpointNew({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: 1,
+            blockHash: keccak256("block"),
+            nextConfigurationNumber: 1,
+            crossMessagesHash: keccak256("messages")
+        });
+
+        // create a checkpoint
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+        vm.stopPrank();
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        bytes memory signature;
+
+        (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(checkpoint)));
+        signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(vm.addr(privKeys[0]));
+        vm.expectRevert();
+        gwRouter.addCheckpointSignature(1, membershipProofs[0], weights[1], signature);
+        vm.stopPrank();
+    }
+
+    function totalWeight(uint256[] memory weights) internal pure returns (uint256 sum) {
+        for (uint64 i = 0; i < 3; i++) {
+            sum += weights[i];
+        }
+        return sum;
+    }
+
     function setupValidators() internal returns (FvmAddress[] memory validators, address[] memory addresses) {
         validators = new FvmAddress[](3);
         validators[0] = FvmAddressHelper.from(vm.addr(100));
@@ -1376,11 +1556,38 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         weights[1] = 100;
         weights[2] = 100;
 
+        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+
         vm.prank(FilAddress.SYSTEM_ACTOR);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
-        gwRouter.commitParentFinality(finality, validators, weights);
+        gwRouter.commitParentFinality(finality, n, validators, weights);
+    }
+
+    function setupValidatorsForCheckpoint()
+        internal
+        returns (uint256[] memory validatorKeys, address[] memory addresses, uint256[] memory weights)
+    {
+        validatorKeys = new uint256[](3);
+        validatorKeys[0] = 100;
+        validatorKeys[1] = 200;
+        validatorKeys[2] = 300;
+
+        addresses = new address[](3);
+        addresses[0] = vm.addr(validatorKeys[0]);
+        addresses[1] = vm.addr(validatorKeys[1]);
+        addresses[2] = vm.addr(validatorKeys[2]);
+
+        weights = new uint256[](3);
+        vm.deal(vm.addr(validatorKeys[0]), 1);
+        vm.deal(vm.addr(validatorKeys[1]), 1);
+        vm.deal(vm.addr(validatorKeys[2]), 1);
+
+        weights = new uint256[](3);
+        weights[0] = 100;
+        weights[1] = 101;
+        weights[2] = 300;
     }
 
     function addValidator(address validator) internal {
@@ -1394,10 +1601,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         weights[0] = weight;
 
         vm.deal(validator, 1);
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        gwRouter.commitParentFinality(finality, validators, weights);
+        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.commitParentFinality(finality, n, validators, weights);
+        vm.stopPrank();
     }
 
     function callback() public view {

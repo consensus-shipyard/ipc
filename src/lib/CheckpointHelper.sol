@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {EMPTY_HASH} from "../constants/Constants.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, BottomUpCheckpointNew, TopDownCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
 
 /// @title Helper library for manipulating Checkpoint struct
 /// @author LimeChain team
@@ -30,6 +30,10 @@ library CheckpointHelper {
         );
 
     function toHash(BottomUpCheckpoint memory bottomupCheckpoint) public pure returns (bytes32) {
+        return keccak256(abi.encode(bottomupCheckpoint));
+    }
+
+    function toHash(BottomUpCheckpointNew memory bottomupCheckpoint) public pure returns (bytes32) {
         return keccak256(abi.encode(bottomupCheckpoint));
     }
 

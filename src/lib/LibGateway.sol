@@ -5,7 +5,8 @@ import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {CrossMsg, BottomUpCheckpoint, ParentFinality} from "../structs/Checkpoint.sol";
-import {NotRegisteredSubnet, InvalidActorAddress, ValidatorWeightIsZero, ValidatorsAndWeightsLengthMismatch, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
+import {Membership, Validator} from "../structs/Validator.sol";
+import {OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ValidatorWeightIsZero, ValidatorsAndWeightsLengthMismatch, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
@@ -23,6 +24,10 @@ library LibGateway {
     using CrossMsgHelper for CrossMsg;
     using CheckpointHelper for BottomUpCheckpoint;
 
+    event MembershipReceived(uint64 n, FvmAddress[] validators, uint256[] weights);
+    event MembershipUpdated(uint64 n, Validator[] validators, uint256 totalWeight);
+
+    // TODO: remove or add a new getter
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
     /// @return epoch - the epoch of the checkpoint
@@ -34,7 +39,7 @@ library LibGateway {
     {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         epoch = LibVoting.getNextEpoch(block.number, s.bottomUpCheckPeriod);
-        checkpoint = s.bottomUpCheckpoints[epoch];
+        checkpoint = s.bottomUpCheckpointsLegacy[epoch];
         exists = !checkpoint.source.isEmpty();
     }
 
@@ -63,43 +68,92 @@ library LibGateway {
         s.latestParentHeight = finality.height;
     }
 
-    /// @notice set up the top-down validators and their voting power
+    /// @notice set the next membership
+    /// @dev It is called by the child subnet when a new configuration is adopted.
+    /// @param n - configuration number
     /// @param validators - list of validator addresses
     /// @param weights - list of validators voting powers
-    function setMembership(FvmAddress[] memory validators, uint256[] memory weights) internal {
+    function newMembership(uint64 n, FvmAddress[] memory validators, uint256[] memory weights) internal {
+        emit MembershipReceived({n: n, validators: validators, weights: weights});
+
         if (validators.length != weights.length) {
             revert ValidatorsAndWeightsLengthMismatch();
         }
 
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        // invalidate the previous validator set
-        ++s.validatorNonce;
+        // Most of the time there are no changes in membership
+        // and we will call this function for the same configuration number and validators.
+        // In this case we just ignore this membership message.
+        if (n == 0 || n == s.lastMembership.configurationNumber) {
+            return;
+        }
+        // We reject messages with configuration numbers from the past and revert the call.
+        if (n < s.lastMembership.configurationNumber) {
+            revert OldConfigurationNumber();
+        }
 
-        uint256 totalValidatorsWeight = 0;
+        // If the input configuration number is greater than the configuration number of the last membership then
+        // store it.
+        uint256 len = validators.length;
+        uint256 totalValidatorsWeight;
 
-        // setup the new validator set
-        uint256 validatorsLength = validators.length;
+        s.lastMembership.configurationNumber = n;
+        // clear old validators
+        delete s.lastMembership.validators;
+
         FvmAddress memory zero = FvmAddressHelper.from(address(0));
-        for (uint256 validatorIndex = 0; validatorIndex < validatorsLength; ) {
-            if (!FvmAddressHelper.equal(validators[validatorIndex], zero)) {
-                uint256 validatorWeight = weights[validatorIndex];
+        for (uint256 i = 0; i < len; ) {
+            if (!FvmAddressHelper.equal(validators[i], zero)) {
+                uint256 validatorWeight = weights[i];
 
                 if (validatorWeight == 0) {
                     revert ValidatorWeightIsZero();
                 }
 
-                s.validatorSet[s.validatorNonce][validators[validatorIndex].toHash()] = validatorWeight;
+                s.validatorSetWeights[n][validators[i].toHash()] = validatorWeight;
+
+                s.lastMembership.validators.push(Validator({addr: validators[i], weight: validatorWeight}));
 
                 totalValidatorsWeight += validatorWeight;
             }
 
             unchecked {
-                ++validatorIndex;
+                ++i;
             }
         }
+        s.lastMembership.totalWeight = totalValidatorsWeight;
+    }
 
-        s.totalWeight = totalValidatorsWeight;
+    /// @dev compares two memberships and returns true if they are equal
+    function membershipEqual(Membership memory mb1, Membership memory mb2) internal pure returns (bool) {
+        if (mb1.configurationNumber != mb2.configurationNumber) {
+            return false;
+        }
+        if (mb1.totalWeight != mb2.totalWeight) {
+            return false;
+        }
+        if (mb1.validators.length != mb2.validators.length) {
+            return false;
+        }
+        bytes32 h1 = keccak256(abi.encode(mb1.validators));
+        bytes32 h2 = keccak256(abi.encode(mb2.validators));
+
+        return h1 == h2;
+    }
+
+    /// @notice update the membership of the child subnet and returns it
+    function updateMembership() internal returns (Membership memory) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        if (membershipEqual(s.currentMembership, s.lastMembership)) {
+            return s.currentMembership;
+        }
+
+        s.currentMembership = s.lastMembership;
+        Membership memory mb = s.currentMembership;
+        emit MembershipUpdated({n: mb.configurationNumber, validators: mb.validators, totalWeight: mb.totalWeight});
+        return mb;
     }
 
     /// @notice commit topdown messages for their execution in the subnet. Adds the message to the subnet struct for future execution
@@ -212,5 +266,11 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         subnet = s.subnets[subnetId.toHash()];
         found = !subnet.id.isEmpty();
+    }
+
+    /// @notice returns the threshold corresponding to the majority percentage
+    function getThreshold(uint256 weight) internal view returns (uint256) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        return (weight * s.majorityPercentage) / 100;
     }
 }

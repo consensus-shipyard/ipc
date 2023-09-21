@@ -3,8 +3,9 @@ pragma solidity 0.8.19;
 
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, CrossMsg, ParentFinality} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, BottomUpCheckpointNew, CrossMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
+import {Membership} from "../structs/Validator.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
@@ -23,12 +24,22 @@ struct GatewayActorStorage {
     /// an actor that need to be propagated further through the hierarchy.
     /// cross-net message id => CrossMsg
     mapping(bytes32 => CrossMsg) postbox;
-    /// @notice BottomUpCheckpoints in the GW per epoch
-    // slither-disable-next-line uninitialized-state
-    mapping(uint64 => BottomUpCheckpoint) bottomUpCheckpoints;
     /// @notice List of validators and how many votes of the total each validator has for top-down messages
-    // validatorNonce => validator fvm address => weight
-    mapping(uint256 => mapping(bytes32 => uint256)) validatorSet;
+    // configurationNumber => validator fvm address => weight
+    mapping(uint64 => mapping(bytes32 => uint256)) validatorSetWeights;
+    /// @notice The current membership of the child subnet
+    Membership currentMembership;
+    /// @notice The last membership received from the parent and adopted
+    Membership lastMembership;
+    mapping(uint64 => BottomUpCheckpoint) bottomUpCheckpointsLegacy;
+    /// @notice A mapping of block numbers to bottom-up checkpoints
+    // slither-disable-next-line uninitialized-state
+    mapping(uint64 => BottomUpCheckpointNew) bottomUpCheckpoints;
+    /// @notice A mapping of block numbers to checkpoint data
+    // slither-disable-next-line uninitialized-state
+    mapping(uint64 => CheckpointInfo) bottomUpCheckpointInfo;
+    /// @notice The validators have already sent signatures at height `h`
+    mapping(uint64 => mapping(address => bool)) bottomUpCollectedSignatures;
     /// @notice epoch => SubnetID => [childIndex, exists(0 - no, 1 - yes)]
     mapping(uint64 => mapping(bytes32 => uint256[2])) children;
     /// @notice epoch => SubnetID => check => exists
@@ -42,12 +53,10 @@ struct GatewayActorStorage {
     SubnetID networkName;
     /// @notice Minimum stake required to create a new subnet
     uint256 minStake;
-    /// @notice sequence number that uniquely identifies a validator set
-    uint256 validatorNonce;
     /// @notice fee amount charged per cross message
     uint256 crossMsgFee;
-    /// @notice total votes of all validators
-    uint256 totalWeight;
+    /// @notice majority percentage value (must be greater than or equal to 51)
+    uint8 majorityPercentage;
     /// @notice nonce for bottom-up messages
     uint64 bottomUpNonce;
     /// @notice AppliedNonces keep track of the next nonce of the message to be applied.

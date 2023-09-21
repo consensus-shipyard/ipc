@@ -107,9 +107,8 @@ library LibDiamond {
             return;
         }
         enforceHasContractCode(_init, "diamondCut: _init address has no code");
-        // solhint-disable-next-line avoid-low-level-calls
         // slither-disable-next-line low-level-calls
-        (bool success, bytes memory error) = _init.delegatecall(_calldata);
+        (bool success, bytes memory error) = _init.delegatecall(_calldata); // solhint-disable-line avoid-low-level-calls
         if (!success) {
             if (error.length > 0) {
                 // bubble up error

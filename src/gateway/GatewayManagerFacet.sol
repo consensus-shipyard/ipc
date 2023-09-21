@@ -7,6 +7,7 @@ import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {AlreadyInitialized, AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
+import {ValidatorInfo, ValidatorSet, Membership} from "../structs/Validator.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -160,5 +161,19 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         });
 
         LibGateway.commitBottomUpMsg(crossMsg);
+    }
+
+    /// @notice set a new membership according to the configuration received from the parent
+    function newMembership(
+        uint64 n,
+        FvmAddress[] memory validators,
+        uint256[] memory weights
+    ) external systemActorOnly {
+        LibGateway.newMembership({n: n, validators: validators, weights: weights});
+    }
+
+    /// @notice updates the current membership of the child subnet to the last received one and returns the new value
+    function updateMembership() external systemActorOnly returns (Membership memory) {
+        return LibGateway.updateMembership();
     }
 }

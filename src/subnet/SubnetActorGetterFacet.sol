@@ -168,7 +168,12 @@ contract SubnetActorGetterFacet {
         return (result, offset + limit);
     }
 
-    /// @notice get the full details of the validators, not just their addresses.
+    /// @notice returns the configuration number.
+    function getConfigurationNumber() external view returns (uint256) {
+        return s.configurationNumber;
+    }
+
+    /// @notice get the full details of the validators, not just their addresses
     function getValidatorSet() external view returns (ValidatorSet memory) {
         uint256 length = s.validators.length();
 

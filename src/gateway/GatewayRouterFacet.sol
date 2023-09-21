@@ -3,15 +3,17 @@ pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {EMPTY_HASH, METHOD_SEND} from "../constants/Constants.sol";
-import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint, BottomUpCheckpointNew, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {Status} from "../enums/Status.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
-import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet} from "../errors/IPCErrors.sol";
+import {IPCMsgType} from "../enums/IPCMsgType.sol";
+import {Membership} from "../structs/Validator.sol";
+import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay} from "../errors/IPCErrors.sol";
+import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists} from "../errors/IPCErrors.sol";
 import {MessagesNotSorted, NotInitialized, NotEnoughBalance, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
-import {NotValidator, SubnetNotActive} from "../errors/IPCErrors.sol";
+import {NotValidator, SubnetNotActive, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {LibVoting} from "../lib/LibVoting.sol";
@@ -21,24 +23,34 @@ import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 
 contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
+    using CheckpointHelper for BottomUpCheckpointNew;
     using CrossMsgHelper for CrossMsg;
     using FvmAddressHelper for FvmAddress;
     using StorableMsgHelper for StorableMsg;
 
+    event QuorumReached(uint64 height, bytes32 checkpoint, uint256 quorumWeight);
+    event QuorumWeightUpdated(uint64 height, bytes32 checkpoint, uint256 newWeight);
+
     /// @notice commit the ipc parent finality into storage
+    /// @param finality - the parent finality
+    /// @param n - the configuration number for the next membership
+    /// @param validators - the validators of the next membership
+    /// @param weights - the weights of the validators
     function commitParentFinality(
         ParentFinality calldata finality,
+        uint64 n,
         FvmAddress[] calldata validators,
         uint256[] calldata weights
     ) external systemActorOnly {
         LibGateway.commitParentFinality(finality);
-
-        LibGateway.setMembership(validators, weights);
+        LibGateway.newMembership({n: n, validators: validators, weights: weights});
     }
 
     /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
@@ -174,5 +186,103 @@ contract GatewayRouterFacet is GatewayActorModifiers {
                 ++i;
             }
         }
+    }
+
+    /// @notice checks whether the provided checkpoint signature for a block at height `h ` is valid and accumulates that it.
+    /// @param height - the height of the block in the checkpoint
+    /// @param membershipProof - a Merkle proof that the validator was in the membership at height `h`
+    /// @param weight - the weight of the validator
+    /// @param signature - the signature of the checkpoint
+    function addCheckpointSignature(
+        uint64 height,
+        bytes32[] memory membershipProof,
+        uint256 weight,
+        bytes memory signature
+    ) external {
+        BottomUpCheckpointNew memory checkpoint = s.bottomUpCheckpoints[height];
+        if (checkpoint.blockHeight == 0) {
+            revert CheckpointNotCreated();
+        }
+
+        CheckpointInfo storage checkpointInfo = s.bottomUpCheckpointInfo[height];
+        if (checkpointInfo.threshold == 0) {
+            revert CheckpointMembershipNotCreated();
+        }
+
+        bytes32 checkpointHash = checkpointInfo.hash;
+
+        // slither-disable-next-line unused-return
+        (address recoveredSignatory, ECDSA.RecoverError err, ) = ECDSA.tryRecover(checkpointHash, signature);
+        if (err != ECDSA.RecoverError.NoError) {
+            revert InvalidSignature();
+        }
+
+        // Check whether the validator has already sent a valid signature
+        if (s.bottomUpCollectedSignatures[height][recoveredSignatory]) {
+            revert SignatureReplay();
+        }
+
+        // The validator is allowed to send a signature if it was in the membership at the target height
+        // Constructing leaf: https://github.com/OpenZeppelin/merkle-tree#leaf-hash
+        bytes32 validatorLeaf = keccak256(bytes.concat(keccak256(abi.encode(recoveredSignatory, weight))));
+        bool valid = MerkleProof.verify({proof: membershipProof, root: checkpointInfo.rootHash, leaf: validatorLeaf});
+        if (!valid) {
+            revert NotAuthorized(recoveredSignatory);
+        }
+
+        // All checks passed.
+        // Adding signature and emitting events.
+
+        s.bottomUpCollectedSignatures[height][recoveredSignatory] = true;
+        checkpointInfo.currentWeight += weight;
+
+        if (checkpointInfo.currentWeight >= checkpointInfo.threshold) {
+            if (!checkpointInfo.reached) {
+                checkpointInfo.reached = true;
+                emit QuorumReached({
+                    height: height,
+                    checkpoint: checkpointHash,
+                    quorumWeight: checkpointInfo.currentWeight
+                });
+            } else {
+                emit QuorumWeightUpdated({
+                    height: height,
+                    checkpoint: checkpointHash,
+                    newWeight: checkpointInfo.currentWeight
+                });
+            }
+        }
+    }
+
+    /// @notice creates a new bottom-up checkpoint
+    /// @param checkpoint - a bottom-up checkpoint
+    /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
+    /// @param membershipWeight - the total weight of the membership
+    function createBottomUpCheckpoint(
+        BottomUpCheckpointNew calldata checkpoint,
+        bytes32 membershipRootHash,
+        uint256 membershipWeight
+    ) external systemActorOnly {
+        if (s.bottomUpCheckpoints[checkpoint.blockHeight].blockHeight > 0) {
+            revert CheckpointAlreadyExists();
+        }
+        if (s.bottomUpCheckpointInfo[checkpoint.blockHeight].threshold > 0) {
+            revert CheckpointInfoAlreadyExists();
+        }
+        if (membershipWeight == 0) {
+            revert ZeroMembershipWeight();
+        }
+
+        uint256 threshold = LibGateway.getThreshold(membershipWeight);
+
+        s.bottomUpCheckpoints[checkpoint.blockHeight] = checkpoint;
+
+        s.bottomUpCheckpointInfo[checkpoint.blockHeight] = CheckpointInfo({
+            hash: checkpoint.toHash(),
+            rootHash: membershipRootHash,
+            threshold: threshold,
+            currentWeight: 0,
+            reached: false
+        });
     }
 }

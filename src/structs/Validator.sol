@@ -14,3 +14,14 @@ struct ValidatorSet {
     ValidatorInfo[] validators;
     uint64 configurationNumber;
 }
+
+struct Validator {
+    uint256 weight;
+    FvmAddress addr;
+}
+
+struct Membership {
+    Validator[] validators;
+    uint64 configurationNumber;
+    uint256 totalWeight;
+}
