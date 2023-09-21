@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+. "$(dirname -- "$0")/_/husky.sh"
+
+# sometime one cannot compile abi on mac, just a way to ignore compilation
+# if one really cannot compile abi and obtains the `out` folder from other
+# sources. Use with care.
+if [[ ! $SKIP_COMPILE ]]; then
+    make compile-abi
+fi
+
+# update the rust binding if we need it
+if [[ ! $SKIP_RUST_BINDING ]]; then
+    make rust-binding
+fi
+
+# checks if there are changes in rust binding
+if [[ `git status ./binding --porcelain` ]]; then 
+    echo "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "\n********** NOT ALL RUST BINDINGS COMMITTED, COMMIT THEM **********\n";
+    git status ./binding --porcelain
+    echo "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+    exit 1;
+fi;

@@ -9,6 +9,10 @@ deploy-ipc:
 
 compile-abi:
 	./ops/compile-abi.sh $(OUTPUT)
+
+rust-binding:
+	BUILD_BINDINGS=1 cargo build --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
+
 # ==============================================================================
 # Running security checks within the local computer
 
