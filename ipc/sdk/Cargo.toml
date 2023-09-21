@@ -24,11 +24,14 @@ num-traits = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }
 thiserror = { workspace = true }
+ipc_actors_abis = { workspace = true, optional = true }
+ethers = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.95"
 fil_actors_runtime = { workspace = true }
 
 [features]
-default = ["fil-actor"]
+default = []
 fil-actor = ["fil_actors_runtime"]
+evm_type_convert = ["ipc_actors_abis", "ethers"]

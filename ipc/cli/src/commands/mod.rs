@@ -12,7 +12,6 @@ mod wallet;
 
 use crate::commands::checkpoint::CheckpointCommandsArgs;
 use crate::commands::crossmsg::CrossMsgsCommandsArgs;
-// use crate::commands::daemon::{LaunchDaemon, LaunchDaemonArgs};
 use crate::commands::util::UtilCommandsArgs;
 use crate::GlobalArguments;
 use anyhow::{Context, Result};
@@ -20,7 +19,7 @@ use anyhow::{Context, Result};
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
-use ipc_provider::manager::evm::ethers_address_to_fil_address;
+use ipc_sdk::evm::ethers_address_to_fil_address;
 
 use std::fmt::Debug;
 use std::io;
@@ -29,8 +28,6 @@ use std::str::FromStr;
 use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
 use subnet::SubnetCommandsArgs;
-
-// pub use subnet::*;
 
 /// We only support up to 9 decimal digits for transaction
 const FIL_AMOUNT_NANO_DIGITS: u32 = 9;

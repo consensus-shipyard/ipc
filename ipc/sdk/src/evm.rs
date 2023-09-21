@@ -3,24 +3,20 @@
 
 //! Type conversion for IPC Agent struct with solidity contract struct
 
-use crate::manager::evm::manager::agent_subnet_to_evm_addresses;
-use crate::manager::evm::manager::{
-    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
-    subnet_actor_getter_facet, subnet_actor_manager_facet,
-};
-use crate::manager::SubnetInfo;
+use crate::address::IPCAddress;
+use crate::cross::{CrossMsg, StorableMsg};
+use crate::subnet_id::SubnetID;
 use anyhow::anyhow;
-use ethers::abi::{ParamType, Token};
 use ethers::types::U256;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{Address, Payload};
 use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
-use ipc_sdk::address::IPCAddress;
-use ipc_sdk::cross::{CrossMsg, StorableMsg};
-use ipc_sdk::gateway::Status;
-use ipc_sdk::subnet_id::SubnetID;
+use ipc_actors_abis::{
+    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
+    subnet_actor_getter_facet, subnet_actor_manager_facet,
+};
 use primitives::EthAddress;
 use std::str::FromStr;
 
@@ -29,32 +25,13 @@ use std::str::FromStr;
 /// code.
 macro_rules! base_type_conversion {
     ($module:ident) => {
-        impl From<Address> for $module::FvmAddress {
-            fn from(value: Address) -> Self {
-                $module::FvmAddress {
-                    addr_type: value.protocol() as u8,
-                    payload: addr_payload_to_bytes(value.into_payload()),
-                }
-            }
-        }
-
-        impl TryFrom<$module::FvmAddress> for Address {
-            type Error = anyhow::Error;
-
-            fn try_from(value: $module::FvmAddress) -> Result<Self, Self::Error> {
-                let protocol = value.addr_type;
-                let addr = bytes_to_fvm_addr(protocol, &value.payload)?;
-                Ok(addr)
-            }
-        }
-
         impl TryFrom<&SubnetID> for $module::SubnetID {
             type Error = anyhow::Error;
 
             fn try_from(subnet: &SubnetID) -> Result<Self, Self::Error> {
                 Ok($module::SubnetID {
                     root: subnet.root_id(),
-                    route: agent_subnet_to_evm_addresses(subnet)?,
+                    route: subnet_id_to_evm_addresses(subnet)?,
                 })
             }
         }
@@ -183,89 +160,27 @@ cross_msg_types!(gateway_getter_facet);
 cross_msg_types!(gateway_router_facet);
 cross_msg_types!(gateway_messenger_facet);
 
-impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
-    type Error = anyhow::Error;
-
-    fn try_from(value: gateway_getter_facet::Subnet) -> Result<Self, Self::Error> {
-        Ok(SubnetInfo {
-            id: SubnetID::try_from(value.id)?,
-            stake: eth_to_fil_amount(&value.stake)?,
-            circ_supply: eth_to_fil_amount(&value.circ_supply)?,
-            status: match value.status {
-                1 => Status::Active,
-                2 => Status::Inactive,
-                3 => Status::Killed,
-                _ => return Err(anyhow!("invalid status: {:}", value.status)),
-            },
-        })
-    }
+/// Convert the ipc SubnetID type to a vec of evm addresses. It extracts all the children addresses
+/// in the subnet id and turns them as a vec of evm addresses.
+pub fn subnet_id_to_evm_addresses(
+    subnet: &SubnetID,
+) -> anyhow::Result<Vec<ethers::types::Address>> {
+    let children = subnet.children();
+    children
+        .iter()
+        .map(|addr| payload_to_evm_address(addr.payload()))
+        .collect::<anyhow::Result<_>>()
 }
 
-/// Converts a Rust type FVM address into its underlying payload
-/// so it can be represented internally in a Solidity contract.
-fn addr_payload_to_bytes(payload: Payload) -> ethers::types::Bytes {
+/// Util function to convert Fil address payload to evm address. Only delegated address is supported.
+pub fn payload_to_evm_address(payload: &Payload) -> anyhow::Result<ethers::types::Address> {
     match payload {
-        Payload::Secp256k1(v) => ethers::types::Bytes::from(v),
-        Payload::Delegated(d) => {
-            let addr = d.subaddress();
-            let b = ethers::abi::encode(&[Token::Tuple(vec![
-                Token::Uint(U256::from(d.namespace())),
-                Token::Uint(U256::from(addr.len())),
-                Token::Bytes(addr.to_vec()),
-            ])]);
-            ethers::types::Bytes::from(b)
+        Payload::Delegated(delegated) => {
+            let slice = delegated.subaddress();
+            Ok(ethers::types::Address::from_slice(&slice[0..20]))
         }
-        _ => unimplemented!(),
+        _ => Err(anyhow!("address provided is not delegated")),
     }
-}
-
-/// It takes the bytes from an FVMAddress represented in Solidity and
-/// converts it into the corresponding FVM address Rust type.
-fn bytes_to_fvm_addr(protocol: u8, bytes: &[u8]) -> anyhow::Result<Address> {
-    let addr = match protocol {
-        1 => Address::from_bytes(&[[1u8].as_slice(), bytes].concat())?,
-        4 => {
-            let mut data = ethers::abi::decode(
-                &[ParamType::Tuple(vec![
-                    ParamType::Uint(32),
-                    ParamType::Uint(32),
-                    ParamType::Bytes,
-                ])],
-                bytes,
-            )?;
-
-            let mut data = data
-                .pop()
-                .ok_or_else(|| anyhow!("invalid tuple data length"))?
-                .into_tuple()
-                .ok_or_else(|| anyhow!("not tuple"))?;
-
-            let raw_bytes = data
-                .pop()
-                .ok_or_else(|| anyhow!("invalid length, should be 3"))?
-                .into_bytes()
-                .ok_or_else(|| anyhow!("invalid bytes"))?;
-            let len = data
-                .pop()
-                .ok_or_else(|| anyhow!("invalid length, should be 3"))?
-                .into_uint()
-                .ok_or_else(|| anyhow!("invalid uint"))?
-                .as_u128();
-            let namespace = data
-                .pop()
-                .ok_or_else(|| anyhow!("invalid length, should be 3"))?
-                .into_uint()
-                .ok_or_else(|| anyhow!("invalid uint"))?
-                .as_u64();
-
-            if len as usize != raw_bytes.len() {
-                return Err(anyhow!("bytes len not match"));
-            }
-            Address::new_delegated(namespace, &raw_bytes)?
-        }
-        _ => return Err(anyhow!("address not support now")),
-    };
-    Ok(addr)
 }
 
 /// Converts a Fil TokenAmount into an ethers::U256 amount.
@@ -286,4 +201,31 @@ pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::R
 
     let eth_addr = EthAddress::from_str(&raw_addr)?;
     Ok(Address::from(eth_addr))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::evm::subnet_id_to_evm_addresses;
+    use crate::subnet_id::SubnetID;
+    use fvm_shared::address::Address;
+    use primitives::EthAddress;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_subnet_id_to_evm_addresses() {
+        let eth_addr = EthAddress::from_str("0x0000000000000000000000000000000000000000").unwrap();
+        let addr = Address::from(eth_addr);
+        let addr2 = Address::from_str("f410ffzyuupbyl2uiucmzr3lu3mtf3luyknthaz4xsrq").unwrap();
+
+        let id = SubnetID::new(0, vec![addr, addr2]);
+
+        let addrs = subnet_id_to_evm_addresses(&id).unwrap();
+
+        let a =
+            ethers::types::Address::from_str("0x0000000000000000000000000000000000000000").unwrap();
+        let b =
+            ethers::types::Address::from_str("0x2e714a3c385ea88a09998ed74db265dae9853667").unwrap();
+
+        assert_eq!(addrs, vec![a, b]);
+    }
 }

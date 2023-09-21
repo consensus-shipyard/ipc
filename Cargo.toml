@@ -41,6 +41,8 @@ rand = "0.8"
 hex = "0.4.3"
 tempfile = "3.4.0"
 serde_json = { version = "1.0.91", features = ["raw_value"] }
+ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "dev" }
+ipc-sdk = { path = "./ipc/sdk", features = ["evm_type_convert"] }
 
 fvm_ipld_blockstore = "0.1.1"
 fvm_ipld_encoding = "0.3.3"

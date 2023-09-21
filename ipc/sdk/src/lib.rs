@@ -15,6 +15,9 @@ mod runtime;
 pub mod subnet;
 pub mod subnet_id;
 
+#[cfg(feature = "evm_type_convert")]
+pub mod evm;
+
 /// Encodes the a ChainEpoch as a varInt for its use
 /// as a key of a HAMT. This serialization has been
 /// tested to be compatible with its go counter-part

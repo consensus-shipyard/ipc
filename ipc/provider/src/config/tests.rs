@@ -16,16 +16,10 @@ use crate::config::{Config, ReloadableConfig};
 
 // Arguments for the config's fields
 const SERVER_JSON_RPC_ADDR: &str = "127.0.0.1:3030";
-const ROOT_ID: &str = "/r123";
 const CHILD_ID: &str = "/r123/f0100";
-const GATEWAY_ADDR: &str = "f064";
-const ROOT_AUTH_TOKEN: &str = "ROOT_AUTH_TOKEN";
 const CHILD_AUTH_TOKEN: &str = "CHILD_AUTH_TOKEN";
-const JSONRPC_API_HTTP: &str = "https://example.org/rpc/v0";
 const PROVIDER_HTTP: &str = "http://127.0.0.1:3030/rpc/v1";
 const ETH_ADDRESS: &str = "0x6be1ccf648c74800380d0520d797a170c808b624";
-const ACCOUNT_ADDRESS: &str =
-    "f3thgjtvoi65yzdcoifgqh6utjbaod3ukidxrx34heu34d6avx6z7r5766t5jqt42a44ehzcnw3u5ehz47n42a";
 
 #[tokio::test]
 async fn reload_works() {
@@ -99,17 +93,6 @@ fn check_server_config() {
 fn check_subnets_config() {
     let config = read_config().subnets;
 
-    let rt_sn = SubnetID::from_str(ROOT_ID).unwrap();
-    let root = &config[&rt_sn];
-    assert_eq!(root.id, rt_sn);
-    assert_eq!(root.network_name, "root");
-    assert_eq!(
-        root.gateway_addr(),
-        Address::from_str(GATEWAY_ADDR).unwrap()
-    );
-    assert_eq!(*root.rpc_http(), Url::from_str(JSONRPC_API_HTTP).unwrap());
-    assert_eq!(root.auth_token().as_ref().unwrap(), ROOT_AUTH_TOKEN);
-
     let child_id = SubnetID::from_str(CHILD_ID).unwrap();
     let child = &config[&child_id];
     assert_eq!(child.id, child_id);
@@ -136,17 +119,6 @@ fn config_str() -> String {
         json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
 
         [[subnets]]
-        id = "{ROOT_ID}"
-        network_name = "root"
-
-        [subnets.config]
-        network_type = "fvm"
-        gateway_addr = "{GATEWAY_ADDR}"
-        jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-        auth_token = "{ROOT_AUTH_TOKEN}"
-        accounts = ["{ACCOUNT_ADDRESS}"]
-
-        [[subnets]]
         id = "{CHILD_ID}"
         network_name = "child"
 
@@ -166,17 +138,6 @@ fn config_str_diff_addr() -> String {
         r#"
         [server]
         json_rpc_address = "127.0.0.1:3031"
-
-        [[subnets]]
-        id = "{ROOT_ID}"
-        network_name = "root"
-
-        [subnets.config]
-        network_type = "fvm"
-        gateway_addr = "{GATEWAY_ADDR}"
-        jsonrpc_api_http = "{JSONRPC_API_HTTP}"
-        auth_token = "{ROOT_AUTH_TOKEN}"
-        accounts = ["{ACCOUNT_ADDRESS}"]
 
         [[subnets]]
         id = "{CHILD_ID}"

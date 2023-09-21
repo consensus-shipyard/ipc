@@ -5,29 +5,36 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-pub use crate::manager::evm::{ethers_address_to_fil_address, fil_to_eth_amount};
-use anyhow::{anyhow, Context, Result};
-use async_trait::async_trait;
-use ethers::abi::Tokenizable;
-use ethers::prelude::k256::ecdsa::SigningKey;
-use ethers::prelude::{abigen, Signer, SignerMiddleware};
-use ethers::providers::{Authorization, Http, Middleware, Provider};
-use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{Eip1559TransactionRequest, I256, U256};
-use fvm_shared::address::Payload;
-use fvm_shared::clock::ChainEpoch;
-use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
-use ipc_sdk::cross::CrossMsg;
-use ipc_sdk::subnet::ConstructParams;
-use ipc_sdk::subnet_id::SubnetID;
-use num_traits::ToPrimitive;
+use ipc_actors_abis::{
+    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
+    subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
+};
+use ipc_sdk::evm::{
+    eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount, payload_to_evm_address,
+    subnet_id_to_evm_addresses,
+};
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo, Validator, ValidatorSet};
 use crate::manager::subnet::TopDownCheckpointQuery;
 use crate::manager::{EthManager, SubnetManager};
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
+use ethers::abi::Tokenizable;
+use ethers::prelude::k256::ecdsa::SigningKey;
+use ethers::prelude::{Signer, SignerMiddleware};
+use ethers::providers::{Authorization, Http, Middleware, Provider};
+use ethers::signers::{LocalWallet, Wallet};
+use ethers::types::{Eip1559TransactionRequest, I256, U256};
+use fvm_shared::clock::ChainEpoch;
+use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
+use ipc_sdk::cross::CrossMsg;
+use ipc_sdk::gateway::Status;
+use ipc_sdk::subnet::ConstructParams;
+use ipc_sdk::subnet_id::SubnetID;
+use num_traits::ToPrimitive;
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
 
@@ -47,24 +54,6 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 /// The majority vote percentage for checkpoint submission when creating a subnet.
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
 const SUBNET_NAME_MAX_LEN: usize = 32;
-
-// Create type bindings for the IPC Solidity contracts
-abigen!(
-    SubnetActorGetterFacet,
-    "contracts/SubnetActorGetterFacet.json"
-);
-abigen!(
-    SubnetActorManagerFacet,
-    "contracts/SubnetActorManagerFacet.json"
-);
-abigen!(GatewayManagerFacet, "contracts/GatewayManagerFacet.json");
-abigen!(GatewayGetterFacet, "contracts/GatewayGetterFacet.json");
-abigen!(GatewayRouterFacet, "contracts/GatewayRouterFacet.json");
-abigen!(
-    GatewayMessengerFacet,
-    "contracts/GatewayMessengerFacet.json"
-);
-abigen!(SubnetRegistry, "contracts/SubnetRegistry.json");
 
 pub struct EthSubnetManager {
     keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
@@ -135,10 +124,10 @@ impl SubnetManager for EthSubnetManager {
 
         log::debug!("calling create subnet for EVM manager");
 
-        let route = agent_subnet_to_evm_addresses(&params.parent)?;
+        let route = subnet_id_to_evm_addresses(&params.parent)?;
         log::debug!("root SubnetID as Ethereum type: {route:?}");
 
-        let params = subnet_registry::ConstructParams {
+        let params = subnet_registry::ConstructorParams {
             parent_id: subnet_registry::SubnetID {
                 root: params.parent.root_id(),
                 route,
@@ -158,8 +147,10 @@ impl SubnetManager for EthSubnetManager {
 
         let signer = self.get_signer(&from)?;
         let signer = Arc::new(signer);
-        let registry_contract =
-            SubnetRegistry::new(self.ipc_contract_info.registry_addr, signer.clone());
+        let registry_contract = subnet_registry::SubnetRegistry::new(
+            self.ipc_contract_info.registry_addr,
+            signer.clone(),
+        );
 
         let call = call_with_premium_estimation(signer, registry_contract.new_subnet_actor(params))
             .await?;
@@ -213,11 +204,12 @@ impl SubnetManager for EthSubnetManager {
         );
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let contract = SubnetActorManagerFacet::new(address, signer.clone());
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.join(
             validator_net_addr,
-            subnet_actor_manager_facet::FvmAddress::from(worker_addr),
+            subnet_actor_manager_facet::FvmAddress::try_from(worker_addr)?,
         );
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
@@ -232,7 +224,8 @@ impl SubnetManager for EthSubnetManager {
         log::info!("leaving evm subnet: {subnet:} at contract: {address:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let contract = SubnetActorManagerFacet::new(address, signer.clone());
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         call_with_premium_estimation(signer, contract.leave())
             .await?
@@ -248,7 +241,8 @@ impl SubnetManager for EthSubnetManager {
         log::info!("kill evm subnet: {subnet:} at contract: {address:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let contract = SubnetActorManagerFacet::new(address, signer.clone());
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         call_with_premium_estimation(signer, contract.kill())
             .await?
@@ -265,7 +259,7 @@ impl SubnetManager for EthSubnetManager {
     ) -> Result<HashMap<SubnetID, SubnetInfo>> {
         self.ensure_same_gateway(&gateway_addr)?;
 
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -304,8 +298,10 @@ impl SubnetManager for EthSubnetManager {
         log::debug!("evm subnet id to fund: {evm_subnet_id:?}");
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let gateway_contract =
-            GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
+        let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
 
         let mut txn = gateway_contract.fund(
             evm_subnet_id,
@@ -337,8 +333,10 @@ impl SubnetManager for EthSubnetManager {
         log::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let gateway_contract =
-            GatewayManagerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
+        let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
         let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
         let txn = call_with_premium_estimation(signer, txn).await?;
@@ -368,8 +366,10 @@ impl SubnetManager for EthSubnetManager {
         log::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let gateway_contract =
-            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
+        let gateway_contract = gateway_messenger_facet::GatewayMessengerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
 
         let mut key = [0u8; 32];
         key.copy_from_slice(&postbox_msg_key);
@@ -393,8 +393,10 @@ impl SubnetManager for EthSubnetManager {
         log::info!("send evm cross messages to gateway contract: {gateway_addr:} with message: {cross_msg:?}");
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let gateway_contract =
-            GatewayMessengerFacet::new(self.ipc_contract_info.gateway_addr, signer.clone());
+        let gateway_contract = gateway_messenger_facet::GatewayMessengerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
 
         let evm_cross_msg = gateway_messenger_facet::CrossMsg::try_from(cross_msg)?;
         call_with_premium_estimation(signer, gateway_contract.send_cross_message(evm_cross_msg))
@@ -417,7 +419,8 @@ impl SubnetManager for EthSubnetManager {
         );
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let contract = SubnetActorManagerFacet::new(address, signer.clone());
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let txn = contract.set_validator_net_addr(net_addr);
 
@@ -438,10 +441,12 @@ impl SubnetManager for EthSubnetManager {
         log::info!("set validator worker addr: {worker_addr:} on evm subnet: {subnet:} at contract: {address:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
-        let contract = SubnetActorManagerFacet::new(address, signer.clone());
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let txn = contract
-            .set_validator_worker_addr(subnet_actor_manager_facet::FvmAddress::from(worker_addr));
+        let txn = contract.set_validator_worker_addr(
+            subnet_actor_manager_facet::FvmAddress::try_from(worker_addr)?,
+        );
 
         let txn = call_with_premium_estimation(signer, txn).await?;
 
@@ -483,7 +488,7 @@ impl SubnetManager for EthSubnetManager {
     async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch> {
         self.ensure_same_gateway(gateway_addr)?;
 
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -507,7 +512,7 @@ impl SubnetManager for EthSubnetManager {
         let evm_subnet_id = gateway_getter_facet::SubnetID::try_from(subnet_id)?;
         log::debug!("evm subnet id: {evm_subnet_id:?}");
 
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -523,8 +528,10 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(subnet_id)?;
         log::debug!("get validator info for subnet: {subnet_id:} at contract: {address:}");
 
-        let contract =
-            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
         let evm_validator_set = if let Some(epoch) = epoch {
             contract
                 .get_validator_set()
@@ -574,7 +581,7 @@ impl SubnetManager for EthSubnetManager {
 #[async_trait]
 impl EthManager for EthSubnetManager {
     async fn gateway_last_voting_executed_epoch(&self) -> Result<ChainEpoch> {
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -584,8 +591,10 @@ impl EthManager for EthSubnetManager {
 
     async fn subnet_last_voting_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract =
-            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
         let u = contract.last_voting_executed_epoch().call().await?;
         Ok(u as ChainEpoch)
     }
@@ -604,7 +613,7 @@ impl EthManager for EthSubnetManager {
         &self,
         epoch: ChainEpoch,
     ) -> Result<subnet_actor_manager_facet::BottomUpCheckpoint> {
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -619,7 +628,7 @@ impl EthManager for EthSubnetManager {
     }
 
     async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> Result<u64> {
-        let route = agent_subnet_to_evm_addresses(subnet_id)?;
+        let route = subnet_id_to_evm_addresses(subnet_id)?;
         log::debug!("getting applied top down nonce for route: {route:?}");
 
         let evm_subnet_id = gateway_getter_facet::SubnetID {
@@ -627,7 +636,7 @@ impl EthManager for EthSubnetManager {
             route,
         };
 
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -651,14 +660,14 @@ impl EthManager for EthSubnetManager {
         start_epoch: ChainEpoch,
         end_epoch: ChainEpoch,
     ) -> Result<Vec<ipc_sdk::cross::CrossMsg>> {
-        let route = agent_subnet_to_evm_addresses(subnet_id)?;
+        let route = subnet_id_to_evm_addresses(subnet_id)?;
         log::debug!("getting top down messages for route: {route:?}");
 
         let subnet_id = gateway_getter_facet::SubnetID {
             root: subnet_id.root_id(),
             route,
         };
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -685,8 +694,10 @@ impl EthManager for EthSubnetManager {
 
     async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract =
-            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
 
         let validators = contract.get_validators().call().await?;
         validators
@@ -696,7 +707,7 @@ impl EthManager for EthSubnetManager {
     }
 
     async fn gateway_initialized(&self) -> Result<bool> {
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -706,13 +717,15 @@ impl EthManager for EthSubnetManager {
 
     async fn subnet_bottom_up_checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract =
-            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
         Ok(contract.bottom_up_check_period().call().await? as ChainEpoch)
     }
 
     async fn gateway_top_down_check_period(&self) -> Result<ChainEpoch> {
-        let gateway_contract = GatewayGetterFacet::new(
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -725,8 +738,10 @@ impl EthManager for EthSubnetManager {
         epoch: ChainEpoch,
     ) -> Result<[u8; 32]> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract =
-            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
         let (exists, hash) = contract
             .bottom_up_checkpoint_hash_at_epoch(epoch as u64)
             .await?;
@@ -743,8 +758,10 @@ impl EthManager for EthSubnetManager {
 
     async fn min_validators(&self, subnet_id: &SubnetID) -> Result<u64> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract =
-            SubnetActorGetterFacet::new(address, Arc::new(self.ipc_contract_info.provider.clone()));
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
         Ok(contract.min_validators().call().await?)
     }
 }
@@ -975,37 +992,29 @@ fn contract_address_from_subnet(subnet: &SubnetID) -> Result<ethers::types::Addr
     payload_to_evm_address(ipc_addr.payload())
 }
 
-/// Convert the ipc SubnetID type to a vec of evm addresses. It extracts all the children addresses
-/// in the subnet id and turns them as a vec of evm addresses.
-pub(crate) fn agent_subnet_to_evm_addresses(
-    subnet: &SubnetID,
-) -> Result<Vec<ethers::types::Address>> {
-    let children = subnet.children();
-    children
-        .iter()
-        .map(|addr| payload_to_evm_address(addr.payload()))
-        .collect::<Result<_>>()
-}
+impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
+    type Error = anyhow::Error;
 
-/// Util function to convert Fil address payload to evm address. Only delegated address is supported.
-pub(crate) fn payload_to_evm_address(payload: &Payload) -> Result<ethers::types::Address> {
-    match payload {
-        Payload::Delegated(delegated) => {
-            let slice = delegated.subaddress();
-            Ok(ethers::types::Address::from_slice(&slice[0..20]))
-        }
-        _ => Err(anyhow!("address provided is not delegated")),
+    fn try_from(value: gateway_getter_facet::Subnet) -> Result<Self, Self::Error> {
+        Ok(SubnetInfo {
+            id: SubnetID::try_from(value.id)?,
+            stake: eth_to_fil_amount(&value.stake)?,
+            circ_supply: eth_to_fil_amount(&value.circ_supply)?,
+            status: match value.status {
+                1 => Status::Active,
+                2 => Status::Inactive,
+                3 => Status::Killed,
+                _ => return Err(anyhow!("invalid status: {:}", value.status)),
+            },
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::manager::evm::manager::{
-        agent_subnet_to_evm_addresses, contract_address_from_subnet,
-    };
+    use crate::manager::evm::manager::contract_address_from_subnet;
     use fvm_shared::address::Address;
     use ipc_sdk::subnet_id::SubnetID;
-    use primitives::EthAddress;
     use std::str::FromStr;
 
     #[test]
@@ -1018,23 +1027,5 @@ mod tests {
             format!("{eth:?}"),
             "0x2e714a3c385ea88a09998ed74db265dae9853667"
         );
-    }
-
-    #[test]
-    fn test_agent_subnet_to_evm_addresses() {
-        let eth_addr = EthAddress::from_str("0x0000000000000000000000000000000000000000").unwrap();
-        let addr = Address::from(eth_addr);
-        let addr2 = Address::from_str("f410ffzyuupbyl2uiucmzr3lu3mtf3luyknthaz4xsrq").unwrap();
-
-        let id = SubnetID::new(0, vec![addr, addr2]);
-
-        let addrs = agent_subnet_to_evm_addresses(&id).unwrap();
-
-        let a =
-            ethers::types::Address::from_str("0x0000000000000000000000000000000000000000").unwrap();
-        let b =
-            ethers::types::Address::from_str("0x2e714a3c385ea88a09998ed74db265dae9853667").unwrap();
-
-        assert_eq!(addrs, vec![a, b]);
     }
 }

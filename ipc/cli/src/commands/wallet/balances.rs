@@ -7,7 +7,7 @@ use clap::Args;
 use futures_util::future::join_all;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, WalletType};
-use ipc_provider::manager::evm::ethers_address_to_fil_address;
+use ipc_sdk::evm::ethers_address_to_fil_address;
 use ipc_sdk::subnet_id::SubnetID;
 use std::{fmt::Debug, str::FromStr};
 

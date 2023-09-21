@@ -99,16 +99,6 @@ mod tests {
     json_rpc_address = "127.0.0.1:3030"
 
     [[subnets]]
-    id = "/r123"
-    network_name = "test"
-
-    [subnets.config]
-    network_type = "fvm"
-    gateway_addr = "f01"
-    jsonrpc_api_http = "http://127.0.0.1:3030/rpc/v1"
-    accounts = ["f01", "f01"]
-
-    [[subnets]]
     id = "/r1234"
     network_name = "test2"
 

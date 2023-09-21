@@ -1,9 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-// #[deprecated]
-// mod conversion;
-mod convert;
 mod manager;
 
 use async_trait::async_trait;
@@ -15,8 +12,7 @@ use ipc_sdk::subnet_id::SubnetID;
 use super::subnet::SubnetManager;
 pub use manager::EthSubnetManager;
 
-use crate::manager::evm::manager::subnet_actor_manager_facet;
-pub use convert::{eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount};
+use ipc_actors_abis::subnet_actor_manager_facet;
 
 #[async_trait]
 pub trait EthManager: SubnetManager {
