@@ -122,7 +122,7 @@ impl Arbitrary for ipc::GatewayParams {
             // Gateway constructor would reject 0.
             min_collateral: ArbFee::arbitrary(g).0.max(TokenAmount::from_atto(1)),
             msg_fee: ArbFee::arbitrary(g).0,
-            majority_percentage: u8::arbitrary(g) % 101,
+            majority_percentage: u8::arbitrary(g) % 50 + 51,
         }
     }
 }
