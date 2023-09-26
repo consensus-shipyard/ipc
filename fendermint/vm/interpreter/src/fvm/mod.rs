@@ -17,10 +17,10 @@ pub mod bundle;
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
 pub use exec::FvmApplyRet;
+use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_eth_hardhat::Hardhat;
 pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
-use libsecp256k1::{PublicKey, SecretKey};
 pub use query::FvmQueryRet;
 
 use self::state::ipc::GatewayCaller;
@@ -57,7 +57,10 @@ impl<DB, C> FvmMessageInterpreter<DB, C> {
         exec_in_check: bool,
     ) -> Self {
         // Derive the public keys so it's available to check whether this node is a validator at any point in time.
-        let validator_key = validator_key.map(|sk| (sk, PublicKey::from_secret_key(&sk)));
+        let validator_key = validator_key.map(|sk| {
+            let pk = sk.public_key();
+            (sk, pk)
+        });
         Self {
             client,
             _validator_key: validator_key,

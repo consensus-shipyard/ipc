@@ -10,7 +10,6 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-libsecp256k1 = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 num-traits = { workspace = true }
@@ -23,6 +22,7 @@ cid = { workspace = true, optional = true }
 fvm_shared = { workspace = true }
 ipc-sdk = { workspace = true }
 
+fendermint_crypto = { path = "../../crypto" }
 fendermint_testing = { path = "../../testing", optional = true }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_encoding = { path = "../encoding" }

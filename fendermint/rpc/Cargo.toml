@@ -11,7 +11,6 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 bytes = { workspace = true }
-libsecp256k1 = { workspace = true }
 prost = { workspace = true }
 serde = { workspace = true }
 tendermint = { workspace = true }
@@ -23,6 +22,7 @@ cid = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 
+fendermint_crypto = { path = "../crypto" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_message = { path = "../vm/message" }
 

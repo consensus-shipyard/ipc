@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! A Genesis data structure similar to [genesis.Template](https://github.com/filecoin-project/lotus/blob/v1.20.4/genesis/types.go)
 //! in Lotus, which is used to [initialize](https://github.com/filecoin-project/lotus/blob/v1.20.4/chain/gen/genesis/genesis.go) the state tree.
+
 use anyhow::anyhow;
-use fendermint_vm_core::Timestamp;
-use fvm_shared::version::NetworkVersion;
-use fvm_shared::{address::Address, econ::TokenAmount};
-use libsecp256k1::curve::Affine;
-use libsecp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
+use fvm_shared::version::NetworkVersion;
+use fvm_shared::{address::Address, econ::TokenAmount};
+
+use fendermint_crypto::{normalize_public_key, PublicKey};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_encoding::IsHumanReadable;
 
 #[cfg(feature = "arb")]
@@ -85,11 +86,7 @@ impl ValidatorKey {
     /// Create a new key and make sure the wrapped public key is normalized,
     /// which is to ensure the results look the same after a serialization roundtrip.
     pub fn new(key: PublicKey) -> Self {
-        let mut aff: Affine = key.into();
-        aff.x.normalize();
-        aff.y.normalize();
-        let key = PublicKey::try_from(aff).unwrap();
-        Self(key)
+        Self(normalize_public_key(key))
     }
 
     pub fn public_key(&self) -> &PublicKey {

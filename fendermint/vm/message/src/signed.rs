@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
 use ethers_core::types as et;
+use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::address::{Address, Payload};
@@ -68,7 +69,7 @@ impl SignedMessage {
     /// Create a signed message.
     pub fn new_secp256k1(
         message: Message,
-        sk: &libsecp256k1::SecretKey,
+        sk: &SecretKey,
         chain_id: &ChainID,
     ) -> Result<Self, SignedMessageError> {
         let sig = match Self::signable(&message, chain_id)? {
@@ -208,7 +209,7 @@ impl SignedMessage {
 }
 
 /// Sign a transaction pre-image using Blake2b256, in a way that [Signature::verify] expects it.
-fn sign_regular(sk: &libsecp256k1::SecretKey, data: &[u8]) -> [u8; SECP_SIG_LEN] {
+fn sign_regular(sk: &SecretKey, data: &[u8]) -> [u8; SECP_SIG_LEN] {
     let hash: [u8; 32] = blake2b_simd::Params::new()
         .hash_length(32)
         .to_state()
@@ -222,13 +223,13 @@ fn sign_regular(sk: &libsecp256k1::SecretKey, data: &[u8]) -> [u8; SECP_SIG_LEN]
 }
 
 /// Sign a transaction pre-image in the same way Ethereum clients would sign it.
-fn sign_eth(sk: &libsecp256k1::SecretKey, hash: et::H256) -> [u8; SECP_SIG_LEN] {
+fn sign_eth(sk: &SecretKey, hash: et::H256) -> [u8; SECP_SIG_LEN] {
     sign_secp256k1(sk, &hash.0)
 }
 
 /// Sign a hash using the secret key.
-fn sign_secp256k1(sk: &libsecp256k1::SecretKey, hash: &[u8; 32]) -> [u8; SECP_SIG_LEN] {
-    let (sig, recovery_id) = libsecp256k1::sign(&libsecp256k1::Message::parse(hash), sk);
+fn sign_secp256k1(sk: &SecretKey, hash: &[u8; 32]) -> [u8; SECP_SIG_LEN] {
+    let (sig, recovery_id) = sk.sign(hash);
 
     let mut signature = [0u8; SECP_SIG_LEN];
     signature[..64].copy_from_slice(&sig.serialize());

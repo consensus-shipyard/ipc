@@ -6,6 +6,7 @@ pub mod from_fvm;
 
 #[cfg(test)]
 pub mod tests {
+    use fendermint_crypto::{PublicKey, SecretKey};
     use fendermint_testing::arb::{ArbMessage, ArbTokenAmount};
     use fendermint_vm_actor_interface::{
         eam::{self, EthAddress},
@@ -65,16 +66,16 @@ pub mod tests {
 
     #[derive(Debug, Clone)]
     pub struct KeyPair {
-        pub sk: libsecp256k1::SecretKey,
-        pub pk: libsecp256k1::PublicKey,
+        pub sk: SecretKey,
+        pub pk: PublicKey,
     }
 
     impl quickcheck::Arbitrary for KeyPair {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             let seed = u64::arbitrary(g);
             let mut rng = StdRng::seed_from_u64(seed);
-            let sk = libsecp256k1::SecretKey::random(&mut rng);
-            let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+            let sk = SecretKey::random(&mut rng);
+            let pk = sk.public_key();
             Self { sk, pk }
         }
     }

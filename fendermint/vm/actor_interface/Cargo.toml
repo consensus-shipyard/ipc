@@ -37,9 +37,9 @@ fendermint_vm_ipc_actors = { path = "../ipc_actors" }
 
 [dev-dependencies]
 ethers-core = { workspace = true }
-libsecp256k1 = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 rand = { workspace = true }
 
+fendermint_crypto = { path = "../../crypto" }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
+use fendermint_crypto::{PublicKey, SecretKey};
 use fvm_shared::address::Address;
-use libsecp256k1::{PublicKey, SecretKey};
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -28,7 +28,7 @@ cmd! {
   KeyGenArgs(self) {
     let mut rng = ChaCha20Rng::from_entropy();
     let sk = SecretKey::random(&mut rng);
-    let pk = PublicKey::from_secret_key(&sk);
+    let pk = sk.public_key();
 
     export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
     export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
@@ -40,7 +40,7 @@ cmd! {
 cmd! {
   KeyIntoTendermintArgs(self) {
     let sk = read_secret_key(&self.secret_key)?;
-    let pk = PublicKey::from_secret_key(&sk);
+    let pk = sk.public_key();
     let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(&pk.serialize())
       .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
     let pub_key = tendermint::PublicKey::Secp256k1(vk);
@@ -76,7 +76,7 @@ cmd! {
 }
 
 fn secret_to_b64(sk: &SecretKey) -> String {
-    to_b64(&sk.serialize())
+    to_b64(sk.serialize().as_ref())
 }
 
 fn public_to_b64(pk: &PublicKey) -> String {
@@ -91,7 +91,7 @@ fn b64_to_public(b64: &str) -> anyhow::Result<PublicKey> {
 
 fn b64_to_secret(b64: &str) -> anyhow::Result<SecretKey> {
     let bz = from_b64(b64)?;
-    let sk = SecretKey::parse_slice(&bz)?;
+    let sk = SecretKey::try_from(bz)?;
     Ok(sk)
 }
 

@@ -4,6 +4,7 @@ use crate::{
     ipc, Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Validator, ValidatorKey,
 };
 use cid::multihash::MultihashDigest;
+use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_core::Timestamp;
 use fvm_shared::{
@@ -65,8 +66,8 @@ impl Arbitrary for Actor {
 impl Arbitrary for ValidatorKey {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
-        let sk = libsecp256k1::SecretKey::random(&mut rng);
-        let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+        let sk = SecretKey::random(&mut rng);
+        let pk = sk.public_key();
         Self::new(pk)
     }
 }

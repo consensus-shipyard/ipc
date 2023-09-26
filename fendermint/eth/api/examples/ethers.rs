@@ -50,9 +50,9 @@ use ethers_core::{
         H256, U256, U64,
     },
 };
+use fendermint_crypto::SecretKey;
 use fendermint_rpc::message::MessageFactory;
 use fendermint_vm_actor_interface::eam::EthAddress;
-use libsecp256k1::SecretKey;
 use tracing::Level;
 
 type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
@@ -180,7 +180,7 @@ struct TestAccount {
 impl TestAccount {
     pub fn new(sk: &Path) -> anyhow::Result<Self> {
         let sk = MessageFactory::read_secret_key(sk)?;
-        let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+        let pk = sk.public_key();
         let ea = EthAddress::new_secp256k1(&pk.serialize())?;
         let h = Address::from_slice(&ea.0);
 
@@ -793,7 +793,7 @@ where
     // transaction in a different way, but we can't for example use the actor ID in the hash, because
     // we have no way of sending it along with the message.
     let wallet: Wallet<SigningKey> =
-        Wallet::from_bytes(&sender.secret_key.serialize())?.with_chain_id(chain_id);
+        Wallet::from_bytes(&sender.secret_key.serialize().as_ref())?.with_chain_id(chain_id);
 
     Ok(SignerMiddleware::new(provider, wallet))
 }

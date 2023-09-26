@@ -20,13 +20,13 @@ use clap::Parser;
 use ethers::abi::Tokenizable;
 use ethers::prelude::{abigen, decode_function_data};
 use ethers::types::{H160, U256};
+use fendermint_crypto::SecretKey;
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use lazy_static::lazy_static;
-use libsecp256k1::{PublicKey, SecretKey};
 use tendermint_rpc::Url;
 use tracing::Level;
 
@@ -183,7 +183,7 @@ async fn run(
 
 /// Get the next sequence number (nonce) of an account.
 async fn sequence(client: &impl QueryClient, sk: &SecretKey) -> anyhow::Result<u64> {
-    let pk = PublicKey::from_secret_key(sk);
+    let pk = sk.public_key();
     let addr = Address::new_secp256k1(&pk.serialize()).unwrap();
     let state = client
         .actor_state(&addr, FvmQueryHeight::default())
