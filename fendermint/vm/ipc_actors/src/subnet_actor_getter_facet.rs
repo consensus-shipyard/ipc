@@ -1727,144 +1727,144 @@ pub mod subnet_actor_getter_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <AccumulatedRewardsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AccumulatedRewardsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AccumulatedRewards(decoded));
             }
-            if let Ok(decoded)
-                = <BottomUpCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BottomUpCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::BottomUpCheckPeriod(decoded));
             }
-            if let Ok(decoded)
-                = <BottomUpCheckpointAtEpochCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BottomUpCheckpointAtEpochCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::BottomUpCheckpointAtEpoch(decoded));
             }
-            if let Ok(decoded)
-                = <BottomUpCheckpointHashAtEpochCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BottomUpCheckpointHashAtEpochCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::BottomUpCheckpointHashAtEpoch(decoded));
             }
-            if let Ok(decoded)
-                = <ConsensusCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ConsensusCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Consensus(decoded));
             }
-            if let Ok(decoded)
-                = <ExecutableQueueCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ExecutableQueueCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ExecutableQueue(decoded));
             }
-            if let Ok(decoded)
-                = <GenesisCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GenesisCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Genesis(decoded));
             }
-            if let Ok(decoded)
-                = <GetConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetConfigurationNumber(decoded));
             }
-            if let Ok(decoded)
-                = <GetParentCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetParentCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetParent(decoded));
             }
-            if let Ok(decoded)
-                = <GetRangeOfValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetRangeOfValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetRangeOfValidators(decoded));
             }
-            if let Ok(decoded)
-                = <GetValidatorSetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetValidatorSetCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetValidatorSet(decoded));
             }
-            if let Ok(decoded)
-                = <GetValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetValidators(decoded));
             }
-            if let Ok(decoded)
-                = <IpcGatewayAddrCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <IpcGatewayAddrCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::IpcGatewayAddr(decoded));
             }
-            if let Ok(decoded)
-                = <LastVotingExecutedEpochCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <LastVotingExecutedEpochCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::LastVotingExecutedEpoch(decoded));
             }
-            if let Ok(decoded)
-                = <ListBottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ListBottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ListBottomUpCheckpoints(decoded));
             }
-            if let Ok(decoded)
-                = <MajorityPercentageCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MajorityPercentageCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MajorityPercentage(decoded));
             }
-            if let Ok(decoded)
-                = <MinActivationCollateralCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MinActivationCollateralCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MinActivationCollateral(decoded));
             }
-            if let Ok(decoded)
-                = <MinValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <MinValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MinValidators(decoded));
             }
-            if let Ok(decoded)
-                = <NameCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NameCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Name(decoded));
             }
-            if let Ok(decoded)
-                = <PrevExecutedCheckpointHashCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <PrevExecutedCheckpointHashCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::PrevExecutedCheckpointHash(decoded));
             }
-            if let Ok(decoded)
-                = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Stake(decoded));
             }
-            if let Ok(decoded)
-                = <StatusCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <StatusCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Status(decoded));
             }
-            if let Ok(decoded)
-                = <TopDownCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TopDownCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::TopDownCheckPeriod(decoded));
             }
-            if let Ok(decoded)
-                = <TotalStakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TotalStakeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::TotalStake(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorAtCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ValidatorAtCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorAt(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorCountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ValidatorCountCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorCount(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorNetAddrCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ValidatorNetAddrCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorNetAddr(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorWorkerAddrCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ValidatorWorkerAddrCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorWorkerAddr(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())

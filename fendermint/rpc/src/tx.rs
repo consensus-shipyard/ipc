@@ -140,7 +140,7 @@ pub trait CallClient: QueryClient + BoundClient {
     }
 
     /// Estimate the gas limit of a FEVM call.
-    async fn fevm_estmiate_gas(
+    async fn fevm_estimate_gas(
         &mut self,
         contract: Address,
         calldata: Bytes,

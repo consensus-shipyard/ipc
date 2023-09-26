@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::path::PathBuf;
 
+mod broadcast;
 mod check;
 mod checkpoint;
 mod exec;
@@ -23,18 +24,42 @@ pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
 pub use query::FvmQueryRet;
 
+pub use self::broadcast::Broadcaster;
 use self::state::ipc::GatewayCaller;
 
 pub type FvmMessage = fvm_shared::message::Message;
+
+#[derive(Clone)]
+pub struct ValidatorContext<C> {
+    /// The secret key the validator uses to produce blocks.
+    secret_key: SecretKey,
+    /// The public key identifying the validator (corresponds to the secret key.)
+    public_key: PublicKey,
+    /// Used to broadcast transactions. It might use a different secret key for
+    /// signing transactions than the validator's block producing key.
+    broadcaster: Broadcaster<C>,
+}
+
+impl<C> ValidatorContext<C> {
+    pub fn new(secret_key: SecretKey, broadcaster: Broadcaster<C>) -> Self {
+        // Derive the public keys so it's available to check whether this node is a validator at any point in time.
+        let public_key = secret_key.public_key();
+        Self {
+            secret_key,
+            public_key,
+            broadcaster,
+        }
+    }
+}
 
 /// Interpreter working on already verified unsigned messages.
 #[derive(Clone)]
 pub struct FvmMessageInterpreter<DB, C> {
     contracts: Hardhat,
-    /// Tendermint client for broadcasting transactions and run API queries.
+    /// Tendermint client for querying the RPC.
     client: C,
     /// If this is a validator node, this should be the key we can use to sign transactions.
-    _validator_key: Option<(SecretKey, PublicKey)>,
+    validator_ctx: Option<ValidatorContext<C>>,
     /// Overestimation rate applied to gas to ensure that the
     /// message goes through in the gas estimation.
     gas_overestimation_rate: f64,
@@ -50,20 +75,15 @@ pub struct FvmMessageInterpreter<DB, C> {
 impl<DB, C> FvmMessageInterpreter<DB, C> {
     pub fn new(
         client: C,
-        validator_key: Option<SecretKey>,
+        validator_ctx: Option<ValidatorContext<C>>,
         contracts_dir: PathBuf,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
     ) -> Self {
-        // Derive the public keys so it's available to check whether this node is a validator at any point in time.
-        let validator_key = validator_key.map(|sk| {
-            let pk = sk.public_key();
-            (sk, pk)
-        });
         Self {
             client,
-            _validator_key: validator_key,
+            validator_ctx,
             contracts: Hardhat::new(contracts_dir),
             gas_overestimation_rate,
             gas_search_step,

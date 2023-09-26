@@ -560,72 +560,69 @@ pub mod subnet_actor_diamond {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <CannotAddFunctionToDiamondThatAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CannotAddFunctionToDiamondThatAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotAddFunctionToDiamondThatAlreadyExists(decoded));
             }
-            if let Ok(decoded)
-                = <CannotAddSelectorsToZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CannotAddSelectorsToZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotAddSelectorsToZeroAddress(decoded));
             }
-            if let Ok(decoded)
-                = <FunctionNotFound as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <FunctionNotFound as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FunctionNotFound(decoded));
             }
-            if let Ok(decoded)
-                = <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GatewayCannotBeZero(decoded));
             }
-            if let Ok(decoded)
-                = <IncorrectFacetCutAction as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <IncorrectFacetCutAction as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::IncorrectFacetCutAction(decoded));
             }
-            if let Ok(decoded)
-                = <InitializationFunctionReverted as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InitializationFunctionReverted as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InitializationFunctionReverted(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidCollateral as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InvalidCollateral as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCollateral(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidMajorityPercentage(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidSubmissionPeriod as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InvalidSubmissionPeriod as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidSubmissionPeriod(decoded));
             }
-            if let Ok(decoded)
-                = <NoBytecodeAtAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NoBytecodeAtAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NoBytecodeAtAddress(decoded));
             }
-            if let Ok(decoded)
-                = <NoSelectorsProvidedForFacetForCut as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <NoSelectorsProvidedForFacetForCut as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NoSelectorsProvidedForFacetForCut(decoded));
             }
-            if let Ok(decoded)
-                = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotGateway(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())

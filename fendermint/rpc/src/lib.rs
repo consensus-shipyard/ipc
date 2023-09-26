@@ -12,6 +12,10 @@ pub mod query;
 pub mod response;
 pub mod tx;
 
+pub use client::FendermintClient;
+pub use query::QueryClient;
+pub use tx::TxClient;
+
 /// A [`base64::Engine`] using the [`alphabet::STANDARD`] base64 alphabet
 /// padding bytes when writing but requireing no padding when reading.
 const B64_ENGINE: base64::engine::GeneralPurpose = GeneralPurpose::new(

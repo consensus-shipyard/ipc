@@ -2334,170 +2334,164 @@ pub mod gateway_getter_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <AppliedTopDownNonceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AppliedTopDownNonceCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AppliedTopDownNonce(decoded));
             }
-            if let Ok(decoded)
-                = <BottomUpCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BottomUpCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::BottomUpCheckPeriod(decoded));
             }
-            if let Ok(decoded)
-                = <BottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::BottomUpCheckpoints(decoded));
             }
-            if let Ok(decoded)
-                = <BottomUpNonceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <BottomUpNonceCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::BottomUpNonce(decoded));
             }
-            if let Ok(decoded)
-                = <CrossMsgFeeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CrossMsgFeeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CrossMsgFee(decoded));
             }
-            if let Ok(decoded)
-                = <ExecutableQueueCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ExecutableQueueCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ExecutableQueue(decoded));
             }
-            if let Ok(decoded)
-                = <GetAppliedTopDownNonceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetAppliedTopDownNonceCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetAppliedTopDownNonce(decoded));
             }
-            if let Ok(decoded)
-                = <GetCheckpointCurrentWeightCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetCheckpointCurrentWeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetCheckpointCurrentWeight(decoded));
             }
-            if let Ok(decoded)
-                = <GetCheckpointInfoCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetCheckpointInfoCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetCheckpointInfo(decoded));
             }
-            if let Ok(decoded)
-                = <GetCurrentConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetCurrentConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetCurrentConfigurationNumber(decoded));
             }
-            if let Ok(decoded)
-                = <GetCurrentMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetCurrentMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetCurrentMembership(decoded));
             }
-            if let Ok(decoded)
-                = <GetCurrentTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetCurrentTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetCurrentTotalWeight(decoded));
             }
-            if let Ok(decoded)
-                = <GetGenesisEpochCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetGenesisEpochCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetGenesisEpoch(decoded));
             }
-            if let Ok(decoded)
-                = <GetLastConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetLastConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetLastConfigurationNumber(decoded));
             }
-            if let Ok(decoded)
-                = <GetLastMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetLastMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetLastMembership(decoded));
             }
-            if let Ok(decoded)
-                = <GetLastTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetLastTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetLastTotalWeight(decoded));
             }
-            if let Ok(decoded)
-                = <GetLatestParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetLatestParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetLatestParentFinality(decoded));
             }
-            if let Ok(decoded)
-                = <GetNetworkNameCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetNetworkNameCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetNetworkName(decoded));
             }
-            if let Ok(decoded)
-                = <GetParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetParentFinality(decoded));
             }
-            if let Ok(decoded)
-                = <GetSubnetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetSubnetCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetSubnet(decoded));
             }
-            if let Ok(decoded)
-                = <GetSubnetTopDownMsgsLengthCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetSubnetTopDownMsgsLengthCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetSubnetTopDownMsgsLength(decoded));
             }
-            if let Ok(decoded)
-                = <GetTopDownMsgsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetTopDownMsgsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetTopDownMsgs(decoded));
             }
-            if let Ok(decoded)
-                = <HasValidatorVotedForSubmissionCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <HasValidatorVotedForSubmissionCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::HasValidatorVotedForSubmission(decoded));
             }
-            if let Ok(decoded)
-                = <InitializedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InitializedCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Initialized(decoded));
             }
-            if let Ok(decoded)
-                = <LastVotingExecutedEpochCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <LastVotingExecutedEpochCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::LastVotingExecutedEpoch(decoded));
             }
-            if let Ok(decoded)
-                = <ListSubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ListSubnetsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ListSubnets(decoded));
             }
-            if let Ok(decoded)
-                = <MajorityPercentageCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MajorityPercentageCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MajorityPercentage(decoded));
             }
-            if let Ok(decoded)
-                = <MinStakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <MinStakeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MinStake(decoded));
             }
-            if let Ok(decoded)
-                = <PostboxCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PostboxCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Postbox(decoded));
             }
-            if let Ok(decoded)
-                = <SubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SubnetsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Subnets(decoded));
             }
-            if let Ok(decoded)
-                = <TopDownCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TopDownCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::TopDownCheckPeriod(decoded));
             }
-            if let Ok(decoded)
-                = <TotalSubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TotalSubnetsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::TotalSubnets(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())

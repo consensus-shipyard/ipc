@@ -46,6 +46,12 @@ gas_search_step = 1.25
 # otherwise only the nonces and balances are projected into a partial state.
 exec_in_check = true
 
+# Gas fee used when broadcasting transactions.
+# TODO: Configure a value once validators are charged for the "miner penalty".
+gas_fee_cap = 0
+# Gas premium used when broadcasting transactions.
+gas_premium = 0
+
 # Ethereum API facade
 [eth]
 # Maximum time allowed between polls for filter changes, in seconds, before the subscription is canceled.

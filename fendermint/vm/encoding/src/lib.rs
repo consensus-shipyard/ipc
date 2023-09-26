@@ -74,6 +74,9 @@ where
 ///
 /// human_readable_str!(Address);
 ///
+/// // Or in full form:
+/// human_readable_str!(Address: IsHumanReadable);
+///
 /// struct MyStruct {
 ///   #[serde_as(as = "Option<IsHumanReadable>")]
 ///   pub delegated_address: Option<Address>,
@@ -81,13 +84,13 @@ where
 /// ```
 #[macro_export]
 macro_rules! human_readable_str {
-    ($mark:ty, $typ: ty) => {
+    ($typ:ty : $mark:ty) => {
         impl serde_with::SerializeAs<$typ> for $mark {
-            fn serialize_as<S>(addr: &$typ, serializer: S) -> Result<S::Ok, S::Error>
+            fn serialize_as<S>(value: &$typ, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
             {
-                $crate::serialize_str(addr, serializer)
+                $crate::serialize_str(value, serializer)
             }
         }
 
@@ -102,7 +105,57 @@ macro_rules! human_readable_str {
     };
 
     ($typ: ty) => {
-        human_readable_str!(IsHumanReadable, $typ);
+        human_readable_str!($typ: IsHumanReadable);
+    };
+}
+
+/// Delegate [`SerializeAs`] and [`DeserializeAs`] to another instance.
+///
+/// # Example
+///
+/// ```ignore
+/// struct IsHumanReadable;
+///
+/// human_readable_delegate!(Address);
+///
+/// // Or in full form:
+/// human_readable_delegate!(Address: IsHumanReadable => fendermint_vm_encoding::IsHumanReadable);
+///
+/// struct MyStruct {
+///   #[serde_as(as = "Option<IsHumanReadable>")]
+///   pub delegated_address: Option<Address>,
+/// }
+/// ```
+#[macro_export]
+macro_rules! human_readable_delegate {
+    ($typ:ty : $mark:ty => $deleg:ty) => {
+        impl serde_with::SerializeAs<$typ> for $mark {
+            fn serialize_as<S>(value: &$typ, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+                $deleg: serde_with::SerializeAs<$typ>,
+            {
+                <$deleg>::serialize_as::<S>(value, serializer)
+            }
+        }
+
+        impl<'de> serde_with::DeserializeAs<'de, $typ> for $mark {
+            fn deserialize_as<D>(deserializer: D) -> Result<$typ, D::Error>
+            where
+                D: serde::de::Deserializer<'de>,
+                $deleg: serde_with::DeserializeAs<'de, $typ>,
+            {
+                <$deleg>::deserialize_as::<D>(deserializer)
+            }
+        }
+    };
+
+    ($typ: ty : $mark:ty) => {
+        human_readable_delegate!($typ : $mark => $crate::IsHumanReadable);
+    };
+
+    ($typ: ty) => {
+        human_readable_delegate!($typ : IsHumanReadable => $crate::IsHumanReadable);
     };
 }
 

@@ -276,7 +276,7 @@ async fn fevm_estimate_gas(
 
     let res = client
         .inner
-        .fevm_estmiate_gas(contract, calldata, value, gas_params, height)
+        .fevm_estimate_gas(contract, calldata, value, gas_params, height)
         .await?;
 
     let json = json!({ "response": res });

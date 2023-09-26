@@ -6,8 +6,7 @@ use serde::Deserialize;
 use serde_with::{serde_as, DurationSeconds};
 use std::time::Duration;
 
-use crate::SocketAddress;
-use fendermint_vm_encoding::IsHumanReadable;
+use crate::{IsHumanReadable, SocketAddress};
 
 /// Ethereum API facade settings.
 #[serde_as]

@@ -904,100 +904,104 @@ pub mod gateway_manager_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddressEmptyCode(decoded));
             }
-            if let Ok(decoded)
-                = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddressInsufficientBalance(decoded));
             }
-            if let Ok(decoded)
-                = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AlreadyInitialized(decoded));
             }
-            if let Ok(decoded)
-                = <AlreadyRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AlreadyRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AlreadyRegisteredSubnet(decoded));
             }
-            if let Ok(decoded)
-                = <CallFailed as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CallFailed as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CallFailed(decoded));
             }
-            if let Ok(decoded)
-                = <CannotReleaseZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CannotReleaseZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotReleaseZero(decoded));
             }
-            if let Ok(decoded)
-                = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FailedInnerCall(decoded));
             }
-            if let Ok(decoded)
-                = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InsufficientFunds(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidActorAddress(decoded));
             }
-            if let Ok(decoded)
-                = <NotEmptySubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <NotEmptySubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEmptySubnetCircSupply(decoded));
             }
-            if let Ok(decoded)
-                = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughFee(decoded));
             }
-            if let Ok(decoded)
-                = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughFunds(decoded));
             }
-            if let Ok(decoded)
-                = <NotEnoughFundsToRelease as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <NotEnoughFundsToRelease as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughFundsToRelease(decoded));
             }
-            if let Ok(decoded)
-                = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotRegisteredSubnet(decoded));
             }
-            if let Ok(decoded)
-                = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotSystemActor(decoded));
             }
-            if let Ok(decoded)
-                = <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::OldConfigurationNumber(decoded));
             }
-            if let Ok(decoded)
-                = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ReentrancyError(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorWeightIsZero as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ValidatorWeightIsZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorWeightIsZero(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorsAndWeightsLengthMismatch as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ValidatorsAndWeightsLengthMismatch as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorsAndWeightsLengthMismatch(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1462,48 +1466,54 @@ pub mod gateway_manager_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <AddStakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AddStakeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddStake(decoded));
             }
-            if let Ok(decoded)
-                = <FundCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <FundCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Fund(decoded));
             }
-            if let Ok(decoded)
-                = <InitGenesisEpochCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InitGenesisEpochCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InitGenesisEpoch(decoded));
             }
-            if let Ok(decoded)
-                = <KillCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <KillCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Kill(decoded));
             }
-            if let Ok(decoded)
-                = <NewMembershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NewMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NewMembership(decoded));
             }
-            if let Ok(decoded)
-                = <RegisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RegisterCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Register(decoded));
             }
-            if let Ok(decoded)
-                = <ReleaseCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ReleaseCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Release(decoded));
             }
-            if let Ok(decoded)
-                = <ReleaseRewardsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ReleaseRewardsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ReleaseRewards(decoded));
             }
-            if let Ok(decoded)
-                = <ReleaseStakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ReleaseStakeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ReleaseStake(decoded));
             }
-            if let Ok(decoded)
-                = <UpdateMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <UpdateMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::UpdateMembership(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())

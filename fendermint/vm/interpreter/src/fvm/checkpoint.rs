@@ -3,14 +3,21 @@
 
 use anyhow::{anyhow, Context};
 use ethers::types as et;
-use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
-use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
-use fendermint_vm_ipc_actors::gateway_router_facet::SubnetID;
-use fvm_ipld_blockstore::Blockstore;
 use tendermint::block::Height;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
 
-use super::state::{ipc::GatewayCaller, FvmExecState};
+use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::{address::Address, chainid::ChainID};
+
+use fendermint_crypto::SecretKey;
+use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
+use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+use fendermint_vm_ipc_actors::gateway_router_facet::SubnetID;
+
+use super::{
+    broadcast::Broadcaster,
+    state::{ipc::GatewayCaller, FvmExecState},
+};
 
 pub type Checkpoint = BottomUpCheckpoint;
 
@@ -50,7 +57,7 @@ where
         None => Ok(None),
         Some(subnet_id) => {
             // Get the current power table.
-            let power_table = power_table(client, height)
+            let power_table = get_power_table(client, height)
                 .await
                 .context("failed to get the power table")?;
 
@@ -80,6 +87,32 @@ where
     }
 }
 
+/// As a validator, sign the checkpoint and broadcast a transaction to add our signature to the ledger.
+pub async fn broadcast_signature<C, DB>(
+    broadcaster: &Broadcaster<C>,
+    gateway: &GatewayCaller<DB>,
+    checkpoint: Checkpoint,
+    power_table: &PowerTable,
+    validator: &Validator,
+    secret_key: &SecretKey,
+    chain_id: ChainID,
+) -> anyhow::Result<()>
+where
+    C: Client + Clone + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + 'static,
+{
+    let calldata = gateway
+        .add_checkpoint_signature_calldata(checkpoint, &power_table.0, validator, secret_key)
+        .context("failed to produce checkpoint signature calldata")?;
+
+    broadcaster
+        .fevm_invoke(Address::from(gateway.addr()), calldata, chain_id)
+        .await
+        .context("failed to broadcast signature")?;
+
+    Ok(())
+}
+
 fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
@@ -103,7 +136,7 @@ where
     Ok(None)
 }
 
-async fn power_table<C>(client: &C, height: Height) -> anyhow::Result<PowerTable>
+async fn get_power_table<C>(client: &C, height: Height) -> anyhow::Result<PowerTable>
 where
     C: Client + Sync + Send + 'static,
 {

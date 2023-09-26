@@ -1308,150 +1308,144 @@ pub mod gateway_router_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddressEmptyCode(decoded));
             }
-            if let Ok(decoded)
-                = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddressInsufficientBalance(decoded));
             }
-            if let Ok(decoded)
-                = <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CheckpointAlreadyExists(decoded));
             }
-            if let Ok(decoded)
-                = <CheckpointInfoAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CheckpointInfoAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CheckpointInfoAlreadyExists(decoded));
             }
-            if let Ok(decoded)
-                = <CheckpointMembershipNotCreated as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CheckpointMembershipNotCreated as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CheckpointMembershipNotCreated(decoded));
             }
-            if let Ok(decoded)
-                = <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CheckpointNotCreated(decoded));
             }
-            if let Ok(decoded)
-                = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FailedInnerCall(decoded));
             }
-            if let Ok(decoded)
-                = <InconsistentPrevCheckpoint as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InconsistentPrevCheckpoint as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InconsistentPrevCheckpoint(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidActorAddress(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidCheckpointEpoch as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InvalidCheckpointEpoch as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCheckpointEpoch(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InvalidCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCheckpointSource(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCrossMsgDstSubnet(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidCrossMsgNonce as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <InvalidCrossMsgNonce as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCrossMsgNonce(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidSignature(decoded));
             }
-            if let Ok(decoded)
-                = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotAuthorized(decoded));
             }
-            if let Ok(decoded)
-                = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughBalance(decoded));
             }
-            if let Ok(decoded)
-                = <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughSubnetCircSupply(decoded));
             }
-            if let Ok(decoded)
-                = <NotInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotInitialized as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotInitialized(decoded));
             }
-            if let Ok(decoded)
-                = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotRegisteredSubnet(decoded));
             }
-            if let Ok(decoded)
-                = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotSystemActor(decoded));
             }
-            if let Ok(decoded)
-                = <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::OldConfigurationNumber(decoded));
             }
-            if let Ok(decoded)
-                = <ParentFinalityAlreadyCommitted as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ParentFinalityAlreadyCommitted as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ParentFinalityAlreadyCommitted(decoded));
             }
-            if let Ok(decoded)
-                = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SignatureReplay(decoded));
             }
-            if let Ok(decoded)
-                = <SubnetNotActive as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SubnetNotActive as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SubnetNotActive(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorWeightIsZero as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ValidatorWeightIsZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorWeightIsZero(decoded));
             }
-            if let Ok(decoded)
-                = <ValidatorsAndWeightsLengthMismatch as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ValidatorsAndWeightsLengthMismatch as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorsAndWeightsLengthMismatch(decoded));
             }
-            if let Ok(decoded)
-                = <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ZeroMembershipWeight(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -2063,34 +2057,29 @@ pub mod gateway_router_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <AddCheckpointSignatureCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AddCheckpointSignatureCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddCheckpointSignature(decoded));
             }
-            if let Ok(decoded)
-                = <ApplyCrossMessagesCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ApplyCrossMessagesCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ApplyCrossMessages(decoded));
             }
-            if let Ok(decoded)
-                = <CommitChildCheckCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CommitChildCheckCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CommitChildCheck(decoded));
             }
-            if let Ok(decoded)
-                = <CommitParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CommitParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CommitParentFinality(decoded));
             }
-            if let Ok(decoded)
-                = <CreateBottomUpCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CreateBottomUpCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CreateBottomUpCheckpoint(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())

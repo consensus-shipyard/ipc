@@ -165,6 +165,11 @@ where
         self.executor.builtin_actors()
     }
 
+    /// The [ChainID] from the network configuration.
+    pub fn chain_id(&self) -> ChainID {
+        self.executor.context().network.chain_id
+    }
+
     /// Collect all the event emitters' delegated addresses, for those who have any.
     fn emitter_delegated_addresses(&self, apply_ret: &ApplyRet) -> anyhow::Result<ActorAddressMap> {
         let emitter_ids = apply_ret

@@ -75,7 +75,7 @@ pub struct Actor {
 }
 
 /// Total stake delegated to this validator.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
 pub struct Power(pub u64);
 
 /// Secp256k1 public key of the validators.

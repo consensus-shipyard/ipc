@@ -3058,6 +3058,7 @@ dependencies = [
  "ethers",
  "fendermint_crypto",
  "fendermint_eth_hardhat",
+ "fendermint_rpc",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_genesis",

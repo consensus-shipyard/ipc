@@ -227,16 +227,6 @@ fn sign_eth(sk: &SecretKey, hash: et::H256) -> [u8; SECP_SIG_LEN] {
     sign_secp256k1(sk, &hash.0)
 }
 
-/// Sign a hash using the secret key.
-fn sign_secp256k1(sk: &SecretKey, hash: &[u8; 32]) -> [u8; SECP_SIG_LEN] {
-    let (sig, recovery_id) = sk.sign(hash);
-
-    let mut signature = [0u8; SECP_SIG_LEN];
-    signature[..64].copy_from_slice(&sig.serialize());
-    signature[64] = recovery_id.serialize();
-    signature
-}
-
 /// Turn a [`ChainID`] into bytes. Uses big-endian encoding.
 pub fn chain_id_bytes(chain_id: &ChainID) -> [u8; 8] {
     u64::from(*chain_id).to_be_bytes()
@@ -275,6 +265,16 @@ fn verify_eth_method(msg: &Message) -> Result<(), SignedMessageError> {
         )));
     }
     Ok(())
+}
+
+/// Sign a hash using the secret key.
+pub fn sign_secp256k1(sk: &SecretKey, hash: &[u8; 32]) -> [u8; SECP_SIG_LEN] {
+    let (sig, recovery_id) = sk.sign(hash);
+
+    let mut signature = [0u8; SECP_SIG_LEN];
+    signature[..64].copy_from_slice(&sig.serialize());
+    signature[64] = recovery_id.serialize();
+    signature
 }
 
 /// Signed message with an invalid random signature.

@@ -65,6 +65,11 @@ impl<C, DB> ContractCaller<C, DB> {
             store: PhantomData,
         }
     }
+
+    /// Get a reference to the wrapped contract to construct messages without callign anything.
+    pub fn contract(&self) -> &C {
+        &self.contract
+    }
 }
 
 impl<C, DB> ContractCaller<C, DB>

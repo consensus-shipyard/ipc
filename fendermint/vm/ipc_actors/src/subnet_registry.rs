@@ -735,36 +735,39 @@ pub mod subnet_registry {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <CannotFindSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CannotFindSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotFindSubnet(decoded));
             }
-            if let Ok(decoded)
-                = <FacetCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <FacetCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FacetCannotBeZero(decoded));
             }
-            if let Ok(decoded)
-                = <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GatewayCannotBeZero(decoded));
             }
-            if let Ok(decoded)
-                = <ReentrancyGuardReentrantCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ReentrancyGuardReentrantCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ReentrancyGuardReentrantCall(decoded));
             }
-            if let Ok(decoded)
-                = <UnknownSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UnknownSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::UnknownSubnet(decoded));
             }
-            if let Ok(decoded)
-                = <WrongGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <WrongGateway as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::WrongGateway(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1053,52 +1056,54 @@ pub mod subnet_registry {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <GatewayCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GatewayCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Gateway(decoded));
             }
-            if let Ok(decoded)
-                = <GetSubnetDeployedByNonceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetSubnetDeployedByNonceCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetSubnetDeployedByNonce(decoded));
             }
-            if let Ok(decoded)
-                = <GetterFacetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetterFacetCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GetterFacet(decoded));
             }
-            if let Ok(decoded)
-                = <LatestSubnetDeployedCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <LatestSubnetDeployedCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::LatestSubnetDeployed(decoded));
             }
-            if let Ok(decoded)
-                = <ManagerFacetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ManagerFacetCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ManagerFacet(decoded));
             }
-            if let Ok(decoded)
-                = <NewSubnetActorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NewSubnetActorCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NewSubnetActor(decoded));
             }
-            if let Ok(decoded)
-                = <SubnetGetterSelectorsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SubnetGetterSelectorsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SubnetGetterSelectors(decoded));
             }
-            if let Ok(decoded)
-                = <SubnetManagerSelectorsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SubnetManagerSelectorsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SubnetManagerSelectors(decoded));
             }
-            if let Ok(decoded)
-                = <SubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SubnetsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Subnets(decoded));
             }
-            if let Ok(decoded)
-                = <UserNoncesCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UserNoncesCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::UserNonces(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())

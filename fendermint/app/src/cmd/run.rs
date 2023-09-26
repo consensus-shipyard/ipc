@@ -8,7 +8,7 @@ use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, R
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
-    fvm::FvmMessageInterpreter,
+    fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
@@ -29,8 +29,9 @@ cmd! {
 ///
 /// This method acts as our composition root.
 async fn run(settings: Settings) -> anyhow::Result<()> {
-    let client = tendermint_rpc::HttpClient::new(settings.tendermint_rpc_url()?)
-        .context("failed to create Tendermint client")?;
+    let client: tendermint_rpc::HttpClient =
+        tendermint_rpc::HttpClient::new(settings.tendermint_rpc_url()?)
+            .context("failed to create Tendermint client")?;
 
     let validator_key = {
         let sk = settings.validator_key();
@@ -42,9 +43,20 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         }
     };
 
+    let validator_ctx = validator_key.map(|sk| {
+        // For now we are using the validator key for submitting transactions.
+        let broadcaster = Broadcaster::new(
+            client.clone(),
+            sk.clone(),
+            settings.fvm.gas_fee_cap.clone(),
+            settings.fvm.gas_premium.clone(),
+        );
+        ValidatorContext::new(sk, broadcaster)
+    });
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         client,
-        validator_key,
+        validator_ctx,
         settings.contracts_dir(),
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,

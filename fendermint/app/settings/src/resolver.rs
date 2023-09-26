@@ -9,8 +9,7 @@ use serde_with::{serde_as, DurationSeconds};
 use ipc_sdk::subnet_id::SubnetID;
 use multiaddr::Multiaddr;
 
-use super::IsHumanReadable;
-use crate::home_relative;
+use crate::{home_relative, IsHumanReadable};
 
 #[serde_as]
 #[derive(Debug, Clone, Deserialize)]
