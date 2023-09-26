@@ -54,7 +54,7 @@ filter_timeout = 300
 cache_capacity = 1000000
 
 [eth.gas]
-# Minimum gas premium returned by the API in `eth_maxPriorityFeePerGas`
+# Minimum gas premium returned by the API in `eth_maxPriorityFeePerGas`, in atto.
 min_gas_premium = 100000
 # Number of blocks used for the computation of the premium in `eth_maxPriorityFeePerGas`
 # Default: Lotus uses only 2 epochs to compupte the premium, but they compute the

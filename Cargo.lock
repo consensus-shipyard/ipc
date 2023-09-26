@@ -2754,10 +2754,9 @@ dependencies = [
  "base64 0.21.4",
  "bytes",
  "cid",
- "config 0.13.3",
- "dirs",
  "fendermint_abci",
  "fendermint_app_options",
+ "fendermint_app_settings",
  "fendermint_eth_api",
  "fendermint_rocksdb",
  "fendermint_rpc",
@@ -2815,6 +2814,23 @@ dependencies = [
  "num-traits",
  "tendermint-rpc",
  "tracing",
+]
+
+[[package]]
+name = "fendermint_app_settings"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "config 0.13.3",
+ "dirs",
+ "fendermint_vm_encoding",
+ "fvm_ipld_encoding 0.3.3",
+ "fvm_shared",
+ "ipc-sdk",
+ "multiaddr 0.16.0",
+ "serde",
+ "serde_with",
+ "tendermint-rpc",
 ]
 
 [[package]]

@@ -126,7 +126,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // Run the ABCI server.
     server
-        .listen(settings.abci.listen.addr())
+        .listen(settings.abci.listen.to_string())
         .await
         .map_err(|e| anyhow!("error listening: {e}"))?;
 

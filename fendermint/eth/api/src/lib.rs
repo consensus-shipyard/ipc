@@ -3,8 +3,8 @@
 
 use anyhow::anyhow;
 use axum::routing::{get, post};
+use fvm_shared::econ::TokenAmount;
 use jsonrpc_v2::Data;
-use serde::Deserialize;
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 use tendermint_rpc::WebSocketClient;
 
@@ -32,9 +32,9 @@ pub struct AppState {
     pub rpc_state: Arc<JsonRpcState<WebSocketClient>>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct GasOpt {
-    pub min_gas_premium: u64,
+    pub min_gas_premium: TokenAmount,
     pub num_blocks_max_prio_fee: u64,
     pub max_fee_hist_size: u64,
 }

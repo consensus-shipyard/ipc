@@ -5,17 +5,15 @@ use anyhow::Context;
 use config::{Config, ConfigError, Environment, File};
 use ipc_sdk::subnet_id::SubnetID;
 use serde::Deserialize;
-use serde_with::{serde_as, DurationSeconds};
-use std::{
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::path::{Path, PathBuf};
 use tendermint_rpc::Url;
 
 use fendermint_vm_encoding::human_readable_str;
 
+use self::eth::EthSettings;
 use self::resolver::ResolverSettings;
 
+pub mod eth;
 pub mod resolver;
 
 /// Marker to be used with the `human_readable_str!` macro.
@@ -26,20 +24,28 @@ struct IsHumanReadable;
 human_readable_str!(IsHumanReadable, SubnetID);
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Address {
+pub struct SocketAddress {
     pub host: String,
     pub port: u32,
 }
 
-impl Address {
-    pub fn addr(&self) -> String {
+impl ToString for SocketAddress {
+    fn to_string(&self) -> String {
         format!("{}:{}", self.host, self.port)
+    }
+}
+
+impl std::net::ToSocketAddrs for SocketAddress {
+    type Iter = <String as std::net::ToSocketAddrs>::Iter;
+
+    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
+        self.to_string().to_socket_addrs()
     }
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AbciSettings {
-    pub listen: Address,
+    pub listen: SocketAddress,
     /// Queue size for each ABCI component.
     pub bound: usize,
 }
@@ -68,17 +74,6 @@ pub struct FvmSettings {
     pub exec_in_check: bool,
 }
 
-/// Ethereum API facade settings.
-#[serde_as]
-#[derive(Debug, Deserialize, Clone)]
-pub struct EthSettings {
-    pub listen: Address,
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub filter_timeout: Duration,
-    pub cache_capacity: usize,
-    pub gas: fendermint_eth_api::GasOpt,
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
@@ -93,6 +88,7 @@ pub struct Settings {
     tendermint_rpc_url: Url,
     /// Secp256k1 private key used for signing transactions. Leave empty if not validating.
     validator_key: PathBuf,
+
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub eth: EthSettings,
@@ -116,7 +112,7 @@ macro_rules! home_relative {
       impl $settings {
         $(
         pub fn $name(&self, home_dir: &std::path::Path) -> std::path::PathBuf {
-            $crate::settings::expand_path(home_dir, &self.$name)
+            $crate::expand_path(home_dir, &self.$name)
         }
         )+
       }
@@ -228,7 +224,7 @@ mod tests {
 
     fn parse_config(run_mode: &str) -> Settings {
         let current_dir = PathBuf::from(".");
-        let default_dir = PathBuf::from("config");
+        let default_dir = PathBuf::from("../config");
         Settings::new(&default_dir, &current_dir, run_mode).unwrap()
     }
 

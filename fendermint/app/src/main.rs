@@ -4,9 +4,9 @@
 use tracing_subscriber::FmtSubscriber;
 
 pub use fendermint_app_options as options;
+pub use fendermint_app_settings as settings;
 
 mod cmd;
-mod settings;
 
 #[tokio::main]
 async fn main() {

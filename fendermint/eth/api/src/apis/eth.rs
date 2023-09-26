@@ -24,7 +24,6 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::crypto::signature::Signature;
-use fvm_shared::econ::TokenAmount;
 use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
 use rand::Rng;
@@ -151,7 +150,7 @@ where
 
     // compute median gas price
     let mut median = crate::gas::median_gas_premium(&mut premiums, block_gas_limit);
-    let min_premium = TokenAmount::from_atto(BigInt::from(data.gas_opt.min_gas_premium));
+    let min_premium = data.gas_opt.min_gas_premium.clone();
     if median < min_premium {
         median = min_premium;
     }
