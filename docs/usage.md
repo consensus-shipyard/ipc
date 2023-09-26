@@ -3,7 +3,7 @@
 >💡 For background and setup information, make sure to start with the [README](/README.md).
 
 ## Key management
-The IPC agent has internally and EVM wallet that it uses to sign transactions and interact with IPC on behalf of specific addresses. Some of the features available for EVM addresses through the EVM are: 
+The IPC agent has internally an EVM wallet that it uses to sign transactions and interact with IPC on behalf of specific addresses. Some of the features available for EVM addresses through the EVM are: 
 * Creating new Ethereum addresses
 ```bash
 ./bin/ipc-agent wallet new -w evm
