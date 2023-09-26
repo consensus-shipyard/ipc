@@ -13,11 +13,4 @@ if [[ ! $SKIP_RUST_BINDING ]]; then
     make rust-binding
 fi
 
-# checks if there are changes in rust binding
-if [[ `git status ./binding --porcelain` ]]; then 
-    echo "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo "\n********** NOT ALL RUST BINDINGS COMMITTED, COMMIT THEM **********\n";
-    git status ./binding --porcelain
-    echo "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-    exit 1;
-fi;
+make check-rust-binding

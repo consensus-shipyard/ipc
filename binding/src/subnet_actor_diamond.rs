@@ -7,7 +7,7 @@ pub use subnet_actor_diamond::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod subnet_actor_diamond {
     #[allow(deprecated)]
@@ -18,51 +18,45 @@ pub mod subnet_actor_diamond {
                     ::ethers::core::abi::ethabi::Param {
                         name: ::std::borrow::ToOwned::to_owned("_diamondCut"),
                         kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                            ::std::boxed::Box::new(
-                                ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                    ::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Address,
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Array(
-                                            ::std::boxed::Box::new(
-                                                ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
+                            ::std::boxed::Box::new(::ethers::core::abi::ethabi::ParamType::Tuple(
+                                ::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                                4usize
                                             ),
                                         ),
-                                    ],
-                                ),
-                            ),
+                                    ),
+                                ],
+                            ),),
                         ),
                         internal_type: ::core::option::Option::Some(
-                            ::std::borrow::ToOwned::to_owned(
-                                "struct IDiamond.FacetCut[]",
-                            ),
+                            ::std::borrow::ToOwned::to_owned("struct IDiamond.FacetCut[]",),
                         ),
                     },
                     ::ethers::core::abi::ethabi::Param {
                         name: ::std::borrow::ToOwned::to_owned("params"),
-                        kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
-                            ::std::vec![
-                                ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                    ::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Array(
-                                            ::std::boxed::Box::new(
-                                                ::ethers::core::abi::ethabi::ParamType::Address,
-                                            ),
-                                        ),
-                                    ],
+                        kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                            ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                ::ethers::core::abi::ethabi::ParamType::Array(
+                                    ::std::boxed::Box::new(
+                                        ::ethers::core::abi::ethabi::ParamType::Address,
+                                    ),
                                 ),
-                                ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
-                                ::ethers::core::abi::ethabi::ParamType::Address,
-                                ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                ::ethers::core::abi::ethabi::ParamType::Bytes,
-                            ],
-                        ),
+                            ],),
+                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                            ::ethers::core::abi::ethabi::ParamType::Address,
+                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                        ],),
                         internal_type: ::core::option::Option::Some(
                             ::std::borrow::ToOwned::to_owned(
                                 "struct SubnetActorDiamond.ConstructorParams",
@@ -71,247 +65,160 @@ pub mod subnet_actor_diamond {
                     },
                 ],
             }),
-            functions: ::core::convert::From::from([
-                (
-                    ::std::borrow::ToOwned::to_owned("MIN_CHECKPOINT_PERIOD"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "MIN_CHECKPOINT_PERIOD",
-                            ),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint8"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("MIN_COLLATERAL_AMOUNT"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "MIN_COLLATERAL_AMOUNT",
-                            ),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-            ]),
+            functions: ::std::collections::BTreeMap::new(),
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
-                    ::std::borrow::ToOwned::to_owned(
-                        "CannotAddFunctionToDiamondThatAlreadyExists",
-                    ),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CannotAddFunctionToDiamondThatAlreadyExists",
+                    ::std::borrow::ToOwned::to_owned("CannotAddFunctionToDiamondThatAlreadyExists"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "CannotAddFunctionToDiamondThatAlreadyExists",
+                        ),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selector"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4"),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_selector"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
-                                        4usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes4"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("CannotAddSelectorsToZeroAddress"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CannotAddSelectorsToZeroAddress",
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("CannotAddSelectorsToZeroAddress",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selectors"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                ::std::boxed::Box::new(
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
+                                ),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_selectors"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
-                                        ),
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes4[]"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4[]"),
+                            ),
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("FunctionNotFound"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("FunctionNotFound"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_functionSelector"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
-                                        4usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes4"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("FunctionNotFound"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_functionSelector"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4"),
+                            ),
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("GatewayCannotBeZero"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "GatewayCannotBeZero",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("GatewayCannotBeZero",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("IncorrectFacetCutAction"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "IncorrectFacetCutAction",
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("IncorrectFacetCutAction",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_action"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("enum IDiamond.FacetCutAction",),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_action"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned(
-                                            "enum IDiamond.FacetCutAction",
-                                        ),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InitializationFunctionReverted"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InitializationFunctionReverted",
-                            ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned(
-                                        "_initializationContractAddress",
-                                    ),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("address"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_calldata"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InitializationFunctionReverted",),
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned(
+                                    "_initializationContractAddress",
+                                ),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("address"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("_calldata"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bytes"),
+                                ),
+                            },
+                        ],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("InvalidCollateral"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidCollateral"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidMajorityPercentage"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InvalidMajorityPercentage",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidMajorityPercentage",),
+                        inputs: ::std::vec![],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("InvalidSubmissionPeriod"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidSubmissionPeriod",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NoBytecodeAtAddress"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "NoBytecodeAtAddress",
-                            ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_contractAddress"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("address"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_message"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::String,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("string"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("NoBytecodeAtAddress",),
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("_contractAddress"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("address"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("_message"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::String,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("string"),
+                                ),
+                            },
+                        ],
+                    },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned(
-                        "NoSelectorsProvidedForFacetForCut",
-                    ),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "NoSelectorsProvidedForFacetForCut",
+                    ::std::borrow::ToOwned::to_owned("NoSelectorsProvidedForFacetForCut"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("NoSelectorsProvidedForFacetForCut",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_facetAddress"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("_facetAddress"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("address"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotGateway"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotGateway"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("NotGateway"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
             ]),
             receive: true,
@@ -319,15 +226,13 @@ pub mod subnet_actor_diamond {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(__abi);
+    pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R`\x046\x10a\0-W`\x005`\xE0\x1C\x80c\x91\xBEMA\x14a\0DW\x80c\xA1\xAD\xA3\x03\x14a\0sWa\0<V[6a\0<Wa\0:a\0\x9AV[\0[a\0:a\0\xC7V[4\x80\x15a\0PW`\0\x80\xFD[Pa\0`g\r\xE0\xB6\xB3\xA7d\0\0\x81V[`@Q\x90\x81R` \x01[`@Q\x80\x91\x03\x90\xF3[4\x80\x15a\0\x7FW`\0\x80\xFD[Pa\0\x88`\n\x81V[`@Q`\xFF\x90\x91\x16\x81R` \x01a\0jV[`\rT`\x01`\x01`\xA0\x1B\x03\x163\x14a\0\xC5W`@Qc\xE7\xE6\x01\xDB`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[V[`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x81R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` \x81\x90R`@\x90\x91 T\x81\x90`\x01`\x01`\xA0\x1B\x03\x16\x80a\x01>W`@Qc\n\x82\xDDs`\xE3\x1B\x81R`\x01`\x01`\xE0\x1B\x03\x19`\x005\x16`\x04\x82\x01R`$\x01`@Q\x80\x91\x03\x90\xFD[6`\0\x807`\0\x806`\0\x84Z\xF4=`\0\x80>\x80\x80\x15a\x01]W=`\0\xF3[=`\0\xFD\xFE\xA2dipfsX\"\x12 \xF0\x1C\xF3I=\x8A\xA9\x8C\xBC\r\xCE|\xF0#\x87\xA6\xF7-\xFB\xA2\xAD\xC6\xB8I\x10\xE1`x\xE6\xF5{ dsolcC\0\x08\x13\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x91W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`oWP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[=\x90\xFD[c\n\x82\xDDs`\xE3\x1B`\x80R`\x01`\x01`\xE0\x1B\x03\x19\x16`\x84R`\x7F\x19`\xA4\x01`\x80\xFD[`\rT`\x01`\x01`\xA0\x1B\x03\x163\x03`\xA4W\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\x80R`\x04`\x80\xFD\xFE\xA2dipfsX\"\x12 @R\x8B\xE3\xE0\xD1\xB0\xEC\xF44cH\x08\xFET\xDDD\x8E\xBC\x825OJaK\xC9o\x96\x88\x1A{\x9AdsolcC\0\x08\x13\x003";
     /// The deployed bytecode of the contract.
-    pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct SubnetActorDiamond<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for SubnetActorDiamond<M> {
         fn clone(&self) -> Self {
@@ -359,33 +264,16 @@ pub mod subnet_actor_diamond {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    SUBNETACTORDIAMOND_ABI.clone(),
-                    client,
-                ),
-            )
-        }
-        ///Calls the contract's `MIN_CHECKPOINT_PERIOD` (0xa1ada303) function
-        pub fn min_checkpoint_period(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, u8> {
-            self.0
-                .method_hash([161, 173, 163, 3], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `MIN_COLLATERAL_AMOUNT` (0x91be4d41) function
-        pub fn min_collateral_amount(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([145, 190, 77, 65], ())
-                .expect("method not found (this should never happen)")
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                SUBNETACTORDIAMOND_ABI.clone(),
+                client,
+            ))
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for SubnetActorDiamond<M> {
+        for SubnetActorDiamond<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -399,7 +287,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "CannotAddFunctionToDiamondThatAlreadyExists",
@@ -417,7 +305,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "CannotAddSelectorsToZeroAddress",
@@ -435,7 +323,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "FunctionNotFound", abi = "FunctionNotFound(bytes4)")]
     pub struct FunctionNotFound {
@@ -450,7 +338,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "GatewayCannotBeZero", abi = "GatewayCannotBeZero()")]
     pub struct GatewayCannotBeZero;
@@ -463,9 +351,12 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
-    #[etherror(name = "IncorrectFacetCutAction", abi = "IncorrectFacetCutAction(uint8)")]
+    #[etherror(
+        name = "IncorrectFacetCutAction",
+        abi = "IncorrectFacetCutAction(uint8)"
+    )]
     pub struct IncorrectFacetCutAction {
         pub action: u8,
     }
@@ -478,7 +369,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "InitializationFunctionReverted",
@@ -488,6 +379,19 @@ pub mod subnet_actor_diamond {
         pub initialization_contract_address: ::ethers::core::types::Address,
         pub calldata: ::ethers::core::types::Bytes,
     }
+    ///Custom Error type `InvalidCollateral` with signature `InvalidCollateral()` and selector `0xd1ef4cea`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "InvalidCollateral", abi = "InvalidCollateral()")]
+    pub struct InvalidCollateral;
     ///Custom Error type `InvalidMajorityPercentage` with signature `InvalidMajorityPercentage()` and selector `0x75c3b427`
     #[derive(
         Clone,
@@ -497,10 +401,26 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
-    #[etherror(name = "InvalidMajorityPercentage", abi = "InvalidMajorityPercentage()")]
+    #[etherror(
+        name = "InvalidMajorityPercentage",
+        abi = "InvalidMajorityPercentage()"
+    )]
     pub struct InvalidMajorityPercentage;
+    ///Custom Error type `InvalidSubmissionPeriod` with signature `InvalidSubmissionPeriod()` and selector `0x312f8e05`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "InvalidSubmissionPeriod", abi = "InvalidSubmissionPeriod()")]
+    pub struct InvalidSubmissionPeriod;
     ///Custom Error type `NoBytecodeAtAddress` with signature `NoBytecodeAtAddress(address,string)` and selector `0x919834b9`
     #[derive(
         Clone,
@@ -510,7 +430,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "NoBytecodeAtAddress",
@@ -529,7 +449,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "NoSelectorsProvidedForFacetForCut",
@@ -547,22 +467,22 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "NotGateway", abi = "NotGateway()")]
     pub struct NotGateway;
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorDiamondErrors {
-        CannotAddFunctionToDiamondThatAlreadyExists(
-            CannotAddFunctionToDiamondThatAlreadyExists,
-        ),
+        CannotAddFunctionToDiamondThatAlreadyExists(CannotAddFunctionToDiamondThatAlreadyExists),
         CannotAddSelectorsToZeroAddress(CannotAddSelectorsToZeroAddress),
         FunctionNotFound(FunctionNotFound),
         GatewayCannotBeZero(GatewayCannotBeZero),
         IncorrectFacetCutAction(IncorrectFacetCutAction),
         InitializationFunctionReverted(InitializationFunctionReverted),
+        InvalidCollateral(InvalidCollateral),
         InvalidMajorityPercentage(InvalidMajorityPercentage),
+        InvalidSubmissionPeriod(InvalidSubmissionPeriod),
         NoBytecodeAtAddress(NoBytecodeAtAddress),
         NoSelectorsProvidedForFacetForCut(NoSelectorsProvidedForFacetForCut),
         NotGateway(NotGateway),
@@ -575,9 +495,9 @@ pub mod subnet_actor_diamond {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::RevertString(decoded));
             }
             if let Ok(decoded) = <CannotAddFunctionToDiamondThatAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
@@ -585,49 +505,55 @@ pub mod subnet_actor_diamond {
             ) {
                 return Ok(Self::CannotAddFunctionToDiamondThatAlreadyExists(decoded));
             }
-            if let Ok(decoded) = <CannotAddSelectorsToZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CannotAddSelectorsToZeroAddress as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CannotAddSelectorsToZeroAddress(decoded));
             }
-            if let Ok(decoded) = <FunctionNotFound as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <FunctionNotFound as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::FunctionNotFound(decoded));
             }
-            if let Ok(decoded) = <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::GatewayCannotBeZero(decoded));
             }
-            if let Ok(decoded) = <IncorrectFacetCutAction as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <IncorrectFacetCutAction as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::IncorrectFacetCutAction(decoded));
             }
-            if let Ok(decoded) = <InitializationFunctionReverted as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InitializationFunctionReverted as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InitializationFunctionReverted(decoded));
             }
-            if let Ok(decoded) = <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <InvalidCollateral as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::InvalidCollateral(decoded));
+            }
+            if let Ok(decoded) =
+                <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidMajorityPercentage(decoded));
             }
-            if let Ok(decoded) = <NoBytecodeAtAddress as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidSubmissionPeriod as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::InvalidSubmissionPeriod(decoded));
+            }
+            if let Ok(decoded) =
+                <NoBytecodeAtAddress as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::NoBytecodeAtAddress(decoded));
             }
-            if let Ok(decoded) = <NoSelectorsProvidedForFacetForCut as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <NoSelectorsProvidedForFacetForCut as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::NoSelectorsProvidedForFacetForCut(decoded));
             }
-            if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotGateway(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -642,9 +568,7 @@ pub mod subnet_actor_diamond {
                 Self::CannotAddSelectorsToZeroAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::FunctionNotFound(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::FunctionNotFound(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GatewayCannotBeZero(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -654,7 +578,11 @@ pub mod subnet_actor_diamond {
                 Self::InitializationFunctionReverted(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::InvalidCollateral(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidMajorityPercentage(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidSubmissionPeriod(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NoBytecodeAtAddress(element) => {
@@ -663,9 +591,7 @@ pub mod subnet_actor_diamond {
                 Self::NoSelectorsProvidedForFacetForCut(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotGateway(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::NotGateway(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -699,7 +625,15 @@ pub mod subnet_actor_diamond {
                     true
                 }
                 _ if selector
+                    == <InvalidCollateral as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <InvalidMajorityPercentage as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidSubmissionPeriod as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -726,21 +660,15 @@ pub mod subnet_actor_diamond {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::FunctionNotFound(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GatewayCannotBeZero(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::IncorrectFacetCutAction(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::GatewayCannotBeZero(element) => ::core::fmt::Display::fmt(element, f),
+                Self::IncorrectFacetCutAction(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InitializationFunctionReverted(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::InvalidMajorityPercentage(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::NoBytecodeAtAddress(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::InvalidCollateral(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidMajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidSubmissionPeriod(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NoBytecodeAtAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoSelectorsProvidedForFacetForCut(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -755,13 +683,13 @@ pub mod subnet_actor_diamond {
         }
     }
     impl ::core::convert::From<CannotAddFunctionToDiamondThatAlreadyExists>
-    for SubnetActorDiamondErrors {
+        for SubnetActorDiamondErrors
+    {
         fn from(value: CannotAddFunctionToDiamondThatAlreadyExists) -> Self {
             Self::CannotAddFunctionToDiamondThatAlreadyExists(value)
         }
     }
-    impl ::core::convert::From<CannotAddSelectorsToZeroAddress>
-    for SubnetActorDiamondErrors {
+    impl ::core::convert::From<CannotAddSelectorsToZeroAddress> for SubnetActorDiamondErrors {
         fn from(value: CannotAddSelectorsToZeroAddress) -> Self {
             Self::CannotAddSelectorsToZeroAddress(value)
         }
@@ -781,10 +709,14 @@ pub mod subnet_actor_diamond {
             Self::IncorrectFacetCutAction(value)
         }
     }
-    impl ::core::convert::From<InitializationFunctionReverted>
-    for SubnetActorDiamondErrors {
+    impl ::core::convert::From<InitializationFunctionReverted> for SubnetActorDiamondErrors {
         fn from(value: InitializationFunctionReverted) -> Self {
             Self::InitializationFunctionReverted(value)
+        }
+    }
+    impl ::core::convert::From<InvalidCollateral> for SubnetActorDiamondErrors {
+        fn from(value: InvalidCollateral) -> Self {
+            Self::InvalidCollateral(value)
         }
     }
     impl ::core::convert::From<InvalidMajorityPercentage> for SubnetActorDiamondErrors {
@@ -792,13 +724,17 @@ pub mod subnet_actor_diamond {
             Self::InvalidMajorityPercentage(value)
         }
     }
+    impl ::core::convert::From<InvalidSubmissionPeriod> for SubnetActorDiamondErrors {
+        fn from(value: InvalidSubmissionPeriod) -> Self {
+            Self::InvalidSubmissionPeriod(value)
+        }
+    }
     impl ::core::convert::From<NoBytecodeAtAddress> for SubnetActorDiamondErrors {
         fn from(value: NoBytecodeAtAddress) -> Self {
             Self::NoBytecodeAtAddress(value)
         }
     }
-    impl ::core::convert::From<NoSelectorsProvidedForFacetForCut>
-    for SubnetActorDiamondErrors {
+    impl ::core::convert::From<NoSelectorsProvidedForFacetForCut> for SubnetActorDiamondErrors {
         fn from(value: NoSelectorsProvidedForFacetForCut) -> Self {
             Self::NoSelectorsProvidedForFacetForCut(value)
         }
@@ -808,112 +744,4 @@ pub mod subnet_actor_diamond {
             Self::NotGateway(value)
         }
     }
-    ///Container type for all input parameters for the `MIN_CHECKPOINT_PERIOD` function with signature `MIN_CHECKPOINT_PERIOD()` and selector `0xa1ada303`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(name = "MIN_CHECKPOINT_PERIOD", abi = "MIN_CHECKPOINT_PERIOD()")]
-    pub struct MinCheckpointPeriodCall;
-    ///Container type for all input parameters for the `MIN_COLLATERAL_AMOUNT` function with signature `MIN_COLLATERAL_AMOUNT()` and selector `0x91be4d41`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(name = "MIN_COLLATERAL_AMOUNT", abi = "MIN_COLLATERAL_AMOUNT()")]
-    pub struct MinCollateralAmountCall;
-    ///Container type for all of the contract's call
-    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
-    pub enum SubnetActorDiamondCalls {
-        MinCheckpointPeriod(MinCheckpointPeriodCall),
-        MinCollateralAmount(MinCollateralAmountCall),
-    }
-    impl ::ethers::core::abi::AbiDecode for SubnetActorDiamondCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
-            let data = data.as_ref();
-            if let Ok(decoded) = <MinCheckpointPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::MinCheckpointPeriod(decoded));
-            }
-            if let Ok(decoded) = <MinCollateralAmountCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::MinCollateralAmount(decoded));
-            }
-            Err(::ethers::core::abi::Error::InvalidData.into())
-        }
-    }
-    impl ::ethers::core::abi::AbiEncode for SubnetActorDiamondCalls {
-        fn encode(self) -> Vec<u8> {
-            match self {
-                Self::MinCheckpointPeriod(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::MinCollateralAmount(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-            }
-        }
-    }
-    impl ::core::fmt::Display for SubnetActorDiamondCalls {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-            match self {
-                Self::MinCheckpointPeriod(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::MinCollateralAmount(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-            }
-        }
-    }
-    impl ::core::convert::From<MinCheckpointPeriodCall> for SubnetActorDiamondCalls {
-        fn from(value: MinCheckpointPeriodCall) -> Self {
-            Self::MinCheckpointPeriod(value)
-        }
-    }
-    impl ::core::convert::From<MinCollateralAmountCall> for SubnetActorDiamondCalls {
-        fn from(value: MinCollateralAmountCall) -> Self {
-            Self::MinCollateralAmount(value)
-        }
-    }
-    ///Container type for all return fields from the `MIN_CHECKPOINT_PERIOD` function with signature `MIN_CHECKPOINT_PERIOD()` and selector `0xa1ada303`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct MinCheckpointPeriodReturn(pub u8);
-    ///Container type for all return fields from the `MIN_COLLATERAL_AMOUNT` function with signature `MIN_COLLATERAL_AMOUNT()` and selector `0x91be4d41`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct MinCollateralAmountReturn(pub ::ethers::core::types::U256);
 }

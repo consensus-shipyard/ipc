@@ -48,6 +48,11 @@ install-npm-package:
 install-eth-abi:
 	curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3 get-pip.py && rm get-pip.py && python3 -m pip install eth_abi
 
+check-rust-binding:
+	cargo fmt --manifest-path ./binding/Cargo.toml && \
+	cargo clippy --manifest-path ./binding/Cargo.toml && \
+	./ops/check-rust-binding.sh
+
 storage:
 	npx hardhat storage-layout --update
 
