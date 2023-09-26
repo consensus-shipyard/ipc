@@ -9,6 +9,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { workspace = true }
 libsecp256k1 = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -16,6 +17,7 @@ num-traits = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
+tendermint = { workspace = true }
 
 cid = { workspace = true, optional = true }
 fvm_shared = { workspace = true }

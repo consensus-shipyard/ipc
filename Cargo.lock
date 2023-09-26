@@ -2956,8 +2956,10 @@ dependencies = [
  "fvm_ipld_encoding 0.3.3",
  "fvm_ipld_hamt 0.6.1",
  "fvm_shared",
+ "hex",
  "lazy_static",
  "libsecp256k1",
+ "merkle-tree-rs",
  "paste",
  "quickcheck 1.0.3",
  "quickcheck_macros",
@@ -2998,6 +3000,7 @@ dependencies = [
 name = "fendermint_vm_genesis"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "cid",
  "fendermint_testing",
@@ -3016,6 +3019,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "tendermint",
 ]
 
 [[package]]
@@ -4561,6 +4565,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f56a2d0bc861f9165be4eb3442afd3c236d8a98afd426f65d92324ae1091a484"
@@ -5519,6 +5532,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a634b1c61a95585bd15607c6ab0c4e5b226e695ff2800ba0cdccddf208c406c"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "merkle-tree-rs"
+version = "0.1.0"
+source = "git+https://github.com/consensus-shipyard/merkle-tree-rs.git?branch=dev#069f1dcb7f29d389c92cac54b1e687d81c4fd639"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "render-tree",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -7044,6 +7070,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbb5fb1acd8a1a18b3dd5be62d25485eb770e05afb408a9627d14d451bae12da"
 
 [[package]]
+name = "render-tree"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68ed587df09cfb7ce1bc6fe8f77e24db219f222c049326ccbfb948ec67e31664"
+dependencies = [
+ "itertools 0.7.11",
+ "log",
+ "termcolor",
+]
+
+[[package]]
 name = "replace_with"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8483,6 +8520,15 @@ dependencies = [
  "dirs-next",
  "rustversion",
  "winapi",
+]
+
+[[package]]
+name = "termcolor"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6093bad37da69aab9d123a8091e4be0aa4a03e4d601ec641c327398315f62b64"
+dependencies = [
+ "winapi-util",
 ]
 
 [[package]]

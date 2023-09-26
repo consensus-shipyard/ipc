@@ -48,6 +48,7 @@ libp2p = "0.50"
 libp2p-bitswap = "0.25.1"
 libsecp256k1 = "0.7"
 lru_time_cache = "0.11"
+merkle-tree-rs = "0.1.0"
 multiaddr = "0.16"
 multihash = { version = "0.16.1", default-features = false }
 num-traits = "0.2"
@@ -126,3 +127,5 @@ ipc_ipld_resolver = { git = "https://github.com/consensus-shipyard/ipc-ipld-reso
 [patch.crates-io]
 # Use stable-only features.
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
+
+merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }

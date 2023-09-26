@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use anyhow::{anyhow, bail, Context};
 use ethers::abi::Detokenize;
@@ -41,12 +41,14 @@ pub type MockContractCall<T> = ethers::prelude::ContractCall<MockProvider, T>;
 ///
 /// let _period: u64 = caller.call(&mut state, |c| c.bottom_up_check_period()).unwrap();
 /// ```
-pub struct ContractCaller<C> {
+#[derive(Clone)]
+pub struct ContractCaller<C, DB> {
     addr: Address,
     contract: C,
+    store: PhantomData<DB>,
 }
 
-impl<C> ContractCaller<C> {
+impl<C, DB> ContractCaller<C, DB> {
     /// Create a new contract caller with the contract's Ethereum address and ABI bindings:
     pub fn new<F>(addr: EthAddress, contract: F) -> Self
     where
@@ -60,18 +62,23 @@ impl<C> ContractCaller<C> {
         Self {
             addr: Address::from(addr),
             contract,
+            store: PhantomData,
         }
     }
+}
 
+impl<C, DB> ContractCaller<C, DB>
+where
+    DB: Blockstore,
+{
     /// Call an EVM method implicitly to read its return value.
     ///
     /// Returns an error if the return code shows is not successful;
     /// intended to be used with methods that are expected succeed.
-    pub fn call<T, F, DB>(&self, state: &mut FvmExecState<DB>, f: F) -> anyhow::Result<T>
+    pub fn call<T, F>(&self, state: &mut FvmExecState<DB>, f: F) -> anyhow::Result<T>
     where
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,
-        DB: Blockstore,
     {
         match self.try_call(state, f)? {
             Ok(value) => Ok(value),
@@ -90,7 +97,7 @@ impl<C> ContractCaller<C> {
     ///
     /// Returns either the result or the exit code if it's not successful;
     /// intended to be used with methods that are expected to fail under certain conditions.
-    pub fn try_call<T, F, DB>(
+    pub fn try_call<T, F>(
         &self,
         state: &mut FvmExecState<DB>,
         f: F,
@@ -98,7 +105,6 @@ impl<C> ContractCaller<C> {
     where
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,
-        DB: Blockstore,
     {
         let call = f(&self.contract);
         let calldata = call.calldata().ok_or_else(|| anyhow!("missing calldata"))?;

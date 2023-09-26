@@ -502,7 +502,7 @@ mod tests {
 
         // Try calling a method on the IPC Gateway.
         let exec_state = state.exec_state().expect("should be in exec stage");
-        let caller = GatewayCaller::new();
+        let caller = GatewayCaller::default();
 
         let period = caller
             .bottom_up_check_period(exec_state)

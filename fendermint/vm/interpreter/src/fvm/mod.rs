@@ -1,8 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use std::{marker::PhantomData, path::PathBuf};
+use std::path::PathBuf;
 
 mod check;
+mod checkpoint;
 mod exec;
 mod externs;
 mod genesis;
@@ -14,12 +15,15 @@ pub mod store;
 pub mod bundle;
 
 pub use check::FvmCheckRet;
+pub use checkpoint::PowerUpdates;
 pub use exec::FvmApplyRet;
 use fendermint_eth_hardhat::Hardhat;
 pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
 use libsecp256k1::{PublicKey, SecretKey};
 pub use query::FvmQueryRet;
+
+use self::state::ipc::GatewayCaller;
 
 pub type FvmMessage = fvm_shared::message::Message;
 
@@ -28,7 +32,7 @@ pub type FvmMessage = fvm_shared::message::Message;
 pub struct FvmMessageInterpreter<DB, C> {
     contracts: Hardhat,
     /// Tendermint client for broadcasting transactions and run API queries.
-    _client: C,
+    client: C,
     /// If this is a validator node, this should be the key we can use to sign transactions.
     _validator_key: Option<(SecretKey, PublicKey)>,
     /// Overestimation rate applied to gas to ensure that the
@@ -40,7 +44,7 @@ pub struct FvmMessageInterpreter<DB, C> {
     /// Indicate whether transactions should be fully executed during the checks performed
     /// when they are added to the mempool, or just the most basic ones are performed.
     exec_in_check: bool,
-    _phantom_db: PhantomData<DB>,
+    gateway: GatewayCaller<DB>,
 }
 
 impl<DB, C> FvmMessageInterpreter<DB, C> {
@@ -55,13 +59,13 @@ impl<DB, C> FvmMessageInterpreter<DB, C> {
         // Derive the public keys so it's available to check whether this node is a validator at any point in time.
         let validator_key = validator_key.map(|sk| (sk, PublicKey::from_secret_key(&sk)));
         Self {
-            _client: client,
+            client,
             _validator_key: validator_key,
             contracts: Hardhat::new(contracts_dir),
             gas_overestimation_rate,
             gas_search_step,
             exec_in_check,
-            _phantom_db: PhantomData,
+            gateway: GatewayCaller::default(),
         }
     }
 }

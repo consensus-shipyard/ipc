@@ -104,12 +104,15 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
 /// Map the return values from epoch boundary operations to validator updates.
 ///
 /// (Currently just a placeholder).
-pub fn to_end_block(_ret: ()) -> response::EndBlock {
-    response::EndBlock {
-        validator_updates: Vec::new(),
+pub fn to_end_block(power_table: Vec<Validator>) -> anyhow::Result<response::EndBlock> {
+    let validator_updates =
+        to_validator_updates(power_table).context("failed to convert validator updates")?;
+
+    Ok(response::EndBlock {
+        validator_updates,
         consensus_param_updates: None,
         events: Vec::new(),
-    }
+    })
 }
 
 /// Map the return values from cron operations.
@@ -260,13 +263,8 @@ pub fn to_validator_updates(
 ) -> anyhow::Result<Vec<tendermint::validator::Update>> {
     let mut updates = vec![];
     for v in validators {
-        let bz = v.public_key.0.serialize();
-
-        let key = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(&bz)
-            .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
-
         updates.push(tendermint::validator::Update {
-            pub_key: tendermint::public_key::PublicKey::Secp256k1(key),
+            pub_key: tendermint::PublicKey::try_from(v.public_key)?,
             power: tendermint::vote::Power::try_from(v.power.0)?,
         });
     }

@@ -8,7 +8,7 @@ use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
     executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
-    machine::{DefaultMachine, Machine, NetworkConfig},
+    machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
     DefaultKernel,
 };
@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::fvm::externs::FendermintExterns;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
+
+pub type BlockHash = [u8; 32];
 
 pub type ActorAddressMap = HashMap<ActorID, Address>;
 
@@ -53,6 +55,12 @@ where
 {
     executor:
         DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns>>>>,
+
+    /// Hash of the block currently being executed. For queries and checks this is empty.
+    ///
+    /// The main motivation to add it here was to make it easier to pass in data to the
+    /// execution interpreter without having to add yet another piece to track at the app level.
+    block_hash: Option<BlockHash>,
 }
 
 impl<DB> FvmExecState<DB>
@@ -87,7 +95,16 @@ where
         let machine = DefaultMachine::new(&mc, blockstore, FendermintExterns)?;
         let executor = DefaultExecutor::new(engine, machine)?;
 
-        Ok(Self { executor })
+        Ok(Self {
+            executor,
+            block_hash: None,
+        })
+    }
+
+    /// Set the block hash during execution.
+    pub fn with_block_hash(mut self, block_hash: BlockHash) -> Self {
+        self.block_hash = Some(block_hash);
+        self
     }
 
     /// Execute message implicitly.
@@ -128,6 +145,11 @@ where
         self.executor.context().epoch
     }
 
+    /// Identity of the block being executed, if we are indeed executing any blocks.
+    pub fn block_hash(&self) -> Option<BlockHash> {
+        self.block_hash
+    }
+
     /// The timestamp of the currently executing block.
     pub fn timestamp(&self) -> Timestamp {
         Timestamp(self.executor.context().timestamp)
@@ -136,6 +158,11 @@ where
     /// Get a mutable reference to the underlying [StateTree].
     pub fn state_tree_mut(&mut self) -> &mut StateTree<MachineBlockstore<DB>> {
         self.executor.state_tree_mut()
+    }
+
+    /// Built-in actor manifest to inspect code CIDs.
+    pub fn builtin_actors(&self) -> &Manifest {
+        self.executor.builtin_actors()
     }
 
     /// Collect all the event emitters' delegated addresses, for those who have any.

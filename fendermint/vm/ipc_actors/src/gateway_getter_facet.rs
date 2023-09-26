@@ -311,6 +311,162 @@ pub mod gateway_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getCheckpointCurrentWeight"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getCheckpointCurrentWeight",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("h"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getCheckpointInfo"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("getCheckpointInfo"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("h"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bool,
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct CheckpointInfo"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getCurrentConfigurationNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getCurrentConfigurationNumber",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getCurrentMembership"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getCurrentMembership",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                ],
+                                                            ),
+                                                        ],
+                                                    ),
+                                                ),
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct Membership"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getCurrentTotalWeight"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getCurrentTotalWeight",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getGenesisEpoch"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -322,6 +478,90 @@ pub mod gateway_getter_facet {
                                     kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getLastConfigurationNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getLastConfigurationNumber",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getLastMembership"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("getLastMembership"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                ],
+                                                            ),
+                                                        ],
+                                                    ),
+                                                ),
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct Membership"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getLastTotalWeight"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("getLastTotalWeight"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -1267,28 +1507,6 @@ pub mod gateway_getter_facet {
                         },
                     ],
                 ),
-                (
-                    ::std::borrow::ToOwned::to_owned("totalWeight"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("totalWeight"),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
             ]),
             events: ::std::collections::BTreeMap::new(),
             errors: ::std::collections::BTreeMap::new(),
@@ -1397,12 +1615,78 @@ pub mod gateway_getter_facet {
                 .method_hash([158, 83, 11, 87], (subnet_id,))
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getCheckpointCurrentWeight` (0xf7ceaf76) function
+        pub fn get_checkpoint_current_weight(
+            &self,
+            h: u64,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([247, 206, 175, 118], h)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getCheckpointInfo` (0x4512ff63) function
+        pub fn get_checkpoint_info(
+            &self,
+            h: u64,
+        ) -> ::ethers::contract::builders::ContractCall<M, CheckpointInfo> {
+            self.0
+                .method_hash([69, 18, 255, 99], h)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getCurrentConfigurationNumber` (0x544dddff) function
+        pub fn get_current_configuration_number(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u64> {
+            self.0
+                .method_hash([84, 77, 221, 255], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getCurrentMembership` (0x6ad21bb0) function
+        pub fn get_current_membership(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, Membership> {
+            self.0
+                .method_hash([106, 210, 27, 176], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getCurrentTotalWeight` (0x0dc25ea1) function
+        pub fn get_current_total_weight(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([13, 194, 94, 161], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getGenesisEpoch` (0x51392fc0) function
         pub fn get_genesis_epoch(
             &self,
         ) -> ::ethers::contract::builders::ContractCall<M, u64> {
             self.0
                 .method_hash([81, 57, 47, 192], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getLastConfigurationNumber` (0xb1ba49b0) function
+        pub fn get_last_configuration_number(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u64> {
+            self.0
+                .method_hash([177, 186, 73, 176], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getLastMembership` (0xf3229131) function
+        pub fn get_last_membership(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, Membership> {
+            self.0
+                .method_hash([243, 34, 145, 49], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getLastTotalWeight` (0x7e84946f) function
+        pub fn get_last_total_weight(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([126, 132, 148, 111], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getLatestParentFinality` (0x0338150f) function
@@ -1543,14 +1827,6 @@ pub mod gateway_getter_facet {
                 .method_hash([162, 182, 113, 88], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `totalWeight` (0x96c82e57) function
-        pub fn total_weight(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([150, 200, 46, 87], ())
-                .expect("method not found (this should never happen)")
-        }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
     for GatewayGetterFacet<M> {
@@ -1656,6 +1932,81 @@ pub mod gateway_getter_facet {
     pub struct GetAppliedTopDownNonceCall {
         pub subnet_id: SubnetID,
     }
+    ///Container type for all input parameters for the `getCheckpointCurrentWeight` function with signature `getCheckpointCurrentWeight(uint64)` and selector `0xf7ceaf76`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "getCheckpointCurrentWeight",
+        abi = "getCheckpointCurrentWeight(uint64)"
+    )]
+    pub struct GetCheckpointCurrentWeightCall {
+        pub h: u64,
+    }
+    ///Container type for all input parameters for the `getCheckpointInfo` function with signature `getCheckpointInfo(uint64)` and selector `0x4512ff63`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getCheckpointInfo", abi = "getCheckpointInfo(uint64)")]
+    pub struct GetCheckpointInfoCall {
+        pub h: u64,
+    }
+    ///Container type for all input parameters for the `getCurrentConfigurationNumber` function with signature `getCurrentConfigurationNumber()` and selector `0x544dddff`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "getCurrentConfigurationNumber",
+        abi = "getCurrentConfigurationNumber()"
+    )]
+    pub struct GetCurrentConfigurationNumberCall;
+    ///Container type for all input parameters for the `getCurrentMembership` function with signature `getCurrentMembership()` and selector `0x6ad21bb0`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getCurrentMembership", abi = "getCurrentMembership()")]
+    pub struct GetCurrentMembershipCall;
+    ///Container type for all input parameters for the `getCurrentTotalWeight` function with signature `getCurrentTotalWeight()` and selector `0x0dc25ea1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getCurrentTotalWeight", abi = "getCurrentTotalWeight()")]
+    pub struct GetCurrentTotalWeightCall;
     ///Container type for all input parameters for the `getGenesisEpoch` function with signature `getGenesisEpoch()` and selector `0x51392fc0`
     #[derive(
         Clone,
@@ -1669,6 +2020,45 @@ pub mod gateway_getter_facet {
     )]
     #[ethcall(name = "getGenesisEpoch", abi = "getGenesisEpoch()")]
     pub struct GetGenesisEpochCall;
+    ///Container type for all input parameters for the `getLastConfigurationNumber` function with signature `getLastConfigurationNumber()` and selector `0xb1ba49b0`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getLastConfigurationNumber", abi = "getLastConfigurationNumber()")]
+    pub struct GetLastConfigurationNumberCall;
+    ///Container type for all input parameters for the `getLastMembership` function with signature `getLastMembership()` and selector `0xf3229131`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getLastMembership", abi = "getLastMembership()")]
+    pub struct GetLastMembershipCall;
+    ///Container type for all input parameters for the `getLastTotalWeight` function with signature `getLastTotalWeight()` and selector `0x7e84946f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getLastTotalWeight", abi = "getLastTotalWeight()")]
+    pub struct GetLastTotalWeightCall;
     ///Container type for all input parameters for the `getLatestParentFinality` function with signature `getLatestParentFinality()` and selector `0x0338150f`
     #[derive(
         Clone,
@@ -1903,19 +2293,6 @@ pub mod gateway_getter_facet {
     )]
     #[ethcall(name = "totalSubnets", abi = "totalSubnets()")]
     pub struct TotalSubnetsCall;
-    ///Container type for all input parameters for the `totalWeight` function with signature `totalWeight()` and selector `0x96c82e57`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(name = "totalWeight", abi = "totalWeight()")]
-    pub struct TotalWeightCall;
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayGetterFacetCalls {
@@ -1926,7 +2303,15 @@ pub mod gateway_getter_facet {
         CrossMsgFee(CrossMsgFeeCall),
         ExecutableQueue(ExecutableQueueCall),
         GetAppliedTopDownNonce(GetAppliedTopDownNonceCall),
+        GetCheckpointCurrentWeight(GetCheckpointCurrentWeightCall),
+        GetCheckpointInfo(GetCheckpointInfoCall),
+        GetCurrentConfigurationNumber(GetCurrentConfigurationNumberCall),
+        GetCurrentMembership(GetCurrentMembershipCall),
+        GetCurrentTotalWeight(GetCurrentTotalWeightCall),
         GetGenesisEpoch(GetGenesisEpochCall),
+        GetLastConfigurationNumber(GetLastConfigurationNumberCall),
+        GetLastMembership(GetLastMembershipCall),
+        GetLastTotalWeight(GetLastTotalWeightCall),
         GetLatestParentFinality(GetLatestParentFinalityCall),
         GetNetworkName(GetNetworkNameCall),
         GetParentFinality(GetParentFinalityCall),
@@ -1943,7 +2328,6 @@ pub mod gateway_getter_facet {
         Subnets(SubnetsCall),
         TopDownCheckPeriod(TopDownCheckPeriodCall),
         TotalSubnets(TotalSubnetsCall),
-        TotalWeight(TotalWeightCall),
     }
     impl ::ethers::core::abi::AbiDecode for GatewayGetterFacetCalls {
         fn decode(
@@ -1987,8 +2371,56 @@ pub mod gateway_getter_facet {
                 return Ok(Self::GetAppliedTopDownNonce(decoded));
             }
             if let Ok(decoded)
+                = <GetCheckpointCurrentWeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetCheckpointCurrentWeight(decoded));
+            }
+            if let Ok(decoded)
+                = <GetCheckpointInfoCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetCheckpointInfo(decoded));
+            }
+            if let Ok(decoded)
+                = <GetCurrentConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetCurrentConfigurationNumber(decoded));
+            }
+            if let Ok(decoded)
+                = <GetCurrentMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetCurrentMembership(decoded));
+            }
+            if let Ok(decoded)
+                = <GetCurrentTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetCurrentTotalWeight(decoded));
+            }
+            if let Ok(decoded)
                 = <GetGenesisEpochCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetGenesisEpoch(decoded));
+            }
+            if let Ok(decoded)
+                = <GetLastConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetLastConfigurationNumber(decoded));
+            }
+            if let Ok(decoded)
+                = <GetLastMembershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetLastMembership(decoded));
+            }
+            if let Ok(decoded)
+                = <GetLastTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::GetLastTotalWeight(decoded));
             }
             if let Ok(decoded)
                 = <GetLatestParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
@@ -2068,10 +2500,6 @@ pub mod gateway_getter_facet {
                 = <TotalSubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalSubnets(decoded));
             }
-            if let Ok(decoded)
-                = <TotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::TotalWeight(decoded));
-            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -2099,7 +2527,31 @@ pub mod gateway_getter_facet {
                 Self::GetAppliedTopDownNonce(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::GetCheckpointCurrentWeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetCheckpointInfo(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetCurrentConfigurationNumber(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetCurrentMembership(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetCurrentTotalWeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetGenesisEpoch(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetLastConfigurationNumber(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetLastMembership(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetLastTotalWeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetLatestParentFinality(element) => {
@@ -2146,9 +2598,6 @@ pub mod gateway_getter_facet {
                 Self::TotalSubnets(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::TotalWeight(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
             }
         }
     }
@@ -2170,7 +2619,27 @@ pub mod gateway_getter_facet {
                 Self::GetAppliedTopDownNonce(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::GetCheckpointCurrentWeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetCheckpointInfo(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetCurrentConfigurationNumber(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetCurrentMembership(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetCurrentTotalWeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GetGenesisEpoch(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetLastConfigurationNumber(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetLastMembership(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetLastTotalWeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GetLatestParentFinality(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -2199,7 +2668,6 @@ pub mod gateway_getter_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::TotalSubnets(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TotalWeight(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -2238,9 +2706,52 @@ pub mod gateway_getter_facet {
             Self::GetAppliedTopDownNonce(value)
         }
     }
+    impl ::core::convert::From<GetCheckpointCurrentWeightCall>
+    for GatewayGetterFacetCalls {
+        fn from(value: GetCheckpointCurrentWeightCall) -> Self {
+            Self::GetCheckpointCurrentWeight(value)
+        }
+    }
+    impl ::core::convert::From<GetCheckpointInfoCall> for GatewayGetterFacetCalls {
+        fn from(value: GetCheckpointInfoCall) -> Self {
+            Self::GetCheckpointInfo(value)
+        }
+    }
+    impl ::core::convert::From<GetCurrentConfigurationNumberCall>
+    for GatewayGetterFacetCalls {
+        fn from(value: GetCurrentConfigurationNumberCall) -> Self {
+            Self::GetCurrentConfigurationNumber(value)
+        }
+    }
+    impl ::core::convert::From<GetCurrentMembershipCall> for GatewayGetterFacetCalls {
+        fn from(value: GetCurrentMembershipCall) -> Self {
+            Self::GetCurrentMembership(value)
+        }
+    }
+    impl ::core::convert::From<GetCurrentTotalWeightCall> for GatewayGetterFacetCalls {
+        fn from(value: GetCurrentTotalWeightCall) -> Self {
+            Self::GetCurrentTotalWeight(value)
+        }
+    }
     impl ::core::convert::From<GetGenesisEpochCall> for GatewayGetterFacetCalls {
         fn from(value: GetGenesisEpochCall) -> Self {
             Self::GetGenesisEpoch(value)
+        }
+    }
+    impl ::core::convert::From<GetLastConfigurationNumberCall>
+    for GatewayGetterFacetCalls {
+        fn from(value: GetLastConfigurationNumberCall) -> Self {
+            Self::GetLastConfigurationNumber(value)
+        }
+    }
+    impl ::core::convert::From<GetLastMembershipCall> for GatewayGetterFacetCalls {
+        fn from(value: GetLastMembershipCall) -> Self {
+            Self::GetLastMembership(value)
+        }
+    }
+    impl ::core::convert::From<GetLastTotalWeightCall> for GatewayGetterFacetCalls {
+        fn from(value: GetLastTotalWeightCall) -> Self {
+            Self::GetLastTotalWeight(value)
         }
     }
     impl ::core::convert::From<GetLatestParentFinalityCall> for GatewayGetterFacetCalls {
@@ -2323,11 +2834,6 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<TotalSubnetsCall> for GatewayGetterFacetCalls {
         fn from(value: TotalSubnetsCall) -> Self {
             Self::TotalSubnets(value)
-        }
-    }
-    impl ::core::convert::From<TotalWeightCall> for GatewayGetterFacetCalls {
-        fn from(value: TotalWeightCall) -> Self {
-            Self::TotalWeight(value)
         }
     }
     ///Container type for all return fields from the `appliedTopDownNonce` function with signature `appliedTopDownNonce()` and selector `0x8789f83b`
@@ -2414,6 +2920,66 @@ pub mod gateway_getter_facet {
         Hash
     )]
     pub struct GetAppliedTopDownNonceReturn(pub bool, pub u64);
+    ///Container type for all return fields from the `getCheckpointCurrentWeight` function with signature `getCheckpointCurrentWeight(uint64)` and selector `0xf7ceaf76`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetCheckpointCurrentWeightReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getCheckpointInfo` function with signature `getCheckpointInfo(uint64)` and selector `0x4512ff63`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetCheckpointInfoReturn(pub CheckpointInfo);
+    ///Container type for all return fields from the `getCurrentConfigurationNumber` function with signature `getCurrentConfigurationNumber()` and selector `0x544dddff`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetCurrentConfigurationNumberReturn(pub u64);
+    ///Container type for all return fields from the `getCurrentMembership` function with signature `getCurrentMembership()` and selector `0x6ad21bb0`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetCurrentMembershipReturn(pub Membership);
+    ///Container type for all return fields from the `getCurrentTotalWeight` function with signature `getCurrentTotalWeight()` and selector `0x0dc25ea1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetCurrentTotalWeightReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getGenesisEpoch` function with signature `getGenesisEpoch()` and selector `0x51392fc0`
     #[derive(
         Clone,
@@ -2426,6 +2992,42 @@ pub mod gateway_getter_facet {
         Hash
     )]
     pub struct GetGenesisEpochReturn(pub u64);
+    ///Container type for all return fields from the `getLastConfigurationNumber` function with signature `getLastConfigurationNumber()` and selector `0xb1ba49b0`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetLastConfigurationNumberReturn(pub u64);
+    ///Container type for all return fields from the `getLastMembership` function with signature `getLastMembership()` and selector `0xf3229131`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetLastMembershipReturn(pub Membership);
+    ///Container type for all return fields from the `getLastTotalWeight` function with signature `getLastTotalWeight()` and selector `0x7e84946f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetLastTotalWeightReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getLatestParentFinality` function with signature `getLatestParentFinality()` and selector `0x0338150f`
     #[derive(
         Clone,
@@ -2623,18 +3225,6 @@ pub mod gateway_getter_facet {
         Hash
     )]
     pub struct TotalSubnetsReturn(pub u64);
-    ///Container type for all return fields from the `totalWeight` function with signature `totalWeight()` and selector `0x96c82e57`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct TotalWeightReturn(pub ::ethers::core::types::U256);
     ///`BottomUpCheckpoint((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes)`
     #[derive(
         Clone,
@@ -2654,6 +3244,24 @@ pub mod gateway_getter_facet {
         pub children: ::std::vec::Vec<ChildCheck>,
         pub prev_hash: [u8; 32],
         pub proof: ::ethers::core::types::Bytes,
+    }
+    ///`CheckpointInfo(bytes32,bytes32,uint256,uint256,bool)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct CheckpointInfo {
+        pub hash: [u8; 32],
+        pub root_hash: [u8; 32],
+        pub threshold: ::ethers::core::types::U256,
+        pub current_weight: ::ethers::core::types::U256,
+        pub reached: bool,
     }
     ///`ChildCheck((uint64,address[]),bytes32[])`
     #[derive(
@@ -2714,6 +3322,22 @@ pub mod gateway_getter_facet {
     pub struct Ipcaddress {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
+    }
+    ///`Membership((uint256,(uint8,bytes))[],uint64,uint256)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct Membership {
+        pub validators: ::std::vec::Vec<Validator>,
+        pub configuration_number: u64,
+        pub total_weight: ::ethers::core::types::U256,
     }
     ///`ParentFinality(uint256,bytes32)`
     #[derive(
@@ -2784,5 +3408,20 @@ pub mod gateway_getter_facet {
     pub struct SubnetID {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
+    }
+    ///`Validator(uint256,(uint8,bytes))`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct Validator {
+        pub weight: ::ethers::core::types::U256,
+        pub addr: FvmAddress,
     }
 }

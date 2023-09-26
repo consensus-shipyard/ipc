@@ -13,6 +13,7 @@ use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
 use fendermint_vm_core::Timestamp;
+use fendermint_vm_genesis::Validator;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
@@ -339,7 +340,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = (),
+        EndOutput = Vec<Validator>,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -562,16 +563,22 @@ where
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.
     async fn begin_block(&self, request: request::BeginBlock) -> AbciResult<response::BeginBlock> {
+        let block_height = request.header.height.into();
+        let block_hash = match request.hash {
+            tendermint::Hash::Sha256(h) => h,
+            tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
+        };
+
+        tracing::debug!(block_height, "begin block");
+
         let db = self.state_store_clone();
-        let height = request.header.height.into();
         let state = self.committed_state()?;
         let mut state_params = state.state_params.clone();
         state_params.timestamp = to_timestamp(request.header.time);
 
-        tracing::debug!(height, "begin block");
-
-        let state = FvmExecState::new(db, self.multi_engine.as_ref(), height, state_params)
-            .context("error creating new state")?;
+        let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+            .context("error creating new state")?
+            .with_block_hash(block_hash);
 
         tracing::debug!("initialized exec state");
 
@@ -624,7 +631,7 @@ where
             .await
             .context("end failed")?;
 
-        Ok(to_end_block(ret))
+        Ok(to_end_block(ret)?)
     }
 
     /// Commit the current state at the current height.

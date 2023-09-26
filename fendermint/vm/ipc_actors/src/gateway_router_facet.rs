@@ -16,6 +16,55 @@ pub mod gateway_router_facet {
             constructor: ::core::option::Option::None,
             functions: ::core::convert::From::from([
                 (
+                    ::std::borrow::ToOwned::to_owned("addCheckpointSignature"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "addCheckpointSignature",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("height"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("membershipProof"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes32[]"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("weight"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("signature"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("applyCrossMessages"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -231,6 +280,13 @@ pub mod gateway_router_facet {
                                     ),
                                 },
                                 ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("n"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
                                     name: ::std::borrow::ToOwned::to_owned("validators"),
                                     kind: ::ethers::core::abi::ethabi::ParamType::Array(
                                         ::std::boxed::Box::new(
@@ -264,8 +320,132 @@ pub mod gateway_router_facet {
                         },
                     ],
                 ),
+                (
+                    ::std::borrow::ToOwned::to_owned("createBottomUpCheckpoint"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "createBottomUpCheckpoint",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("checkpoint"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                        ::std::boxed::Box::new(
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned(
+                                            "struct BottomUpCheckpointNew",
+                                        ),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned(
+                                        "membershipRootHash",
+                                    ),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes32"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("membershipWeight"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
             ]),
-            events: ::std::collections::BTreeMap::new(),
+            events: ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("QuorumReached"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("QuorumReached"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("height"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("checkpoint"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("quorumWeight"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("QuorumWeightUpdated"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "QuorumWeightUpdated",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("height"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("checkpoint"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("newWeight"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+            ]),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
@@ -300,6 +480,50 @@ pub mod gateway_router_facet {
                                     ),
                                 },
                             ],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("CheckpointAlreadyExists"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "CheckpointAlreadyExists",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("CheckpointInfoAlreadyExists"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "CheckpointInfoAlreadyExists",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("CheckpointMembershipNotCreated"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "CheckpointMembershipNotCreated",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("CheckpointNotCreated"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "CheckpointNotCreated",
+                            ),
+                            inputs: ::std::vec![],
                         },
                     ],
                 ),
@@ -379,6 +603,32 @@ pub mod gateway_router_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("InvalidSignature"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("InvalidSignature"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("NotAuthorized"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotAuthorized"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -428,12 +678,32 @@ pub mod gateway_router_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("OldConfigurationNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "OldConfigurationNumber",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("ParentFinalityAlreadyCommitted"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned(
                                 "ParentFinalityAlreadyCommitted",
                             ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("SignatureReplay"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("SignatureReplay"),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -466,6 +736,17 @@ pub mod gateway_router_facet {
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned(
                                 "ValidatorsAndWeightsLengthMismatch",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("ZeroMembershipWeight"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "ZeroMembershipWeight",
                             ),
                             inputs: ::std::vec![],
                         },
@@ -519,6 +800,21 @@ pub mod gateway_router_facet {
                 ),
             )
         }
+        ///Calls the contract's `addCheckpointSignature` (0x2a04f220) function
+        pub fn add_checkpoint_signature(
+            &self,
+            height: u64,
+            membership_proof: ::std::vec::Vec<[u8; 32]>,
+            weight: ::ethers::core::types::U256,
+            signature: ::ethers::core::types::Bytes,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash(
+                    [42, 4, 242, 32],
+                    (height, membership_proof, weight, signature),
+                )
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `applyCrossMessages` (0x3dde36ec) function
         pub fn apply_cross_messages(
             &self,
@@ -537,16 +833,61 @@ pub mod gateway_router_facet {
                 .method_hash([212, 225, 73, 168], (commit,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `commitParentFinality` (0x89f23a50) function
+        ///Calls the contract's `commitParentFinality` (0x9fa68440) function
         pub fn commit_parent_finality(
             &self,
             finality: ParentFinality,
+            n: u64,
             validators: ::std::vec::Vec<FvmAddress>,
             weights: ::std::vec::Vec<::ethers::core::types::U256>,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([137, 242, 58, 80], (finality, validators, weights))
+                .method_hash([159, 166, 132, 64], (finality, n, validators, weights))
                 .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `createBottomUpCheckpoint` (0xa656ca5b) function
+        pub fn create_bottom_up_checkpoint(
+            &self,
+            checkpoint: BottomUpCheckpointNew,
+            membership_root_hash: [u8; 32],
+            membership_weight: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash(
+                    [166, 86, 202, 91],
+                    (checkpoint, membership_root_hash, membership_weight),
+                )
+                .expect("method not found (this should never happen)")
+        }
+        ///Gets the contract's `QuorumReached` event
+        pub fn quorum_reached_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            QuorumReachedFilter,
+        > {
+            self.0.event()
+        }
+        ///Gets the contract's `QuorumWeightUpdated` event
+        pub fn quorum_weight_updated_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            QuorumWeightUpdatedFilter,
+        > {
+            self.0.event()
+        }
+        /// Returns an `Event` builder for all the events of this contract.
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            GatewayRouterFacetEvents,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
@@ -588,6 +929,64 @@ pub mod gateway_router_facet {
     pub struct AddressInsufficientBalance {
         pub account: ::ethers::core::types::Address,
     }
+    ///Custom Error type `CheckpointAlreadyExists` with signature `CheckpointAlreadyExists()` and selector `0xb8a1eae1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "CheckpointAlreadyExists", abi = "CheckpointAlreadyExists()")]
+    pub struct CheckpointAlreadyExists;
+    ///Custom Error type `CheckpointInfoAlreadyExists` with signature `CheckpointInfoAlreadyExists()` and selector `0xa04ff7c7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "CheckpointInfoAlreadyExists",
+        abi = "CheckpointInfoAlreadyExists()"
+    )]
+    pub struct CheckpointInfoAlreadyExists;
+    ///Custom Error type `CheckpointMembershipNotCreated` with signature `CheckpointMembershipNotCreated()` and selector `0x009f833a`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "CheckpointMembershipNotCreated",
+        abi = "CheckpointMembershipNotCreated()"
+    )]
+    pub struct CheckpointMembershipNotCreated;
+    ///Custom Error type `CheckpointNotCreated` with signature `CheckpointNotCreated()` and selector `0x58cdd2e7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "CheckpointNotCreated", abi = "CheckpointNotCreated()")]
+    pub struct CheckpointNotCreated;
     ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
     #[derive(
         Clone,
@@ -682,6 +1081,32 @@ pub mod gateway_router_facet {
     )]
     #[etherror(name = "InvalidCrossMsgNonce", abi = "InvalidCrossMsgNonce()")]
     pub struct InvalidCrossMsgNonce;
+    ///Custom Error type `InvalidSignature` with signature `InvalidSignature()` and selector `0x8baa579f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "InvalidSignature", abi = "InvalidSignature()")]
+    pub struct InvalidSignature;
+    ///Custom Error type `NotAuthorized` with signature `NotAuthorized(address)` and selector `0x4a0bfec1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "NotAuthorized", abi = "NotAuthorized(address)")]
+    pub struct NotAuthorized(pub ::ethers::core::types::Address);
     ///Custom Error type `NotEnoughBalance` with signature `NotEnoughBalance()` and selector `0xad3a8b9e`
     #[derive(
         Clone,
@@ -747,6 +1172,19 @@ pub mod gateway_router_facet {
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
+    ///Custom Error type `OldConfigurationNumber` with signature `OldConfigurationNumber()` and selector `0x6e8d7c4a`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "OldConfigurationNumber", abi = "OldConfigurationNumber()")]
+    pub struct OldConfigurationNumber;
     ///Custom Error type `ParentFinalityAlreadyCommitted` with signature `ParentFinalityAlreadyCommitted()` and selector `0x2a75b082`
     #[derive(
         Clone,
@@ -763,6 +1201,19 @@ pub mod gateway_router_facet {
         abi = "ParentFinalityAlreadyCommitted()"
     )]
     pub struct ParentFinalityAlreadyCommitted;
+    ///Custom Error type `SignatureReplay` with signature `SignatureReplay()` and selector `0xb47fa1b2`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "SignatureReplay", abi = "SignatureReplay()")]
+    pub struct SignatureReplay;
     ///Custom Error type `SubnetNotActive` with signature `SubnetNotActive()` and selector `0xc18316bf`
     #[derive(
         Clone,
@@ -805,11 +1256,28 @@ pub mod gateway_router_facet {
         abi = "ValidatorsAndWeightsLengthMismatch()"
     )]
     pub struct ValidatorsAndWeightsLengthMismatch;
+    ///Custom Error type `ZeroMembershipWeight` with signature `ZeroMembershipWeight()` and selector `0x4e8ac6e5`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "ZeroMembershipWeight", abi = "ZeroMembershipWeight()")]
+    pub struct ZeroMembershipWeight;
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayRouterFacetErrors {
         AddressEmptyCode(AddressEmptyCode),
         AddressInsufficientBalance(AddressInsufficientBalance),
+        CheckpointAlreadyExists(CheckpointAlreadyExists),
+        CheckpointInfoAlreadyExists(CheckpointInfoAlreadyExists),
+        CheckpointMembershipNotCreated(CheckpointMembershipNotCreated),
+        CheckpointNotCreated(CheckpointNotCreated),
         FailedInnerCall(FailedInnerCall),
         InconsistentPrevCheckpoint(InconsistentPrevCheckpoint),
         InvalidActorAddress(InvalidActorAddress),
@@ -817,15 +1285,20 @@ pub mod gateway_router_facet {
         InvalidCheckpointSource(InvalidCheckpointSource),
         InvalidCrossMsgDstSubnet(InvalidCrossMsgDstSubnet),
         InvalidCrossMsgNonce(InvalidCrossMsgNonce),
+        InvalidSignature(InvalidSignature),
+        NotAuthorized(NotAuthorized),
         NotEnoughBalance(NotEnoughBalance),
         NotEnoughSubnetCircSupply(NotEnoughSubnetCircSupply),
         NotInitialized(NotInitialized),
         NotRegisteredSubnet(NotRegisteredSubnet),
         NotSystemActor(NotSystemActor),
+        OldConfigurationNumber(OldConfigurationNumber),
         ParentFinalityAlreadyCommitted(ParentFinalityAlreadyCommitted),
+        SignatureReplay(SignatureReplay),
         SubnetNotActive(SubnetNotActive),
         ValidatorWeightIsZero(ValidatorWeightIsZero),
         ValidatorsAndWeightsLengthMismatch(ValidatorsAndWeightsLengthMismatch),
+        ZeroMembershipWeight(ZeroMembershipWeight),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
         RevertString(::std::string::String),
@@ -850,6 +1323,30 @@ pub mod gateway_router_facet {
                     data,
                 ) {
                 return Ok(Self::AddressInsufficientBalance(decoded));
+            }
+            if let Ok(decoded)
+                = <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::CheckpointAlreadyExists(decoded));
+            }
+            if let Ok(decoded)
+                = <CheckpointInfoAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::CheckpointInfoAlreadyExists(decoded));
+            }
+            if let Ok(decoded)
+                = <CheckpointMembershipNotCreated as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::CheckpointMembershipNotCreated(decoded));
+            }
+            if let Ok(decoded)
+                = <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::CheckpointNotCreated(decoded));
             }
             if let Ok(decoded)
                 = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
@@ -890,6 +1387,14 @@ pub mod gateway_router_facet {
                 return Ok(Self::InvalidCrossMsgNonce(decoded));
             }
             if let Ok(decoded)
+                = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::InvalidSignature(decoded));
+            }
+            if let Ok(decoded)
+                = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::NotAuthorized(decoded));
+            }
+            if let Ok(decoded)
                 = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotEnoughBalance(decoded));
             }
@@ -912,10 +1417,20 @@ pub mod gateway_router_facet {
                 return Ok(Self::NotSystemActor(decoded));
             }
             if let Ok(decoded)
+                = <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::OldConfigurationNumber(decoded));
+            }
+            if let Ok(decoded)
                 = <ParentFinalityAlreadyCommitted as ::ethers::core::abi::AbiDecode>::decode(
                     data,
                 ) {
                 return Ok(Self::ParentFinalityAlreadyCommitted(decoded));
+            }
+            if let Ok(decoded)
+                = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::SignatureReplay(decoded));
             }
             if let Ok(decoded)
                 = <SubnetNotActive as ::ethers::core::abi::AbiDecode>::decode(data) {
@@ -933,6 +1448,12 @@ pub mod gateway_router_facet {
                 ) {
                 return Ok(Self::ValidatorsAndWeightsLengthMismatch(decoded));
             }
+            if let Ok(decoded)
+                = <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::ZeroMembershipWeight(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -943,6 +1464,18 @@ pub mod gateway_router_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::AddressInsufficientBalance(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CheckpointAlreadyExists(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CheckpointInfoAlreadyExists(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CheckpointMembershipNotCreated(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CheckpointNotCreated(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::FailedInnerCall(element) => {
@@ -966,6 +1499,12 @@ pub mod gateway_router_facet {
                 Self::InvalidCrossMsgNonce(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::InvalidSignature(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotAuthorized(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotEnoughBalance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -981,7 +1520,13 @@ pub mod gateway_router_facet {
                 Self::NotSystemActor(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::OldConfigurationNumber(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::ParentFinalityAlreadyCommitted(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SignatureReplay(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::SubnetNotActive(element) => {
@@ -991,6 +1536,9 @@ pub mod gateway_router_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::ValidatorsAndWeightsLengthMismatch(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ZeroMembershipWeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
@@ -1007,6 +1555,22 @@ pub mod gateway_router_facet {
                 }
                 _ if selector
                     == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CheckpointAlreadyExists as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CheckpointInfoAlreadyExists as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CheckpointMembershipNotCreated as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CheckpointNotCreated as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1038,6 +1602,14 @@ pub mod gateway_router_facet {
                     true
                 }
                 _ if selector
+                    == <InvalidSignature as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <NotEnoughBalance as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1058,7 +1630,15 @@ pub mod gateway_router_facet {
                     true
                 }
                 _ if selector
+                    == <OldConfigurationNumber as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <ParentFinalityAlreadyCommitted as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SignatureReplay as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1073,6 +1653,10 @@ pub mod gateway_router_facet {
                     == <ValidatorsAndWeightsLengthMismatch as ::ethers::contract::EthError>::selector() => {
                     true
                 }
+                _ if selector
+                    == <ZeroMembershipWeight as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ => false,
             }
         }
@@ -1082,6 +1666,18 @@ pub mod gateway_router_facet {
             match self {
                 Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
                 Self::AddressInsufficientBalance(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CheckpointAlreadyExists(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CheckpointInfoAlreadyExists(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CheckpointMembershipNotCreated(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CheckpointNotCreated(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
@@ -1103,6 +1699,8 @@ pub mod gateway_router_facet {
                 Self::InvalidCrossMsgNonce(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::InvalidSignature(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughSubnetCircSupply(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -1112,14 +1710,21 @@ pub mod gateway_router_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OldConfigurationNumber(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::ParentFinalityAlreadyCommitted(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::SignatureReplay(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetNotActive(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ValidatorWeightIsZero(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::ValidatorsAndWeightsLengthMismatch(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::ZeroMembershipWeight(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
@@ -1139,6 +1744,28 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<AddressInsufficientBalance> for GatewayRouterFacetErrors {
         fn from(value: AddressInsufficientBalance) -> Self {
             Self::AddressInsufficientBalance(value)
+        }
+    }
+    impl ::core::convert::From<CheckpointAlreadyExists> for GatewayRouterFacetErrors {
+        fn from(value: CheckpointAlreadyExists) -> Self {
+            Self::CheckpointAlreadyExists(value)
+        }
+    }
+    impl ::core::convert::From<CheckpointInfoAlreadyExists>
+    for GatewayRouterFacetErrors {
+        fn from(value: CheckpointInfoAlreadyExists) -> Self {
+            Self::CheckpointInfoAlreadyExists(value)
+        }
+    }
+    impl ::core::convert::From<CheckpointMembershipNotCreated>
+    for GatewayRouterFacetErrors {
+        fn from(value: CheckpointMembershipNotCreated) -> Self {
+            Self::CheckpointMembershipNotCreated(value)
+        }
+    }
+    impl ::core::convert::From<CheckpointNotCreated> for GatewayRouterFacetErrors {
+        fn from(value: CheckpointNotCreated) -> Self {
+            Self::CheckpointNotCreated(value)
         }
     }
     impl ::core::convert::From<FailedInnerCall> for GatewayRouterFacetErrors {
@@ -1176,6 +1803,16 @@ pub mod gateway_router_facet {
             Self::InvalidCrossMsgNonce(value)
         }
     }
+    impl ::core::convert::From<InvalidSignature> for GatewayRouterFacetErrors {
+        fn from(value: InvalidSignature) -> Self {
+            Self::InvalidSignature(value)
+        }
+    }
+    impl ::core::convert::From<NotAuthorized> for GatewayRouterFacetErrors {
+        fn from(value: NotAuthorized) -> Self {
+            Self::NotAuthorized(value)
+        }
+    }
     impl ::core::convert::From<NotEnoughBalance> for GatewayRouterFacetErrors {
         fn from(value: NotEnoughBalance) -> Self {
             Self::NotEnoughBalance(value)
@@ -1201,10 +1838,20 @@ pub mod gateway_router_facet {
             Self::NotSystemActor(value)
         }
     }
+    impl ::core::convert::From<OldConfigurationNumber> for GatewayRouterFacetErrors {
+        fn from(value: OldConfigurationNumber) -> Self {
+            Self::OldConfigurationNumber(value)
+        }
+    }
     impl ::core::convert::From<ParentFinalityAlreadyCommitted>
     for GatewayRouterFacetErrors {
         fn from(value: ParentFinalityAlreadyCommitted) -> Self {
             Self::ParentFinalityAlreadyCommitted(value)
+        }
+    }
+    impl ::core::convert::From<SignatureReplay> for GatewayRouterFacetErrors {
+        fn from(value: SignatureReplay) -> Self {
+            Self::SignatureReplay(value)
         }
     }
     impl ::core::convert::From<SubnetNotActive> for GatewayRouterFacetErrors {
@@ -1222,6 +1869,108 @@ pub mod gateway_router_facet {
         fn from(value: ValidatorsAndWeightsLengthMismatch) -> Self {
             Self::ValidatorsAndWeightsLengthMismatch(value)
         }
+    }
+    impl ::core::convert::From<ZeroMembershipWeight> for GatewayRouterFacetErrors {
+        fn from(value: ZeroMembershipWeight) -> Self {
+            Self::ZeroMembershipWeight(value)
+        }
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(name = "QuorumReached", abi = "QuorumReached(uint64,bytes32,uint256)")]
+    pub struct QuorumReachedFilter {
+        pub height: u64,
+        pub checkpoint: [u8; 32],
+        pub quorum_weight: ::ethers::core::types::U256,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(
+        name = "QuorumWeightUpdated",
+        abi = "QuorumWeightUpdated(uint64,bytes32,uint256)"
+    )]
+    pub struct QuorumWeightUpdatedFilter {
+        pub height: u64,
+        pub checkpoint: [u8; 32],
+        pub new_weight: ::ethers::core::types::U256,
+    }
+    ///Container type for all of the contract's events
+    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
+    pub enum GatewayRouterFacetEvents {
+        QuorumReachedFilter(QuorumReachedFilter),
+        QuorumWeightUpdatedFilter(QuorumWeightUpdatedFilter),
+    }
+    impl ::ethers::contract::EthLogDecode for GatewayRouterFacetEvents {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+            if let Ok(decoded) = QuorumReachedFilter::decode_log(log) {
+                return Ok(GatewayRouterFacetEvents::QuorumReachedFilter(decoded));
+            }
+            if let Ok(decoded) = QuorumWeightUpdatedFilter::decode_log(log) {
+                return Ok(GatewayRouterFacetEvents::QuorumWeightUpdatedFilter(decoded));
+            }
+            Err(::ethers::core::abi::Error::InvalidData)
+        }
+    }
+    impl ::core::fmt::Display for GatewayRouterFacetEvents {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+            match self {
+                Self::QuorumReachedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::QuorumWeightUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+            }
+        }
+    }
+    impl ::core::convert::From<QuorumReachedFilter> for GatewayRouterFacetEvents {
+        fn from(value: QuorumReachedFilter) -> Self {
+            Self::QuorumReachedFilter(value)
+        }
+    }
+    impl ::core::convert::From<QuorumWeightUpdatedFilter> for GatewayRouterFacetEvents {
+        fn from(value: QuorumWeightUpdatedFilter) -> Self {
+            Self::QuorumWeightUpdatedFilter(value)
+        }
+    }
+    ///Container type for all input parameters for the `addCheckpointSignature` function with signature `addCheckpointSignature(uint64,bytes32[],uint256,bytes)` and selector `0x2a04f220`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "addCheckpointSignature",
+        abi = "addCheckpointSignature(uint64,bytes32[],uint256,bytes)"
+    )]
+    pub struct AddCheckpointSignatureCall {
+        pub height: u64,
+        pub membership_proof: ::std::vec::Vec<[u8; 32]>,
+        pub weight: ::ethers::core::types::U256,
+        pub signature: ::ethers::core::types::Bytes,
     }
     ///Container type for all input parameters for the `applyCrossMessages` function with signature `applyCrossMessages(((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[])` and selector `0x3dde36ec`
     #[derive(
@@ -1259,7 +2008,7 @@ pub mod gateway_router_facet {
     pub struct CommitChildCheckCall {
         pub commit: BottomUpCheckpoint,
     }
-    ///Container type for all input parameters for the `commitParentFinality` function with signature `commitParentFinality((uint256,bytes32),(uint8,bytes)[],uint256[])` and selector `0x89f23a50`
+    ///Container type for all input parameters for the `commitParentFinality` function with signature `commitParentFinality((uint256,bytes32),uint64,(uint8,bytes)[],uint256[])` and selector `0x9fa68440`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1272,25 +2021,54 @@ pub mod gateway_router_facet {
     )]
     #[ethcall(
         name = "commitParentFinality",
-        abi = "commitParentFinality((uint256,bytes32),(uint8,bytes)[],uint256[])"
+        abi = "commitParentFinality((uint256,bytes32),uint64,(uint8,bytes)[],uint256[])"
     )]
     pub struct CommitParentFinalityCall {
         pub finality: ParentFinality,
+        pub n: u64,
         pub validators: ::std::vec::Vec<FvmAddress>,
         pub weights: ::std::vec::Vec<::ethers::core::types::U256>,
+    }
+    ///Container type for all input parameters for the `createBottomUpCheckpoint` function with signature `createBottomUpCheckpoint(((uint64,address[]),uint64,bytes32,uint64,bytes32),bytes32,uint256)` and selector `0xa656ca5b`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "createBottomUpCheckpoint",
+        abi = "createBottomUpCheckpoint(((uint64,address[]),uint64,bytes32,uint64,bytes32),bytes32,uint256)"
+    )]
+    pub struct CreateBottomUpCheckpointCall {
+        pub checkpoint: BottomUpCheckpointNew,
+        pub membership_root_hash: [u8; 32],
+        pub membership_weight: ::ethers::core::types::U256,
     }
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayRouterFacetCalls {
+        AddCheckpointSignature(AddCheckpointSignatureCall),
         ApplyCrossMessages(ApplyCrossMessagesCall),
         CommitChildCheck(CommitChildCheckCall),
         CommitParentFinality(CommitParentFinalityCall),
+        CreateBottomUpCheckpoint(CreateBottomUpCheckpointCall),
     }
     impl ::ethers::core::abi::AbiDecode for GatewayRouterFacetCalls {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
+            if let Ok(decoded)
+                = <AddCheckpointSignatureCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::AddCheckpointSignature(decoded));
+            }
             if let Ok(decoded)
                 = <ApplyCrossMessagesCall as ::ethers::core::abi::AbiDecode>::decode(
                     data,
@@ -1309,12 +2087,21 @@ pub mod gateway_router_facet {
                 ) {
                 return Ok(Self::CommitParentFinality(decoded));
             }
+            if let Ok(decoded)
+                = <CreateBottomUpCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::CreateBottomUpCheckpoint(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
     impl ::ethers::core::abi::AbiEncode for GatewayRouterFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
+                Self::AddCheckpointSignature(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::ApplyCrossMessages(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1324,12 +2111,18 @@ pub mod gateway_router_facet {
                 Self::CommitParentFinality(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::CreateBottomUpCheckpoint(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
     impl ::core::fmt::Display for GatewayRouterFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
+                Self::AddCheckpointSignature(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::ApplyCrossMessages(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1337,7 +2130,15 @@ pub mod gateway_router_facet {
                 Self::CommitParentFinality(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::CreateBottomUpCheckpoint(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
+        }
+    }
+    impl ::core::convert::From<AddCheckpointSignatureCall> for GatewayRouterFacetCalls {
+        fn from(value: AddCheckpointSignatureCall) -> Self {
+            Self::AddCheckpointSignature(value)
         }
     }
     impl ::core::convert::From<ApplyCrossMessagesCall> for GatewayRouterFacetCalls {
@@ -1353,6 +2154,12 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<CommitParentFinalityCall> for GatewayRouterFacetCalls {
         fn from(value: CommitParentFinalityCall) -> Self {
             Self::CommitParentFinality(value)
+        }
+    }
+    impl ::core::convert::From<CreateBottomUpCheckpointCall>
+    for GatewayRouterFacetCalls {
+        fn from(value: CreateBottomUpCheckpointCall) -> Self {
+            Self::CreateBottomUpCheckpoint(value)
         }
     }
     ///`BottomUpCheckpoint((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes)`
@@ -1374,6 +2181,24 @@ pub mod gateway_router_facet {
         pub children: ::std::vec::Vec<ChildCheck>,
         pub prev_hash: [u8; 32],
         pub proof: ::ethers::core::types::Bytes,
+    }
+    ///`BottomUpCheckpointNew((uint64,address[]),uint64,bytes32,uint64,bytes32)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct BottomUpCheckpointNew {
+        pub subnet_id: SubnetID,
+        pub block_height: u64,
+        pub block_hash: [u8; 32],
+        pub next_configuration_number: u64,
+        pub cross_messages_hash: [u8; 32],
     }
     ///`ChildCheck((uint64,address[]),bytes32[])`
     #[derive(

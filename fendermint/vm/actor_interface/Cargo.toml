@@ -11,7 +11,9 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 ethers = { workspace = true }
+hex = { workspace = true }
 lazy_static = { workspace = true }
+merkle-tree-rs = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }
@@ -39,3 +41,5 @@ libsecp256k1 = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 rand = { workspace = true }
+
+fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }

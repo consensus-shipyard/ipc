@@ -1,7 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::Context;
 use async_trait::async_trait;
+use fendermint_vm_genesis::Validator;
 use std::collections::HashMap;
 
 use fendermint_vm_actor_interface::{cron, system};
@@ -12,7 +14,11 @@ use tendermint_rpc::Client;
 
 use crate::ExecInterpreter;
 
-use super::{state::FvmExecState, FvmMessage, FvmMessageInterpreter};
+use super::{
+    checkpoint::{self, PowerUpdates},
+    state::FvmExecState,
+    FvmMessage, FvmMessageInterpreter,
+};
 
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups
@@ -38,7 +44,10 @@ where
     type Message = FvmMessage;
     type BeginOutput = FvmApplyRet;
     type DeliverOutput = FvmApplyRet;
-    type EndOutput = ();
+    /// Return validator power updates.
+    /// Currently ignoring events as there aren't any emitted by the smart contract,
+    /// but keep in mind that if there were, those would have to be propagated.
+    type EndOutput = Vec<Validator>;
 
     async fn begin(
         &self,
@@ -119,29 +128,18 @@ where
         Ok((state, ret))
     }
 
-    async fn end(&self, state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
-        // TODO #252: Epoch transitions for checkpointing.
-        // TODO #254: Construct checkpoint.
-        // TODO #255: Broadcast signature, if validating.
-
-        #[cfg(test)]
+    async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        let updates = if let Some((_checkpoint, _powers, updates)) =
+            checkpoint::maybe_create_checkpoint(&self.client, &self.gateway, &mut state)
+                .await
+                .context("failed to create checkpoint")?
         {
-            use anyhow::Context;
-            use tendermint_rpc::endpoint::validators;
-            use tendermint_rpc::Paging;
+            // TODO #255: Asynchronously broadcast signature, if validating.
+            updates
+        } else {
+            PowerUpdates::default()
+        };
 
-            let height: tendermint::block::Height = state
-                .block_height()
-                .try_into()
-                .context("block height is not u64")?;
-
-            let validators: validators::Response =
-                self._client.validators(height, Paging::All).await?;
-
-            // This is the power table.
-            let _validators = validators.validators;
-        }
-
-        Ok((state, ()))
+        Ok((state, updates.0))
     }
 }

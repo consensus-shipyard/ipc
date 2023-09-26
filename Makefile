@@ -1,18 +1,18 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
-BUILTIN_ACTORS_TAG:=v11.0.0
-BUILTIN_ACTORS_DIR:=../builtin-actors
-BUILTIN_ACTORS_CODE:=$(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs" | grep -v target)
-BUILTIN_ACTORS_BUNDLE:=$(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
+BUILTIN_ACTORS_TAG    ?= v11.0.0
+BUILTIN_ACTORS_DIR    := ../builtin-actors
+BUILTIN_ACTORS_CODE   := $(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs" | grep -v target)
+BUILTIN_ACTORS_BUNDLE := $(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
 
-IPC_ACTORS_TAG:=origin/dev
-IPC_ACTORS_DIR:=$(shell pwd)/../ipc-solidity-actors
-IPC_ACTORS_CODE:=$(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
-IPC_ACTORS_BUILD:=fendermint/vm/ipc_actors/build.rs
-IPC_ACTORS_OUT:=$(IPC_ACTORS_DIR)/out
-IPC_ACTORS_ABI:=$(IPC_ACTORS_OUT)/.compile.abi
+IPC_ACTORS_TAG        ?= origin/dev
+IPC_ACTORS_DIR        := $(shell pwd)/../ipc-solidity-actors
+IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
+IPC_ACTORS_BUILD      := fendermint/vm/ipc_actors/build.rs
+IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
+IPC_ACTORS_ABI        := $(IPC_ACTORS_OUT)/.compile.abi
 
-FENDERMINT_CODE:=$(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
+FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
 # Override PROFILE env var to choose between `local | ci`
 PROFILE?=local
