@@ -1,0 +1,46 @@
+[tasks.fendermint-start]
+extend = "fendermint-run"
+env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+
+[tasks.fendermint-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${FM_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${BASE_DIR}:/data \
+  --env FM_DATA_DIR=/data/fendermint/data \
+  --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env LOG_LEVEL=info \
+  --entrypoint ${ENTRY} \
+  ${FM_DOCKER_IMAGE} \
+  ${CMD}
+"""
+dependencies = ["docker-network-create", "fendermint-deps"]
+
+[tasks.fendermint-deps]
+script = """
+# Check if the image exists
+# TODO: Check the version or use a flag to always re-build?
+if docker images | awk '{print $1":"$2}' | grep fendermint; then
+    echo fendermint image already exists
+    docker images | grep fendermint
+else
+    cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
+    make docker-build
+fi
+"""
+
+[tasks.fendermint-rm]
+extend = "docker-rm"
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+
+[tasks.fendermint-stop]
+extend = "docker-stop"
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+
+[tasks.fendermint-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }

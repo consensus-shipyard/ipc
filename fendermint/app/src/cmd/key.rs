@@ -7,21 +7,25 @@ use fvm_shared::address::Address;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use serde_json::json;
 use std::path::{Path, PathBuf};
+use tendermint_config::NodeKey;
 
 use super::{from_b64, to_b64};
 use crate::{
     cmd,
-    options::key::{KeyAddressArgs, KeyArgs, KeyCommands, KeyGenArgs, KeyIntoTendermintArgs},
+    options::key::{
+        AddPeer, KeyAddressArgs, KeyArgs, KeyCommands, KeyGenArgs, KeyIntoTendermintArgs,
+    },
 };
 
 cmd! {
-  KeyArgs(self) {
-    match &self.command {
-        KeyCommands::Gen(args) => args.exec(()).await,
-        KeyCommands::IntoTendermint(args) => args.exec(()).await,
-        KeyCommands::Address(args) => args.exec(()).await,
+    KeyArgs(self) {
+        match &self.command {
+            KeyCommands::Gen(args) => args.exec(()).await,
+            KeyCommands::IntoTendermint(args) => args.exec(()).await,
+            KeyCommands::AddPeer(args) => args.exec(()).await,
+            KeyCommands::Address(args) => args.exec(()).await,
+        }
     }
-  }
 }
 
 cmd! {
@@ -67,12 +71,30 @@ cmd! {
 }
 
 cmd! {
-  KeyAddressArgs(self) {
-    let pk = read_public_key(&self.public_key)?;
-    let addr = Address::new_secp256k1(&pk.serialize())?;
-    println!("{}", addr);
-    Ok(())
+    AddPeer(self) {
+        let node_key = NodeKey::load_json_file(&self.node_key_file).context("failed to read node key file")?;
+        let peer_id = format!("{}@{}", node_key.node_id(), self.network_addr);
+        let mut peers = std::fs::read_to_string(&self.local_peers_file).unwrap_or_default();
+
+        if peers.is_empty()  {
+            peers.push_str(&peer_id);
+        } else {
+            peers.push(',');
+            peers.push_str(peer_id.as_str());
+        }
+
+        std::fs::write(&self.local_peers_file, peers).context("failed to write to the peers file")?;
+        Ok(())
   }
+}
+
+cmd! {
+    KeyAddressArgs(self) {
+        let pk = read_public_key(&self.public_key)?;
+        let addr = Address::new_secp256k1(&pk.serialize())?;
+        println!("{}", addr);
+        Ok(())
+    }
 }
 
 fn secret_to_b64(sk: &SecretKey) -> String {

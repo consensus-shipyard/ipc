@@ -1,0 +1,43 @@
+[tasks.cometbft-pull]
+command = "docker"
+args = ["pull", "${CMT_DOCKER_IMAGE}"]
+
+[tasks.cometbft-init]
+extend = "cometbft-run"
+env = { "CMD" = "init", "FLAGS" = "-a STDOUT -a STDERR --rm" }
+
+[tasks.cometbft-start]
+extend = "cometbft-run"
+env = { "CMD" = "start", "FLAGS" = "-d" }
+
+[tasks.cometbft-wait]
+extend = "wait"
+env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "${CMT_WAIT_MILLIS}" }
+
+[tasks.cometbft-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${CMT_CONTAINER_NAME} \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish 26657:${CMT_HOST_PORT} \
+  --volume ${CMT_DIR}:/cometbft \
+  --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
+  --env CMT_PEX=false \
+  ${CMT_DOCKER_IMAGE} \
+  ${CMD}
+"""
+dependencies = ["cometbft-pull", "docker-network-create"]
+
+[tasks.cometbft-rm]
+extend = "docker-rm"
+env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
+
+[tasks.cometbft-stop]
+extend = "docker-stop"
+env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
+
+[tasks.cometbft-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }

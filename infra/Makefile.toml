@@ -1,0 +1,98 @@
+extend = [
+  { path = "scripts/docker.toml" },
+  { path = "scripts/cometbft.toml" },
+  { path = "scripts/fendermint.toml" },
+  { path = "scripts/ethapi.toml" },
+  { path = "scripts/node.toml" },
+  { path = "scripts/testnet.toml" }
+]
+
+[config]
+default_to_workspace = false
+
+[env]
+CHAIN_NAME = { value = "root", condition = { env_not_set = ["CHAIN_NAME"] }}
+BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] }}
+BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] }}
+TIMESTAMP = { value = "1680101412", condition = { env_not_set = ["TIMESTAMP"] }}
+BASE_DIR="${HOME}/.ipc/${CHAIN_NAME}"
+FM_DIR="${BASE_DIR}/fendermint"
+CMT_DIR="${BASE_DIR}/cometbft"
+
+GENESIS_FILE="${FM_DIR}/genesis.json"
+KEYS_DIR="${FM_DIR}/keys"
+KEY_NAME="validator_key"
+PUB_KEY_PATH="${KEYS_DIR}/${KEY_NAME}.pk"
+PRIV_KEY_PATH="${KEYS_DIR}/${KEY_NAME}.sk"
+
+NETWORK_NAME = "${CHAIN_NAME}"
+
+CMT_CONTAINER_NAME = "${NETWORK_NAME}-cometbft"
+FM_CONTAINER_NAME = "${NETWORK_NAME}-fendermint"
+ETHAPI_CONTAINER_NAME = "${NETWORK_NAME}-ethapi"
+
+CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
+FM_DOCKER_IMAGE = "fendermint:latest"
+TEST_DATA_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/test-data"
+TEST_SCRIPTS_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/scripts"
+ACTORS_BUNDLE = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/../builtin-actors/output/bundle.car"
+CMT_HOST_PORT = 26657
+ETHAPI_HOST_PORT = 8545
+# If this wasn't present, any wait task is skipped.
+CARGO_MAKE_WAIT_MILLISECONDS = 5000
+# This wait time seems to work locally.
+CMT_WAIT_MILLIS = 10000
+# Keep example logs to a minimum.
+VERBOSITY = ""
+
+[tasks.info]
+script="""
+echo
+echo Chain info:
+echo - Chain: ${CHAIN_NAME}
+echo - Balance: ${BALANCE}
+echo - Base Fee: ${BASE_FEE}
+echo - Timestamp: ${TIMESTAMP}
+echo
+echo Single node testnet layout:
+echo - IPC directory: ${BASE_DIR}
+echo - IPC Testnet directory: ${BASE_TESTNET_DIR}
+echo - CometBFT directory: ${CMT_DIR}
+echo - Fendermint directory: ${FM_DIR}
+echo - Keys directory: ${KEYS_DIR}
+echo - Genesis file: ${GENESIS_FILE}
+echo - Private key: ${PRIV_KEY_PATH}
+echo - Network: ${NETWORK_NAME}
+echo - CometBFT container: ${CMT_CONTAINER_NAME}
+echo - Fendermint container: ${FM_CONTAINER_NAME}
+echo
+echo
+echo 4 nodes testnet layout:
+echo - IPC directory: ${BASE_TESTNET_DIR}
+echo - Genesis file: ${GENESIS_FILE}
+echo - Network: ${NETWORK_NAME}
+echo
+"""
+
+[tasks.default]
+clear = true
+script_runner = "@duckscript"
+script = ['''
+    echo
+    echo Main tasks:
+    echo - clear: Clear all information: private keys, cache, database, etc.
+    echo - init: Initialize the system
+    echo - info: Print the setup information
+    echo - start: Start Fendermint/CometBFT docker containers with the genesis
+    echo - teardown: Stop the system and clears all data
+    echo - run: Init and then start the system
+    echo
+    echo Most tasks use these environment variables:
+    echo - CHAIN_NAME (default '${CHAIN_NAME}'): the target IPC subnet
+    echo
+    echo Run 'cargo make -e CHAIN_NAME=chain -e BALANCE=100 -e BASE_FEE=200 ... COMMAND' to populate the variables from CLI or
+    echo Run 'cargo make --env-file=/PATH/.env COMMAND' to populate the variables from the file before running the command.
+    echo
+    echo Run 'cargo make --list-all-steps' for a complete list of available tasks.
+    echo
+''']

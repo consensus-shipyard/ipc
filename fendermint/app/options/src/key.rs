@@ -13,12 +13,29 @@ pub enum KeyCommands {
     IntoTendermint(KeyIntoTendermintArgs),
     /// Convert a public key file from base64 into an f1 Address format an print it to STDOUT.
     Address(KeyAddressArgs),
+    /// Get the peer ID corresponding to a node ID and its network address and print it to a local file.
+    AddPeer(AddPeer),
 }
 
 #[derive(Args, Debug)]
 pub struct KeyArgs {
     #[command(subcommand)]
     pub command: KeyCommands,
+}
+
+#[derive(Args, Debug)]
+pub struct AddPeer {
+    /// The path to a CometBFT node key file.
+    #[arg(long, short = 'n')]
+    pub node_key_file: PathBuf,
+    /// The path to a temporal local file where the peer IDs will be added.
+    /// The file will be created if it doesn't exist.
+    #[arg(long, short)]
+    pub local_peers_file: PathBuf,
+    /// The target CometBFT node network interface in the following format `IP:Port`.
+    /// For example: `192.168.10.7:26656`.
+    #[arg(long, short)]
+    pub network_addr: String,
 }
 
 #[derive(Args, Debug)]
