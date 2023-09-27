@@ -72,4 +72,4 @@ registry contract deployed to: <REGISTRY_ADDRESS>
 
 Keep the addresses of the gateway and the registry contracts deployed, as you will need them to configure the IPC agent.
 
->💡If instead of deploying IPC Solidity in Calibration, you want to test them in Spacenet or a local network, the only thing that you need to do is to configure the `RPC_URL` of your `.env` to point to the corresponding network's RPC endpoint, and `make deploy-ipc NETWORK=localnet`.
+>💡If instead of deploying IPC Solidity in Calibration, you want to test them in a local network, the only thing that you need to do is to configure the `RPC_URL` of your `.env` to point to the corresponding network's RPC endpoint, and `make deploy-ipc NETWORK=localnet`.
