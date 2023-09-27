@@ -5,6 +5,13 @@ if [ $# -ne 1 ]; then
   exit 1
 fi
 
+if [ -z ${NETWORK_NAME} ]; then
+  echo "NETWORK_NAME variable is not set";
+  exit 1
+fi
+
+export NETWORK_NAME
+
 PORT1=26656
 PORT2=26657
 PORT3=8545
@@ -26,8 +33,6 @@ if [ "$1" == "start" ]; then
   docker network rm -f ${NETWORK_NAME}
   docker network create --subnet 192.167.10.0/16 ${NETWORK_NAME}
 fi
-
-export NETWORK_NAME=${NETWORK_NAME}
 
 for i in $(seq 0 3); do
 	export NODE_ID=${i}
