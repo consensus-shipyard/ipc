@@ -10,8 +10,8 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {Membership} from "../structs/Validator.sol";
-import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay} from "../errors/IPCErrors.sol";
-import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists} from "../errors/IPCErrors.sol";
+import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
+import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, IncompleteCheckpointExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory} from "../errors/IPCErrors.sol";
 import {MessagesNotSorted, NotInitialized, NotEnoughBalance, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
 import {NotValidator, SubnetNotActive, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -25,6 +25,7 @@ import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
@@ -34,6 +35,8 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     using CrossMsgHelper for CrossMsg;
     using FvmAddressHelper for FvmAddress;
     using StorableMsgHelper for StorableMsg;
+    using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     event QuorumReached(uint64 height, bytes32 checkpoint, uint256 quorumWeight);
     event QuorumWeightUpdated(uint64 height, bytes32 checkpoint, uint256 newWeight);
@@ -188,9 +191,10 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         }
     }
 
-    /// @notice checks whether the provided checkpoint signature for a block at height `h ` is valid and accumulates that it.
+    /// @notice checks whether the provided checkpoint signature for the block at height `height` is valid and accumulates that it
+    /// @dev If adding the signature leads to reaching the threshold, then the checkpoint is removed from `incompleteCheckpoints`
     /// @param height - the height of the block in the checkpoint
-    /// @param membershipProof - a Merkle proof that the validator was in the membership at height `h`
+    /// @param membershipProof - a Merkle proof that the validator was in the membership at height `height` with weight `weight`
     /// @param weight - the weight of the validator
     /// @param signature - the signature of the checkpoint
     function addCheckpointSignature(
@@ -199,6 +203,9 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         uint256 weight,
         bytes memory signature
     ) external {
+        if (height < s.bottomUpCheckpointRetentionHeight) {
+            revert CheckpointAlreadyProcessed();
+        }
         BottomUpCheckpointNew memory checkpoint = s.bottomUpCheckpoints[height];
         if (checkpoint.blockHeight == 0) {
             revert CheckpointNotCreated();
@@ -218,7 +225,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         }
 
         // Check whether the validator has already sent a valid signature
-        if (s.bottomUpCollectedSignatures[height][recoveredSignatory]) {
+        if (s.bottomUpCollectedSignatures[height].contains(recoveredSignatory)) {
             revert SignatureReplay();
         }
 
@@ -233,12 +240,20 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         // All checks passed.
         // Adding signature and emitting events.
 
-        s.bottomUpCollectedSignatures[height][recoveredSignatory] = true;
+        bool ok = s.bottomUpCollectedSignatures[height].add(recoveredSignatory);
+        if (!ok) {
+            revert FailedAddSignatory();
+        }
         checkpointInfo.currentWeight += weight;
 
         if (checkpointInfo.currentWeight >= checkpointInfo.threshold) {
             if (!checkpointInfo.reached) {
                 checkpointInfo.reached = true;
+                // checkpoint is completed since the threshold has been reached
+                ok = s.incompleteCheckpoints.remove(checkpoint.blockHeight);
+                if (!ok) {
+                    revert FailedRemoveIncompleteCheckpoint();
+                }
                 emit QuorumReached({
                     height: height,
                     checkpoint: checkpointHash,
@@ -263,20 +278,28 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
+        if (checkpoint.blockHeight < s.bottomUpCheckpointRetentionHeight) {
+            revert CheckpointAlreadyProcessed();
+        }
         if (s.bottomUpCheckpoints[checkpoint.blockHeight].blockHeight > 0) {
             revert CheckpointAlreadyExists();
         }
         if (s.bottomUpCheckpointInfo[checkpoint.blockHeight].threshold > 0) {
             revert CheckpointInfoAlreadyExists();
         }
+
         if (membershipWeight == 0) {
             revert ZeroMembershipWeight();
         }
 
-        uint256 threshold = LibGateway.getThreshold(membershipWeight);
+        uint256 threshold = LibGateway.weightNeeded(membershipWeight, s.majorityPercentage);
 
+        // process the checkpoint
         s.bottomUpCheckpoints[checkpoint.blockHeight] = checkpoint;
-
+        bool ok = s.incompleteCheckpoints.add(checkpoint.blockHeight);
+        if (!ok) {
+            revert FailedAddIncompleteCheckpoint();
+        }
         s.bottomUpCheckpointInfo[checkpoint.blockHeight] = CheckpointInfo({
             hash: checkpoint.toHash(),
             rootHash: membershipRootHash,
@@ -284,5 +307,29 @@ contract GatewayRouterFacet is GatewayActorModifiers {
             currentWeight: 0,
             reached: false
         });
+    }
+
+    /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
+    /// @dev `retentionHeight` is the height of the first incomplete checkpointswe must keep to implement checkpointing.
+    /// All checkpoints with a height less than `retentionHeight` are removed from the history, assuming they are committed to the parent.
+    /// @param newRetentionHeight - the height of the oldest checkpoint to keep
+    function pruneBottomUpCheckpoints(uint64 newRetentionHeight) external systemActorOnly {
+        uint64 oldRetentionHeight = s.bottomUpCheckpointRetentionHeight;
+
+        if (newRetentionHeight <= oldRetentionHeight) {
+            revert InvalidRetentionHeight();
+        }
+
+        for (uint64 h = oldRetentionHeight; h < newRetentionHeight; ) {
+            delete s.bottomUpCheckpoints[h];
+            delete s.bottomUpCheckpointInfo[h];
+            delete s.bottomUpCollectedSignatures[h];
+
+            unchecked {
+                ++h;
+            }
+        }
+
+        s.bottomUpCheckpointRetentionHeight = newRetentionHeight;
     }
 }

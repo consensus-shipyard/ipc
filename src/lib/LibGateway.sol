@@ -268,9 +268,9 @@ library LibGateway {
         found = !subnet.id.isEmpty();
     }
 
-    /// @notice returns the threshold corresponding to the majority percentage
-    function getThreshold(uint256 weight) internal view returns (uint256) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        return (weight * s.majorityPercentage) / 100;
+    /// @notice returns the needed weight value corresponding to the majority percentage
+    /// @dev `majorityPercentage` must be a valid number
+    function weightNeeded(uint256 weight, uint256 majorityPercentage) internal pure returns (uint256) {
+        return (weight * majorityPercentage) / 100;
     }
 }

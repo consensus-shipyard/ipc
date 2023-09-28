@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, BottomUpCheckpointNew, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Validator.sol";
@@ -10,6 +10,7 @@ import {LibGateway} from "../lib/LibGateway.sol";
 import {GatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {LibVoting} from "../lib/LibVoting.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 contract GatewayGetterFacet {
     // slither-disable-next-line uninitialized-state
@@ -17,6 +18,7 @@ contract GatewayGetterFacet {
 
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     function crossMsgFee() external view returns (uint256) {
         return s.crossMsgFee;
@@ -193,5 +195,36 @@ contract GatewayGetterFacet {
     /// @notice get the checkpoint current weight corresponding to the block height
     function getCheckpointCurrentWeight(uint64 h) public view returns (uint256) {
         return s.bottomUpCheckpointInfo[h].currentWeight;
+    }
+
+    /// @notice get the incomplete checkpoint heights
+    function getIncompleteCheckpointHeights() public view returns (uint256[] memory) {
+        return s.incompleteCheckpoints.values();
+    }
+
+    /// @notice get the incomplete checkpoints
+    function getIncompleteCheckpoints() public view returns (BottomUpCheckpointNew[] memory) {
+        uint256[] memory heights = s.incompleteCheckpoints.values();
+        uint256 size = heights.length;
+
+        BottomUpCheckpointNew[] memory checkpoints = new BottomUpCheckpointNew[](size);
+        for (uint64 i = 0; i < size; ) {
+            checkpoints[i] = s.bottomUpCheckpoints[uint64(heights[i])];
+            unchecked {
+                ++i;
+            }
+        }
+        return checkpoints;
+    }
+
+    /// @notice get the bottom-up checkpoint retention index
+    function getBottomUpRetentionHeight() public view returns (uint64) {
+        return s.bottomUpCheckpointRetentionHeight;
+    }
+
+    /// @notice Calculate the threshold required for quorum in this subnet
+    /// based on the configured majority percentage and the total weight of the validators.
+    function getQuorumThreshold(uint256 totalWeight) public view returns (uint256) {
+        return LibGateway.weightNeeded(totalWeight, s.majorityPercentage);
     }
 }
