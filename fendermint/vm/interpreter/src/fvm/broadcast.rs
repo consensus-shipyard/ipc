@@ -37,14 +37,12 @@ where
 {
     pub fn new(
         client: C,
+        addr: Address,
         secret_key: SecretKey,
         gas_fee_cap: TokenAmount,
         gas_premium: TokenAmount,
     ) -> Self {
         let client = FendermintClient::new(client);
-        // TODO: We could use f410 addresses to send the transaction, but the `MessageFactory` assumes f1.
-        let addr = Address::new_secp256k1(&secret_key.public_key().serialize())
-            .expect("public key is 65 bytes");
         Self {
             client,
             secret_key,
@@ -65,8 +63,7 @@ where
             .await
             .context("failed to get broadcaster sequence")?;
 
-        let factory = MessageFactory::new(self.secret_key.clone(), sequence, chain_id)
-            .context("failed to create MessageFactory")?;
+        let factory = MessageFactory::new(self.secret_key.clone(), self.addr, sequence, chain_id);
 
         // Using the bound client as a one-shot transaction sender.
         let mut client = self.client.clone().bind(factory);

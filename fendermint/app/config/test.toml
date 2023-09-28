@@ -1,6 +1,10 @@
 # These setting are overlayed over `default.toml` in unit tests
 # to exercise parsing values that are not viable as defaults.
 
+[validator_key]
+path = "dummy.sk"
+kind = "ethereum"
+
 [resolver]
 subnet_id = "/r31415926"
 

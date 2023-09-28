@@ -1,10 +1,13 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use fendermint_abci::ApplicationService;
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
+use fendermint_app_settings::AccountKind;
+use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
+use fendermint_vm_actor_interface::eam;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
@@ -12,6 +15,7 @@ use fendermint_vm_interpreter::{
     signed::SignedMessageInterpreter,
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
+use fvm_shared::address::Address;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use tracing::info;
@@ -33,20 +37,29 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tendermint_rpc::HttpClient::new(settings.tendermint_rpc_url()?)
             .context("failed to create Tendermint client")?;
 
-    let validator_key = {
-        let sk = settings.validator_key();
-        if sk.exists() && sk.is_file() {
-            Some(read_secret_key(&sk).context("failed to read validator key")?)
-        } else {
+    let validator = match settings.validator_key {
+        Some(ref key) => {
+            let sk = key.path(settings.home_dir());
+            if sk.exists() && sk.is_file() {
+                let sk = read_secret_key(&sk).context("failed to read validator key")?;
+                let addr = to_address(&sk, &key.kind)?;
+                Some((sk, addr))
+            } else {
+                bail!("validator key does not exist: {}", sk.to_string_lossy());
+            }
+        }
+        None => {
             tracing::debug!("validator key not configured");
             None
         }
     };
 
-    let validator_ctx = validator_key.map(|sk| {
+    let validator_ctx = validator.map(|(sk, addr)| {
         // For now we are using the validator key for submitting transactions.
+        // This allows us to identify transactions coming from bonded validators, to give priority to protocol related transactions.
         let broadcaster = Broadcaster::new(
             client.clone(),
+            addr,
             sk.clone(),
             settings.fvm.gas_fee_cap.clone(),
             settings.fvm.gas_premium.clone(),
@@ -236,4 +249,12 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
     };
 
     Ok(config)
+}
+
+fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
+    let pk = sk.public_key().serialize();
+    match kind {
+        AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
+        AccountKind::Ethereum => Ok(Address::new_delegated(eam::EAM_ACTOR_ID, &pk)?),
+    }
 }

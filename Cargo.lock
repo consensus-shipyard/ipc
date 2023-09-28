@@ -3045,7 +3045,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "tendermint",
+ "tendermint 0.31.1",
 ]
 
 [[package]]
@@ -3081,7 +3081,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "tendermint",
+ "tendermint 0.31.1",
  "tendermint-rpc",
  "thiserror",
  "tokio",

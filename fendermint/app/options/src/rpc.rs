@@ -10,7 +10,10 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, econ::TokenAmount, MethodNum};
 use tendermint_rpc::Url;
 
-use crate::parse::{parse_address, parse_bytes, parse_cid, parse_full_fil, parse_token_amount};
+use crate::{
+    genesis::AccountKind,
+    parse::{parse_address, parse_bytes, parse_cid, parse_full_fil, parse_token_amount},
+};
 
 #[derive(Args, Debug)]
 pub struct RpcArgs {
@@ -151,6 +154,9 @@ pub struct TransArgs {
     /// Path to the secret key of the sender to sign the transaction.
     #[arg(long, short)]
     pub secret_key: PathBuf,
+    /// Indicate whether its a regular or ethereum account.
+    #[arg(long, short, default_value = "regular")]
+    pub account_kind: AccountKind,
     /// Sender account nonce.
     #[arg(long, short = 'n')]
     pub sequence: u64,

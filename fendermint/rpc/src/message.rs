@@ -28,15 +28,21 @@ pub struct MessageFactory {
 }
 
 impl MessageFactory {
-    pub fn new(sk: SecretKey, sequence: u64, chain_id: ChainID) -> anyhow::Result<Self> {
-        let pk = sk.public_key();
-        let addr = Address::new_secp256k1(&pk.serialize())?;
-        Ok(Self {
+    /// Create a factor from a secret key and its corresponding address, which could be a delegated one.
+    pub fn new(sk: SecretKey, addr: Address, sequence: u64, chain_id: ChainID) -> Self {
+        Self {
             sk,
             addr,
             sequence,
             chain_id,
-        })
+        }
+    }
+
+    /// Treat the secret key as an f1 type account.
+    pub fn new_secp256k1(sk: SecretKey, sequence: u64, chain_id: ChainID) -> Self {
+        let pk = sk.public_key();
+        let addr = Address::new_secp256k1(&pk.serialize()).expect("public key is 65 bytes");
+        Self::new(sk, addr, sequence, chain_id)
     }
 
     /// Convenience method to read the secret key from a file, expected to be in Base64 format.

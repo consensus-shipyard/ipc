@@ -8,6 +8,8 @@ use std::pin::Pin;
 use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
+use fendermint_app_options::genesis::AccountKind;
+use fendermint_crypto::SecretKey;
 use fendermint_rpc::client::BoundFendermintClient;
 use fendermint_rpc::tx::{
     AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
@@ -329,8 +331,9 @@ struct TransClient {
 impl TransClient {
     pub fn new(client: FendermintClient, args: &TransArgs) -> anyhow::Result<Self> {
         let sk = read_secret_key(&args.secret_key)?;
+        let addr = to_address(&sk, &args.account_kind)?;
         let chain_id = chainid::from_str_hashed(&args.chain_name)?;
-        let mf = MessageFactory::new(sk, args.sequence, chain_id)?;
+        let mf = MessageFactory::new(sk, addr, args.sequence, chain_id);
         let client = client.bind(mf);
         let client = Self {
             inner: client,
@@ -375,5 +378,13 @@ fn gas_params(args: &TransArgs) -> GasParams {
         gas_limit: args.gas_limit,
         gas_fee_cap: args.gas_fee_cap.clone(),
         gas_premium: args.gas_premium.clone(),
+    }
+}
+
+fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
+    let pk = sk.public_key().serialize();
+    match kind {
+        AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
+        AccountKind::Ethereum => Ok(Address::new_delegated(eam::EAM_ACTOR_ID, &pk)?),
     }
 }

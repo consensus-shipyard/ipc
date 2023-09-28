@@ -11,11 +11,17 @@ contracts_dir = "contracts"
 builtin_actors_bundle = "bundle.car"
 # Where to reach CometBFT for queries or broadcasting transactions.
 tendermint_rpc_url = "http://127.0.0.1:26657"
+
 # Secp256k1 private key used for signing transactions. Leave empty if not validating,
 # or if it's not needed to sign and broadcast transactions as a validator.
 # Leaving empty by default so single node deployments don't fail to start because
 # this key is not copied into place.
-validator_key = ""
+# [validator_key]
+# # Path to the secret key file in base64 format.
+# path =
+
+# # The on-chain account kind (regular|ethereum)
+# kind =
 
 [abci]
 # Number of concurrent requests allowed to reach the application.

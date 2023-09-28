@@ -49,6 +49,26 @@ impl std::net::ToSocketAddrs for SocketAddress {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+/// Indicate the FVM account kind for generating addresses from a key.
+pub enum AccountKind {
+    /// Has an f1 address.
+    Regular,
+    /// Has an f410 address.
+    Ethereum,
+}
+
+/// A Secp256k1 key used to sign transactions,
+/// with the account kind showing if it's a regular or an ethereum key.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SigningKey {
+    path: PathBuf,
+    pub kind: AccountKind,
+}
+
+home_relative!(SigningKey { path });
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct AbciSettings {
     pub listen: SocketAddress,
     /// Queue size for each ABCI component.
@@ -99,8 +119,9 @@ pub struct Settings {
     builtin_actors_bundle: PathBuf,
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
-    /// Secp256k1 private key used for signing transactions. Leave empty if not validating.
-    validator_key: PathBuf,
+
+    /// Secp256k1 private key used for signing transactions sent in the validator's name. Leave empty if not validating.
+    pub validator_key: Option<SigningKey>,
 
     pub abci: AbciSettings,
     pub db: DbSettings,
@@ -133,12 +154,7 @@ macro_rules! home_relative {
 }
 
 impl Settings {
-    home_relative!(
-        data_dir,
-        contracts_dir,
-        builtin_actors_bundle,
-        validator_key
-    );
+    home_relative!(data_dir, contracts_dir, builtin_actors_bundle);
 
     /// Load the default configuration from a directory,
     /// then potential overrides specific to the run mode,

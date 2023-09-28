@@ -127,8 +127,7 @@ async fn main() {
         .value
         .chain_id;
 
-    let mf = MessageFactory::new(sk, sn, ChainID::from(chain_id))
-        .expect("failed to create message factor");
+    let mf = MessageFactory::new_secp256k1(sk, sn, ChainID::from(chain_id));
 
     let mut client = client.bind(mf);
 
