@@ -193,7 +193,7 @@ pub mod subnet_actor_getter_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned(
-                                            "struct BottomUpCheckpoint",
+                                            "struct BottomUpCheckpointLegacy",
                                         ),
                                     ),
                                 },
@@ -660,7 +660,7 @@ pub mod subnet_actor_getter_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned(
-                                            "struct BottomUpCheckpoint[]",
+                                            "struct BottomUpCheckpointLegacy[]",
                                         ),
                                     ),
                                 },
@@ -1058,7 +1058,10 @@ pub mod subnet_actor_getter_facet {
         pub fn bottom_up_checkpoint_at_epoch(
             &self,
             epoch: u64,
-        ) -> ::ethers::contract::builders::ContractCall<M, (bool, BottomUpCheckpoint)> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            (bool, BottomUpCheckpointLegacy),
+        > {
             self.0
                 .method_hash([108, 178, 236, 238], epoch)
                 .expect("method not found (this should never happen)")
@@ -1174,7 +1177,7 @@ pub mod subnet_actor_getter_facet {
             to_epoch: u64,
         ) -> ::ethers::contract::builders::ContractCall<
             M,
-            ::std::vec::Vec<BottomUpCheckpoint>,
+            ::std::vec::Vec<BottomUpCheckpointLegacy>,
         > {
             self.0
                 .method_hash([172, 156, 42, 111], (from_epoch, to_epoch))
@@ -2197,7 +2200,7 @@ pub mod subnet_actor_getter_facet {
     )]
     pub struct BottomUpCheckpointAtEpochReturn {
         pub exists: bool,
-        pub checkpoint: BottomUpCheckpoint,
+        pub checkpoint: BottomUpCheckpointLegacy,
     }
     ///Container type for all return fields from the `bottomUpCheckpointHashAtEpoch` function with signature `bottomUpCheckpointHashAtEpoch(uint64)` and selector `0x133f74ea`
     #[derive(
@@ -2345,7 +2348,9 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash
     )]
-    pub struct ListBottomUpCheckpointsReturn(pub ::std::vec::Vec<BottomUpCheckpoint>);
+    pub struct ListBottomUpCheckpointsReturn(
+        pub ::std::vec::Vec<BottomUpCheckpointLegacy>,
+    );
     ///Container type for all return fields from the `majorityPercentage` function with signature `majorityPercentage()` and selector `0x599c7bd1`
     #[derive(
         Clone,
@@ -2502,7 +2507,7 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct ValidatorWorkerAddrReturn(pub FvmAddress);
-    ///`BottomUpCheckpoint((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes)`
+    ///`BottomUpCheckpointLegacy((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2513,7 +2518,7 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash
     )]
-    pub struct BottomUpCheckpoint {
+    pub struct BottomUpCheckpointLegacy {
         pub source: SubnetID,
         pub epoch: u64,
         pub fee: ::ethers::core::types::U256,

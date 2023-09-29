@@ -15,7 +15,7 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_genesis::Validator;
 use fendermint_vm_ipc_actors::gateway_getter_facet::{GatewayGetterFacet, SubnetID};
-use fendermint_vm_ipc_actors::gateway_router_facet::{BottomUpCheckpointNew, GatewayRouterFacet};
+use fendermint_vm_ipc_actors::gateway_router_facet::{BottomUpCheckpoint, GatewayRouterFacet};
 use fendermint_vm_message::signed::sign_secp256k1;
 
 use super::{
@@ -79,7 +79,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     pub fn create_bottom_up_checkpoint(
         &self,
         state: &mut FvmExecState<DB>,
-        checkpoint: BottomUpCheckpointNew,
+        checkpoint: BottomUpCheckpoint,
         power_table: &[Validator],
     ) -> anyhow::Result<()> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
@@ -101,7 +101,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     /// This will need to be broadcasted as a transaction.
     pub fn add_checkpoint_signature_calldata(
         &self,
-        checkpoint: BottomUpCheckpointNew,
+        checkpoint: BottomUpCheckpoint,
         power_table: &[Validator],
         validator: &Validator,
         secret_key: &SecretKey,

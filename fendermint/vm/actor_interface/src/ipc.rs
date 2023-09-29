@@ -10,7 +10,7 @@ use ethers::core::types as et;
 use fendermint_vm_genesis::Validator;
 use fendermint_vm_ipc_actors as ia;
 pub use fendermint_vm_ipc_actors::gateway_manager_facet::SubnetID;
-pub use fendermint_vm_ipc_actors::gateway_router_facet::BottomUpCheckpointNew as BottomUpCheckpoint;
+pub use fendermint_vm_ipc_actors::gateway_router_facet::BottomUpCheckpoint;
 use lazy_static::lazy_static;
 use merkle_tree_rs::{
     core::{process_proof, Hash},

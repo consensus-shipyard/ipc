@@ -193,9 +193,9 @@ dependencies = [
 
 [[package]]
 name = "anstream"
-version = "0.5.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f58811cfac344940f1a400b6e6231ce35171f614f26439e80f8c1465c5cc0c"
+checksum = "f6cd65a4b849ace0b7f6daeebcc1a1d111282227ca745458c61dbf670e52a597"
 dependencies = [
  "anstyle",
  "anstyle-parse",
@@ -207,15 +207,15 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b84bf0a05bbb2a83e5eb6fa36bb6e87baa08193c35ff52bbf6b38d8af2890e46"
+checksum = "7079075b41f533b8c61d2a4d073c4676e1f8b249ff94a393b0595db304e0dd87"
 
 [[package]]
 name = "anstyle-parse"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "938874ff5980b03a87c5524b3ae5b59cf99b1d6bc836848df7bc5ada9643c333"
+checksum = "317b9a89c1868f5ea6ff1d9539a69f45dffc21ce321ac1fd1160dfa48c8e2140"
 dependencies = [
  "utf8parse",
 ]
@@ -231,9 +231,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle-wincon"
-version = "2.1.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58f54d10c6dfa51283a066ceab3ec1ab78d13fae00aa49243a45e4571fb79dfd"
+checksum = "0238ca56c96dfa37bdf7c373c8886dd591322500aceeeccdb2216fe06dc2f796"
 dependencies = [
  "anstyle",
  "windows-sys 0.48.0",
@@ -630,7 +630,7 @@ dependencies = [
  "rayon",
  "rustversion",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
 ]
 
@@ -881,7 +881,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5353f36341f7451062466f0b755b96ac3a9547e4d7f6b70d603fc721a7d7896"
 dependencies = [
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "tinyvec",
 ]
 
@@ -1149,9 +1149,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.4.5"
+version = "4.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "824956d0dca8334758a5b7f7e50518d66ea319330cbceedcf76905c2f6ab30e3"
+checksum = "d04704f56c2cde07f43e8e2c154b43f216dc5c92fc98ada720177362f953b956"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1159,9 +1159,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.4.5"
+version = "4.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122ec64120a49b4563ccaedcbea7818d069ed8e9aa6d829b82d8a4128936b2ab"
+checksum = "0e231faeaca65ebd1ea3c737966bf858971cd38c3849107aa3ea7de90a804e45"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1199,7 +1199,7 @@ dependencies = [
  "hmac 0.12.1",
  "k256 0.13.1",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
 ]
 
@@ -1215,7 +1215,7 @@ dependencies = [
  "once_cell",
  "pbkdf2 0.12.2",
  "rand 0.8.5",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
 ]
 
@@ -1234,7 +1234,7 @@ dependencies = [
  "ripemd",
  "serde",
  "serde_derive",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "sha3",
  "thiserror",
 ]
@@ -1793,7 +1793,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
 dependencies = [
  "cfg-if",
- "hashbrown 0.14.0",
+ "hashbrown 0.14.1",
  "lock_api",
  "once_cell",
  "parking_lot_core 0.9.8",
@@ -2059,7 +2059,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "rayon",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
  "yastl",
 ]
@@ -2146,7 +2146,7 @@ dependencies = [
  "ed25519 2.2.2",
  "rand_core 0.6.4",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "zeroize",
 ]
 
@@ -2328,7 +2328,7 @@ dependencies = [
  "scrypt",
  "serde",
  "serde_json",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "sha3",
  "thiserror",
  "uuid 0.8.2",
@@ -2593,7 +2593,7 @@ dependencies = [
  "eth-keystore",
  "ethers-core",
  "rand 0.8.5",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
  "tracing",
 ]
@@ -2792,7 +2792,7 @@ dependencies = [
  "serde_with",
  "tempfile",
  "tendermint 0.31.1",
- "tendermint-config 0.33.1",
+ "tendermint-config 0.33.2",
  "tendermint-proto 0.31.1",
  "tendermint-rpc",
  "tokio",
@@ -2807,7 +2807,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "cid",
- "clap 4.4.5",
+ "clap 4.4.6",
  "fvm_ipld_encoding 0.3.3",
  "fvm_shared",
  "hex",
@@ -2851,7 +2851,7 @@ dependencies = [
  "async-trait",
  "axum",
  "cid",
- "clap 4.4.5",
+ "clap 4.4.6",
  "ethers",
  "ethers-core",
  "fendermint_crypto",
@@ -2917,7 +2917,7 @@ dependencies = [
  "base64 0.21.4",
  "bytes",
  "cid",
- "clap 4.4.5",
+ "clap 4.4.6",
  "ethers",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",
@@ -3213,7 +3213,7 @@ dependencies = [
  "serde",
  "serde_repr",
  "serde_tuple",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
  "unsigned-varint",
 ]
@@ -3243,7 +3243,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_repr",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
  "unsigned-varint",
 ]
@@ -3280,7 +3280,7 @@ dependencies = [
  "neptune",
  "rand 0.8.5",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -3307,7 +3307,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "storage-proofs-core",
  "storage-proofs-porep",
  "storage-proofs-post",
@@ -3782,7 +3782,7 @@ dependencies = [
  "multihash 0.16.3",
  "once_cell",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
 ]
 
@@ -3802,7 +3802,7 @@ dependencies = [
  "multihash 0.16.3",
  "once_cell",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
 ]
 
@@ -4020,9 +4020,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
+checksum = "7dfda62a12f55daeae5015f81b0baea145391cb4520f86c248fc615d72640d12"
 
 [[package]]
 name = "hashers"
@@ -4437,12 +4437,12 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
+checksum = "ad227c3af19d4914570ad36d30409928b75967c298feb9ea1969db3a610bb14e"
 dependencies = [
  "equivalent",
- "hashbrown 0.14.0",
+ "hashbrown 0.14.1",
 ]
 
 [[package]]
@@ -4513,7 +4513,7 @@ dependencies = [
 [[package]]
 name = "ipc-sdk"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-agent.git?branch=dev#114b2892232a0b78912f2ad1ba5a21f8dcae6c4b"
+source = "git+https://github.com/consensus-shipyard/ipc-agent.git?branch=dev#13d78f1500c16aacc5e59a4df1a9b55fb920f926"
 dependencies = [
  "anyhow",
  "cid",
@@ -4698,7 +4698,7 @@ dependencies = [
  "cfg-if",
  "ecdsa 0.14.8",
  "elliptic-curve 0.12.3",
- "sha2 0.10.7",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -4711,7 +4711,7 @@ dependencies = [
  "ecdsa 0.16.8",
  "elliptic-curve 0.13.5",
  "once_cell",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "signature 2.1.0",
 ]
 
@@ -4934,7 +4934,7 @@ dependencies = [
  "rw-stream-sink",
  "sec1 0.3.0",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "smallvec",
  "thiserror",
  "unsigned-varint",
@@ -5008,7 +5008,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "smallvec",
  "thiserror",
  "unsigned-varint",
@@ -5049,7 +5049,7 @@ dependencies = [
  "multihash 0.17.0",
  "quick-protobuf",
  "rand 0.8.5",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
  "zeroize",
 ]
@@ -5075,7 +5075,7 @@ dependencies = [
  "prost-build",
  "rand 0.8.5",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "smallvec",
  "thiserror",
  "uint",
@@ -5151,7 +5151,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.5",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "snow",
  "static_assertions",
  "thiserror",
@@ -5700,7 +5700,7 @@ dependencies = [
  "ripemd",
  "serde",
  "serde-big-array",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "sha3",
  "unsigned-varint",
 ]
@@ -6113,7 +6113,7 @@ checksum = "51f44edd08f51e2ade572f141051021c5af22677e42b7dd28a88155151c33594"
 dependencies = [
  "ecdsa 0.14.8",
  "elliptic-curve 0.12.3",
- "sha2 0.10.7",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -6124,7 +6124,7 @@ checksum = "dfc8c5bf642dde52bb9e87c0ecd8ca5a76faac2eeed98dedb7c717997e1080aa"
 dependencies = [
  "ecdsa 0.14.8",
  "elliptic-curve 0.12.3",
- "sha2 0.10.7",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -6254,7 +6254,7 @@ dependencies = [
  "digest 0.10.7",
  "hmac 0.12.1",
  "password-hash",
- "sha2 0.10.7",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -6366,7 +6366,7 @@ checksum = "1df74e9e7ec4053ceb980e7c0c8bd3594e977fde1af91daba9c928e8e8c6708d"
 dependencies = [
  "once_cell",
  "pest",
- "sha2 0.10.7",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -6376,7 +6376,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1d3afd2628e69da2be385eb6f2fd57c8ac7977ceeff6dc166ff1657b0e386a9"
 dependencies = [
  "fixedbitset",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
 ]
 
 [[package]]
@@ -7544,7 +7544,7 @@ dependencies = [
  "hmac 0.12.1",
  "pbkdf2 0.11.0",
  "salsa20",
- "sha2 0.10.7",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -7842,9 +7842,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.7"
+version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "479fb9d862239e610720565ca91403019f2f00410f1864c5aa7479b950a76ed8"
+checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -7888,9 +7888,9 @@ dependencies = [
 
 [[package]]
 name = "sharded-slab"
-version = "0.1.4"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "900fba806f70c630b0a382d0d825e17a0f19fcd059a2ade1ff237bcddf446b31"
+checksum = "c1b21f559e07218024e7e9f90f96f601825397de0e25420135f7f952453fed0b"
 dependencies = [
  "lazy_static",
 ]
@@ -7996,7 +7996,7 @@ dependencies = [
  "rand_core 0.6.4",
  "ring",
  "rustc_version",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "subtle",
 ]
 
@@ -8112,7 +8112,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
 ]
 
@@ -8149,7 +8149,7 @@ dependencies = [
  "rustversion",
  "serde",
  "serde_json",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "sha2raw",
  "storage-proofs-core",
  "yastl",
@@ -8174,7 +8174,7 @@ dependencies = [
  "log",
  "rayon",
  "serde",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "storage-proofs-core",
 ]
 
@@ -8336,7 +8336,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "thiserror",
  "url",
  "zip",
@@ -8450,7 +8450,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_repr",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "signature 2.1.0",
  "subtle",
  "subtle-encoding",
@@ -8461,9 +8461,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint"
-version = "0.33.1"
+version = "0.33.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c293cdbb6e13bad728bce26584a3a89d7cb5ea0b4b9db796fded10bae4a0b06b"
+checksum = "7c35fe4fd24a7715571814c22416dbc40ec0f2a6e3cce75d73e19699faecd246"
 dependencies = [
  "bytes",
  "digest 0.10.7",
@@ -8479,11 +8479,11 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_repr",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "signature 2.1.0",
  "subtle",
  "subtle-encoding",
- "tendermint-proto 0.33.1",
+ "tendermint-proto 0.33.2",
  "time",
  "zeroize",
 ]
@@ -8504,14 +8504,14 @@ dependencies = [
 
 [[package]]
 name = "tendermint-config"
-version = "0.33.1"
+version = "0.33.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "007da10d992c93039bde6a962ec0ab12e3520695cebb9542d5c9011de29341e3"
+checksum = "6a213a026dfc1c68468160bee24bf128e26002170abc123678ecfbe5ff37f91d"
 dependencies = [
  "flex-error",
  "serde",
  "serde_json",
- "tendermint 0.33.1",
+ "tendermint 0.33.2",
  "toml 0.5.11",
  "url",
 ]
@@ -8536,9 +8536,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-proto"
-version = "0.33.1"
+version = "0.33.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03dcd29922e5670af2307f3d8e58c9720ec94b15b92ef85fe9ed0f4b25fbde44"
+checksum = "639e5adffd77220d238a800a72c74c98d7e869290a6e4494c10b6b4e8f702f02"
 dependencies = [
  "bytes",
  "flex-error",
@@ -8618,18 +8618,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.48"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d6d7a740b8a666a7e828dd00da9c0dc290dff53154ea77ac109281de90589b7"
+checksum = "1177e8c6d7ede7afde3585fd2513e611227efd6481bd78d2e82ba1ce16557ed4"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.48"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49922ecae66cc8a249b77e68d1d0623c1b2c514f0060c27cdc68bd62a1219d35"
+checksum = "10712f02019e9288794769fba95cd6847df9874d49d871d062172f9dd41bc4cc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8870,7 +8870,7 @@ version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -9457,22 +9457,22 @@ dependencies = [
 
 [[package]]
 name = "wasmparser"
-version = "0.113.1"
+version = "0.113.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a128cea7b8516703ab41b10a0b1aa9ba18d0454cd3792341489947ddeee268db"
+checksum = "1fd0d44fab0bd78404e352f3399324eef76516a4580b52bc9031c60f064e98f3"
 dependencies = [
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "semver",
 ]
 
 [[package]]
 name = "wasmprinter"
-version = "0.2.66"
+version = "0.2.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab2e5e818f88cee5311e9a5df15cba0a8f772978baf3109af97004bce6e8e3c6"
+checksum = "f6615a5587149e753bf4b93f90fa3c3f41c88597a7a2da72879afcabeda9648f"
 dependencies = [
  "anyhow",
- "wasmparser 0.113.1",
+ "wasmparser 0.113.2",
 ]
 
 [[package]]
@@ -9689,7 +9689,7 @@ dependencies = [
  "sdp",
  "serde",
  "serde_json",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "stun",
  "thiserror",
  "time",
@@ -9751,7 +9751,7 @@ dependencies = [
  "sec1 0.3.0",
  "serde",
  "sha1",
- "sha2 0.10.7",
+ "sha2 0.10.8",
  "signature 1.6.4",
  "subtle",
  "thiserror",
