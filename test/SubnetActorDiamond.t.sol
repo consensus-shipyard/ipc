@@ -8,7 +8,7 @@ import {TestUtils} from "./TestUtils.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {Status} from "../src/enums/Status.sol";
-import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck} from "../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpointLegacy, TopDownCheckpoint, StorableMsg, ChildCheck} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, IPCAddress, Subnet} from "../src/structs/Subnet.sol";
 import {StorableMsg} from "../src/structs/Checkpoint.sol";
@@ -31,7 +31,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 contract SubnetActorDiamondTest is Test {
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpoint;
+    using CheckpointHelper for BottomUpCheckpointLegacy;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
 
@@ -213,7 +213,7 @@ contract SubnetActorDiamondTest is Test {
 
         require(saGetter.getValidatorSet().validators.length == 0, "empty validator set");
 
-        BottomUpCheckpoint[] memory l = saGetter.listBottomUpCheckpoints(0, 10);
+        BottomUpCheckpointLegacy[] memory l = saGetter.listBottomUpCheckpoints(0, 10);
         require(l.length == 0, "listBottomUpCheckpoints");
     }
 
@@ -861,7 +861,7 @@ contract SubnetActorDiamondTest is Test {
         uint64 nonce,
         bytes32 prevHash,
         bytes memory proof
-    ) internal view returns (BottomUpCheckpoint memory checkpoint) {
+    ) internal view returns (BottomUpCheckpointLegacy memory checkpoint) {
         SubnetID memory subnetActorId = saGetter.getParent().createSubnetId(address(saManager));
         CrossMsg[] memory crossMsgs = new CrossMsg[](1);
 
@@ -877,7 +877,7 @@ contract SubnetActorDiamondTest is Test {
             wrapped: false
         });
 
-        checkpoint = BottomUpCheckpoint({
+        checkpoint = BottomUpCheckpointLegacy({
             source: subnetActorId,
             epoch: epoch,
             fee: 0,
@@ -888,7 +888,7 @@ contract SubnetActorDiamondTest is Test {
         });
     }
 
-    function _createBottomUpCheckpoint() internal view returns (BottomUpCheckpoint memory checkpoint) {
+    function _createBottomUpCheckpoint() internal view returns (BottomUpCheckpointLegacy memory checkpoint) {
         return _createBottomUpCheckpointWithConfig(DEFAULT_CHECKPOINT_PERIOD, 0, EMPTY_HASH, new bytes(0));
     }
 

@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {EMPTY_HASH, METHOD_SEND} from "../constants/Constants.sol";
-import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint, BottomUpCheckpointNew, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {Status} from "../enums/Status.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
@@ -31,7 +31,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
-    using CheckpointHelper for BottomUpCheckpointNew;
+    using CheckpointHelper for BottomUpCheckpoint;
     using CrossMsgHelper for CrossMsg;
     using FvmAddressHelper for FvmAddress;
     using StorableMsgHelper for StorableMsg;
@@ -54,70 +54,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     ) external systemActorOnly {
         LibGateway.commitParentFinality(finality);
         LibGateway.newMembership({n: n, validators: validators, weights: weights});
-    }
-
-    /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
-    function commitChildCheck(BottomUpCheckpoint calldata commit) external {
-        if (!s.initialized) {
-            revert NotInitialized();
-        }
-        if (commit.source.getActor().normalize() != msg.sender) {
-            revert InvalidCheckpointSource();
-        }
-
-        // slither-disable-next-line unused-return
-        (, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
-        if (subnet.status != Status.Active) {
-            revert SubnetNotActive();
-        }
-        if (subnet.prevCheckpoint.epoch >= commit.epoch) {
-            revert InvalidCheckpointEpoch();
-        }
-        if (commit.prevHash != EMPTY_HASH) {
-            if (commit.prevHash != subnet.prevCheckpoint.toHash()) {
-                revert InconsistentPrevCheckpoint();
-            }
-        }
-
-        // get checkpoint for the current template being populated
-        (bool checkpointExists, uint64 nextCheckEpoch, BottomUpCheckpoint storage checkpoint) = LibGateway
-            .getCurrentBottomUpCheckpoint();
-
-        // create a checkpoint template if it doesn't exists
-        if (!checkpointExists) {
-            checkpoint.source = s.networkName;
-            checkpoint.epoch = nextCheckEpoch;
-        }
-
-        checkpoint.setChildCheck({
-            commit: commit,
-            children: s.children,
-            checks: s.checks,
-            currentEpoch: nextCheckEpoch
-        });
-
-        uint256 totalValue = 0;
-        uint256 crossMsgLength = commit.crossMsgs.length;
-        for (uint256 i = 0; i < crossMsgLength; ) {
-            totalValue += commit.crossMsgs[i].message.value;
-            unchecked {
-                ++i;
-            }
-        }
-
-        totalValue += commit.fee + checkpoint.fee; // add fee that is already in checkpoint as well. For example from release message interacting with the same checkpoint
-
-        if (subnet.circSupply < totalValue) {
-            revert NotEnoughSubnetCircSupply();
-        }
-
-        subnet.circSupply -= totalValue;
-
-        subnet.prevCheckpoint = commit;
-
-        _applyMessages(commit.source, commit.crossMsgs);
-
-        LibGateway.distributeRewards(msg.sender, commit.fee);
     }
 
     /// @notice apply cross messages
@@ -206,7 +142,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         if (height < s.bottomUpCheckpointRetentionHeight) {
             revert CheckpointAlreadyProcessed();
         }
-        BottomUpCheckpointNew memory checkpoint = s.bottomUpCheckpoints[height];
+        BottomUpCheckpoint memory checkpoint = s.bottomUpCheckpoints[height];
         if (checkpoint.blockHeight == 0) {
             revert CheckpointNotCreated();
         }
@@ -274,7 +210,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
     /// @param membershipWeight - the total weight of the membership
     function createBottomUpCheckpoint(
-        BottomUpCheckpointNew calldata checkpoint,
+        BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
@@ -324,6 +260,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
             delete s.bottomUpCheckpoints[h];
             delete s.bottomUpCheckpointInfo[h];
             delete s.bottomUpCollectedSignatures[h];
+            delete s.bottomUpMessages[h];
 
             unchecked {
                 ++h;

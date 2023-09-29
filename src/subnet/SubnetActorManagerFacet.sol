@@ -5,7 +5,7 @@ import {Status} from "../enums/Status.sol";
 import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, InconsistentPrevCheckpoint} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpointLegacy} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
@@ -23,12 +23,12 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpoint;
+    using CheckpointHelper for BottomUpCheckpointLegacy;
     using FilAddress for address;
     using Address for address payable;
     using FvmAddressHelper for FvmAddress;
 
-    event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
+    event BottomUpCheckpointSubmitted(BottomUpCheckpointLegacy checkpoint, address submitter);
     event BottomUpCheckpointExecuted(uint64 epoch, address submitter);
     event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
 
@@ -170,7 +170,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice methods that allows a validator to submit a checkpoint (batch of messages) and vote for it with it's own voting power.
     /// @param checkpoint - the batch messages data
-    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
+    function submitCheckpoint(BottomUpCheckpointLegacy calldata checkpoint) external {
         if (s.status != Status.Active) {
             revert SubnetNotActive();
         }
@@ -189,7 +189,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice method that commits a checkpoint after reaching majority
     /// @param checkpoint - the batch messages data
-    function _commitCheckpoint(BottomUpCheckpoint calldata checkpoint) internal {
+    function _commitCheckpoint(BottomUpCheckpointLegacy calldata checkpoint) internal {
         /// Ensures the checkpoints are chained. If not, should abort the current checkpoint.
         if (s.prevExecutedCheckpointHash != checkpoint.prevHash) {
             revert InconsistentPrevCheckpoint();

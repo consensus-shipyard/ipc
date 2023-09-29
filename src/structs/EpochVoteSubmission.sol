@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, TopDownCheckpoint} from "./Checkpoint.sol";
+import {BottomUpCheckpointLegacy, TopDownCheckpoint} from "./Checkpoint.sol";
 
 struct EpochVoteSubmission {
     uint256 nonce;
@@ -22,5 +22,5 @@ struct EpochVoteTopDownSubmission {
 struct EpochVoteBottomUpSubmission {
     EpochVoteSubmission vote;
     // submissionHash => submission
-    mapping(bytes32 => BottomUpCheckpoint) submissions;
+    mapping(bytes32 => BottomUpCheckpointLegacy) submissions;
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpointLegacy} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
 /// @title Subnet Actor interface
@@ -22,5 +22,5 @@ interface ISubnetActor {
     function reward(uint256 amount) external;
 
     /// SubmitCheckpoint accepts signed checkpoint votes for validators.
-    function submitCheckpoint(BottomUpCheckpoint calldata checkpoint) external;
+    function submitCheckpoint(BottomUpCheckpointLegacy calldata checkpoint) external;
 }

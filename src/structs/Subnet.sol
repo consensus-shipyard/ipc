@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {SubnetID} from "./Subnet.sol";
 import {FvmAddress} from "./FvmAddress.sol";
-import {BottomUpCheckpoint, CrossMsg} from "./Checkpoint.sol";
+import {BottomUpCheckpointLegacy, CrossMsg} from "./Checkpoint.sol";
 import {Status} from "../enums/Status.sol";
 
 struct SubnetID {
@@ -21,7 +21,7 @@ struct Subnet {
     uint64 appliedBottomUpNonce;
     Status status;
     SubnetID id;
-    BottomUpCheckpoint prevCheckpoint;
+    BottomUpCheckpointLegacy prevCheckpoint;
 }
 
 struct IPCAddress {

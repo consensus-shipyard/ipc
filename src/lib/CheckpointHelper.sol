@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {EMPTY_HASH} from "../constants/Constants.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {BottomUpCheckpoint, BottomUpCheckpointNew, TopDownCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpointLegacy, BottomUpCheckpoint, TopDownCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
 
 /// @title Helper library for manipulating Checkpoint struct
 /// @author LimeChain team
@@ -17,7 +17,7 @@ library CheckpointHelper {
     bytes32 public constant EMPTY_BOTTOMUPCHECKPOINT_HASH =
         keccak256(
             abi.encode(
-                BottomUpCheckpoint({
+                BottomUpCheckpointLegacy({
                     source: SubnetID(0, new address[](0)),
                     epoch: 0,
                     fee: 0,
@@ -29,11 +29,11 @@ library CheckpointHelper {
             )
         );
 
-    function toHash(BottomUpCheckpoint memory bottomupCheckpoint) public pure returns (bytes32) {
+    function toHash(BottomUpCheckpointLegacy memory bottomupCheckpoint) public pure returns (bytes32) {
         return keccak256(abi.encode(bottomupCheckpoint));
     }
 
-    function toHash(BottomUpCheckpointNew memory bottomupCheckpoint) public pure returns (bytes32) {
+    function toHash(BottomUpCheckpoint memory bottomupCheckpoint) public pure returns (bytes32) {
         return keccak256(abi.encode(bottomupCheckpoint));
     }
 
@@ -45,13 +45,13 @@ library CheckpointHelper {
         return toHash(topdownCheckpoint) == EMPTY_TOPDOWNCHECKPOINT_HASH;
     }
 
-    function isEmpty(BottomUpCheckpoint memory bottomUpCheckpoint) public pure returns (bool) {
+    function isEmpty(BottomUpCheckpointLegacy memory bottomUpCheckpoint) public pure returns (bool) {
         return toHash(bottomUpCheckpoint) == EMPTY_BOTTOMUPCHECKPOINT_HASH;
     }
 
     function setChildCheck(
-        BottomUpCheckpoint storage checkpoint,
-        BottomUpCheckpoint calldata commit,
+        BottomUpCheckpointLegacy storage checkpoint,
+        BottomUpCheckpointLegacy calldata commit,
         mapping(uint64 => mapping(bytes32 => uint256[2])) storage children,
         mapping(uint64 => mapping(bytes32 => mapping(bytes32 => bool))) storage checks,
         uint64 currentEpoch

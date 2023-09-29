@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, BottomUpCheckpointNew, CrossMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Validator.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
@@ -14,7 +14,7 @@ struct GatewayActorStorage {
     /// @notice List of subnets
     /// SubnetID => Subnet
     mapping(bytes32 => Subnet) subnets;
-    /// @notice a mapping of block number to cross messages
+    /// @notice a mapping of block number to top-down cross-messages
     /// SubnetID => blockNumber => messages
     mapping(bytes32 => mapping(uint256 => CrossMsg[])) topDownMsgs;
     /// @notice The parent finalities. Key is the block number, value is the finality struct.
@@ -32,13 +32,15 @@ struct GatewayActorStorage {
     Membership currentMembership;
     /// @notice The last membership received from the parent and adopted
     Membership lastMembership;
-    mapping(uint64 => BottomUpCheckpoint) bottomUpCheckpointsLegacy;
     /// @notice A mapping of block numbers to bottom-up checkpoints
     // slither-disable-next-line uninitialized-state
-    mapping(uint64 => BottomUpCheckpointNew) bottomUpCheckpoints;
+    mapping(uint64 => BottomUpCheckpoint) bottomUpCheckpoints;
     /// @notice A mapping of block numbers to checkpoint data
     // slither-disable-next-line uninitialized-state
     mapping(uint64 => CheckpointInfo) bottomUpCheckpointInfo;
+    /// @notice A mapping of block numbers to bottom-up cross-messages
+    // slither-disable-next-line uninitialized-state
+    mapping(uint64 => CrossMsg[]) bottomUpMessages;
     /// @notice The height of the first bottom-up checkpoint that must be retained since they have not been processed in the parent.
     /// All checkpoint with the height less than this number may be garbage collected in the child subnet.
     /// @dev Initial retention index is 1.

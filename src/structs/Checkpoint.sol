@@ -9,9 +9,10 @@ struct ParentFinality {
     bytes32 blockHash;
 }
 
+// TODO: Remove old BottomUpCheckpointLegacy and update the codebase.
 /// @title BottomUpCheckpoint struct
 /// @author LimeChain team
-struct BottomUpCheckpoint {
+struct BottomUpCheckpointLegacy {
     SubnetID source;
     uint64 epoch;
     uint256 fee;
@@ -22,8 +23,7 @@ struct BottomUpCheckpoint {
 }
 
 /// @notice A bottom-up checkpoint type.
-// TODO: Remove old BottomUpCheckpoint, rename BottomUpCheckpointNew to BottomUpCheckpoint and update the codebase.
-struct BottomUpCheckpointNew {
+struct BottomUpCheckpoint {
     /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.
     /// Alternatively it can be appended to the hash before signing, similar to how we use the chain ID.
     SubnetID subnetID;

@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {Status} from "../enums/Status.sol";
 import {NotEnoughValidatorsInSubnet} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpointLegacy} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {ValidatorInfo, ValidatorSet} from "../structs/Validator.sol";
@@ -20,7 +20,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 contract SubnetActorGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpoint;
+    using CheckpointHelper for BottomUpCheckpointLegacy;
     using FilAddress for address;
     using Address for address payable;
 
@@ -200,7 +200,7 @@ contract SubnetActorGetterFacet {
     function listBottomUpCheckpoints(
         uint64 fromEpoch,
         uint64 toEpoch
-    ) external view returns (BottomUpCheckpoint[] memory) {
+    ) external view returns (BottomUpCheckpointLegacy[] memory) {
         uint64 period = s.bottomUpCheckPeriod;
 
         // slither-disable-next-line divide-before-multiply
@@ -209,7 +209,7 @@ contract SubnetActorGetterFacet {
         uint64 to = (toEpoch / period) * period;
 
         uint64 size = (to - from) / period;
-        BottomUpCheckpoint[] memory out = new BottomUpCheckpoint[](size);
+        BottomUpCheckpointLegacy[] memory out = new BottomUpCheckpointLegacy[](size);
 
         uint64 nextEpoch = from;
         for (uint64 i = 0; i < size; ) {
@@ -229,7 +229,7 @@ contract SubnetActorGetterFacet {
     /// @return checkpoint - the checkpoint struct
     function bottomUpCheckpointAtEpoch(
         uint64 epoch
-    ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
+    ) public view returns (bool exists, BottomUpCheckpointLegacy memory checkpoint) {
         checkpoint = s.committedCheckpoints[epoch];
         exists = !checkpoint.source.isEmpty();
     }
@@ -239,7 +239,7 @@ contract SubnetActorGetterFacet {
     /// @return exists - whether the checkpoint exists
     /// @return hash - the hash of the checkpoint
     function bottomUpCheckpointHashAtEpoch(uint64 epoch) external view returns (bool, bytes32) {
-        (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
+        (bool exists, BottomUpCheckpointLegacy memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
         return (exists, checkpoint.toHash());
     }
 }

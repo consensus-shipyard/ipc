@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {Status} from "../enums/Status.sol";
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpointLegacy} from "../structs/Checkpoint.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {EpochVoteBottomUpSubmission} from "../structs/EpochVoteSubmission.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
@@ -24,7 +24,7 @@ struct SubnetActorStorage {
     /// @notice validator address to validator worker address
     mapping(address => FvmAddress) validatorWorkerAddresses;
     /// @notice contains all committed bottom-up checkpoint at specific epoch
-    mapping(uint64 => BottomUpCheckpoint) committedCheckpoints;
+    mapping(uint64 => BottomUpCheckpointLegacy) committedCheckpoints;
     /// @notice genesis block
     bytes genesis;
     /// @notice Total collateral currently deposited in the GW from the subnet

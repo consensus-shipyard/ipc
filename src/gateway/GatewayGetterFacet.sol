@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CrossMsg, BottomUpCheckpoint, BottomUpCheckpointNew, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, BottomUpCheckpoint, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Validator.sol";
@@ -52,9 +52,12 @@ contract GatewayGetterFacet {
         return s.networkName;
     }
 
-    // TODO: remove or add a new getter
-    function bottomUpCheckpoints(uint64 e) external view returns (BottomUpCheckpoint memory) {
-        return s.bottomUpCheckpointsLegacy[e];
+    function bottomUpCheckpoint(uint64 e) external view returns (BottomUpCheckpoint memory) {
+        return s.bottomUpCheckpoints[e];
+    }
+
+    function bottomUpMessages(uint64 e) external view returns (CrossMsg[] memory) {
+        return s.bottomUpMessages[e];
     }
 
     function getParentFinality(uint256 blockNumber) external view returns (ParentFinality memory) {
@@ -203,11 +206,11 @@ contract GatewayGetterFacet {
     }
 
     /// @notice get the incomplete checkpoints
-    function getIncompleteCheckpoints() public view returns (BottomUpCheckpointNew[] memory) {
+    function getIncompleteCheckpoints() public view returns (BottomUpCheckpoint[] memory) {
         uint256[] memory heights = s.incompleteCheckpoints.values();
         uint256 size = heights.length;
 
-        BottomUpCheckpointNew[] memory checkpoints = new BottomUpCheckpointNew[](size);
+        BottomUpCheckpoint[] memory checkpoints = new BottomUpCheckpoint[](size);
         for (uint64 i = 0; i < size; ) {
             checkpoints[i] = s.bottomUpCheckpoints[uint64(heights[i])];
             unchecked {

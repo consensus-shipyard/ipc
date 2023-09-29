@@ -7,10 +7,10 @@ import "../src/structs/Checkpoint.sol";
 import "../src/lib/CheckpointHelper.sol";
 
 contract CheckpointHelperTest is Test {
-    using CheckpointHelper for BottomUpCheckpoint;
+    using CheckpointHelper for BottomUpCheckpointLegacy;
     using CheckpointHelper for TopDownCheckpoint;
 
-    BottomUpCheckpoint public checkpoint;
+    BottomUpCheckpointLegacy public checkpoint;
     TopDownCheckpoint public topDownCheckpoint;
     CrossMsg public crossMsg;
 
@@ -18,7 +18,7 @@ contract CheckpointHelperTest is Test {
         checkpoint.epoch = 10;
 
         require(
-            BottomUpCheckpoint({
+            BottomUpCheckpointLegacy({
                 source: SubnetID(0, new address[](0)),
                 epoch: 10,
                 crossMsgs: new CrossMsg[](0),
@@ -61,7 +61,7 @@ contract CheckpointHelperTest is Test {
         require(isSorted(checkpoint) == false);
     }
 
-    function isSorted(BottomUpCheckpoint memory _checkpoint) public pure returns (bool) {
+    function isSorted(BottomUpCheckpointLegacy memory _checkpoint) public pure returns (bool) {
         if (_checkpoint.crossMsgs.length < 2) return true;
         for (uint256 i = 1; i < _checkpoint.crossMsgs.length; ) {
             if (_checkpoint.crossMsgs[i].message.nonce <= _checkpoint.crossMsgs[i - 1].message.nonce) return false;

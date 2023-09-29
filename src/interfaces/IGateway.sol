@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg, ParentFinality} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpointLegacy, TopDownCheckpoint, CrossMsg, ParentFinality} from "../structs/Checkpoint.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
@@ -27,7 +27,7 @@ interface IGateway {
 
     /// CommitChildCheck propagates the commitment of a checkpoint from a child subnet,
     /// process the cross-messages directed to the subnet.
-    function commitChildCheck(BottomUpCheckpoint calldata bottomupCheckpoint) external;
+    function commitChildCheck(BottomUpCheckpointLegacy calldata bottomupCheckpoint) external;
 
     /// Fund injects new funds from an account of the parent chain to a subnet.
     ///
