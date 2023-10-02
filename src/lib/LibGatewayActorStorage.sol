@@ -48,8 +48,10 @@ struct GatewayActorStorage {
     /// @notice A list of incomplete checkpoints.
     // slither-disable-next-line uninitialized-state
     EnumerableSet.UintSet incompleteCheckpoints;
-    /// @notice The validators have already sent signatures at height `h`
-    mapping(uint64 => EnumerableSet.AddressSet) bottomUpCollectedSignatures;
+    /// @notice The addresses of the validators that have already sent signatures at height `h`
+    mapping(uint64 => EnumerableSet.AddressSet) bottomUpSignatureSenders;
+    /// @notice The list of the collected signatures at height `h`
+    mapping(uint64 => mapping(address => bytes)) bottomUpSignatures;
     /// @notice epoch => SubnetID => [childIndex, exists(0 - no, 1 - yes)]
     mapping(uint64 => mapping(bytes32 => uint256[2])) children;
     /// @notice epoch => SubnetID => check => exists

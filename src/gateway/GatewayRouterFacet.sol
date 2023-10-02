@@ -11,7 +11,7 @@ import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {Membership} from "../structs/Validator.sol";
 import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
-import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, IncompleteCheckpointExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory} from "../errors/IPCErrors.sol";
+import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, IncompleteCheckpointExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory, FailedAddSignature} from "../errors/IPCErrors.sol";
 import {MessagesNotSorted, NotInitialized, NotEnoughBalance, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
 import {NotValidator, SubnetNotActive, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -37,6 +37,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     using StorableMsgHelper for StorableMsg;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     event QuorumReached(uint64 height, bytes32 checkpoint, uint256 quorumWeight);
     event QuorumWeightUpdated(uint64 height, bytes32 checkpoint, uint256 newWeight);
@@ -161,7 +162,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         }
 
         // Check whether the validator has already sent a valid signature
-        if (s.bottomUpCollectedSignatures[height].contains(recoveredSignatory)) {
+        if (s.bottomUpSignatureSenders[height].contains(recoveredSignatory)) {
             revert SignatureReplay();
         }
 
@@ -176,10 +177,11 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         // All checks passed.
         // Adding signature and emitting events.
 
-        bool ok = s.bottomUpCollectedSignatures[height].add(recoveredSignatory);
+        bool ok = s.bottomUpSignatureSenders[height].add(recoveredSignatory);
         if (!ok) {
             revert FailedAddSignatory();
         }
+        s.bottomUpSignatures[height][recoveredSignatory] = signature;
         checkpointInfo.currentWeight += weight;
 
         if (checkpointInfo.currentWeight >= checkpointInfo.threshold) {
@@ -259,8 +261,18 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         for (uint64 h = oldRetentionHeight; h < newRetentionHeight; ) {
             delete s.bottomUpCheckpoints[h];
             delete s.bottomUpCheckpointInfo[h];
-            delete s.bottomUpCollectedSignatures[h];
+            delete s.bottomUpSignatureSenders[h];
             delete s.bottomUpMessages[h];
+
+            address[] memory validators = s.bottomUpSignatureSenders[h].values();
+            uint256 n = validators.length;
+
+            for (uint256 i = 0; i < n; ) {
+                delete s.bottomUpSignatures[h][validators[i]];
+                unchecked {
+                    ++i;
+                }
+            }
 
             unchecked {
                 ++h;

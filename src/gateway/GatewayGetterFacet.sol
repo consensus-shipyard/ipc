@@ -19,6 +19,7 @@ contract GatewayGetterFacet {
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     function crossMsgFee() external view returns (uint256) {
         return s.crossMsgFee;
@@ -229,5 +230,25 @@ contract GatewayGetterFacet {
     /// based on the configured majority percentage and the total weight of the validators.
     function getQuorumThreshold(uint256 totalWeight) public view returns (uint256) {
         return LibGateway.weightNeeded(totalWeight, s.majorityPercentage);
+    }
+
+    function getCheckpointAndSignatures(
+        uint64 h
+    ) external view returns (BottomUpCheckpoint memory ch, CheckpointInfo memory info, bytes[] memory signatures) {
+        ch = s.bottomUpCheckpoints[h];
+        info = s.bottomUpCheckpointInfo[h];
+        address[] memory validators = s.bottomUpSignatureSenders[h].values();
+        uint256 n = validators.length;
+
+        signatures = new bytes[](n);
+
+        for (uint256 i = 0; i < n; ) {
+            signatures[i] = s.bottomUpSignatures[h][validators[i]];
+            unchecked {
+                ++i;
+            }
+        }
+
+        return (ch, info, signatures);
     }
 }

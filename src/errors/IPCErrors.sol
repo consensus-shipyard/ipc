@@ -11,6 +11,7 @@ error CheckpointAlreadyProcessed();
 error CheckpointInfoAlreadyExists();
 error IncompleteCheckpointExists();
 error FailedAddSignatory();
+error FailedAddSignature();
 error FailedAddIncompleteCheckpoint();
 error FailedRemoveIncompleteCheckpoint();
 error CheckpointNotChained();

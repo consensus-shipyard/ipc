@@ -335,6 +335,81 @@ pub mod gateway_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getCheckpointAndSignatures"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getCheckpointAndSignatures",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("h"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("ch"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                        ::std::boxed::Box::new(
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned(
+                                            "struct BottomUpCheckpoint",
+                                        ),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("info"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bool,
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct CheckpointInfo"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("signatures"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes[]"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getCheckpointCurrentWeight"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -1750,6 +1825,22 @@ pub mod gateway_getter_facet {
                 .method_hash([62, 55, 207, 162], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getCheckpointAndSignatures` (0x380a62b3) function
+        pub fn get_checkpoint_and_signatures(
+            &self,
+            h: u64,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            (
+                BottomUpCheckpoint,
+                CheckpointInfo,
+                ::std::vec::Vec<::ethers::core::types::Bytes>,
+            ),
+        > {
+            self.0
+                .method_hash([56, 10, 98, 179], h)
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getCheckpointCurrentWeight` (0xf7ceaf76) function
         pub fn get_checkpoint_current_weight(
             &self,
@@ -2116,6 +2207,24 @@ pub mod gateway_getter_facet {
         abi = "getBottomUpRetentionHeight()"
     )]
     pub struct GetBottomUpRetentionHeightCall;
+    ///Container type for all input parameters for the `getCheckpointAndSignatures` function with signature `getCheckpointAndSignatures(uint64)` and selector `0x380a62b3`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "getCheckpointAndSignatures",
+        abi = "getCheckpointAndSignatures(uint64)"
+    )]
+    pub struct GetCheckpointAndSignaturesCall {
+        pub h: u64,
+    }
     ///Container type for all input parameters for the `getCheckpointCurrentWeight` function with signature `getCheckpointCurrentWeight(uint64)` and selector `0xf7ceaf76`
     #[derive(
         Clone,
@@ -2536,6 +2645,7 @@ pub mod gateway_getter_facet {
         ExecutableQueue(ExecutableQueueCall),
         GetAppliedTopDownNonce(GetAppliedTopDownNonceCall),
         GetBottomUpRetentionHeight(GetBottomUpRetentionHeightCall),
+        GetCheckpointAndSignatures(GetCheckpointAndSignaturesCall),
         GetCheckpointCurrentWeight(GetCheckpointCurrentWeightCall),
         GetCheckpointInfo(GetCheckpointInfoCall),
         GetCurrentConfigurationNumber(GetCurrentConfigurationNumberCall),
@@ -2611,6 +2721,11 @@ pub mod gateway_getter_facet {
                 <GetBottomUpRetentionHeightCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::GetBottomUpRetentionHeight(decoded));
+            }
+            if let Ok(decoded) =
+                <GetCheckpointAndSignaturesCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::GetCheckpointAndSignatures(decoded));
             }
             if let Ok(decoded) =
                 <GetCheckpointCurrentWeightCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -2764,6 +2879,9 @@ pub mod gateway_getter_facet {
                 Self::GetBottomUpRetentionHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::GetCheckpointAndSignatures(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetCheckpointCurrentWeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -2837,6 +2955,7 @@ pub mod gateway_getter_facet {
                 Self::ExecutableQueue(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetAppliedTopDownNonce(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetBottomUpRetentionHeight(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetCheckpointAndSignatures(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetCheckpointCurrentWeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetCheckpointInfo(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetCurrentConfigurationNumber(element) => {
@@ -2917,6 +3036,11 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<GetBottomUpRetentionHeightCall> for GatewayGetterFacetCalls {
         fn from(value: GetBottomUpRetentionHeightCall) -> Self {
             Self::GetBottomUpRetentionHeight(value)
+        }
+    }
+    impl ::core::convert::From<GetCheckpointAndSignaturesCall> for GatewayGetterFacetCalls {
+        fn from(value: GetCheckpointAndSignaturesCall) -> Self {
+            Self::GetCheckpointAndSignatures(value)
         }
     }
     impl ::core::convert::From<GetCheckpointCurrentWeightCall> for GatewayGetterFacetCalls {
@@ -3167,6 +3291,22 @@ pub mod gateway_getter_facet {
         Hash,
     )]
     pub struct GetBottomUpRetentionHeightReturn(pub u64);
+    ///Container type for all return fields from the `getCheckpointAndSignatures` function with signature `getCheckpointAndSignatures(uint64)` and selector `0x380a62b3`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GetCheckpointAndSignaturesReturn {
+        pub ch: BottomUpCheckpoint,
+        pub info: CheckpointInfo,
+        pub signatures: ::std::vec::Vec<::ethers::core::types::Bytes>,
+    }
     ///Container type for all return fields from the `getCheckpointCurrentWeight` function with signature `getCheckpointCurrentWeight(uint64)` and selector `0xf7ceaf76`
     #[derive(
         Clone,
