@@ -321,7 +321,7 @@ pub mod subnet_actor_manager_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned(
-                                            "struct BottomUpCheckpoint",
+                                            "struct BottomUpCheckpointLegacy",
                                         ),
                                     ),
                                 },
@@ -795,7 +795,7 @@ pub mod subnet_actor_manager_facet {
         ///Calls the contract's `submitCheckpoint` (0xf6fd8381) function
         pub fn submit_checkpoint(
             &self,
-            checkpoint: BottomUpCheckpoint,
+            checkpoint: BottomUpCheckpointLegacy,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([246, 253, 131, 129], (checkpoint,))
@@ -1425,7 +1425,7 @@ pub mod subnet_actor_manager_facet {
         abi = "BottomUpCheckpointSubmitted(((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes),address)"
     )]
     pub struct BottomUpCheckpointSubmittedFilter {
-        pub checkpoint: BottomUpCheckpoint,
+        pub checkpoint: BottomUpCheckpointLegacy,
         pub submitter: ::ethers::core::types::Address,
     }
     #[derive(
@@ -1626,7 +1626,7 @@ pub mod subnet_actor_manager_facet {
         abi = "submitCheckpoint(((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes))"
     )]
     pub struct SubmitCheckpointCall {
-        pub checkpoint: BottomUpCheckpoint,
+        pub checkpoint: BottomUpCheckpointLegacy,
     }
     ///Container type for all input parameters for the `withdraw` function with signature `withdraw()` and selector `0x3ccfd60b`
     #[derive(
@@ -1796,7 +1796,7 @@ pub mod subnet_actor_manager_facet {
         pub prev_hash: [u8; 32],
         pub proof: ::ethers::core::types::Bytes,
     }
-    ///`BottomUpCheckpoint((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes)`
+    ///`BottomUpCheckpointLegacy((uint64,address[]),uint64,uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],((uint64,address[]),bytes32[])[],bytes32,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1807,7 +1807,7 @@ pub mod subnet_actor_manager_facet {
         Eq,
         Hash,
     )]
-    pub struct BottomUpCheckpoint {
+    pub struct BottomUpCheckpointLegacy {
         pub source: SubnetID,
         pub epoch: u64,
         pub fee: ::ethers::core::types::U256,

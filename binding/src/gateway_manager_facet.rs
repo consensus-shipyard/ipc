@@ -87,6 +87,49 @@ pub mod gateway_manager_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("newMembership"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("newMembership"),
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("n"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint64"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("validators"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                    ::std::boxed::Box::new(
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],),
+                                    ),
+                                ),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("struct FvmAddress[]"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("weights"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                    ::std::boxed::Box::new(
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                    ),
+                                ),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256[]"),
+                                ),
+                            },
+                        ],
+                        outputs: ::std::vec![],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("register"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("register"),
@@ -143,6 +186,40 @@ pub mod gateway_manager_facet {
                             ),
                         },],
                         outputs: ::std::vec![],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("updateMembership"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("updateMembership"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                ::ethers::core::abi::ethabi::ParamType::Array(
+                                    ::std::boxed::Box::new(
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(
+                                                        8usize
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                ],
+                                            ),
+                                        ],),
+                                    ),
+                                ),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                            ],),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("struct Membership"),
+                            ),
+                        },],
                         constant: ::core::option::Option::None,
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
                     },],
@@ -268,9 +345,32 @@ pub mod gateway_manager_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("OldConfigurationNumber"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("OldConfigurationNumber",),
+                        inputs: ::std::vec![],
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("ReentrancyError"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("ReentrancyError"),
+                        inputs: ::std::vec![],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("ValidatorWeightIsZero"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("ValidatorWeightIsZero",),
+                        inputs: ::std::vec![],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("ValidatorsAndWeightsLengthMismatch"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "ValidatorsAndWeightsLengthMismatch",
+                        ),
                         inputs: ::std::vec![],
                     },],
                 ),
@@ -350,6 +450,17 @@ pub mod gateway_manager_facet {
                 .method_hash([65, 192, 225, 181], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `newMembership` (0x79e6c327) function
+        pub fn new_membership(
+            &self,
+            n: u64,
+            validators: ::std::vec::Vec<FvmAddress>,
+            weights: ::std::vec::Vec<::ethers::core::types::U256>,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([121, 230, 195, 39], (n, validators, weights))
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `register` (0x1aa3a008) function
         pub fn register(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
@@ -378,6 +489,14 @@ pub mod gateway_manager_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([69, 245, 68, 133], amount)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `updateMembership` (0x031ffb00) function
+        pub fn update_membership(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, Membership> {
+            self.0
+                .method_hash([3, 31, 251, 0], ())
                 .expect("method not found (this should never happen)")
         }
     }
@@ -590,6 +709,19 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
+    ///Custom Error type `OldConfigurationNumber` with signature `OldConfigurationNumber()` and selector `0x6e8d7c4a`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "OldConfigurationNumber", abi = "OldConfigurationNumber()")]
+    pub struct OldConfigurationNumber;
     ///Custom Error type `ReentrancyError` with signature `ReentrancyError()` and selector `0x29f745a7`
     #[derive(
         Clone,
@@ -603,6 +735,35 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "ReentrancyError", abi = "ReentrancyError()")]
     pub struct ReentrancyError;
+    ///Custom Error type `ValidatorWeightIsZero` with signature `ValidatorWeightIsZero()` and selector `0x389b457d`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "ValidatorWeightIsZero", abi = "ValidatorWeightIsZero()")]
+    pub struct ValidatorWeightIsZero;
+    ///Custom Error type `ValidatorsAndWeightsLengthMismatch` with signature `ValidatorsAndWeightsLengthMismatch()` and selector `0x465f0a7d`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "ValidatorsAndWeightsLengthMismatch",
+        abi = "ValidatorsAndWeightsLengthMismatch()"
+    )]
+    pub struct ValidatorsAndWeightsLengthMismatch;
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayManagerFacetErrors {
@@ -621,7 +782,10 @@ pub mod gateway_manager_facet {
         NotEnoughFundsToRelease(NotEnoughFundsToRelease),
         NotRegisteredSubnet(NotRegisteredSubnet),
         NotSystemActor(NotSystemActor),
+        OldConfigurationNumber(OldConfigurationNumber),
         ReentrancyError(ReentrancyError),
+        ValidatorWeightIsZero(ValidatorWeightIsZero),
+        ValidatorsAndWeightsLengthMismatch(ValidatorsAndWeightsLengthMismatch),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
         RevertString(::std::string::String),
@@ -698,8 +862,23 @@ pub mod gateway_manager_facet {
             if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotSystemActor(decoded));
             }
+            if let Ok(decoded) =
+                <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::OldConfigurationNumber(decoded));
+            }
             if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ReentrancyError(decoded));
+            }
+            if let Ok(decoded) =
+                <ValidatorWeightIsZero as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::ValidatorWeightIsZero(decoded));
+            }
+            if let Ok(decoded) =
+                <ValidatorsAndWeightsLengthMismatch as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::ValidatorsAndWeightsLengthMismatch(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
@@ -736,7 +915,16 @@ pub mod gateway_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OldConfigurationNumber(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::ReentrancyError(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ValidatorWeightIsZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ValidatorsAndWeightsLengthMismatch(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -745,66 +933,76 @@ pub mod gateway_manager_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <AlreadyInitialized as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <AlreadyRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <CallFailed as ::ethers::contract::EthError>::selector() => true,
-                _ if selector
-                    == <CannotReleaseZero as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
+                    == <AlreadyRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InsufficientFunds as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <CallFailed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <CannotReleaseZero as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotEmptySubnetCircSupply as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    == <InsufficientFunds as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotEnoughFundsToRelease as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <NotEmptySubnetCircSupply as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <NotEnoughFundsToRelease as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <OldConfigurationNumber as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ValidatorWeightIsZero as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ValidatorsAndWeightsLengthMismatch as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ => false,
@@ -829,7 +1027,12 @@ pub mod gateway_manager_facet {
                 Self::NotEnoughFundsToRelease(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OldConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ValidatorWeightIsZero(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ValidatorsAndWeightsLengthMismatch(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -914,9 +1117,24 @@ pub mod gateway_manager_facet {
             Self::NotSystemActor(value)
         }
     }
+    impl ::core::convert::From<OldConfigurationNumber> for GatewayManagerFacetErrors {
+        fn from(value: OldConfigurationNumber) -> Self {
+            Self::OldConfigurationNumber(value)
+        }
+    }
     impl ::core::convert::From<ReentrancyError> for GatewayManagerFacetErrors {
         fn from(value: ReentrancyError) -> Self {
             Self::ReentrancyError(value)
+        }
+    }
+    impl ::core::convert::From<ValidatorWeightIsZero> for GatewayManagerFacetErrors {
+        fn from(value: ValidatorWeightIsZero) -> Self {
+            Self::ValidatorWeightIsZero(value)
+        }
+    }
+    impl ::core::convert::From<ValidatorsAndWeightsLengthMismatch> for GatewayManagerFacetErrors {
+        fn from(value: ValidatorsAndWeightsLengthMismatch) -> Self {
+            Self::ValidatorsAndWeightsLengthMismatch(value)
         }
     }
     ///Container type for all input parameters for the `addStake` function with signature `addStake()` and selector `0x5a627dbc`
@@ -976,6 +1194,26 @@ pub mod gateway_manager_facet {
     )]
     #[ethcall(name = "kill", abi = "kill()")]
     pub struct KillCall;
+    ///Container type for all input parameters for the `newMembership` function with signature `newMembership(uint64,(uint8,bytes)[],uint256[])` and selector `0x79e6c327`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "newMembership",
+        abi = "newMembership(uint64,(uint8,bytes)[],uint256[])"
+    )]
+    pub struct NewMembershipCall {
+        pub n: u64,
+        pub validators: ::std::vec::Vec<FvmAddress>,
+        pub weights: ::std::vec::Vec<::ethers::core::types::U256>,
+    }
     ///Container type for all input parameters for the `register` function with signature `register()` and selector `0x1aa3a008`
     #[derive(
         Clone,
@@ -1034,6 +1272,19 @@ pub mod gateway_manager_facet {
     pub struct ReleaseStakeCall {
         pub amount: ::ethers::core::types::U256,
     }
+    ///Container type for all input parameters for the `updateMembership` function with signature `updateMembership()` and selector `0x031ffb00`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "updateMembership", abi = "updateMembership()")]
+    pub struct UpdateMembershipCall;
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayManagerFacetCalls {
@@ -1041,10 +1292,12 @@ pub mod gateway_manager_facet {
         Fund(FundCall),
         InitGenesisEpoch(InitGenesisEpochCall),
         Kill(KillCall),
+        NewMembership(NewMembershipCall),
         Register(RegisterCall),
         Release(ReleaseCall),
         ReleaseRewards(ReleaseRewardsCall),
         ReleaseStake(ReleaseStakeCall),
+        UpdateMembership(UpdateMembershipCall),
     }
     impl ::ethers::core::abi::AbiDecode for GatewayManagerFacetCalls {
         fn decode(
@@ -1065,6 +1318,10 @@ pub mod gateway_manager_facet {
             if let Ok(decoded) = <KillCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Kill(decoded));
             }
+            if let Ok(decoded) = <NewMembershipCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::NewMembership(decoded));
+            }
             if let Ok(decoded) = <RegisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Register(decoded));
             }
@@ -1080,6 +1337,11 @@ pub mod gateway_manager_facet {
             {
                 return Ok(Self::ReleaseStake(decoded));
             }
+            if let Ok(decoded) =
+                <UpdateMembershipCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::UpdateMembership(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -1090,10 +1352,12 @@ pub mod gateway_manager_facet {
                 Self::Fund(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InitGenesisEpoch(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NewMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Register(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Release(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ReleaseRewards(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ReleaseStake(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::UpdateMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -1104,10 +1368,12 @@ pub mod gateway_manager_facet {
                 Self::Fund(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InitGenesisEpoch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NewMembership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Register(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Release(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReleaseRewards(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReleaseStake(element) => ::core::fmt::Display::fmt(element, f),
+                Self::UpdateMembership(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -1131,6 +1397,11 @@ pub mod gateway_manager_facet {
             Self::Kill(value)
         }
     }
+    impl ::core::convert::From<NewMembershipCall> for GatewayManagerFacetCalls {
+        fn from(value: NewMembershipCall) -> Self {
+            Self::NewMembership(value)
+        }
+    }
     impl ::core::convert::From<RegisterCall> for GatewayManagerFacetCalls {
         fn from(value: RegisterCall) -> Self {
             Self::Register(value)
@@ -1151,6 +1422,23 @@ pub mod gateway_manager_facet {
             Self::ReleaseStake(value)
         }
     }
+    impl ::core::convert::From<UpdateMembershipCall> for GatewayManagerFacetCalls {
+        fn from(value: UpdateMembershipCall) -> Self {
+            Self::UpdateMembership(value)
+        }
+    }
+    ///Container type for all return fields from the `updateMembership` function with signature `updateMembership()` and selector `0x031ffb00`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct UpdateMembershipReturn(pub Membership);
     ///`FvmAddress(uint8,bytes)`
     #[derive(
         Clone,
@@ -1166,6 +1454,22 @@ pub mod gateway_manager_facet {
         pub addr_type: u8,
         pub payload: ::ethers::core::types::Bytes,
     }
+    ///`Membership((uint256,(uint8,bytes))[],uint64,uint256)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct Membership {
+        pub validators: ::std::vec::Vec<Validator>,
+        pub configuration_number: u64,
+        pub total_weight: ::ethers::core::types::U256,
+    }
     ///`SubnetID(uint64,address[])`
     #[derive(
         Clone,
@@ -1180,5 +1484,20 @@ pub mod gateway_manager_facet {
     pub struct SubnetID {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
+    }
+    ///`Validator(uint256,(uint8,bytes))`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct Validator {
+        pub weight: ::ethers::core::types::U256,
+        pub addr: FvmAddress,
     }
 }
