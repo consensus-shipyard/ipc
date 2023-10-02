@@ -7,7 +7,7 @@ import {BottomUpCheckpointLegacy} from "../structs/Checkpoint.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {EpochVoteBottomUpSubmission} from "../structs/EpochVoteSubmission.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
-import {SubnetID} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorSet, StakingChangeSet, StakingReleaseQueue} from "../structs/Subnet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
@@ -56,6 +56,13 @@ struct SubnetActorStorage {
     SubnetID parentId;
     /// immutable params
     ConsensusType consensus;
+    // =========== Staking ===========
+    /// @notice the list of validators staking
+    ValidatorSet validatorSet;
+    /// @notice Contains the list of changes to validator set. Configuration number is associated at each change.
+    StakingChangeSet changeSet;
+    /// @notice The staking release queue that only allow transfer of collateral after certain locking period.
+    StakingReleaseQueue releaseQueue;
 }
 
 library LibSubnetActorStorage {
