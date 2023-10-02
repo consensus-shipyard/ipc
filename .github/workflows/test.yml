@@ -23,10 +23,16 @@ jobs:
       - name: Install abi
         run: pip install eth_abi
 
+      - name: Install lcov and genhtml
+        run:  sudo apt-get update && sudo apt-get -y install lcov
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           cache: false
+
+      - name: Run coverage check
+        run: make coverage
 
       - name: Run tests
         run: forge test -vvv --ffi

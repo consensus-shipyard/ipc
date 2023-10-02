@@ -67,6 +67,11 @@ clean:
 	rm -rf ./cache_hardhat
 	rm -rf ./typechain
 
+coverage:
+	forge coverage -C ./src --report lcov
+	genhtml -o coverage_report lcov.info --branch-coverage
+	./tools/check_coverage.sh
+
 prepare: format lint test slither
 
 # ==============================================================================

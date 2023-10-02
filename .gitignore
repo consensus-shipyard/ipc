@@ -21,3 +21,7 @@ scripts/*.out
 scripts/deploy-registry.ts
 scripts/deploy-gateway.ts
 binding/target
+
+# Coverage tools assets
+coverage_report
+lcov.info
