@@ -17,7 +17,10 @@ FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.
 # Override PROFILE env var to choose between `local | ci`
 PROFILE?=local
 
-all: test build
+all: test build diagrams
+
+diagrams:
+	make -C docs/diagrams diagrams
 
 build:
 	cargo build --release
