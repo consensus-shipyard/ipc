@@ -61,22 +61,6 @@ pub mod gateway_manager_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("initGenesisEpoch"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("initGenesisEpoch"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("genesisEpoch"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint64"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("kill"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("kill"),
@@ -254,13 +238,6 @@ pub mod gateway_manager_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("AlreadyInitialized"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AlreadyInitialized"),
-                        inputs: ::std::vec![],
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("AlreadyRegisteredSubnet"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("AlreadyRegisteredSubnet",),
@@ -435,15 +412,6 @@ pub mod gateway_manager_facet {
                 .method_hash([24, 244, 75, 112], (subnet_id, to))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `initGenesisEpoch` (0x13f35388) function
-        pub fn init_genesis_epoch(
-            &self,
-            genesis_epoch: u64,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
-            self.0
-                .method_hash([19, 243, 83, 136], genesis_epoch)
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `kill` (0x41c0e1b5) function
         pub fn kill(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
@@ -540,19 +508,6 @@ pub mod gateway_manager_facet {
     pub struct AddressInsufficientBalance {
         pub account: ::ethers::core::types::Address,
     }
-    ///Custom Error type `AlreadyInitialized` with signature `AlreadyInitialized()` and selector `0x0dc149f0`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "AlreadyInitialized", abi = "AlreadyInitialized()")]
-    pub struct AlreadyInitialized;
     ///Custom Error type `AlreadyRegisteredSubnet` with signature `AlreadyRegisteredSubnet()` and selector `0x36a719be`
     #[derive(
         Clone,
@@ -769,7 +724,6 @@ pub mod gateway_manager_facet {
     pub enum GatewayManagerFacetErrors {
         AddressEmptyCode(AddressEmptyCode),
         AddressInsufficientBalance(AddressInsufficientBalance),
-        AlreadyInitialized(AlreadyInitialized),
         AlreadyRegisteredSubnet(AlreadyRegisteredSubnet),
         CallFailed(CallFailed),
         CannotReleaseZero(CannotReleaseZero),
@@ -808,11 +762,6 @@ pub mod gateway_manager_facet {
                 <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::AddressInsufficientBalance(decoded));
-            }
-            if let Ok(decoded) =
-                <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::AlreadyInitialized(decoded));
             }
             if let Ok(decoded) =
                 <AlreadyRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -890,9 +839,6 @@ pub mod gateway_manager_facet {
                 Self::AddressInsufficientBalance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::AlreadyInitialized(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::AlreadyRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -939,10 +885,6 @@ pub mod gateway_manager_facet {
                 }
                 _ if selector
                     == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1014,7 +956,6 @@ pub mod gateway_manager_facet {
             match self {
                 Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
                 Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AlreadyInitialized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::AlreadyRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CallFailed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
@@ -1050,11 +991,6 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<AddressInsufficientBalance> for GatewayManagerFacetErrors {
         fn from(value: AddressInsufficientBalance) -> Self {
             Self::AddressInsufficientBalance(value)
-        }
-    }
-    impl ::core::convert::From<AlreadyInitialized> for GatewayManagerFacetErrors {
-        fn from(value: AlreadyInitialized) -> Self {
-            Self::AlreadyInitialized(value)
         }
     }
     impl ::core::convert::From<AlreadyRegisteredSubnet> for GatewayManagerFacetErrors {
@@ -1166,21 +1102,6 @@ pub mod gateway_manager_facet {
         pub subnet_id: SubnetID,
         pub to: FvmAddress,
     }
-    ///Container type for all input parameters for the `initGenesisEpoch` function with signature `initGenesisEpoch(uint64)` and selector `0x13f35388`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "initGenesisEpoch", abi = "initGenesisEpoch(uint64)")]
-    pub struct InitGenesisEpochCall {
-        pub genesis_epoch: u64,
-    }
     ///Container type for all input parameters for the `kill` function with signature `kill()` and selector `0x41c0e1b5`
     #[derive(
         Clone,
@@ -1290,7 +1211,6 @@ pub mod gateway_manager_facet {
     pub enum GatewayManagerFacetCalls {
         AddStake(AddStakeCall),
         Fund(FundCall),
-        InitGenesisEpoch(InitGenesisEpochCall),
         Kill(KillCall),
         NewMembership(NewMembershipCall),
         Register(RegisterCall),
@@ -1309,11 +1229,6 @@ pub mod gateway_manager_facet {
             }
             if let Ok(decoded) = <FundCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Fund(decoded));
-            }
-            if let Ok(decoded) =
-                <InitGenesisEpochCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::InitGenesisEpoch(decoded));
             }
             if let Ok(decoded) = <KillCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Kill(decoded));
@@ -1350,7 +1265,6 @@ pub mod gateway_manager_facet {
             match self {
                 Self::AddStake(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Fund(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InitGenesisEpoch(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NewMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Register(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -1366,7 +1280,6 @@ pub mod gateway_manager_facet {
             match self {
                 Self::AddStake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Fund(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InitGenesisEpoch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewMembership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Register(element) => ::core::fmt::Display::fmt(element, f),
@@ -1385,11 +1298,6 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<FundCall> for GatewayManagerFacetCalls {
         fn from(value: FundCall) -> Self {
             Self::Fund(value)
-        }
-    }
-    impl ::core::convert::From<InitGenesisEpochCall> for GatewayManagerFacetCalls {
-        fn from(value: InitGenesisEpochCall) -> Self {
-            Self::InitGenesisEpoch(value)
         }
     }
     impl ::core::convert::From<KillCall> for GatewayManagerFacetCalls {

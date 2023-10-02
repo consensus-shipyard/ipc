@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint, CrossMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
@@ -52,13 +51,6 @@ struct GatewayActorStorage {
     mapping(uint64 => EnumerableSet.AddressSet) bottomUpSignatureSenders;
     /// @notice The list of the collected signatures at height `h`
     mapping(uint64 => mapping(address => bytes)) bottomUpSignatures;
-    /// @notice epoch => SubnetID => [childIndex, exists(0 - no, 1 - yes)]
-    mapping(uint64 => mapping(bytes32 => uint256[2])) children;
-    /// @notice epoch => SubnetID => check => exists
-    mapping(uint64 => mapping(bytes32 => mapping(bytes32 => bool))) checks;
-    /// @notice contains voted submissions for a given epoch
-    // slither-disable-next-line uninitialized-state
-    mapping(uint64 => EpochVoteTopDownSubmission) epochVoteSubmissions;
     /// @notice Keys of the registered subnets. Useful to iterate through them
     bytes32[] subnetKeys;
     /// @notice path to the current network

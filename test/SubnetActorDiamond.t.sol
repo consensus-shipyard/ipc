@@ -8,7 +8,7 @@ import {TestUtils} from "./TestUtils.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {Status} from "../src/enums/Status.sol";
-import {CrossMsg, BottomUpCheckpointLegacy, TopDownCheckpoint, StorableMsg, ChildCheck} from "../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, IPCAddress, Subnet} from "../src/structs/Subnet.sol";
 import {StorableMsg} from "../src/structs/Checkpoint.sol";
@@ -31,7 +31,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 contract SubnetActorDiamondTest is Test {
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpointLegacy;
+    using CheckpointHelper for BottomUpCheckpoint;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
 
@@ -41,7 +41,6 @@ contract SubnetActorDiamondTest is Test {
     uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     string private constant DEFAULT_NET_ADDR = "netAddr";
-    bytes private constant GENESIS = EMPTY_BYTES;
     uint256 constant CROSS_MSG_FEE = 10 gwei;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     uint64 private constant ROOTNET_CHAINID = 123;
@@ -174,7 +173,6 @@ contract SubnetActorDiamondTest is Test {
             DEFAULT_MIN_VALIDATOR_STAKE,
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_CHECKPOINT_PERIOD,
-            GENESIS,
             DEFAULT_MAJORITY_PERCENTAGE
         );
     }
@@ -185,7 +183,6 @@ contract SubnetActorDiamondTest is Test {
         uint256 _minActivationCollateral,
         uint64 _minValidators,
         uint64 _checkPeriod,
-        bytes calldata _genesis,
         uint8 _majorityPercentage
     ) public {
         vm.assume(_minActivationCollateral > DEFAULT_MIN_VALIDATOR_STAKE);
@@ -200,7 +197,6 @@ contract SubnetActorDiamondTest is Test {
             _minActivationCollateral,
             _minValidators,
             _checkPeriod,
-            _genesis,
             _majorityPercentage
         );
 
@@ -212,9 +208,6 @@ contract SubnetActorDiamondTest is Test {
         require(saGetter.getValidators().length == 0, "empty validators");
 
         require(saGetter.getValidatorSet().validators.length == 0, "empty validator set");
-
-        BottomUpCheckpointLegacy[] memory l = saGetter.listBottomUpCheckpoints(0, 10);
-        require(l.length == 0, "listBottomUpCheckpoints");
     }
 
     function testSubnetActorDiamond_Deployments_Fail_GatewayCannotBeZero() public {
@@ -232,8 +225,7 @@ contract SubnetActorDiamondTest is Test {
                 minValidators: DEFAULT_MIN_VALIDATORS,
                 bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
                 topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-                majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-                genesis: EMPTY_BYTES
+                majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet)
@@ -785,7 +777,6 @@ contract SubnetActorDiamondTest is Test {
         uint256 _minActivationCollateral,
         uint64 _minValidators,
         uint64 _checkPeriod,
-        bytes memory _genesis,
         uint8 _majorityPercentage
     ) public {
         SubnetID memory _parentId = gwGetter.getNetworkName();
@@ -822,8 +813,7 @@ contract SubnetActorDiamondTest is Test {
                 minValidators: _minValidators,
                 bottomUpCheckPeriod: _checkPeriod,
                 topDownCheckPeriod: _checkPeriod,
-                majorityPercentage: _majorityPercentage,
-                genesis: _genesis
+                majorityPercentage: _majorityPercentage
             })
         );
 
@@ -841,55 +831,11 @@ contract SubnetActorDiamondTest is Test {
         );
         require(saGetter.minValidators() == _minValidators, "saGetter.minValidators() == _minValidators");
         require(saGetter.topDownCheckPeriod() == _checkPeriod, "saGetter.topDownCheckPeriod() == _checkPeriod");
-        require(
-            keccak256(saGetter.genesis()) == keccak256(_genesis),
-            "keccak256(saGetter.genesis()) == keccak256(_genesis)"
-        );
-        require(
-            saGetter.majorityPercentage() == _majorityPercentage,
-            "saGetter.majorityPercentage() == _majorityPercentage"
-        );
         require(saGetter.consensus() == _consensus);
         require(
             saGetter.getParent().toHash() == _parentId.toHash(),
             "parent.toHash() == SubnetID({root: ROOTNET_CHAINID, route: path}).toHash()"
         );
-    }
-
-    function _createBottomUpCheckpointWithConfig(
-        uint64 epoch,
-        uint64 nonce,
-        bytes32 prevHash,
-        bytes memory proof
-    ) internal view returns (BottomUpCheckpointLegacy memory checkpoint) {
-        SubnetID memory subnetActorId = saGetter.getParent().createSubnetId(address(saManager));
-        CrossMsg[] memory crossMsgs = new CrossMsg[](1);
-
-        crossMsgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: subnetActorId, rawAddress: FvmAddressHelper.from(address(this))}),
-                to: IPCAddress({subnetId: subnetActorId, rawAddress: FvmAddressHelper.from(address(this))}),
-                value: 0,
-                nonce: nonce,
-                method: this.callback.selector,
-                params: new bytes(0)
-            }),
-            wrapped: false
-        });
-
-        checkpoint = BottomUpCheckpointLegacy({
-            source: subnetActorId,
-            epoch: epoch,
-            fee: 0,
-            crossMsgs: crossMsgs,
-            prevHash: prevHash,
-            children: new ChildCheck[](0),
-            proof: proof
-        });
-    }
-
-    function _createBottomUpCheckpoint() internal view returns (BottomUpCheckpointLegacy memory checkpoint) {
-        return _createBottomUpCheckpointWithConfig(DEFAULT_CHECKPOINT_PERIOD, 0, EMPTY_HASH, new bytes(0));
     }
 
     function invariant_BalanceEqualsTotalStake() public {

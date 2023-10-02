@@ -3,18 +3,14 @@ pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {Status} from "../enums/Status.sol";
-import {BottomUpCheckpointLegacy} from "../structs/Checkpoint.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {EpochVoteBottomUpSubmission} from "../structs/EpochVoteSubmission.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
+import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {SubnetID, ValidatorSet, StakingChangeSet, StakingReleaseQueue} from "../structs/Subnet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 struct SubnetActorStorage {
-    /// @notice contains voted submissions for a given epoch
-    // slither-disable-next-line uninitialized-state
-    mapping(uint64 => EpochVoteBottomUpSubmission) epochVoteSubmissions;
     /// @notice validator address to stake amount
     mapping(address => uint256) stake;
     /// @notice validator address to accumulated rewards
@@ -24,7 +20,7 @@ struct SubnetActorStorage {
     /// @notice validator address to validator worker address
     mapping(address => FvmAddress) validatorWorkerAddresses;
     /// @notice contains all committed bottom-up checkpoint at specific epoch
-    mapping(uint64 => BottomUpCheckpointLegacy) committedCheckpoints;
+    mapping(uint64 => BottomUpCheckpoint) committedCheckpoints;
     /// @notice genesis block
     bytes genesis;
     /// @notice Total collateral currently deposited in the GW from the subnet

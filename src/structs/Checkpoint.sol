@@ -9,19 +9,6 @@ struct ParentFinality {
     bytes32 blockHash;
 }
 
-// TODO: Remove old BottomUpCheckpointLegacy and update the codebase.
-/// @title BottomUpCheckpoint struct
-/// @author LimeChain team
-struct BottomUpCheckpointLegacy {
-    SubnetID source;
-    uint64 epoch;
-    uint256 fee;
-    CrossMsg[] crossMsgs;
-    ChildCheck[] children;
-    bytes32 prevHash;
-    bytes proof;
-}
-
 /// @notice A bottom-up checkpoint type.
 struct BottomUpCheckpoint {
     /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.

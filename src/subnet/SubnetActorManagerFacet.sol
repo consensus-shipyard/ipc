@@ -5,16 +5,14 @@ import {Status} from "../enums/Status.sol";
 import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
-import {BottomUpCheckpointLegacy} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Validator} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
-import {EpochVoteSubmissionHelper} from "../lib/EpochVoteSubmissionHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
-import {LibVoting} from "../lib/LibVoting.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
@@ -24,12 +22,12 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpointLegacy;
+    using CheckpointHelper for BottomUpCheckpoint;
     using FilAddress for address;
     using Address for address payable;
     using FvmAddressHelper for FvmAddress;
 
-    event BottomUpCheckpointSubmitted(BottomUpCheckpointLegacy checkpoint, address submitter);
+    event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
     event BottomUpCheckpointExecuted(uint64 epoch, address submitter);
     event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
 
@@ -139,17 +137,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         payable(msg.sender).sendValue(amount);
     }
 
-    /// @notice get the total stake
-    function committedCheckpoints(
-        uint64 e
-    ) external view returns (SubnetID memory source, uint64 epoch, uint256 fee, bytes32 prevHash, bytes memory proof) {
-        source = s.committedCheckpoints[e].source;
-        epoch = s.committedCheckpoints[e].epoch;
-        fee = s.committedCheckpoints[e].fee;
-        prevHash = s.committedCheckpoints[e].prevHash;
-        proof = s.committedCheckpoints[e].proof;
-    }
-
     function setValidatorNetAddr(string calldata newNetAddr) external {
         address validator = msg.sender;
         if (!s.validators.contains(validator)) {
@@ -171,35 +158,45 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice methods that allows a validator to submit a checkpoint (batch of messages) and vote for it with it's own voting power.
     /// @param checkpoint - the batch messages data
-    function submitCheckpoint(BottomUpCheckpointLegacy calldata checkpoint) external {
+    /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
+    /// @param membershipWeight - the total weight of the membership
+    function submitCheckpoint(
+        BottomUpCheckpoint calldata checkpoint,
+        bytes32 membershipRootHash,
+        uint256 membershipWeight
+    ) external {
         if (s.status != Status.Active) {
             revert SubnetNotActive();
         }
         if (!s.validators.contains(msg.sender)) {
             revert NotValidator();
         }
-        if (checkpoint.source.toHash() != s.currentSubnetHash) {
+        if (checkpoint.subnetID.toHash() != s.currentSubnetHash) {
             revert WrongCheckpointSource();
         }
-        if (!CrossMsgHelper.isSorted(checkpoint.crossMsgs)) {
-            revert MessagesNotSorted();
-        }
 
-        _commitCheckpoint(checkpoint);
+        _commitCheckpoint({
+            checkpoint: checkpoint,
+            membershipRootHash: membershipRootHash,
+            membershipWeight: membershipWeight
+        });
     }
 
     /// @notice method that commits a checkpoint after reaching majority
     /// @param checkpoint - the batch messages data
-    function _commitCheckpoint(BottomUpCheckpointLegacy calldata checkpoint) internal {
-        /// Ensures the checkpoints are chained. If not, should abort the current checkpoint.
-        if (s.prevExecutedCheckpointHash != checkpoint.prevHash) {
-            revert InconsistentPrevCheckpoint();
-        }
-
-        s.committedCheckpoints[checkpoint.epoch] = checkpoint;
+    function _commitCheckpoint(
+        BottomUpCheckpoint calldata checkpoint,
+        bytes32 membershipRootHash,
+        uint256 membershipWeight
+    ) internal {
+        s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
         s.prevExecutedCheckpointHash = checkpoint.toHash();
 
-        IGateway(s.ipcGatewayAddr).commitChildCheck(checkpoint);
+        IGateway(s.ipcGatewayAddr).createBottomUpCheckpoint({
+            checkpoint: checkpoint,
+            membershipRootHash: membershipRootHash,
+            membershipWeight: membershipWeight
+        });
     }
 
     /// @notice Get the information of a validator

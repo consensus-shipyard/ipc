@@ -125,5 +125,7 @@ make prepare
 
 Use `make storage` to check that the storage layout has not been corrupted.
 
+Use `make coverage` to get test coverage report.
+
 # Bugs
 Please report any bugs using the [issue tracker](https://github.com/consensus-shipyard/ipc-solidity-actors/issues).

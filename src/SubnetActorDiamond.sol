@@ -6,7 +6,6 @@ import {ConsensusType} from "./enums/ConsensusType.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
 import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
-import {LibVoting} from "./lib/LibVoting.sol";
 import {SubnetID} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 import {Status} from "./enums/Status.sol";
@@ -28,7 +27,6 @@ contract SubnetActorDiamond {
         uint64 bottomUpCheckPeriod;
         uint64 topDownCheckPeriod;
         uint8 majorityPercentage;
-        bytes genesis;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -56,16 +54,7 @@ contract SubnetActorDiamond {
         s.topDownCheckPeriod = params.topDownCheckPeriod;
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.status = Status.Instantiated;
-        s.genesis = params.genesis;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
-        // NOTE: we currently use 0 as the genesisEpoch for subnets so checkpoints
-        // are submitted directly from epoch 0.
-        // In the future we can use the current epoch. This will be really
-        // useful once we support the docking of subnets to new parents, etc.
-        LibVoting.initGenesisEpoch(0);
-
-        // init Voting params.
-        LibVoting.initVoting(params.majorityPercentage, params.topDownCheckPeriod);
     }
 
     function _fallback() internal {

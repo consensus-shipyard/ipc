@@ -55,7 +55,6 @@ pub mod subnet_actor_diamond {
                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                            ::ethers::core::abi::ethabi::ParamType::Bytes,
                         ],),
                         internal_type: ::core::option::Option::Some(
                             ::std::borrow::ToOwned::to_owned(
@@ -165,13 +164,6 @@ pub mod subnet_actor_diamond {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("InvalidMajorityPercentage"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("InvalidMajorityPercentage",),
-                        inputs: ::std::vec![],
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("InvalidSubmissionPeriod"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("InvalidSubmissionPeriod",),
@@ -229,7 +221,7 @@ pub mod subnet_actor_diamond {
     pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
         ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x91W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`oWP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[=\x90\xFD[c\n\x82\xDDs`\xE3\x1B`\x80R`\x01`\x01`\xE0\x1B\x03\x19\x16`\x84R`\x7F\x19`\xA4\x01`\x80\xFD[`\rT`\x01`\x01`\xA0\x1B\x03\x163\x03`\xA4W\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\x80R`\x04`\x80\xFD\xFE\xA2dipfsX\"\x12 \x12\xE0\xC1\x88\xB5\xF2\xFD\xECAI\xDBZ\x9C\xE2\x0C\xF3\xF8=\xAC+\xAC\x0C\xE6\x04g\x84^*\x163@^dsolcC\0\x08\x13\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x91W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`oWP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[=\x90\xFD[c\n\x82\xDDs`\xE3\x1B`\x80R`\x01`\x01`\xE0\x1B\x03\x19\x16`\x84R`\x7F\x19`\xA4\x01`\x80\xFD[`\x0CT`\x01`\x01`\xA0\x1B\x03\x163\x03`\xA4W\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\x80R`\x04`\x80\xFD\xFE\xA2dipfsX\"\x12 ud3\xA6#\xA1\xAEmH\xE4M\xD4g\xDB\"\x11\")\x1F\xD4\x86\xD3\xF7\x17<\xAFll\x9E\xF8O\xAFdsolcC\0\x08\x13\x003";
     /// The deployed bytecode of the contract.
     pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
@@ -392,22 +384,6 @@ pub mod subnet_actor_diamond {
     )]
     #[etherror(name = "InvalidCollateral", abi = "InvalidCollateral()")]
     pub struct InvalidCollateral;
-    ///Custom Error type `InvalidMajorityPercentage` with signature `InvalidMajorityPercentage()` and selector `0x75c3b427`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "InvalidMajorityPercentage",
-        abi = "InvalidMajorityPercentage()"
-    )]
-    pub struct InvalidMajorityPercentage;
     ///Custom Error type `InvalidSubmissionPeriod` with signature `InvalidSubmissionPeriod()` and selector `0x312f8e05`
     #[derive(
         Clone,
@@ -481,7 +457,6 @@ pub mod subnet_actor_diamond {
         IncorrectFacetCutAction(IncorrectFacetCutAction),
         InitializationFunctionReverted(InitializationFunctionReverted),
         InvalidCollateral(InvalidCollateral),
-        InvalidMajorityPercentage(InvalidMajorityPercentage),
         InvalidSubmissionPeriod(InvalidSubmissionPeriod),
         NoBytecodeAtAddress(NoBytecodeAtAddress),
         NoSelectorsProvidedForFacetForCut(NoSelectorsProvidedForFacetForCut),
@@ -534,11 +509,6 @@ pub mod subnet_actor_diamond {
                 return Ok(Self::InvalidCollateral(decoded));
             }
             if let Ok(decoded) =
-                <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::InvalidMajorityPercentage(decoded));
-            }
-            if let Ok(decoded) =
                 <InvalidSubmissionPeriod as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::InvalidSubmissionPeriod(decoded));
@@ -579,9 +549,6 @@ pub mod subnet_actor_diamond {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::InvalidCollateral(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidMajorityPercentage(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::InvalidSubmissionPeriod(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -629,10 +596,6 @@ pub mod subnet_actor_diamond {
                     true
                 }
                 _ if selector
-                    == <InvalidMajorityPercentage as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <InvalidSubmissionPeriod as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -666,7 +629,6 @@ pub mod subnet_actor_diamond {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::InvalidCollateral(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidMajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSubmissionPeriod(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoBytecodeAtAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoSelectorsProvidedForFacetForCut(element) => {
@@ -717,11 +679,6 @@ pub mod subnet_actor_diamond {
     impl ::core::convert::From<InvalidCollateral> for SubnetActorDiamondErrors {
         fn from(value: InvalidCollateral) -> Self {
             Self::InvalidCollateral(value)
-        }
-    }
-    impl ::core::convert::From<InvalidMajorityPercentage> for SubnetActorDiamondErrors {
-        fn from(value: InvalidMajorityPercentage) -> Self {
-            Self::InvalidMajorityPercentage(value)
         }
     }
     impl ::core::convert::From<InvalidSubmissionPeriod> for SubnetActorDiamondErrors {

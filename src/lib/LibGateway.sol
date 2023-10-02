@@ -12,7 +12,6 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {LibVoting} from "../lib/LibVoting.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FvmAddressHelper} from "./FvmAddressHelper.sol";
 
@@ -37,7 +36,7 @@ library LibGateway {
         returns (bool exists, uint64 epoch, BottomUpCheckpoint storage checkpoint)
     {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        epoch = LibVoting.getNextEpoch(block.number, s.bottomUpCheckPeriod);
+        epoch = LibGateway.getNextEpoch(block.number, s.bottomUpCheckPeriod);
         checkpoint = s.bottomUpCheckpoints[epoch];
         exists = !checkpoint.subnetID.isEmpty();
     }
@@ -174,11 +173,11 @@ library LibGateway {
         s.topDownMsgs[subnetId.toHash()][block.number].push(crossMessage);
     }
 
-    /// @notice commit bottomup messages for their execution in the subnet. Adds the message to the checkpoint for future execution
+    /// @notice commit bottom-up messages for their execution in the subnet. Adds the message to the checkpoint for future execution
     /// @param crossMessage - the cross message to be committed
     function commitBottomUpMsg(CrossMsg memory crossMessage) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        (, uint64 epoch, ) = getCurrentBottomUpCheckpoint();
+        uint64 epoch = getNextEpoch(block.number, s.bottomUpCheckPeriod);
 
         crossMessage.message.nonce = s.bottomUpNonce;
 
@@ -270,5 +269,11 @@ library LibGateway {
     /// @dev `majorityPercentage` must be a valid number
     function weightNeeded(uint256 weight, uint256 majorityPercentage) internal pure returns (uint256) {
         return (weight * majorityPercentage) / 100;
+    }
+
+    /// @notice method that gives the epoch for a given block number and checkpoint period
+    /// @return epoch - the epoch for the given block number and checkpoint period
+    function getNextEpoch(uint256 blockNumber, uint64 checkPeriod) internal pure returns (uint64) {
+        return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 }

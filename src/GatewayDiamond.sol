@@ -5,7 +5,6 @@ import {GatewayActorStorage} from "./lib/LibGatewayActorStorage.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
 import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
-import {LibVoting} from "./lib/LibVoting.sol";
 import {SubnetID} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 
@@ -54,9 +53,6 @@ contract GatewayDiamond {
         if (s.networkName.isRoot()) {
             s.initialized = true;
         }
-
-        // init Voting params.
-        LibVoting.initVoting(params.majorityPercentage, params.topDownCheckPeriod);
     }
 
     function _fallback() internal {

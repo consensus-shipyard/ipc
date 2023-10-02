@@ -14,7 +14,7 @@ import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
 import {IPCMsgType} from "../src/enums/IPCMsgType.sol";
 import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
 import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
-import {CrossMsg, BottomUpCheckpoint, BottomUpCheckpointLegacy, TopDownCheckpoint, StorableMsg, ChildCheck, ParentFinality} from "../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck, ParentFinality} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress} from "../src/structs/Subnet.sol";
 import {ValidatorSet, ValidatorInfo, Membership, Validator} from "../src/structs/Validator.sol";
@@ -238,8 +238,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesis: GENESIS
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
 
         saManager = new SubnetActorManagerFacet();
@@ -420,25 +419,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         require(targetSubnet.stake == stake);
         require(targetSubnet.stake == subnetCollateral);
         require(id.equals(subnetId));
-    }
-
-    function testGatewayDiamond_InitGenesisEpoch_Works() public {
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwManager2.initGenesisEpoch(50);
-
-        require(gwGetter2.initialized() == true);
-        require(gwGetter2.getGenesisEpoch() == 50);
-    }
-
-    function testGatewayDiamond_InitGenesisEpoch_Fails_NotSystemActor() public {
-        vm.expectRevert(NotSystemActor.selector);
-        gwManager.initGenesisEpoch(50);
-    }
-
-    function testGatewayDiamond_InitGenesisEpoch_Fails_AlreadyInitialized() public {
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        vm.expectRevert(AlreadyInitialized.selector);
-        gwManager.initGenesisEpoch(50);
     }
 
     function testGatewayDiamond_Register_Works_MultipleSubnets(uint8 numberOfSubnets) public {
@@ -1843,24 +1823,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         uint256 expectedNonce = gwGetter.bottomUpNonce() + 1;
         gwManager.release{value: releaseAmount}(FvmAddressHelper.from(msg.sender));
         require(gwGetter.bottomUpNonce() == expectedNonce, "gwGetter.bottomUpNonce() == expectedNonce");
-    }
-
-    function createCheckpoint(
-        address subnetAddress,
-        uint64 blockNumber
-    ) internal view returns (BottomUpCheckpointLegacy memory) {
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
-        BottomUpCheckpointLegacy memory checkpoint = BottomUpCheckpointLegacy({
-            source: subnetId,
-            epoch: blockNumber,
-            fee: 0,
-            crossMsgs: new CrossMsg[](0),
-            prevHash: EMPTY_HASH,
-            children: new ChildCheck[](0),
-            proof: new bytes(0)
-        });
-
-        return checkpoint;
     }
 
     function addStake(uint256 stakeAmount, address subnetAddress) internal {

@@ -73,8 +73,7 @@ contract SubnetRegistryTest is Test {
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesis: GENESIS
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
         vm.expectRevert(WrongGateway.selector);
         registry.newSubnetActor(params);
@@ -91,8 +90,7 @@ contract SubnetRegistryTest is Test {
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesis: GENESIS
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -110,8 +108,7 @@ contract SubnetRegistryTest is Test {
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesis: GENESIS
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -126,7 +123,6 @@ contract SubnetRegistryTest is Test {
             DEFAULT_MIN_VALIDATOR_STAKE,
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_CHECKPOINT_PERIOD,
-            GENESIS,
             DEFAULT_MAJORITY_PERCENTAGE
         );
     }
@@ -138,7 +134,6 @@ contract SubnetRegistryTest is Test {
         uint256 _minActivationCollateral,
         uint64 _minValidators,
         uint64 _checkPeriod,
-        bytes memory _genesis,
         uint8 _majorityPercentage
     ) public {
         vm.startPrank(DEFAULT_SENDER);
@@ -151,8 +146,7 @@ contract SubnetRegistryTest is Test {
             minValidators: _minValidators,
             bottomUpCheckPeriod: _checkPeriod,
             topDownCheckPeriod: _checkPeriod,
-            majorityPercentage: _majorityPercentage,
-            genesis: _genesis
+            majorityPercentage: _majorityPercentage
         });
         registry.newSubnetActor(params);
         require(registry.latestSubnetDeployed(DEFAULT_SENDER) != address(0));

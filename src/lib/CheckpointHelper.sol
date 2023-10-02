@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {EMPTY_HASH} from "../constants/Constants.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {BottomUpCheckpointLegacy, BottomUpCheckpoint, TopDownCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, TopDownCheckpoint, CrossMsg, ChildCheck} from "../structs/Checkpoint.sol";
 
 /// @title Helper library for manipulating Checkpoint struct
 /// @author LimeChain team
@@ -17,21 +17,15 @@ library CheckpointHelper {
     bytes32 public constant EMPTY_BOTTOMUPCHECKPOINT_HASH =
         keccak256(
             abi.encode(
-                BottomUpCheckpointLegacy({
-                    source: SubnetID(0, new address[](0)),
-                    epoch: 0,
-                    fee: 0,
-                    crossMsgs: new CrossMsg[](0),
-                    children: new ChildCheck[](0),
-                    prevHash: EMPTY_HASH,
-                    proof: new bytes(0)
+                BottomUpCheckpoint({
+                    subnetID: SubnetID(0, new address[](0)),
+                    blockHeight: 0,
+                    blockHash: 0,
+                    nextConfigurationNumber: 0,
+                    crossMessagesHash: 0
                 })
             )
         );
-
-    function toHash(BottomUpCheckpointLegacy memory bottomupCheckpoint) public pure returns (bytes32) {
-        return keccak256(abi.encode(bottomupCheckpoint));
-    }
 
     function toHash(BottomUpCheckpoint memory bottomupCheckpoint) public pure returns (bytes32) {
         return keccak256(abi.encode(bottomupCheckpoint));
@@ -45,33 +39,7 @@ library CheckpointHelper {
         return toHash(topdownCheckpoint) == EMPTY_TOPDOWNCHECKPOINT_HASH;
     }
 
-    function isEmpty(BottomUpCheckpointLegacy memory bottomUpCheckpoint) public pure returns (bool) {
+    function isEmpty(BottomUpCheckpoint memory bottomUpCheckpoint) public pure returns (bool) {
         return toHash(bottomUpCheckpoint) == EMPTY_BOTTOMUPCHECKPOINT_HASH;
-    }
-
-    function setChildCheck(
-        BottomUpCheckpointLegacy storage checkpoint,
-        BottomUpCheckpointLegacy calldata commit,
-        mapping(uint64 => mapping(bytes32 => uint256[2])) storage children,
-        mapping(uint64 => mapping(bytes32 => mapping(bytes32 => bool))) storage checks,
-        uint64 currentEpoch
-    ) public {
-        bytes32 commitSource = commit.source.toHash();
-        bytes32 commitData = toHash(commit);
-
-        uint256[2] memory child = children[currentEpoch][commitSource];
-        uint256 childIndex = child[0]; // index at checkpoint.data.children for the given subnet
-        bool childExists = child[1] == 1; // 0 - no, 1 - yes
-
-        if (!childExists) {
-            checkpoint.children.push(ChildCheck({source: commit.source, checks: new bytes32[](0)}));
-            childIndex = checkpoint.children.length - 1;
-        }
-
-        checkpoint.children[childIndex].checks.push(commitData);
-
-        children[currentEpoch][commitSource][0] = childIndex;
-        children[currentEpoch][commitSource][1] = 1;
-        checks[currentEpoch][commitSource][commitData] = true;
     }
 }

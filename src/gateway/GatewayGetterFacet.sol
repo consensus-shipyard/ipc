@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CrossMsg, BottomUpCheckpoint, BottomUpCheckpoint, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
-import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Validator.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {GatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
-import {LibVoting} from "../lib/LibVoting.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
@@ -120,30 +118,8 @@ contract GatewayGetterFacet {
         return (s.postbox[id].message, s.postbox[id].wrapped);
     }
 
-    /// @notice whether a validator has voted for a checkpoint submission during an epoch
-    /// @param epoch - the epoch to check
-    /// @param submitter - the validator to check
-    function hasValidatorVotedForSubmission(uint64 epoch, address submitter) external view returns (bool) {
-        EpochVoteTopDownSubmission storage voteSubmission = s.epochVoteSubmissions[epoch];
-        return voteSubmission.vote.submitters[voteSubmission.vote.nonce][submitter];
-    }
-
-    function getGenesisEpoch() public view returns (uint64) {
-        // slither-disable-next-line unused-return
-        return LibVoting.getGenesisEpoch();
-    }
-
-    function executableQueue() public view returns (uint64, uint64, uint64) {
-        // slither-disable-next-line unused-return
-        return LibVoting.executableQueue();
-    }
-
-    function lastVotingExecutedEpoch() public view returns (uint64) {
-        return LibVoting.lastVotingExecutedEpoch();
-    }
-
     function majorityPercentage() public view returns (uint64) {
-        return LibVoting.majorityPercentage();
+        return s.majorityPercentage;
     }
 
     /// @notice returns the list of registered subnets in IPC

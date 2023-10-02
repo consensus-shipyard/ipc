@@ -4,7 +4,6 @@ pragma solidity 0.8.19;
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {EMPTY_HASH, METHOD_SEND} from "../constants/Constants.sol";
 import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint, CheckpointInfo} from "../structs/Checkpoint.sol";
-import {EpochVoteTopDownSubmission} from "../structs/EpochVoteSubmission.sol";
 import {Status} from "../enums/Status.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
@@ -16,7 +15,6 @@ import {MessagesNotSorted, NotInitialized, NotEnoughBalance, NotRegisteredSubnet
 import {NotValidator, SubnetNotActive, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
-import {LibVoting} from "../lib/LibVoting.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
@@ -31,16 +29,67 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
-    using CheckpointHelper for BottomUpCheckpoint;
     using CrossMsgHelper for CrossMsg;
     using FvmAddressHelper for FvmAddress;
     using StorableMsgHelper for StorableMsg;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
-    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     event QuorumReached(uint64 height, bytes32 checkpoint, uint256 quorumWeight);
     event QuorumWeightUpdated(uint64 height, bytes32 checkpoint, uint256 newWeight);
+
+    // TODO: Reimplement the function.
+    /// @dev This function must be reimplemented according to the current checkpoint protocol.
+    /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
+    function commitChildCheck(BottomUpCheckpoint calldata commit) external {
+        if (!s.initialized) {
+            revert NotInitialized();
+        }
+        if (commit.subnetID.getActor().normalize() != msg.sender) {
+            revert InvalidCheckpointSource();
+        }
+
+        // slither-disable-next-line unused-return
+        (, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
+        if (subnet.status != Status.Active) {
+            revert SubnetNotActive();
+        }
+
+        // get checkpoint for the current template being populated
+        (bool checkpointExists, uint64 nextCheckEpoch, BottomUpCheckpoint storage checkpoint) = LibGateway
+            .getCurrentBottomUpCheckpoint();
+
+        // create a checkpoint template if it doesn't exists
+        if (!checkpointExists) {
+            checkpoint.subnetID = s.networkName;
+            checkpoint.blockHeight = nextCheckEpoch;
+        }
+
+        CrossMsg[] memory messages = s.bottomUpMessages[commit.blockHeight];
+
+        uint256 totalValue = 0;
+        uint256 crossMsgLength = messages.length;
+        for (uint256 i = 0; i < crossMsgLength; ) {
+            totalValue += messages[i].message.value;
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (subnet.circSupply < totalValue) {
+            revert NotEnoughSubnetCircSupply();
+        }
+
+        subnet.circSupply -= totalValue;
+
+        subnet.prevCheckpoint = commit;
+
+        _applyMessages(commit.subnetID, messages);
+
+        uint256 fee = 0;
+
+        LibGateway.distributeRewards(msg.sender, fee);
+    }
 
     /// @notice commit the ipc parent finality into storage
     /// @param finality - the parent finality

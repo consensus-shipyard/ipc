@@ -14,23 +14,11 @@ import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {LibVoting} from "../lib/LibVoting.sol";
 
 contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
     using FvmAddressHelper for FvmAddress;
-
-    /// @notice initialize the contract with the genesis epoch
-    /// @param genesisEpoch - genesis epoch to set
-    function initGenesisEpoch(uint64 genesisEpoch) external systemActorOnly {
-        if (s.initialized) {
-            revert AlreadyInitialized();
-        }
-
-        LibVoting.initGenesisEpoch(genesisEpoch);
-        s.initialized = true;
-    }
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     function register() external payable {

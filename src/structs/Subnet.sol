@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {SubnetID} from "./Subnet.sol";
 import {FvmAddress} from "./FvmAddress.sol";
-import {BottomUpCheckpointLegacy, CrossMsg} from "./Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg} from "./Checkpoint.sol";
 import {Status} from "../enums/Status.sol";
 import {MaxPQ} from "../lib/priority/LibMaxPQ.sol";
 import {MinPQ} from "../lib/priority/LibMinPQ.sol";
@@ -23,7 +23,7 @@ struct Subnet {
     uint64 appliedBottomUpNonce;
     Status status;
     SubnetID id;
-    BottomUpCheckpointLegacy prevCheckpoint;
+    BottomUpCheckpoint prevCheckpoint;
 }
 
 // ======== Subnet Staking =======
