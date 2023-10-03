@@ -12,14 +12,14 @@ use fvm_shared::{address::Address, chainid::ChainID};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
-use fendermint_vm_ipc_actors::gateway_router_facet::SubnetID;
+use fendermint_vm_ipc_actors::gateway_getter_facet as getter;
+use fendermint_vm_ipc_actors::gateway_router_facet as router;
 
 use super::{
     broadcast::Broadcaster,
     state::{ipc::GatewayCaller, FvmExecState},
+    ValidatorContext,
 };
-
-pub type Checkpoint = BottomUpCheckpoint;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone)]
@@ -38,7 +38,7 @@ pub async fn maybe_create_checkpoint<C, DB>(
     client: &C,
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
-) -> anyhow::Result<Option<(Checkpoint, PowerTable, PowerUpdates)>>
+) -> anyhow::Result<Option<(router::BottomUpCheckpoint, PowerTable, PowerUpdates)>>
 where
     C: Client + Sync + Send + 'static,
     DB: Blockstore + Sync + Send + 'static,
@@ -87,11 +87,66 @@ where
     }
 }
 
+/// Sign the current and any incomplete checkpoints.
+pub async fn broadcast_incomplete_signatures<C, DB>(
+    client: &C,
+    validator_ctx: &ValidatorContext<C>,
+    gateway: &GatewayCaller<DB>,
+    chain_id: ChainID,
+    incomplete_checkpoints: Vec<getter::BottomUpCheckpoint>,
+) -> anyhow::Result<()>
+where
+    C: Client + Clone + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + 'static,
+{
+    for cp in incomplete_checkpoints {
+        let height = Height::try_from(cp.block_height)?;
+        let power_table = get_power_table(client, height)
+            .await
+            .context("failed to get power table")?;
+
+        if let Some(validator) = power_table
+            .0
+            .iter()
+            .find(|v| v.public_key.0 == validator_ctx.public_key)
+            .cloned()
+        {
+            // TODO: Code generation in the ipc-solidity-actors repo should cater for this.
+            let checkpoint = router::BottomUpCheckpoint {
+                subnet_id: router::SubnetID {
+                    root: cp.subnet_id.root,
+                    route: cp.subnet_id.route,
+                },
+                block_height: cp.block_height,
+                block_hash: cp.block_hash,
+                next_configuration_number: cp.next_configuration_number,
+                cross_messages_hash: cp.cross_messages_hash,
+            };
+
+            // We mustn't do these in parallel because of how nonces are fetched.
+            broadcast_signature(
+                &validator_ctx.broadcaster,
+                gateway,
+                checkpoint,
+                &power_table,
+                &validator,
+                &validator_ctx.secret_key,
+                chain_id,
+            )
+            .await
+            .context("failed to broadcast checkpoint signature")?;
+
+            tracing::debug!(?height, "submitted checkpoint signature");
+        }
+    }
+    Ok(())
+}
+
 /// As a validator, sign the checkpoint and broadcast a transaction to add our signature to the ledger.
 pub async fn broadcast_signature<C, DB>(
     broadcaster: &Broadcaster<C>,
     gateway: &GatewayCaller<DB>,
-    checkpoint: Checkpoint,
+    checkpoint: router::BottomUpCheckpoint,
     power_table: &PowerTable,
     validator: &Validator,
     secret_key: &SecretKey,
@@ -117,7 +172,7 @@ fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
     height: Height,
-) -> anyhow::Result<Option<SubnetID>>
+) -> anyhow::Result<Option<router::SubnetID>>
 where
     DB: Blockstore,
 {
@@ -126,7 +181,7 @@ where
         let is_root = id.route.is_empty();
 
         if !is_root && height.value() % gateway.bottom_up_check_period(state)? == 0 {
-            let id = SubnetID {
+            let id = router::SubnetID {
                 root: id.root,
                 route: id.route,
             };

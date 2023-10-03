@@ -14,9 +14,11 @@ use fendermint_vm_actor_interface::{
     ipc::{ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
 use fendermint_vm_genesis::Validator;
-use fendermint_vm_ipc_actors::gateway_getter_facet::{GatewayGetterFacet, SubnetID};
-use fendermint_vm_ipc_actors::gateway_router_facet::{BottomUpCheckpoint, GatewayRouterFacet};
+use fendermint_vm_ipc_actors::gateway_getter_facet as getter;
+use fendermint_vm_ipc_actors::gateway_router_facet as router;
 use fendermint_vm_message::signed::sign_secp256k1;
+use getter::GatewayGetterFacet;
+use router::GatewayRouterFacet;
 
 use super::{
     fevm::{ContractCaller, MockProvider},
@@ -66,7 +68,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     }
 
     /// Return the current subnet ID.
-    pub fn subnet_id(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<SubnetID> {
+    pub fn subnet_id(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<getter::SubnetID> {
         self.getter.call(state, |c| c.get_network_name())
     }
 
@@ -79,7 +81,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     pub fn create_bottom_up_checkpoint(
         &self,
         state: &mut FvmExecState<DB>,
-        checkpoint: BottomUpCheckpoint,
+        checkpoint: router::BottomUpCheckpoint,
         power_table: &[Validator],
     ) -> anyhow::Result<()> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
@@ -96,12 +98,20 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         })
     }
 
+    /// Retrieve checkpoints which have not reached a quorum.
+    pub fn incomplete_checkpoints(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<Vec<getter::BottomUpCheckpoint>> {
+        self.getter.call(state, |c| c.get_incomplete_checkpoints())
+    }
+
     /// Construct the input parameters for adding a signature to the checkpoint.
     ///
     /// This will need to be broadcasted as a transaction.
     pub fn add_checkpoint_signature_calldata(
         &self,
-        checkpoint: BottomUpCheckpoint,
+        checkpoint: router::BottomUpCheckpoint,
         power_table: &[Validator],
         validator: &Validator,
         secret_key: &SecretKey,
