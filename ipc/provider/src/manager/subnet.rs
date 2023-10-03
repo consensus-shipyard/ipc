@@ -111,9 +111,6 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
     /// Get the balance of an address
     async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount>;
 
-    /// Returns the epoch of the latest top-down checkpoint executed
-    async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch>;
-
     /// Returns the validator set
     async fn get_validator_set(
         &self,

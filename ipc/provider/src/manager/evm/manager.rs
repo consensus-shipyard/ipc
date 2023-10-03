@@ -512,10 +512,6 @@ impl SubnetManager for EthSubnetManager {
         Ok(TokenAmount::from_atto(balance.as_u128()))
     }
 
-    async fn last_topdown_executed(&self, _gateway_addr: &Address) -> Result<ChainEpoch> {
-        unimplemented!()
-    }
-
     async fn get_validator_set(
         &self,
         subnet_id: &SubnetID,

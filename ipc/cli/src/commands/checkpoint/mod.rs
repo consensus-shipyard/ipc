@@ -6,10 +6,7 @@ use crate::commands::checkpoint::list_checkpoints::{
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
-use self::topdown_executed::{LastTopDownExec, LastTopDownExecArgs};
-
 mod list_checkpoints;
-mod topdown_executed;
 
 #[derive(Debug, Args)]
 #[command(name = "checkpoint", about = "checkpoint related commands")]
@@ -23,7 +20,6 @@ impl CheckpointCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
             Commands::ListBottomup(args) => ListBottomUpCheckpoints::handle(global, args).await,
-            Commands::LastTopdown(args) => LastTopDownExec::handle(global, args).await,
         }
     }
 }
@@ -31,5 +27,4 @@ impl CheckpointCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     ListBottomup(ListBottomUpCheckpointsArgs),
-    LastTopdown(LastTopDownExecArgs),
 }
