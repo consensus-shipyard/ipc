@@ -142,29 +142,32 @@ where
                     .find(|v| v.public_key.0 == ctx.public_key)
                     .cloned()
                 {
-                    let secret_key = ctx.secret_key.clone();
-                    let broadcaster = ctx.broadcaster.clone();
-                    let gateway = self.gateway.clone();
-                    let chain_id = state.chain_id();
+                    // Do not resend past signatures.
+                    if !self.syncing().await? {
+                        let secret_key = ctx.secret_key.clone();
+                        let broadcaster = ctx.broadcaster.clone();
+                        let gateway = self.gateway.clone();
+                        let chain_id = state.chain_id();
 
-                    tokio::spawn(async move {
-                        let height = checkpoint.block_height;
+                        tokio::spawn(async move {
+                            let height = checkpoint.block_height;
 
-                        let res = checkpoint::broadcast_signature(
-                            &broadcaster,
-                            &gateway,
-                            checkpoint,
-                            &power_table,
-                            &validator,
-                            &secret_key,
-                            chain_id,
-                        )
-                        .await;
+                            let res = checkpoint::broadcast_signature(
+                                &broadcaster,
+                                &gateway,
+                                checkpoint,
+                                &power_table,
+                                &validator,
+                                &secret_key,
+                                chain_id,
+                            )
+                            .await;
 
-                        if let Err(e) = res {
-                            tracing::error!(error =? e, height, "error broadcasting checkpoint signature");
-                        }
-                    });
+                            if let Err(e) = res {
+                                tracing::error!(error =? e, height, "error broadcasting checkpoint signature");
+                            }
+                        });
+                    }
                 }
             }
 

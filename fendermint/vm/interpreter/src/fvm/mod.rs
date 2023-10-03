@@ -15,6 +15,7 @@ pub mod store;
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
 
+use anyhow::Context;
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
 pub use exec::FvmApplyRet;
@@ -23,6 +24,7 @@ use fendermint_eth_hardhat::Hardhat;
 pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
 pub use query::FvmQueryRet;
+use tendermint_rpc::Client;
 
 pub use self::broadcast::Broadcaster;
 use self::state::ipc::GatewayCaller;
@@ -90,5 +92,21 @@ impl<DB, C> FvmMessageInterpreter<DB, C> {
             exec_in_check,
             gateway: GatewayCaller::default(),
         }
+    }
+}
+
+impl<DB, C> FvmMessageInterpreter<DB, C>
+where
+    C: Client + Sync,
+{
+    /// Indicate that the node is syncing with the rest of the network and hasn't caught up with the tip yet.
+    async fn syncing(&self) -> anyhow::Result<bool> {
+        let status: tendermint_rpc::endpoint::status::Response = self
+            .client
+            .status()
+            .await
+            .context("failed to get Tendermint status")?;
+
+        Ok(status.sync_info.catching_up)
     }
 }
