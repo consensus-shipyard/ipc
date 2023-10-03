@@ -88,16 +88,29 @@ fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
 #[cfg(test)]
 mod tests {
     use crate::config::subnet::{EVMSubnet, SubnetConfig};
-    use crate::config::{Config, Server, Subnet};
+    use crate::config::{Config, Subnet};
     use fvm_shared::address::Address;
     use ipc_sdk::subnet_id::SubnetID;
     use primitives::EthAddress;
     use std::str::FromStr;
 
     const STR: &str = r#"
-    [server]
-    json_rpc_address = "127.0.0.1:3030"
+    keystore_path = "~/.ipc"
 
+    [[subnets]]
+    id = "/r1234"
+    network_name = "test2"
+
+    [subnets.config]
+    network_type = "fevm"
+    provider_http = "http://127.0.0.1:3030/rpc/v1"
+    registry_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
+    gateway_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
+    private_key = "0x6BE1Ccf648c74800380d0520D797a170c808b624"
+    accounts = ["0x6be1ccf648c74800380d0520d797a170c808b624", "0x6be1ccf648c74800380d0520d797a170c808b624"]
+    "#;
+
+    const EMPTY_KEYSTORE: &str = r#"
     [[subnets]]
     id = "/r1234"
     network_name = "test2"
@@ -121,11 +134,18 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_keystore() {
+        let config = Config::from_toml_str(EMPTY_KEYSTORE).unwrap();
+
+        let r = toml::to_string(&config).unwrap();
+        let from_str = Config::from_toml_str(&r).unwrap();
+        assert_eq!(from_str, config);
+    }
+
+    #[test]
     fn test_serialization() {
         let mut config = Config {
-            server: Server {
-                json_rpc_address: "127.0.0.1:3030".parse().unwrap(),
-            },
+            keystore_path: Some(String::from("~/.ipc")),
             subnets: Default::default(),
         };
 

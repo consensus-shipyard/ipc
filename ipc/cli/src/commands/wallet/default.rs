@@ -24,12 +24,12 @@ impl CommandLineHandler for WalletSetDefault {
 
         match wallet_type {
             WalletType::Evm => {
-                let wallet = provider.evm_wallet();
+                let wallet = provider.evm_wallet()?;
                 let addr = ipc_identity::EthKeyAddress::from_str(&arguments.address)?;
                 wallet.write().unwrap().set_default(&addr)?;
             }
             WalletType::Fvm => {
-                let wallet = provider.fvm_wallet();
+                let wallet = provider.fvm_wallet()?;
                 let addr = fvm_shared::address::Address::from_str(&arguments.address)?;
                 wallet.write().unwrap().set_default(addr)?;
             }
@@ -61,7 +61,7 @@ impl CommandLineHandler for WalletGetDefault {
 
         match wallet_type {
             WalletType::Evm => {
-                let wallet = provider.evm_wallet();
+                let wallet = provider.evm_wallet()?;
                 let mut wallet = wallet.write().unwrap();
                 match wallet.get_default()? {
                     None => println!("No default account set"),
@@ -69,7 +69,7 @@ impl CommandLineHandler for WalletGetDefault {
                 }
             }
             WalletType::Fvm => {
-                let wallet = provider.fvm_wallet();
+                let wallet = provider.fvm_wallet()?;
                 println!("{:?}", wallet.write().unwrap().get_default()?);
             }
         }

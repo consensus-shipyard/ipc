@@ -1,7 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use std::io::Write;
-use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -15,7 +14,7 @@ use url::Url;
 use crate::config::{Config, ReloadableConfig};
 
 // Arguments for the config's fields
-const SERVER_JSON_RPC_ADDR: &str = "127.0.0.1:3030";
+const REPO_PATH: &str = "~/.ipc";
 const CHILD_ID: &str = "/r123/f0100";
 const CHILD_AUTH_TOKEN: &str = "CHILD_AUTH_TOKEN";
 const PROVIDER_HTTP: &str = "http://127.0.0.1:3030/rpc/v1";
@@ -73,19 +72,16 @@ async fn reload_works() {
     rx.recv().await.unwrap();
 
     let updated_config = h.get_config();
-    assert_ne!(
-        updated_config.server.json_rpc_address,
-        original_config.server.json_rpc_address
-    );
+    assert_ne!(updated_config.keystore_path, original_config.keystore_path,);
 }
 
 #[test]
-fn check_server_config() {
-    let config = read_config().server;
+fn check_keystore_config() {
+    let config = read_config();
     assert_eq!(
-        config.json_rpc_address,
-        SocketAddr::from_str(SERVER_JSON_RPC_ADDR).unwrap(),
-        "invalid server rpc address"
+        config.keystore_path,
+        Some(REPO_PATH.to_string()),
+        "invalid provider keystore path"
     );
 }
 
@@ -115,8 +111,7 @@ fn check_subnets_config() {
 fn config_str() -> String {
     formatdoc!(
         r#"
-        [server]
-        json_rpc_address = "{SERVER_JSON_RPC_ADDR}"
+        keystore_path = "{REPO_PATH}"
 
         [[subnets]]
         id = "{CHILD_ID}"
@@ -136,8 +131,7 @@ fn config_str() -> String {
 fn config_str_diff_addr() -> String {
     formatdoc!(
         r#"
-        [server]
-        json_rpc_address = "127.0.0.1:3031"
+        repo_path = "~/.ipc2"
 
         [[subnets]]
         id = "{CHILD_ID}"
