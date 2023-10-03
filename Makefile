@@ -5,12 +5,12 @@ BUILTIN_ACTORS_DIR    := ../builtin-actors
 BUILTIN_ACTORS_CODE   := $(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs" | grep -v target)
 BUILTIN_ACTORS_BUNDLE := $(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
 
-IPC_ACTORS_TAG        ?= origin/dev
-IPC_ACTORS_DIR        := $(shell pwd)/../ipc-solidity-actors
-IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
-IPC_ACTORS_BUILD      := fendermint/vm/ipc_actors/build.rs
-IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
-IPC_ACTORS_ABI        := $(IPC_ACTORS_OUT)/.compile.abi
+IPC_ACTORS_FIND       := scripts/find-ipc-actors.sh
+IPC_ACTORS_CODE       := $(shell find $(shell $(IPC_ACTORS_FIND)) -type f -name "*.sol")
+IPC_ACTORS_ABI        := .make/.ipc-actors-abi
+# Note that without `:=`, just `=`, it should evaluate it every time it appears in a target.
+IPC_ACTORS_DIR         = $(shell $(IPC_ACTORS_FIND))
+IPC_ACTORS_OUT         = $(shell find $(IPC_ACTORS_DIR) -type d -name out)
 
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
@@ -29,7 +29,7 @@ install:
 	cargo install --path fendermint/app
 
 # Using --release for testing because wasm can otherwise be slow.
-test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_ABI)
+test: $(IPC_ACTORS_ABI) $(BUILTIN_ACTORS_BUNDLE)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release --workspace --exclude smoke-test
@@ -37,10 +37,11 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_ABI)
 e2e: docker-build
 	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
 
-clean: clean-ipc-actors-abi
+clean:
 	cargo clean
 	cd $(BUILTIN_ACTORS_DIR) && cargo clean
 	rm $(BUILTIN_ACTORS_BUNDLE)
+	rm -rf .make
 
 lint: \
 	license \
@@ -60,8 +61,8 @@ check-clippy:
 docker-build: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE) $(IPC_ACTORS_ABI)
 	mkdir -p docker/.artifacts/contracts
 
-	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
+	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
 
 	if [ "$(PROFILE)" = "ci" ]; then \
 		$(MAKE) --no-print-directory build && \
@@ -93,27 +94,19 @@ $(BUILTIN_ACTORS_BUNDLE): $(BUILTIN_ACTORS_CODE)
 	cargo run --release -- -o output/$(shell basename $@)
 
 
-# Compile the ABI artifacts and Rust bindings for the IPC Solidity actors.
+# Compile the ABI artifacts of the IPC Solidity actors.
 ipc-actors-abi: $(IPC_ACTORS_ABI)
 
-# Force reompilation of the IPC actors.
-clean-ipc-actors-abi:
-	rm -rf $(IPC_ACTORS_ABI)
-
-# Clone the IPC Solidity actors if necessary and compile the ABI, putting down a marker at the end.
+# Check out the IPC Solidity actors if necessary and compile the ABI, putting down a marker at the end.
+# Doing a recursive call if the checkouts haven't been done before because of how $(shell) is already evaluated.
 $(IPC_ACTORS_ABI): $(IPC_ACTORS_CODE) | forge
-	if [ ! -d $(IPC_ACTORS_DIR) ]; then \
-		mkdir -p $(IPC_ACTORS_DIR) && \
-		cd $(IPC_ACTORS_DIR) && \
-		cd .. && \
-		git clone https://github.com/consensus-shipyard/ipc-solidity-actors.git; \
+	if [ -z $(IPC_ACTORS_DIR) ]; then \
+		cargo fetch; \
+		$(MAKE) ipc-actors-abi; \
+	else \
+		$(MAKE) -C $(IPC_ACTORS_DIR) compile-abi; \
 	fi
-	cd $(IPC_ACTORS_DIR) && \
-	git fetch origin && \
-	git checkout $(IPC_ACTORS_TAG)
-	make -C $(IPC_ACTORS_DIR) compile-abi
-	touch $@
-
+	mkdir -p $(dir $@) && touch $@
 
 # Forge is used by the ipc-solidity-actors compilation steps.
 .PHONY: forge

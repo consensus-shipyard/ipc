@@ -3,3 +3,4 @@ docker/.artifacts
 cometbft
 test-network
 .idea
+.make
