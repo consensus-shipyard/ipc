@@ -492,27 +492,6 @@ impl IpcProvider {
         conn.manager().wallet_balance(address).await
     }
 
-    /// Returns the epoch of the latest top-down checkpoint executed
-    pub async fn last_topdown_executed(
-        &self,
-        subnet: &SubnetID,
-        gateway_addr: Option<Address>,
-    ) -> anyhow::Result<ChainEpoch> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
-
-        let subnet_config = conn.subnet();
-
-        let gateway_addr = match gateway_addr {
-            None => subnet_config.gateway_addr(),
-            Some(addr) => addr,
-        };
-
-        conn.manager().last_topdown_executed(&gateway_addr).await
-    }
-
     pub async fn chain_head(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),

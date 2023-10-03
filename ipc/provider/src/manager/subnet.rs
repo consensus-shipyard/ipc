@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_sdk::cross::CrossMsg;
+use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
 
@@ -110,9 +111,6 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
     /// Get the balance of an address
     async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount>;
 
-    /// Returns the epoch of the latest top-down checkpoint executed
-    async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch>;
-
     /// Returns the validator set
     async fn get_validator_set(
         &self,
@@ -141,4 +139,11 @@ pub trait TopDownCheckpointQuery: Send + Sync {
     ) -> Result<Vec<CrossMsg>>;
     /// Get the block hash
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>>;
+    /// Get the validator change set from start to end block.
+    async fn get_validator_changeset(
+        &self,
+        subnet_id: &SubnetID,
+        start: ChainEpoch,
+        end: ChainEpoch,
+    ) -> Result<Vec<StakingChangeRequest>>;
 }

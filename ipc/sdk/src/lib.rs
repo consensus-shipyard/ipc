@@ -4,6 +4,8 @@ use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use integer_encoding::VarInt;
+use primitives::EthAddress;
+use std::str::FromStr;
 
 pub mod address;
 pub mod checkpoint;
@@ -17,6 +19,7 @@ pub mod subnet_id;
 
 #[cfg(feature = "evm_type_convert")]
 pub mod evm;
+pub mod staking;
 
 /// Encodes the a ChainEpoch as a varInt for its use
 /// as a key of a HAMT. This serialization has been
@@ -87,4 +90,18 @@ impl ValidatorSet {
 
         self.configuration_number += 1;
     }
+}
+
+/// Converts an ethers::U256 TokenAmount into a FIL amount.
+pub fn eth_to_fil_amount(amount: &ethers::types::U256) -> anyhow::Result<TokenAmount> {
+    let v = fvm_shared::bigint::BigInt::from_str(&amount.to_string())?;
+    Ok(TokenAmount::from_atto(v))
+}
+
+pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
+    let raw_addr = format!("{addr:?}");
+    log::debug!("raw evm subnet addr: {raw_addr:}");
+
+    let eth_addr = EthAddress::from_str(&raw_addr)?;
+    Ok(Address::from(eth_addr))
 }
