@@ -30,6 +30,13 @@ pub struct ResolverSettings {
     pub content: ContentSettings,
 }
 
+impl ResolverSettings {
+    /// Indicate whether we have configured the IPLD Resolver to run.
+    pub fn enabled(&self) -> bool {
+        !self.connection.listen_addr.is_empty() && self.subnet_id != *ipc_sdk::subnet_id::UNDEF
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct NetworkSettings {
     /// Cryptographic key used to sign messages.

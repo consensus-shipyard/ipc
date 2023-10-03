@@ -63,7 +63,9 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             sk.clone(),
             settings.fvm.gas_fee_cap.clone(),
             settings.fvm.gas_premium.clone(),
-        );
+        )
+        .with_max_retries(settings.broadcast.max_retries);
+
         ValidatorContext::new(sk, broadcaster)
     });
 
@@ -89,7 +91,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     let resolve_pool = CheckpointPool::new();
 
-    if settings.resolver_enabled() {
+    if settings.resolver.enabled() {
         let service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
 

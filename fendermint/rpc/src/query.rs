@@ -79,9 +79,12 @@ pub trait QueryClient: Sync {
     /// Estimate the gas limit of a message.
     async fn estimate_gas(
         &self,
-        message: Message,
+        mut message: Message,
         height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<GasEstimate>> {
+        // Using 0 sequence so estimation doesn't get tripped over by nonce mismatch.
+        message.sequence = 0;
+
         let res = self
             .perform(FvmQuery::EstimateGas(Box::new(message)), height)
             .await?;

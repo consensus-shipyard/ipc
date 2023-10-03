@@ -37,6 +37,10 @@ port = 26658
 # Keep unlimited history by default.
 state_hist_size = 0
 
+[broadcast]
+# Maximum number of times to retry broadcasting a transaction after failure.
+max_retries = 5
+
 # FVM configuration
 [fvm]
 # Overestimation rate applied to gas estimations to ensure that the

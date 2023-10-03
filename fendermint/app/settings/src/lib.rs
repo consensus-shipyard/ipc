@@ -6,16 +6,17 @@ use config::{Config, ConfigError, Environment, File};
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::Deserialize;
-use serde_with::serde_as;
 use std::path::{Path, PathBuf};
 use tendermint_rpc::Url;
 
 use fendermint_vm_encoding::{human_readable_delegate, human_readable_str};
 
 use self::eth::EthSettings;
+use self::fvm::FvmSettings;
 use self::resolver::ResolverSettings;
 
 pub mod eth;
+pub mod fvm;
 pub mod resolver;
 
 /// Marker to be used with the `#[serde_as(as = "IsHumanReadable")]` annotations.
@@ -83,28 +84,13 @@ pub struct DbSettings {
     pub state_hist_size: u64,
 }
 
-#[serde_as]
+/// Settings affecting how we deal with failures in trying to send transactions to the local CometBFT node.
+/// It is not expected to be unavailable, however we might get into race conditions about the nonce which
+/// would need us to try creating a completely new transaction and try again.
 #[derive(Debug, Deserialize, Clone)]
-pub struct FvmSettings {
-    /// Overestimation rate applied to gas estimations to ensure that the
-    /// message goes through
-    pub gas_overestimation_rate: f64,
-    /// Gas search step increase used to find the optimal gas limit.
-    /// It determines how fine-grained we want the gas estimation to be.
-    pub gas_search_step: f64,
-    /// Indicate whether transactions should be fully executed during the checks performed
-    /// when they are added to the mempool, or just the most basic ones are performed.
-    ///
-    /// Enabling this option is required to fully support "pending" queries in the Ethereum API,
-    /// otherwise only the nonces and balances are projected into a partial state.
-    pub exec_in_check: bool,
-
-    /// Gas fee used when broadcasting transactions.
-    #[serde_as(as = "IsHumanReadable")]
-    pub gas_fee_cap: TokenAmount,
-    /// Gas premium used when broadcasting transactions.
-    #[serde_as(as = "IsHumanReadable")]
-    pub gas_premium: TokenAmount,
+pub struct BroadcastSettings {
+    /// Number of times to retry broadcasting a transaction.
+    pub max_retries: u8,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -128,6 +114,7 @@ pub struct Settings {
     pub eth: EthSettings,
     pub fvm: FvmSettings,
     pub resolver: ResolverSettings,
+    pub broadcast: BroadcastSettings,
 }
 
 #[macro_export]
@@ -187,12 +174,6 @@ impl Settings {
     /// The configured home directory.
     pub fn home_dir(&self) -> &Path {
         &self.home_dir
-    }
-
-    /// Indicate whether we have configured the IPLD Resolver to run.
-    pub fn resolver_enabled(&self) -> bool {
-        !self.resolver.connection.listen_addr.is_empty()
-            && self.resolver.subnet_id != *ipc_sdk::subnet_id::UNDEF
     }
 
     /// Tendermint RPC URL from the environment or the config file.
@@ -260,13 +241,13 @@ mod tests {
     #[test]
     fn parse_default_config() {
         let settings = parse_config("");
-        assert!(!settings.resolver_enabled());
+        assert!(!settings.resolver.enabled());
     }
 
     #[test]
     fn parse_test_config() {
         let settings = parse_config("test");
-        assert!(settings.resolver_enabled());
+        assert!(settings.resolver.enabled());
     }
 
     #[test]
