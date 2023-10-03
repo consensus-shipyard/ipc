@@ -95,7 +95,6 @@ $(BUILTIN_ACTORS_BUNDLE): $(BUILTIN_ACTORS_CODE)
 
 # Compile the ABI artifacts and Rust bindings for the IPC Solidity actors.
 ipc-actors-abi: $(IPC_ACTORS_ABI)
-	cargo build --release -p fendermint_vm_ipc_actors
 
 # Force reompilation of the IPC actors.
 clean-ipc-actors-abi:

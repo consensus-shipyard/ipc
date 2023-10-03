@@ -18,11 +18,11 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Validator};
-use fendermint_vm_ipc_actors::i_diamond::FacetCut;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
 
 use crate::GenesisInterpreter;

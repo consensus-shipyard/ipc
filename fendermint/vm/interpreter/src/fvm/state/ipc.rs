@@ -14,11 +14,11 @@ use fendermint_vm_actor_interface::{
     ipc::{ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
 use fendermint_vm_genesis::Validator;
-use fendermint_vm_ipc_actors::gateway_getter_facet as getter;
-use fendermint_vm_ipc_actors::gateway_getter_facet::GatewayGetterFacet;
-use fendermint_vm_ipc_actors::gateway_router_facet as router;
-use fendermint_vm_ipc_actors::gateway_router_facet::GatewayRouterFacet;
 use fendermint_vm_message::signed::sign_secp256k1;
+use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
+use ipc_actors_abis::gateway_router_facet as router;
+use ipc_actors_abis::gateway_router_facet::GatewayRouterFacet;
 
 use super::{
     fevm::{ContractCaller, MockProvider},

@@ -11,8 +11,8 @@ use fvm_shared::{address::Address, chainid::ChainID};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
-use fendermint_vm_ipc_actors::gateway_getter_facet as getter;
-use fendermint_vm_ipc_actors::gateway_router_facet as router;
+use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_actors_abis::gateway_router_facet as router;
 
 use super::{
     broadcast::Broadcaster,

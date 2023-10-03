@@ -27,7 +27,7 @@ pub type MockContractCall<T> = ethers::prelude::ContractCall<MockProvider, T>;
 /// Example:
 /// ```no_run
 /// use fendermint_vm_actor_interface::{eam::EthAddress, ipc::GATEWAY_ACTOR_ID};
-/// use fendermint_vm_ipc_actors::gateway_getter_facet::GatewayGetterFacet;
+/// use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 /// # use fendermint_vm_interpreter::fvm::state::fevm::ContractCaller;
 /// # use fendermint_vm_interpreter::fvm::state::FvmExecState;
 /// # use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore as DB;

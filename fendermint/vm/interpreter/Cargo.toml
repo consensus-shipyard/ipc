@@ -10,7 +10,6 @@ license.workspace = true
 
 [dependencies]
 fendermint_vm_actor_interface = { path = "../actor_interface" }
-fendermint_vm_ipc_actors = { path = "../ipc_actors" }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_message = { path = "../message" }
@@ -18,6 +17,7 @@ fendermint_vm_resolver = { path = "../resolver" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 fendermint_rpc = { path = "../../rpc" }
+ipc_actors_abis = { workspace = true }
 
 async-trait = { workspace = true }
 async-stm = { workspace = true }
