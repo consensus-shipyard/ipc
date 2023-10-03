@@ -19,7 +19,7 @@ use anyhow::{Context, Result};
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
-use ipc_sdk::evm::ethers_address_to_fil_address;
+use ipc_sdk::ethers_address_to_fil_address;
 
 use std::fmt::Debug;
 use std::io;

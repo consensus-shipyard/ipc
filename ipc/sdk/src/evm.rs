@@ -6,19 +6,17 @@
 use crate::address::IPCAddress;
 use crate::cross::{CrossMsg, StorableMsg};
 use crate::subnet_id::SubnetID;
+use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
 use ethers::types::U256;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{Address, Payload};
-use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use ipc_actors_abis::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
     subnet_actor_getter_facet, subnet_actor_manager_facet,
 };
-use primitives::EthAddress;
-use std::str::FromStr;
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
 /// the abigen is creating the same struct but under different modules. This save a lot of
@@ -154,8 +152,6 @@ base_type_conversion!(subnet_actor_manager_facet);
 base_type_conversion!(gateway_getter_facet);
 base_type_conversion!(gateway_messenger_facet);
 
-cross_msg_types!(subnet_actor_manager_facet);
-cross_msg_types!(subnet_actor_getter_facet);
 cross_msg_types!(gateway_getter_facet);
 cross_msg_types!(gateway_router_facet);
 cross_msg_types!(gateway_messenger_facet);
@@ -187,20 +183,6 @@ pub fn payload_to_evm_address(payload: &Payload) -> anyhow::Result<ethers::types
 pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
     let str = amount.atto().to_string();
     Ok(U256::from_dec_str(&str)?)
-}
-
-/// Converts an ethers::U256 TokenAmount into a FIL amount.
-pub fn eth_to_fil_amount(amount: &U256) -> anyhow::Result<TokenAmount> {
-    let v = BigInt::from_str(&amount.to_string())?;
-    Ok(TokenAmount::from_atto(v))
-}
-
-pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
-    let raw_addr = format!("{addr:?}");
-    log::debug!("raw evm subnet addr: {raw_addr:}");
-
-    let eth_addr = EthAddress::from_str(&raw_addr)?;
-    Ok(Address::from(eth_addr))
 }
 
 #[cfg(test)]

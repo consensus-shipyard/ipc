@@ -9,10 +9,8 @@ use ipc_actors_abis::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
 };
-use ipc_sdk::evm::{
-    eth_to_fil_amount, ethers_address_to_fil_address, fil_to_eth_amount, payload_to_evm_address,
-    subnet_id_to_evm_addresses,
-};
+use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
+use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
@@ -27,11 +25,13 @@ use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{Eip1559TransactionRequest, I256, U256};
+use futures_util::StreamExt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::gateway::Status;
+use ipc_sdk::staking::{NewStakingRequest, StakingChangeRequest};
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
@@ -102,6 +102,34 @@ impl TopDownCheckpointQuery for EthSubnetManager {
             .to_fixed_bytes()
             .to_vec())
     }
+
+    async fn get_validator_changeset(
+        &self,
+        subnet_id: &SubnetID,
+        start: ChainEpoch,
+        end: ChainEpoch,
+    ) -> Result<Vec<StakingChangeRequest>> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        log::info!("querying validator changes in evm subnet contract: {address:}");
+
+        let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<NewStakingRequest>()
+            .from_block(start as u64)
+            .to_block(end as u64);
+        let mut event_stream = ev.stream().await?;
+
+        let mut changes = vec![];
+        while let Some(Ok(event)) = event_stream.next().await {
+            changes.push(StakingChangeRequest::try_from(event)?);
+        }
+
+        Ok(changes)
+    }
 }
 
 #[async_trait]
@@ -140,7 +168,6 @@ impl SubnetManager for EthSubnetManager {
             bottom_up_check_period: params.bottomup_check_period as u64,
             top_down_check_period: params.topdown_check_period as u64,
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
-            genesis: ethers::types::Bytes::default(),
         };
 
         log::info!("creating subnet on evm with params: {params:?}");
@@ -485,16 +512,8 @@ impl SubnetManager for EthSubnetManager {
         Ok(TokenAmount::from_atto(balance.as_u128()))
     }
 
-    async fn last_topdown_executed(&self, gateway_addr: &Address) -> Result<ChainEpoch> {
-        self.ensure_same_gateway(gateway_addr)?;
-
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let epoch = gateway_contract.last_voting_executed_epoch().call().await?;
-
-        Ok(epoch as ChainEpoch)
+    async fn last_topdown_executed(&self, _gateway_addr: &Address) -> Result<ChainEpoch> {
+        unimplemented!()
     }
 
     async fn get_validator_set(
@@ -580,25 +599,6 @@ impl SubnetManager for EthSubnetManager {
 
 #[async_trait]
 impl EthManager for EthSubnetManager {
-    async fn gateway_last_voting_executed_epoch(&self) -> Result<ChainEpoch> {
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let u = gateway_contract.last_voting_executed_epoch().call().await?;
-        Ok(u as ChainEpoch)
-    }
-
-    async fn subnet_last_voting_executed_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let u = contract.last_voting_executed_epoch().call().await?;
-        Ok(u as ChainEpoch)
-    }
-
     async fn current_epoch(&self) -> Result<ChainEpoch> {
         let block_number = self
             .ipc_contract_info
@@ -618,7 +618,7 @@ impl EthManager for EthSubnetManager {
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
         let checkpoint = gateway_contract
-            .bottom_up_checkpoints(epoch as u64)
+            .bottom_up_checkpoint(epoch as u64)
             .call()
             .await?;
         log::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");

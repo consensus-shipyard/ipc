@@ -16,15 +16,6 @@ use ipc_actors_abis::subnet_actor_manager_facet;
 
 #[async_trait]
 pub trait EthManager: SubnetManager {
-    /// Fetches the last executed epoch for voting in the gateway.
-    async fn gateway_last_voting_executed_epoch(&self) -> anyhow::Result<ChainEpoch>;
-
-    /// Fetches the last executed epoch for voting in the subnet actor.
-    async fn subnet_last_voting_executed_epoch(
-        &self,
-        subnet_id: &SubnetID,
-    ) -> anyhow::Result<ChainEpoch>;
-
     /// The current epoch/block number of the blockchain that the manager connects to.
     async fn current_epoch(&self) -> anyhow::Result<ChainEpoch>;
 
