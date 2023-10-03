@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
-use ethers::types as et;
 use tendermint::block::Height;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
 
@@ -61,11 +60,17 @@ where
                 .await
                 .context("failed to get the power table")?;
 
-            // TODO #252: Take the next changes from the gateway.
+            // TODO #252: Take the next validator changes from the gateway.
             let power_updates = PowerUpdates(Vec::new());
 
-            // TODO: #252: Take the configuration number of the last change.
+            // TODO: #252: Take the configuration number of the last change,
+            // or use 0 to signal that there was no change.
             let next_configuration_number = 0;
+
+            // Retrieve the bottom-up messages so we can put their hash into the checkpoint.
+            let cross_messages_hash = gateway
+                .bottom_up_msgs_hash(state, height.value())
+                .context("failed to retrieve bottom-up messages hash")?;
 
             // Construct checkpoint.
             let checkpoint = BottomUpCheckpoint {
@@ -73,7 +78,7 @@ where
                 block_height: height.value(),
                 block_hash,
                 next_configuration_number,
-                cross_messages_hash: et::H256::zero().0,
+                cross_messages_hash,
             };
 
             // Save the checkpoint in the ledger.

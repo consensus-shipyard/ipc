@@ -15,10 +15,10 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_genesis::Validator;
 use fendermint_vm_ipc_actors::gateway_getter_facet as getter;
+use fendermint_vm_ipc_actors::gateway_getter_facet::GatewayGetterFacet;
 use fendermint_vm_ipc_actors::gateway_router_facet as router;
+use fendermint_vm_ipc_actors::gateway_router_facet::GatewayRouterFacet;
 use fendermint_vm_message::signed::sign_secp256k1;
-use getter::GatewayGetterFacet;
-use router::GatewayRouterFacet;
 
 use super::{
     fevm::{ContractCaller, MockProvider},
@@ -77,6 +77,25 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         self.getter.call(state, |c| c.bottom_up_check_period())
     }
 
+    /// Fetch the bottom-up messages enqueued for a given checkpoint height.
+    pub fn bottom_up_msgs(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: u64,
+    ) -> anyhow::Result<Vec<getter::CrossMsg>> {
+        self.getter.call(state, |c| c.bottom_up_messages(height))
+    }
+
+    /// Fetch the bottom-up messages enqueued in a given checkpoint.
+    pub fn bottom_up_msgs_hash(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: u64,
+    ) -> anyhow::Result<[u8; 32]> {
+        let msgs = self.bottom_up_msgs(state, height)?;
+        Ok(abi_hash(msgs))
+    }
+
     /// Insert a new checkpoint at the period boundary.
     pub fn create_bottom_up_checkpoint(
         &self,
@@ -121,7 +140,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         let height = checkpoint.block_height;
         let weight = et::U256::from(validator.power.0);
 
-        let hash = keccak256(ethers::abi::encode(&checkpoint.into_tokens()));
+        let hash = abi_hash(checkpoint);
         let signature = et::Bytes::from(sign_secp256k1(secret_key, &hash));
 
         let tree =
@@ -147,4 +166,9 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 
         Ok(calldata)
     }
+}
+
+/// Hash some value in the same way we'd hash it in Solidity.
+fn abi_hash<T: Tokenize>(value: T) -> [u8; 32] {
+    keccak256(ethers::abi::encode(&value.into_tokens()))
 }
