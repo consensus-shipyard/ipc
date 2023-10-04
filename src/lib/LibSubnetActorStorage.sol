@@ -43,6 +43,8 @@ struct SubnetActorStorage {
     bytes32 prevExecutedCheckpointHash;
     /// @notice Address of the IPC gateway for the subnet
     address ipcGatewayAddr;
+    /// @notice majority percentage value (must be greater than or equal to 51)
+    uint8 majorityPercentage;
     /// @notice Type of consensus algorithm.
     /// @notice current status of the subnet
     Status status;

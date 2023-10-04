@@ -6,7 +6,7 @@ import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {StakingReleaseQueue, StakingChangeSet, StakingChange, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases} from "../structs/Subnet.sol";
-import {WithdrawExceedingCollateral, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator} from "../errors/IPCErrors.sol";
+import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator} from "../errors/IPCErrors.sol";
 
 /// The util library for `StakingChangeSet`
 library LibStakingChangeSet {
@@ -102,7 +102,7 @@ library LibAddressStakingReleases {
 }
 
 /// The util library for `StakingReleaseQueue`
-library LibStakingRelaseQueue {
+library LibStakingReleaseQueue {
     using LibAddressStakingReleases for AddressStakingReleases;
 
     event NewCollateralRelease(address validator, uint256 amount, uint256 releaseBlock);
@@ -156,6 +156,27 @@ library LibValidatorSet {
         address validator
     ) internal view returns (uint256 collateral) {
         collateral = validators.validators[validator].confirmedCollateral;
+    }
+
+    /// @notice Get the confirmed collaterals of the validators.
+    /// The function reverts if at least one validator is not in the active validator set.
+    function getConfirmedCollaterals(
+        ValidatorSet storage validators,
+        address[] memory addresses
+    ) internal view returns (uint256[] memory) {
+        uint256 size = addresses.length;
+        uint256[] memory activeCollaterals = new uint256[](size);
+
+        for (uint256 i = 0; i < size; ) {
+            if (!isActiveValidator(validators, addresses[i])) {
+                revert NotValidator();
+            }
+            activeCollaterals[i] = validators.validators[addresses[i]].confirmedCollateral;
+            unchecked {
+                i++;
+            }
+        }
+        return activeCollaterals;
     }
 
     function isActiveValidator(ValidatorSet storage self, address validator) internal view returns (bool) {
@@ -319,7 +340,7 @@ library LibValidatorSet {
 }
 
 library LibStaking {
-    using LibStakingRelaseQueue for StakingReleaseQueue;
+    using LibStakingReleaseQueue for StakingReleaseQueue;
     using LibStakingChangeSet for StakingChangeSet;
     using LibValidatorSet for ValidatorSet;
     using LibMaxPQ for MaxPQ;

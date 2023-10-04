@@ -155,6 +155,7 @@ contract SubnetActorGetterFacet {
         return s.configurationNumber;
     }
 
+    // TODO: is this relevant? should it be updated or deleted?
     /// @notice get the full details of the validators, not just their addresses
     function getValidatorSet() external view returns (ValidatorSet memory) {
         uint256 length = s.validators.length();

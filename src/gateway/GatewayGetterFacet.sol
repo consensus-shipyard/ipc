@@ -208,23 +208,33 @@ contract GatewayGetterFacet {
         return LibGateway.weightNeeded(totalWeight, s.majorityPercentage);
     }
 
-    function getCheckpointAndSignatures(
+    /// @notice get the checkpoint signature bundle consisting of the checkpoint, its info, signatories and the corresponding signatures.
+    function getSignatureBundle(
         uint64 h
-    ) external view returns (BottomUpCheckpoint memory ch, CheckpointInfo memory info, bytes[] memory signatures) {
+    )
+        external
+        view
+        returns (
+            BottomUpCheckpoint memory ch,
+            CheckpointInfo memory info,
+            address[] memory signatories,
+            bytes[] memory signatures
+        )
+    {
         ch = s.bottomUpCheckpoints[h];
         info = s.bottomUpCheckpointInfo[h];
-        address[] memory validators = s.bottomUpSignatureSenders[h].values();
-        uint256 n = validators.length;
+        signatories = s.bottomUpSignatureSenders[h].values();
+        uint256 n = signatories.length;
 
         signatures = new bytes[](n);
 
         for (uint256 i = 0; i < n; ) {
-            signatures[i] = s.bottomUpSignatures[h][validators[i]];
+            signatures[i] = s.bottomUpSignatures[h][signatories[i]];
             unchecked {
                 ++i;
             }
         }
 
-        return (ch, info, signatures);
+        return (ch, info, signatories, signatures);
     }
 }

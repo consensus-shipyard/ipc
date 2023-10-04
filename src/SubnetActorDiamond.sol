@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {SubnetActorStorage} from "./lib/LibSubnetActorStorage.sol";
 import {ConsensusType} from "./enums/ConsensusType.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
-import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral} from "./errors/IPCErrors.sol";
+import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {SubnetID} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
@@ -41,6 +41,9 @@ contract SubnetActorDiamond {
         if (params.minActivationCollateral == 0) {
             revert InvalidCollateral();
         }
+        if (params.majorityPercentage < 51 || params.majorityPercentage > 100) {
+            revert InvalidMajorityPercentage();
+        }
 
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
@@ -54,6 +57,7 @@ contract SubnetActorDiamond {
         s.topDownCheckPeriod = params.topDownCheckPeriod;
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.status = Status.Instantiated;
+        s.majorityPercentage = params.majorityPercentage;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
     }
 

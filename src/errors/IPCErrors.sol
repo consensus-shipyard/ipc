@@ -34,6 +34,7 @@ error InvalidCrossMsgFromSubnet();
 error InvalidCrossMsgNonce();
 error InvalidMajorityPercentage();
 error InvalidSignature();
+error InvalidSignatureErr(uint8);
 error InvalidSignatureLength();
 error InvalidSubmissionPeriod();
 error MessagesNotSorted();

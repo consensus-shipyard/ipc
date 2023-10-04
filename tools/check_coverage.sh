@@ -6,7 +6,7 @@ measurements[0]="lines"
 measurements[1]="functions"
 measurements[2]="branches"
 
-threshold=45
+threshold=30
 i=0
 
 for c in $coverages

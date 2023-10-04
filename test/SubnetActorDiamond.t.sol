@@ -187,6 +187,7 @@ contract SubnetActorDiamondTest is Test {
     ) public {
         vm.assume(_minActivationCollateral > DEFAULT_MIN_VALIDATOR_STAKE);
         vm.assume(_checkPeriod > DEFAULT_CHECKPOINT_PERIOD);
+        vm.assume(_majorityPercentage > 51);
         vm.assume(_majorityPercentage <= 100);
         vm.assume(_ipcGatewayAddr != address(0));
 

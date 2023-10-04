@@ -2,19 +2,20 @@
 pragma solidity 0.8.19;
 
 import {Status} from "../enums/Status.sol";
-import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint, InvalidSignatureErr} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
-import {SubnetID, Validator} from "../structs/Subnet.sol";
+import {SubnetID, Validator, ValidatorSet} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
+import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {LibStaking} from "../lib/LibStaking.sol";
+import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -23,6 +24,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
+    using LibValidatorSet for ValidatorSet;
     using FilAddress for address;
     using Address for address payable;
     using FvmAddressHelper for FvmAddress;
@@ -263,5 +265,30 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice Valdiator claims their released collateral
     function claim() external nonReentrant notKilled {
         LibStaking.claimCollateral(msg.sender);
+    }
+
+    /**
+     * @notice Checks whether the checkpoint is valid for the provided signatories, signatures and hash. Reverts otherwise.
+     * @dev Signatories in `signatories` and their signatures in `signatures` must be provided in the same order.
+     * @param signatories The addresses of the signatories.
+     * @param hash The hash of the checkpoint.
+     * @param signatures The packed signatures of the checkpoint.
+     */
+    function validateCheckpoint(address[] memory signatories, bytes32 hash, bytes memory signatures) external view {
+        uint256[] memory collaterals = s.validatorSet.getConfirmedCollaterals(signatories);
+
+        uint256 threshold = (s.validatorSet.totalConfirmedCollateral * s.majorityPercentage) / 100;
+
+        (bool valid, MultisignatureChecker.Error err) = MultisignatureChecker.isValidWeightedMultiSignature({
+            signatories: signatories,
+            weights: collaterals,
+            threshold: threshold,
+            hash: hash,
+            signatures: signatures
+        });
+
+        if (!valid) {
+            revert InvalidSignatureErr(uint8(err));
+        }
     }
 }
