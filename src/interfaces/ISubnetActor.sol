@@ -10,16 +10,19 @@ interface ISubnetActor {
     /// Called by peers looking to join a subnet.
     ///
     /// It implements the basic logic to onboard new peers to the subnet.
-    function join(string calldata networkAddr, FvmAddress calldata workerAddr) external payable;
+    function join(bytes calldata metadata) external payable;
 
     /// Called by peers looking to leave a subnet.
     function leave() external;
 
+    /// Method that allows a validator to increase their stake
+    function stake() external payable;
+
     /// Unregister the subnet from the hierarchy, making it no longer discoverable.
     function kill() external;
 
-    /// Tracks the accumulated rewards for each validator.
-    function reward(uint256 amount) external;
+    /// Valdiator claims their released collateral
+    function claim() external;
 
     /// SubmitCheckpoint accepts signed checkpoint votes for validators.
     function submitCheckpoint(

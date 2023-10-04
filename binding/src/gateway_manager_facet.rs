@@ -143,22 +143,6 @@ pub mod gateway_manager_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("releaseRewards"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("releaseRewards"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("amount"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("releaseStake"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("releaseStake"),
@@ -212,32 +196,6 @@ pub mod gateway_manager_facet {
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
-                    ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("target"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("AlreadyRegisteredSubnet"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("AlreadyRegisteredSubnet",),
@@ -255,13 +213,6 @@ pub mod gateway_manager_facet {
                     ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
-                        inputs: ::std::vec![],
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
                         inputs: ::std::vec![],
                     },],
                 ),
@@ -441,15 +392,6 @@ pub mod gateway_manager_facet {
                 .method_hash([107, 44, 30, 239], (to,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `releaseRewards` (0xf8703bb8) function
-        pub fn release_rewards(
-            &self,
-            amount: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
-            self.0
-                .method_hash([248, 112, 59, 184], amount)
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `releaseStake` (0x45f54485) function
         pub fn release_stake(
             &self,
@@ -474,39 +416,6 @@ pub mod gateway_manager_facet {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
-    }
-    ///Custom Error type `AddressEmptyCode` with signature `AddressEmptyCode(address)` and selector `0x9996b315`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "AddressEmptyCode", abi = "AddressEmptyCode(address)")]
-    pub struct AddressEmptyCode {
-        pub target: ::ethers::core::types::Address,
-    }
-    ///Custom Error type `AddressInsufficientBalance` with signature `AddressInsufficientBalance(address)` and selector `0xcd786059`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "AddressInsufficientBalance",
-        abi = "AddressInsufficientBalance(address)"
-    )]
-    pub struct AddressInsufficientBalance {
-        pub account: ::ethers::core::types::Address,
     }
     ///Custom Error type `AlreadyRegisteredSubnet` with signature `AlreadyRegisteredSubnet()` and selector `0x36a719be`
     #[derive(
@@ -547,19 +456,6 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "CannotReleaseZero", abi = "CannotReleaseZero()")]
     pub struct CannotReleaseZero;
-    ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
-    pub struct FailedInnerCall;
     ///Custom Error type `InsufficientFunds` with signature `InsufficientFunds()` and selector `0x356680b7`
     #[derive(
         Clone,
@@ -722,12 +618,9 @@ pub mod gateway_manager_facet {
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayManagerFacetErrors {
-        AddressEmptyCode(AddressEmptyCode),
-        AddressInsufficientBalance(AddressInsufficientBalance),
         AlreadyRegisteredSubnet(AlreadyRegisteredSubnet),
         CallFailed(CallFailed),
         CannotReleaseZero(CannotReleaseZero),
-        FailedInnerCall(FailedInnerCall),
         InsufficientFunds(InsufficientFunds),
         InvalidActorAddress(InvalidActorAddress),
         NotEmptySubnetCircSupply(NotEmptySubnetCircSupply),
@@ -754,15 +647,6 @@ pub mod gateway_manager_facet {
             {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::AddressEmptyCode(decoded));
-            }
-            if let Ok(decoded) =
-                <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::AddressInsufficientBalance(decoded));
-            }
             if let Ok(decoded) =
                 <AlreadyRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -774,9 +658,6 @@ pub mod gateway_manager_facet {
             if let Ok(decoded) = <CannotReleaseZero as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::CannotReleaseZero(decoded));
-            }
-            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::FailedInnerCall(decoded));
             }
             if let Ok(decoded) = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -835,16 +716,11 @@ pub mod gateway_manager_facet {
     impl ::ethers::core::abi::AbiEncode for GatewayManagerFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AddressEmptyCode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::AddressInsufficientBalance(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::AlreadyRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::CallFailed(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::CannotReleaseZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::FailedInnerCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InsufficientFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidActorAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -880,14 +756,6 @@ pub mod gateway_manager_facet {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
                 _ if selector
-                    == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <AlreadyRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -895,10 +763,6 @@ pub mod gateway_manager_facet {
                     == <CallFailed as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <CannotReleaseZero as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -954,12 +818,9 @@ pub mod gateway_manager_facet {
     impl ::core::fmt::Display for GatewayManagerFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::AlreadyRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CallFailed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InsufficientFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidActorAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEmptySubnetCircSupply(element) => ::core::fmt::Display::fmt(element, f),
@@ -983,16 +844,6 @@ pub mod gateway_manager_facet {
             Self::RevertString(value)
         }
     }
-    impl ::core::convert::From<AddressEmptyCode> for GatewayManagerFacetErrors {
-        fn from(value: AddressEmptyCode) -> Self {
-            Self::AddressEmptyCode(value)
-        }
-    }
-    impl ::core::convert::From<AddressInsufficientBalance> for GatewayManagerFacetErrors {
-        fn from(value: AddressInsufficientBalance) -> Self {
-            Self::AddressInsufficientBalance(value)
-        }
-    }
     impl ::core::convert::From<AlreadyRegisteredSubnet> for GatewayManagerFacetErrors {
         fn from(value: AlreadyRegisteredSubnet) -> Self {
             Self::AlreadyRegisteredSubnet(value)
@@ -1006,11 +857,6 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<CannotReleaseZero> for GatewayManagerFacetErrors {
         fn from(value: CannotReleaseZero) -> Self {
             Self::CannotReleaseZero(value)
-        }
-    }
-    impl ::core::convert::From<FailedInnerCall> for GatewayManagerFacetErrors {
-        fn from(value: FailedInnerCall) -> Self {
-            Self::FailedInnerCall(value)
         }
     }
     impl ::core::convert::From<InsufficientFunds> for GatewayManagerFacetErrors {
@@ -1163,21 +1009,6 @@ pub mod gateway_manager_facet {
     pub struct ReleaseCall {
         pub to: FvmAddress,
     }
-    ///Container type for all input parameters for the `releaseRewards` function with signature `releaseRewards(uint256)` and selector `0xf8703bb8`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "releaseRewards", abi = "releaseRewards(uint256)")]
-    pub struct ReleaseRewardsCall {
-        pub amount: ::ethers::core::types::U256,
-    }
     ///Container type for all input parameters for the `releaseStake` function with signature `releaseStake(uint256)` and selector `0x45f54485`
     #[derive(
         Clone,
@@ -1215,7 +1046,6 @@ pub mod gateway_manager_facet {
         NewMembership(NewMembershipCall),
         Register(RegisterCall),
         Release(ReleaseCall),
-        ReleaseRewards(ReleaseRewardsCall),
         ReleaseStake(ReleaseStakeCall),
         UpdateMembership(UpdateMembershipCall),
     }
@@ -1243,11 +1073,6 @@ pub mod gateway_manager_facet {
             if let Ok(decoded) = <ReleaseCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Release(decoded));
             }
-            if let Ok(decoded) =
-                <ReleaseRewardsCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::ReleaseRewards(decoded));
-            }
             if let Ok(decoded) = <ReleaseStakeCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::ReleaseStake(decoded));
@@ -1269,7 +1094,6 @@ pub mod gateway_manager_facet {
                 Self::NewMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Register(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Release(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ReleaseRewards(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ReleaseStake(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::UpdateMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
@@ -1284,7 +1108,6 @@ pub mod gateway_manager_facet {
                 Self::NewMembership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Register(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Release(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ReleaseRewards(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReleaseStake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UpdateMembership(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -1318,11 +1141,6 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<ReleaseCall> for GatewayManagerFacetCalls {
         fn from(value: ReleaseCall) -> Self {
             Self::Release(value)
-        }
-    }
-    impl ::core::convert::From<ReleaseRewardsCall> for GatewayManagerFacetCalls {
-        fn from(value: ReleaseRewardsCall) -> Self {
-            Self::ReleaseRewards(value)
         }
     }
     impl ::core::convert::From<ReleaseStakeCall> for GatewayManagerFacetCalls {

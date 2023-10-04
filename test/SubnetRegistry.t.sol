@@ -72,7 +72,6 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
         vm.expectRevert(WrongGateway.selector);
@@ -89,7 +88,6 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
         registry.newSubnetActor(params);
@@ -107,7 +105,6 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
         });
         registry.newSubnetActor(params);
@@ -145,7 +142,6 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: _minActivationCollateral,
             minValidators: _minValidators,
             bottomUpCheckPeriod: _checkPeriod,
-            topDownCheckPeriod: _checkPeriod,
             majorityPercentage: _majorityPercentage
         });
         registry.newSubnetActor(params);

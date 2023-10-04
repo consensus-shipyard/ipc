@@ -79,10 +79,10 @@ struct StakingReleaseQueue {
 struct Validator {
     uint256 confirmedCollateral;
     uint256 totalCollateral;
-    /// The data associated with the validator, i.e. offchain network address.
+    /// The metadata associated with the validator, i.e. offchain network address.
     /// This information is not important to the protocol, offchain should know how
     /// to parse or decode the bytes.
-    bytes data;
+    bytes metadata;
 }
 
 /// Keeping track of the list of validators. There are two types of validators:

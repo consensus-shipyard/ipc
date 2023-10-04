@@ -19,6 +19,12 @@ library LibStakingChangeSet {
         uint64 configurationNumber = changes.nextConfigurationNumber;
         changes.nextConfigurationNumber = configurationNumber + 1;
 
+        changes.changes[configurationNumber] = StakingChange({
+            op: StakingOperation.Withdraw,
+            validator: validator,
+            amount: amount
+        });
+
         emit NewStakingRequest({
             op: StakingOperation.Withdraw,
             validator: validator,
@@ -31,6 +37,12 @@ library LibStakingChangeSet {
     function depositRequest(StakingChangeSet storage changes, address validator, uint256 amount) internal {
         uint64 configurationNumber = changes.nextConfigurationNumber;
         changes.nextConfigurationNumber = configurationNumber + 1;
+
+        changes.changes[configurationNumber] = StakingChange({
+            op: StakingOperation.Deposit,
+            validator: validator,
+            amount: amount
+        });
 
         emit NewStakingRequest({
             op: StakingOperation.Deposit,
@@ -184,8 +196,8 @@ library LibValidatorSet {
     }
 
     /// @notice Set validator data
-    function setData(ValidatorSet storage validators, address validator, bytes calldata data) internal {
-        validators.validators[validator].data = data;
+    function setMetadata(ValidatorSet storage validators, address validator, bytes calldata metadata) internal {
+        validators.validators[validator].metadata = metadata;
     }
 
     /***********************************************************************
@@ -349,11 +361,22 @@ library LibStaking {
     event ConfigurantionNumberConfirmed(uint64 number);
     event CollateralClaimed(address validator, uint256 amount);
 
+    /// @notice Checks if the validator is an active validator
+    function isActiveValidator(address validator) internal view returns (bool) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return s.validatorSet.activeValidators.contains(validator);
+    }
+
+    /// @notice Checks if the validator is a waiting validator
+    function isWaitingValidator(address validator) internal view returns (bool) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return s.validatorSet.waitingValidators.contains(validator);
+    }
+
     /// @notice Checks if the validator has staked before
     function hasStaked(address validator) internal view returns (bool) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return
-            s.validatorSet.waitingValidators.contains(validator) || s.validatorSet.activeValidators.contains(validator);
+        return s.validatorSet.validators[validator].totalCollateral > 0;
     }
 
     /// @notice Gets the total number of validators, including active and waiting
@@ -368,10 +391,10 @@ library LibStaking {
         return s.validatorSet.validators[validator].totalCollateral;
     }
 
-    /// @notice Set the validator data
-    function setValidatorData(address validator, bytes calldata data) internal {
+    /// @notice Set the validator metadata
+    function setValidatorMetadata(address validator, bytes calldata data) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        s.validatorSet.setData(validator, data);
+        s.validatorSet.setMetadata(validator, data);
     }
 
     /// @notice Deposit the collateral

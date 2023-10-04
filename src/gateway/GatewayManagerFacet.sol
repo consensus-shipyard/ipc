@@ -6,8 +6,8 @@ import {CrossMsg} from "../structs/Checkpoint.sol";
 import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
+import {Membership} from "../structs/Validator.sol";
 import {AlreadyInitialized, AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
-import {ValidatorInfo, ValidatorSet, Membership} from "../structs/Validator.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -89,19 +89,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         payable(subnet.id.getActor()).sendValue(amount);
     }
 
-    function releaseRewards(uint256 amount) external nonReentrant {
-        if (amount == 0) {
-            revert CannotReleaseZero();
-        }
-
-        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
-        if (!registered) {
-            revert NotRegisteredSubnet();
-        }
-
-        payable(subnet.id.getActor()).sendValue(amount);
-    }
-
     /// @notice kill an existing subnet. It's balance must be empty
     function kill() external {
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
@@ -135,8 +122,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         // commit top-down message.
         LibGateway.commitTopDownMsg(crossMsg);
-
-        LibGateway.distributeRewards(subnetId.getActor(), s.crossMsgFee);
     }
 
     /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds

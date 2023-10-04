@@ -16,28 +16,6 @@ pub mod subnet_actor_getter_facet {
             constructor: ::core::option::Option::None,
             functions: ::core::convert::From::from([
                 (
-                    ::std::borrow::ToOwned::to_owned("accumulatedRewards"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("accumulatedRewards"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("a"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("bottomUpCheckPeriod"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("bottomUpCheckPeriod",),
@@ -145,17 +123,26 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("getConfigurationNumber"),
+                    ::std::borrow::ToOwned::to_owned("getConfigurationNumbers"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("getConfigurationNumber",),
+                        name: ::std::borrow::ToOwned::to_owned("getConfigurationNumbers",),
                         inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
+                        outputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::string::String::new(),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint64"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::string::String::new(),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint64"),
+                                ),
+                            },
+                        ],
                         constant: ::core::option::Option::None,
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
                     },],
@@ -184,98 +171,25 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("getRangeOfValidators"),
+                    ::std::borrow::ToOwned::to_owned("getValidator"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("getRangeOfValidators",),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("offset"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("uint256"),
-                                ),
-                            },
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("limit"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("uint256"),
-                                ),
-                            },
-                        ],
-                        outputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::string::String::new(),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                    ::std::boxed::Box::new(
-                                        ::ethers::core::abi::ethabi::ParamType::Address,
-                                    ),
-                                ),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("address[]"),
-                                ),
-                            },
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::string::String::new(),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("uint256"),
-                                ),
-                            },
-                        ],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("getValidatorSet"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("getValidatorSet"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                ::ethers::core::abi::ethabi::ParamType::Array(
-                                    ::std::boxed::Box::new(
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(
-                                                        8usize
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                ],
-                                            ),
-                                            ::ethers::core::abi::ethabi::ParamType::String,
-                                        ],),
-                                    ),
-                                ),
-                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                            ],),
+                        name: ::std::borrow::ToOwned::to_owned("getValidator"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("validatorAddress"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
                             internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("struct ValidatorSet"),
+                                ::std::borrow::ToOwned::to_owned("address"),
                             ),
                         },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("getValidators"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("getValidators"),
-                        inputs: ::std::vec![],
                         outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                ::std::boxed::Box::new(
-                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                ),
-                            ),
+                            name: ::std::borrow::ToOwned::to_owned("validator"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                ::ethers::core::abi::ethabi::ParamType::Bytes,
+                            ],),
                             internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address[]"),
+                                ::std::borrow::ToOwned::to_owned("struct Validator"),
                             ),
                         },],
                         constant: ::core::option::Option::None,
@@ -292,6 +206,28 @@ pub mod subnet_actor_getter_facet {
                             kind: ::ethers::core::abi::ethabi::ParamType::Address,
                             internal_type: ::core::option::Option::Some(
                                 ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("isActiveValidator"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("isActiveValidator"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("validator"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bool"),
                             ),
                         },],
                         constant: ::core::option::Option::None,
@@ -363,28 +299,6 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("stake"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("stake"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("a"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("status"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("status"),
@@ -401,22 +315,6 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("topDownCheckPeriod"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("topDownCheckPeriod"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint64"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("totalStake"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("totalStake"),
@@ -426,91 +324,6 @@ pub mod subnet_actor_getter_facet {
                             kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
                             internal_type: ::core::option::Option::Some(
                                 ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("validatorAt"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("validatorAt"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("index"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("validatorCount"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("validatorCount"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("validatorNetAddr"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("validatorNetAddr"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("addr"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::String,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("string"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("validatorWorkerAddr"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("validatorWorkerAddr",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("addr"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                ::ethers::core::abi::ethabi::ParamType::Bytes,
-                            ],),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("struct FvmAddress"),
                             ),
                         },],
                         constant: ::core::option::Option::None,
@@ -564,15 +377,6 @@ pub mod subnet_actor_getter_facet {
                 client,
             ))
         }
-        ///Calls the contract's `accumulatedRewards` (0x73f273fc) function
-        pub fn accumulated_rewards(
-            &self,
-            a: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([115, 242, 115, 252], a)
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `bottomUpCheckPeriod` (0x06c46853) function
         pub fn bottom_up_check_period(&self) -> ::ethers::contract::builders::ContractCall<M, u64> {
             self.0
@@ -603,12 +407,12 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([142, 243, 247, 97], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getConfigurationNumber` (0x2e19ed6a) function
-        pub fn get_configuration_number(
+        ///Calls the contract's `getConfigurationNumbers` (0x38a210b3) function
+        pub fn get_configuration_numbers(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        ) -> ::ethers::contract::builders::ContractCall<M, (u64, u64)> {
             self.0
-                .method_hash([46, 25, 237, 106], ())
+                .method_hash([56, 162, 16, 179], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getParent` (0x80f76021) function
@@ -617,39 +421,13 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([128, 247, 96, 33], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getRangeOfValidators` (0x1a1531fc) function
-        pub fn get_range_of_validators(
+        ///Calls the contract's `getValidator` (0x1904bb2e) function
+        pub fn get_validator(
             &self,
-            offset: ::ethers::core::types::U256,
-            limit: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            (
-                ::std::vec::Vec<::ethers::core::types::Address>,
-                ::ethers::core::types::U256,
-            ),
-        > {
+            validator_address: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, Validator> {
             self.0
-                .method_hash([26, 21, 49, 252], (offset, limit))
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `getValidatorSet` (0xcf331250) function
-        pub fn get_validator_set(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ValidatorSet> {
-            self.0
-                .method_hash([207, 51, 18, 80], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `getValidators` (0xb7ab4db5) function
-        pub fn get_validators(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::std::vec::Vec<::ethers::core::types::Address>,
-        > {
-            self.0
-                .method_hash([183, 171, 77, 181], ())
+                .method_hash([25, 4, 187, 46], validator_address)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `ipcGatewayAddr` (0xcfca2824) function
@@ -658,6 +436,15 @@ pub mod subnet_actor_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([207, 202, 40, 36], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `isActiveValidator` (0x40550a1c) function
+        pub fn is_active_validator(
+            &self,
+            validator: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+            self.0
+                .method_hash([64, 85, 10, 28], validator)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `minActivationCollateral` (0x9e33bd02) function
@@ -688,25 +475,10 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([95, 131, 45, 191], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `stake` (0x26476204) function
-        pub fn stake(
-            &self,
-            a: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([38, 71, 98, 4], a)
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `status` (0x200d2ed2) function
         pub fn status(&self) -> ::ethers::contract::builders::ContractCall<M, u8> {
             self.0
                 .method_hash([32, 13, 46, 210], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `topDownCheckPeriod` (0x7d9740f4) function
-        pub fn top_down_check_period(&self) -> ::ethers::contract::builders::ContractCall<M, u64> {
-            self.0
-                .method_hash([125, 151, 64, 244], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `totalStake` (0x8b0e9f3f) function
@@ -717,41 +489,6 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([139, 14, 159, 63], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `validatorAt` (0x32e0aa1f) function
-        pub fn validator_at(
-            &self,
-            index: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
-            self.0
-                .method_hash([50, 224, 170, 31], index)
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `validatorCount` (0x0f43a677) function
-        pub fn validator_count(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([15, 67, 166, 119], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `validatorNetAddr` (0x950c8d46) function
-        pub fn validator_net_addr(
-            &self,
-            addr: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
-            self.0
-                .method_hash([149, 12, 141, 70], addr)
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `validatorWorkerAddr` (0x74f189b4) function
-        pub fn validator_worker_addr(
-            &self,
-            addr: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, FvmAddress> {
-            self.0
-                .method_hash([116, 241, 137, 180], addr)
-                .expect("method not found (this should never happen)")
-        }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
         for SubnetActorGetterFacet<M>
@@ -759,21 +496,6 @@ pub mod subnet_actor_getter_facet {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
-    }
-    ///Container type for all input parameters for the `accumulatedRewards` function with signature `accumulatedRewards(address)` and selector `0x73f273fc`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "accumulatedRewards", abi = "accumulatedRewards(address)")]
-    pub struct AccumulatedRewardsCall {
-        pub a: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `bottomUpCheckPeriod` function with signature `bottomUpCheckPeriod()` and selector `0x06c46853`
     #[derive(
@@ -837,7 +559,7 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "consensus", abi = "consensus()")]
     pub struct ConsensusCall;
-    ///Container type for all input parameters for the `getConfigurationNumber` function with signature `getConfigurationNumber()` and selector `0x2e19ed6a`
+    ///Container type for all input parameters for the `getConfigurationNumbers` function with signature `getConfigurationNumbers()` and selector `0x38a210b3`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -848,8 +570,8 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "getConfigurationNumber", abi = "getConfigurationNumber()")]
-    pub struct GetConfigurationNumberCall;
+    #[ethcall(name = "getConfigurationNumbers", abi = "getConfigurationNumbers()")]
+    pub struct GetConfigurationNumbersCall;
     ///Container type for all input parameters for the `getParent` function with signature `getParent()` and selector `0x80f76021`
     #[derive(
         Clone,
@@ -863,7 +585,7 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "getParent", abi = "getParent()")]
     pub struct GetParentCall;
-    ///Container type for all input parameters for the `getRangeOfValidators` function with signature `getRangeOfValidators(uint256,uint256)` and selector `0x1a1531fc`
+    ///Container type for all input parameters for the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -874,40 +596,10 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash,
     )]
-    #[ethcall(
-        name = "getRangeOfValidators",
-        abi = "getRangeOfValidators(uint256,uint256)"
-    )]
-    pub struct GetRangeOfValidatorsCall {
-        pub offset: ::ethers::core::types::U256,
-        pub limit: ::ethers::core::types::U256,
+    #[ethcall(name = "getValidator", abi = "getValidator(address)")]
+    pub struct GetValidatorCall {
+        pub validator_address: ::ethers::core::types::Address,
     }
-    ///Container type for all input parameters for the `getValidatorSet` function with signature `getValidatorSet()` and selector `0xcf331250`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "getValidatorSet", abi = "getValidatorSet()")]
-    pub struct GetValidatorSetCall;
-    ///Container type for all input parameters for the `getValidators` function with signature `getValidators()` and selector `0xb7ab4db5`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "getValidators", abi = "getValidators()")]
-    pub struct GetValidatorsCall;
     ///Container type for all input parameters for the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
         Clone,
@@ -921,6 +613,21 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "ipcGatewayAddr", abi = "ipcGatewayAddr()")]
     pub struct IpcGatewayAddrCall;
+    ///Container type for all input parameters for the `isActiveValidator` function with signature `isActiveValidator(address)` and selector `0x40550a1c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "isActiveValidator", abi = "isActiveValidator(address)")]
+    pub struct IsActiveValidatorCall {
+        pub validator: ::ethers::core::types::Address,
+    }
     ///Container type for all input parameters for the `minActivationCollateral` function with signature `minActivationCollateral()` and selector `0x9e33bd02`
     #[derive(
         Clone,
@@ -976,21 +683,6 @@ pub mod subnet_actor_getter_facet {
         abi = "prevExecutedCheckpointHash()"
     )]
     pub struct PrevExecutedCheckpointHashCall;
-    ///Container type for all input parameters for the `stake` function with signature `stake(address)` and selector `0x26476204`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "stake", abi = "stake(address)")]
-    pub struct StakeCall {
-        pub a: ::ethers::core::types::Address,
-    }
     ///Container type for all input parameters for the `status` function with signature `status()` and selector `0x200d2ed2`
     #[derive(
         Clone,
@@ -1004,19 +696,6 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "status", abi = "status()")]
     pub struct StatusCall;
-    ///Container type for all input parameters for the `topDownCheckPeriod` function with signature `topDownCheckPeriod()` and selector `0x7d9740f4`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "topDownCheckPeriod", abi = "topDownCheckPeriod()")]
-    pub struct TopDownCheckPeriodCall;
     ///Container type for all input parameters for the `totalStake` function with signature `totalStake()` and selector `0x8b0e9f3f`
     #[derive(
         Clone,
@@ -1030,101 +709,30 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "totalStake", abi = "totalStake()")]
     pub struct TotalStakeCall;
-    ///Container type for all input parameters for the `validatorAt` function with signature `validatorAt(uint256)` and selector `0x32e0aa1f`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "validatorAt", abi = "validatorAt(uint256)")]
-    pub struct ValidatorAtCall {
-        pub index: ::ethers::core::types::U256,
-    }
-    ///Container type for all input parameters for the `validatorCount` function with signature `validatorCount()` and selector `0x0f43a677`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "validatorCount", abi = "validatorCount()")]
-    pub struct ValidatorCountCall;
-    ///Container type for all input parameters for the `validatorNetAddr` function with signature `validatorNetAddr(address)` and selector `0x950c8d46`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "validatorNetAddr", abi = "validatorNetAddr(address)")]
-    pub struct ValidatorNetAddrCall {
-        pub addr: ::ethers::core::types::Address,
-    }
-    ///Container type for all input parameters for the `validatorWorkerAddr` function with signature `validatorWorkerAddr(address)` and selector `0x74f189b4`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "validatorWorkerAddr", abi = "validatorWorkerAddr(address)")]
-    pub struct ValidatorWorkerAddrCall {
-        pub addr: ::ethers::core::types::Address,
-    }
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorGetterFacetCalls {
-        AccumulatedRewards(AccumulatedRewardsCall),
         BottomUpCheckPeriod(BottomUpCheckPeriodCall),
         BottomUpCheckpointAtEpoch(BottomUpCheckpointAtEpochCall),
         BottomUpCheckpointHashAtEpoch(BottomUpCheckpointHashAtEpochCall),
         Consensus(ConsensusCall),
-        GetConfigurationNumber(GetConfigurationNumberCall),
+        GetConfigurationNumbers(GetConfigurationNumbersCall),
         GetParent(GetParentCall),
-        GetRangeOfValidators(GetRangeOfValidatorsCall),
-        GetValidatorSet(GetValidatorSetCall),
-        GetValidators(GetValidatorsCall),
+        GetValidator(GetValidatorCall),
         IpcGatewayAddr(IpcGatewayAddrCall),
+        IsActiveValidator(IsActiveValidatorCall),
         MinActivationCollateral(MinActivationCollateralCall),
         MinValidators(MinValidatorsCall),
         Name(NameCall),
         PrevExecutedCheckpointHash(PrevExecutedCheckpointHashCall),
-        Stake(StakeCall),
         Status(StatusCall),
-        TopDownCheckPeriod(TopDownCheckPeriodCall),
         TotalStake(TotalStakeCall),
-        ValidatorAt(ValidatorAtCall),
-        ValidatorCount(ValidatorCountCall),
-        ValidatorNetAddr(ValidatorNetAddrCall),
-        ValidatorWorkerAddr(ValidatorWorkerAddrCall),
     }
     impl ::ethers::core::abi::AbiDecode for SubnetActorGetterFacetCalls {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <AccumulatedRewardsCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::AccumulatedRewards(decoded));
-            }
             if let Ok(decoded) =
                 <BottomUpCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -1144,31 +752,26 @@ pub mod subnet_actor_getter_facet {
                 return Ok(Self::Consensus(decoded));
             }
             if let Ok(decoded) =
-                <GetConfigurationNumberCall as ::ethers::core::abi::AbiDecode>::decode(data)
+                <GetConfigurationNumbersCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
-                return Ok(Self::GetConfigurationNumber(decoded));
+                return Ok(Self::GetConfigurationNumbers(decoded));
             }
             if let Ok(decoded) = <GetParentCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetParent(decoded));
             }
-            if let Ok(decoded) =
-                <GetRangeOfValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            if let Ok(decoded) = <GetValidatorCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
-                return Ok(Self::GetRangeOfValidators(decoded));
-            }
-            if let Ok(decoded) =
-                <GetValidatorSetCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::GetValidatorSet(decoded));
-            }
-            if let Ok(decoded) = <GetValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::GetValidators(decoded));
+                return Ok(Self::GetValidator(decoded));
             }
             if let Ok(decoded) =
                 <IpcGatewayAddrCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::IpcGatewayAddr(decoded));
+            }
+            if let Ok(decoded) =
+                <IsActiveValidatorCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::IsActiveValidator(decoded));
             }
             if let Ok(decoded) =
                 <MinActivationCollateralCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1187,37 +790,11 @@ pub mod subnet_actor_getter_facet {
             {
                 return Ok(Self::PrevExecutedCheckpointHash(decoded));
             }
-            if let Ok(decoded) = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::Stake(decoded));
-            }
             if let Ok(decoded) = <StatusCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Status(decoded));
             }
-            if let Ok(decoded) =
-                <TopDownCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::TopDownCheckPeriod(decoded));
-            }
             if let Ok(decoded) = <TotalStakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalStake(decoded));
-            }
-            if let Ok(decoded) = <ValidatorAtCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::ValidatorAt(decoded));
-            }
-            if let Ok(decoded) =
-                <ValidatorCountCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::ValidatorCount(decoded));
-            }
-            if let Ok(decoded) =
-                <ValidatorNetAddrCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::ValidatorNetAddr(decoded));
-            }
-            if let Ok(decoded) =
-                <ValidatorWorkerAddrCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::ValidatorWorkerAddr(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
@@ -1225,9 +802,6 @@ pub mod subnet_actor_getter_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorGetterFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::AccumulatedRewards(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::BottomUpCheckPeriod(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1238,16 +812,13 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::Consensus(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetConfigurationNumber(element) => {
+                Self::GetConfigurationNumbers(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetParent(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetRangeOfValidators(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetValidatorSet(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetValidators(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IpcGatewayAddr(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsActiveValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::MinActivationCollateral(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1256,55 +827,32 @@ pub mod subnet_actor_getter_facet {
                 Self::PrevExecutedCheckpointHash(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::Stake(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Status(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TopDownCheckPeriod(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::TotalStake(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ValidatorAt(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ValidatorCount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ValidatorNetAddr(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ValidatorWorkerAddr(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
             }
         }
     }
     impl ::core::fmt::Display for SubnetActorGetterFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AccumulatedRewards(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckPeriod(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckpointAtEpoch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckpointHashAtEpoch(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::Consensus(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetConfigurationNumbers(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetParent(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetRangeOfValidators(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetValidatorSet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetValidators(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IpcGatewayAddr(element) => ::core::fmt::Display::fmt(element, f),
+                Self::IsActiveValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinActivationCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Name(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PrevExecutedCheckpointHash(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Stake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Status(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TopDownCheckPeriod(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalStake(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorAt(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorCount(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorNetAddr(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorWorkerAddr(element) => ::core::fmt::Display::fmt(element, f),
             }
-        }
-    }
-    impl ::core::convert::From<AccumulatedRewardsCall> for SubnetActorGetterFacetCalls {
-        fn from(value: AccumulatedRewardsCall) -> Self {
-            Self::AccumulatedRewards(value)
         }
     }
     impl ::core::convert::From<BottomUpCheckPeriodCall> for SubnetActorGetterFacetCalls {
@@ -1327,9 +875,9 @@ pub mod subnet_actor_getter_facet {
             Self::Consensus(value)
         }
     }
-    impl ::core::convert::From<GetConfigurationNumberCall> for SubnetActorGetterFacetCalls {
-        fn from(value: GetConfigurationNumberCall) -> Self {
-            Self::GetConfigurationNumber(value)
+    impl ::core::convert::From<GetConfigurationNumbersCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetConfigurationNumbersCall) -> Self {
+            Self::GetConfigurationNumbers(value)
         }
     }
     impl ::core::convert::From<GetParentCall> for SubnetActorGetterFacetCalls {
@@ -1337,24 +885,19 @@ pub mod subnet_actor_getter_facet {
             Self::GetParent(value)
         }
     }
-    impl ::core::convert::From<GetRangeOfValidatorsCall> for SubnetActorGetterFacetCalls {
-        fn from(value: GetRangeOfValidatorsCall) -> Self {
-            Self::GetRangeOfValidators(value)
-        }
-    }
-    impl ::core::convert::From<GetValidatorSetCall> for SubnetActorGetterFacetCalls {
-        fn from(value: GetValidatorSetCall) -> Self {
-            Self::GetValidatorSet(value)
-        }
-    }
-    impl ::core::convert::From<GetValidatorsCall> for SubnetActorGetterFacetCalls {
-        fn from(value: GetValidatorsCall) -> Self {
-            Self::GetValidators(value)
+    impl ::core::convert::From<GetValidatorCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetValidatorCall) -> Self {
+            Self::GetValidator(value)
         }
     }
     impl ::core::convert::From<IpcGatewayAddrCall> for SubnetActorGetterFacetCalls {
         fn from(value: IpcGatewayAddrCall) -> Self {
             Self::IpcGatewayAddr(value)
+        }
+    }
+    impl ::core::convert::From<IsActiveValidatorCall> for SubnetActorGetterFacetCalls {
+        fn from(value: IsActiveValidatorCall) -> Self {
+            Self::IsActiveValidator(value)
         }
     }
     impl ::core::convert::From<MinActivationCollateralCall> for SubnetActorGetterFacetCalls {
@@ -1377,19 +920,9 @@ pub mod subnet_actor_getter_facet {
             Self::PrevExecutedCheckpointHash(value)
         }
     }
-    impl ::core::convert::From<StakeCall> for SubnetActorGetterFacetCalls {
-        fn from(value: StakeCall) -> Self {
-            Self::Stake(value)
-        }
-    }
     impl ::core::convert::From<StatusCall> for SubnetActorGetterFacetCalls {
         fn from(value: StatusCall) -> Self {
             Self::Status(value)
-        }
-    }
-    impl ::core::convert::From<TopDownCheckPeriodCall> for SubnetActorGetterFacetCalls {
-        fn from(value: TopDownCheckPeriodCall) -> Self {
-            Self::TopDownCheckPeriod(value)
         }
     }
     impl ::core::convert::From<TotalStakeCall> for SubnetActorGetterFacetCalls {
@@ -1397,38 +930,6 @@ pub mod subnet_actor_getter_facet {
             Self::TotalStake(value)
         }
     }
-    impl ::core::convert::From<ValidatorAtCall> for SubnetActorGetterFacetCalls {
-        fn from(value: ValidatorAtCall) -> Self {
-            Self::ValidatorAt(value)
-        }
-    }
-    impl ::core::convert::From<ValidatorCountCall> for SubnetActorGetterFacetCalls {
-        fn from(value: ValidatorCountCall) -> Self {
-            Self::ValidatorCount(value)
-        }
-    }
-    impl ::core::convert::From<ValidatorNetAddrCall> for SubnetActorGetterFacetCalls {
-        fn from(value: ValidatorNetAddrCall) -> Self {
-            Self::ValidatorNetAddr(value)
-        }
-    }
-    impl ::core::convert::From<ValidatorWorkerAddrCall> for SubnetActorGetterFacetCalls {
-        fn from(value: ValidatorWorkerAddrCall) -> Self {
-            Self::ValidatorWorkerAddr(value)
-        }
-    }
-    ///Container type for all return fields from the `accumulatedRewards` function with signature `accumulatedRewards(address)` and selector `0x73f273fc`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct AccumulatedRewardsReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `bottomUpCheckPeriod` function with signature `bottomUpCheckPeriod()` and selector `0x06c46853`
     #[derive(
         Clone,
@@ -1480,7 +981,7 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct ConsensusReturn(pub u8);
-    ///Container type for all return fields from the `getConfigurationNumber` function with signature `getConfigurationNumber()` and selector `0x2e19ed6a`
+    ///Container type for all return fields from the `getConfigurationNumbers` function with signature `getConfigurationNumbers()` and selector `0x38a210b3`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1491,7 +992,7 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash,
     )]
-    pub struct GetConfigurationNumberReturn(pub ::ethers::core::types::U256);
+    pub struct GetConfigurationNumbersReturn(pub u64, pub u64);
     ///Container type for all return fields from the `getParent` function with signature `getParent()` and selector `0x80f76021`
     #[derive(
         Clone,
@@ -1504,7 +1005,7 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct GetParentReturn(pub SubnetID);
-    ///Container type for all return fields from the `getRangeOfValidators` function with signature `getRangeOfValidators(uint256,uint256)` and selector `0x1a1531fc`
+    ///Container type for all return fields from the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1515,34 +1016,9 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash,
     )]
-    pub struct GetRangeOfValidatorsReturn(
-        pub ::std::vec::Vec<::ethers::core::types::Address>,
-        pub ::ethers::core::types::U256,
-    );
-    ///Container type for all return fields from the `getValidatorSet` function with signature `getValidatorSet()` and selector `0xcf331250`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct GetValidatorSetReturn(pub ValidatorSet);
-    ///Container type for all return fields from the `getValidators` function with signature `getValidators()` and selector `0xb7ab4db5`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct GetValidatorsReturn(pub ::std::vec::Vec<::ethers::core::types::Address>);
+    pub struct GetValidatorReturn {
+        pub validator: Validator,
+    }
     ///Container type for all return fields from the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
         Clone,
@@ -1555,6 +1031,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct IpcGatewayAddrReturn(pub ::ethers::core::types::Address);
+    ///Container type for all return fields from the `isActiveValidator` function with signature `isActiveValidator(address)` and selector `0x40550a1c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct IsActiveValidatorReturn(pub bool);
     ///Container type for all return fields from the `minActivationCollateral` function with signature `minActivationCollateral()` and selector `0x9e33bd02`
     #[derive(
         Clone,
@@ -1603,18 +1091,6 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct PrevExecutedCheckpointHashReturn(pub [u8; 32]);
-    ///Container type for all return fields from the `stake` function with signature `stake(address)` and selector `0x26476204`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct StakeReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `status` function with signature `status()` and selector `0x200d2ed2`
     #[derive(
         Clone,
@@ -1627,18 +1103,6 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct StatusReturn(pub u8);
-    ///Container type for all return fields from the `topDownCheckPeriod` function with signature `topDownCheckPeriod()` and selector `0x7d9740f4`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct TopDownCheckPeriodReturn(pub u64);
     ///Container type for all return fields from the `totalStake` function with signature `totalStake()` and selector `0x8b0e9f3f`
     #[derive(
         Clone,
@@ -1651,54 +1115,6 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct TotalStakeReturn(pub ::ethers::core::types::U256);
-    ///Container type for all return fields from the `validatorAt` function with signature `validatorAt(uint256)` and selector `0x32e0aa1f`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct ValidatorAtReturn(pub ::ethers::core::types::Address);
-    ///Container type for all return fields from the `validatorCount` function with signature `validatorCount()` and selector `0x0f43a677`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct ValidatorCountReturn(pub ::ethers::core::types::U256);
-    ///Container type for all return fields from the `validatorNetAddr` function with signature `validatorNetAddr(address)` and selector `0x950c8d46`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct ValidatorNetAddrReturn(pub ::std::string::String);
-    ///Container type for all return fields from the `validatorWorkerAddr` function with signature `validatorWorkerAddr(address)` and selector `0x74f189b4`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct ValidatorWorkerAddrReturn(pub FvmAddress);
     ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`
     #[derive(
         Clone,
@@ -1717,21 +1133,6 @@ pub mod subnet_actor_getter_facet {
         pub next_configuration_number: u64,
         pub cross_messages_hash: [u8; 32],
     }
-    ///`FvmAddress(uint8,bytes)`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct FvmAddress {
-        pub addr_type: u8,
-        pub payload: ::ethers::core::types::Bytes,
-    }
     ///`SubnetID(uint64,address[])`
     #[derive(
         Clone,
@@ -1747,7 +1148,7 @@ pub mod subnet_actor_getter_facet {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
     }
-    ///`ValidatorInfo(address,uint256,(uint8,bytes),string)`
+    ///`Validator(uint256,uint256,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1758,25 +1159,9 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash,
     )]
-    pub struct ValidatorInfo {
-        pub addr: ::ethers::core::types::Address,
-        pub weight: ::ethers::core::types::U256,
-        pub worker_addr: FvmAddress,
-        pub net_addresses: ::std::string::String,
-    }
-    ///`ValidatorSet((address,uint256,(uint8,bytes),string)[],uint64)`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct ValidatorSet {
-        pub validators: ::std::vec::Vec<ValidatorInfo>,
-        pub configuration_number: u64,
+    pub struct Validator {
+        pub confirmed_collateral: ::ethers::core::types::U256,
+        pub total_collateral: ::ethers::core::types::U256,
+        pub metadata: ::ethers::core::types::Bytes,
     }
 }

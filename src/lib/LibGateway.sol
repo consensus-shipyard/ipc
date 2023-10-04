@@ -185,17 +185,6 @@ library LibGateway {
         s.bottomUpNonce += 1;
     }
 
-    /// @notice distribute rewards to validators in child subnet
-    /// @param to - the address of the target subnet contract
-    /// @param amount - the amount of rewards to distribute
-    function distributeRewards(address to, uint256 amount) internal {
-        if (amount == 0) {
-            return;
-        }
-        // slither-disable-next-line unused-return
-        Address.functionCall(to.normalize(), abi.encodeCall(ISubnetActor.reward, amount));
-    }
-
     /// @notice get the list of top down messages from block number, we may also consider introducing pagination.
     /// @param subnetId - The subnet id to fetch messages from
     /// @param fromBlock - The starting block to get top down messages, inclusive.

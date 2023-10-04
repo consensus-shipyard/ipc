@@ -86,9 +86,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
         _applyMessages(commit.subnetID, messages);
 
-        uint256 fee = 0;
-
-        LibGateway.distributeRewards(msg.sender, fee);
+        // TODO: distribute rewards to validators for their service executing a checkpoint
     }
 
     /// @notice commit the ipc parent finality into storage

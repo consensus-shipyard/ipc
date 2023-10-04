@@ -36,14 +36,9 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         }
 
         // commit cross-message for propagation
-        (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(crossMsg);
+        (bool shouldBurn, ) = _commitCrossMessage(crossMsg);
 
-        _crossMsgSideEffects({
-            v: crossMsg.message.value,
-            toSubnetId: crossMsg.message.to.subnetId.down(s.networkName),
-            shouldBurn: shouldBurn,
-            shouldDistributeRewards: shouldDistributeRewards
-        });
+        _crossMsgSideEffects({v: crossMsg.message.value, shouldBurn: shouldBurn});
     }
 
     /**
@@ -53,20 +48,14 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     function propagate(bytes32 msgCid) external payable hasFee {
         CrossMsg storage crossMsg = s.postbox[msgCid];
 
-        (bool shouldBurn, bool shouldDistributeRewards) = _commitCrossMessage(crossMsg);
+        (bool shouldBurn, ) = _commitCrossMessage(crossMsg);
         // We must delete the message first to prevent potential re-entrancies,
         // and as the message is deleted and we don't have a reference to the object
         // anymore, we need to pull the data from the message to trigger the side-effects.
         uint256 v = crossMsg.message.value;
-        SubnetID memory toSubnetId = crossMsg.message.to.subnetId.down(s.networkName);
         delete s.postbox[msgCid];
 
-        _crossMsgSideEffects({
-            v: v,
-            toSubnetId: toSubnetId,
-            shouldBurn: shouldBurn,
-            shouldDistributeRewards: shouldDistributeRewards
-        });
+        _crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
 
         uint256 feeRemainder = msg.value - s.crossMsgFee;
 
@@ -125,22 +114,11 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      * and propagates the corresponding rewards.
      *
      * @param v - the value of the committed cross-net message
-     * @param toSubnetId - the destination subnet of the committed cross-net message
      * @param shouldBurn - flag if the message should burn funds
-     * @param shouldDistributeRewards - flag if the message should distribute rewards
      */
-    function _crossMsgSideEffects(
-        uint256 v,
-        SubnetID memory toSubnetId,
-        bool shouldBurn,
-        bool shouldDistributeRewards
-    ) internal {
+    function _crossMsgSideEffects(uint256 v, bool shouldBurn) internal {
         if (shouldBurn) {
             payable(BURNT_FUNDS_ACTOR).sendValue(v);
-        }
-
-        if (shouldDistributeRewards) {
-            LibGateway.distributeRewards(toSubnetId.getActor(), s.crossMsgFee);
         }
     }
 }

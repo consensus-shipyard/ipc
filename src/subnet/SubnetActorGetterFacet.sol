@@ -7,7 +7,7 @@ import {NotEnoughValidatorsInSubnet} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID} from "../structs/Subnet.sol";
-import {ValidatorInfo, ValidatorSet} from "../structs/Validator.sol";
+import {SubnetID, Validator} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
@@ -15,15 +15,15 @@ import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {LibStaking} from "../lib/LibStaking.sol";
 
 contract SubnetActorGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
-    using FilAddress for address;
     using Address for address payable;
 
-    // slither-disable-next-line uninitialized-state-variables
+    // slither-disable-next-line uninitialized-state
     SubnetActorStorage internal s;
 
     /// @notice get the parent subnet id
@@ -45,14 +45,6 @@ contract SubnetActorGetterFacet {
         return s.prevExecutedCheckpointHash;
     }
 
-    function accumulatedRewards(address a) external view returns (uint256) {
-        return s.accumulatedRewards[a];
-    }
-
-    function stake(address a) external view returns (uint256) {
-        return s.stake[a];
-    }
-
     function ipcGatewayAddr() external view returns (address) {
         return s.ipcGatewayAddr;
     }
@@ -61,8 +53,8 @@ contract SubnetActorGetterFacet {
         return s.minValidators;
     }
 
-    function topDownCheckPeriod() external view returns (uint64) {
-        return s.topDownCheckPeriod;
+    function getConfigurationNumbers() external view returns (uint64, uint64) {
+        return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
     }
 
     function bottomUpCheckPeriod() external view returns (uint64) {
@@ -81,102 +73,19 @@ contract SubnetActorGetterFacet {
         return s.name;
     }
 
-    /// @notice get validator count
-    function validatorCount() external view returns (uint256) {
-        return s.validators.length();
+    /// @notice Get the information of a validator
+    function getValidator(address validatorAddress) external view returns (Validator memory validator) {
+        validator = s.validatorSet.validators[validatorAddress];
     }
 
-    /// @notice get validator at index
-    /// @param index - the index of the validator set
-    function validatorAt(uint256 index) external view returns (address) {
-        return s.validators.at(index);
+    /// @notice Checks if the validator address is an active validator
+    function isActiveValidator(address validator) external view returns (bool) {
+        return LibStaking.isActiveValidator(validator);
     }
 
-    /// @notice get validator network address
-    /// @param addr - validator address
-    function validatorNetAddr(address addr) external view returns (string memory) {
-        return s.validatorNetAddresses[addr];
-    }
-
-    /// @notice get validator worker address
-    /// @param addr - validator address
-    function validatorWorkerAddr(address addr) external view returns (FvmAddress memory) {
-        return s.validatorWorkerAddresses[addr];
-    }
-
-    /// @notice get all the validators in the subnet.
-    function getValidators() external view returns (address[] memory) {
-        uint256 length = s.validators.length();
-        address[] memory result = new address[](length);
-
-        for (uint256 i = 0; i < length; ) {
-            result[i] = s.validators.at(i);
-            unchecked {
-                ++i;
-            }
-        }
-
-        return result;
-    }
-
-    /// @notice get no more than `limit` number of validators starting from the validator with index `offset`
-    /// @dev It returns an empty array[] and 0 if there are no validators to return according to the input parameters
-    /// @param offset The first index of the first validator to return
-    /// @param limit The maximum number of validators to return
-    /// @return the array of validators, the size of that array is no more than `limit`
-    /// @return the next `offset` that needs to query the next range of validators
-    function getRangeOfValidators(uint256 offset, uint256 limit) external view returns (address[] memory, uint256) {
-        uint256 n = s.validators.length();
-        address[] memory empty = new address[](0);
-        if (limit == 0) {
-            return (empty, 0);
-        }
-        if (n <= offset) {
-            return (empty, 0);
-        }
-
-        if (limit > n - offset) {
-            limit = n - offset;
-        }
-        address[] memory result = new address[](limit);
-
-        for (uint256 i = 0; i < limit; ) {
-            result[i] = s.validators.at(i + offset);
-            unchecked {
-                ++i;
-            }
-        }
-
-        return (result, offset + limit);
-    }
-
-    /// @notice returns the configuration number.
-    function getConfigurationNumber() external view returns (uint256) {
-        return s.configurationNumber;
-    }
-
-    // TODO: is this relevant? should it be updated or deleted?
-    /// @notice get the full details of the validators, not just their addresses
-    function getValidatorSet() external view returns (ValidatorSet memory) {
-        uint256 length = s.validators.length();
-
-        ValidatorInfo[] memory details = new ValidatorInfo[](length);
-        address a;
-
-        for (uint256 i = 0; i < length; ) {
-            a = s.validators.at(i);
-            details[i] = ValidatorInfo({
-                addr: a,
-                weight: s.stake[a],
-                workerAddr: s.validatorWorkerAddresses[a],
-                netAddresses: s.validatorNetAddresses[a]
-            });
-            unchecked {
-                ++i;
-            }
-        }
-
-        return ValidatorSet({validators: details, configurationNumber: s.configurationNumber});
+    /// @notice Checks if the validator is a waiting validator
+    function isWaitingValidator(address validator) internal view returns (bool) {
+        return LibStaking.isWaitingValidator(validator);
     }
 
     /// @notice returns the committed bottom-up checkpoint at specific epoch

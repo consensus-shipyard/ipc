@@ -68,8 +68,6 @@ fn main() {
         "GatewayGetterFacet",
         "GatewayRouterFacet",
         "GatewayMessengerFacet",
-        "SubnetActorGetterFacet",
-        "SubnetActorManagerFacet",
     ];
     let modules = fvm_address_conversion.into_iter().map(camel_to_snake);
     for module in modules {

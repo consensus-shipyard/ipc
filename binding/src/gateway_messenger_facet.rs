@@ -87,32 +87,6 @@ pub mod gateway_messenger_facet {
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
-                    ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("target"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("CallFailed"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("CallFailed"),
@@ -123,13 +97,6 @@ pub mod gateway_messenger_facet {
                     ::std::borrow::ToOwned::to_owned("CannotSendCrossMsgToItself"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("CannotSendCrossMsgToItself",),
-                        inputs: ::std::vec![],
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
                         inputs: ::std::vec![],
                     },],
                 ),
@@ -246,39 +213,6 @@ pub mod gateway_messenger_facet {
             Self::new(contract.address(), contract.client())
         }
     }
-    ///Custom Error type `AddressEmptyCode` with signature `AddressEmptyCode(address)` and selector `0x9996b315`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "AddressEmptyCode", abi = "AddressEmptyCode(address)")]
-    pub struct AddressEmptyCode {
-        pub target: ::ethers::core::types::Address,
-    }
-    ///Custom Error type `AddressInsufficientBalance` with signature `AddressInsufficientBalance(address)` and selector `0xcd786059`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "AddressInsufficientBalance",
-        abi = "AddressInsufficientBalance(address)"
-    )]
-    pub struct AddressInsufficientBalance {
-        pub account: ::ethers::core::types::Address,
-    }
     ///Custom Error type `CallFailed` with signature `CallFailed()` and selector `0x3204506f`
     #[derive(
         Clone,
@@ -308,19 +242,6 @@ pub mod gateway_messenger_facet {
         abi = "CannotSendCrossMsgToItself()"
     )]
     pub struct CannotSendCrossMsgToItself;
-    ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
-    pub struct FailedInnerCall;
     ///Custom Error type `InsufficientFunds` with signature `InsufficientFunds()` and selector `0x356680b7`
     #[derive(
         Clone,
@@ -405,11 +326,8 @@ pub mod gateway_messenger_facet {
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayMessengerFacetErrors {
-        AddressEmptyCode(AddressEmptyCode),
-        AddressInsufficientBalance(AddressInsufficientBalance),
         CallFailed(CallFailed),
         CannotSendCrossMsgToItself(CannotSendCrossMsgToItself),
-        FailedInnerCall(FailedInnerCall),
         InsufficientFunds(InsufficientFunds),
         InvalidCrossMsgDstSubnet(InvalidCrossMsgDstSubnet),
         InvalidCrossMsgFromSubnet(InvalidCrossMsgFromSubnet),
@@ -430,15 +348,6 @@ pub mod gateway_messenger_facet {
             {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::AddressEmptyCode(decoded));
-            }
-            if let Ok(decoded) =
-                <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::AddressInsufficientBalance(decoded));
-            }
             if let Ok(decoded) = <CallFailed as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CallFailed(decoded));
             }
@@ -446,9 +355,6 @@ pub mod gateway_messenger_facet {
                 <CannotSendCrossMsgToItself as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::CannotSendCrossMsgToItself(decoded));
-            }
-            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::FailedInnerCall(decoded));
             }
             if let Ok(decoded) = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -483,15 +389,10 @@ pub mod gateway_messenger_facet {
     impl ::ethers::core::abi::AbiEncode for GatewayMessengerFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AddressEmptyCode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::AddressInsufficientBalance(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::CallFailed(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::CannotSendCrossMsgToItself(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::FailedInnerCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InsufficientFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidCrossMsgDstSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -514,21 +415,10 @@ pub mod gateway_messenger_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
                 _ if selector == <CallFailed as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <CannotSendCrossMsgToItself as ::ethers::contract::EthError>::selector() =>
                 {
-                    true
-                }
-                _ if selector == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -564,11 +454,8 @@ pub mod gateway_messenger_facet {
     impl ::core::fmt::Display for GatewayMessengerFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CallFailed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotSendCrossMsgToItself(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InsufficientFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCrossMsgDstSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCrossMsgFromSubnet(element) => ::core::fmt::Display::fmt(element, f),
@@ -584,16 +471,6 @@ pub mod gateway_messenger_facet {
             Self::RevertString(value)
         }
     }
-    impl ::core::convert::From<AddressEmptyCode> for GatewayMessengerFacetErrors {
-        fn from(value: AddressEmptyCode) -> Self {
-            Self::AddressEmptyCode(value)
-        }
-    }
-    impl ::core::convert::From<AddressInsufficientBalance> for GatewayMessengerFacetErrors {
-        fn from(value: AddressInsufficientBalance) -> Self {
-            Self::AddressInsufficientBalance(value)
-        }
-    }
     impl ::core::convert::From<CallFailed> for GatewayMessengerFacetErrors {
         fn from(value: CallFailed) -> Self {
             Self::CallFailed(value)
@@ -602,11 +479,6 @@ pub mod gateway_messenger_facet {
     impl ::core::convert::From<CannotSendCrossMsgToItself> for GatewayMessengerFacetErrors {
         fn from(value: CannotSendCrossMsgToItself) -> Self {
             Self::CannotSendCrossMsgToItself(value)
-        }
-    }
-    impl ::core::convert::From<FailedInnerCall> for GatewayMessengerFacetErrors {
-        fn from(value: FailedInnerCall) -> Self {
-            Self::FailedInnerCall(value)
         }
     }
     impl ::core::convert::From<InsufficientFunds> for GatewayMessengerFacetErrors {

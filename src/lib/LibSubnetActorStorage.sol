@@ -11,14 +11,6 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 struct SubnetActorStorage {
-    /// @notice validator address to stake amount
-    mapping(address => uint256) stake;
-    /// @notice validator address to accumulated rewards
-    mapping(address => uint256) accumulatedRewards;
-    /// @notice validator address to validator net address
-    mapping(address => string) validatorNetAddresses;
-    /// @notice validator address to validator worker address
-    mapping(address => FvmAddress) validatorWorkerAddresses;
     /// @notice contains all committed bottom-up checkpoint at specific epoch
     mapping(uint64 => BottomUpCheckpoint) committedCheckpoints;
     /// @notice genesis block
@@ -27,10 +19,6 @@ struct SubnetActorStorage {
     uint256 totalStake;
     /// @notice Minimal activation collateral
     uint256 minActivationCollateral;
-    /// @notice Sequence number that uniquely identifies a validator set.
-    uint64 configurationNumber;
-    /// @notice number of blocks in a top-down epoch
-    uint64 topDownCheckPeriod;
     /// @notice number of blocks in a bottom-up epoch
     uint64 bottomUpCheckPeriod;
     /// @notice Minimal number of validators required for the subnet to be able to validate new blocks.
@@ -48,8 +36,6 @@ struct SubnetActorStorage {
     /// @notice Type of consensus algorithm.
     /// @notice current status of the subnet
     Status status;
-    /// @notice List of validators in the subnet
-    EnumerableSet.AddressSet validators;
     /// @notice ID of the parent subnet
     SubnetID parentId;
     /// immutable params
