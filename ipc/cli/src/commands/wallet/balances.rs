@@ -28,7 +28,7 @@ impl CommandLineHandler for WalletBalances {
         let subnet = SubnetID::from_str(&arguments.subnet)?;
         match wallet_type {
             WalletType::Evm => {
-                let wallet = provider.evm_wallet();
+                let wallet = provider.evm_wallet()?;
                 let addresses = wallet.read().unwrap().list()?;
                 let r = addresses
                     .iter()
@@ -57,7 +57,7 @@ impl CommandLineHandler for WalletBalances {
                 }
             }
             WalletType::Fvm => {
-                let wallet = provider.fvm_wallet();
+                let wallet = provider.fvm_wallet()?;
                 let addresses = wallet.read().unwrap().list_addrs()?;
                 let r = addresses
                     .iter()

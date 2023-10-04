@@ -7,7 +7,6 @@
 
 mod deserialize;
 mod reload;
-mod server;
 pub mod subnet;
 
 mod serialize;
@@ -24,18 +23,15 @@ use ipc_sdk::subnet_id::SubnetID;
 pub use reload::ReloadableConfig;
 use serde::{Deserialize, Serialize};
 use serialize::serialize_subnets_to_str;
-pub use server::JSON_RPC_ENDPOINT;
-pub use server::{json_rpc_methods, Server};
 pub use subnet::Subnet;
 
 pub const JSON_RPC_VERSION: &str = "2.0";
 
 /// DefaulDEFAULT_CHAIN_IDSUBNET_e
 pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
-[server]
-json_rpc_address = "0.0.0.0:3030"
-
 # Default configuration for Filecoin Calibration
+repo_path = "~/.ipc"
+
 [[subnets]]
 id = "/r314159"
 network_name = "calibration"
@@ -64,13 +60,22 @@ registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
 /// this struct.
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct Config {
-    pub server: Server,
+    /// Directory of the keystore that wants to be made available by the provider.
+    pub keystore_path: Option<String>,
     #[serde(deserialize_with = "deserialize_subnets_from_vec", default)]
     #[serde(serialize_with = "serialize_subnets_to_str")]
     pub subnets: HashMap<SubnetID, Subnet>,
 }
 
 impl Config {
+    /// Returns an empty config to be populated further
+    pub fn new() -> Self {
+        Config {
+            keystore_path: None,
+            subnets: Default::default(),
+        }
+    }
+
     /// Reads a TOML configuration in the `s` string and returns a [`Config`] struct.
     pub fn from_toml_str(s: &str) -> Result<Self> {
         let config = toml::from_str(s)?;
@@ -102,5 +107,11 @@ impl Config {
 
     pub fn remove_subnet(&mut self, subnet_id: &SubnetID) {
         self.subnets.remove(subnet_id);
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
     }
 }

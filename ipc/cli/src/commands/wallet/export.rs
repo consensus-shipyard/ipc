@@ -18,7 +18,7 @@ pub(crate) struct WalletExport;
 
 impl WalletExport {
     fn export_evm(provider: &IpcProvider, arguments: &WalletExportArgs) -> anyhow::Result<String> {
-        let keystore = provider.evm_wallet();
+        let keystore = provider.evm_wallet()?;
         let address = ethers::types::Address::from_str(&arguments.address)?;
 
         let key_info = keystore
@@ -35,7 +35,7 @@ impl WalletExport {
     }
 
     fn export_fvm(provider: &IpcProvider, arguments: &WalletExportArgs) -> anyhow::Result<String> {
-        let wallet = provider.fvm_wallet();
+        let wallet = provider.fvm_wallet()?;
 
         let addr = Address::from_str(&arguments.address)?;
         let key_info = wallet.write().unwrap().export(&addr)?;

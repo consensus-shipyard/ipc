@@ -4,7 +4,7 @@
 
 use anyhow::anyhow;
 use base64::Engine;
-use config::ReloadableConfig;
+use config::Config;
 use fvm_shared::{
     address::{set_current_network, Address, Network},
     clock::ChainEpoch,
@@ -36,7 +36,7 @@ pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
 
-const DEFAULT_REPO_PATH: &str = ".ipc-agent";
+const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
 
 pub fn set_fil_network_from_env() {
@@ -70,34 +70,60 @@ impl Connection {
 #[derive(Clone)]
 pub struct IpcProvider {
     sender: Option<Address>,
-    config: Arc<ReloadableConfig>,
-    fvm_wallet: Arc<RwLock<Wallet>>,
-    evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+    config: Arc<Config>,
+    fvm_wallet: Option<Arc<RwLock<Wallet>>>,
+    evm_keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
 }
 
 impl IpcProvider {
-    pub fn new(
-        config: Arc<ReloadableConfig>,
+    fn new(
+        config: Arc<Config>,
         fvm_wallet: Arc<RwLock<Wallet>>,
         evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             sender: None,
             config,
-            fvm_wallet,
-            evm_keystore,
+            fvm_wallet: Some(fvm_wallet),
+            evm_keystore: Some(evm_keystore),
         }
     }
 
     /// Initializes an `IpcProvider` from the config specified in the
     /// argument's config path.
     pub fn new_from_config(config_path: String) -> anyhow::Result<Self> {
-        let config = Arc::new(ReloadableConfig::new(config_path)?);
+        let config = Arc::new(Config::from_file(config_path)?);
         let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_wallet_from_config(
             config.clone(),
         )?)));
         let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_config(config.clone())?));
         Ok(Self::new(config, fvm_wallet, evm_keystore))
+    }
+
+    /// Initializes a new `IpcProvider` configured to interact with
+    /// a single subnet.
+    pub fn new_with_subnet(
+        keystore_path: Option<String>,
+        subnet: config::Subnet,
+    ) -> anyhow::Result<Self> {
+        let mut config = Config::new();
+        config.add_subnet(subnet);
+        let config = Arc::new(config);
+
+        if let Some(repo_path) = keystore_path {
+            let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_keystore_from_path(
+                &repo_path,
+            )?)));
+            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(&repo_path)?));
+            Ok(Self::new(config, fvm_wallet, evm_keystore))
+        } else {
+            Ok(Self {
+                sender: None,
+                config,
+                fvm_wallet: None,
+                evm_keystore: None,
+            })
+        }
     }
 
     /// Initialized an `IpcProvider` using the default config path.
@@ -107,15 +133,14 @@ impl IpcProvider {
 
     /// Get the connection instance for the subnet.
     pub fn connection(&self, subnet: &SubnetID) -> Option<Connection> {
-        let config = self.config.get_config();
-        let subnets = &config.subnets;
+        let subnets = &self.config.subnets;
         match subnets.get(subnet) {
             Some(subnet) => match &subnet.config {
                 config::subnet::SubnetConfig::Fevm(_) => {
                     let manager = Box::new(
                         EthSubnetManager::from_subnet_with_wallet_store(
                             subnet,
-                            self.evm_keystore.clone(),
+                            self.evm_wallet().ok()?,
                         )
                         .ok()?,
                     );
@@ -136,12 +161,20 @@ impl IpcProvider {
 
     // FIXME: Reconcile these into a single wallet method that
     // accepts an `ipc_identity::WalletType` as an input.
-    pub fn evm_wallet(&self) -> Arc<RwLock<PersistentKeyStore<EthKeyAddress>>> {
-        self.evm_keystore.clone()
+    pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
+        if let Some(wallet) = &self.evm_keystore {
+            Ok(wallet.clone())
+        } else {
+            Err(anyhow!("No evm wallet found in provider"))
+        }
     }
 
-    pub fn fvm_wallet(&self) -> Arc<RwLock<Wallet>> {
-        self.fvm_wallet.clone()
+    pub fn fvm_wallet(&self) -> anyhow::Result<Arc<RwLock<Wallet>>> {
+        if let Some(wallet) = &self.fvm_wallet {
+            Ok(wallet.clone())
+        } else {
+            Err(anyhow!("No fvm wallet found in provider"))
+        }
     }
 
     fn check_sender(
@@ -164,7 +197,7 @@ impl IpcProvider {
         match &subnet.config {
             config::subnet::SubnetConfig::Fevm(_) => {
                 if self.sender.is_none() {
-                    let wallet = self.evm_wallet();
+                    let wallet = self.evm_wallet()?;
                     let addr = match wallet.write().unwrap().get_default()? {
                         None => return Err(anyhow!("no default evm account configured")),
                         Some(addr) => Address::try_from(addr)?,
@@ -577,16 +610,20 @@ impl IpcProvider {
             WalletKeyType::Secp256k1Ledger => return Err(anyhow!("ledger key type not supported")),
         };
 
-        self.fvm_wallet().write().unwrap().generate_addr(tp)
+        self.fvm_wallet()?.write().unwrap().generate_addr(tp)
     }
 
     pub fn new_evm_key(&self) -> anyhow::Result<EthKeyAddress> {
         let key_info = ipc_identity::random_eth_key_info();
-        self.evm_wallet().write().unwrap().put(key_info)
+        let wallet = self.evm_wallet()?;
+
+        let out = wallet.write().unwrap().put(key_info);
+        out
     }
 
     pub fn import_fvm_key(&self, keyinfo: String) -> anyhow::Result<Address> {
-        let mut wallet = self.fvm_wallet.write().unwrap();
+        let wallet = self.fvm_wallet()?;
+        let mut wallet = wallet.write().unwrap();
         let keyinfo = LotusJsonKeyType::from_str(&keyinfo)?;
 
         let key_type = if WalletKeyType::from_str(&keyinfo.r#type)? == WalletKeyType::BLS {
@@ -608,7 +645,8 @@ impl IpcProvider {
         &self,
         private_key: String,
     ) -> anyhow::Result<EthKeyAddress> {
-        let mut keystore = self.evm_keystore.write().unwrap();
+        let keystore = self.evm_wallet()?;
+        let mut keystore = keystore.write().unwrap();
 
         let private_key = if !private_key.starts_with("0x") {
             hex::decode(&private_key)?
@@ -624,32 +662,34 @@ impl IpcProvider {
     }
 }
 
-fn new_fvm_wallet_from_config(config: Arc<ReloadableConfig>) -> anyhow::Result<KeyStore> {
-    let repo_str = config.get_config_repo();
+fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<KeyStore> {
+    let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
-        new_keystore_from_path(&repo_str)
+        new_fvm_keystore_from_path(repo_str)
     } else {
         Err(anyhow!("No keystore repo found in config"))
     }
 }
 
 fn new_evm_keystore_from_config(
-    config: Arc<ReloadableConfig>,
+    config: Arc<Config>,
 ) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
-    let repo_str = config.get_config_repo();
+    let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
-        new_evm_keystore_from_path(&repo_str)
+        new_evm_keystore_from_path(repo_str)
     } else {
         Err(anyhow!("No keystore repo found in config"))
     }
 }
 
-fn new_evm_keystore_from_path(repo_str: &str) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
+pub fn new_evm_keystore_from_path(
+    repo_str: &str,
+) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo = std::path::Path::new(&repo_str).join(ipc_identity::DEFAULT_KEYSTORE_NAME);
     PersistentKeyStore::new(repo).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
-fn new_keystore_from_path(repo_str: &str) -> anyhow::Result<KeyStore> {
+pub fn new_fvm_keystore_from_path(repo_str: &str) -> anyhow::Result<KeyStore> {
     let repo = std::path::Path::new(&repo_str);
     let keystore_config = KeyStoreConfig::Persistent(repo.join(ipc_identity::KEYSTORE_NAME));
     // TODO: we currently only support persistent keystore in the default repo directory.
