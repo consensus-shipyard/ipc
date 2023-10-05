@@ -1052,26 +1052,6 @@ pub mod gateway_getter_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("initialized"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("initialized"),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bool"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("listSubnets"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -1637,12 +1617,6 @@ pub mod gateway_getter_facet {
                 .method_hash([119, 41, 107, 177], (subnet_id, from_block, to_block))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `initialized` (0x158ef93e) function
-        pub fn initialized(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
-            self.0
-                .method_hash([21, 142, 249, 62], ())
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `listSubnets` (0x5d029685) function
         pub fn list_subnets(
             &self,
@@ -2089,19 +2063,6 @@ pub mod gateway_getter_facet {
         pub from_block: ::ethers::core::types::U256,
         pub to_block: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `initialized` function with signature `initialized()` and selector `0x158ef93e`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "initialized", abi = "initialized()")]
-    pub struct InitializedCall;
     ///Container type for all input parameters for the `listSubnets` function with signature `listSubnets()` and selector `0x5d029685`
     #[derive(
         Clone,
@@ -2226,7 +2187,6 @@ pub mod gateway_getter_facet {
         GetSubnet(GetSubnetCall),
         GetSubnetTopDownMsgsLength(GetSubnetTopDownMsgsLengthCall),
         GetTopDownMsgs(GetTopDownMsgsCall),
-        Initialized(InitializedCall),
         ListSubnets(ListSubnetsCall),
         MajorityPercentage(MajorityPercentageCall),
         MinStake(MinStakeCall),
@@ -2365,9 +2325,6 @@ pub mod gateway_getter_facet {
             {
                 return Ok(Self::GetTopDownMsgs(decoded));
             }
-            if let Ok(decoded) = <InitializedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::Initialized(decoded));
-            }
             if let Ok(decoded) = <ListSubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ListSubnets(decoded));
             }
@@ -2460,7 +2417,6 @@ pub mod gateway_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetTopDownMsgs(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Initialized(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ListSubnets(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::MajorityPercentage(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -2508,7 +2464,6 @@ pub mod gateway_getter_facet {
                 Self::GetSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetSubnetTopDownMsgsLength(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetTopDownMsgs(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Initialized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ListSubnets(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinStake(element) => ::core::fmt::Display::fmt(element, f),
@@ -2647,11 +2602,6 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<GetTopDownMsgsCall> for GatewayGetterFacetCalls {
         fn from(value: GetTopDownMsgsCall) -> Self {
             Self::GetTopDownMsgs(value)
-        }
-    }
-    impl ::core::convert::From<InitializedCall> for GatewayGetterFacetCalls {
-        fn from(value: InitializedCall) -> Self {
-            Self::Initialized(value)
         }
     }
     impl ::core::convert::From<ListSubnetsCall> for GatewayGetterFacetCalls {
@@ -3008,18 +2958,6 @@ pub mod gateway_getter_facet {
         Hash,
     )]
     pub struct GetTopDownMsgsReturn(pub ::std::vec::Vec<CrossMsg>);
-    ///Container type for all return fields from the `initialized` function with signature `initialized()` and selector `0x158ef93e`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct InitializedReturn(pub bool);
     ///Container type for all return fields from the `listSubnets` function with signature `listSubnets()` and selector `0x5d029685`
     #[derive(
         Clone,

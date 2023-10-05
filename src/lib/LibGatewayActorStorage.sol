@@ -72,8 +72,6 @@ struct GatewayActorStorage {
     uint64 totalSubnets;
     // @notice bottom-up period in number of epochs for the subnet
     uint64 bottomUpCheckPeriod;
-    /// @notice whether the contract is initialized
-    bool initialized;
 }
 
 library LibGatewayActorStorage {

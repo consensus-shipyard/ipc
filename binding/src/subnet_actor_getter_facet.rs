@@ -16,6 +16,22 @@ pub mod subnet_actor_getter_facet {
             constructor: ::core::option::Option::None,
             functions: ::core::convert::From::from([
                 (
+                    ::std::borrow::ToOwned::to_owned("bootstrapped"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("bootstrapped"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bool"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("bottomUpCheckPeriod"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("bottomUpCheckPeriod",),
@@ -235,6 +251,22 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("killed"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("killed"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bool"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("minActivationCollateral"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("minActivationCollateral",),
@@ -292,22 +324,6 @@ pub mod subnet_actor_getter_facet {
                             kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
                             internal_type: ::core::option::Option::Some(
                                 ::std::borrow::ToOwned::to_owned("bytes32"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("status"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("status"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("enum Status"),
                             ),
                         },],
                         constant: ::core::option::Option::None,
@@ -376,6 +392,12 @@ pub mod subnet_actor_getter_facet {
                 SUBNETACTORGETTERFACET_ABI.clone(),
                 client,
             ))
+        }
+        ///Calls the contract's `bootstrapped` (0x35142c8c) function
+        pub fn bootstrapped(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
+            self.0
+                .method_hash([53, 20, 44, 140], ())
+                .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `bottomUpCheckPeriod` (0x06c46853) function
         pub fn bottom_up_check_period(&self) -> ::ethers::contract::builders::ContractCall<M, u64> {
@@ -447,6 +469,12 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([64, 85, 10, 28], validator)
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `killed` (0x1f3a0e41) function
+        pub fn killed(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
+            self.0
+                .method_hash([31, 58, 14, 65], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `minActivationCollateral` (0x9e33bd02) function
         pub fn min_activation_collateral(
             &self,
@@ -475,12 +503,6 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([95, 131, 45, 191], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `status` (0x200d2ed2) function
-        pub fn status(&self) -> ::ethers::contract::builders::ContractCall<M, u8> {
-            self.0
-                .method_hash([32, 13, 46, 210], ())
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `totalStake` (0x8b0e9f3f) function
         pub fn total_stake(
             &self,
@@ -497,6 +519,19 @@ pub mod subnet_actor_getter_facet {
             Self::new(contract.address(), contract.client())
         }
     }
+    ///Container type for all input parameters for the `bootstrapped` function with signature `bootstrapped()` and selector `0x35142c8c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "bootstrapped", abi = "bootstrapped()")]
+    pub struct BootstrappedCall;
     ///Container type for all input parameters for the `bottomUpCheckPeriod` function with signature `bottomUpCheckPeriod()` and selector `0x06c46853`
     #[derive(
         Clone,
@@ -628,6 +663,19 @@ pub mod subnet_actor_getter_facet {
     pub struct IsActiveValidatorCall {
         pub validator: ::ethers::core::types::Address,
     }
+    ///Container type for all input parameters for the `killed` function with signature `killed()` and selector `0x1f3a0e41`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "killed", abi = "killed()")]
+    pub struct KilledCall;
     ///Container type for all input parameters for the `minActivationCollateral` function with signature `minActivationCollateral()` and selector `0x9e33bd02`
     #[derive(
         Clone,
@@ -683,19 +731,6 @@ pub mod subnet_actor_getter_facet {
         abi = "prevExecutedCheckpointHash()"
     )]
     pub struct PrevExecutedCheckpointHashCall;
-    ///Container type for all input parameters for the `status` function with signature `status()` and selector `0x200d2ed2`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "status", abi = "status()")]
-    pub struct StatusCall;
     ///Container type for all input parameters for the `totalStake` function with signature `totalStake()` and selector `0x8b0e9f3f`
     #[derive(
         Clone,
@@ -712,6 +747,7 @@ pub mod subnet_actor_getter_facet {
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorGetterFacetCalls {
+        Bootstrapped(BootstrappedCall),
         BottomUpCheckPeriod(BottomUpCheckPeriodCall),
         BottomUpCheckpointAtEpoch(BottomUpCheckpointAtEpochCall),
         BottomUpCheckpointHashAtEpoch(BottomUpCheckpointHashAtEpochCall),
@@ -721,11 +757,11 @@ pub mod subnet_actor_getter_facet {
         GetValidator(GetValidatorCall),
         IpcGatewayAddr(IpcGatewayAddrCall),
         IsActiveValidator(IsActiveValidatorCall),
+        Killed(KilledCall),
         MinActivationCollateral(MinActivationCollateralCall),
         MinValidators(MinValidatorsCall),
         Name(NameCall),
         PrevExecutedCheckpointHash(PrevExecutedCheckpointHashCall),
-        Status(StatusCall),
         TotalStake(TotalStakeCall),
     }
     impl ::ethers::core::abi::AbiDecode for SubnetActorGetterFacetCalls {
@@ -733,6 +769,10 @@ pub mod subnet_actor_getter_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
+            if let Ok(decoded) = <BootstrappedCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::Bootstrapped(decoded));
+            }
             if let Ok(decoded) =
                 <BottomUpCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -773,6 +813,9 @@ pub mod subnet_actor_getter_facet {
             {
                 return Ok(Self::IsActiveValidator(decoded));
             }
+            if let Ok(decoded) = <KilledCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::Killed(decoded));
+            }
             if let Ok(decoded) =
                 <MinActivationCollateralCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -790,9 +833,6 @@ pub mod subnet_actor_getter_facet {
             {
                 return Ok(Self::PrevExecutedCheckpointHash(decoded));
             }
-            if let Ok(decoded) = <StatusCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::Status(decoded));
-            }
             if let Ok(decoded) = <TotalStakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalStake(decoded));
             }
@@ -802,6 +842,7 @@ pub mod subnet_actor_getter_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorGetterFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
+                Self::Bootstrapped(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::BottomUpCheckPeriod(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -819,6 +860,7 @@ pub mod subnet_actor_getter_facet {
                 Self::GetValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IpcGatewayAddr(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IsActiveValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Killed(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::MinActivationCollateral(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -827,7 +869,6 @@ pub mod subnet_actor_getter_facet {
                 Self::PrevExecutedCheckpointHash(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::Status(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::TotalStake(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
@@ -835,6 +876,7 @@ pub mod subnet_actor_getter_facet {
     impl ::core::fmt::Display for SubnetActorGetterFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
+                Self::Bootstrapped(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckPeriod(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckpointAtEpoch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckpointHashAtEpoch(element) => {
@@ -846,13 +888,18 @@ pub mod subnet_actor_getter_facet {
                 Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IpcGatewayAddr(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsActiveValidator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::Killed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinActivationCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Name(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PrevExecutedCheckpointHash(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Status(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalStake(element) => ::core::fmt::Display::fmt(element, f),
             }
+        }
+    }
+    impl ::core::convert::From<BootstrappedCall> for SubnetActorGetterFacetCalls {
+        fn from(value: BootstrappedCall) -> Self {
+            Self::Bootstrapped(value)
         }
     }
     impl ::core::convert::From<BottomUpCheckPeriodCall> for SubnetActorGetterFacetCalls {
@@ -900,6 +947,11 @@ pub mod subnet_actor_getter_facet {
             Self::IsActiveValidator(value)
         }
     }
+    impl ::core::convert::From<KilledCall> for SubnetActorGetterFacetCalls {
+        fn from(value: KilledCall) -> Self {
+            Self::Killed(value)
+        }
+    }
     impl ::core::convert::From<MinActivationCollateralCall> for SubnetActorGetterFacetCalls {
         fn from(value: MinActivationCollateralCall) -> Self {
             Self::MinActivationCollateral(value)
@@ -920,16 +972,23 @@ pub mod subnet_actor_getter_facet {
             Self::PrevExecutedCheckpointHash(value)
         }
     }
-    impl ::core::convert::From<StatusCall> for SubnetActorGetterFacetCalls {
-        fn from(value: StatusCall) -> Self {
-            Self::Status(value)
-        }
-    }
     impl ::core::convert::From<TotalStakeCall> for SubnetActorGetterFacetCalls {
         fn from(value: TotalStakeCall) -> Self {
             Self::TotalStake(value)
         }
     }
+    ///Container type for all return fields from the `bootstrapped` function with signature `bootstrapped()` and selector `0x35142c8c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct BootstrappedReturn(pub bool);
     ///Container type for all return fields from the `bottomUpCheckPeriod` function with signature `bottomUpCheckPeriod()` and selector `0x06c46853`
     #[derive(
         Clone,
@@ -1043,6 +1102,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct IsActiveValidatorReturn(pub bool);
+    ///Container type for all return fields from the `killed` function with signature `killed()` and selector `0x1f3a0e41`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct KilledReturn(pub bool);
     ///Container type for all return fields from the `minActivationCollateral` function with signature `minActivationCollateral()` and selector `0x9e33bd02`
     #[derive(
         Clone,
@@ -1091,18 +1162,6 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct PrevExecutedCheckpointHashReturn(pub [u8; 32]);
-    ///Container type for all return fields from the `status` function with signature `status()` and selector `0x200d2ed2`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct StatusReturn(pub u8);
     ///Container type for all return fields from the `totalStake` function with signature `totalStake()` and selector `0x8b0e9f3f`
     #[derive(
         Clone,

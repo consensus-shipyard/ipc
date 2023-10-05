@@ -6,6 +6,7 @@ import {IDiamond} from "./interfaces/IDiamond.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
 contract SubnetRegistry is ReentrancyGuard {
+    // solhint-disable-next-line var-name-mixedcase
     address public immutable GATEWAY;
 
     /// The getter and manager facet shared by diamond

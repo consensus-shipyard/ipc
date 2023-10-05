@@ -579,15 +579,6 @@ pub mod gateway_router_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotInitialized"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotInitialized"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -1064,19 +1055,6 @@ pub mod gateway_router_facet {
         abi = "NotEnoughSubnetCircSupply()"
     )]
     pub struct NotEnoughSubnetCircSupply;
-    ///Custom Error type `NotInitialized` with signature `NotInitialized()` and selector `0x87138d5c`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "NotInitialized", abi = "NotInitialized()")]
-    pub struct NotInitialized;
     ///Custom Error type `NotRegisteredSubnet` with signature `NotRegisteredSubnet()` and selector `0xe991abd0`
     #[derive(
         Clone,
@@ -1220,7 +1198,6 @@ pub mod gateway_router_facet {
         NotAuthorized(NotAuthorized),
         NotEnoughBalance(NotEnoughBalance),
         NotEnoughSubnetCircSupply(NotEnoughSubnetCircSupply),
-        NotInitialized(NotInitialized),
         NotRegisteredSubnet(NotRegisteredSubnet),
         NotSystemActor(NotSystemActor),
         OldConfigurationNumber(OldConfigurationNumber),
@@ -1325,9 +1302,6 @@ pub mod gateway_router_facet {
             {
                 return Ok(Self::NotEnoughSubnetCircSupply(decoded));
             }
-            if let Ok(decoded) = <NotInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::NotInitialized(decoded));
-            }
             if let Ok(decoded) =
                 <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -1418,7 +1392,6 @@ pub mod gateway_router_facet {
                 Self::NotEnoughSubnetCircSupply(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotInitialized(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1517,10 +1490,6 @@ pub mod gateway_router_facet {
                     true
                 }
                 _ if selector
-                    == <NotInitialized as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1586,7 +1555,6 @@ pub mod gateway_router_facet {
                 Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughSubnetCircSupply(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotInitialized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
                 Self::OldConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
@@ -1692,11 +1660,6 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<NotEnoughSubnetCircSupply> for GatewayRouterFacetErrors {
         fn from(value: NotEnoughSubnetCircSupply) -> Self {
             Self::NotEnoughSubnetCircSupply(value)
-        }
-    }
-    impl ::core::convert::From<NotInitialized> for GatewayRouterFacetErrors {
-        fn from(value: NotInitialized) -> Self {
-            Self::NotInitialized(value)
         }
     }
     impl ::core::convert::From<NotRegisteredSubnet> for GatewayRouterFacetErrors {

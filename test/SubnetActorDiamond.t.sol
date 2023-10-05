@@ -92,7 +92,7 @@ contract SubnetActorDiamondTest is Test {
         _assertDeploySubnetActor(
             DEFAULT_NETWORK_NAME,
             gatewayAddress,
-            ConsensusType.Mir,
+            ConsensusType.Fendermint,
             DEFAULT_MIN_VALIDATOR_STAKE,
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_CHECKPOINT_PERIOD,
@@ -122,7 +122,7 @@ contract SubnetActorDiamondTest is Test {
         _assertDeploySubnetActor(
             _networkName,
             _ipcGatewayAddr,
-            ConsensusType.Mir,
+            ConsensusType.Fendermint,
             _minActivationCollateral,
             _minValidators,
             _checkPeriod,
@@ -145,7 +145,7 @@ contract SubnetActorDiamondTest is Test {
                 parentId: SubnetID(ROOTNET_CHAINID, new address[](0)),
                 name: DEFAULT_NETWORK_NAME,
                 ipcGatewayAddr: address(0),
-                consensus: ConsensusType.Mir,
+                consensus: ConsensusType.Fendermint,
                 minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
                 minValidators: DEFAULT_MIN_VALIDATORS,
                 bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
@@ -168,31 +168,50 @@ contract SubnetActorDiamondTest is Test {
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
     function testSubnetActorDiamond_BasicLifeCycle() public {
-        address validator = vm.addr(1235);
+        address validator1 = vm.addr(1234);
+        address validator2 = vm.addr(1235);
         uint256 collateral = DEFAULT_MIN_VALIDATOR_STAKE;
 
         bytes memory metadata = new bytes(10);
 
         // ======== Step. Join ======
-        vm.startPrank(validator);
-        vm.deal(validator, collateral);
+        // initial validator joins
+        vm.startPrank(validator1);
+        vm.deal(validator1, collateral);
+
+        saManager.join{value: collateral}(metadata);
+
+        // collateral confirmed immediately and network boostrapped
+        Validator memory v = saGetter.getValidator(validator1);
+        require(v.totalCollateral == collateral, "total collateral not expected");
+        require(v.confirmedCollateral == collateral, "confirmed collateral not 0");
+        ensureBytesEqual(v.metadata, metadata);
+        require(saGetter.bootstrapped(), "subnet not bootstrapped");
+
+        (uint64 nextConfigNum, uint64 startConfigNum) = saGetter.getConfigurationNumbers();
+        require(nextConfigNum == 0, "next config num not 1");
+        require(startConfigNum == 0, "start config num not 0");
+
+        // second validator joins
+        vm.startPrank(validator2);
+        vm.deal(validator2, collateral);
 
         saManager.join{value: collateral}(metadata);
 
         // collateral not confirmed yet
-        Validator memory v = saGetter.getValidator(validator);
+        v = saGetter.getValidator(validator2);
         require(v.totalCollateral == collateral, "total collateral not expected");
         require(v.confirmedCollateral == 0, "confirmed collateral not 0");
         ensureBytesEqual(v.metadata, metadata);
 
-        (uint64 nextConfigNum, uint64 startConfigNum) = saGetter.getConfigurationNumbers();
+        (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
         require(nextConfigNum == 1, "next config num not 1");
         require(startConfigNum == 0, "start config num not 0");
 
         // ======== Step. Confirm join operation ======
         saManager.confirmChange(0);
 
-        v = saGetter.getValidator(validator);
+        v = saGetter.getValidator(validator2);
         require(v.totalCollateral == collateral, "total collateral not expected after confirm join");
         require(
             v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE,
@@ -204,13 +223,13 @@ contract SubnetActorDiamondTest is Test {
         require(startConfigNum == 1, "start config num not 1 after confirm join");
 
         // ======== Step. Stake more ======
-        vm.startPrank(validator);
-        vm.deal(validator, 10);
+        vm.startPrank(validator1);
+        vm.deal(validator1, 10);
 
         saManager.stake{value: 10}();
 
         collateral += 10;
-        v = saGetter.getValidator(validator);
+        v = saGetter.getValidator(validator1);
         require(v.totalCollateral == collateral, "total collateral not expected after stake");
         require(v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "confirmed collateral not 0 after stake");
 
@@ -221,7 +240,7 @@ contract SubnetActorDiamondTest is Test {
         // ======== Step. Confirm stake operation ======
         saManager.confirmChange(1);
 
-        v = saGetter.getValidator(validator);
+        v = saGetter.getValidator(validator1);
         require(v.totalCollateral == collateral, "total collateral not expected after confirm stake");
         require(v.confirmedCollateral == collateral, "confirmed collateral not expected after confrim stake");
 
@@ -230,11 +249,11 @@ contract SubnetActorDiamondTest is Test {
         require(startConfigNum == 2, "start config num not 2 after confirm stake");
 
         // ======== Step. Leave ======
-        vm.startPrank(validator);
+        vm.startPrank(validator1);
 
         saManager.leave();
 
-        v = saGetter.getValidator(validator);
+        v = saGetter.getValidator(validator1);
         require(v.totalCollateral == 0, "total collateral not 0 after confirm leave");
         require(v.confirmedCollateral == collateral, "confirmed collateral not 0 after confrim leave");
 
@@ -245,7 +264,7 @@ contract SubnetActorDiamondTest is Test {
         // ======== Step. Confirm leave ======
         saManager.confirmChange(2);
 
-        v = saGetter.getValidator(validator);
+        v = saGetter.getValidator(validator1);
         require(v.totalCollateral == 0, "total collateral not 0 after confirm leave");
         require(v.confirmedCollateral == 0, "confirmed collateral not 0 after confrim leave");
 

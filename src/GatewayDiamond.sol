@@ -48,11 +48,6 @@ contract GatewayDiamond {
         s.crossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.bottomUpCheckpointRetentionHeight = 1;
-
-        // the root doesn't need to be explicitly initialized
-        if (s.networkName.isRoot()) {
-            s.initialized = true;
-        }
     }
 
     function _fallback() internal {

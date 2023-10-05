@@ -35,10 +35,6 @@ contract GatewayGetterFacet {
         return s.minStake;
     }
 
-    function initialized() external view returns (bool) {
-        return s.initialized;
-    }
-
     function bottomUpCheckPeriod() external view returns (uint64) {
         return s.bottomUpCheckPeriod;
     }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-error AlreadyInitialized();
 error AlreadyRegisteredSubnet();
 error CallerHasNoStake();
 error CannotReleaseZero();
@@ -51,7 +50,7 @@ error NotEnoughFunds();
 error NotEnoughFundsToRelease();
 error NotEnoughSubnetCircSupply();
 error NotGateway();
-error NotInitialized();
+
 error NotSystemActor();
 error NotRegisteredSubnet();
 error NotValidator();

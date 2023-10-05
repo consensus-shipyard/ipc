@@ -333,13 +333,6 @@ pub mod subnet_actor_manager_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("SubnetNotActive"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("SubnetNotActive"),
-                        inputs: ::std::vec![],
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("WithdrawExceedingCollateral"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("WithdrawExceedingCollateral",),
@@ -673,19 +666,6 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "SubnetAlreadyKilled", abi = "SubnetAlreadyKilled()")]
     pub struct SubnetAlreadyKilled;
-    ///Custom Error type `SubnetNotActive` with signature `SubnetNotActive()` and selector `0xc18316bf`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "SubnetNotActive", abi = "SubnetNotActive()")]
-    pub struct SubnetNotActive;
     ///Custom Error type `WithdrawExceedingCollateral` with signature `WithdrawExceedingCollateral()` and selector `0xac693603`
     #[derive(
         Clone,
@@ -730,7 +710,6 @@ pub mod subnet_actor_manager_facet {
         PQEmpty(PQEmpty),
         ReentrancyError(ReentrancyError),
         SubnetAlreadyKilled(SubnetAlreadyKilled),
-        SubnetNotActive(SubnetNotActive),
         WithdrawExceedingCollateral(WithdrawExceedingCollateral),
         WrongCheckpointSource(WrongCheckpointSource),
         /// The standard solidity revert string, with selector
@@ -798,9 +777,6 @@ pub mod subnet_actor_manager_facet {
             {
                 return Ok(Self::SubnetAlreadyKilled(decoded));
             }
-            if let Ok(decoded) = <SubnetNotActive as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::SubnetNotActive(decoded));
-            }
             if let Ok(decoded) =
                 <WithdrawExceedingCollateral as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -843,7 +819,6 @@ pub mod subnet_actor_manager_facet {
                 Self::SubnetAlreadyKilled(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::SubnetNotActive(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::WithdrawExceedingCollateral(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -904,9 +879,6 @@ pub mod subnet_actor_manager_facet {
                 {
                     true
                 }
-                _ if selector == <SubnetNotActive as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
                 _ if selector
                     == <WithdrawExceedingCollateral as ::ethers::contract::EthError>::selector(
                     ) =>
@@ -937,7 +909,6 @@ pub mod subnet_actor_manager_facet {
                 Self::PQEmpty(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetAlreadyKilled(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SubnetNotActive(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WithdrawExceedingCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WrongCheckpointSource(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
@@ -1007,11 +978,6 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<SubnetAlreadyKilled> for SubnetActorManagerFacetErrors {
         fn from(value: SubnetAlreadyKilled) -> Self {
             Self::SubnetAlreadyKilled(value)
-        }
-    }
-    impl ::core::convert::From<SubnetNotActive> for SubnetActorManagerFacetErrors {
-        fn from(value: SubnetNotActive) -> Self {
-            Self::SubnetNotActive(value)
         }
     }
     impl ::core::convert::From<WithdrawExceedingCollateral> for SubnetActorManagerFacetErrors {

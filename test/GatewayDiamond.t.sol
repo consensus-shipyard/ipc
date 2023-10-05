@@ -235,7 +235,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(gatewayDiamond),
-            consensus: ConsensusType.Mir,
+            consensus: ConsensusType.Fendermint,
             minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
@@ -323,7 +323,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         SubnetID memory networkName = depGetter.getNetworkName();
 
         require(networkName.isRoot(), "networkName.isRoot()");
-        require(depGetter.initialized() == true, "gw.initialized() == true");
         require(depGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "gw.minStake() == MIN_COLLATERAL_AMOUNT");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
         require(depGetter.topDownCheckPeriod() == checkpointPeriod, "gw.topDownCheckPeriod() == checkpointPeriod");
@@ -389,7 +388,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         SubnetID memory networkName = depGetter.getNetworkName();
 
         require(networkName.isRoot() == false, "networkName.isRoot()");
-        require(depGetter.initialized() == false, "gw.initialized() == false");
         require(depGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "gw.minStake() == MIN_COLLATERAL_AMOUNT");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
         require(depGetter.topDownCheckPeriod() == checkpointPeriod, "gw.topDownCheckPeriod() == checkpointPeriod");

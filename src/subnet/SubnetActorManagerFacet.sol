@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {Status} from "../enums/Status.sol";
 import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint, InvalidSignatureErr} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
@@ -38,9 +37,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external {
-        if (s.status != Status.Active) {
-            revert SubnetNotActive();
-        }
         if (!LibStaking.isActiveValidator(msg.sender)) {
             revert NotValidator();
         }
@@ -105,8 +101,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
             revert NotAllValidatorsHaveLeft();
         }
 
-        s.status = Status.Killed;
-
+        s.killed = true;
         IGateway(s.ipcGatewayAddr).kill();
     }
 

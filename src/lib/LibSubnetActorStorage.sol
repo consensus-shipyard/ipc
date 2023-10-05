@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
-import {Status} from "../enums/Status.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
@@ -33,13 +32,14 @@ struct SubnetActorStorage {
     address ipcGatewayAddr;
     /// @notice majority percentage value (must be greater than or equal to 51)
     uint8 majorityPercentage;
-    /// @notice Type of consensus algorithm.
-    /// @notice current status of the subnet
-    Status status;
     /// @notice ID of the parent subnet
     SubnetID parentId;
     /// immutable params
     ConsensusType consensus;
+    /// @notice Determines if the subnet has been bootstrapped (i.e. it has been activated)
+    bool bootstrapped;
+    /// @notice Determines if the subnet has been successfully killed
+    bool killed;
     // =========== Staking ===========
     /// @notice the list of validators staking
     ValidatorSet validatorSet;
@@ -67,7 +67,7 @@ contract SubnetActorModifiers {
     }
 
     function _notKilled() private view {
-        if (s.status == Status.Killed) {
+        if (s.killed) {
             revert SubnetAlreadyKilled();
         }
     }
