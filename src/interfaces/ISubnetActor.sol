@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
 /// @title Subnet Actor interface
@@ -24,10 +24,13 @@ interface ISubnetActor {
     /// Valdiator claims their released collateral
     function claim() external;
 
-    /// SubmitCheckpoint accepts signed checkpoint votes for validators.
+    /// Executes the checkpoint if it is valid.
+    /// It triggers the commitment of the checkpoint, the execution of related cross-net messages,
+    /// and any other side-effects that need to be triggered by the checkpoint such as relayer reward book keeping.
     function submitCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
-        bytes32 membershipRootHash,
-        uint256 membershipWeight
+        CrossMsg[] calldata messages,
+        address[] calldata signatories,
+        bytes[] calldata signatures
     ) external;
 }

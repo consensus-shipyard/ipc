@@ -12,8 +12,8 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
 struct SubnetActorStorage {
     /// @notice contains all committed bottom-up checkpoint at specific epoch
     mapping(uint64 => BottomUpCheckpoint) committedCheckpoints;
-    /// @notice genesis block
-    bytes genesis;
+    /// @notice The height of the last committed bottom-up checkpoint.
+    uint64 lastBottomUpCheckpointHeight;
     /// @notice Total collateral currently deposited in the GW from the subnet
     uint256 totalStake;
     /// @notice Minimal activation collateral
@@ -26,8 +26,6 @@ struct SubnetActorStorage {
     bytes32 name;
     // @notice Hash of the current subnet id
     bytes32 currentSubnetHash;
-    /// @notice contains the last executed checkpoint hash
-    bytes32 prevExecutedCheckpointHash;
     /// @notice Address of the IPC gateway for the subnet
     address ipcGatewayAddr;
     /// @notice majority percentage value (must be greater than or equal to 51)

@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {MultisignatureChecker} from "../src/lib/LibMultisignatureChecker.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 
-contract SignerTest is StdInvariant, Test {
+contract MultisignatureCheckerTest is StdInvariant, Test {
     function testBasicSignerInterface() public pure {
         uint256 PRIVATE_KEY = 1000;
         address signer = vm.addr(PRIVATE_KEY);
@@ -36,12 +36,15 @@ contract SignerTest is StdInvariant, Test {
         uint256[] memory weights = new uint256[](1);
         weights[0] = 10;
 
+        bytes[] memory signatures = new bytes[](1);
+        signatures[0] = signatureBytes;
+
         (bool valid, MultisignatureChecker.Error err) = MultisignatureChecker.isValidWeightedMultiSignature(
             signers,
             weights,
             10,
             hash,
-            signatureBytes
+            signatures
         );
         require(valid == true, "valid == true");
         require(err == MultisignatureChecker.Error.Nil, "err == Nil");
@@ -51,28 +54,23 @@ contract SignerTest is StdInvariant, Test {
         uint256 PRIVATE_KEY_BASE = 1000;
         address[] memory signers = new address[](4);
         uint256[] memory weights = new uint256[](4);
+        bytes[] memory signatures = new bytes[](4);
 
         bytes32 hash = keccak256(abi.encodePacked("test"));
 
-        bytes memory multisignatureBytes;
-
         for (uint256 i = 0; i < 4; i++) {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY_BASE + i, hash);
-            bytes memory signature = abi.encodePacked(r, s, v);
+            signatures[i] = abi.encodePacked(r, s, v);
             signers[i] = vm.addr(PRIVATE_KEY_BASE + i);
             weights[i] = 10;
-
-            multisignatureBytes = bytes.concat(multisignatureBytes, signature);
         }
-
-        require(multisignatureBytes.length == 65 * 4, "multisignatureBytes.length == 65 * 4");
 
         (bool valid, MultisignatureChecker.Error err) = MultisignatureChecker.isValidWeightedMultiSignature(
             signers,
             weights,
             30,
             hash,
-            multisignatureBytes
+            signatures
         );
         require(valid == true, "valid == true");
         require(err == MultisignatureChecker.Error.Nil, "err == Nil");
@@ -87,55 +85,54 @@ contract SignerTest is StdInvariant, Test {
         uint256[] memory weights = new uint256[](1);
         weights[0] = 10;
 
+        // signatures is empty
         (bool valid, MultisignatureChecker.Error err) = MultisignatureChecker.isValidWeightedMultiSignature(
             signers,
             weights,
             10,
             hash,
-            abi.encodePacked(hash)
+            new bytes[](0)
         );
         require(valid == false, "valid == false");
-        require(err == MultisignatureChecker.Error.InvalidSignaturesBytes);
+        require(err == MultisignatureChecker.Error.EmptySignatures, "for empty signatures");
 
-        (valid, err) = MultisignatureChecker.isValidWeightedMultiSignature(
-            signers,
-            weights,
-            10,
-            hash,
-            bytes("1234567890")
-        );
+        // signature has one signature with incorrect length
+        bytes[] memory signatures = new bytes[](1);
+        signatures[0] = abi.encodePacked(hash);
+        (valid, err) = MultisignatureChecker.isValidWeightedMultiSignature(signers, weights, 10, hash, signatures);
         require(valid == false, "valid == false");
-        require(err == MultisignatureChecker.Error.InvalidSignaturesBytes);
+        require(err == MultisignatureChecker.Error.InvalidSignature, "signature length is 32");
 
-        bytes memory signature66 = bytes.concat(abi.encodePacked(hash), abi.encodePacked(hash), "1", "1");
-
-        (valid, err) = MultisignatureChecker.isValidWeightedMultiSignature(signers, weights, 10, hash, signature66);
+        signatures[0] = bytes.concat(abi.encodePacked(hash), abi.encodePacked(hash), abi.encodePacked(hash));
+        (valid, err) = MultisignatureChecker.isValidWeightedMultiSignature(signers, weights, 10, hash, signatures);
         require(valid == false, "valid == false");
-        require(err == MultisignatureChecker.Error.InvalidSignaturesBytes);
+        require(err == MultisignatureChecker.Error.InvalidSignature, "signature length is 96");
 
-        (valid, err) = MultisignatureChecker.isValidWeightedMultiSignature(signers, weights, 10, hash, bytes(""));
+        signatures = new bytes[](2);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(100, hash);
+        signatures[0] = abi.encodePacked(r, s, v);
+        signatures[1] = abi.encodePacked(r, s, v);
+        (valid, err) = MultisignatureChecker.isValidWeightedMultiSignature(signers, weights, 10, hash, signatures);
         require(valid == false, "valid == false");
-        require(err == MultisignatureChecker.Error.InvalidSignaturesBytes, "err == InvalidSignaturesBytes");
+        require(err == MultisignatureChecker.Error.InvalidArrayLength, "different array lengths");
     }
 
     function testMultiSignatureChecker_Weighted_InvalidSignatureInMultisig() public pure {
         uint256 PRIVATE_KEY_BASE = 1000;
         address[] memory signers = new address[](4);
+        bytes[] memory signatures = new bytes[](4);
 
         bytes32 hash = keccak256(abi.encodePacked("test"));
 
-        bytes memory multisignatureBytes;
         bytes32 b;
 
         uint256[] memory weights = new uint256[](4);
 
         for (uint256 i = 0; i < 4; i++) {
             (uint8 v, bytes32 r, ) = vm.sign(PRIVATE_KEY_BASE + i, hash);
-            bytes memory signature = abi.encodePacked(r, b, v);
+            signatures[i] = abi.encodePacked(r, b, v);
             signers[i] = vm.addr(PRIVATE_KEY_BASE + i);
             weights[i] = 10;
-
-            multisignatureBytes = bytes.concat(multisignatureBytes, signature);
         }
 
         (bool valid, MultisignatureChecker.Error err) = MultisignatureChecker.isValidWeightedMultiSignature(
@@ -143,7 +140,7 @@ contract SignerTest is StdInvariant, Test {
             weights,
             30,
             hash,
-            abi.encodePacked(multisignatureBytes)
+            signatures
         );
         require(valid == false, "valid == false");
         require(err == MultisignatureChecker.Error.InvalidSignature, "err == InvalidSignature");
@@ -153,19 +150,16 @@ contract SignerTest is StdInvariant, Test {
         uint256 PRIVATE_KEY_BASE = 1000;
         address[] memory signers = new address[](2);
         uint256[] memory weights = new uint256[](2);
+        bytes[] memory signatures = new bytes[](2);
 
         bytes32 hash = keccak256(abi.encodePacked("test"));
 
-        bytes memory multisignatureBytes;
-
         for (uint256 i = 0; i < 2; i++) {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY_BASE + i, hash);
-            bytes memory signature = abi.encodePacked(r, s, v);
-            multisignatureBytes = bytes.concat(multisignatureBytes, signature);
+            signatures[i] = abi.encodePacked(r, s, v);
             weights[i] = 10;
         }
 
-        // use invalid keys
         signers[0] = vm.addr(PRIVATE_KEY_BASE + 1);
         signers[1] = vm.addr(PRIVATE_KEY_BASE);
 
@@ -174,25 +168,23 @@ contract SignerTest is StdInvariant, Test {
             weights,
             10,
             hash,
-            multisignatureBytes
+            signatures
         );
         require(valid == false, "valid == false");
-        require(err == MultisignatureChecker.Error.InvalidSigner, "err == InvalidSigner");
+        require(err == MultisignatureChecker.Error.InvalidSignatory, "err == InvalidSigner");
     }
 
     function testMultiSignatureChecker_Weighted_LessThanThreshold() public pure {
         uint256 PRIVATE_KEY_BASE = 1000;
         address[] memory signers = new address[](2);
         uint256[] memory weights = new uint256[](2);
+        bytes[] memory signatures = new bytes[](2);
 
         bytes32 hash = keccak256(abi.encodePacked("test"));
 
-        bytes memory multisignatureBytes;
-
         for (uint256 i = 0; i < 2; i++) {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY_BASE + i, hash);
-            bytes memory signature = abi.encodePacked(r, s, v);
-            multisignatureBytes = bytes.concat(multisignatureBytes, signature);
+            signatures[i] = abi.encodePacked(r, s, v);
             weights[i] = 10;
             signers[i] = vm.addr(PRIVATE_KEY_BASE + i);
         }
@@ -202,7 +194,7 @@ contract SignerTest is StdInvariant, Test {
             weights,
             100,
             hash,
-            multisignatureBytes
+            signatures
         );
         require(valid == false, "valid == false");
         require(err == MultisignatureChecker.Error.WeightsSumLessThanThreshold, "err == WeightsSumLessThanThreshold");
@@ -212,19 +204,16 @@ contract SignerTest is StdInvariant, Test {
         uint256 PRIVATE_KEY_BASE = 1000;
         address[] memory signers = new address[](2);
         uint256[] memory weights = new uint256[](1);
+        bytes[] memory signatures = new bytes[](2);
 
         bytes32 hash = keccak256(abi.encodePacked("test"));
 
-        bytes memory multisignatureBytes;
-
         for (uint256 i = 0; i < 2; i++) {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY_BASE + i, hash);
-            bytes memory signature = abi.encodePacked(r, s, v);
-            multisignatureBytes = bytes.concat(multisignatureBytes, signature);
+            signatures[i] = abi.encodePacked(r, s, v);
         }
         weights[0] = 1;
 
-        // use invalid keys
         signers[0] = vm.addr(PRIVATE_KEY_BASE + 1);
         signers[1] = vm.addr(PRIVATE_KEY_BASE);
 
@@ -233,7 +222,7 @@ contract SignerTest is StdInvariant, Test {
             weights,
             10,
             hash,
-            multisignatureBytes
+            signatures
         );
         require(valid == false, "valid == false");
         require(err == MultisignatureChecker.Error.InvalidArrayLength, "err == InvalidArrayLength");

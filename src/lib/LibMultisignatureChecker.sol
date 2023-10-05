@@ -10,33 +10,11 @@ library MultisignatureChecker {
     enum Error {
         Nil,
         InvalidArrayLength,
-        InvalidSignaturesBytes,
-        InvalidSigner,
+        EmptySignatures,
+        InvalidSignatureLength,
+        InvalidSignatory,
         InvalidSignature,
         WeightsSumLessThanThreshold
-    }
-
-    function parseSignature(
-        bytes memory signatures,
-        uint256 index
-    ) public pure returns (uint8 v, bytes32 r, bytes32 s) {
-        uint256 offset = index * SIGNATURE_LENGTH;
-
-        assembly {
-            r := mload(add(signatures, add(32, offset)))
-            s := mload(add(signatures, add(64, offset)))
-            v := byte(0, mload(add(signatures, add(96, offset))))
-        }
-
-        return (v, r, s);
-    }
-
-    /// @notice Counts the number of signatures in a signatures bytes array. Returns 0 if the length is invalid.
-    /// @param signatures The signatures bytes array
-    /// @dev Signatures are 65 bytes long and are densely packed.
-    function countSignatures(bytes memory signatures) public pure returns (uint256) {
-        uint256 len = signatures.length;
-        return (len % SIGNATURE_LENGTH) == 0 ? (len / SIGNATURE_LENGTH) : 0;
     }
 
     /**
@@ -55,31 +33,30 @@ library MultisignatureChecker {
         uint256[] memory weights,
         uint256 threshold,
         bytes32 hash,
-        bytes memory signatures
+        bytes[] memory signatures
     ) internal pure returns (bool, Error) {
         bool valid = true;
         uint256 weight;
 
-        uint256 signaturesNumber = countSignatures(signatures);
+        uint256 signaturesNumber = signatures.length;
         if (signaturesNumber == 0) {
-            return (!valid, Error.InvalidSignaturesBytes);
+            return (!valid, Error.EmptySignatures);
         }
+
         if (signaturesNumber != signatories.length || signaturesNumber != weights.length) {
             return (!valid, Error.InvalidArrayLength);
         }
 
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-
         for (uint256 i = 0; i < signaturesNumber; ) {
-            (v, r, s) = parseSignature(signatures, i);
-            (address recovered, ECDSA.RecoverError ecdsaErr, ) = ECDSA.tryRecover({hash: hash, v: v, r: r, s: s});
+            (address recovered, ECDSA.RecoverError ecdsaErr, ) = ECDSA.tryRecover({
+                hash: hash,
+                signature: signatures[i]
+            });
             if (ecdsaErr != ECDSA.RecoverError.NoError) {
                 return (!valid, Error.InvalidSignature);
             }
             if (recovered != signatories[i]) {
-                return (!valid, Error.InvalidSigner);
+                return (!valid, Error.InvalidSignatory);
             }
             weight = weight + weights[i];
             unchecked {

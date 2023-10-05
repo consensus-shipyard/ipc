@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint, InvalidSignatureErr} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint, InvalidSignatureErr, HeightAlreadyExecuted, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Validator, ValidatorSet} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
@@ -28,29 +28,39 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     event BottomUpCheckpointExecuted(uint64 epoch, address submitter);
     event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
 
-    /// @notice methods that allows a validator to submit a checkpoint (batch of messages) and vote for it with it's own voting power.
-    /// @param checkpoint - the batch messages data
-    /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
-    /// @param membershipWeight - the total weight of the membership
+    /** @notice Executes the checkpoint if it is valid.
+     *  @dev It triggers the commitment of the checkpoint, the execution of related cross-net messages,
+     *       and any other side-effects that need to be triggered by the checkpoint such as relayer reward book keeping.
+     * @param checkpoint The executed bottom-up checkpoint
+     * @param messages The list of executed cross-messages
+     * @param signatories The addresses of the signatories
+     * @param signatures The collected checkpoint signatures
+     */
     function submitCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
-        bytes32 membershipRootHash,
-        uint256 membershipWeight
+        CrossMsg[] calldata messages,
+        address[] calldata signatories,
+        bytes[] calldata signatures
     ) external {
+        // validations
         if (!LibStaking.isActiveValidator(msg.sender)) {
             revert NotValidator();
         }
-        if (checkpoint.subnetID.toHash() != s.currentSubnetHash) {
-            revert WrongCheckpointSource();
+        if (checkpoint.blockHeight != s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
+            revert InvalidCheckpointEpoch();
         }
+        if (keccak256(abi.encode(messages)) != checkpoint.crossMessagesHash) {
+            revert InvalidCheckpointMessagesHash();
+        }
+        bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
+        validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
 
-        _commitCheckpoint({
-            checkpoint: checkpoint,
-            membershipRootHash: membershipRootHash,
-            membershipWeight: membershipWeight
-        });
+        // effects
+        s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
+        s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
-        LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+        // interactions
+        IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint);
     }
 
     /// @notice Set the data of a validator
@@ -110,31 +120,21 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         LibStaking.claimCollateral(msg.sender);
     }
 
-    /// @notice method that commits a checkpoint after reaching majority
-    /// @param checkpoint - the batch messages data
-    function _commitCheckpoint(
-        BottomUpCheckpoint calldata checkpoint,
-        bytes32 membershipRootHash,
-        uint256 membershipWeight
-    ) internal {
-        s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
-        s.prevExecutedCheckpointHash = checkpoint.toHash();
-
-        IGateway(s.ipcGatewayAddr).createBottomUpCheckpoint({
-            checkpoint: checkpoint,
-            membershipRootHash: membershipRootHash,
-            membershipWeight: membershipWeight
-        });
-    }
-
     /**
-     * @notice Checks whether the checkpoint is valid for the provided signatories, signatures and hash. Reverts otherwise.
+     * @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
+     *         Reverts otherwise.
      * @dev Signatories in `signatories` and their signatures in `signatures` must be provided in the same order.
+     *       Having it public allows external users to perform sanity-check verification if needed.
      * @param signatories The addresses of the signatories.
      * @param hash The hash of the checkpoint.
      * @param signatures The packed signatures of the checkpoint.
      */
-    function validateCheckpoint(address[] memory signatories, bytes32 hash, bytes memory signatures) external view {
+    function validateActiveQuorumSignatures(
+        address[] memory signatories,
+        bytes32 hash,
+        bytes[] memory signatures
+    ) public view {
+        // This call reverts if at least one of the signatories (validator) is not in the active validator set.
         uint256[] memory collaterals = s.validatorSet.getConfirmedCollaterals(signatories);
 
         uint256 threshold = (s.validatorSet.totalConfirmedCollateral * s.majorityPercentage) / 100;

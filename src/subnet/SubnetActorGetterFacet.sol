@@ -35,10 +35,6 @@ contract SubnetActorGetterFacet {
         return s.totalStake;
     }
 
-    function prevExecutedCheckpointHash() external view returns (bytes32) {
-        return s.prevExecutedCheckpointHash;
-    }
-
     function ipcGatewayAddr() external view returns (address) {
         return s.ipcGatewayAddr;
     }

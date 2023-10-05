@@ -47,7 +47,7 @@ contract DefaultGatewayMock is IGateway {
 
     /// CommitChildCheck propagates the commitment of a checkpoint from a child subnet,
     /// process the cross-messages directed to the subnet.
-    function commitChildCheck(BottomUpCheckpoint calldata bottomUpCheckpoint) external {
+    function commitBottomUpCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint) external {
         // silent warning
         bottomUpCheckpoint;
         // make method perform txn
