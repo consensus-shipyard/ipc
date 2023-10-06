@@ -5,7 +5,7 @@ import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
-import {SubnetID, ValidatorSet, StakingChangeSet, StakingReleaseQueue} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue} from "../structs/Subnet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
@@ -42,7 +42,7 @@ struct SubnetActorStorage {
     /// @notice the list of validators staking
     ValidatorSet validatorSet;
     /// @notice Contains the list of changes to validator set. Configuration number is associated at each change.
-    StakingChangeSet changeSet;
+    StakingChangeLog changeSet;
     /// @notice The staking release queue that only allow transfer of collateral after certain locking period.
     StakingReleaseQueue releaseQueue;
 }

@@ -199,40 +199,6 @@ pub mod gateway_router_facet {
                                         ::std::borrow::ToOwned::to_owned("struct ParentFinality"),
                                     ),
                                 },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("n"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("validators"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                ],
-                                            ),
-                                        ),
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("struct FvmAddress[]"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("weights"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                        ),
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256[]"),
-                                    ),
-                                },
                             ],
                             outputs: ::std::vec![],
                             constant: ::core::option::Option::None,
@@ -316,6 +282,92 @@ pub mod gateway_router_facet {
                                     kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("storeValidatorChanges"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "storeValidatorChanges",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("changeRequests"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                ],
+                                            ),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned(
+                                            "struct StakingChangeRequest[]",
+                                        ),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("updateMembership"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("updateMembership"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("n"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validators"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                ],
+                                            ),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct FvmAddress[]"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("weights"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256[]"),
                                     ),
                                 },
                             ],
@@ -489,11 +541,33 @@ pub mod gateway_router_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("InvalidCheckpointEpoch"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidCheckpointEpoch",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("InvalidCheckpointSource"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned(
                                 "InvalidCheckpointSource",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("InvalidConfigurationNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidConfigurationNumber",
                             ),
                             inputs: ::std::vec![],
                         },
@@ -751,16 +825,13 @@ pub mod gateway_router_facet {
                 .method_hash([147, 152, 222, 200], (commit,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `commitParentFinality` (0x9fa68440) function
+        ///Calls the contract's `commitParentFinality` (0x11196974) function
         pub fn commit_parent_finality(
             &self,
             finality: ParentFinality,
-            n: u64,
-            validators: ::std::vec::Vec<FvmAddress>,
-            weights: ::std::vec::Vec<::ethers::core::types::U256>,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([159, 166, 132, 64], (finality, n, validators, weights))
+                .method_hash([17, 25, 105, 116], (finality,))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `createBottomUpCheckpoint` (0xa656ca5b) function
@@ -784,6 +855,26 @@ pub mod gateway_router_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([174, 0, 194, 152], new_retention_height)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `storeValidatorChanges` (0xa12465bc) function
+        pub fn store_validator_changes(
+            &self,
+            change_requests: ::std::vec::Vec<StakingChangeRequest>,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([161, 36, 101, 188], change_requests)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `updateMembership` (0xfd5215fc) function
+        pub fn update_membership(
+            &self,
+            n: u64,
+            validators: ::std::vec::Vec<FvmAddress>,
+            weights: ::std::vec::Vec<::ethers::core::types::U256>,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([253, 82, 21, 252], (n, validators, weights))
                 .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `QuorumReached` event
@@ -948,6 +1039,19 @@ pub mod gateway_router_facet {
     )]
     #[etherror(name = "InvalidActorAddress", abi = "InvalidActorAddress()")]
     pub struct InvalidActorAddress;
+    ///Custom Error type `InvalidCheckpointEpoch` with signature `InvalidCheckpointEpoch()` and selector `0xfae4eadb`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "InvalidCheckpointEpoch", abi = "InvalidCheckpointEpoch()")]
+    pub struct InvalidCheckpointEpoch;
     ///Custom Error type `InvalidCheckpointSource` with signature `InvalidCheckpointSource()` and selector `0xfe72264e`
     #[derive(
         Clone,
@@ -961,6 +1065,22 @@ pub mod gateway_router_facet {
     )]
     #[etherror(name = "InvalidCheckpointSource", abi = "InvalidCheckpointSource()")]
     pub struct InvalidCheckpointSource;
+    ///Custom Error type `InvalidConfigurationNumber` with signature `InvalidConfigurationNumber()` and selector `0x6ae94ca4`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "InvalidConfigurationNumber",
+        abi = "InvalidConfigurationNumber()"
+    )]
+    pub struct InvalidConfigurationNumber;
     ///Custom Error type `InvalidCrossMsgDstSubnet` with signature `InvalidCrossMsgDstSubnet()` and selector `0xc5f563eb`
     #[derive(
         Clone,
@@ -1190,7 +1310,9 @@ pub mod gateway_router_facet {
         FailedAddSignatory(FailedAddSignatory),
         FailedRemoveIncompleteCheckpoint(FailedRemoveIncompleteCheckpoint),
         InvalidActorAddress(InvalidActorAddress),
+        InvalidCheckpointEpoch(InvalidCheckpointEpoch),
         InvalidCheckpointSource(InvalidCheckpointSource),
+        InvalidConfigurationNumber(InvalidConfigurationNumber),
         InvalidCrossMsgDstSubnet(InvalidCrossMsgDstSubnet),
         InvalidCrossMsgNonce(InvalidCrossMsgNonce),
         InvalidRetentionHeight(InvalidRetentionHeight),
@@ -1267,9 +1389,19 @@ pub mod gateway_router_facet {
                 return Ok(Self::InvalidActorAddress(decoded));
             }
             if let Ok(decoded) =
+                <InvalidCheckpointEpoch as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::InvalidCheckpointEpoch(decoded));
+            }
+            if let Ok(decoded) =
                 <InvalidCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::InvalidCheckpointSource(decoded));
+            }
+            if let Ok(decoded) =
+                <InvalidConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::InvalidConfigurationNumber(decoded));
             }
             if let Ok(decoded) =
                 <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1374,7 +1506,13 @@ pub mod gateway_router_facet {
                 Self::InvalidActorAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::InvalidCheckpointEpoch(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidCheckpointSource(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidConfigurationNumber(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::InvalidCrossMsgDstSubnet(element) => {
@@ -1458,7 +1596,15 @@ pub mod gateway_router_facet {
                     true
                 }
                 _ if selector
+                    == <InvalidCheckpointEpoch as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <InvalidCheckpointSource as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidConfigurationNumber as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1547,7 +1693,9 @@ pub mod gateway_router_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::InvalidActorAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidCheckpointEpoch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCheckpointSource(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCrossMsgDstSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCrossMsgNonce(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidRetentionHeight(element) => ::core::fmt::Display::fmt(element, f),
@@ -1622,9 +1770,19 @@ pub mod gateway_router_facet {
             Self::InvalidActorAddress(value)
         }
     }
+    impl ::core::convert::From<InvalidCheckpointEpoch> for GatewayRouterFacetErrors {
+        fn from(value: InvalidCheckpointEpoch) -> Self {
+            Self::InvalidCheckpointEpoch(value)
+        }
+    }
     impl ::core::convert::From<InvalidCheckpointSource> for GatewayRouterFacetErrors {
         fn from(value: InvalidCheckpointSource) -> Self {
             Self::InvalidCheckpointSource(value)
+        }
+    }
+    impl ::core::convert::From<InvalidConfigurationNumber> for GatewayRouterFacetErrors {
+        fn from(value: InvalidConfigurationNumber) -> Self {
+            Self::InvalidConfigurationNumber(value)
         }
     }
     impl ::core::convert::From<InvalidCrossMsgDstSubnet> for GatewayRouterFacetErrors {
@@ -1836,7 +1994,7 @@ pub mod gateway_router_facet {
     pub struct CommitChildCheckCall {
         pub commit: BottomUpCheckpoint,
     }
-    ///Container type for all input parameters for the `commitParentFinality` function with signature `commitParentFinality((uint256,bytes32),uint64,(uint8,bytes)[],uint256[])` and selector `0x9fa68440`
+    ///Container type for all input parameters for the `commitParentFinality` function with signature `commitParentFinality((uint256,bytes32))` and selector `0x11196974`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1849,13 +2007,10 @@ pub mod gateway_router_facet {
     )]
     #[ethcall(
         name = "commitParentFinality",
-        abi = "commitParentFinality((uint256,bytes32),uint64,(uint8,bytes)[],uint256[])"
+        abi = "commitParentFinality((uint256,bytes32))"
     )]
     pub struct CommitParentFinalityCall {
         pub finality: ParentFinality,
-        pub n: u64,
-        pub validators: ::std::vec::Vec<FvmAddress>,
-        pub weights: ::std::vec::Vec<::ethers::core::types::U256>,
     }
     ///Container type for all input parameters for the `createBottomUpCheckpoint` function with signature `createBottomUpCheckpoint(((uint64,address[]),uint64,bytes32,uint64,bytes32),bytes32,uint256)` and selector `0xa656ca5b`
     #[derive(
@@ -1895,6 +2050,44 @@ pub mod gateway_router_facet {
     pub struct PruneBottomUpCheckpointsCall {
         pub new_retention_height: u64,
     }
+    ///Container type for all input parameters for the `storeValidatorChanges` function with signature `storeValidatorChanges(((uint8,uint256,address),uint64)[])` and selector `0xa12465bc`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "storeValidatorChanges",
+        abi = "storeValidatorChanges(((uint8,uint256,address),uint64)[])"
+    )]
+    pub struct StoreValidatorChangesCall {
+        pub change_requests: ::std::vec::Vec<StakingChangeRequest>,
+    }
+    ///Container type for all input parameters for the `updateMembership` function with signature `updateMembership(uint64,(uint8,bytes)[],uint256[])` and selector `0xfd5215fc`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "updateMembership",
+        abi = "updateMembership(uint64,(uint8,bytes)[],uint256[])"
+    )]
+    pub struct UpdateMembershipCall {
+        pub n: u64,
+        pub validators: ::std::vec::Vec<FvmAddress>,
+        pub weights: ::std::vec::Vec<::ethers::core::types::U256>,
+    }
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayRouterFacetCalls {
@@ -1904,6 +2097,8 @@ pub mod gateway_router_facet {
         CommitParentFinality(CommitParentFinalityCall),
         CreateBottomUpCheckpoint(CreateBottomUpCheckpointCall),
         PruneBottomUpCheckpoints(PruneBottomUpCheckpointsCall),
+        StoreValidatorChanges(StoreValidatorChangesCall),
+        UpdateMembership(UpdateMembershipCall),
     }
     impl ::ethers::core::abi::AbiDecode for GatewayRouterFacetCalls {
         fn decode(
@@ -1940,6 +2135,16 @@ pub mod gateway_router_facet {
             {
                 return Ok(Self::PruneBottomUpCheckpoints(decoded));
             }
+            if let Ok(decoded) =
+                <StoreValidatorChangesCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::StoreValidatorChanges(decoded));
+            }
+            if let Ok(decoded) =
+                <UpdateMembershipCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::UpdateMembership(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -1962,6 +2167,10 @@ pub mod gateway_router_facet {
                 Self::PruneBottomUpCheckpoints(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::StoreValidatorChanges(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::UpdateMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -1974,6 +2183,8 @@ pub mod gateway_router_facet {
                 Self::CommitParentFinality(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CreateBottomUpCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PruneBottomUpCheckpoints(element) => ::core::fmt::Display::fmt(element, f),
+                Self::StoreValidatorChanges(element) => ::core::fmt::Display::fmt(element, f),
+                Self::UpdateMembership(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -2005,6 +2216,16 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<PruneBottomUpCheckpointsCall> for GatewayRouterFacetCalls {
         fn from(value: PruneBottomUpCheckpointsCall) -> Self {
             Self::PruneBottomUpCheckpoints(value)
+        }
+    }
+    impl ::core::convert::From<StoreValidatorChangesCall> for GatewayRouterFacetCalls {
+        fn from(value: StoreValidatorChangesCall) -> Self {
+            Self::StoreValidatorChanges(value)
+        }
+    }
+    impl ::core::convert::From<UpdateMembershipCall> for GatewayRouterFacetCalls {
+        fn from(value: UpdateMembershipCall) -> Self {
+            Self::UpdateMembership(value)
         }
     }
     ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`
@@ -2084,6 +2305,37 @@ pub mod gateway_router_facet {
     pub struct ParentFinality {
         pub height: ::ethers::core::types::U256,
         pub block_hash: [u8; 32],
+    }
+    ///`StakingChange(uint8,uint256,address)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct StakingChange {
+        pub op: u8,
+        pub amount: ::ethers::core::types::U256,
+        pub validator: ::ethers::core::types::Address,
+    }
+    ///`StakingChangeRequest((uint8,uint256,address),uint64)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct StakingChangeRequest {
+        pub change: StakingChange,
+        pub configuration_number: u64,
     }
     ///`StorableMsg(((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes)`
     #[derive(

@@ -24,6 +24,8 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {StakingChangeRequest, ParentValidatorsTracker} from "../structs/Subnet.sol";
+import {LibValidatorTracking} from "../lib/LibStaking.sol";
 
 contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
@@ -34,6 +36,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     using StorableMsgHelper for StorableMsg;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using LibValidatorTracking for ParentValidatorsTracker;
 
     event QuorumReached(uint64 height, bytes32 checkpoint, uint256 quorumWeight);
     event QuorumWeightUpdated(uint64 height, bytes32 checkpoint, uint256 newWeight);
@@ -88,16 +91,23 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
     /// @notice commit the ipc parent finality into storage
     /// @param finality - the parent finality
-    /// @param n - the configuration number for the next membership
-    /// @param validators - the validators of the next membership
-    /// @param weights - the weights of the validators
-    function commitParentFinality(
-        ParentFinality calldata finality,
+    function commitParentFinality(ParentFinality calldata finality) external systemActorOnly {
+        LibGateway.commitParentFinality(finality);
+    }
+
+    /// @notice Store the validator change requests from parent.
+    /// @param changeRequests - the validator changes
+    function storeValidatorChanges(StakingChangeRequest[] calldata changeRequests) external systemActorOnly {
+        s.validatorsTracker.batchStoreChange(changeRequests);
+    }
+
+    /// @notice THIS METHOD IS DEPRECATED. It will be replaced with validator changes. Keep now to ensure tests runs.
+    /// @notice Update the membership.
+    function updateMembership(
         uint64 n,
         FvmAddress[] calldata validators,
         uint256[] calldata weights
     ) external systemActorOnly {
-        LibGateway.commitParentFinality(finality);
         LibGateway.newMembership({n: n, validators: validators, weights: weights});
     }
 

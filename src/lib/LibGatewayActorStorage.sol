@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint, CrossMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
-import {SubnetID, Subnet} from "../structs/Subnet.sol";
+import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Validator.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -72,6 +72,8 @@ struct GatewayActorStorage {
     uint64 totalSubnets;
     // @notice bottom-up period in number of epochs for the subnet
     uint64 bottomUpCheckPeriod;
+    /// Tracking validator changes from parent in child subnet
+    ParentValidatorsTracker validatorsTracker;
 }
 
 library LibGatewayActorStorage {

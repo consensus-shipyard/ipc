@@ -58,11 +58,7 @@ interface IGateway {
     function propagate(bytes32 msgCid) external payable;
 
     /// @notice commit the ipc parent finality into storage
-    function commitParentFinality(
-        ParentFinality calldata finality,
-        FvmAddress[] calldata validators,
-        uint256[] calldata weights
-    ) external;
+    function commitParentFinality(ParentFinality calldata finality) external;
 
     /// @notice creates a new bottom-up checkpoint
     function createBottomUpCheckpoint(
