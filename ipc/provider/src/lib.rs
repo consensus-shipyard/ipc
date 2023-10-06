@@ -14,6 +14,7 @@ use fvm_shared::{
 use ipc_identity::{
     EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
 };
+use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::{
     cross::CrossMsg,
     subnet::{ConsensusType, ConstructParams},
@@ -534,6 +535,33 @@ impl IpcProvider {
         conn.manager().chain_head_height().await
     }
 
+    /// Obtain the genesis epoch of the input subnet.
+    pub async fn genesis_epoch(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("parent subnet config not found")),
+            Some(conn) => conn,
+        };
+        conn.manager().genesis_epoch(subnet).await
+    }
+
+    /// Get the changes in subnet validators. This is fetched from parent.
+    pub async fn get_validator_changeset(
+        &self,
+        subnet: &SubnetID,
+        start: ChainEpoch,
+        end: ChainEpoch,
+    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager()
+            .get_validator_changeset(subnet, start, end)
+            .await
+    }
+
     pub async fn get_top_down_msgs(
         &self,
         subnet: &SubnetID,
@@ -571,6 +599,15 @@ impl IpcProvider {
         };
 
         conn.manager().get_chain_id().await
+    }
+
+    pub async fn get_chain_head_height(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().chain_head_height().await
     }
 }
 

@@ -70,6 +70,23 @@ struct IPCContractInfo {
 
 #[async_trait]
 impl TopDownCheckpointQuery for EthSubnetManager {
+    async fn genesis_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        log::info!("querying genesis epoch in evm subnet contract: {address:}");
+
+        let evm_subnet_id = gateway_getter_facet::SubnetID::try_from(subnet_id)?;
+
+        let contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let (exists, subnet) = contract.get_subnet(evm_subnet_id).call().await?;
+        if !exists {
+            return Err(anyhow!("subnet: {} does not exists", subnet_id));
+        }
+        Ok(subnet.genesis_epoch.as_u64() as ChainEpoch)
+    }
+
     async fn chain_head_height(&self) -> Result<ChainEpoch> {
         let block = self
             .ipc_contract_info
