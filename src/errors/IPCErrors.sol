@@ -76,3 +76,4 @@ error PQDoesNotContainAddress();
 error AddressShouldBeValidator();
 error NotStakedBefore();
 error InvalidConfigurationNumber();
+error NotOwnerOfPublicKey();

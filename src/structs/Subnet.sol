@@ -29,13 +29,14 @@ struct Subnet {
 // ======== Subnet Staking =======
 enum StakingOperation {
     Deposit,
-    Withdraw
+    Withdraw,
+    SetMetadata
 }
 
 /// The change request to validator staking
 struct StakingChange {
     StakingOperation op;
-    uint256 amount;
+    bytes payload;
     address validator;
 }
 

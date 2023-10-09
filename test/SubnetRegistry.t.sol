@@ -72,7 +72,8 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: 100
         });
         vm.expectRevert(WrongGateway.selector);
         registry.newSubnetActor(params);
@@ -88,7 +89,8 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: 100
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -105,7 +107,8 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: 100
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -142,7 +145,8 @@ contract SubnetRegistryTest is Test {
             minActivationCollateral: _minActivationCollateral,
             minValidators: _minValidators,
             bottomUpCheckPeriod: _checkPeriod,
-            majorityPercentage: _majorityPercentage
+            majorityPercentage: _majorityPercentage,
+            activeValidatorsLimit: 100
         });
         registry.newSubnetActor(params);
         require(registry.latestSubnetDeployed(DEFAULT_SENDER) != address(0));

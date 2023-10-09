@@ -314,22 +314,6 @@ pub mod subnet_actor_getter_facet {
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
                     },],
                 ),
-                (
-                    ::std::borrow::ToOwned::to_owned("totalStake"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("totalStake"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
             ]),
             events: ::std::collections::BTreeMap::new(),
             errors: ::std::collections::BTreeMap::new(),
@@ -477,14 +461,6 @@ pub mod subnet_actor_getter_facet {
         pub fn name(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([6, 253, 222, 3], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `totalStake` (0x8b0e9f3f) function
-        pub fn total_stake(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([139, 14, 159, 63], ())
                 .expect("method not found (this should never happen)")
         }
     }
@@ -691,19 +667,6 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "name", abi = "name()")]
     pub struct NameCall;
-    ///Container type for all input parameters for the `totalStake` function with signature `totalStake()` and selector `0x8b0e9f3f`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "totalStake", abi = "totalStake()")]
-    pub struct TotalStakeCall;
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorGetterFacetCalls {
@@ -721,7 +684,6 @@ pub mod subnet_actor_getter_facet {
         MinActivationCollateral(MinActivationCollateralCall),
         MinValidators(MinValidatorsCall),
         Name(NameCall),
-        TotalStake(TotalStakeCall),
     }
     impl ::ethers::core::abi::AbiDecode for SubnetActorGetterFacetCalls {
         fn decode(
@@ -787,9 +749,6 @@ pub mod subnet_actor_getter_facet {
             if let Ok(decoded) = <NameCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Name(decoded));
             }
-            if let Ok(decoded) = <TotalStakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::TotalStake(decoded));
-            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -820,7 +779,6 @@ pub mod subnet_actor_getter_facet {
                 }
                 Self::MinValidators(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Name(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TotalStake(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -843,7 +801,6 @@ pub mod subnet_actor_getter_facet {
                 Self::MinActivationCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Name(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TotalStake(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -915,11 +872,6 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<NameCall> for SubnetActorGetterFacetCalls {
         fn from(value: NameCall) -> Self {
             Self::Name(value)
-        }
-    }
-    impl ::core::convert::From<TotalStakeCall> for SubnetActorGetterFacetCalls {
-        fn from(value: TotalStakeCall) -> Self {
-            Self::TotalStake(value)
         }
     }
     ///Container type for all return fields from the `bootstrapped` function with signature `bootstrapped()` and selector `0x35142c8c`
@@ -1095,18 +1047,6 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct NameReturn(pub [u8; 32]);
-    ///Container type for all return fields from the `totalStake` function with signature `totalStake()` and selector `0x8b0e9f3f`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct TotalStakeReturn(pub ::ethers::core::types::U256);
     ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`
     #[derive(
         Clone,

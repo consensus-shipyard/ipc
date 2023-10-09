@@ -69,6 +69,7 @@ fn main() {
         "GatewayRouterFacet",
         "GatewayMessengerFacet",
     ];
+
     let modules = fvm_address_conversion.into_iter().map(camel_to_snake);
     for module in modules {
         writeln!(lib, "fvm_address_conversion!({module});").unwrap();

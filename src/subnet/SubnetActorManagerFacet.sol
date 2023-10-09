@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CollateralIsZero, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint, InvalidSignatureErr, HeightAlreadyExecuted, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint, InvalidSignatureErr, HeightAlreadyExecuted, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
@@ -27,6 +27,9 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
     event BottomUpCheckpointExecuted(uint64 epoch, address submitter);
     event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
+    // TODO: Include the list of initial validators as part of the event
+    // so Fendermint can directly pick it up when bootstrapping the infra?
+    event SubnetBootstrapped();
 
     /** @notice Executes the checkpoint if it is valid.
      *  @dev It triggers the commitment of the checkpoint, the execution of related cross-net messages,
@@ -63,23 +66,39 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint);
     }
 
-    /// @notice Set the data of a validator
-    function setMetadata(bytes calldata metadata) external {
-        if (!LibStaking.hasStaked(msg.sender)) {
-            revert NotStakedBefore();
-        }
-        LibStaking.setValidatorMetadata(msg.sender, metadata);
-    }
-
     /// @notice method that allows a validator to join the subnet
-    /// @param metadata The offchain data that should be associated with the validator
-    function join(bytes calldata metadata) external payable notKilled {
+    /// @param publicKey The offchain public key that should be associated with the validator
+    function join(bytes calldata publicKey) external payable nonReentrant notKilled {
         if (msg.value == 0) {
             revert CollateralIsZero();
         }
 
-        LibStaking.setValidatorMetadata(msg.sender, metadata);
-        LibStaking.deposit(msg.sender, msg.value);
+        address convertedAddress = publicKeyToAddress(publicKey);
+        if (convertedAddress != msg.sender) {
+            revert NotOwnerOfPublicKey();
+        }
+
+        if (!s.bootstrapped) {
+            // if the subnet has not been bootstrapped, join directly
+            // without delays, and collect collateral to register
+            // in the gateway
+
+            // confirm validators deposit immediately
+            LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
+            LibStaking.depositWithConfirm(msg.sender, msg.value);
+
+            uint256 totalCollateral = LibStaking.getTotalConfirmedCollateral();
+
+            if (totalCollateral >= s.minActivationCollateral && LibStaking.totalActiveValidators() >= s.minValidators) {
+                s.bootstrapped = true;
+                emit SubnetBootstrapped();
+
+                IGateway(s.ipcGatewayAddr).register{value: totalCollateral}();
+            }
+        } else {
+            LibStaking.setValidatorMetadata(msg.sender, publicKey);
+            LibStaking.deposit(msg.sender, msg.value);
+        }
     }
 
     /// @notice method that allows a validator to increase their stake
@@ -92,6 +111,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
             revert NotStakedBefore();
         }
 
+        if (!s.bootstrapped) {
+            LibStaking.depositWithConfirm(msg.sender, msg.value);
+            return;
+        }
+
         LibStaking.deposit(msg.sender, msg.value);
     }
 
@@ -102,6 +126,10 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
             revert NotValidator();
         }
 
+        if (!s.bootstrapped) {
+            LibStaking.withdrawWithConfirm(msg.sender, amount);
+            return;
+        }
         LibStaking.withdraw(msg.sender, amount);
     }
 
@@ -150,5 +178,10 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         if (!valid) {
             revert InvalidSignatureErr(uint8(err));
         }
+    }
+
+    function publicKeyToAddress(bytes memory publicKey) internal pure returns (address) {
+        bytes32 hashed = keccak256(publicKey);
+        return address(uint160(bytes20(hashed)));
     }
 }

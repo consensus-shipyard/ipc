@@ -23,6 +23,7 @@ import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {LibStaking} from "../src/lib/LibStaking.sol";
 
 import {DefaultGatewayMock} from "./subnetActorMock/DefaultGatewayMock.sol";
 import {SubnetManagerTestUtil} from "./subnetActorMock/SubnetManagerTestUtil.sol";
@@ -105,6 +106,13 @@ contract SubnetActorDiamondTest is Test {
         require(keccak256(_a) == keccak256(_b), "bytes not equal");
     }
 
+    function deriveValidatorAddress(uint8 seq) internal pure returns (address addr, bytes memory data) {
+        data = new bytes(64);
+        data[0] = bytes1(seq);
+
+        addr = address(uint160(bytes20(keccak256(data))));
+    }
+
     function testSubnetActorDiamond_Deployment_Works(
         bytes32 _networkName,
         address _ipcGatewayAddr,
@@ -149,67 +157,80 @@ contract SubnetActorDiamondTest is Test {
                 minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
                 minValidators: DEFAULT_MIN_VALIDATORS,
                 bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-                majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE
+                majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+                activeValidatorsLimit: 100
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet)
         );
     }
 
-    function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {
+    function testSubnetActorDiamond_Join_Fail_NotOwnerOfPublicKey() public {
         address validator = vm.addr(100);
+
+        vm.deal(validator, 1 gwei);
+        vm.prank(validator);
+        vm.expectRevert(NotOwnerOfPublicKey.selector);
+
+        saManager.join{value: 10}(new bytes(20));
+    }
+
+    function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {
+        (address validator, bytes memory publicKey) = deriveValidatorAddress(100);
 
         vm.deal(validator, 1 gwei);
         vm.prank(validator);
         vm.expectRevert(CollateralIsZero.selector);
 
-        saManager.join(new bytes(20));
+        saManager.join(publicKey);
     }
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
     function testSubnetActorDiamond_BasicLifeCycle() public {
-        address validator1 = vm.addr(1234);
-        address validator2 = vm.addr(1235);
-        uint256 collateral = DEFAULT_MIN_VALIDATOR_STAKE;
+        (address validator1, bytes memory publicKey1) = deriveValidatorAddress(100);
+        (address validator2, bytes memory publicKey2) = deriveValidatorAddress(101);
 
-        bytes memory metadata = new bytes(10);
+        uint256 collateral = DEFAULT_MIN_VALIDATOR_STAKE;
 
         // ======== Step. Join ======
         // initial validator joins
         vm.startPrank(validator1);
         vm.deal(validator1, collateral);
 
-        saManager.join{value: collateral}(metadata);
+        saManager.join{value: collateral}(publicKey1);
 
         // collateral confirmed immediately and network boostrapped
         Validator memory v = saGetter.getValidator(validator1);
         require(v.totalCollateral == collateral, "total collateral not expected");
         require(v.confirmedCollateral == collateral, "confirmed collateral not 0");
-        ensureBytesEqual(v.metadata, metadata);
+        ensureBytesEqual(v.metadata, publicKey1);
         require(saGetter.bootstrapped(), "subnet not bootstrapped");
 
         (uint64 nextConfigNum, uint64 startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == 0, "next config num not 1");
-        require(startConfigNum == 0, "start config num not 0");
+        require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "next config num not 1");
+        require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
 
         // second validator joins
         vm.startPrank(validator2);
         vm.deal(validator2, collateral);
 
-        saManager.join{value: collateral}(metadata);
+        // subnet bootstrapped and should go through queue
+        saManager.join{value: collateral}(publicKey2);
 
         // collateral not confirmed yet
         v = saGetter.getValidator(validator2);
         require(v.totalCollateral == collateral, "total collateral not expected");
         require(v.confirmedCollateral == 0, "confirmed collateral not 0");
-        ensureBytesEqual(v.metadata, metadata);
+        ensureBytesEqual(v.metadata, new bytes(0));
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == 1, "next config num not 1");
-        require(startConfigNum == 0, "start config num not 0");
+        // join will update the metadata, incr by 1
+        // join will call deposit, incre by 1
+        require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2, "next config num not 3");
+        require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
 
         // ======== Step. Confirm join operation ======
-        saManager.confirmChange(0);
+        saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 1);
 
         v = saGetter.getValidator(validator2);
         require(v.totalCollateral == collateral, "total collateral not expected after confirm join");
@@ -219,8 +240,14 @@ contract SubnetActorDiamondTest is Test {
         );
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == 1, "next config num not 1 after confirm join");
-        require(startConfigNum == 1, "start config num not 1 after confirm join");
+        require(
+            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2,
+            "next config num not 3 after confirm join"
+        );
+        require(
+            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2,
+            "start config num not 3 after confirm join"
+        );
 
         // ======== Step. Stake more ======
         vm.startPrank(validator1);
@@ -234,19 +261,25 @@ contract SubnetActorDiamondTest is Test {
         require(v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "confirmed collateral not 0 after stake");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == 2, "next config num not 2 after stake");
-        require(startConfigNum == 1, "start config num not 1 after stake");
+        require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3, "next config num not 4 after stake");
+        require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2, "start config num not 3 after stake");
 
         // ======== Step. Confirm stake operation ======
-        saManager.confirmChange(1);
+        saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 2);
 
         v = saGetter.getValidator(validator1);
         require(v.totalCollateral == collateral, "total collateral not expected after confirm stake");
         require(v.confirmedCollateral == collateral, "confirmed collateral not expected after confrim stake");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == 2, "next config num not 2 after confirm stake");
-        require(startConfigNum == 2, "start config num not 2 after confirm stake");
+        require(
+            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3,
+            "next config num not 4 after confirm stake"
+        );
+        require(
+            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3,
+            "start config num not 4 after confirm stake"
+        );
 
         // ======== Step. Leave ======
         vm.startPrank(validator1);
@@ -258,19 +291,31 @@ contract SubnetActorDiamondTest is Test {
         require(v.confirmedCollateral == collateral, "confirmed collateral not 0 after confrim leave");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == 3, "next config num not 3 after confirm leave");
-        require(startConfigNum == 2, "start config num not 2 after confirm leave");
+        require(
+            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
+            "next config num not 5 after confirm leave"
+        );
+        require(
+            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3,
+            "start config num not 4 after confirm leave"
+        );
 
         // ======== Step. Confirm leave ======
-        saManager.confirmChange(2);
+        saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 3);
 
         v = saGetter.getValidator(validator1);
         require(v.totalCollateral == 0, "total collateral not 0 after confirm leave");
         require(v.confirmedCollateral == 0, "confirmed collateral not 0 after confrim leave");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == 3, "next config num not 3 after confirm leave");
-        require(startConfigNum == 3, "start config num not 3 after confirm leave");
+        require(
+            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
+            "next config num not 5 after confirm leave"
+        );
+        require(
+            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
+            "start config num not 5 after confirm leave"
+        );
     }
 
     // function testSubnetActorDiamond_MultipleJoins_Works_GetValidators() public {
@@ -651,7 +696,8 @@ contract SubnetActorDiamondTest is Test {
                 minActivationCollateral: _minActivationCollateral,
                 minValidators: _minValidators,
                 bottomUpCheckPeriod: _checkPeriod,
-                majorityPercentage: _majorityPercentage
+                majorityPercentage: _majorityPercentage,
+                activeValidatorsLimit: 100
             })
         );
 

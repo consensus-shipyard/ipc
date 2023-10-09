@@ -30,11 +30,6 @@ contract SubnetActorGetterFacet {
         return s.parentId;
     }
 
-    /// @notice get the total stake
-    function totalStake() external view returns (uint256) {
-        return s.totalStake;
-    }
-
     function ipcGatewayAddr() external view returns (address) {
         return s.ipcGatewayAddr;
     }

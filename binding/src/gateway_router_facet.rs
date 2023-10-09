@@ -308,7 +308,7 @@ pub mod gateway_router_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                             ::ethers::core::abi::ethabi::ParamType::Address,
                                                         ],
                                                     ),
@@ -857,13 +857,13 @@ pub mod gateway_router_facet {
                 .method_hash([174, 0, 194, 152], new_retention_height)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `storeValidatorChanges` (0xa12465bc) function
+        ///Calls the contract's `storeValidatorChanges` (0xe49a547d) function
         pub fn store_validator_changes(
             &self,
             change_requests: ::std::vec::Vec<StakingChangeRequest>,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([161, 36, 101, 188], change_requests)
+                .method_hash([228, 154, 84, 125], change_requests)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `updateMembership` (0xfd5215fc) function
@@ -2050,7 +2050,7 @@ pub mod gateway_router_facet {
     pub struct PruneBottomUpCheckpointsCall {
         pub new_retention_height: u64,
     }
-    ///Container type for all input parameters for the `storeValidatorChanges` function with signature `storeValidatorChanges(((uint8,uint256,address),uint64)[])` and selector `0xa12465bc`
+    ///Container type for all input parameters for the `storeValidatorChanges` function with signature `storeValidatorChanges(((uint8,bytes,address),uint64)[])` and selector `0xe49a547d`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -2063,7 +2063,7 @@ pub mod gateway_router_facet {
     )]
     #[ethcall(
         name = "storeValidatorChanges",
-        abi = "storeValidatorChanges(((uint8,uint256,address),uint64)[])"
+        abi = "storeValidatorChanges(((uint8,bytes,address),uint64)[])"
     )]
     pub struct StoreValidatorChangesCall {
         pub change_requests: ::std::vec::Vec<StakingChangeRequest>,
@@ -2306,7 +2306,7 @@ pub mod gateway_router_facet {
         pub height: ::ethers::core::types::U256,
         pub block_hash: [u8; 32],
     }
-    ///`StakingChange(uint8,uint256,address)`
+    ///`StakingChange(uint8,bytes,address)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2319,10 +2319,10 @@ pub mod gateway_router_facet {
     )]
     pub struct StakingChange {
         pub op: u8,
-        pub amount: ::ethers::core::types::U256,
+        pub payload: ::ethers::core::types::Bytes,
         pub validator: ::ethers::core::types::Address,
     }
-    ///`StakingChangeRequest((uint8,uint256,address),uint64)`
+    ///`StakingChangeRequest((uint8,bytes,address),uint64)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
