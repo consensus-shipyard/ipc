@@ -3,8 +3,11 @@ pragma solidity 0.8.19;
 
 import {GatewayActorStorage} from "./lib/LibGatewayActorStorage.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
+import {FvmAddress} from "./structs/FvmAddress.sol";
+import {Validator} from "./structs/Validator.sol";
 import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
+import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 
@@ -22,6 +25,7 @@ contract GatewayDiamond {
         uint256 minCollateral;
         uint256 msgFee;
         uint8 majorityPercentage;
+        Validator[] genesisValidators;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -48,6 +52,22 @@ contract GatewayDiamond {
         s.crossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.bottomUpCheckpointRetentionHeight = 1;
+
+        // set initial validators and update membership
+        uint256 length = params.genesisValidators.length;
+        FvmAddress[] memory validators = new FvmAddress[](length);
+        uint256[] memory weights = new uint256[](length);
+        for (uint256 i = 0; i < length; ) {
+            validators[i] = params.genesisValidators[i].addr;
+            weights[i] = params.genesisValidators[i].weight;
+            unchecked {
+                ++i;
+            }
+        }
+
+        LibGateway.newMembership({n: 0, validators: validators, weights: weights});
+        // slither-disable-next-line unused-return
+        LibGateway.updateMembership();
     }
 
     function _fallback() internal {

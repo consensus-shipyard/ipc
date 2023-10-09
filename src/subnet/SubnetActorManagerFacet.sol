@@ -6,7 +6,7 @@ import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
-import {SubnetID, Validator, ValidatorSet} from "../structs/Subnet.sol";
+import {SubnetID, Validator, GenesisValidator, ValidatorSet} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
@@ -27,9 +27,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
     event BottomUpCheckpointExecuted(uint64 epoch, address submitter);
     event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
-    // TODO: Include the list of initial validators as part of the event
-    // so Fendermint can directly pick it up when bootstrapping the infra?
-    event SubnetBootstrapped();
+    event SubnetBootstrapped(GenesisValidator[]);
 
     /** @notice Executes the checkpoint if it is valid.
      *  @dev It triggers the commitment of the checkpoint, the execution of related cross-net messages,
@@ -91,7 +89,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
             if (totalCollateral >= s.minActivationCollateral && LibStaking.totalActiveValidators() >= s.minValidators) {
                 s.bootstrapped = true;
-                emit SubnetBootstrapped();
+                emit SubnetBootstrapped(s.genesisValidators);
 
                 IGateway(s.ipcGatewayAddr).register{value: totalCollateral}();
             }

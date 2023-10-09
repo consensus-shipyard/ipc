@@ -1,12 +1,12 @@
 {
   "storage": [
     {
-      "astId": 9857,
+      "astId": 9942,
       "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
       "label": "s",
       "offset": 0,
       "slot": "0",
-      "type": "t_struct(GatewayActorStorage)9845_storage"
+      "type": "t_struct(GatewayActorStorage)9930_storage"
     }
   ],
   "types": {
@@ -27,14 +27,14 @@
       "label": "bytes32[]",
       "numberOfBytes": "32"
     },
-    "t_array(t_struct(CrossMsg)14311_storage)dyn_storage": {
-      "base": "t_struct(CrossMsg)14311_storage",
+    "t_array(t_struct(CrossMsg)14479_storage)dyn_storage": {
+      "base": "t_struct(CrossMsg)14479_storage",
       "encoding": "dynamic_array",
       "label": "struct CrossMsg[]",
       "numberOfBytes": "32"
     },
-    "t_array(t_struct(Validator)14494_storage)dyn_storage": {
-      "base": "t_struct(Validator)14494_storage",
+    "t_array(t_struct(Validator)14669_storage)dyn_storage": {
+      "base": "t_struct(Validator)14669_storage",
       "encoding": "dynamic_array",
       "label": "struct Validator[]",
       "numberOfBytes": "32"
@@ -59,12 +59,12 @@
       "label": "bytes",
       "numberOfBytes": "32"
     },
-    "t_enum(StakingOperation)14387": {
+    "t_enum(StakingOperation)14555": {
       "encoding": "inplace",
       "label": "enum StakingOperation",
       "numberOfBytes": "1"
     },
-    "t_enum(Status)4990": {
+    "t_enum(Status)5075": {
       "encoding": "inplace",
       "label": "enum Status",
       "numberOfBytes": "1"
@@ -76,12 +76,12 @@
       "numberOfBytes": "32",
       "value": "t_bytes_storage"
     },
-    "t_mapping(t_address,t_struct(Validator)14449_storage)": {
+    "t_mapping(t_address,t_struct(Validator)14617_storage)": {
       "encoding": "mapping",
       "key": "t_address",
       "label": "mapping(address => struct Validator)",
       "numberOfBytes": "32",
-      "value": "t_struct(Validator)14449_storage"
+      "value": "t_struct(Validator)14617_storage"
     },
     "t_mapping(t_address,t_uint16)": {
       "encoding": "mapping",
@@ -90,26 +90,26 @@
       "numberOfBytes": "32",
       "value": "t_uint16"
     },
-    "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(CrossMsg)14311_storage)dyn_storage))": {
+    "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(CrossMsg)14479_storage)dyn_storage))": {
       "encoding": "mapping",
       "key": "t_bytes32",
       "label": "mapping(bytes32 => mapping(uint256 => struct CrossMsg[]))",
       "numberOfBytes": "32",
-      "value": "t_mapping(t_uint256,t_array(t_struct(CrossMsg)14311_storage)dyn_storage)"
+      "value": "t_mapping(t_uint256,t_array(t_struct(CrossMsg)14479_storage)dyn_storage)"
     },
-    "t_mapping(t_bytes32,t_struct(CrossMsg)14311_storage)": {
+    "t_mapping(t_bytes32,t_struct(CrossMsg)14479_storage)": {
       "encoding": "mapping",
       "key": "t_bytes32",
       "label": "mapping(bytes32 => struct CrossMsg)",
       "numberOfBytes": "32",
-      "value": "t_struct(CrossMsg)14311_storage"
+      "value": "t_struct(CrossMsg)14479_storage"
     },
-    "t_mapping(t_bytes32,t_struct(Subnet)14383_storage)": {
+    "t_mapping(t_bytes32,t_struct(Subnet)14551_storage)": {
       "encoding": "mapping",
       "key": "t_bytes32",
       "label": "mapping(bytes32 => struct Subnet)",
       "numberOfBytes": "32",
-      "value": "t_struct(Subnet)14383_storage"
+      "value": "t_struct(Subnet)14551_storage"
     },
     "t_mapping(t_bytes32,t_uint256)": {
       "encoding": "mapping",
@@ -125,26 +125,26 @@
       "numberOfBytes": "32",
       "value": "t_address"
     },
-    "t_mapping(t_uint256,t_array(t_struct(CrossMsg)14311_storage)dyn_storage)": {
+    "t_mapping(t_uint256,t_array(t_struct(CrossMsg)14479_storage)dyn_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct CrossMsg[])",
       "numberOfBytes": "32",
-      "value": "t_array(t_struct(CrossMsg)14311_storage)dyn_storage"
+      "value": "t_array(t_struct(CrossMsg)14479_storage)dyn_storage"
     },
-    "t_mapping(t_uint256,t_struct(ParentFinality)14258_storage)": {
+    "t_mapping(t_uint256,t_struct(ParentFinality)14426_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct ParentFinality)",
       "numberOfBytes": "32",
-      "value": "t_struct(ParentFinality)14258_storage"
+      "value": "t_struct(ParentFinality)14426_storage"
     },
-    "t_mapping(t_uint64,t_array(t_struct(CrossMsg)14311_storage)dyn_storage)": {
+    "t_mapping(t_uint64,t_array(t_struct(CrossMsg)14479_storage)dyn_storage)": {
       "encoding": "mapping",
       "key": "t_uint64",
       "label": "mapping(uint64 => struct CrossMsg[])",
       "numberOfBytes": "32",
-      "value": "t_array(t_struct(CrossMsg)14311_storage)dyn_storage"
+      "value": "t_array(t_struct(CrossMsg)14479_storage)dyn_storage"
     },
     "t_mapping(t_uint64,t_mapping(t_address,t_bytes_storage))": {
       "encoding": "mapping",
@@ -167,26 +167,26 @@
       "numberOfBytes": "32",
       "value": "t_struct(AddressSet)3420_storage"
     },
-    "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14275_storage)": {
+    "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14443_storage)": {
       "encoding": "mapping",
       "key": "t_uint64",
       "label": "mapping(uint64 => struct BottomUpCheckpoint)",
       "numberOfBytes": "32",
-      "value": "t_struct(BottomUpCheckpoint)14275_storage"
+      "value": "t_struct(BottomUpCheckpoint)14443_storage"
     },
-    "t_mapping(t_uint64,t_struct(CheckpointInfo)14291_storage)": {
+    "t_mapping(t_uint64,t_struct(CheckpointInfo)14459_storage)": {
       "encoding": "mapping",
       "key": "t_uint64",
       "label": "mapping(uint64 => struct CheckpointInfo)",
       "numberOfBytes": "32",
-      "value": "t_struct(CheckpointInfo)14291_storage"
+      "value": "t_struct(CheckpointInfo)14459_storage"
     },
-    "t_mapping(t_uint64,t_struct(StakingChange)14395_storage)": {
+    "t_mapping(t_uint64,t_struct(StakingChange)14563_storage)": {
       "encoding": "mapping",
       "key": "t_uint64",
       "label": "mapping(uint64 => struct StakingChange)",
       "numberOfBytes": "32",
-      "value": "t_struct(StakingChange)14395_storage"
+      "value": "t_struct(StakingChange)14563_storage"
     },
     "t_struct(AddressSet)3420_storage": {
       "encoding": "inplace",
@@ -203,20 +203,20 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(BottomUpCheckpoint)14275_storage": {
+    "t_struct(BottomUpCheckpoint)14443_storage": {
       "encoding": "inplace",
       "label": "struct BottomUpCheckpoint",
       "members": [
         {
-          "astId": 14262,
+          "astId": 14430,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "subnetID",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(SubnetID)14363_storage"
+          "type": "t_struct(SubnetID)14531_storage"
         },
         {
-          "astId": 14265,
+          "astId": 14433,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "blockHeight",
           "offset": 0,
@@ -224,7 +224,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14268,
+          "astId": 14436,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "blockHash",
           "offset": 0,
@@ -232,7 +232,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 14271,
+          "astId": 14439,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "nextConfigurationNumber",
           "offset": 0,
@@ -240,7 +240,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14274,
+          "astId": 14442,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "crossMessagesHash",
           "offset": 0,
@@ -250,12 +250,12 @@
       ],
       "numberOfBytes": "192"
     },
-    "t_struct(CheckpointInfo)14291_storage": {
+    "t_struct(CheckpointInfo)14459_storage": {
       "encoding": "inplace",
       "label": "struct CheckpointInfo",
       "members": [
         {
-          "astId": 14278,
+          "astId": 14446,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "hash",
           "offset": 0,
@@ -263,7 +263,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 14281,
+          "astId": 14449,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "rootHash",
           "offset": 0,
@@ -271,7 +271,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 14284,
+          "astId": 14452,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "threshold",
           "offset": 0,
@@ -279,7 +279,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14287,
+          "astId": 14455,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "currentWeight",
           "offset": 0,
@@ -287,7 +287,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14290,
+          "astId": 14458,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "reached",
           "offset": 0,
@@ -297,20 +297,20 @@
       ],
       "numberOfBytes": "160"
     },
-    "t_struct(CrossMsg)14311_storage": {
+    "t_struct(CrossMsg)14479_storage": {
       "encoding": "inplace",
       "label": "struct CrossMsg",
       "members": [
         {
-          "astId": 14308,
+          "astId": 14476,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "message",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(StorableMsg)14326_storage"
+          "type": "t_struct(StorableMsg)14494_storage"
         },
         {
-          "astId": 14310,
+          "astId": 14478,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "wrapped",
           "offset": 0,
@@ -320,12 +320,12 @@
       ],
       "numberOfBytes": "384"
     },
-    "t_struct(FvmAddress)14333_storage": {
+    "t_struct(FvmAddress)14501_storage": {
       "encoding": "inplace",
       "label": "struct FvmAddress",
       "members": [
         {
-          "astId": 14330,
+          "astId": 14498,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "addrType",
           "offset": 0,
@@ -333,7 +333,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 14332,
+          "astId": 14500,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "payload",
           "offset": 0,
@@ -343,36 +343,36 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(GatewayActorStorage)9845_storage": {
+    "t_struct(GatewayActorStorage)9930_storage": {
       "encoding": "inplace",
       "label": "struct GatewayActorStorage",
       "members": [
         {
-          "astId": 9731,
+          "astId": 9816,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "subnets",
           "offset": 0,
           "slot": "0",
-          "type": "t_mapping(t_bytes32,t_struct(Subnet)14383_storage)"
+          "type": "t_mapping(t_bytes32,t_struct(Subnet)14551_storage)"
         },
         {
-          "astId": 9740,
+          "astId": 9825,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "topDownMsgs",
           "offset": 0,
           "slot": "1",
-          "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(CrossMsg)14311_storage)dyn_storage))"
+          "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(CrossMsg)14479_storage)dyn_storage))"
         },
         {
-          "astId": 9746,
+          "astId": 9831,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "finalitiesMap",
           "offset": 0,
           "slot": "2",
-          "type": "t_mapping(t_uint256,t_struct(ParentFinality)14258_storage)"
+          "type": "t_mapping(t_uint256,t_struct(ParentFinality)14426_storage)"
         },
         {
-          "astId": 9749,
+          "astId": 9834,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "latestParentHeight",
           "offset": 0,
@@ -380,15 +380,15 @@
           "type": "t_uint256"
         },
         {
-          "astId": 9755,
+          "astId": 9840,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "postbox",
           "offset": 0,
           "slot": "4",
-          "type": "t_mapping(t_bytes32,t_struct(CrossMsg)14311_storage)"
+          "type": "t_mapping(t_bytes32,t_struct(CrossMsg)14479_storage)"
         },
         {
-          "astId": 9762,
+          "astId": 9847,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "validatorSetWeights",
           "offset": 0,
@@ -396,47 +396,47 @@
           "type": "t_mapping(t_uint64,t_mapping(t_bytes32,t_uint256))"
         },
         {
-          "astId": 9766,
+          "astId": 9851,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "currentMembership",
           "offset": 0,
           "slot": "6",
-          "type": "t_struct(Membership)14503_storage"
+          "type": "t_struct(Membership)14678_storage"
         },
         {
-          "astId": 9770,
+          "astId": 9855,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "lastMembership",
           "offset": 0,
           "slot": "9",
-          "type": "t_struct(Membership)14503_storage"
+          "type": "t_struct(Membership)14678_storage"
         },
         {
-          "astId": 9776,
+          "astId": 9861,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpCheckpoints",
           "offset": 0,
           "slot": "12",
-          "type": "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14275_storage)"
+          "type": "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14443_storage)"
         },
         {
-          "astId": 9782,
+          "astId": 9867,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpCheckpointInfo",
           "offset": 0,
           "slot": "13",
-          "type": "t_mapping(t_uint64,t_struct(CheckpointInfo)14291_storage)"
+          "type": "t_mapping(t_uint64,t_struct(CheckpointInfo)14459_storage)"
         },
         {
-          "astId": 9789,
+          "astId": 9874,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpMessages",
           "offset": 0,
           "slot": "14",
-          "type": "t_mapping(t_uint64,t_array(t_struct(CrossMsg)14311_storage)dyn_storage)"
+          "type": "t_mapping(t_uint64,t_array(t_struct(CrossMsg)14479_storage)dyn_storage)"
         },
         {
-          "astId": 9792,
+          "astId": 9877,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpCheckpointRetentionHeight",
           "offset": 0,
@@ -444,7 +444,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 9796,
+          "astId": 9881,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "incompleteCheckpoints",
           "offset": 0,
@@ -452,7 +452,7 @@
           "type": "t_struct(UintSet)3577_storage"
         },
         {
-          "astId": 9802,
+          "astId": 9887,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpSignatureSenders",
           "offset": 0,
@@ -460,7 +460,7 @@
           "type": "t_mapping(t_uint64,t_struct(AddressSet)3420_storage)"
         },
         {
-          "astId": 9809,
+          "astId": 9894,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpSignatures",
           "offset": 0,
@@ -468,7 +468,7 @@
           "type": "t_mapping(t_uint64,t_mapping(t_address,t_bytes_storage))"
         },
         {
-          "astId": 9813,
+          "astId": 9898,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "subnetKeys",
           "offset": 0,
@@ -476,15 +476,15 @@
           "type": "t_array(t_bytes32)dyn_storage"
         },
         {
-          "astId": 9817,
+          "astId": 9902,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "networkName",
           "offset": 0,
           "slot": "21",
-          "type": "t_struct(SubnetID)14363_storage"
+          "type": "t_struct(SubnetID)14531_storage"
         },
         {
-          "astId": 9820,
+          "astId": 9905,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "minStake",
           "offset": 0,
@@ -492,7 +492,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 9823,
+          "astId": 9908,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "crossMsgFee",
           "offset": 0,
@@ -500,7 +500,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 9826,
+          "astId": 9911,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "majorityPercentage",
           "offset": 0,
@@ -508,7 +508,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 9829,
+          "astId": 9914,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpNonce",
           "offset": 1,
@@ -516,7 +516,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 9832,
+          "astId": 9917,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "appliedTopDownNonce",
           "offset": 9,
@@ -524,7 +524,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 9835,
+          "astId": 9920,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "topDownCheckPeriod",
           "offset": 17,
@@ -532,7 +532,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 9838,
+          "astId": 9923,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "totalSubnets",
           "offset": 0,
@@ -540,7 +540,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 9840,
+          "astId": 9925,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "bottomUpCheckPeriod",
           "offset": 8,
@@ -548,68 +548,68 @@
           "type": "t_uint64"
         },
         {
-          "astId": 9844,
+          "astId": 9929,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "validatorsTracker",
           "offset": 0,
           "slot": "27",
-          "type": "t_struct(ParentValidatorsTracker)14477_storage"
+          "type": "t_struct(ParentValidatorsTracker)14652_storage"
         }
       ],
       "numberOfBytes": "1216"
     },
-    "t_struct(IPCAddress)14484_storage": {
+    "t_struct(IPCAddress)14659_storage": {
       "encoding": "inplace",
       "label": "struct IPCAddress",
       "members": [
         {
-          "astId": 14480,
+          "astId": 14655,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "subnetId",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(SubnetID)14363_storage"
+          "type": "t_struct(SubnetID)14531_storage"
         },
         {
-          "astId": 14483,
+          "astId": 14658,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "rawAddress",
           "offset": 0,
           "slot": "2",
-          "type": "t_struct(FvmAddress)14333_storage"
+          "type": "t_struct(FvmAddress)14501_storage"
         }
       ],
       "numberOfBytes": "128"
     },
-    "t_struct(MaxPQ)12843_storage": {
+    "t_struct(MaxPQ)13011_storage": {
       "encoding": "inplace",
       "label": "struct MaxPQ",
       "members": [
         {
-          "astId": 12842,
+          "astId": 13010,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "inner",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(PQ)14046_storage"
+          "type": "t_struct(PQ)14214_storage"
         }
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(Membership)14503_storage": {
+    "t_struct(Membership)14678_storage": {
       "encoding": "inplace",
       "label": "struct Membership",
       "members": [
         {
-          "astId": 14498,
+          "astId": 14673,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "validators",
           "offset": 0,
           "slot": "0",
-          "type": "t_array(t_struct(Validator)14494_storage)dyn_storage"
+          "type": "t_array(t_struct(Validator)14669_storage)dyn_storage"
         },
         {
-          "astId": 14500,
+          "astId": 14675,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "configurationNumber",
           "offset": 0,
@@ -617,7 +617,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14502,
+          "astId": 14677,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "totalWeight",
           "offset": 0,
@@ -627,27 +627,27 @@
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(MinPQ)13439_storage": {
+    "t_struct(MinPQ)13607_storage": {
       "encoding": "inplace",
       "label": "struct MinPQ",
       "members": [
         {
-          "astId": 13438,
+          "astId": 13606,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "inner",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(PQ)14046_storage"
+          "type": "t_struct(PQ)14214_storage"
         }
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(PQ)14046_storage": {
+    "t_struct(PQ)14214_storage": {
       "encoding": "inplace",
       "label": "struct PQ",
       "members": [
         {
-          "astId": 14035,
+          "astId": 14203,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "size",
           "offset": 0,
@@ -655,7 +655,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 14040,
+          "astId": 14208,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "addressToPos",
           "offset": 0,
@@ -663,7 +663,7 @@
           "type": "t_mapping(t_address,t_uint16)"
         },
         {
-          "astId": 14045,
+          "astId": 14213,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "posToAddress",
           "offset": 0,
@@ -673,12 +673,12 @@
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(ParentFinality)14258_storage": {
+    "t_struct(ParentFinality)14426_storage": {
       "encoding": "inplace",
       "label": "struct ParentFinality",
       "members": [
         {
-          "astId": 14255,
+          "astId": 14423,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "height",
           "offset": 0,
@@ -686,7 +686,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14257,
+          "astId": 14425,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "blockHash",
           "offset": 0,
@@ -696,25 +696,25 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(ParentValidatorsTracker)14477_storage": {
+    "t_struct(ParentValidatorsTracker)14652_storage": {
       "encoding": "inplace",
       "label": "struct ParentValidatorsTracker",
       "members": [
         {
-          "astId": 14473,
+          "astId": 14648,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "validators",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(ValidatorSet)14470_storage"
+          "type": "t_struct(ValidatorSet)14645_storage"
         },
         {
-          "astId": 14476,
+          "astId": 14651,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "changes",
           "offset": 0,
           "slot": "9",
-          "type": "t_struct(StakingChangeLog)14414_storage"
+          "type": "t_struct(StakingChangeLog)14582_storage"
         }
       ],
       "numberOfBytes": "352"
@@ -742,20 +742,20 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(StakingChange)14395_storage": {
+    "t_struct(StakingChange)14563_storage": {
       "encoding": "inplace",
       "label": "struct StakingChange",
       "members": [
         {
-          "astId": 14390,
+          "astId": 14558,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "op",
           "offset": 0,
           "slot": "0",
-          "type": "t_enum(StakingOperation)14387"
+          "type": "t_enum(StakingOperation)14555"
         },
         {
-          "astId": 14392,
+          "astId": 14560,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "payload",
           "offset": 0,
@@ -763,7 +763,7 @@
           "type": "t_bytes_storage"
         },
         {
-          "astId": 14394,
+          "astId": 14562,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "validator",
           "offset": 0,
@@ -773,12 +773,12 @@
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(StakingChangeLog)14414_storage": {
+    "t_struct(StakingChangeLog)14582_storage": {
       "encoding": "inplace",
       "label": "struct StakingChangeLog",
       "members": [
         {
-          "astId": 14404,
+          "astId": 14572,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "nextConfigurationNumber",
           "offset": 0,
@@ -786,7 +786,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14407,
+          "astId": 14575,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "startConfigurationNumber",
           "offset": 8,
@@ -794,38 +794,38 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14413,
+          "astId": 14581,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "changes",
           "offset": 0,
           "slot": "1",
-          "type": "t_mapping(t_uint64,t_struct(StakingChange)14395_storage)"
+          "type": "t_mapping(t_uint64,t_struct(StakingChange)14563_storage)"
         }
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(StorableMsg)14326_storage": {
+    "t_struct(StorableMsg)14494_storage": {
       "encoding": "inplace",
       "label": "struct StorableMsg",
       "members": [
         {
-          "astId": 14314,
+          "astId": 14482,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "from",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(IPCAddress)14484_storage"
+          "type": "t_struct(IPCAddress)14659_storage"
         },
         {
-          "astId": 14317,
+          "astId": 14485,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "to",
           "offset": 0,
           "slot": "4",
-          "type": "t_struct(IPCAddress)14484_storage"
+          "type": "t_struct(IPCAddress)14659_storage"
         },
         {
-          "astId": 14319,
+          "astId": 14487,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "value",
           "offset": 0,
@@ -833,7 +833,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14321,
+          "astId": 14489,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "nonce",
           "offset": 0,
@@ -841,7 +841,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14323,
+          "astId": 14491,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "method",
           "offset": 8,
@@ -849,7 +849,7 @@
           "type": "t_bytes4"
         },
         {
-          "astId": 14325,
+          "astId": 14493,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "params",
           "offset": 0,
@@ -859,12 +859,12 @@
       ],
       "numberOfBytes": "352"
     },
-    "t_struct(Subnet)14383_storage": {
+    "t_struct(Subnet)14551_storage": {
       "encoding": "inplace",
       "label": "struct Subnet",
       "members": [
         {
-          "astId": 14365,
+          "astId": 14533,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "stake",
           "offset": 0,
@@ -872,7 +872,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14367,
+          "astId": 14535,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "genesisEpoch",
           "offset": 0,
@@ -880,7 +880,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14369,
+          "astId": 14537,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "circSupply",
           "offset": 0,
@@ -888,7 +888,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14371,
+          "astId": 14539,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "topDownNonce",
           "offset": 0,
@@ -896,7 +896,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14373,
+          "astId": 14541,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "appliedBottomUpNonce",
           "offset": 8,
@@ -904,38 +904,38 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14376,
+          "astId": 14544,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "status",
           "offset": 16,
           "slot": "3",
-          "type": "t_enum(Status)4990"
+          "type": "t_enum(Status)5075"
         },
         {
-          "astId": 14379,
+          "astId": 14547,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "id",
           "offset": 0,
           "slot": "4",
-          "type": "t_struct(SubnetID)14363_storage"
+          "type": "t_struct(SubnetID)14531_storage"
         },
         {
-          "astId": 14382,
+          "astId": 14550,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "prevCheckpoint",
           "offset": 0,
           "slot": "6",
-          "type": "t_struct(BottomUpCheckpoint)14275_storage"
+          "type": "t_struct(BottomUpCheckpoint)14443_storage"
         }
       ],
       "numberOfBytes": "384"
     },
-    "t_struct(SubnetID)14363_storage": {
+    "t_struct(SubnetID)14531_storage": {
       "encoding": "inplace",
       "label": "struct SubnetID",
       "members": [
         {
-          "astId": 14358,
+          "astId": 14526,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "root",
           "offset": 0,
@@ -943,7 +943,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14362,
+          "astId": 14530,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "route",
           "offset": 0,
@@ -968,12 +968,12 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(Validator)14449_storage": {
+    "t_struct(Validator)14617_storage": {
       "encoding": "inplace",
       "label": "struct Validator",
       "members": [
         {
-          "astId": 14443,
+          "astId": 14611,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "confirmedCollateral",
           "offset": 0,
@@ -981,7 +981,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14445,
+          "astId": 14613,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "totalCollateral",
           "offset": 0,
@@ -989,7 +989,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14448,
+          "astId": 14616,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "metadata",
           "offset": 0,
@@ -999,12 +999,12 @@
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(Validator)14494_storage": {
+    "t_struct(Validator)14669_storage": {
       "encoding": "inplace",
       "label": "struct Validator",
       "members": [
         {
-          "astId": 14490,
+          "astId": 14665,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "weight",
           "offset": 0,
@@ -1012,22 +1012,22 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14493,
+          "astId": 14668,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "addr",
           "offset": 0,
           "slot": "1",
-          "type": "t_struct(FvmAddress)14333_storage"
+          "type": "t_struct(FvmAddress)14501_storage"
         }
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(ValidatorSet)14470_storage": {
+    "t_struct(ValidatorSet)14645_storage": {
       "encoding": "inplace",
       "label": "struct ValidatorSet",
       "members": [
         {
-          "astId": 14452,
+          "astId": 14627,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "activeLimit",
           "offset": 0,
@@ -1035,7 +1035,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 14455,
+          "astId": 14630,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "totalConfirmedCollateral",
           "offset": 0,
@@ -1043,28 +1043,28 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14461,
+          "astId": 14636,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "validators",
           "offset": 0,
           "slot": "2",
-          "type": "t_mapping(t_address,t_struct(Validator)14449_storage)"
+          "type": "t_mapping(t_address,t_struct(Validator)14617_storage)"
         },
         {
-          "astId": 14465,
+          "astId": 14640,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "activeValidators",
           "offset": 0,
           "slot": "3",
-          "type": "t_struct(MinPQ)13439_storage"
+          "type": "t_struct(MinPQ)13607_storage"
         },
         {
-          "astId": 14469,
+          "astId": 14644,
           "contract": "src/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "waitingValidators",
           "offset": 0,
           "slot": "6",
-          "type": "t_struct(MaxPQ)12843_storage"
+          "type": "t_struct(MaxPQ)13011_storage"
         }
       ],
       "numberOfBytes": "288"

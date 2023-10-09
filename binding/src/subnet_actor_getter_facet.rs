@@ -139,6 +139,30 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("genesisValidators"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("genesisValidators"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                ::std::boxed::Box::new(
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    ],),
+                                ),
+                            ),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("struct GenesisValidator[]",),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getConfigurationNumbers"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("getConfigurationNumbers",),
@@ -397,6 +421,15 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([142, 243, 247, 97], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `genesisValidators` (0xd92e8f12) function
+        pub fn genesis_validators(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<GenesisValidator>>
+        {
+            self.0
+                .method_hash([217, 46, 143, 18], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getConfigurationNumbers` (0x38a210b3) function
         pub fn get_configuration_numbers(
             &self,
@@ -546,6 +579,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "consensus", abi = "consensus()")]
     pub struct ConsensusCall;
+    ///Container type for all input parameters for the `genesisValidators` function with signature `genesisValidators()` and selector `0xd92e8f12`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "genesisValidators", abi = "genesisValidators()")]
+    pub struct GenesisValidatorsCall;
     ///Container type for all input parameters for the `getConfigurationNumbers` function with signature `getConfigurationNumbers()` and selector `0x38a210b3`
     #[derive(
         Clone,
@@ -675,6 +721,7 @@ pub mod subnet_actor_getter_facet {
         BottomUpCheckpointAtEpoch(BottomUpCheckpointAtEpochCall),
         BottomUpCheckpointHashAtEpoch(BottomUpCheckpointHashAtEpochCall),
         Consensus(ConsensusCall),
+        GenesisValidators(GenesisValidatorsCall),
         GetConfigurationNumbers(GetConfigurationNumbersCall),
         GetParent(GetParentCall),
         GetValidator(GetValidatorCall),
@@ -711,6 +758,11 @@ pub mod subnet_actor_getter_facet {
             }
             if let Ok(decoded) = <ConsensusCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Consensus(decoded));
+            }
+            if let Ok(decoded) =
+                <GenesisValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::GenesisValidators(decoded));
             }
             if let Ok(decoded) =
                 <GetConfigurationNumbersCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -766,6 +818,7 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::Consensus(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GenesisValidators(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GetConfigurationNumbers(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -792,6 +845,7 @@ pub mod subnet_actor_getter_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::Consensus(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GenesisValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetConfigurationNumbers(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetParent(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
@@ -827,6 +881,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<ConsensusCall> for SubnetActorGetterFacetCalls {
         fn from(value: ConsensusCall) -> Self {
             Self::Consensus(value)
+        }
+    }
+    impl ::core::convert::From<GenesisValidatorsCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GenesisValidatorsCall) -> Self {
+            Self::GenesisValidators(value)
         }
     }
     impl ::core::convert::From<GetConfigurationNumbersCall> for SubnetActorGetterFacetCalls {
@@ -937,6 +996,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct ConsensusReturn(pub u8);
+    ///Container type for all return fields from the `genesisValidators` function with signature `genesisValidators()` and selector `0xd92e8f12`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GenesisValidatorsReturn(pub ::std::vec::Vec<GenesisValidator>);
     ///Container type for all return fields from the `getConfigurationNumbers` function with signature `getConfigurationNumbers()` and selector `0x38a210b3`
     #[derive(
         Clone,
@@ -1064,6 +1135,22 @@ pub mod subnet_actor_getter_facet {
         pub block_hash: [u8; 32],
         pub next_configuration_number: u64,
         pub cross_messages_hash: [u8; 32],
+    }
+    ///`GenesisValidator(address,uint256,bytes)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GenesisValidator {
+        pub addr: ::ethers::core::types::Address,
+        pub collaterall: ::ethers::core::types::U256,
+        pub metadata: ::ethers::core::types::Bytes,
     }
     ///`SubnetID(uint64,address[])`
     #[derive(

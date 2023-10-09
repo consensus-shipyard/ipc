@@ -5,7 +5,7 @@ import {IGateway} from "../interfaces/IGateway.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
-import {StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker} from "../structs/Subnet.sol";
+import {StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, GenesisValidator, AddressStakingReleases, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 
 /// The util library for `StakingChangeLog`
@@ -462,6 +462,31 @@ library LibStaking {
         s.validatorSet.recordDeposit(validator, amount);
         // confirm deposit that updates the confirmed collateral
         s.validatorSet.confirmDeposit(validator, amount);
+
+        if (!s.bootstrapped) {
+            // add to initial validators avoiding duplicates if it
+            // is a genesis validator.
+            bool alreadyValidator = false;
+            uint256 length = s.genesisValidators.length;
+            for (uint256 i = 0; i < length; ) {
+                if (s.genesisValidators[i].addr == validator) {
+                    alreadyValidator = true;
+                    break;
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+            if (!alreadyValidator) {
+                uint256 collateral = s.validatorSet.validators[validator].confirmedCollateral;
+                GenesisValidator memory val = GenesisValidator({
+                    addr: validator,
+                    collateral: collateral,
+                    metadata: s.validatorSet.validators[validator].metadata
+                });
+                s.genesisValidators.push(val);
+            }
+        }
     }
 
     /// @notice Confirm the withdraw directly without going through the confirmation process

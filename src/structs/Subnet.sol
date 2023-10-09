@@ -92,6 +92,15 @@ struct Validator {
     bytes metadata;
 }
 
+/// Struct that holds all the information required for a genesis vallidator,
+/// including its address and genesis collateral and metadata.
+/// This can be used by Fendermint to bootstrap a new child subnet.
+struct GenesisValidator {
+    address addr;
+    uint256 collateral;
+    bytes metadata;
+}
+
 /// Keeping track of the list of validators. There are two types of validators:
 ///     - Active
 ///     - Waiting
