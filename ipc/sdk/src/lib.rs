@@ -17,7 +17,6 @@ mod runtime;
 pub mod subnet;
 pub mod subnet_id;
 
-#[cfg(feature = "evm_type_convert")]
 pub mod evm;
 pub mod staking;
 

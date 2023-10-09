@@ -55,7 +55,7 @@ where
 }
 
 /// A serde deserialization method to deserialize an eth address from string, i.e. "0x...."
-pub(crate) fn deserialize_eth_address_from_str<'de, D>(
+pub fn deserialize_eth_address_from_str<'de, D>(
     deserializer: D,
 ) -> anyhow::Result<Address, D::Error>
 where

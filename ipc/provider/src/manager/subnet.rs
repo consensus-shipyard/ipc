@@ -12,7 +12,6 @@ use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
 
-use crate::lotus::message::ipc::QueryValidatorSetResponse;
 use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
@@ -33,8 +32,7 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
         subnet: SubnetID,
         from: Address,
         collateral: TokenAmount,
-        validator_net_addr: String,
-        worker_addr: Address,
+        metadata: Vec<u8>,
     ) -> Result<()>;
 
     /// Sends a request to leave a subnet from a wallet address.
@@ -89,35 +87,11 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
         cross_msg: CrossMsg,
     ) -> Result<()>;
 
-    /// Sets a new net address to an existing validator
-    async fn set_validator_net_addr(
-        &self,
-        subnet: SubnetID,
-        from: Address,
-        validator_net_addr: String,
-    ) -> Result<()>;
-
-    /// Sets a new worker address to an existing validator
-    async fn set_validator_worker_addr(
-        &self,
-        subnet: SubnetID,
-        from: Address,
-        validator_worker_addr: Address,
-    ) -> Result<()>;
-
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()>;
 
     /// Get the balance of an address
     async fn wallet_balance(&self, address: &Address) -> Result<TokenAmount>;
-
-    /// Returns the validator set
-    async fn get_validator_set(
-        &self,
-        subnet_id: &SubnetID,
-        gateway: Option<Address>,
-        epoch: Option<ChainEpoch>,
-    ) -> Result<QueryValidatorSetResponse>;
 
     /// Get chainID for the network.
     /// Returning as a `String` because the maximum value for an EVM

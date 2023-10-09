@@ -5,6 +5,8 @@
 
 use crate::address::IPCAddress;
 use crate::cross::{CrossMsg, StorableMsg};
+use crate::staking::StakingChange;
+use crate::staking::StakingChangeRequest;
 use crate::subnet_id::SubnetID;
 use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
@@ -183,6 +185,29 @@ pub fn payload_to_evm_address(payload: &Payload) -> anyhow::Result<ethers::types
 pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
     let str = amount.atto().to_string();
     Ok(U256::from_dec_str(&str)?)
+}
+
+impl TryFrom<StakingChange> for gateway_router_facet::StakingChange {
+    type Error = anyhow::Error;
+
+    fn try_from(value: StakingChange) -> Result<Self, Self::Error> {
+        Ok(gateway_router_facet::StakingChange {
+            op: value.op as u8,
+            payload: ethers::core::types::Bytes::from(value.payload),
+            validator: payload_to_evm_address(value.validator.payload())?,
+        })
+    }
+}
+
+impl TryFrom<StakingChangeRequest> for gateway_router_facet::StakingChangeRequest {
+    type Error = anyhow::Error;
+
+    fn try_from(value: StakingChangeRequest) -> Result<Self, Self::Error> {
+        Ok(gateway_router_facet::StakingChangeRequest {
+            change: gateway_router_facet::StakingChange::try_from(value.change)?,
+            configuration_number: value.configuration_number,
+        })
+    }
 }
 
 #[cfg(test)]

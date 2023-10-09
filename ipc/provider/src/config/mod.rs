@@ -5,11 +5,11 @@
 //! Reads a TOML config file for the IPC Agent and deserializes it in a type-safe way into a
 //! [`Config`] struct.
 
-mod deserialize;
+pub mod deserialize;
 mod reload;
 pub mod subnet;
 
-mod serialize;
+pub mod serialize;
 #[cfg(test)]
 mod tests;
 

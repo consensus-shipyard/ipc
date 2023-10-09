@@ -4,7 +4,6 @@
 mod manager;
 
 use async_trait::async_trait;
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
@@ -36,20 +35,11 @@ pub trait EthManager: SubnetManager {
         end_epoch: ChainEpoch,
     ) -> anyhow::Result<Vec<CrossMsg>>;
 
-    /// Get the list of validators in a subnet
-    async fn validators(&self, subnet_id: &SubnetID) -> anyhow::Result<Vec<Address>>;
-
-    /// Checks if the gateway is initialized
-    async fn gateway_initialized(&self) -> anyhow::Result<bool>;
-
     /// Get the subnet contract bottom up checkpoint period
     async fn subnet_bottom_up_checkpoint_period(
         &self,
         subnet_id: &SubnetID,
     ) -> anyhow::Result<ChainEpoch>;
-
-    /// Get the gateway contract top down checkpoint period
-    async fn gateway_top_down_check_period(&self) -> anyhow::Result<ChainEpoch>;
 
     /// Get the previous checkpoint hash from the gateway
     async fn prev_bottom_up_checkpoint_hash(

@@ -14,7 +14,7 @@ use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
-use crate::lotus::message::ipc::{QueryValidatorSetResponse, SubnetInfo, Validator, ValidatorSet};
+use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::subnet::TopDownCheckpointQuery;
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
@@ -183,8 +183,8 @@ impl SubnetManager for EthSubnetManager {
             min_activation_collateral: ethers::types::U256::from(min_validator_stake),
             min_validators: params.min_validators,
             bottom_up_check_period: params.bottomup_check_period as u64,
-            top_down_check_period: params.topdown_check_period as u64,
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
+            active_validators_limit: params.active_validators_limit,
         };
 
         log::info!("creating subnet on evm with params: {params:?}");
@@ -234,8 +234,7 @@ impl SubnetManager for EthSubnetManager {
         subnet: SubnetID,
         from: Address,
         collateral: TokenAmount,
-        validator_net_addr: String,
-        worker_addr: Address,
+        metadata: Vec<u8>,
     ) -> Result<()> {
         let collateral = collateral
             .atto()
@@ -251,10 +250,7 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let mut txn = contract.join(
-            validator_net_addr,
-            subnet_actor_manager_facet::FvmAddress::try_from(worker_addr)?,
-        );
+        let mut txn = contract.join(ethers::types::Bytes::from(metadata));
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
 
@@ -451,54 +447,6 @@ impl SubnetManager for EthSubnetManager {
         Ok(())
     }
 
-    async fn set_validator_net_addr(
-        &self,
-        subnet: SubnetID,
-        from: Address,
-        net_addr: String,
-    ) -> Result<()> {
-        let address = contract_address_from_subnet(&subnet)?;
-        log::info!(
-            "set validator net addr: {net_addr:} on evm subnet: {subnet:} at contract: {address:}"
-        );
-
-        let signer = Arc::new(self.get_signer(&from)?);
-        let contract =
-            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
-
-        let txn = contract.set_validator_net_addr(net_addr);
-
-        let txn = call_with_premium_estimation(signer, txn).await?;
-
-        txn.send().await?.await?;
-
-        Ok(())
-    }
-
-    async fn set_validator_worker_addr(
-        &self,
-        subnet: SubnetID,
-        from: Address,
-        worker_addr: Address,
-    ) -> Result<()> {
-        let address = contract_address_from_subnet(&subnet)?;
-        log::info!("set validator worker addr: {worker_addr:} on evm subnet: {subnet:} at contract: {address:}");
-
-        let signer = Arc::new(self.get_signer(&from)?);
-        let contract =
-            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
-
-        let txn = contract.set_validator_worker_addr(
-            subnet_actor_manager_facet::FvmAddress::try_from(worker_addr)?,
-        );
-
-        let txn = call_with_premium_estimation(signer, txn).await?;
-
-        txn.send().await?.await?;
-
-        Ok(())
-    }
-
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
         let signer = Arc::new(self.get_signer(&from)?);
@@ -527,77 +475,6 @@ impl SubnetManager for EthSubnetManager {
             .get_balance(payload_to_evm_address(address.payload())?, None)
             .await?;
         Ok(TokenAmount::from_atto(balance.as_u128()))
-    }
-
-    async fn get_validator_set(
-        &self,
-        subnet_id: &SubnetID,
-        gateway: Option<Address>,
-        epoch: Option<ChainEpoch>,
-    ) -> Result<QueryValidatorSetResponse> {
-        // we do optionally check as gateway addr is already part of the struct
-        if let Some(addr) = gateway {
-            self.ensure_same_gateway(&addr)?;
-        }
-
-        // get genesis epoch from gateway
-        let evm_subnet_id = gateway_getter_facet::SubnetID::try_from(subnet_id)?;
-        log::debug!("evm subnet id: {evm_subnet_id:?}");
-
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let (exists, evm_subnet) = gateway_contract.get_subnet(evm_subnet_id).call().await?;
-        if !exists {
-            return Err(anyhow!("subnet: {subnet_id:?} does not exists"));
-        }
-        let genesis_epoch = evm_subnet.genesis_epoch.as_u64() as i64;
-
-        let min_validators = self.min_validators(subnet_id).await?;
-
-        // get validator set
-        let address = contract_address_from_subnet(subnet_id)?;
-        log::debug!("get validator info for subnet: {subnet_id:} at contract: {address:}");
-
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let evm_validator_set = if let Some(epoch) = epoch {
-            contract
-                .get_validator_set()
-                .block(epoch as u64)
-                .call()
-                .await?
-        } else {
-            contract.get_validator_set().call().await?
-        };
-
-        let mut validators = vec![];
-        for v in evm_validator_set.validators.into_iter() {
-            validators.push(Validator {
-                // we are using worker address here so that the fvm validator node can pick up
-                // the correct
-                addr: Address::try_from(v.worker_addr.clone())?.to_string(),
-                net_addr: v.net_addresses,
-                worker_addr: Some(Address::try_from(v.worker_addr)?.to_string()),
-                weight: v.weight.to_string(),
-            });
-        }
-        let mut validator_set = ValidatorSet {
-            validators: None,
-            configuration_number: evm_validator_set.configuration_number,
-        };
-        if !validators.is_empty() {
-            validator_set.validators = Some(validators);
-        }
-
-        Ok(QueryValidatorSetResponse {
-            validator_set,
-            min_validators,
-            genesis_epoch,
-        })
     }
 
     async fn get_chain_id(&self) -> Result<String> {
@@ -705,29 +582,6 @@ impl EthManager for EthSubnetManager {
         Ok(msgs)
     }
 
-    async fn validators(&self, subnet_id: &SubnetID) -> Result<Vec<Address>> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-
-        let validators = contract.get_validators().call().await?;
-        validators
-            .iter()
-            .map(ethers_address_to_fil_address)
-            .collect::<Result<Vec<_>>>()
-    }
-
-    async fn gateway_initialized(&self) -> Result<bool> {
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let initialized = gateway_contract.initialized().call().await?;
-        Ok(initialized)
-    }
-
     async fn subnet_bottom_up_checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
@@ -735,14 +589,6 @@ impl EthManager for EthSubnetManager {
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
         Ok(contract.bottom_up_check_period().call().await? as ChainEpoch)
-    }
-
-    async fn gateway_top_down_check_period(&self) -> Result<ChainEpoch> {
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        Ok(gateway_contract.top_down_check_period().call().await? as ChainEpoch)
     }
 
     async fn prev_bottom_up_checkpoint_hash(

@@ -20,7 +20,7 @@ use ipc_sdk::{
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
-use lotus::message::{ipc::QueryValidatorSetResponse, wallet::WalletKeyType};
+use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetInfo, SubnetManager};
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -231,7 +231,7 @@ impl IpcProvider {
         min_validators: u64,
         min_validator_stake: TokenAmount,
         bottomup_check_period: ChainEpoch,
-        topdown_check_period: ChainEpoch,
+        active_validators_limit: u16,
     ) -> anyhow::Result<Address> {
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -249,8 +249,7 @@ impl IpcProvider {
             min_validators,
             min_validator_stake,
             bottomup_check_period,
-            topdown_check_period,
-            genesis: vec![],
+            active_validators_limit,
         };
 
         conn.manager()
@@ -263,8 +262,7 @@ impl IpcProvider {
         subnet: SubnetID,
         from: Option<Address>,
         collateral: TokenAmount,
-        validator_net_addr: String,
-        worker_addr: Option<Address>,
+        public_key: Vec<u8>,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
@@ -275,12 +273,8 @@ impl IpcProvider {
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
 
-        let worker = match worker_addr {
-            None => sender,
-            Some(addr) => addr,
-        };
         conn.manager()
-            .join_subnet(subnet, sender, collateral, validator_net_addr, worker)
+            .join_subnet(subnet, sender, collateral, public_key)
             .await
     }
 
@@ -415,69 +409,6 @@ impl IpcProvider {
         _cross_msg: CrossMsg,
     ) -> anyhow::Result<()> {
         todo!()
-    }
-
-    /// Sets a new net address to an existing validator
-    pub async fn set_validator_net_addr(
-        &mut self,
-        subnet: SubnetID,
-        from: Option<Address>,
-        validator_net_addr: String,
-    ) -> anyhow::Result<()> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
-
-        let subnet_config = conn.subnet();
-        let sender = self.check_sender(subnet_config, from)?;
-
-        conn.manager()
-            .set_validator_net_addr(subnet, sender, validator_net_addr)
-            .await
-    }
-
-    /// Sets a new worker address to an existing validator
-    pub async fn set_validator_worker_addr(
-        &mut self,
-        subnet: SubnetID,
-        from: Option<Address>,
-        worker_addr: Address,
-    ) -> anyhow::Result<()> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
-
-        let subnet_config = conn.subnet();
-        let sender = self.check_sender(subnet_config, from)?;
-
-        conn.manager()
-            .set_validator_worker_addr(subnet, sender, worker_addr)
-            .await
-    }
-
-    /// Returns the validator set
-    pub async fn get_validator_set(
-        &self,
-        subnet: &SubnetID,
-        gateway_addr: Option<Address>,
-        epoch: Option<ChainEpoch>,
-    ) -> anyhow::Result<QueryValidatorSetResponse> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
-
-        // FIXME: get_validator_set should not acception `Option<Address>` as
-        // the type for gateway_addr. This requires changes in all implementations
-        // of the trait.
-        conn.manager()
-            .get_validator_set(subnet, gateway_addr, epoch)
-            .await
     }
 
     /// Send value between two addresses in a subnet
