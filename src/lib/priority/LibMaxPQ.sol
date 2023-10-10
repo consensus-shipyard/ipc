@@ -19,6 +19,10 @@ library LibMaxPQ {
         return self.inner.size;
     }
 
+    function getAddress(MaxPQ storage self, uint16 i) internal view returns (address) {
+        return self.inner.posToAddress[i];
+    }
+
     function contains(MaxPQ storage self, address validator) internal view returns (bool) {
         return self.inner.contains(validator);
     }

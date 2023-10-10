@@ -41,6 +41,7 @@ contract SubnetActorDiamondTest is Test {
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     string private constant DEFAULT_NET_ADDR = "netAddr";
     uint256 private constant CROSS_MSG_FEE = 10 gwei;
+    uint256 private constant DEFAULT_RELAYER_REWARD = 10 gwei;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     uint64 private constant ROOTNET_CHAINID = 123;
 
@@ -97,7 +98,8 @@ contract SubnetActorDiamondTest is Test {
             DEFAULT_MIN_VALIDATOR_STAKE,
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_CHECKPOINT_PERIOD,
-            DEFAULT_MAJORITY_PERCENTAGE
+            DEFAULT_MAJORITY_PERCENTAGE,
+            DEFAULT_RELAYER_REWARD
         );
     }
 
@@ -119,7 +121,8 @@ contract SubnetActorDiamondTest is Test {
         uint256 _minActivationCollateral,
         uint64 _minValidators,
         uint64 _checkPeriod,
-        uint8 _majorityPercentage
+        uint8 _majorityPercentage,
+        uint256 _relayerReward
     ) public {
         vm.assume(_minActivationCollateral > DEFAULT_MIN_VALIDATOR_STAKE);
         vm.assume(_checkPeriod > DEFAULT_CHECKPOINT_PERIOD);
@@ -134,7 +137,8 @@ contract SubnetActorDiamondTest is Test {
             _minActivationCollateral,
             _minValidators,
             _checkPeriod,
-            _majorityPercentage
+            _majorityPercentage,
+            _relayerReward
         );
 
         SubnetID memory parent = saGetter.getParent();
@@ -158,7 +162,8 @@ contract SubnetActorDiamondTest is Test {
                 minValidators: DEFAULT_MIN_VALIDATORS,
                 bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
                 majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-                activeValidatorsLimit: 100
+                activeValidatorsLimit: 100,
+                relayerReward: DEFAULT_RELAYER_REWARD
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet)
@@ -663,7 +668,8 @@ contract SubnetActorDiamondTest is Test {
         uint256 _minActivationCollateral,
         uint64 _minValidators,
         uint64 _checkPeriod,
-        uint8 _majorityPercentage
+        uint8 _majorityPercentage,
+        uint256 _relayerReward
     ) public {
         SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
@@ -699,7 +705,8 @@ contract SubnetActorDiamondTest is Test {
                 minValidators: _minValidators,
                 bottomUpCheckPeriod: _checkPeriod,
                 majorityPercentage: _majorityPercentage,
-                activeValidatorsLimit: 100
+                activeValidatorsLimit: 100,
+                relayerReward: _relayerReward
             })
         );
 

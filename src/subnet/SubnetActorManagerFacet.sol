@@ -29,8 +29,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
     event SubnetBootstrapped(Validator[]);
 
-    /** @notice Executes the checkpoint if it is valid.
-     *  @dev It triggers the commitment of the checkpoint, the execution of related cross-net messages,
+    /** @notice submit a checkpoint for execution.
+     *  @dev It triggers the commitment of the checkpoint and the execution of related cross-net messages,
      *       and any other side-effects that need to be triggered by the checkpoint such as relayer reward book keeping.
      * @param checkpoint The executed bottom-up checkpoint
      * @param messages The list of executed cross-messages
@@ -43,25 +43,50 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         address[] calldata signatories,
         bytes[] calldata signatures
     ) external {
-        // validations
-        if (!LibStaking.isActiveValidator(msg.sender)) {
-            revert NotValidator();
-        }
-        if (checkpoint.blockHeight != s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
+        // the checkpoint height must be equal to the last bottom-up checkpoint height or
+        // the next one
+        if (
+            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod ||
+            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight
+        ) {
             revert InvalidCheckpointEpoch();
         }
         if (keccak256(abi.encode(messages)) != checkpoint.crossMessagesHash) {
             revert InvalidCheckpointMessagesHash();
         }
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
-        validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
 
-        // effects
-        s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
-        s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
+        if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
+            // validate signatures and quorum threshold, revert if validation fails
+            validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
 
-        // interactions
-        IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint);
+            // If the checkpoint height is the next expected height then this is a new checkpoint which must be executed
+            // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
+            s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
+
+            // slither-disable-next-line unused-return
+            s.rewardedRelayers[checkpoint.blockHeight].add(msg.sender);
+
+            // reward relayers in the subnet for committing the previous checkpoint
+            rewardRelayers(s.lastBottomUpCheckpointHeight);
+
+            s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
+
+            IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint, messages);
+        } else if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight) {
+            // If the checkpoint height is equal to the last checkpoint height, then this is a repeated submission.
+            // We should store the relayer, but not to execute checkpoint again.
+            // In this case, we do not verify the signatures for this checkpoint again,
+            // but we add the relayer to the list of all relayers for this checkpoint to be rewarded later.
+            // The reason for comparing hashes instead of verifying signatures is the following:
+            // once the checkpoint is executed, the active validator set changes
+            // and can only be used to validate the next checkpoint, not another instance of the last one.
+            bytes32 lastCheckpointHash = keccak256(abi.encode(s.committedCheckpoints[checkpoint.blockHeight]));
+            if (checkpointHash == lastCheckpointHash) {
+                // slither-disable-next-line unused-return
+                s.rewardedRelayers[checkpoint.blockHeight].add(msg.sender);
+            }
+        }
     }
 
     /// @notice method that allows a validator to join the subnet
@@ -141,9 +166,37 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         IGateway(s.ipcGatewayAddr).kill();
     }
 
-    /// @notice Valdiator claims their released collateral
+    /// @notice Validator claims their released collateral
     function claim() external nonReentrant {
         LibStaking.claimCollateral(msg.sender);
+    }
+
+    /// @notice Relayer claims its reward
+    function claimRewardForRelayer() external nonReentrant {
+        LibStaking.claimRewardForRelayer(msg.sender);
+    }
+
+    /// @notice reward the relayers for processing checkpoint at height `height`.
+    function rewardRelayers(uint64 height) internal {
+        if (s.relayerReward == 0) {
+            return;
+        }
+        address[] memory relayers = s.rewardedRelayers[height].values();
+        uint256 relayersLength = relayers.length;
+        if (relayersLength == 0) {
+            return;
+        }
+        if (s.relayerReward < relayersLength) {
+            revert NotEnoughBalanceForRewards();
+        }
+        uint256 rewardAmount = s.relayerReward / relayersLength;
+
+        for (uint256 i = 0; i < relayersLength; ) {
+            s.relayerRewards[relayers[i]] += rewardAmount;
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /**

@@ -23,7 +23,6 @@ struct Subnet {
     uint64 appliedBottomUpNonce;
     Status status;
     SubnetID id;
-    BottomUpCheckpoint prevCheckpoint;
 }
 
 // ======== Subnet Staking =======

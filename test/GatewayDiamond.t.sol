@@ -53,6 +53,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     string private constant DEFAULT_NET_ADDR = "netAddr";
     bytes private constant GENESIS = EMPTY_BYTES;
     uint256 constant CROSS_MSG_FEE = 10 gwei;
+    uint256 constant DEFAULT_RELAYER_REWARD = 10 gwei;
     address constant CHILD_NETWORK_ADDRESS = address(10);
     address constant CHILD_NETWORK_ADDRESS_2 = address(11);
     uint64 constant EPOCH_ONE = 1 * DEFAULT_CHECKPOINT_PERIOD;
@@ -239,7 +240,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            relayerReward: DEFAULT_RELAYER_REWARD
         });
 
         saManager = new SubnetManagerTestUtil();

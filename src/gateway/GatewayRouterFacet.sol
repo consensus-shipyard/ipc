@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
+import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {EMPTY_HASH, METHOD_SEND} from "../constants/Constants.sol";
 import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint, CheckpointInfo} from "../structs/Checkpoint.sol";
@@ -12,7 +13,7 @@ import {Membership} from "../structs/Subnet.sol";
 import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
 import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, IncompleteCheckpointExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory, FailedAddSignature} from "../errors/IPCErrors.sol";
 import {MessagesNotSorted, NotEnoughBalance, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
-import {NotValidator, SubnetNotActive, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
+import {NotValidator, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -26,6 +27,7 @@ import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {StakingChangeRequest, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {LibValidatorTracking} from "../lib/LibStaking.sol";
+import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
@@ -41,35 +43,34 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     event QuorumReached(uint64 height, bytes32 checkpoint, uint256 quorumWeight);
     event QuorumWeightUpdated(uint64 height, bytes32 checkpoint, uint256 newWeight);
 
-    // TODO: Reimplement the function.
-    /// @dev This function must be reimplemented according to the current checkpoint protocol.
-    /// @notice submit a checkpoint in the gateway. Called from a subnet once the checkpoint is voted for and reaches majority
-    function commitChildCheck(BottomUpCheckpoint calldata commit) external {
-        if (commit.subnetID.getActor().normalize() != msg.sender) {
+    /// @notice submit a verified checkpoint in the gateway to trigger side-effects and apply cross-messages.
+    /// @dev this method is called by the corresponding subnet actor.
+    /// Called from a subnet actor if the checkpoint is cryptographically valid.
+    function commitBottomUpCheckpoint(BottomUpCheckpoint calldata checkpoint, CrossMsg[] calldata messages) external {
+        // checkpoint is used to implement access control
+        if (checkpoint.subnetID.getActor() != msg.sender) {
             revert InvalidCheckpointSource();
         }
-
-        // slither-disable-next-line unused-return
-        (, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
+        (bool subnetExists, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
+        if (!subnetExists) {
+            revert SubnetNotFound();
+        }
+        if (!checkpoint.subnetID.equals(subnet.id)) {
+            revert InvalidSubnet();
+        }
         if (subnet.status != Status.Active) {
             revert SubnetNotActive();
         }
-
-        // get checkpoint for the current template being populated
-        (bool checkpointExists, uint64 nextCheckEpoch, BottomUpCheckpoint storage checkpoint) = LibGateway
-            .getCurrentBottomUpCheckpoint();
-
-        // create a checkpoint template if it doesn't exists
-        if (!checkpointExists) {
-            checkpoint.subnetID = s.networkName;
-            checkpoint.blockHeight = nextCheckEpoch;
+        if (checkpoint.blockHeight != s.lastBottomUpExecutedCheckpointHeight + s.bottomUpCheckPeriod) {
+            revert CheckpointAlreadyProcessed();
         }
-
-        CrossMsg[] memory messages = s.bottomUpMessages[commit.blockHeight];
 
         uint256 totalValue = 0;
         uint256 crossMsgLength = messages.length;
         for (uint256 i = 0; i < crossMsgLength; ) {
+            // CODE-REVIEW
+            // before we used to do `totalValue += commit.fee + checkpoint.fee` here
+            // where and how are we going to use fees?
             totalValue += messages[i].message.value;
             unchecked {
                 ++i;
@@ -82,11 +83,11 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
         subnet.circSupply -= totalValue;
 
-        subnet.prevCheckpoint = commit;
+        // execute cross-messages
+        _applyMessages(checkpoint.subnetID, messages);
 
-        _applyMessages(commit.subnetID, messages);
-
-        // TODO: distribute rewards to validators for their service executing a checkpoint
+        // seal the checkpoint for the height `lastBottomUpExecutedCheckpointHeight`
+        s.lastBottomUpExecutedCheckpointHeight = checkpoint.blockHeight;
     }
 
     /// @notice commit the ipc parent finality into storage

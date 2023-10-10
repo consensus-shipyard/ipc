@@ -27,6 +27,7 @@ contract SubnetActorDiamond {
         uint64 bottomUpCheckPeriod;
         uint8 majorityPercentage;
         uint16 activeValidatorsLimit;
+        uint256 relayerReward;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -56,6 +57,7 @@ contract SubnetActorDiamond {
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.majorityPercentage = params.majorityPercentage;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
+        s.relayerReward = params.relayerReward;
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership

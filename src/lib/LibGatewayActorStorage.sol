@@ -72,6 +72,8 @@ struct GatewayActorStorage {
     uint64 bottomUpCheckPeriod;
     /// Tracking validator changes from parent in child subnet
     ParentValidatorsTracker validatorsTracker;
+    /// @notice The height of the last received bottom-up checkpoint.
+    uint64 lastBottomUpExecutedCheckpointHeight;
 }
 
 library LibGatewayActorStorage {

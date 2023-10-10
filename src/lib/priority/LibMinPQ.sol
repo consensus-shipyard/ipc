@@ -18,6 +18,10 @@ library LibMinPQ {
         return self.inner.size;
     }
 
+    function getAddress(MinPQ storage self, uint16 i) internal view returns (address) {
+        return self.inner.posToAddress[i];
+    }
+
     function contains(MinPQ storage self, address validator) internal view returns (bool) {
         return self.inner.contains(validator);
     }

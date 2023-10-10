@@ -31,7 +31,7 @@ contract DefaultGatewayMock is IGateway {
         dummy = 1;
     }
 
-    function releaseRewards(uint256 amount) external {
+    function releaseRewardForRelayer(uint256 amount) external {
         // silent warning
         amount;
         // make method perform txn
@@ -47,9 +47,10 @@ contract DefaultGatewayMock is IGateway {
 
     /// CommitChildCheck propagates the commitment of a checkpoint from a child subnet,
     /// process the cross-messages directed to the subnet.
-    function commitBottomUpCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint) external {
+    function commitBottomUpCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint, CrossMsg[] calldata messages) external {
         // silent warning
         bottomUpCheckpoint;
+        messages;
         // make method perform txn
         dummy = 1;
     }
