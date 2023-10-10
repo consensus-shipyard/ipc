@@ -5,7 +5,7 @@ import {IGateway} from "../interfaces/IGateway.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
-import {StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, GenesisValidator, AddressStakingReleases, ParentValidatorsTracker} from "../structs/Subnet.sol";
+import {StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator} from "../structs/Subnet.sol";
 import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 
 /// The util library for `StakingChangeLog`
@@ -479,9 +479,9 @@ library LibStaking {
             }
             if (!alreadyValidator) {
                 uint256 collateral = s.validatorSet.validators[validator].confirmedCollateral;
-                GenesisValidator memory val = GenesisValidator({
+                Validator memory val = Validator({
                     addr: validator,
-                    collateral: collateral,
+                    weight: collateral,
                     metadata: s.validatorSet.validators[validator].metadata
                 });
                 s.genesisValidators.push(val);

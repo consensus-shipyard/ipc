@@ -330,53 +330,6 @@ pub mod gateway_router_facet {
                         },
                     ],
                 ),
-                (
-                    ::std::borrow::ToOwned::to_owned("updateMembership"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("updateMembership"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("n"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("validators"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                ],
-                                            ),
-                                        ),
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("struct FvmAddress[]"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("weights"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                        ),
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256[]"),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
-                ),
             ]),
             events: ::core::convert::From::from([
                 (
@@ -673,17 +626,6 @@ pub mod gateway_router_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("OldConfigurationNumber"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "OldConfigurationNumber",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("ParentFinalityAlreadyCommitted"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -708,30 +650,6 @@ pub mod gateway_router_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("SubnetNotActive"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("ValidatorWeightIsZero"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "ValidatorWeightIsZero",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned(
-                        "ValidatorsAndWeightsLengthMismatch",
-                    ),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "ValidatorsAndWeightsLengthMismatch",
-                            ),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -864,17 +782,6 @@ pub mod gateway_router_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([228, 154, 84, 125], change_requests)
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `updateMembership` (0xfd5215fc) function
-        pub fn update_membership(
-            &self,
-            n: u64,
-            validators: ::std::vec::Vec<FvmAddress>,
-            weights: ::std::vec::Vec<::ethers::core::types::U256>,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
-            self.0
-                .method_hash([253, 82, 21, 252], (n, validators, weights))
                 .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `QuorumReached` event
@@ -1201,19 +1108,6 @@ pub mod gateway_router_facet {
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
-    ///Custom Error type `OldConfigurationNumber` with signature `OldConfigurationNumber()` and selector `0x6e8d7c4a`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "OldConfigurationNumber", abi = "OldConfigurationNumber()")]
-    pub struct OldConfigurationNumber;
     ///Custom Error type `ParentFinalityAlreadyCommitted` with signature `ParentFinalityAlreadyCommitted()` and selector `0x2a75b082`
     #[derive(
         Clone,
@@ -1256,35 +1150,6 @@ pub mod gateway_router_facet {
     )]
     #[etherror(name = "SubnetNotActive", abi = "SubnetNotActive()")]
     pub struct SubnetNotActive;
-    ///Custom Error type `ValidatorWeightIsZero` with signature `ValidatorWeightIsZero()` and selector `0x389b457d`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "ValidatorWeightIsZero", abi = "ValidatorWeightIsZero()")]
-    pub struct ValidatorWeightIsZero;
-    ///Custom Error type `ValidatorsAndWeightsLengthMismatch` with signature `ValidatorsAndWeightsLengthMismatch()` and selector `0x465f0a7d`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "ValidatorsAndWeightsLengthMismatch",
-        abi = "ValidatorsAndWeightsLengthMismatch()"
-    )]
-    pub struct ValidatorsAndWeightsLengthMismatch;
     ///Custom Error type `ZeroMembershipWeight` with signature `ZeroMembershipWeight()` and selector `0x4e8ac6e5`
     #[derive(
         Clone,
@@ -1322,12 +1187,9 @@ pub mod gateway_router_facet {
         NotEnoughSubnetCircSupply(NotEnoughSubnetCircSupply),
         NotRegisteredSubnet(NotRegisteredSubnet),
         NotSystemActor(NotSystemActor),
-        OldConfigurationNumber(OldConfigurationNumber),
         ParentFinalityAlreadyCommitted(ParentFinalityAlreadyCommitted),
         SignatureReplay(SignatureReplay),
         SubnetNotActive(SubnetNotActive),
-        ValidatorWeightIsZero(ValidatorWeightIsZero),
-        ValidatorsAndWeightsLengthMismatch(ValidatorsAndWeightsLengthMismatch),
         ZeroMembershipWeight(ZeroMembershipWeight),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
@@ -1443,11 +1305,6 @@ pub mod gateway_router_facet {
                 return Ok(Self::NotSystemActor(decoded));
             }
             if let Ok(decoded) =
-                <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::OldConfigurationNumber(decoded));
-            }
-            if let Ok(decoded) =
                 <ParentFinalityAlreadyCommitted as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::ParentFinalityAlreadyCommitted(decoded));
@@ -1457,16 +1314,6 @@ pub mod gateway_router_facet {
             }
             if let Ok(decoded) = <SubnetNotActive as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SubnetNotActive(decoded));
-            }
-            if let Ok(decoded) =
-                <ValidatorWeightIsZero as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::ValidatorWeightIsZero(decoded));
-            }
-            if let Ok(decoded) =
-                <ValidatorsAndWeightsLengthMismatch as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::ValidatorsAndWeightsLengthMismatch(decoded));
             }
             if let Ok(decoded) =
                 <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1534,20 +1381,11 @@ pub mod gateway_router_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::OldConfigurationNumber(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::ParentFinalityAlreadyCommitted(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::SignatureReplay(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::SubnetNotActive(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ValidatorWeightIsZero(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ValidatorsAndWeightsLengthMismatch(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::ZeroMembershipWeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1644,10 +1482,6 @@ pub mod gateway_router_facet {
                     true
                 }
                 _ if selector
-                    == <OldConfigurationNumber as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <ParentFinalityAlreadyCommitted as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1657,14 +1491,6 @@ pub mod gateway_router_facet {
                 }
                 _ if selector
                     == <SubnetNotActive as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <ValidatorWeightIsZero as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <ValidatorsAndWeightsLengthMismatch as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1705,16 +1531,11 @@ pub mod gateway_router_facet {
                 Self::NotEnoughSubnetCircSupply(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OldConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ParentFinalityAlreadyCommitted(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::SignatureReplay(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetNotActive(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorWeightIsZero(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorsAndWeightsLengthMismatch(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
                 Self::ZeroMembershipWeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
@@ -1830,11 +1651,6 @@ pub mod gateway_router_facet {
             Self::NotSystemActor(value)
         }
     }
-    impl ::core::convert::From<OldConfigurationNumber> for GatewayRouterFacetErrors {
-        fn from(value: OldConfigurationNumber) -> Self {
-            Self::OldConfigurationNumber(value)
-        }
-    }
     impl ::core::convert::From<ParentFinalityAlreadyCommitted> for GatewayRouterFacetErrors {
         fn from(value: ParentFinalityAlreadyCommitted) -> Self {
             Self::ParentFinalityAlreadyCommitted(value)
@@ -1848,16 +1664,6 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<SubnetNotActive> for GatewayRouterFacetErrors {
         fn from(value: SubnetNotActive) -> Self {
             Self::SubnetNotActive(value)
-        }
-    }
-    impl ::core::convert::From<ValidatorWeightIsZero> for GatewayRouterFacetErrors {
-        fn from(value: ValidatorWeightIsZero) -> Self {
-            Self::ValidatorWeightIsZero(value)
-        }
-    }
-    impl ::core::convert::From<ValidatorsAndWeightsLengthMismatch> for GatewayRouterFacetErrors {
-        fn from(value: ValidatorsAndWeightsLengthMismatch) -> Self {
-            Self::ValidatorsAndWeightsLengthMismatch(value)
         }
     }
     impl ::core::convert::From<ZeroMembershipWeight> for GatewayRouterFacetErrors {
@@ -2068,26 +1874,6 @@ pub mod gateway_router_facet {
     pub struct StoreValidatorChangesCall {
         pub change_requests: ::std::vec::Vec<StakingChangeRequest>,
     }
-    ///Container type for all input parameters for the `updateMembership` function with signature `updateMembership(uint64,(uint8,bytes)[],uint256[])` and selector `0xfd5215fc`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(
-        name = "updateMembership",
-        abi = "updateMembership(uint64,(uint8,bytes)[],uint256[])"
-    )]
-    pub struct UpdateMembershipCall {
-        pub n: u64,
-        pub validators: ::std::vec::Vec<FvmAddress>,
-        pub weights: ::std::vec::Vec<::ethers::core::types::U256>,
-    }
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayRouterFacetCalls {
@@ -2098,7 +1884,6 @@ pub mod gateway_router_facet {
         CreateBottomUpCheckpoint(CreateBottomUpCheckpointCall),
         PruneBottomUpCheckpoints(PruneBottomUpCheckpointsCall),
         StoreValidatorChanges(StoreValidatorChangesCall),
-        UpdateMembership(UpdateMembershipCall),
     }
     impl ::ethers::core::abi::AbiDecode for GatewayRouterFacetCalls {
         fn decode(
@@ -2140,11 +1925,6 @@ pub mod gateway_router_facet {
             {
                 return Ok(Self::StoreValidatorChanges(decoded));
             }
-            if let Ok(decoded) =
-                <UpdateMembershipCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::UpdateMembership(decoded));
-            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -2170,7 +1950,6 @@ pub mod gateway_router_facet {
                 Self::StoreValidatorChanges(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::UpdateMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -2184,7 +1963,6 @@ pub mod gateway_router_facet {
                 Self::CreateBottomUpCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PruneBottomUpCheckpoints(element) => ::core::fmt::Display::fmt(element, f),
                 Self::StoreValidatorChanges(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UpdateMembership(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -2221,11 +1999,6 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<StoreValidatorChangesCall> for GatewayRouterFacetCalls {
         fn from(value: StoreValidatorChangesCall) -> Self {
             Self::StoreValidatorChanges(value)
-        }
-    }
-    impl ::core::convert::From<UpdateMembershipCall> for GatewayRouterFacetCalls {
-        fn from(value: UpdateMembershipCall) -> Self {
-            Self::UpdateMembership(value)
         }
     }
     ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`

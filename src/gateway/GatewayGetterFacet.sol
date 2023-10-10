@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {Membership} from "../structs/Validator.sol";
+import {Membership} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {GatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
@@ -37,10 +37,6 @@ contract GatewayGetterFacet {
 
     function bottomUpCheckPeriod() external view returns (uint64) {
         return s.bottomUpCheckPeriod;
-    }
-
-    function topDownCheckPeriod() external view returns (uint64) {
-        return s.topDownCheckPeriod;
     }
 
     function getNetworkName() external view returns (SubnetID memory) {
@@ -143,11 +139,6 @@ contract GatewayGetterFacet {
         return s.lastMembership.configurationNumber;
     }
 
-    /// @notice get the last total weight for the membership received from the parent
-    function getLastTotalWeight() public view returns (uint256) {
-        return s.lastMembership.totalWeight;
-    }
-
     /// @notice get the current membership
     function getCurrentMembership() external view returns (Membership memory) {
         return s.currentMembership;
@@ -156,11 +147,6 @@ contract GatewayGetterFacet {
     /// @notice get the current configuration number
     function getCurrentConfigurationNumber() external view returns (uint64) {
         return s.currentMembership.configurationNumber;
-    }
-
-    /// @notice get the current membership validators total weight
-    function getCurrentTotalWeight() public view returns (uint256) {
-        return s.currentMembership.totalWeight;
     }
 
     /// @notice get the checkpoint information corresponding to the block height

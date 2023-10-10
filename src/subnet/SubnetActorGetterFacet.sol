@@ -6,7 +6,7 @@ import {NotEnoughValidatorsInSubnet} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID} from "../structs/Subnet.sol";
-import {SubnetID, GenesisValidator, Validator} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorInfo, Validator} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
@@ -42,7 +42,7 @@ contract SubnetActorGetterFacet {
         return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
     }
 
-    function genesisValidators() external view returns (GenesisValidator[] memory) {
+    function genesisValidators() external view returns (Validator[] memory) {
         return s.genesisValidators;
     }
 
@@ -71,7 +71,7 @@ contract SubnetActorGetterFacet {
     }
 
     /// @notice Get the information of a validator
-    function getValidator(address validatorAddress) external view returns (Validator memory validator) {
+    function getValidator(address validatorAddress) external view returns (ValidatorInfo memory validator) {
         validator = s.validatorSet.validators[validatorAddress];
     }
 

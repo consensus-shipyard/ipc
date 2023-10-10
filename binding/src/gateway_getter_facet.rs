@@ -408,46 +408,17 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
                                                 ),
                                             ),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("struct Membership"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("getCurrentTotalWeight"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "getCurrentTotalWeight",
-                            ),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -565,44 +536,17 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
                                                 ),
                                             ),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("struct Membership"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("getLastTotalWeight"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("getLastTotalWeight"),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -1306,26 +1250,6 @@ pub mod gateway_getter_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("topDownCheckPeriod"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("topDownCheckPeriod"),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("totalSubnets"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -1487,14 +1411,6 @@ pub mod gateway_getter_facet {
                 .method_hash([106, 210, 27, 176], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getCurrentTotalWeight` (0x0dc25ea1) function
-        pub fn get_current_total_weight(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([13, 194, 94, 161], ())
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `getIncompleteCheckpointHeights` (0xa517218f) function
         pub fn get_incomplete_checkpoint_heights(
             &self,
@@ -1529,14 +1445,6 @@ pub mod gateway_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, Membership> {
             self.0
                 .method_hash([243, 34, 145, 49], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `getLastTotalWeight` (0x7e84946f) function
-        pub fn get_last_total_weight(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([126, 132, 148, 111], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getLatestParentFinality` (0x0338150f) function
@@ -1655,12 +1563,6 @@ pub mod gateway_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, Subnet> {
             self.0
                 .method_hash([2, 227, 15, 154], h)
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `topDownCheckPeriod` (0x7d9740f4) function
-        pub fn top_down_check_period(&self) -> ::ethers::contract::builders::ContractCall<M, u64> {
-            self.0
-                .method_hash([125, 151, 64, 244], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `totalSubnets` (0xa2b67158) function
@@ -1855,19 +1757,6 @@ pub mod gateway_getter_facet {
     )]
     #[ethcall(name = "getCurrentMembership", abi = "getCurrentMembership()")]
     pub struct GetCurrentMembershipCall;
-    ///Container type for all input parameters for the `getCurrentTotalWeight` function with signature `getCurrentTotalWeight()` and selector `0x0dc25ea1`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "getCurrentTotalWeight", abi = "getCurrentTotalWeight()")]
-    pub struct GetCurrentTotalWeightCall;
     ///Container type for all input parameters for the `getIncompleteCheckpointHeights` function with signature `getIncompleteCheckpointHeights()` and selector `0xa517218f`
     #[derive(
         Clone,
@@ -1926,19 +1815,6 @@ pub mod gateway_getter_facet {
     )]
     #[ethcall(name = "getLastMembership", abi = "getLastMembership()")]
     pub struct GetLastMembershipCall;
-    ///Container type for all input parameters for the `getLastTotalWeight` function with signature `getLastTotalWeight()` and selector `0x7e84946f`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "getLastTotalWeight", abi = "getLastTotalWeight()")]
-    pub struct GetLastTotalWeightCall;
     ///Container type for all input parameters for the `getLatestParentFinality` function with signature `getLatestParentFinality()` and selector `0x0338150f`
     #[derive(
         Clone,
@@ -2132,19 +2008,6 @@ pub mod gateway_getter_facet {
     pub struct SubnetsCall {
         pub h: [u8; 32],
     }
-    ///Container type for all input parameters for the `topDownCheckPeriod` function with signature `topDownCheckPeriod()` and selector `0x7d9740f4`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "topDownCheckPeriod", abi = "topDownCheckPeriod()")]
-    pub struct TopDownCheckPeriodCall;
     ///Container type for all input parameters for the `totalSubnets` function with signature `totalSubnets()` and selector `0xa2b67158`
     #[derive(
         Clone,
@@ -2173,12 +2036,10 @@ pub mod gateway_getter_facet {
         GetCheckpointInfo(GetCheckpointInfoCall),
         GetCurrentConfigurationNumber(GetCurrentConfigurationNumberCall),
         GetCurrentMembership(GetCurrentMembershipCall),
-        GetCurrentTotalWeight(GetCurrentTotalWeightCall),
         GetIncompleteCheckpointHeights(GetIncompleteCheckpointHeightsCall),
         GetIncompleteCheckpoints(GetIncompleteCheckpointsCall),
         GetLastConfigurationNumber(GetLastConfigurationNumberCall),
         GetLastMembership(GetLastMembershipCall),
-        GetLastTotalWeight(GetLastTotalWeightCall),
         GetLatestParentFinality(GetLatestParentFinalityCall),
         GetNetworkName(GetNetworkNameCall),
         GetParentFinality(GetParentFinalityCall),
@@ -2192,7 +2053,6 @@ pub mod gateway_getter_facet {
         MinStake(MinStakeCall),
         Postbox(PostboxCall),
         Subnets(SubnetsCall),
-        TopDownCheckPeriod(TopDownCheckPeriodCall),
         TotalSubnets(TotalSubnetsCall),
     }
     impl ::ethers::core::abi::AbiDecode for GatewayGetterFacetCalls {
@@ -2258,11 +2118,6 @@ pub mod gateway_getter_facet {
                 return Ok(Self::GetCurrentMembership(decoded));
             }
             if let Ok(decoded) =
-                <GetCurrentTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::GetCurrentTotalWeight(decoded));
-            }
-            if let Ok(decoded) =
                 <GetIncompleteCheckpointHeightsCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::GetIncompleteCheckpointHeights(decoded));
@@ -2281,11 +2136,6 @@ pub mod gateway_getter_facet {
                 <GetLastMembershipCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::GetLastMembership(decoded));
-            }
-            if let Ok(decoded) =
-                <GetLastTotalWeightCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::GetLastTotalWeight(decoded));
             }
             if let Ok(decoded) =
                 <GetLatestParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -2342,11 +2192,6 @@ pub mod gateway_getter_facet {
             if let Ok(decoded) = <SubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Subnets(decoded));
             }
-            if let Ok(decoded) =
-                <TopDownCheckPeriodCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::TopDownCheckPeriod(decoded));
-            }
             if let Ok(decoded) = <TotalSubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::TotalSubnets(decoded));
@@ -2385,9 +2230,6 @@ pub mod gateway_getter_facet {
                 Self::GetCurrentMembership(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::GetCurrentTotalWeight(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::GetIncompleteCheckpointHeights(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -2398,9 +2240,6 @@ pub mod gateway_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetLastMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetLastTotalWeight(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::GetLatestParentFinality(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -2424,9 +2263,6 @@ pub mod gateway_getter_facet {
                 Self::MinStake(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Postbox(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Subnets(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TopDownCheckPeriod(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::TotalSubnets(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
@@ -2448,14 +2284,12 @@ pub mod gateway_getter_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::GetCurrentMembership(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetCurrentTotalWeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetIncompleteCheckpointHeights(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::GetIncompleteCheckpoints(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetLastConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetLastMembership(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetLastTotalWeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetLatestParentFinality(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetNetworkName(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetParentFinality(element) => ::core::fmt::Display::fmt(element, f),
@@ -2469,7 +2303,6 @@ pub mod gateway_getter_facet {
                 Self::MinStake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Postbox(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Subnets(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TopDownCheckPeriod(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalSubnets(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
@@ -2534,11 +2367,6 @@ pub mod gateway_getter_facet {
             Self::GetCurrentMembership(value)
         }
     }
-    impl ::core::convert::From<GetCurrentTotalWeightCall> for GatewayGetterFacetCalls {
-        fn from(value: GetCurrentTotalWeightCall) -> Self {
-            Self::GetCurrentTotalWeight(value)
-        }
-    }
     impl ::core::convert::From<GetIncompleteCheckpointHeightsCall> for GatewayGetterFacetCalls {
         fn from(value: GetIncompleteCheckpointHeightsCall) -> Self {
             Self::GetIncompleteCheckpointHeights(value)
@@ -2557,11 +2385,6 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<GetLastMembershipCall> for GatewayGetterFacetCalls {
         fn from(value: GetLastMembershipCall) -> Self {
             Self::GetLastMembership(value)
-        }
-    }
-    impl ::core::convert::From<GetLastTotalWeightCall> for GatewayGetterFacetCalls {
-        fn from(value: GetLastTotalWeightCall) -> Self {
-            Self::GetLastTotalWeight(value)
         }
     }
     impl ::core::convert::From<GetLatestParentFinalityCall> for GatewayGetterFacetCalls {
@@ -2627,11 +2450,6 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<SubnetsCall> for GatewayGetterFacetCalls {
         fn from(value: SubnetsCall) -> Self {
             Self::Subnets(value)
-        }
-    }
-    impl ::core::convert::From<TopDownCheckPeriodCall> for GatewayGetterFacetCalls {
-        fn from(value: TopDownCheckPeriodCall) -> Self {
-            Self::TopDownCheckPeriod(value)
         }
     }
     impl ::core::convert::From<TotalSubnetsCall> for GatewayGetterFacetCalls {
@@ -2783,18 +2601,6 @@ pub mod gateway_getter_facet {
         Hash,
     )]
     pub struct GetCurrentMembershipReturn(pub Membership);
-    ///Container type for all return fields from the `getCurrentTotalWeight` function with signature `getCurrentTotalWeight()` and selector `0x0dc25ea1`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct GetCurrentTotalWeightReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getIncompleteCheckpointHeights` function with signature `getIncompleteCheckpointHeights()` and selector `0xa517218f`
     #[derive(
         Clone,
@@ -2845,18 +2651,6 @@ pub mod gateway_getter_facet {
         Hash,
     )]
     pub struct GetLastMembershipReturn(pub Membership);
-    ///Container type for all return fields from the `getLastTotalWeight` function with signature `getLastTotalWeight()` and selector `0x7e84946f`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct GetLastTotalWeightReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getLatestParentFinality` function with signature `getLatestParentFinality()` and selector `0x0338150f`
     #[derive(
         Clone,
@@ -3023,18 +2817,6 @@ pub mod gateway_getter_facet {
     pub struct SubnetsReturn {
         pub subnet: Subnet,
     }
-    ///Container type for all return fields from the `topDownCheckPeriod` function with signature `topDownCheckPeriod()` and selector `0x7d9740f4`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct TopDownCheckPeriodReturn(pub u64);
     ///Container type for all return fields from the `totalSubnets` function with signature `totalSubnets()` and selector `0xa2b67158`
     #[derive(
         Clone,
@@ -3128,7 +2910,7 @@ pub mod gateway_getter_facet {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`Membership((uint256,(uint8,bytes))[],uint64,uint256)`
+    ///`Membership((uint256,address,bytes)[],uint64)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -3142,7 +2924,6 @@ pub mod gateway_getter_facet {
     pub struct Membership {
         pub validators: ::std::vec::Vec<Validator>,
         pub configuration_number: u64,
-        pub total_weight: ::ethers::core::types::U256,
     }
     ///`ParentFinality(uint256,bytes32)`
     #[derive(
@@ -3214,7 +2995,7 @@ pub mod gateway_getter_facet {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
     }
-    ///`Validator(uint256,(uint8,bytes))`
+    ///`Validator(uint256,address,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -3227,6 +3008,7 @@ pub mod gateway_getter_facet {
     )]
     pub struct Validator {
         pub weight: ::ethers::core::types::U256,
-        pub addr: FvmAddress,
+        pub addr: ::ethers::core::types::Address,
+        pub metadata: ::ethers::core::types::Bytes,
     }
 }

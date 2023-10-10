@@ -148,14 +148,14 @@ pub mod subnet_actor_getter_facet {
                             kind: ::ethers::core::abi::ethabi::ParamType::Array(
                                 ::std::boxed::Box::new(
                                     ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Address,
                                         ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Address,
                                         ::ethers::core::abi::ethabi::ParamType::Bytes,
                                     ],),
                                 ),
                             ),
                             internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("struct GenesisValidator[]",),
+                                ::std::borrow::ToOwned::to_owned("struct Validator[]"),
                             ),
                         },],
                         constant: ::core::option::Option::None,
@@ -229,7 +229,7 @@ pub mod subnet_actor_getter_facet {
                                 ::ethers::core::abi::ethabi::ParamType::Bytes,
                             ],),
                             internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("struct Validator"),
+                                ::std::borrow::ToOwned::to_owned("struct ValidatorInfo"),
                             ),
                         },],
                         constant: ::core::option::Option::None,
@@ -424,8 +424,7 @@ pub mod subnet_actor_getter_facet {
         ///Calls the contract's `genesisValidators` (0xd92e8f12) function
         pub fn genesis_validators(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<GenesisValidator>>
-        {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<Validator>> {
             self.0
                 .method_hash([217, 46, 143, 18], ())
                 .expect("method not found (this should never happen)")
@@ -448,7 +447,7 @@ pub mod subnet_actor_getter_facet {
         pub fn get_validator(
             &self,
             validator_address: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, Validator> {
+        ) -> ::ethers::contract::builders::ContractCall<M, ValidatorInfo> {
             self.0
                 .method_hash([25, 4, 187, 46], validator_address)
                 .expect("method not found (this should never happen)")
@@ -1007,7 +1006,7 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash,
     )]
-    pub struct GenesisValidatorsReturn(pub ::std::vec::Vec<GenesisValidator>);
+    pub struct GenesisValidatorsReturn(pub ::std::vec::Vec<Validator>);
     ///Container type for all return fields from the `getConfigurationNumbers` function with signature `getConfigurationNumbers()` and selector `0x38a210b3`
     #[derive(
         Clone,
@@ -1044,7 +1043,7 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct GetValidatorReturn {
-        pub validator: Validator,
+        pub validator: ValidatorInfo,
     }
     ///Container type for all return fields from the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
@@ -1136,22 +1135,6 @@ pub mod subnet_actor_getter_facet {
         pub next_configuration_number: u64,
         pub cross_messages_hash: [u8; 32],
     }
-    ///`GenesisValidator(address,uint256,bytes)`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct GenesisValidator {
-        pub addr: ::ethers::core::types::Address,
-        pub collaterall: ::ethers::core::types::U256,
-        pub metadata: ::ethers::core::types::Bytes,
-    }
     ///`SubnetID(uint64,address[])`
     #[derive(
         Clone,
@@ -1167,7 +1150,7 @@ pub mod subnet_actor_getter_facet {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
     }
-    ///`Validator(uint256,uint256,bytes)`
+    ///`Validator(uint256,address,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1179,6 +1162,22 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct Validator {
+        pub weight: ::ethers::core::types::U256,
+        pub addr: ::ethers::core::types::Address,
+        pub metadata: ::ethers::core::types::Bytes,
+    }
+    ///`ValidatorInfo(uint256,uint256,bytes)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct ValidatorInfo {
         pub confirmed_collateral: ::ethers::core::types::U256,
         pub total_collateral: ::ethers::core::types::U256,
         pub metadata: ::ethers::core::types::Bytes,

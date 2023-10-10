@@ -8,10 +8,8 @@ import "../src/lib/CheckpointHelper.sol";
 
 contract CheckpointHelperTest is Test {
     using CheckpointHelper for BottomUpCheckpoint;
-    using CheckpointHelper for TopDownCheckpoint;
 
     BottomUpCheckpoint public checkpoint;
-    TopDownCheckpoint public topDownCheckpoint;
     CrossMsg public crossMsg;
 
     function test_ToHash_Works_BottomUpCheckpoint() public {
@@ -26,10 +24,5 @@ contract CheckpointHelperTest is Test {
                 nextConfigurationNumber: 0
             }).toHash() == checkpoint.toHash()
         );
-    }
-
-    function test_ToHash_Works_TopDownCheckpoint() public {
-        topDownCheckpoint.epoch = 10;
-        require(TopDownCheckpoint({epoch: 10, topDownMsgs: new CrossMsg[](0)}).toHash() == topDownCheckpoint.toHash());
     }
 }

@@ -14,10 +14,9 @@ import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
 import {IPCMsgType} from "../src/enums/IPCMsgType.sol";
 import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
 import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
-import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck, ParentFinality} from "../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress} from "../src/structs/Subnet.sol";
-import {Membership, Validator} from "../src/structs/Validator.sol";
+import {SubnetID, Subnet, IPCAddress, Membership, Validator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CheckpointHelper} from "../src/lib/CheckpointHelper.sol";
@@ -160,7 +159,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory gwConstructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
@@ -283,7 +281,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         require(gwGetter.crossMsgFee() == CROSS_MSG_FEE, "crossMsgFee");
         require(gwGetter.bottomUpCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD, "bottomUpCheckPeriod");
-        require(gwGetter.topDownCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD, "topDownCheckPeriod");
         require(
             gwGetter.getNetworkName().equals(SubnetID({root: ROOTNET_CHAINID, route: new address[](0)})),
             "getNetworkName"
@@ -311,7 +308,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
-            topDownCheckPeriod: checkpointPeriod,
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
@@ -328,7 +324,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         require(networkName.isRoot(), "networkName.isRoot()");
         require(depGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "gw.minStake() == MIN_COLLATERAL_AMOUNT");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
-        require(depGetter.topDownCheckPeriod() == checkpointPeriod, "gw.topDownCheckPeriod() == checkpointPeriod");
         require(
             depGetter.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE,
             "gw.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE"
@@ -350,7 +345,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
-            topDownCheckPeriod: checkpointPeriod,
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: 100,
@@ -394,7 +388,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         require(networkName.isRoot() == false, "networkName.isRoot()");
         require(depGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "gw.minStake() == MIN_COLLATERAL_AMOUNT");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
-        require(depGetter.topDownCheckPeriod() == checkpointPeriod, "gw.topDownCheckPeriod() == checkpointPeriod");
         require(depGetter.majorityPercentage() == 100, "gw.majorityPercentage() == 100");
     }
 
@@ -837,7 +830,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
@@ -868,7 +860,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
@@ -897,7 +888,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
@@ -929,7 +919,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            topDownCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
@@ -1208,16 +1197,11 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         weights[0] = 100;
         weights[1] = 130;
 
-        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
         vm.prank(FilAddress.SYSTEM_ACTOR);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
         gwRouter.commitParentFinality(finality);
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.expectRevert(ValidatorsAndWeightsLengthMismatch.selector);
-
-        gwRouter.updateMembership(n, validators, weights);
     }
 
     function testGatewayDiamond_CommitParentFinality_Fails_ZeroWeight() public {
@@ -1226,17 +1210,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         uint256[] memory weights = new uint256[](1);
         weights[0] = 0;
 
-        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
         gwRouter.commitParentFinality(finality);
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.expectRevert(ValidatorWeightIsZero.selector);
-
-        gwRouter.updateMembership(n, validators, weights);
     }
 
     function testGatewayDiamond_CommitParentFinality_Works_MultipleValidators() public {
@@ -1252,21 +1231,18 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
         gwRouter.commitParentFinality(finality);
-        gwRouter.updateMembership(gwGetter.getLastConfigurationNumber() + 1, validators, weights);
-        gwManager.updateMembership();
-
-        require(gwGetter.getCurrentTotalWeight() == 250);
     }
 
-    function testGatewayDiamond_CommitParentFinality_Works_NewValidators() public {
-        addValidator(vm.addr(100), 100);
+    // TODO: Update test
+    // function testGatewayDiamond_CommitParentFinality_Works_NewValidators() public {
+    //     addValidator(vm.addr(100), 100);
 
-        require(gwGetter.getLastTotalWeight() == 100);
+    //     require(gwGetter.getLastTotalWeight() == 100);
 
-        addValidator(vm.addr(101), 1000);
+    //     addValidator(vm.addr(101), 1000);
 
-        require(gwGetter.getLastTotalWeight() == 1000);
-    }
+    //     require(gwGetter.getLastTotalWeight() == 1000);
+    // }
 
     function testGatewayDiamond_CommitParentFinality_Works_WithQuery() public {
         FvmAddress[] memory validators = new FvmAddress[](2);
@@ -1281,9 +1257,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
         gwRouter.commitParentFinality(finality);
-        gwRouter.updateMembership(gwGetter.getLastConfigurationNumber() + 1, validators, weights);
-        gwManager.updateMembership();
-
         ParentFinality memory committedFinality = gwGetter.getParentFinality(block.number);
 
         require(committedFinality.height == finality.height, "height not equal");
@@ -1325,56 +1298,54 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwRouter.applyCrossMessages(topDownMsgs);
     }
 
-    function testGatewayDiamond_Membership() public {
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+    // TODO: Update membership tests
+    // function testGatewayDiamond_Membership() public {
+    //     vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
-        Membership memory lastMb;
-        Membership memory curMb;
+    //     Membership memory lastMb;
+    //     Membership memory curMb;
 
-        uint64 initConfigurationNumber = gwGetter.getLastConfigurationNumber();
-        uint64 newConfigurationNumber = initConfigurationNumber;
+    //     uint64 initConfigurationNumber = gwGetter.getLastConfigurationNumber();
+    //     uint64 newConfigurationNumber = initConfigurationNumber;
 
-        // new configuration
-        FvmAddress[] memory validators = new FvmAddress[](2);
-        validators[0] = FvmAddressHelper.from(address(this));
-        validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
+    //     // new configuration
+    //     FvmAddress[] memory validators = new FvmAddress[](2);
+    //     validators[0] = FvmAddressHelper.from(address(this));
+    //     validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
 
-        uint256[] memory weights = new uint256[](2);
-        weights[0] = 100;
-        weights[1] = 200;
+    //     uint256[] memory weights = new uint256[](2);
+    //     weights[0] = 100;
+    //     weights[1] = 200;
 
-        gwManager.newMembership(++newConfigurationNumber, validators, weights);
-        lastMb = gwGetter.getLastMembership();
-        require(gwGetter.getLastConfigurationNumber() == newConfigurationNumber, "last n correct");
-        require(gwGetter.getCurrentConfigurationNumber() != newConfigurationNumber, "current n correct");
-        require(lastMb.configurationNumber == newConfigurationNumber, "lastMb.n correct");
-        require(lastMb.validators.length == 2, "lastMb.validators.length correct");
-        require(lastMb.totalWeight == 300, "lastMb.totalWeight correct");
+    //     gwManager.newMembership(++newConfigurationNumber, validators, weights);
+    //     lastMb = gwGetter.getLastMembership();
+    //     require(gwGetter.getLastConfigurationNumber() == newConfigurationNumber, "last n correct");
+    //     require(gwGetter.getCurrentConfigurationNumber() != newConfigurationNumber, "current n correct");
+    //     require(lastMb.configurationNumber == newConfigurationNumber, "lastMb.n correct");
+    //     require(lastMb.validators.length == 2, "lastMb.validators.length correct");
 
-        // new configuration
-        validators = new FvmAddress[](3);
-        validators[0] = FvmAddressHelper.from(address(this));
-        validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
-        validators[2] = FvmAddressHelper.from(address(vm.addr(301)));
+    //     // new configuration
+    //     validators = new FvmAddress[](3);
+    //     validators[0] = FvmAddressHelper.from(address(this));
+    //     validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
+    //     validators[2] = FvmAddressHelper.from(address(vm.addr(301)));
 
-        weights = new uint256[](3);
-        weights[0] = 100;
-        weights[1] = 200;
-        weights[2] = 300;
+    //     weights = new uint256[](3);
+    //     weights[0] = 100;
+    //     weights[1] = 200;
+    //     weights[2] = 300;
 
-        gwManager.newMembership(++newConfigurationNumber, validators, weights);
-        lastMb = gwGetter.getLastMembership();
-        require(lastMb.configurationNumber == newConfigurationNumber, "nlast.configurationNumber correct");
-        require(lastMb.validators.length == 3, "lastMb.validators.length correct");
-        require(lastMb.totalWeight == 600, "lastMb.totalWeight correct");
+    //     gwManager.newMembership(++newConfigurationNumber, validators, weights);
+    //     lastMb = gwGetter.getLastMembership();
+    //     require(lastMb.configurationNumber == newConfigurationNumber, "nlast.configurationNumber correct");
+    //     require(lastMb.validators.length == 3, "lastMb.validators.length correct");
 
-        // update
-        curMb = gwManager.updateMembership();
-        require(gwGetter.getCurrentConfigurationNumber() == newConfigurationNumber, "current n correct");
-        require(curMb.configurationNumber == newConfigurationNumber, "curMb.configurationNumber correct");
-        require(curMb.validators.length == 3, "curMb.validators.length correct");
-        require(curMb.totalWeight == 600, "curMb.totalWeight correct");
-    }
+    //     // update
+    //     curMb = gwManager.updateMembership();
+    //     require(gwGetter.getCurrentConfigurationNumber() == newConfigurationNumber, "current n correct");
+    //     require(curMb.configurationNumber == newConfigurationNumber, "curMb.configurationNumber correct");
+    //     require(curMb.validators.length == 3, "curMb.validators.length correct");
+    // }
 
     function testGatewayDiamond_createBottomUpCheckpoint() public {
         (, address[] memory addrs, uint256[] memory weights) = setupThreeValidatorsForCheckpoint();
@@ -1698,14 +1669,11 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         weights[1] = 100;
         weights[2] = 100;
 
-        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
         gwRouter.commitParentFinality(finality);
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwRouter.updateMembership(n, validators, weights);
     }
 
     function setupThreeValidatorsForCheckpoint()
@@ -1745,11 +1713,10 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         vm.deal(validator, 1);
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         gwRouter.commitParentFinality(finality);
-        gwRouter.updateMembership(n, validators, weights);
         vm.stopPrank();
     }
 

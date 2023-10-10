@@ -8,9 +8,9 @@ import {TestUtils} from "./TestUtils.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {Status} from "../src/enums/Status.sol";
-import {CrossMsg, BottomUpCheckpoint, TopDownCheckpoint, StorableMsg, ChildCheck} from "../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, IPCAddress, Subnet, Validator} from "../src/structs/Subnet.sol";
+import {SubnetID, IPCAddress, Subnet, ValidatorInfo} from "../src/structs/Subnet.sol";
 import {StorableMsg} from "../src/structs/Checkpoint.sol";
 import {IGateway} from "../src/interfaces/IGateway.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
@@ -200,7 +200,7 @@ contract SubnetActorDiamondTest is Test {
         saManager.join{value: collateral}(publicKey1);
 
         // collateral confirmed immediately and network boostrapped
-        Validator memory v = saGetter.getValidator(validator1);
+        ValidatorInfo memory v = saGetter.getValidator(validator1);
         require(v.totalCollateral == collateral, "total collateral not expected");
         require(v.confirmedCollateral == collateral, "confirmed collateral not 0");
         ensureBytesEqual(v.metadata, publicKey1);

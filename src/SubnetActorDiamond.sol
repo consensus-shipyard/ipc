@@ -33,7 +33,6 @@ contract SubnetActorDiamond {
         if (params.ipcGatewayAddr == address(0)) {
             revert GatewayCannotBeZero();
         }
-        // topDownCheckPeriod can be equal 0, since validators can propose anything they want.
         // The bottomUpCheckPeriod should be non-zero for now.
         if (params.bottomUpCheckPeriod == 0) {
             revert InvalidSubmissionPeriod();

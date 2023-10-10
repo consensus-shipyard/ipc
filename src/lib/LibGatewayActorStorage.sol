@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {NotEnoughFee, NotSystemActor} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint, CrossMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
-import {Membership} from "../structs/Validator.sol";
+import {Membership} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
@@ -66,8 +66,6 @@ struct GatewayActorStorage {
     /// @notice AppliedNonces keep track of the next nonce of the message to be applied.
     /// This prevents potential replay attacks.
     uint64 appliedTopDownNonce;
-    /// @notice top-down period in number of epochs for the subnet
-    uint64 topDownCheckPeriod;
     /// @notice Number of active subnets spawned from this one
     uint64 totalSubnets;
     // @notice bottom-up period in number of epochs for the subnet

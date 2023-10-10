@@ -5,7 +5,7 @@ import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
-import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, GenesisValidator} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, Validator} from "../structs/Subnet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
@@ -13,7 +13,7 @@ struct SubnetActorStorage {
     /// @notice contains all committed bottom-up checkpoint at specific epoch
     mapping(uint64 => BottomUpCheckpoint) committedCheckpoints;
     // @notice initial set of validators joining in genesis
-    GenesisValidator[] genesisValidators;
+    Validator[] genesisValidators;
     /// @notice The height of the last committed bottom-up checkpoint.
     uint64 lastBottomUpCheckpointHeight;
     /// @notice Minimal activation collateral

@@ -83,21 +83,12 @@ struct StakingReleaseQueue {
 /// Keeping track of the validator information. There are two types of collaterals:
 ///     - Confirmed: The amount of collateral actually confirmed in child subnet
 ///     - Total: Aside from Confirmed, there is also the collateral has been supplied, but not yet confirmed in child.
-struct Validator {
+struct ValidatorInfo {
     uint256 confirmedCollateral;
     uint256 totalCollateral;
     /// The metadata associated with the validator, i.e. offchain network address.
     /// This information is not important to the protocol, offchain should know how
     /// to parse or decode the bytes.
-    bytes metadata;
-}
-
-/// Struct that holds all the information required for a genesis vallidator,
-/// including its address and genesis collateral and metadata.
-/// This can be used by Fendermint to bootstrap a new child subnet.
-struct GenesisValidator {
-    address addr;
-    uint256 collateral;
     bytes metadata;
 }
 
@@ -118,7 +109,7 @@ struct ValidatorSet {
     /// The total collateral confirmed.
     uint256 totalConfirmedCollateral;
     /// The mapping of each validator address to its information.
-    mapping(address => Validator) validators;
+    mapping(address => ValidatorInfo) validators;
     /// @notice The active validators tracked using min priority queue.
     MinPQ activeValidators;
     /// @notice The waiting validators trakced using max priority queue.
@@ -134,4 +125,17 @@ struct ParentValidatorsTracker {
 struct IPCAddress {
     SubnetID subnetId;
     FvmAddress rawAddress;
+}
+
+// Validator struct stored in the gateway.
+struct Validator {
+    uint256 weight;
+    address addr;
+    bytes metadata;
+}
+
+// Membership information stored in the gateway
+struct Membership {
+    Validator[] validators;
+    uint64 configurationNumber;
 }

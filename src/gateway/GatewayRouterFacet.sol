@@ -8,7 +8,7 @@ import {Status} from "../enums/Status.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {Membership} from "../structs/Validator.sol";
+import {Membership} from "../structs/Subnet.sol";
 import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
 import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, IncompleteCheckpointExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory, FailedAddSignature} from "../errors/IPCErrors.sol";
 import {MessagesNotSorted, NotEnoughBalance, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
@@ -101,16 +101,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
-    /// @notice THIS METHOD IS DEPRECATED. It will be replaced with validator changes. Keep now to ensure tests runs.
-    /// @notice Update the membership.
-    function updateMembership(
-        uint64 n,
-        FvmAddress[] calldata validators,
-        uint256[] calldata weights
-    ) external systemActorOnly {
-        LibGateway.newMembership({n: n, validators: validators, weights: weights});
-    }
-
     /// @notice apply cross messages
     function applyCrossMessages(CrossMsg[] calldata crossMsgs) external systemActorOnly {
         _applyMessages(SubnetID(0, new address[](0)), crossMsgs);
@@ -133,9 +123,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
         // If the cross-message destination is the current network.
         if (crossMsg.message.to.subnetId.equals(s.networkName)) {
-            // forwarder will always be empty subnet when we reach here from submitTopDownCheckpoint
-            // so we check against it to not reach here in coverage
-
             if (applyType == IPCMsgType.BottomUp) {
                 if (!forwarder.isEmpty()) {
                     (bool registered, Subnet storage subnet) = LibGateway.getSubnet(forwarder);

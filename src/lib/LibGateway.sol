@@ -5,7 +5,7 @@ import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {CrossMsg, BottomUpCheckpoint, ParentFinality} from "../structs/Checkpoint.sol";
-import {Membership, Validator} from "../structs/Validator.sol";
+import {Membership, Validator} from "../structs/Subnet.sol";
 import {OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ValidatorWeightIsZero, ValidatorsAndWeightsLengthMismatch, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -23,8 +23,7 @@ library LibGateway {
     using CrossMsgHelper for CrossMsg;
     using CheckpointHelper for BottomUpCheckpoint;
 
-    event MembershipReceived(uint64 n, FvmAddress[] validators, uint256[] weights);
-    event MembershipUpdated(uint64 n, Validator[] validators, uint256 totalWeight);
+    event MembershipUpdated(Membership);
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -67,60 +66,67 @@ library LibGateway {
     }
 
     /// @notice set the next membership
-    /// @dev It is called by the child subnet when a new configuration is adopted.
-    /// @param n - configuration number
-    /// @param validators - list of validator addresses
-    /// @param weights - list of validators voting powers
-    function newMembership(uint64 n, FvmAddress[] memory validators, uint256[] memory weights) internal {
-        emit MembershipReceived({n: n, validators: validators, weights: weights});
-
-        if (validators.length != weights.length) {
-            revert ValidatorsAndWeightsLengthMismatch();
-        }
+    /// @param membership - new membership
+    function updateMembership(Membership memory membership) internal {
+        emit MembershipUpdated(membership);
 
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        // Most of the time there are no changes in membership
-        // and we will call this function for the same configuration number and validators.
-        // In this case we just ignore this membership message.
-        if (n == 0 || n == s.lastMembership.configurationNumber) {
-            return;
-        }
-        // We reject messages with configuration numbers from the past and revert the call.
-        if (n < s.lastMembership.configurationNumber) {
-            revert OldConfigurationNumber();
-        }
-
-        // If the input configuration number is greater than the configuration number of the last membership then
-        // store it.
-        uint256 len = validators.length;
-        uint256 totalValidatorsWeight;
-
-        s.lastMembership.configurationNumber = n;
-        // clear old validators
-        delete s.lastMembership.validators;
-
-        FvmAddress memory zero = FvmAddressHelper.from(address(0));
-        for (uint256 i = 0; i < len; ) {
-            if (!FvmAddressHelper.equal(validators[i], zero)) {
-                uint256 validatorWeight = weights[i];
-
-                if (validatorWeight == 0) {
-                    revert ValidatorWeightIsZero();
-                }
-
-                s.validatorSetWeights[n][validators[i].toHash()] = validatorWeight;
-
-                s.lastMembership.validators.push(Validator({addr: validators[i], weight: validatorWeight}));
-
-                totalValidatorsWeight += validatorWeight;
+        // perform checks after the genesis membership
+        if (s.currentMembership.configurationNumber != 0) {
+            if (membership.configurationNumber == s.lastMembership.configurationNumber) {
+                return;
+            }
+            // We reject messages with configuration numbers from the past and revert the call.
+            if (membership.configurationNumber < s.lastMembership.configurationNumber) {
+                revert OldConfigurationNumber();
             }
 
+            // Check if the memmbersip is equal and return if it is the case
+            if (membershipEqual(membership, s.currentMembership)) {
+                return;
+            }
+        }
+
+        s.lastMembership = s.currentMembership;
+
+        uint256 inputLength = membership.validators.length;
+        uint256 storLength = s.currentMembership.validators.length;
+        // memory arrays can't be copied directly from memory into storage,
+        // we need to explicitly increase the size of the array in storage.
+        for (uint256 i = 0; i < inputLength; ) {
+            if (i < storLength) {
+                s.currentMembership.validators[i] = membership.validators[i];
+            } else {
+                s.currentMembership.validators.push(membership.validators[i]);
+            }
             unchecked {
                 ++i;
             }
         }
-        s.lastMembership.totalWeight = totalValidatorsWeight;
+        // finally we need to remove any outstanding membership from
+        // storage.
+        if (storLength > inputLength) {
+            for (uint256 i = inputLength; i < storLength; ) {
+                s.currentMembership.validators.pop();
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+    }
+
+    /// @dev - Computes total weight for a specific membership
+    function membershipTotalWeight(Membership memory self) internal pure returns (uint256) {
+        uint256 len = self.validators.length;
+        uint256 totalValidatorsWeight;
+        for (uint256 i = 0; i < len; ) {
+            totalValidatorsWeight += self.validators[i].weight;
+            unchecked {
+                ++i;
+            }
+        }
+        return totalValidatorsWeight;
     }
 
     /// @dev compares two memberships and returns true if they are equal
@@ -128,7 +134,7 @@ library LibGateway {
         if (mb1.configurationNumber != mb2.configurationNumber) {
             return false;
         }
-        if (mb1.totalWeight != mb2.totalWeight) {
+        if (membershipTotalWeight(mb1) != membershipTotalWeight(mb2)) {
             return false;
         }
         if (mb1.validators.length != mb2.validators.length) {
@@ -138,20 +144,6 @@ library LibGateway {
         bytes32 h2 = keccak256(abi.encode(mb2.validators));
 
         return h1 == h2;
-    }
-
-    /// @notice update the membership of the child subnet and returns it
-    function updateMembership() internal returns (Membership memory) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-
-        if (membershipEqual(s.currentMembership, s.lastMembership)) {
-            return s.currentMembership;
-        }
-
-        s.currentMembership = s.lastMembership;
-        Membership memory mb = s.currentMembership;
-        emit MembershipUpdated({n: mb.configurationNumber, validators: mb.validators, totalWeight: mb.totalWeight});
-        return mb;
     }
 
     /// @notice commit topdown messages for their execution in the subnet. Adds the message to the subnet struct for future execution
