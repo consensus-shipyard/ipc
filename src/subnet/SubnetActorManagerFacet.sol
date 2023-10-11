@@ -67,9 +67,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
             // slither-disable-next-line unused-return
             s.rewardedRelayers[checkpoint.blockHeight].add(msg.sender);
 
-            // reward relayers in the subnet for committing the previous checkpoint
-            rewardRelayers(s.lastBottomUpCheckpointHeight);
-
             s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
             IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint, messages);
@@ -177,8 +174,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice reward the relayers for processing checkpoint at height `height`.
-    function rewardRelayers(uint64 height) internal {
-        if (s.relayerReward == 0) {
+    /// @dev The reward includes the fixed relayer reward and accumulated cross-message fees received from the gateway.
+    /// @param height height of the checkpoint the relayers are rewarded for
+    /// @param reward The sum of cross-message fees in the checkpoint
+    function distributeRewardToRelayers(uint64 height, uint256 reward) external onlyGateway {
+        if (reward == 0) {
             return;
         }
         address[] memory relayers = s.rewardedRelayers[height].values();
@@ -186,13 +186,13 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         if (relayersLength == 0) {
             return;
         }
-        if (s.relayerReward < relayersLength) {
+        if (reward < relayersLength) {
             revert NotEnoughBalanceForRewards();
         }
-        uint256 rewardAmount = s.relayerReward / relayersLength;
+        uint256 relayerReward = reward / relayersLength;
 
         for (uint256 i = 0; i < relayersLength; ) {
-            s.relayerRewards[relayers[i]] += rewardAmount;
+            s.relayerRewards[relayers[i]] += relayerReward;
             unchecked {
                 ++i;
             }

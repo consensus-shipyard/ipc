@@ -76,8 +76,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
-            powerScale: DEFAULT_POWER_SCALE,
-            relayerReward: DEFAULT_RELAYER_REWARD
+            powerScale: DEFAULT_POWER_SCALE
         });
         vm.expectRevert(WrongGateway.selector);
         registry.newSubnetActor(params);
@@ -95,8 +94,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
-            powerScale: DEFAULT_POWER_SCALE,
-            relayerReward: DEFAULT_RELAYER_REWARD
+            powerScale: DEFAULT_POWER_SCALE
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -115,8 +113,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
-            powerScale: DEFAULT_POWER_SCALE,
-            relayerReward: DEFAULT_RELAYER_REWARD
+            powerScale: DEFAULT_POWER_SCALE
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -132,8 +129,7 @@ contract SubnetRegistryTest is Test {
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_CHECKPOINT_PERIOD,
             DEFAULT_MAJORITY_PERCENTAGE,
-            DEFAULT_POWER_SCALE,
-            DEFAULT_RELAYER_REWARD
+            DEFAULT_POWER_SCALE
         );
     }
 
@@ -145,8 +141,7 @@ contract SubnetRegistryTest is Test {
         uint64 _minValidators,
         uint64 _checkPeriod,
         uint8 _majorityPercentage,
-        int8 _powerScale,
-        uint256 _relayerReward
+        int8 _powerScale
     ) public {
         vm.startPrank(DEFAULT_SENDER);
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
@@ -159,8 +154,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: _checkPeriod,
             majorityPercentage: _majorityPercentage,
             activeValidatorsLimit: 100,
-            powerScale: _powerScale,
-            relayerReward: _relayerReward
+            powerScale: _powerScale
         });
         registry.newSubnetActor(params);
         require(registry.latestSubnetDeployed(DEFAULT_SENDER) != address(0));

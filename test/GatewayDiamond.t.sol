@@ -242,8 +242,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
-            powerScale: 12,
-            relayerReward: DEFAULT_RELAYER_REWARD
+            powerScale: 12
         });
 
         saManager = new SubnetManagerTestUtil();
@@ -853,11 +852,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.deal(callerAddress, 1 ether);
         vm.expectRevert(NotEnoughFee.selector);
 
-        gwManager.release{value: 0 ether}(FvmAddressHelper.from(msg.sender));
+        gwManager.release{value: 0 ether}(FvmAddressHelper.from(msg.sender), 0);
     }
 
     function testGatewayDiamond_Release_Works_BLSAccount(uint256 releaseAmount, uint256 crossMsgFee) public {
-        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max);
+        vm.assume(crossMsgFee >= CROSS_MSG_FEE);
+        vm.assume(releaseAmount < type(uint256).max);
         vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
 
         address[] memory path = new address[](2);
@@ -882,11 +882,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.warp(0);
         vm.startPrank(BLS_ACCOUNT_ADDREESS);
         vm.deal(BLS_ACCOUNT_ADDREESS, releaseAmount + 1);
-        release(releaseAmount);
+        release(releaseAmount, crossMsgFee);
     }
 
     function testGatewayDiamond_Release_Works_EmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
-        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max);
+        vm.assume(crossMsgFee >= CROSS_MSG_FEE);
+        vm.assume(releaseAmount < type(uint256).max);
         vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
 
         address[] memory path = new address[](2);
@@ -913,12 +914,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.warp(0);
         vm.startPrank(callerAddress);
         vm.deal(callerAddress, releaseAmount + 1);
-
-        release(releaseAmount);
+        release(releaseAmount, crossMsgFee);
     }
 
     function testGatewayDiamond_Release_Works_NonEmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
-        vm.assume(releaseAmount > 0 && releaseAmount < type(uint256).max / 2);
+        vm.assume(crossMsgFee >= CROSS_MSG_FEE);
+        vm.assume(releaseAmount < type(uint256).max / 2);
         vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
 
         address[] memory path = new address[](2);
@@ -946,9 +947,9 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         vm.startPrank(callerAddress);
         vm.deal(callerAddress, 2 * releaseAmount + 1);
 
-        release(releaseAmount);
+        release(releaseAmount, crossMsgFee);
 
-        release(releaseAmount);
+        release(releaseAmount, crossMsgFee);
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_NoDestination() public {
@@ -972,7 +973,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: new bytes(0)
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
                 }),
                 wrapped: false
             })
@@ -997,14 +999,15 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: new bytes(0)
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
         );
     }
 
-    function testGatewayDiamond_SendCrossMessage_Fails_DifferentMessageValue() public {
+    function testGatewayDiamond_SendCrossMessage_Fails_Failes_InvalidCrossMsgValue() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
@@ -1022,7 +1025,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     value: 5,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: new bytes(0)
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
@@ -1050,7 +1054,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: new bytes(0)
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
@@ -1075,21 +1080,23 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     value: 1,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: new bytes(0)
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
         );
     }
 
-    function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughGas() public {
+    function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughFee() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
+
         vm.expectRevert(NotEnoughFee.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE - 1}(
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1100,7 +1107,35 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     value: 0,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: new bytes(0)
+                    params: new bytes(0),
+                    fee: 0
+                }),
+                wrapped: true
+            })
+        );
+    }
+
+    function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughFunds() public {
+        address caller = vm.addr(100);
+        vm.startPrank(caller);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE);
+        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
+        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
+
+        vm.expectRevert(NotEnoughFunds.selector);
+        gwMessenger.sendCrossMessage{value: 0}(
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                        rawAddress: FvmAddressHelper.from(caller)
+                    }),
+                    to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
+                    value: 0,
+                    nonce: 0,
+                    method: METHOD_SEND,
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
@@ -1167,7 +1202,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                 value: CROSS_MSG_FEE + 1,
                 nonce: 0,
                 method: METHOD_SEND,
-                params: new bytes(0)
+                params: new bytes(0),
+                fee: CROSS_MSG_FEE
             }),
             wrapped: false
         });
@@ -1294,7 +1330,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                     value: 0,
                     nonce: i,
                     method: this.callback.selector,
-                    params: EMPTY_BYTES
+                    params: EMPTY_BYTES,
+                    fee: CROSS_MSG_FEE
                 }),
                 wrapped: false
             });
@@ -1743,9 +1780,9 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     //     saManager.confirmChange(nextConfigNum - 1);
     // }
 
-    function release(uint256 releaseAmount) internal {
+    function release(uint256 releaseAmount, uint256 fee) internal {
         uint256 expectedNonce = gwGetter.bottomUpNonce() + 1;
-        gwManager.release{value: releaseAmount}(FvmAddressHelper.from(msg.sender));
+        gwManager.release{value: releaseAmount}(FvmAddressHelper.from(msg.sender), fee);
         require(gwGetter.bottomUpNonce() == expectedNonce, "gwGetter.bottomUpNonce() == expectedNonce");
     }
 

@@ -42,6 +42,37 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("distributeRewardToRelayers"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "distributeRewardToRelayers",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("height"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("reward"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("join"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -181,6 +212,7 @@ pub mod subnet_actor_manager_facet {
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                                         ],
                                                     ),
                                                     ::ethers::core::abi::ethabi::ParamType::Bool,
@@ -478,6 +510,15 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("NotGateway"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotGateway"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NotOwnerOfPublicKey"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -616,6 +657,16 @@ pub mod subnet_actor_manager_facet {
                 .method_hash([237, 124, 77, 161], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `distributeRewardToRelayers` (0xf9002bb1) function
+        pub fn distribute_reward_to_relayers(
+            &self,
+            height: u64,
+            reward: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([249, 0, 43, 177], (height, reward))
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `join` (0x6170b162) function
         pub fn join(
             &self,
@@ -643,7 +694,7 @@ pub mod subnet_actor_manager_facet {
                 .method_hash([58, 75, 102, 241], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `submitCheckpoint` (0x0847be42) function
+        ///Calls the contract's `submitCheckpoint` (0xa8284de3) function
         pub fn submit_checkpoint(
             &self,
             checkpoint: BottomUpCheckpoint,
@@ -653,7 +704,7 @@ pub mod subnet_actor_manager_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash(
-                    [8, 71, 190, 66],
+                    [168, 40, 77, 227],
                     (checkpoint, messages, signatories, signatures),
                 )
                 .expect("method not found (this should never happen)")
@@ -835,6 +886,19 @@ pub mod subnet_actor_manager_facet {
         abi = "NotEnoughBalanceForRewards()"
     )]
     pub struct NotEnoughBalanceForRewards;
+    ///Custom Error type `NotGateway` with signature `NotGateway()` and selector `0xe7e601db`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "NotGateway", abi = "NotGateway()")]
+    pub struct NotGateway;
     ///Custom Error type `NotOwnerOfPublicKey` with signature `NotOwnerOfPublicKey()` and selector `0x97d24a3a`
     #[derive(
         Clone,
@@ -953,6 +1017,7 @@ pub mod subnet_actor_manager_facet {
         NoCollateralToWithdraw(NoCollateralToWithdraw),
         NotAllValidatorsHaveLeft(NotAllValidatorsHaveLeft),
         NotEnoughBalanceForRewards(NotEnoughBalanceForRewards),
+        NotGateway(NotGateway),
         NotOwnerOfPublicKey(NotOwnerOfPublicKey),
         NotStakedBefore(NotStakedBefore),
         NotValidator(NotValidator),
@@ -1014,6 +1079,9 @@ pub mod subnet_actor_manager_facet {
             {
                 return Ok(Self::NotEnoughBalanceForRewards(decoded));
             }
+            if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::NotGateway(decoded));
+            }
             if let Ok(decoded) =
                 <NotOwnerOfPublicKey as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -1074,6 +1142,7 @@ pub mod subnet_actor_manager_facet {
                 Self::NotEnoughBalanceForRewards(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::NotGateway(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotOwnerOfPublicKey(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1131,6 +1200,8 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
+                    == <NotGateway as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
                     == <NotOwnerOfPublicKey as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1175,6 +1246,7 @@ pub mod subnet_actor_manager_facet {
                 Self::NoCollateralToWithdraw(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotAllValidatorsHaveLeft(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughBalanceForRewards(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotGateway(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotOwnerOfPublicKey(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotStakedBefore(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotValidator(element) => ::core::fmt::Display::fmt(element, f),
@@ -1230,6 +1302,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<NotEnoughBalanceForRewards> for SubnetActorManagerFacetErrors {
         fn from(value: NotEnoughBalanceForRewards) -> Self {
             Self::NotEnoughBalanceForRewards(value)
+        }
+    }
+    impl ::core::convert::From<NotGateway> for SubnetActorManagerFacetErrors {
+        fn from(value: NotGateway) -> Self {
+            Self::NotGateway(value)
         }
     }
     impl ::core::convert::From<NotOwnerOfPublicKey> for SubnetActorManagerFacetErrors {
@@ -1438,6 +1515,25 @@ pub mod subnet_actor_manager_facet {
     )]
     #[ethcall(name = "claimRewardForRelayer", abi = "claimRewardForRelayer()")]
     pub struct ClaimRewardForRelayerCall;
+    ///Container type for all input parameters for the `distributeRewardToRelayers` function with signature `distributeRewardToRelayers(uint64,uint256)` and selector `0xf9002bb1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "distributeRewardToRelayers",
+        abi = "distributeRewardToRelayers(uint64,uint256)"
+    )]
+    pub struct DistributeRewardToRelayersCall {
+        pub height: u64,
+        pub reward: ::ethers::core::types::U256,
+    }
     ///Container type for all input parameters for the `join` function with signature `join(bytes)` and selector `0x6170b162`
     #[derive(
         Clone,
@@ -1492,7 +1588,7 @@ pub mod subnet_actor_manager_facet {
     )]
     #[ethcall(name = "stake", abi = "stake()")]
     pub struct StakeCall;
-    ///Container type for all input parameters for the `submitCheckpoint` function with signature `submitCheckpoint(((uint64,address[]),uint64,bytes32,uint64,bytes32),((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],address[],bytes[])` and selector `0x0847be42`
+    ///Container type for all input parameters for the `submitCheckpoint` function with signature `submitCheckpoint(((uint64,address[]),uint64,bytes32,uint64,bytes32),((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)[],address[],bytes[])` and selector `0xa8284de3`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1505,7 +1601,7 @@ pub mod subnet_actor_manager_facet {
     )]
     #[ethcall(
         name = "submitCheckpoint",
-        abi = "submitCheckpoint(((uint64,address[]),uint64,bytes32,uint64,bytes32),((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)[],address[],bytes[])"
+        abi = "submitCheckpoint(((uint64,address[]),uint64,bytes32,uint64,bytes32),((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)[],address[],bytes[])"
     )]
     pub struct SubmitCheckpointCall {
         pub checkpoint: BottomUpCheckpoint,
@@ -1538,6 +1634,7 @@ pub mod subnet_actor_manager_facet {
     pub enum SubnetActorManagerFacetCalls {
         Claim(ClaimCall),
         ClaimRewardForRelayer(ClaimRewardForRelayerCall),
+        DistributeRewardToRelayers(DistributeRewardToRelayersCall),
         Join(JoinCall),
         Kill(KillCall),
         Leave(LeaveCall),
@@ -1557,6 +1654,11 @@ pub mod subnet_actor_manager_facet {
                 <ClaimRewardForRelayerCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::ClaimRewardForRelayer(decoded));
+            }
+            if let Ok(decoded) =
+                <DistributeRewardToRelayersCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::DistributeRewardToRelayers(decoded));
             }
             if let Ok(decoded) = <JoinCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Join(decoded));
@@ -1590,6 +1692,9 @@ pub mod subnet_actor_manager_facet {
                 Self::ClaimRewardForRelayer(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::DistributeRewardToRelayers(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Join(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Leave(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -1606,6 +1711,7 @@ pub mod subnet_actor_manager_facet {
             match self {
                 Self::Claim(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ClaimRewardForRelayer(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DistributeRewardToRelayers(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Join(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Leave(element) => ::core::fmt::Display::fmt(element, f),
@@ -1625,6 +1731,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<ClaimRewardForRelayerCall> for SubnetActorManagerFacetCalls {
         fn from(value: ClaimRewardForRelayerCall) -> Self {
             Self::ClaimRewardForRelayer(value)
+        }
+    }
+    impl ::core::convert::From<DistributeRewardToRelayersCall> for SubnetActorManagerFacetCalls {
+        fn from(value: DistributeRewardToRelayersCall) -> Self {
+            Self::DistributeRewardToRelayers(value)
         }
     }
     impl ::core::convert::From<JoinCall> for SubnetActorManagerFacetCalls {
@@ -1675,7 +1786,7 @@ pub mod subnet_actor_manager_facet {
         pub next_configuration_number: u64,
         pub cross_messages_hash: [u8; 32],
     }
-    ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)`
+    ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1720,7 +1831,7 @@ pub mod subnet_actor_manager_facet {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`StorableMsg(((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes)`
+    ///`StorableMsg(((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1738,6 +1849,7 @@ pub mod subnet_actor_manager_facet {
         pub nonce: u64,
         pub method: [u8; 4],
         pub params: ::ethers::core::types::Bytes,
+        pub fee: ::ethers::core::types::U256,
     }
     ///`SubnetID(uint64,address[])`
     #[derive(

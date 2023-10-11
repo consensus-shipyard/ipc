@@ -20,7 +20,7 @@ contract GatewayGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     function crossMsgFee() external view returns (uint256) {
-        return s.crossMsgFee;
+        return s.minCrossMsgFee;
     }
 
     function bottomUpNonce() external view returns (uint64) {

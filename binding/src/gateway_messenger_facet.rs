@@ -71,6 +71,7 @@ pub mod gateway_messenger_facet {
                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
                                     ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                 ],),
                                 ::ethers::core::abi::ethabi::ParamType::Bool,
                             ],),
@@ -136,6 +137,13 @@ pub mod gateway_messenger_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                        inputs: ::std::vec![],
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet",),
@@ -196,13 +204,13 @@ pub mod gateway_messenger_facet {
                 .method_hash([37, 191, 13, 182], msg_cid)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `sendCrossMessage` (0x2f757dd1) function
+        ///Calls the contract's `sendCrossMessage` (0xc13175ef) function
         pub fn send_cross_message(
             &self,
             cross_msg: CrossMsg,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([47, 117, 125, 209], (cross_msg,))
+                .method_hash([193, 49, 117, 239], (cross_msg,))
                 .expect("method not found (this should never happen)")
         }
     }
@@ -310,6 +318,19 @@ pub mod gateway_messenger_facet {
     )]
     #[etherror(name = "NotEnoughFee", abi = "NotEnoughFee()")]
     pub struct NotEnoughFee;
+    ///Custom Error type `NotEnoughFunds` with signature `NotEnoughFunds()` and selector `0x81b5ad68`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "NotEnoughFunds", abi = "NotEnoughFunds()")]
+    pub struct NotEnoughFunds;
     ///Custom Error type `NotRegisteredSubnet` with signature `NotRegisteredSubnet()` and selector `0xe991abd0`
     #[derive(
         Clone,
@@ -333,6 +354,7 @@ pub mod gateway_messenger_facet {
         InvalidCrossMsgFromSubnet(InvalidCrossMsgFromSubnet),
         InvalidCrossMsgValue(InvalidCrossMsgValue),
         NotEnoughFee(NotEnoughFee),
+        NotEnoughFunds(NotEnoughFunds),
         NotRegisteredSubnet(NotRegisteredSubnet),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
@@ -378,6 +400,9 @@ pub mod gateway_messenger_facet {
             if let Ok(decoded) = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotEnoughFee(decoded));
             }
+            if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::NotEnoughFunds(decoded));
+            }
             if let Ok(decoded) =
                 <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -404,6 +429,7 @@ pub mod gateway_messenger_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotEnoughFee(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotEnoughFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -442,6 +468,9 @@ pub mod gateway_messenger_facet {
                     true
                 }
                 _ if selector == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ if selector
                     == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
                 {
@@ -461,6 +490,7 @@ pub mod gateway_messenger_facet {
                 Self::InvalidCrossMsgFromSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCrossMsgValue(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughFee(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
@@ -506,6 +536,11 @@ pub mod gateway_messenger_facet {
             Self::NotEnoughFee(value)
         }
     }
+    impl ::core::convert::From<NotEnoughFunds> for GatewayMessengerFacetErrors {
+        fn from(value: NotEnoughFunds) -> Self {
+            Self::NotEnoughFunds(value)
+        }
+    }
     impl ::core::convert::From<NotRegisteredSubnet> for GatewayMessengerFacetErrors {
         fn from(value: NotRegisteredSubnet) -> Self {
             Self::NotRegisteredSubnet(value)
@@ -526,7 +561,7 @@ pub mod gateway_messenger_facet {
     pub struct PropagateCall {
         pub msg_cid: [u8; 32],
     }
-    ///Container type for all input parameters for the `sendCrossMessage` function with signature `sendCrossMessage(((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool))` and selector `0x2f757dd1`
+    ///Container type for all input parameters for the `sendCrossMessage` function with signature `sendCrossMessage(((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool))` and selector `0xc13175ef`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -539,7 +574,7 @@ pub mod gateway_messenger_facet {
     )]
     #[ethcall(
         name = "sendCrossMessage",
-        abi = "sendCrossMessage(((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool))"
+        abi = "sendCrossMessage(((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool))"
     )]
     pub struct SendCrossMessageCall {
         pub cross_msg: CrossMsg,
@@ -592,7 +627,7 @@ pub mod gateway_messenger_facet {
             Self::SendCrossMessage(value)
         }
     }
-    ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)`
+    ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -637,7 +672,7 @@ pub mod gateway_messenger_facet {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`StorableMsg(((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes)`
+    ///`StorableMsg(((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -655,6 +690,7 @@ pub mod gateway_messenger_facet {
         pub nonce: u64,
         pub method: [u8; 4],
         pub params: ::ethers::core::types::Bytes,
+        pub fee: ::ethers::core::types::U256,
     }
     ///`SubnetID(uint64,address[])`
     #[derive(

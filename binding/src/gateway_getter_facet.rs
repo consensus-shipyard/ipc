@@ -173,6 +173,7 @@ pub mod gateway_getter_facet {
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                                         ],
                                                     ),
                                                     ::ethers::core::abi::ethabi::ParamType::Bool,
@@ -960,6 +961,7 @@ pub mod gateway_getter_facet {
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                                         ],
                                                     ),
                                                     ::ethers::core::abi::ethabi::ParamType::Bool,
@@ -1127,6 +1129,7 @@ pub mod gateway_getter_facet {
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                             ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
@@ -2811,7 +2814,7 @@ pub mod gateway_getter_facet {
         pub current_weight: ::ethers::core::types::U256,
         pub reached: bool,
     }
-    ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes),bool)`
+    ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2886,7 +2889,7 @@ pub mod gateway_getter_facet {
         pub height: ::ethers::core::types::U256,
         pub block_hash: [u8; 32],
     }
-    ///`StorableMsg(((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes)`
+    ///`StorableMsg(((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2904,6 +2907,7 @@ pub mod gateway_getter_facet {
         pub nonce: u64,
         pub method: [u8; 4],
         pub params: ::ethers::core::types::Bytes,
+        pub fee: ::ethers::core::types::U256,
     }
     ///`Subnet(uint256,uint256,uint256,uint64,uint64,uint8,(uint64,address[]))`
     #[derive(

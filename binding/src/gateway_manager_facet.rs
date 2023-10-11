@@ -84,16 +84,25 @@ pub mod gateway_manager_facet {
                     ::std::borrow::ToOwned::to_owned("release"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("release"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("to"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                ::ethers::core::abi::ethabi::ParamType::Bytes,
-                            ],),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("struct FvmAddress"),
-                            ),
-                        },],
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("to"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                ],),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("struct FvmAddress"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("fee"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                        ],
                         outputs: ::std::vec![],
                         constant: ::core::option::Option::None,
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
@@ -284,10 +293,14 @@ pub mod gateway_manager_facet {
                 .method_hash([26, 163, 160, 8], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `release` (0x6b2c1eef) function
-        pub fn release(&self, to: FvmAddress) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        ///Calls the contract's `release` (0x9ba53580) function
+        pub fn release(
+            &self,
+            to: FvmAddress,
+            fee: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([107, 44, 30, 239], (to,))
+                .method_hash([155, 165, 53, 128], (to, fee))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `releaseRewardForRelayer` (0xd8e25572) function
@@ -747,7 +760,7 @@ pub mod gateway_manager_facet {
     )]
     #[ethcall(name = "register", abi = "register()")]
     pub struct RegisterCall;
-    ///Container type for all input parameters for the `release` function with signature `release((uint8,bytes))` and selector `0x6b2c1eef`
+    ///Container type for all input parameters for the `release` function with signature `release((uint8,bytes),uint256)` and selector `0x9ba53580`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -758,9 +771,10 @@ pub mod gateway_manager_facet {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "release", abi = "release((uint8,bytes))")]
+    #[ethcall(name = "release", abi = "release((uint8,bytes),uint256)")]
     pub struct ReleaseCall {
         pub to: FvmAddress,
+        pub fee: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `releaseRewardForRelayer` function with signature `releaseRewardForRelayer(uint256)` and selector `0xd8e25572`
     #[derive(

@@ -18,6 +18,7 @@ contract CrossMsgHelperTest is Test {
     using FvmAddressHelper for FvmAddress;
 
     uint64 private constant ROOTNET_CHAINID = 123;
+    uint256 CROSS_MESSAGE_FEE = 1 gwei;
 
     CrossMsg public crossMsg;
     CrossMsg[] public crossMsgs;
@@ -46,7 +47,8 @@ contract CrossMsgHelperTest is Test {
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
-            releaseAmount
+            releaseAmount,
+            CROSS_MESSAGE_FEE
         );
 
         address[] memory parentRoute = new address[](1);
@@ -69,7 +71,13 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createReleaseMsg(subnetId, sender, FvmAddressHelper.from(sender), releaseAmount);
+        CrossMsgHelper.createReleaseMsg(
+            subnetId,
+            sender,
+            FvmAddressHelper.from(sender),
+            releaseAmount,
+            CROSS_MESSAGE_FEE
+        );
     }
 
     function test_CreateFundMsg_Works_Root(uint256 fundAmount, address sender) public {
@@ -83,7 +91,8 @@ contract CrossMsgHelperTest is Test {
             parentSubnetId,
             sender,
             FvmAddressHelper.from(sender),
-            fundAmount
+            fundAmount,
+            CROSS_MESSAGE_FEE
         );
 
         SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
@@ -111,7 +120,8 @@ contract CrossMsgHelperTest is Test {
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
-            fundAmount
+            fundAmount,
+            CROSS_MESSAGE_FEE
         );
 
         address[] memory parentRoute = new address[](1);
@@ -134,7 +144,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createFundMsg(subnetId, sender, FvmAddressHelper.from(sender), fundAmount);
+        CrossMsgHelper.createFundMsg(subnetId, sender, FvmAddressHelper.from(sender), fundAmount, CROSS_MESSAGE_FEE);
     }
 
     function test_Execute_Works_SendValue() public {
@@ -258,7 +268,7 @@ contract CrossMsgHelperTest is Test {
         require(CrossMsgHelper.isSorted(crossMsgs) == false);
     }
 
-    function createCrossMsg(uint64 nonce) internal pure returns (CrossMsg memory) {
+    function createCrossMsg(uint64 nonce, uint256 fee) internal pure returns (CrossMsg memory) {
         return
             CrossMsg({
                 message: StorableMsg({
@@ -273,17 +283,18 @@ contract CrossMsgHelperTest is Test {
                     value: 0,
                     nonce: nonce,
                     method: METHOD_SEND,
-                    params: EMPTY_BYTES
+                    params: EMPTY_BYTES,
+                    fee: fee
                 }),
                 wrapped: false
             });
     }
 
-    function createCrossMsgs(uint256 length, uint64 nonce) internal pure returns (CrossMsg[] memory _crossMsgs) {
+    function createCrossMsgs(uint256 length, uint64 nonce) internal view returns (CrossMsg[] memory _crossMsgs) {
         _crossMsgs = new CrossMsg[](length);
 
         for (uint256 i = 0; i < length; i++) {
-            _crossMsgs[i] = createCrossMsg(nonce);
+            _crossMsgs[i] = createCrossMsg(nonce, CROSS_MESSAGE_FEE);
         }
     }
 

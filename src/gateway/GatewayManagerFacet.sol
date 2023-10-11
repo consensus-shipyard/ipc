@@ -7,7 +7,7 @@ import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet, NotEnoughFee} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -127,12 +127,13 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @notice fund - commit a top-down message releasing funds in a child subnet. There is an associated fee that gets distributed to validators in the subnet as well
     /// @param subnetId - subnet to fund
     /// @param to - the address to send funds to
-    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable hasFee {
+    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable {
         CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
             signer: msg.sender,
             to: to,
-            value: msg.value - s.crossMsgFee
+            value: msg.value,
+            fee: 0 // injecting funds into a subnet should is free
         });
 
         // commit top-down message.
@@ -140,12 +141,13 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     }
 
     /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds
-    function release(FvmAddress calldata to) external payable hasFee {
+    function release(FvmAddress calldata to, uint256 fee) external payable validFee(fee) {
         CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg({
             subnet: s.networkName,
             signer: msg.sender,
             to: to,
-            value: msg.value - s.crossMsgFee
+            value: msg.value - fee,
+            fee: fee
         });
 
         LibGateway.commitBottomUpMsg(crossMsg);

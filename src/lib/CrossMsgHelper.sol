@@ -21,7 +21,8 @@ library CrossMsgHelper {
         SubnetID calldata subnet,
         address signer,
         FvmAddress calldata to,
-        uint256 value
+        uint256 value,
+        uint256 fee
     ) public pure returns (CrossMsg memory) {
         return
             CrossMsg({
@@ -31,7 +32,8 @@ library CrossMsgHelper {
                     value: value,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: EMPTY_BYTES
+                    params: EMPTY_BYTES,
+                    fee: fee
                 }),
                 wrapped: false
             });
@@ -41,7 +43,8 @@ library CrossMsgHelper {
         SubnetID calldata subnet,
         address signer,
         FvmAddress calldata to,
-        uint256 value
+        uint256 value,
+        uint256 fee
     ) public pure returns (CrossMsg memory) {
         return
             CrossMsg({
@@ -51,7 +54,8 @@ library CrossMsgHelper {
                     value: value,
                     nonce: 0,
                     method: METHOD_SEND,
-                    params: EMPTY_BYTES
+                    params: EMPTY_BYTES,
+                    fee: fee
                 }),
                 wrapped: false
             });

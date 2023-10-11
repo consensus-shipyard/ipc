@@ -12,6 +12,7 @@ contract StorableMsgHelperTest is Test {
     using StorableMsgHelper for StorableMsg;
 
     uint64 private constant ROOTNET_CHAINID = 123;
+    uint256 private constant CROSS_MSG_FEE = 10 gwei;
 
     // StorableMsg EMPTY_STORABLE_MESSAGE =
     //     StorableMsg({
@@ -37,7 +38,8 @@ contract StorableMsgHelperTest is Test {
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
-            params: EMPTY_BYTES
+            params: EMPTY_BYTES,
+            fee: CROSS_MSG_FEE
         });
         bytes32 expectedHash = keccak256(abi.encode(storableMsg));
         require(storableMsg.toHash() == expectedHash, "Hashes should be equal");
@@ -64,7 +66,8 @@ contract StorableMsgHelperTest is Test {
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
-            params: EMPTY_BYTES
+            params: EMPTY_BYTES,
+            fee: CROSS_MSG_FEE
         });
 
         require(
@@ -109,7 +112,8 @@ contract StorableMsgHelperTest is Test {
             value: 1,
             nonce: 1,
             method: METHOD_SEND,
-            params: EMPTY_BYTES
+            params: EMPTY_BYTES,
+            fee: CROSS_MSG_FEE
         });
 
         require(

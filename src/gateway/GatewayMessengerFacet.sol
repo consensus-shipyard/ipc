@@ -24,8 +24,8 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      *
      * @param crossMsg - a cross-message to send
      */
-    function sendCrossMessage(CrossMsg calldata crossMsg) external payable hasFee {
-        if (crossMsg.message.value != msg.value - s.crossMsgFee) {
+    function sendCrossMessage(CrossMsg calldata crossMsg) external payable validFee(crossMsg.message.fee) {
+        if (crossMsg.message.value != msg.value - crossMsg.message.fee) {
             revert InvalidCrossMsgValue();
         }
 
@@ -45,8 +45,9 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      * @dev propagates the populated cross net message for the given cid
      * @param msgCid - the cid of the cross-net message
      */
-    function propagate(bytes32 msgCid) external payable hasFee {
+    function propagate(bytes32 msgCid) external payable {
         CrossMsg storage crossMsg = s.postbox[msgCid];
+        validateFee(crossMsg.message.fee);
 
         (bool shouldBurn, ) = _commitCrossMessage(crossMsg);
         // We must delete the message first to prevent potential re-entrancies,
@@ -57,7 +58,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
 
         _crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
 
-        uint256 feeRemainder = msg.value - s.crossMsgFee;
+        uint256 feeRemainder = msg.value - s.minCrossMsgFee;
 
         if (feeRemainder > 0) {
             payable(msg.sender).sendValue(feeRemainder);

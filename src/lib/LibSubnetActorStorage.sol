@@ -53,8 +53,6 @@ struct SubnetActorStorage {
     mapping(address => uint256) relayerRewards;
     /// @notice The addresses of the relayers sent the checkpoint at height `h`.
     mapping(uint64 => EnumerableSet.AddressSet) rewardedRelayers;
-    /// @notice the reward which a relayer gets
-    uint256 relayerReward;
 }
 
 library LibSubnetActorStorage {

@@ -60,4 +60,5 @@ struct StorableMsg {
     uint64 nonce;
     bytes4 method;
     bytes params;
+    uint256 fee;
 }
