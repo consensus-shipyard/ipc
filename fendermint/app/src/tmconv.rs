@@ -3,7 +3,7 @@
 //! Conversions to Tendermint data types.
 use anyhow::{anyhow, Context};
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_genesis::Validator;
+use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet};
 use fendermint_vm_message::signed::DomainHash;
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
@@ -104,7 +104,7 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
 /// Map the return values from epoch boundary operations to validator updates.
 ///
 /// (Currently just a placeholder).
-pub fn to_end_block(power_table: Vec<Validator>) -> anyhow::Result<response::EndBlock> {
+pub fn to_end_block(power_table: Vec<Validator<Power>>) -> anyhow::Result<response::EndBlock> {
     let validator_updates =
         to_validator_updates(power_table).context("failed to convert validator updates")?;
 
@@ -259,7 +259,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
 
 /// Project Genesis validators to Tendermint.
 pub fn to_validator_updates(
-    validators: Vec<Validator>,
+    validators: Vec<Validator<Power>>,
 ) -> anyhow::Result<Vec<tendermint::validator::Update>> {
     let mut updates = vec![];
     for v in validators {

@@ -29,9 +29,17 @@ mkdir test-network
 ### Create a new Genesis file
 
 First, create a new `genesis.json` file devoid of accounts and validators. The `--base-fee` here is completely arbitrary.
+The `--power-scale` value of `0` means we'll grant 1 voting power per 1 FIL; to use more precision, we can set it to `3`
+to use milliFIL for example.
 
 ```shell
-cargo run -p fendermint_app -- genesis --genesis-file test-network/genesis.json new --chain-name test --base-fee 1000 --timestamp 1680101412
+cargo run -p fendermint_app -- \
+  genesis --genesis-file test-network/genesis.json \
+  new \
+  --chain-name test \
+  --base-fee 1000 \
+  --timestamp 1680101412 \
+  --power-scale 0
 ```
 
 We can check what the contents look like:
@@ -43,6 +51,7 @@ $ cat test-network/genesis.json
   "chain_name": "test",
   "network_version": 18,
   "base_fee": "1000",
+  "power_scale": 0,
   "validators": [],
   "accounts": []
 }
@@ -138,14 +147,17 @@ cargo run -p fendermint_app -- \
       add-validator --public-key test-network/keys/bob.pk --power 1;
 ```
 
-The value of power doens't matter in this case, as `bob` is our only validator. Check the result:
+The value of power doesn't matter in this case, as `bob` is our only validator. It's value is expressed in tokens,
+ie. FIL, and will be serialized in atto, hence the 18 zeroes.
+
+Check the result:
 
 ```console
 $ cat test-network/genesis.json | jq .validators
 [
   {
     "public_key": "BCImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QEy8cVKNuvTU/EOTibo3hIyOQslvSouzIpR24h1kkqCSI=",
-    "power": 1
+    "power": "1000000000000000000"
   },
 ]
 ```
@@ -410,7 +422,7 @@ Note that the first block execution is very slow because we have to load the Was
 but after that the blocks come in fast, one per second.
 
 ### Run ETH API
-If we want to use `evm` related API, such as running `fendermint/eth/api/examples/ethers.rs`, we need to start ETH API process. 
+If we want to use `evm` related API, such as running `fendermint/eth/api/examples/ethers.rs`, we need to start ETH API process.
 
 The ETH RPC api runs on top of cometbft. Make sure you have cometbft running properly. The architecture is as follows:
 ```

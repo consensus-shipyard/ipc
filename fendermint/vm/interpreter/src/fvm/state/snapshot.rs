@@ -341,6 +341,7 @@ mod tests {
             base_fee: Default::default(),
             circ_supply: Default::default(),
             chain_id: 1024,
+            power_scale: 0,
         };
         let block_height = 2048;
 

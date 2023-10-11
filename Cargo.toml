@@ -131,5 +131,5 @@ ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-ac
 [patch.crates-io]
 # Use stable-only features.
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
-
+# Contains some API changes that the upstream has not merged.
 merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }

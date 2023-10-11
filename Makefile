@@ -5,7 +5,9 @@ BUILTIN_ACTORS_DIR    := ../builtin-actors
 BUILTIN_ACTORS_CODE   := $(shell find $(BUILTIN_ACTORS_DIR) -type f -name "*.rs" | grep -v target)
 BUILTIN_ACTORS_BUNDLE := $(shell pwd)/$(BUILTIN_ACTORS_DIR)/output/bundle.car
 
-IPC_ACTORS_FIND       := scripts/find-ipc-actors.sh
+# Tag used to disambiguate if there are multiple options.
+IPC_ACTORS_TAG				?= dev
+IPC_ACTORS_FIND       := scripts/find-ipc-actors.sh $(IPC_ACTORS_TAG)
 IPC_ACTORS_CODE       := $(shell find $(shell $(IPC_ACTORS_FIND)) -type f -name "*.sol")
 IPC_ACTORS_ABI        := .make/.ipc-actors-abi
 # Note that without `:=`, just `=`, it should evaluate it every time it appears in a target.

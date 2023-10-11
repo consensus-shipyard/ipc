@@ -1,7 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::{
-    ipc, Account, Actor, ActorMeta, Genesis, Multisig, Power, SignerAddr, Validator, ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, Power, SignerAddr, Validator,
+    ValidatorKey,
 };
 use cid::multihash::MultihashDigest;
 use fendermint_crypto::SecretKey;
@@ -72,11 +73,23 @@ impl Arbitrary for ValidatorKey {
     }
 }
 
-impl Arbitrary for Validator {
+impl Arbitrary for Collateral {
+    fn arbitrary(g: &mut Gen) -> Self {
+        Self(ArbTokenAmount::arbitrary(g).0)
+    }
+}
+
+impl Arbitrary for Power {
+    fn arbitrary(g: &mut Gen) -> Self {
+        Self(u64::arbitrary(g))
+    }
+}
+
+impl<P: Arbitrary> Arbitrary for Validator<P> {
     fn arbitrary(g: &mut Gen) -> Self {
         Self {
             public_key: ValidatorKey::arbitrary(g),
-            power: Power(u64::arbitrary(g)),
+            power: P::arbitrary(g),
         }
     }
 }
@@ -90,6 +103,7 @@ impl Arbitrary for Genesis {
             chain_name: String::arbitrary(g),
             network_version: NetworkVersion::new(*g.choose(&[18u32]).unwrap()),
             base_fee: ArbTokenAmount::arbitrary(g).0,
+            power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
             validators: (0..nv).map(|_| Arbitrary::arbitrary(g)).collect(),
             accounts: (0..na).map(|_| Arbitrary::arbitrary(g)).collect(),
             ipc: if bool::arbitrary(g) {
@@ -124,6 +138,7 @@ impl Arbitrary for ipc::GatewayParams {
             min_collateral: ArbFee::arbitrary(g).0.max(TokenAmount::from_atto(1)),
             msg_fee: ArbFee::arbitrary(g).0,
             majority_percentage: u8::arbitrary(g) % 50 + 51,
+            active_validators_limit: u16::arbitrary(g) % 100 + 1,
         }
     }
 }

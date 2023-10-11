@@ -316,7 +316,11 @@ mod tests {
         let hardhat = test_hardhat();
 
         // Not giving any dependency should result in a failure.
-        let result = hardhat.bytecode("GatewayDiamond.sol", "GatewayDiamond", &Default::default());
+        let result = hardhat.bytecode(
+            "SubnetActorDiamond.sol",
+            "SubnetActorDiamond",
+            &Default::default(),
+        );
 
         assert!(result.is_err());
         assert!(result

@@ -58,6 +58,9 @@ pub struct GenesisNewArgs {
     /// Base fee for running transactions in atto.
     #[arg(long, short = 'f', value_parser = parse_token_amount)]
     pub base_fee: TokenAmount,
+    /// Number of decimals to use during converting FIL to Power.
+    #[arg(long, short)]
+    pub power_scale: i8,
 }
 
 #[derive(Args, Debug)]
@@ -97,9 +100,9 @@ pub struct GenesisAddValidatorArgs {
     /// Path to the Secp256k1 public key exported in base64 format.
     #[arg(long, short)]
     pub public_key: PathBuf,
-    /// Voting power.
-    #[arg(long, short = 'v')]
-    pub power: u64,
+    /// The collateral staked by the validator, lending it its voting power.
+    #[arg(long, short = 'v', value_parser = parse_full_fil)]
+    pub power: TokenAmount,
 }
 
 #[derive(Args, Debug)]
@@ -138,6 +141,11 @@ pub struct GenesisIpcGatewayArgs {
     #[arg(long, short = 'f', value_parser = parse_token_amount)]
     pub msg_fee: TokenAmount,
 
+    /// Quorum majority percentage [51 - 100]
     #[arg(long, short, value_parser = parse_percentage::<u8>)]
     pub majority_percentage: u8,
+
+    /// Maximum number of active validators.
+    #[arg(long, short = 'v', default_value = "100")]
+    pub active_validators_limit: u16,
 }

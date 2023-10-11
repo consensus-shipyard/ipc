@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use cid::Cid;
+use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
@@ -44,6 +45,7 @@ pub struct FvmStateParams {
     ///
     /// How exactly that would be communicated is uknown at this point.
     pub chain_id: u64,
+    pub power_scale: PowerScale,
 }
 
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns> as Machine>::Blockstore;

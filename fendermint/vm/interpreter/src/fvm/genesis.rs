@@ -17,7 +17,7 @@ use fendermint_vm_actor_interface::{
     account, burntfunds, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
-use fendermint_vm_genesis::{ActorMeta, Genesis, Validator};
+use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
@@ -35,8 +35,9 @@ pub struct FvmGenesisOutput {
     pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
     pub base_fee: TokenAmount,
+    pub power_scale: PowerScale,
     pub circ_supply: TokenAmount,
-    pub validators: Vec<Validator>,
+    pub validators: Vec<Validator<Power>>,
 }
 
 #[async_trait]
@@ -82,6 +83,14 @@ where
         //       presumably Tendermint checks that its peers have the same.
         let chain_id = chainid::from_str_hashed(&genesis.chain_name)?;
 
+        // Convert validators to CometBFT power scale.
+        let validators = genesis
+            .validators
+            .iter()
+            .cloned()
+            .map(|vc| vc.map_power(|c| c.into_power(genesis.power_scale)))
+            .collect();
+
         // Currently we just pass them back as they are, but later we should
         // store them in the IPC actors; or in case of a snapshot restore them
         // from the state.
@@ -91,7 +100,8 @@ where
             network_version: genesis.network_version,
             circ_supply: circ_supply(&genesis),
             base_fee: genesis.base_fee,
-            validators: genesis.validators,
+            power_scale: genesis.power_scale,
+            validators,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
@@ -246,6 +256,7 @@ where
                 out.base_fee.clone(),
                 out.circ_supply.clone(),
                 out.chain_id.into(),
+                out.power_scale,
             )
             .context("failed to init exec state")?;
 
@@ -261,7 +272,7 @@ where
             let gateway_addr = {
                 use ipc::gateway::ConstructorParameters;
 
-                let params = ConstructorParameters::try_from(ipc_params.gateway)
+                let params = ConstructorParameters::new(ipc_params.gateway, genesis.validators)
                     .context("failed to create gateway constructor")?;
 
                 let facets = deployer
@@ -498,7 +509,7 @@ mod tests {
             .await
             .expect("failed to create actors");
 
-        assert_eq!(out.validators, genesis.validators);
+        assert_eq!(out.validators.len(), genesis.validators.len());
 
         // Try calling a method on the IPC Gateway.
         let exec_state = state.exec_state().expect("should be in exec stage");

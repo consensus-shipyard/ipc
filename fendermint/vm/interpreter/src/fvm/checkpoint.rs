@@ -22,11 +22,11 @@ use super::{
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone)]
-pub struct PowerTable(pub Vec<Validator>);
+pub struct PowerTable(pub Vec<Validator<Power>>);
 
 /// Changes in the power table.
 #[derive(Debug, Clone, Default)]
-pub struct PowerUpdates(pub Vec<Validator>);
+pub struct PowerUpdates(pub Vec<Validator<Power>>);
 
 /// Construct and store a checkpoint if this is the end of the checkpoint period.
 /// Perform end-of-checkpoint-period transitions in the ledger.
@@ -153,7 +153,7 @@ pub async fn broadcast_signature<C, DB>(
     gateway: &GatewayCaller<DB>,
     checkpoint: router::BottomUpCheckpoint,
     power_table: &PowerTable,
-    validator: &Validator,
+    validator: &Validator<Power>,
     secret_key: &SecretKey,
     chain_id: ChainID,
 ) -> anyhow::Result<()>

@@ -16,7 +16,7 @@ use fendermint_vm_actor_interface::{
     system, EMPTY_ARR,
 };
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_genesis::{Account, Multisig};
+use fendermint_vm_genesis::{Account, Multisig, PowerScale};
 use fvm::{
     engine::MultiEngine,
     machine::Manifest,
@@ -120,6 +120,7 @@ where
         base_fee: TokenAmount,
         circ_supply: TokenAmount,
         chain_id: u64,
+        power_scale: PowerScale,
     ) -> anyhow::Result<()> {
         self.stage = match self.stage {
             Stage::Exec(_) => bail!("execution engine already initialized"),
@@ -134,6 +135,7 @@ where
                     base_fee,
                     circ_supply,
                     chain_id,
+                    power_scale,
                 };
 
                 let exec_state =
