@@ -1,12 +1,12 @@
 {
   "storage": [
     {
-      "astId": 12207,
+      "astId": 12502,
       "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
       "label": "s",
       "offset": 0,
       "slot": "0",
-      "type": "t_struct(SubnetActorStorage)12195_storage"
+      "type": "t_struct(SubnetActorStorage)12490_storage"
     }
   ],
   "types": {
@@ -27,8 +27,8 @@
       "label": "bytes32[]",
       "numberOfBytes": "32"
     },
-    "t_array(t_struct(Validator)14615_storage)dyn_storage": {
-      "base": "t_struct(Validator)14615_storage",
+    "t_array(t_struct(Validator)14910_storage)dyn_storage": {
+      "base": "t_struct(Validator)14910_storage",
       "encoding": "dynamic_array",
       "label": "struct Validator[]",
       "numberOfBytes": "32"
@@ -48,29 +48,29 @@
       "label": "bytes",
       "numberOfBytes": "32"
     },
-    "t_enum(ConsensusType)4996": {
+    "t_enum(ConsensusType)5028": {
       "encoding": "inplace",
       "label": "enum ConsensusType",
       "numberOfBytes": "1"
     },
-    "t_enum(StakingOperation)14511": {
+    "t_enum(StakingOperation)14806": {
       "encoding": "inplace",
       "label": "enum StakingOperation",
       "numberOfBytes": "1"
     },
-    "t_mapping(t_address,t_struct(AddressStakingReleases)14555_storage)": {
+    "t_mapping(t_address,t_struct(AddressStakingReleases)14850_storage)": {
       "encoding": "mapping",
       "key": "t_address",
       "label": "mapping(address => struct AddressStakingReleases)",
       "numberOfBytes": "32",
-      "value": "t_struct(AddressStakingReleases)14555_storage"
+      "value": "t_struct(AddressStakingReleases)14850_storage"
     },
-    "t_mapping(t_address,t_struct(ValidatorInfo)14573_storage)": {
+    "t_mapping(t_address,t_struct(ValidatorInfo)14868_storage)": {
       "encoding": "mapping",
       "key": "t_address",
       "label": "mapping(address => struct ValidatorInfo)",
       "numberOfBytes": "32",
-      "value": "t_struct(ValidatorInfo)14573_storage"
+      "value": "t_struct(ValidatorInfo)14868_storage"
     },
     "t_mapping(t_address,t_uint16)": {
       "encoding": "mapping",
@@ -100,12 +100,12 @@
       "numberOfBytes": "32",
       "value": "t_address"
     },
-    "t_mapping(t_uint16,t_struct(StakingRelease)14545_storage)": {
+    "t_mapping(t_uint16,t_struct(StakingRelease)14840_storage)": {
       "encoding": "mapping",
       "key": "t_uint16",
       "label": "mapping(uint16 => struct StakingRelease)",
       "numberOfBytes": "32",
-      "value": "t_struct(StakingRelease)14545_storage"
+      "value": "t_struct(StakingRelease)14840_storage"
     },
     "t_mapping(t_uint64,t_struct(AddressSet)3420_storage)": {
       "encoding": "mapping",
@@ -114,19 +114,19 @@
       "numberOfBytes": "32",
       "value": "t_struct(AddressSet)3420_storage"
     },
-    "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14416_storage)": {
+    "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14711_storage)": {
       "encoding": "mapping",
       "key": "t_uint64",
       "label": "mapping(uint64 => struct BottomUpCheckpoint)",
       "numberOfBytes": "32",
-      "value": "t_struct(BottomUpCheckpoint)14416_storage"
+      "value": "t_struct(BottomUpCheckpoint)14711_storage"
     },
-    "t_mapping(t_uint64,t_struct(StakingChange)14519_storage)": {
+    "t_mapping(t_uint64,t_struct(StakingChange)14814_storage)": {
       "encoding": "mapping",
       "key": "t_uint64",
       "label": "mapping(uint64 => struct StakingChange)",
       "numberOfBytes": "32",
-      "value": "t_struct(StakingChange)14519_storage"
+      "value": "t_struct(StakingChange)14814_storage"
     },
     "t_struct(AddressSet)3420_storage": {
       "encoding": "inplace",
@@ -143,12 +143,12 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(AddressStakingReleases)14555_storage": {
+    "t_struct(AddressStakingReleases)14850_storage": {
       "encoding": "inplace",
       "label": "struct AddressStakingReleases",
       "members": [
         {
-          "astId": 14547,
+          "astId": 14842,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "length",
           "offset": 0,
@@ -156,7 +156,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 14549,
+          "astId": 14844,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "startIdx",
           "offset": 2,
@@ -164,30 +164,30 @@
           "type": "t_uint16"
         },
         {
-          "astId": 14554,
+          "astId": 14849,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "releases",
           "offset": 0,
           "slot": "1",
-          "type": "t_mapping(t_uint16,t_struct(StakingRelease)14545_storage)"
+          "type": "t_mapping(t_uint16,t_struct(StakingRelease)14840_storage)"
         }
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(BottomUpCheckpoint)14416_storage": {
+    "t_struct(BottomUpCheckpoint)14711_storage": {
       "encoding": "inplace",
       "label": "struct BottomUpCheckpoint",
       "members": [
         {
-          "astId": 14403,
+          "astId": 14698,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "subnetID",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(SubnetID)14490_storage"
+          "type": "t_struct(SubnetID)14785_storage"
         },
         {
-          "astId": 14406,
+          "astId": 14701,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "blockHeight",
           "offset": 0,
@@ -195,7 +195,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14409,
+          "astId": 14704,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "blockHash",
           "offset": 0,
@@ -203,7 +203,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 14412,
+          "astId": 14707,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "nextConfigurationNumber",
           "offset": 0,
@@ -211,7 +211,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14415,
+          "astId": 14710,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "crossMessagesHash",
           "offset": 0,
@@ -221,42 +221,42 @@
       ],
       "numberOfBytes": "192"
     },
-    "t_struct(MaxPQ)12950_storage": {
+    "t_struct(MaxPQ)13245_storage": {
       "encoding": "inplace",
       "label": "struct MaxPQ",
       "members": [
         {
-          "astId": 12949,
+          "astId": 13244,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "inner",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(PQ)14187_storage"
+          "type": "t_struct(PQ)14482_storage"
         }
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(MinPQ)13563_storage": {
+    "t_struct(MinPQ)13858_storage": {
       "encoding": "inplace",
       "label": "struct MinPQ",
       "members": [
         {
-          "astId": 13562,
+          "astId": 13857,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "inner",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(PQ)14187_storage"
+          "type": "t_struct(PQ)14482_storage"
         }
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(PQ)14187_storage": {
+    "t_struct(PQ)14482_storage": {
       "encoding": "inplace",
       "label": "struct PQ",
       "members": [
         {
-          "astId": 14176,
+          "astId": 14471,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "size",
           "offset": 0,
@@ -264,7 +264,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 14181,
+          "astId": 14476,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "addressToPos",
           "offset": 0,
@@ -272,7 +272,7 @@
           "type": "t_mapping(t_address,t_uint16)"
         },
         {
-          "astId": 14186,
+          "astId": 14481,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "posToAddress",
           "offset": 0,
@@ -305,20 +305,20 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(StakingChange)14519_storage": {
+    "t_struct(StakingChange)14814_storage": {
       "encoding": "inplace",
       "label": "struct StakingChange",
       "members": [
         {
-          "astId": 14514,
+          "astId": 14809,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "op",
           "offset": 0,
           "slot": "0",
-          "type": "t_enum(StakingOperation)14511"
+          "type": "t_enum(StakingOperation)14806"
         },
         {
-          "astId": 14516,
+          "astId": 14811,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "payload",
           "offset": 0,
@@ -326,7 +326,7 @@
           "type": "t_bytes_storage"
         },
         {
-          "astId": 14518,
+          "astId": 14813,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "validator",
           "offset": 0,
@@ -336,12 +336,12 @@
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(StakingChangeLog)14538_storage": {
+    "t_struct(StakingChangeLog)14833_storage": {
       "encoding": "inplace",
       "label": "struct StakingChangeLog",
       "members": [
         {
-          "astId": 14528,
+          "astId": 14823,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "nextConfigurationNumber",
           "offset": 0,
@@ -349,7 +349,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14531,
+          "astId": 14826,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "startConfigurationNumber",
           "offset": 8,
@@ -357,22 +357,22 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14537,
+          "astId": 14832,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "changes",
           "offset": 0,
           "slot": "1",
-          "type": "t_mapping(t_uint64,t_struct(StakingChange)14519_storage)"
+          "type": "t_mapping(t_uint64,t_struct(StakingChange)14814_storage)"
         }
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(StakingRelease)14545_storage": {
+    "t_struct(StakingRelease)14840_storage": {
       "encoding": "inplace",
       "label": "struct StakingRelease",
       "members": [
         {
-          "astId": 14541,
+          "astId": 14836,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "releaseAt",
           "offset": 0,
@@ -380,7 +380,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14544,
+          "astId": 14839,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "amount",
           "offset": 0,
@@ -390,12 +390,12 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(StakingReleaseQueue)14565_storage": {
+    "t_struct(StakingReleaseQueue)14860_storage": {
       "encoding": "inplace",
       "label": "struct StakingReleaseQueue",
       "members": [
         {
-          "astId": 14558,
+          "astId": 14853,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "lockingDuration",
           "offset": 0,
@@ -403,38 +403,38 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14564,
+          "astId": 14859,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "releases",
           "offset": 0,
           "slot": "1",
-          "type": "t_mapping(t_address,t_struct(AddressStakingReleases)14555_storage)"
+          "type": "t_mapping(t_address,t_struct(AddressStakingReleases)14850_storage)"
         }
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(SubnetActorStorage)12195_storage": {
+    "t_struct(SubnetActorStorage)12490_storage": {
       "encoding": "inplace",
       "label": "struct SubnetActorStorage",
       "members": [
         {
-          "astId": 12127,
+          "astId": 12419,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "committedCheckpoints",
           "offset": 0,
           "slot": "0",
-          "type": "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14416_storage)"
+          "type": "t_mapping(t_uint64,t_struct(BottomUpCheckpoint)14711_storage)"
         },
         {
-          "astId": 12131,
+          "astId": 12423,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "genesisValidators",
           "offset": 0,
           "slot": "1",
-          "type": "t_array(t_struct(Validator)14615_storage)dyn_storage"
+          "type": "t_array(t_struct(Validator)14910_storage)dyn_storage"
         },
         {
-          "astId": 12134,
+          "astId": 12426,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "lastBottomUpCheckpointHeight",
           "offset": 0,
@@ -442,7 +442,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 12137,
+          "astId": 12429,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "minActivationCollateral",
           "offset": 0,
@@ -450,7 +450,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 12140,
+          "astId": 12432,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "bottomUpCheckPeriod",
           "offset": 0,
@@ -458,7 +458,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 12143,
+          "astId": 12435,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "minValidators",
           "offset": 8,
@@ -466,7 +466,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 12146,
+          "astId": 12438,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "name",
           "offset": 0,
@@ -474,7 +474,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 12148,
+          "astId": 12440,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "currentSubnetHash",
           "offset": 0,
@@ -482,7 +482,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 12151,
+          "astId": 12443,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "ipcGatewayAddr",
           "offset": 0,
@@ -490,7 +490,7 @@
           "type": "t_address"
         },
         {
-          "astId": 12154,
+          "astId": 12446,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "majorityPercentage",
           "offset": 20,
@@ -498,23 +498,23 @@
           "type": "t_uint8"
         },
         {
-          "astId": 12158,
+          "astId": 12450,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "parentId",
           "offset": 0,
           "slot": "8",
-          "type": "t_struct(SubnetID)14490_storage"
+          "type": "t_struct(SubnetID)14785_storage"
         },
         {
-          "astId": 12162,
+          "astId": 12454,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "consensus",
           "offset": 0,
           "slot": "10",
-          "type": "t_enum(ConsensusType)4996"
+          "type": "t_enum(ConsensusType)5028"
         },
         {
-          "astId": 12165,
+          "astId": 12457,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "bootstrapped",
           "offset": 1,
@@ -522,7 +522,7 @@
           "type": "t_bool"
         },
         {
-          "astId": 12168,
+          "astId": 12460,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "killed",
           "offset": 2,
@@ -530,62 +530,70 @@
           "type": "t_bool"
         },
         {
-          "astId": 12172,
+          "astId": 12464,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "validatorSet",
           "offset": 0,
           "slot": "11",
-          "type": "t_struct(ValidatorSet)14594_storage"
+          "type": "t_struct(ValidatorSet)14889_storage"
         },
         {
-          "astId": 12176,
+          "astId": 12468,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "changeSet",
           "offset": 0,
           "slot": "20",
-          "type": "t_struct(StakingChangeLog)14538_storage"
+          "type": "t_struct(StakingChangeLog)14833_storage"
         },
         {
-          "astId": 12180,
+          "astId": 12472,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "releaseQueue",
           "offset": 0,
           "slot": "22",
-          "type": "t_struct(StakingReleaseQueue)14565_storage"
+          "type": "t_struct(StakingReleaseQueue)14860_storage"
         },
         {
-          "astId": 12185,
+          "astId": 12475,
+          "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
+          "label": "powerScale",
+          "offset": 0,
+          "slot": "24",
+          "type": "t_uint8"
+        },
+        {
+          "astId": 12480,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "relayerRewards",
           "offset": 0,
-          "slot": "24",
+          "slot": "25",
           "type": "t_mapping(t_address,t_uint256)"
         },
         {
-          "astId": 12191,
+          "astId": 12486,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "rewardedRelayers",
           "offset": 0,
-          "slot": "25",
+          "slot": "26",
           "type": "t_mapping(t_uint64,t_struct(AddressSet)3420_storage)"
         },
         {
-          "astId": 12194,
+          "astId": 12489,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "relayerReward",
           "offset": 0,
-          "slot": "26",
+          "slot": "27",
           "type": "t_uint256"
         }
       ],
-      "numberOfBytes": "864"
+      "numberOfBytes": "896"
     },
-    "t_struct(SubnetID)14490_storage": {
+    "t_struct(SubnetID)14785_storage": {
       "encoding": "inplace",
       "label": "struct SubnetID",
       "members": [
         {
-          "astId": 14485,
+          "astId": 14780,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "root",
           "offset": 0,
@@ -593,7 +601,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 14489,
+          "astId": 14784,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "route",
           "offset": 0,
@@ -603,12 +611,12 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(Validator)14615_storage": {
+    "t_struct(Validator)14910_storage": {
       "encoding": "inplace",
       "label": "struct Validator",
       "members": [
         {
-          "astId": 14610,
+          "astId": 14905,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "weight",
           "offset": 0,
@@ -616,7 +624,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14612,
+          "astId": 14907,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "addr",
           "offset": 0,
@@ -624,7 +632,7 @@
           "type": "t_address"
         },
         {
-          "astId": 14614,
+          "astId": 14909,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "metadata",
           "offset": 0,
@@ -634,12 +642,12 @@
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(ValidatorInfo)14573_storage": {
+    "t_struct(ValidatorInfo)14868_storage": {
       "encoding": "inplace",
       "label": "struct ValidatorInfo",
       "members": [
         {
-          "astId": 14567,
+          "astId": 14862,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "confirmedCollateral",
           "offset": 0,
@@ -647,7 +655,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14569,
+          "astId": 14864,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "totalCollateral",
           "offset": 0,
@@ -655,7 +663,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14572,
+          "astId": 14867,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "metadata",
           "offset": 0,
@@ -665,12 +673,12 @@
       ],
       "numberOfBytes": "96"
     },
-    "t_struct(ValidatorSet)14594_storage": {
+    "t_struct(ValidatorSet)14889_storage": {
       "encoding": "inplace",
       "label": "struct ValidatorSet",
       "members": [
         {
-          "astId": 14576,
+          "astId": 14871,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "activeLimit",
           "offset": 0,
@@ -678,7 +686,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 14579,
+          "astId": 14874,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "totalConfirmedCollateral",
           "offset": 0,
@@ -686,28 +694,28 @@
           "type": "t_uint256"
         },
         {
-          "astId": 14585,
+          "astId": 14880,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "validators",
           "offset": 0,
           "slot": "2",
-          "type": "t_mapping(t_address,t_struct(ValidatorInfo)14573_storage)"
+          "type": "t_mapping(t_address,t_struct(ValidatorInfo)14868_storage)"
         },
         {
-          "astId": 14589,
+          "astId": 14884,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "activeValidators",
           "offset": 0,
           "slot": "3",
-          "type": "t_struct(MinPQ)13563_storage"
+          "type": "t_struct(MinPQ)13858_storage"
         },
         {
-          "astId": 14593,
+          "astId": 14888,
           "contract": "src/lib/LibSubnetActorStorage.sol:SubnetActorModifiers",
           "label": "waitingValidators",
           "offset": 0,
           "slot": "6",
-          "type": "t_struct(MaxPQ)12950_storage"
+          "type": "t_struct(MaxPQ)13245_storage"
         }
       ],
       "numberOfBytes": "288"

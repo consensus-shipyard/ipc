@@ -338,6 +338,22 @@ pub mod subnet_actor_getter_facet {
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
                     },],
                 ),
+                (
+                    ::std::borrow::ToOwned::to_owned("powerScale"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("powerScale"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Int(8usize),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("int8"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
             ]),
             events: ::std::collections::BTreeMap::new(),
             errors: ::std::collections::BTreeMap::new(),
@@ -493,6 +509,12 @@ pub mod subnet_actor_getter_facet {
         pub fn name(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([6, 253, 222, 3], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `powerScale` (0xad81e4d6) function
+        pub fn power_scale(&self) -> ::ethers::contract::builders::ContractCall<M, i8> {
+            self.0
+                .method_hash([173, 129, 228, 214], ())
                 .expect("method not found (this should never happen)")
         }
     }
@@ -712,6 +734,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "name", abi = "name()")]
     pub struct NameCall;
+    ///Container type for all input parameters for the `powerScale` function with signature `powerScale()` and selector `0xad81e4d6`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "powerScale", abi = "powerScale()")]
+    pub struct PowerScaleCall;
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorGetterFacetCalls {
@@ -730,6 +765,7 @@ pub mod subnet_actor_getter_facet {
         MinActivationCollateral(MinActivationCollateralCall),
         MinValidators(MinValidatorsCall),
         Name(NameCall),
+        PowerScale(PowerScaleCall),
     }
     impl ::ethers::core::abi::AbiDecode for SubnetActorGetterFacetCalls {
         fn decode(
@@ -800,6 +836,9 @@ pub mod subnet_actor_getter_facet {
             if let Ok(decoded) = <NameCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Name(decoded));
             }
+            if let Ok(decoded) = <PowerScaleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::PowerScale(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -831,6 +870,7 @@ pub mod subnet_actor_getter_facet {
                 }
                 Self::MinValidators(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Name(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PowerScale(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -854,6 +894,7 @@ pub mod subnet_actor_getter_facet {
                 Self::MinActivationCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Name(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PowerScale(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -930,6 +971,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<NameCall> for SubnetActorGetterFacetCalls {
         fn from(value: NameCall) -> Self {
             Self::Name(value)
+        }
+    }
+    impl ::core::convert::From<PowerScaleCall> for SubnetActorGetterFacetCalls {
+        fn from(value: PowerScaleCall) -> Self {
+            Self::PowerScale(value)
         }
     }
     ///Container type for all return fields from the `bootstrapped` function with signature `bootstrapped()` and selector `0x35142c8c`
@@ -1117,6 +1163,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct NameReturn(pub [u8; 32]);
+    ///Container type for all return fields from the `powerScale` function with signature `powerScale()` and selector `0xad81e4d6`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct PowerScaleReturn(pub i8);
     ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`
     #[derive(
         Clone,

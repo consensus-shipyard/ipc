@@ -163,6 +163,7 @@ contract SubnetActorDiamondTest is Test {
                 bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
                 majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
                 activeValidatorsLimit: 100,
+                powerScale: 12,
                 relayerReward: DEFAULT_RELAYER_REWARD
             }),
             address(saDupGetterFaucet),
@@ -706,6 +707,7 @@ contract SubnetActorDiamondTest is Test {
                 bottomUpCheckPeriod: _checkPeriod,
                 majorityPercentage: _majorityPercentage,
                 activeValidatorsLimit: 100,
+                powerScale: 12,
                 relayerReward: _relayerReward
             })
         );

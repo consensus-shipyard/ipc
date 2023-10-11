@@ -25,6 +25,7 @@ contract SubnetRegistryTest is Test {
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     bytes private constant GENESIS = EMPTY_BYTES;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
+    int8 private constant DEFAULT_POWER_SCALE = 18;
     uint64 private constant ROOTNET_CHAINID = 123;
 
     SubnetRegistry registry;
@@ -75,6 +76,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
+            powerScale: DEFAULT_POWER_SCALE,
             relayerReward: DEFAULT_RELAYER_REWARD
         });
         vm.expectRevert(WrongGateway.selector);
@@ -93,6 +95,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
+            powerScale: DEFAULT_POWER_SCALE,
             relayerReward: DEFAULT_RELAYER_REWARD
         });
         registry.newSubnetActor(params);
@@ -112,6 +115,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
+            powerScale: DEFAULT_POWER_SCALE,
             relayerReward: DEFAULT_RELAYER_REWARD
         });
         registry.newSubnetActor(params);
@@ -128,6 +132,7 @@ contract SubnetRegistryTest is Test {
             DEFAULT_MIN_VALIDATORS,
             DEFAULT_CHECKPOINT_PERIOD,
             DEFAULT_MAJORITY_PERCENTAGE,
+            DEFAULT_POWER_SCALE,
             DEFAULT_RELAYER_REWARD
         );
     }
@@ -140,6 +145,7 @@ contract SubnetRegistryTest is Test {
         uint64 _minValidators,
         uint64 _checkPeriod,
         uint8 _majorityPercentage,
+        int8 _powerScale,
         uint256 _relayerReward
     ) public {
         vm.startPrank(DEFAULT_SENDER);
@@ -153,6 +159,7 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: _checkPeriod,
             majorityPercentage: _majorityPercentage,
             activeValidatorsLimit: 100,
+            powerScale: _powerScale,
             relayerReward: _relayerReward
         });
         registry.newSubnetActor(params);

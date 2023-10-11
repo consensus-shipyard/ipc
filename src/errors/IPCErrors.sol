@@ -33,6 +33,7 @@ error InvalidCrossMsgDstSubnet();
 error InvalidCrossMsgFromSubnet();
 error InvalidCrossMsgNonce();
 error InvalidMajorityPercentage();
+error InvalidPowerScale();
 error InvalidSignature();
 error InvalidSignatureErr(uint8);
 error InvalidSignatureLength();

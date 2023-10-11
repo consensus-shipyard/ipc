@@ -22,6 +22,7 @@ contract GatewayDiamond {
         uint256 msgFee;
         uint8 majorityPercentage;
         Validator[] genesisValidators;
+        uint16 activeValidatorsLimit;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -46,6 +47,8 @@ contract GatewayDiamond {
         s.crossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.bottomUpCheckpointRetentionHeight = 1;
+
+        s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
 
         // set initial validators and update membership
         Membership memory initial = Membership({configurationNumber: 0, validators: params.genesisValidators});

@@ -16,7 +16,7 @@ import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
 import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
 import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Membership, Validator} from "../src/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CheckpointHelper} from "../src/lib/CheckpointHelper.sol";
@@ -163,7 +163,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0)
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
         });
 
         gwRouter = new GatewayRouterFacet();
@@ -241,6 +242,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
+            powerScale: 12,
             relayerReward: DEFAULT_RELAYER_REWARD
         });
 
@@ -313,7 +315,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0)
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
         });
 
         dep = createDiamond(constructorParams);
@@ -350,7 +353,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: 100,
-            genesisValidators: new Validator[](0)
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
         });
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](3);
@@ -835,7 +839,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             msgFee: CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0)
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
         });
         gatewayDiamond = createDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
@@ -865,7 +870,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             msgFee: crossMsgFee,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0)
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
         });
         gatewayDiamond = createDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
@@ -893,7 +899,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             msgFee: crossMsgFee,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0)
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
         });
         gatewayDiamond = createDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
@@ -924,7 +931,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             msgFee: crossMsgFee,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0)
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
         });
         gatewayDiamond = createDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
@@ -1192,59 +1200,54 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwRouter.commitParentFinality(finality);
     }
 
-    function testGatewayDiamond_CommitParentFinality_Fails_ValidatorsAndWeightsNotEqual() public {
-        FvmAddress[] memory validators = new FvmAddress[](1);
-        validators[0] = FvmAddressHelper.from(vm.addr(100));
-        uint256[] memory weights = new uint256[](2);
-        weights[0] = 100;
-        weights[1] = 130;
+    function testGatewayDiamond_applyFinality_works() public {
+        // changes included for two validators joining
+        address val1 = vm.addr(100);
+        address val2 = vm.addr(101);
+        uint256 amount = 10000;
+        StakingChangeRequest[] memory changes = new StakingChangeRequest[](2);
 
-        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        gwRouter.commitParentFinality(finality);
-    }
-
-    function testGatewayDiamond_CommitParentFinality_Fails_ZeroWeight() public {
-        FvmAddress[] memory validators = new FvmAddress[](1);
-        validators[0] = FvmAddressHelper.from(vm.addr(100));
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = 0;
-
-        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+        changes[0] = StakingChangeRequest({
+            configurationNumber: 0,
+            change: StakingChange({validator: val1, op: StakingOperation.Deposit, payload: abi.encode(amount)})
+        });
+        changes[1] = StakingChangeRequest({
+            configurationNumber: 1,
+            change: StakingChange({validator: val2, op: StakingOperation.Deposit, payload: abi.encode(amount)})
+        });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        gwRouter.commitParentFinality(finality);
-    }
+        gwRouter.storeValidatorChanges(changes);
+        uint64 configNumber = gwRouter.applyFinalityChanges();
+        require(configNumber == 1, "wrong config number after applying finality");
+        require(gwGetter.getCurrentMembership().validators.length == 2, "current membership should be 2");
 
-    function testGatewayDiamond_CommitParentFinality_Works_MultipleValidators() public {
-        FvmAddress[] memory validators = new FvmAddress[](2);
-        validators[0] = FvmAddressHelper.from(vm.addr(100));
-        validators[1] = FvmAddressHelper.from(vm.addr(101));
-        uint256[] memory weights = new uint256[](2);
-        weights[0] = 100;
-        weights[1] = 150;
+        vm.stopPrank();
 
+        // new change with a validator leaving
+        changes = new StakingChangeRequest[](1);
+
+        changes[0] = StakingChangeRequest({
+            configurationNumber: 2,
+            change: StakingChange({validator: val1, op: StakingOperation.Withdraw, payload: abi.encode(amount)})
+        });
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        gwRouter.storeValidatorChanges(changes);
+        configNumber = gwRouter.applyFinalityChanges();
+        require(configNumber == 2, "wrong config number after applying finality");
+        require(gwGetter.getCurrentMembership().validators.length == 1, "current membership should be 1");
+        require(gwGetter.getLastMembership().validators.length == 2, "last membership should be 2");
 
-        gwRouter.commitParentFinality(finality);
+        // no changes
+        configNumber = gwRouter.applyFinalityChanges();
+        require(configNumber == 0, "wrong config number after applying finality");
+        require(gwGetter.getCurrentMembership().validators.length == 1, "current membership should be 1");
+        require(gwGetter.getLastMembership().validators.length == 2, "last membership should be 2");
+
+        vm.stopPrank();
     }
-
-    // TODO: Update test
-    // function testGatewayDiamond_CommitParentFinality_Works_NewValidators() public {
-    //     addValidator(vm.addr(100), 100);
-
-    //     require(gwGetter.getLastTotalWeight() == 100);
-
-    //     addValidator(vm.addr(101), 1000);
-
-    //     require(gwGetter.getLastTotalWeight() == 1000);
-    // }
 
     function testGatewayDiamond_CommitParentFinality_Works_WithQuery() public {
         FvmAddress[] memory validators = new FvmAddress[](2);
@@ -1263,6 +1266,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         require(committedFinality.height == finality.height, "height not equal");
         require(committedFinality.blockHash == finality.blockHash, "blockHash not equal");
+
+        vm.stopPrank();
     }
 
     function testGatewayDiamond_CommitParentFinality_BigNumberOfMessages() public {
@@ -1295,59 +1300,12 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             });
         }
 
-        vm.prank(FilAddress.SYSTEM_ACTOR);
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
         gwRouter.applyCrossMessages(topDownMsgs);
+
+        vm.stopPrank();
     }
-
-    // TODO: Update membership tests
-    // function testGatewayDiamond_Membership() public {
-    //     vm.startPrank(FilAddress.SYSTEM_ACTOR);
-
-    //     Membership memory lastMb;
-    //     Membership memory curMb;
-
-    //     uint64 initConfigurationNumber = gwGetter.getLastConfigurationNumber();
-    //     uint64 newConfigurationNumber = initConfigurationNumber;
-
-    //     // new configuration
-    //     FvmAddress[] memory validators = new FvmAddress[](2);
-    //     validators[0] = FvmAddressHelper.from(address(this));
-    //     validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
-
-    //     uint256[] memory weights = new uint256[](2);
-    //     weights[0] = 100;
-    //     weights[1] = 200;
-
-    //     gwManager.newMembership(++newConfigurationNumber, validators, weights);
-    //     lastMb = gwGetter.getLastMembership();
-    //     require(gwGetter.getLastConfigurationNumber() == newConfigurationNumber, "last n correct");
-    //     require(gwGetter.getCurrentConfigurationNumber() != newConfigurationNumber, "current n correct");
-    //     require(lastMb.configurationNumber == newConfigurationNumber, "lastMb.n correct");
-    //     require(lastMb.validators.length == 2, "lastMb.validators.length correct");
-
-    //     // new configuration
-    //     validators = new FvmAddress[](3);
-    //     validators[0] = FvmAddressHelper.from(address(this));
-    //     validators[1] = FvmAddressHelper.from(address(vm.addr(201)));
-    //     validators[2] = FvmAddressHelper.from(address(vm.addr(301)));
-
-    //     weights = new uint256[](3);
-    //     weights[0] = 100;
-    //     weights[1] = 200;
-    //     weights[2] = 300;
-
-    //     gwManager.newMembership(++newConfigurationNumber, validators, weights);
-    //     lastMb = gwGetter.getLastMembership();
-    //     require(lastMb.configurationNumber == newConfigurationNumber, "nlast.configurationNumber correct");
-    //     require(lastMb.validators.length == 3, "lastMb.validators.length correct");
-
-    //     // update
-    //     curMb = gwManager.updateMembership();
-    //     require(gwGetter.getCurrentConfigurationNumber() == newConfigurationNumber, "current n correct");
-    //     require(curMb.configurationNumber == newConfigurationNumber, "curMb.configurationNumber correct");
-    //     require(curMb.validators.length == 3, "curMb.validators.length correct");
-    // }
 
     function testGatewayDiamond_createBottomUpCheckpoint() public {
         (, address[] memory addrs, uint256[] memory weights) = setupThreeValidatorsForCheckpoint();
