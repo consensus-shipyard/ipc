@@ -176,6 +176,7 @@ pub struct StorableMsgsWrapper {
     pub params: RawBytes,
     pub value: TokenAmount,
     pub nonce: u64,
+    pub fee: TokenAmount,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -200,6 +201,7 @@ impl From<BatchCrossMsgsWrapper> for BatchCrossMsgs {
                         params: cross_wrapper.msg.params,
                         value: cross_wrapper.msg.value,
                         nonce: cross_wrapper.msg.nonce,
+                        fee: cross_wrapper.msg.fee,
                     },
                     wrapped: cross_wrapper.wrapped,
                 })

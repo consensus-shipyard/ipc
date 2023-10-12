@@ -185,6 +185,7 @@ impl SubnetManager for EthSubnetManager {
             bottom_up_check_period: params.bottomup_check_period as u64,
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
             active_validators_limit: params.active_validators_limit,
+            power_scale: 3,
         };
 
         log::info!("creating subnet on evm with params: {params:?}");
@@ -234,7 +235,7 @@ impl SubnetManager for EthSubnetManager {
         subnet: SubnetID,
         from: Address,
         collateral: TokenAmount,
-        metadata: Vec<u8>,
+        pub_key: Vec<u8>,
     ) -> Result<()> {
         let collateral = collateral
             .atto()
@@ -250,7 +251,31 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let mut txn = contract.join(ethers::types::Bytes::from(metadata));
+        let mut txn = contract.join(ethers::types::Bytes::from(pub_key));
+        txn.tx.set_value(collateral);
+        let txn = call_with_premium_estimation(signer, txn).await?;
+
+        txn.send().await?.await?;
+
+        Ok(())
+    }
+
+    async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()> {
+        let collateral = collateral
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!(
+            "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
+        );
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        let mut txn = contract.stake();
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
 
@@ -317,6 +342,40 @@ impl SubnetManager for EthSubnetManager {
         Ok(s)
     }
 
+    async fn claim_collateral(&self, subnet: SubnetID, from: Address) -> Result<()> {
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!("claim collateral evm subnet: {subnet:} at contract: {address:}");
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        call_with_premium_estimation(signer, contract.claim())
+            .await?
+            .send()
+            .await?
+            .await?;
+
+        Ok(())
+    }
+
+    async fn claim_relayer_reward(&self, subnet: SubnetID, from: Address) -> Result<()> {
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!("claim relayer reward evm subnet: {subnet:} at contract: {address:}");
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        call_with_premium_estimation(signer, contract.claim_reward_for_relayer())
+            .await?
+            .send()
+            .await?
+            .await?;
+
+        Ok(())
+    }
+
     async fn fund(
         &self,
         subnet: SubnetID,
@@ -362,6 +421,7 @@ impl SubnetManager for EthSubnetManager {
         from: Address,
         to: Address,
         amount: TokenAmount,
+        fee: Option<TokenAmount>,
     ) -> Result<ChainEpoch> {
         self.ensure_same_gateway(&gateway_addr)?;
 
@@ -370,6 +430,17 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid value to fund"))?;
 
+        let fee = match fee {
+            Some(f) => fil_to_eth_amount(&f)?,
+            None => {
+                let gateway_getter = gateway_getter_facet::GatewayGetterFacet::new(
+                    self.ipc_contract_info.gateway_addr,
+                    Arc::new(self.ipc_contract_info.provider.clone()),
+                );
+                gateway_getter.cross_msg_fee().call().await?
+            }
+        };
+
         log::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
@@ -377,7 +448,8 @@ impl SubnetManager for EthSubnetManager {
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
         );
-        let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
+        let mut txn =
+            gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?, fee);
         txn.tx.set_value(value);
         let txn = call_with_premium_estimation(signer, txn).await?;
 

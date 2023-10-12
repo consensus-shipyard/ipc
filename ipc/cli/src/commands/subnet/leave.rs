@@ -38,3 +38,45 @@ pub struct LeaveSubnetArgs {
     #[arg(long, short, help = "The subnet to leave")]
     pub subnet: String,
 }
+
+/// The command to claim collateral for a validator after leaving
+pub struct Claim;
+
+#[async_trait]
+impl CommandLineHandler for Claim {
+    type Arguments = ClaimArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("leave subnet with args: {:?}", arguments);
+
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(Address::from_str(address)?),
+            None => None,
+        };
+        if !&arguments.rewards {
+            provider.claim_collateral(subnet, from).await
+        } else {
+            provider.claim_relayer_reward(subnet, from).await
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(
+    name = "claim",
+    about = "Claim collateral or rewards available for validators and relayers, respectively"
+)]
+pub struct ClaimArgs {
+    #[arg(long, short, help = "The address that claims the collateral")]
+    pub from: Option<String>,
+    #[arg(long, short, help = "The subnet to claim from")]
+    pub subnet: String,
+    #[arg(
+        long,
+        short,
+        help = "Determine if we want to claim rewards instead of collateral"
+    )]
+    pub rewards: bool,
+}

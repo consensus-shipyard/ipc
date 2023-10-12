@@ -10,6 +10,7 @@ use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use fvm_shared::METHOD_SEND;
+use num_traits::Zero;
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
 /// StorableMsg stores all the relevant information required
@@ -48,6 +49,7 @@ impl StorableMsg {
         from: &Address,
         to: &Address,
         value: TokenAmount,
+        fee: TokenAmount,
     ) -> anyhow::Result<Self> {
         let to = IPCAddress::new(
             &match sub_id.parent() {
@@ -64,6 +66,7 @@ impl StorableMsg {
             params: RawBytes::default(),
             value,
             nonce: 0,
+            fee,
         })
     }
 
@@ -89,6 +92,7 @@ impl StorableMsg {
             params: RawBytes::default(),
             value,
             nonce: 0,
+            fee: TokenAmount::zero(), // fund messages are currently free
         })
     }
 
