@@ -125,6 +125,19 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         self.getter.call(state, |c| c.get_incomplete_checkpoints())
     }
 
+    /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
+    pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        self.router.call(state, |c| c.apply_finality_changes())
+    }
+
+    /// Get the currently active validator set.
+    pub fn current_validator_set(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<getter::Membership> {
+        self.getter.call(state, |c| c.get_current_membership())
+    }
+
     /// Construct the input parameters for adding a signature to the checkpoint.
     ///
     /// This will need to be broadcasted as a transaction.

@@ -8,12 +8,7 @@ use cid::multihash::MultihashDigest;
 use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_core::Timestamp;
-use fvm_shared::{
-    address::Address,
-    bigint::{BigInt, Integer},
-    econ::TokenAmount,
-    version::NetworkVersion,
-};
+use fvm_shared::{address::Address, econ::TokenAmount, version::NetworkVersion};
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -66,7 +61,12 @@ impl Arbitrary for Actor {
 
 impl Arbitrary for ValidatorKey {
     fn arbitrary(g: &mut Gen) -> Self {
-        let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
+        // Using a full 32 byte seed instead of `StdRng::seed_from_u64` to reduce the annoying collisions
+        // when trying to generate multiple validators. Probably 0 is generated more often than other u64
+        // for example, but there is a high probability of matching keys, which is possible but usually
+        // not what we are trying to test, and using a common `Rng` to generate all validators is cumbersome.
+        let seed: [u8; 32] = std::array::from_fn(|_| u8::arbitrary(g));
+        let mut rng = StdRng::from_seed(seed);
         let sk = SecretKey::random(&mut rng);
         let pk = sk.public_key();
         Self::new(pk)
@@ -81,7 +81,9 @@ impl Arbitrary for Collateral {
 
 impl Arbitrary for Power {
     fn arbitrary(g: &mut Gen) -> Self {
-        Self(u64::arbitrary(g))
+        // Giving at least 1 power. 0 is a valid value to signal deletion,
+        // but not that useful in the more common power table setting.
+        Self(u64::arbitrary(g).saturating_add(1))
     }
 }
 
@@ -115,18 +117,6 @@ impl Arbitrary for Genesis {
     }
 }
 
-/// `TokenAmount` well within the limits of U256
-#[derive(Debug, Clone)]
-struct ArbFee(TokenAmount);
-
-impl Arbitrary for ArbFee {
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        let t = ArbTokenAmount::arbitrary(g).0;
-        let (_, t) = t.atto().div_mod_floor(&BigInt::from(u64::MAX));
-        Self(TokenAmount::from_atto(t))
-    }
-}
-
 impl Arbitrary for ipc::GatewayParams {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self {
@@ -135,8 +125,10 @@ impl Arbitrary for ipc::GatewayParams {
             bottom_up_check_period: u64::arbitrary(g).max(1),
             top_down_check_period: u64::arbitrary(g),
             // Gateway constructor would reject 0.
-            min_collateral: ArbFee::arbitrary(g).0.max(TokenAmount::from_atto(1)),
-            msg_fee: ArbFee::arbitrary(g).0,
+            min_collateral: ArbTokenAmount::arbitrary(g)
+                .0
+                .max(TokenAmount::from_atto(1)),
+            msg_fee: ArbTokenAmount::arbitrary(g).0,
             majority_percentage: u8::arbitrary(g) % 50 + 51,
             active_validators_limit: u16::arbitrary(g) % 100 + 1,
         }

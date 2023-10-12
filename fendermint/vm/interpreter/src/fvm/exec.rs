@@ -129,7 +129,7 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
-        let updates = if let Some((checkpoint, _, updates)) =
+        let updates = if let Some((checkpoint, updates)) =
             checkpoint::maybe_create_checkpoint(&self.client, &self.gateway, &mut state)
                 .await
                 .context("failed to create checkpoint")?

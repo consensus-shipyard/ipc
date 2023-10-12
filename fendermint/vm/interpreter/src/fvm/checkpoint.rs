@@ -1,7 +1,17 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+
 use anyhow::{anyhow, Context};
+use ethers::types::U256;
+use fendermint_crypto::PublicKey;
+use fendermint_vm_genesis::Collateral;
+use fendermint_vm_genesis::PowerScale;
+use fvm_shared::bigint::BigInt;
+use fvm_shared::bigint::Sign;
+use fvm_shared::econ::TokenAmount;
+use ipc_actors_abis::gateway_getter_facet::Membership;
 use tendermint::block::Height;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
 
@@ -21,7 +31,7 @@ use super::{
 };
 
 /// Validator voting power snapshot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerTable(pub Vec<Validator<Power>>);
 
 /// Changes in the power table.
@@ -37,7 +47,7 @@ pub async fn maybe_create_checkpoint<C, DB>(
     client: &C,
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
-) -> anyhow::Result<Option<(router::BottomUpCheckpoint, PowerTable, PowerUpdates)>>
+) -> anyhow::Result<Option<(router::BottomUpCheckpoint, PowerUpdates)>>
 where
     C: Client + Sync + Send + 'static,
     DB: Blockstore + Sync + Send + 'static,
@@ -55,17 +65,16 @@ where
     match should_create_checkpoint(gateway, state, height)? {
         None => Ok(None),
         Some(subnet_id) => {
-            // Get the current power table.
-            let power_table = get_power_table(client, height)
+            // Get the current power table from CometBFT.
+            // NB: Here we could also get it from the IPC Gateway.
+            let power_table = bft_power_table(client, height)
                 .await
                 .context("failed to get the power table")?;
 
-            // TODO #252: Take the next validator changes from the gateway.
-            let power_updates = PowerUpdates(Vec::new());
-
-            // TODO: #252: Take the configuration number of the last change,
-            // or use 0 to signal that there was no change.
-            let next_configuration_number = 0;
+            // Apply any validator set transitions.
+            let next_configuration_number = gateway
+                .apply_validator_changes(state)
+                .context("failed to apply validator changes")?;
 
             // Retrieve the bottom-up messages so we can put their hash into the checkpoint.
             let cross_messages_hash = gateway
@@ -87,7 +96,26 @@ where
                 .create_bottom_up_checkpoint(state, checkpoint.clone(), &power_table.0)
                 .context("failed to store checkpoint")?;
 
-            Ok(Some((checkpoint, power_table, power_updates)))
+            // Figure out the power updates if there was some change in the configuration.
+            let power_updates = if next_configuration_number == 0 {
+                PowerUpdates(Vec::new())
+            } else {
+                let next_membership = gateway
+                    .current_validator_set(state)
+                    .context("failed to get current validator set")?;
+
+                debug_assert_eq!(
+                    next_membership.configuration_number,
+                    next_configuration_number
+                );
+
+                let next_power_table =
+                    membership_to_power_table(&next_membership, state.power_scale());
+
+                power_diff(power_table, next_power_table)
+            };
+
+            Ok(Some((checkpoint, power_updates)))
         }
     }
 }
@@ -106,7 +134,7 @@ where
 {
     for cp in incomplete_checkpoints {
         let height = Height::try_from(cp.block_height)?;
-        let power_table = get_power_table(client, height)
+        let power_table = bft_power_table(client, height)
             .await
             .context("failed to get power table")?;
 
@@ -196,7 +224,8 @@ where
     Ok(None)
 }
 
-async fn get_power_table<C>(client: &C, height: Height) -> anyhow::Result<PowerTable>
+/// Get the power table from CometBFT.
+async fn bft_power_table<C>(client: &C, height: Height) -> anyhow::Result<PowerTable>
 where
     C: Client + Sync + Send + 'static,
 {
@@ -211,4 +240,161 @@ where
     }
 
     Ok(PowerTable(power_table))
+}
+
+/// Convert the collaterals and metadata in the membership to the public key and power expected by the system.
+fn membership_to_power_table(m: &Membership, power_scale: PowerScale) -> PowerTable {
+    let mut pt = Vec::new();
+
+    for v in m.validators.iter() {
+        // Ignoring any metadata that isn't a public key.
+        if let Ok(pk) = PublicKey::parse_slice(&v.metadata, None) {
+            let c = u256_to_tokens(v.weight);
+            pt.push(Validator {
+                public_key: ValidatorKey(pk),
+                power: Collateral(c).into_power(power_scale),
+            })
+        }
+    }
+
+    PowerTable(pt)
+}
+
+fn u256_to_tokens(value: U256) -> TokenAmount {
+    let mut bz = [0u8; 32];
+    value.to_big_endian(&mut bz);
+    let atto = BigInt::from_bytes_be(Sign::Plus, &bz);
+    TokenAmount::from_atto(atto)
+}
+
+/// Calculate the difference between the current and the next power table, to return to CometBFT only what changed:
+/// * include any new validator, or validators whose power has been updated
+/// * include validators to be removed with a power of 0, as [expected](https://github.com/informalsystems/tendermint-rs/blob/bcc0b377812b8e53a02dff156988569c5b3c81a2/rpc/src/dialect/end_block.rs#L12-L14) by CometBFT
+fn power_diff(current: PowerTable, next: PowerTable) -> PowerUpdates {
+    let current = into_power_map(current);
+    let next = into_power_map(next);
+
+    let mut diff = Vec::new();
+
+    // Validators in `current` but not in `next` should be removed.
+    for (k, v) in current.iter() {
+        if !next.contains_key(k) {
+            let delete = Validator {
+                public_key: v.public_key.clone(),
+                power: Power(0),
+            };
+            diff.push(delete);
+        }
+    }
+
+    // Validators in `next` that differ from `current` should be updated.
+    for (k, v) in next.into_iter() {
+        let insert = match current.get(&k) {
+            Some(w) if *w == v => None,
+            _ => Some(v),
+        };
+        if let Some(insert) = insert {
+            diff.push(insert);
+        }
+    }
+
+    PowerUpdates(diff)
+}
+
+/// Convert the power list to a `HashMap` to support lookups by the public key.
+///
+/// Unfortunately in their raw format the [`PublicKey`] does not implement `Hash`,
+/// so we have to use the serialized format.
+fn into_power_map(value: PowerTable) -> HashMap<[u8; 65], Validator<Power>> {
+    value
+        .0
+        .into_iter()
+        .map(|v| {
+            let k = v.public_key.0.serialize();
+            (k, v)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use ethers::core::types::U256;
+    use fendermint_vm_genesis::{Power, Validator};
+    use quickcheck_macros::quickcheck;
+
+    use crate::fvm::checkpoint::{into_power_map, power_diff, u256_to_tokens};
+
+    use super::{PowerTable, PowerUpdates};
+
+    fn power_update(current: PowerTable, updates: PowerUpdates) -> PowerTable {
+        let mut current = into_power_map(current);
+
+        for v in updates.0 {
+            let k = v.public_key.0.serialize();
+            if v.power.0 == 0 {
+                current.remove(&k);
+            } else {
+                current.insert(k, v);
+            }
+        }
+
+        PowerTable(current.into_values().collect())
+    }
+
+    #[derive(Debug, Clone)]
+    struct TestPowerTables {
+        current: PowerTable,
+        next: PowerTable,
+    }
+
+    impl quickcheck::Arbitrary for TestPowerTables {
+        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            let v = 1 + usize::arbitrary(g) % 10;
+            let c = 1 + usize::arbitrary(g) % v;
+            let n = 1 + usize::arbitrary(g) % v;
+
+            let vs = (0..v).map(|_| Validator::arbitrary(g)).collect::<Vec<_>>();
+            let cvs = vs.iter().take(c).cloned().collect();
+            let nvs = vs
+                .into_iter()
+                .skip(v - n)
+                .map(|mut v| {
+                    v.power = Power::arbitrary(g);
+                    v
+                })
+                .collect();
+
+            TestPowerTables {
+                current: PowerTable(cvs),
+                next: PowerTable(nvs),
+            }
+        }
+    }
+
+    #[quickcheck]
+    fn prop_u256_to_tokens(value: u64) {
+        let atto = U256::from(value);
+        let tokens = u256_to_tokens(atto);
+        let atto: u64 = tokens.atto().try_into().unwrap();
+        assert_eq!(atto, value);
+    }
+
+    #[quickcheck]
+    fn prop_power_diff_update(powers: TestPowerTables) {
+        let diff = power_diff(powers.current.clone(), powers.next.clone());
+        let next = power_update(powers.current, diff);
+
+        // Order shouldn't matter.
+        let next = into_power_map(next);
+        let expected = into_power_map(powers.next);
+
+        assert_eq!(next, expected)
+    }
+
+    #[quickcheck]
+    fn prop_power_diff_nochange(v1: Validator<Power>, v2: Validator<Power>) {
+        let current = PowerTable(vec![v1.clone(), v2.clone()]);
+        let next = PowerTable(vec![v2, v1]);
+        assert!(power_diff(current, next).0.is_empty());
+    }
 }

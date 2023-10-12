@@ -49,6 +49,7 @@ pin-project = { workspace = true }
 
 [dev-dependencies]
 quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 fvm = { workspace = true, features = ["arb", "testing"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 tempfile = "3.7.0"

@@ -52,6 +52,7 @@ lru_time_cache = "0.11"
 merkle-tree-rs = "0.1.0"
 multiaddr = "0.16"
 multihash = { version = "0.16.1", default-features = false }
+num-bigint = "0.4"
 num-traits = "0.2"
 paste = "1"
 prost = { version = "0.11" }

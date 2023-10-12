@@ -2955,11 +2955,14 @@ dependencies = [
  "arbitrary",
  "arbtest",
  "cid",
+ "ethers",
  "fendermint_testing",
  "fvm_ipld_encoding 0.3.3",
  "fvm_shared",
  "hex",
  "ipc-sdk",
+ "lazy_static",
+ "num-bigint",
  "quickcheck 1.0.3",
  "rand 0.8.5",
  "serde",
@@ -3077,6 +3080,7 @@ dependencies = [
  "num-traits",
  "pin-project",
  "quickcheck 1.0.3",
+ "quickcheck_macros",
  "serde",
  "serde_json",
  "tempfile",
@@ -4529,7 +4533,7 @@ dependencies = [
 [[package]]
 name = "ipc_actors_abis"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#081fea80569ff11c080de7281340c8faa167d3b0"
+source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#1ab4113ea235e1d5b055dce732fb5d4bdb8e025e"
 dependencies = [
  "anyhow",
  "ethers",
@@ -5903,6 +5907,7 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "608e7659b5c3d7cba262d894801b9ec9d00de989e8a82bd4bef91d08da45cdc0"
 dependencies = [
+ "arbitrary",
  "autocfg",
  "num-integer",
  "num-traits",

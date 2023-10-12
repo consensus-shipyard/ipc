@@ -63,6 +63,9 @@ where
     /// The main motivation to add it here was to make it easier to pass in data to the
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
+
+    /// Conversion between collateral and voting power.
+    power_scale: PowerScale,
 }
 
 impl<DB> FvmExecState<DB>
@@ -100,6 +103,7 @@ where
         Ok(Self {
             executor,
             block_hash: None,
+            power_scale: params.power_scale,
         })
     }
 
@@ -155,6 +159,11 @@ where
     /// The timestamp of the currently executing block.
     pub fn timestamp(&self) -> Timestamp {
         Timestamp(self.executor.context().timestamp)
+    }
+
+    /// Conversion between collateral and voting power.
+    pub fn power_scale(&self) -> PowerScale {
+        self.power_scale
     }
 
     /// Get a mutable reference to the underlying [StateTree].
