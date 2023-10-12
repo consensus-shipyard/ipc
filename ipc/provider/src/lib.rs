@@ -278,6 +278,24 @@ impl IpcProvider {
             .await
     }
 
+    pub async fn stake(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        collateral: TokenAmount,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().stake(subnet, sender, collateral).await
+    }
+
     pub async fn leave_subnet(
         &mut self,
         subnet: SubnetID,
@@ -293,6 +311,40 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
 
         conn.manager().leave_subnet(subnet, sender).await
+    }
+
+    pub async fn claim_collateral(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().claim_collateral(subnet, sender).await
+    }
+
+    pub async fn claim_relayer_reward(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().claim_relayer_reward(subnet, sender).await
     }
 
     pub async fn kill_subnet(
@@ -370,6 +422,7 @@ impl IpcProvider {
         from: Option<Address>,
         to: Option<Address>,
         amount: TokenAmount,
+        fee: Option<TokenAmount>,
     ) -> anyhow::Result<ChainEpoch> {
         let conn = match self.connection(&subnet) {
             None => return Err(anyhow!("target subnet not found")),
@@ -385,7 +438,14 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .release(subnet, gateway_addr, sender, to.unwrap_or(sender), amount)
+            .release(
+                subnet,
+                gateway_addr,
+                sender,
+                to.unwrap_or(sender),
+                amount,
+                fee,
+            )
             .await
     }
 

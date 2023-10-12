@@ -37,6 +37,10 @@ impl CommandLineHandler for Release {
             Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
+        let fee = match &arguments.fee {
+            Some(f) => Some(f64_to_token_amount(*f)?),
+            None => None,
+        };
 
         println!(
             "release performed in epoch: {:?}",
@@ -47,6 +51,7 @@ impl CommandLineHandler for Release {
                     from,
                     to,
                     f64_to_token_amount(arguments.amount)?,
+                    fee,
                 )
                 .await?,
         );
@@ -72,4 +77,6 @@ pub(crate) struct ReleaseArgs {
     pub subnet: String,
     #[arg(help = "The amount to release in FIL, in whole FIL")]
     pub amount: f64,
+    #[arg(help = "The fee to pay for the cross-net message, in whole FIL")]
+    pub fee: Option<f64>,
 }

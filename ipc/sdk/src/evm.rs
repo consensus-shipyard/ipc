@@ -81,6 +81,7 @@ macro_rules! cross_msg_types {
 
             fn try_from(value: StorableMsg) -> Result<Self, Self::Error> {
                 let msg_value = fil_to_eth_amount(&value.value)?;
+                let msg_fee = fil_to_eth_amount(&value.fee)?;
 
                 log::info!(
                     "storable message token amount: {:}, converted: {:?}",
@@ -99,6 +100,7 @@ macro_rules! cross_msg_types {
                     // FIXME: we might a better way to handle the encoding of methods and params according to the type of message the cross-net message is targetting.
                     method: (value.method as u32).to_be_bytes(),
                     params: ethers::core::types::Bytes::from(value.params.to_vec()),
+                    fee: msg_fee,
                 };
                 Ok(c)
             }
@@ -115,6 +117,7 @@ macro_rules! cross_msg_types {
                     params: RawBytes::from(value.params.to_vec()),
                     value: eth_to_fil_amount(&value.value)?,
                     nonce: value.nonce,
+                    fee: eth_to_fil_amount(&value.fee)?,
                 };
                 Ok(s)
             }

@@ -35,6 +35,10 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
         metadata: Vec<u8>,
     ) -> Result<()>;
 
+    /// Allows validators that have already joined the subnet to stake more collateral
+    /// and increase their power in the subnet
+    async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()>;
+
     /// Sends a request to leave a subnet from a wallet address.
     async fn leave_subnet(&self, subnet: SubnetID, from: Address) -> Result<()>;
 
@@ -46,6 +50,15 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
         &self,
         gateway_addr: Address,
     ) -> Result<HashMap<SubnetID, SubnetInfo>>;
+
+    /// Claims any collateral that may be available to claim by validators that
+    /// have left the subnet.
+    async fn claim_collateral(&self, subnet: SubnetID, from: Address) -> Result<()>;
+
+    /// Claims any reward that may be available for a relayer. Relayer rewards
+    /// are obtained by submitting bottom-up checkpoints to the parent of a child
+    /// subnet.
+    async fn claim_relayer_reward(&self, subnet: SubnetID, from: Address) -> Result<()>;
 
     /// Fund injects new funds from an account of the parent chain to a subnet.
     /// Returns the epoch that the fund is executed in the parent.
@@ -67,6 +80,7 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
         from: Address,
         to: Address,
         amount: TokenAmount,
+        fee: Option<TokenAmount>,
     ) -> Result<ChainEpoch>;
 
     /// Propagate a cross-net message forward. For `postbox_msg_key`, we are using bytes because different
