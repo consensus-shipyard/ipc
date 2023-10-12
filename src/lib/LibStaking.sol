@@ -134,8 +134,8 @@ library LibAddressStakingReleases {
             delete self.releases[i];
 
             unchecked {
-                i++;
-                newLength--;
+                ++i;
+                --newLength;
             }
         }
 
@@ -219,7 +219,7 @@ library LibValidatorSet {
         for (uint16 i = 1; i <= size; ) {
             addresses[i - 1] = validators.activeValidators.getAddress(i);
             unchecked {
-                i++;
+                ++i;
             }
         }
         return addresses;
@@ -240,7 +240,7 @@ library LibValidatorSet {
             }
             activeCollaterals[i] = validators.validators[addresses[i]].confirmedCollateral;
             unchecked {
-                i++;
+                ++i;
             }
         }
         return activeCollaterals;
@@ -596,7 +596,7 @@ library LibStaking {
 
             changeSet.purgeChange(i);
             unchecked {
-                i++;
+                ++i;
             }
         }
 
@@ -628,14 +628,15 @@ library LibValidatorTracking {
         ParentValidatorsTracker storage self,
         StakingChangeRequest[] calldata changeRequests
     ) internal {
-        if (changeRequests.length == 0) {
+        uint256 length = changeRequests.length;
+        if (length == 0) {
             return;
         }
 
-        for (uint256 i = 0; i < changeRequests.length; ) {
+        for (uint256 i = 0; i < length; ) {
             storeChange(self, changeRequests[i]);
             unchecked {
-                i++;
+                ++i;
             }
         }
     }
@@ -666,7 +667,7 @@ library LibValidatorTracking {
 
             self.changes.purgeChange(i);
             unchecked {
-                i++;
+                ++i;
             }
         }
         self.changes.startConfigurationNumber = configurationNumber + 1;

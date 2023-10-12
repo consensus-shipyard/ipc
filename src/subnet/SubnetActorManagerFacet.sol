@@ -109,11 +109,13 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
             uint256 totalCollateral = LibStaking.getTotalConfirmedCollateral();
 
-            if (totalCollateral >= s.minActivationCollateral && LibStaking.totalActiveValidators() >= s.minValidators) {
-                s.bootstrapped = true;
-                emit SubnetBootstrapped(s.genesisValidators);
+            if (totalCollateral >= s.minActivationCollateral) {
+                if (LibStaking.totalActiveValidators() >= s.minValidators) {
+                    s.bootstrapped = true;
+                    emit SubnetBootstrapped(s.genesisValidators);
 
-                IGateway(s.ipcGatewayAddr).register{value: totalCollateral}();
+                    IGateway(s.ipcGatewayAddr).register{value: totalCollateral}();
+                }
             }
         } else {
             LibStaking.setValidatorMetadata(msg.sender, publicKey);

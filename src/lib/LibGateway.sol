@@ -198,7 +198,7 @@ library LibGateway {
         for (uint256 i = fromBlock; i <= toBlock; ) {
             msgLength += s.topDownMsgs[subnetHash][i].length;
             unchecked {
-                i++;
+                ++i;
             }
         }
 
@@ -206,16 +206,17 @@ library LibGateway {
         uint256 index = 0;
         for (uint256 i = fromBlock; i <= toBlock; ) {
             // perform copy
-            for (uint256 j = 0; j < s.topDownMsgs[subnetHash][i].length; ) {
+            uint256 topDownMsgsLength = s.topDownMsgs[subnetHash][i].length;
+            for (uint256 j = 0; j < topDownMsgsLength; ) {
                 messages[index] = s.topDownMsgs[subnetHash][i][j];
                 unchecked {
-                    j++;
-                    index++;
+                    ++j;
+                    ++index;
                 }
             }
 
             unchecked {
-                i++;
+                ++i;
             }
         }
 
