@@ -112,11 +112,11 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
-    /// @notice Apply all changes committed through the committment of parent finality
+    /// @notice Apply all changes committed through the commitment of parent finality
     function applyFinalityChanges() external systemActorOnly returns (uint64) {
         // get the latest configuration number for the change set
         uint64 configurationNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
-        // return immedidately if there are no changes to confirm by looking at next configNumber
+        // return immediately if there are no changes to confirm by looking at next configNumber
         if (
             // nextConfiguration == startConfiguration (i.e. no changes)
             (configurationNumber + 1) == s.validatorsTracker.changes.startConfigurationNumber
@@ -336,7 +336,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     }
 
     /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
-    /// @dev `retentionHeight` is the height of the first incomplete checkpointswe must keep to implement checkpointing.
+    /// @dev `retentionHeight` is the height of the first incomplete checkpoint that must be kept to implement checkpointing.
     /// All checkpoints with a height less than `retentionHeight` are removed from the history, assuming they are committed to the parent.
     /// @param newRetentionHeight - the height of the oldest checkpoint to keep
     function pruneBottomUpCheckpoints(uint64 newRetentionHeight) external systemActorOnly {

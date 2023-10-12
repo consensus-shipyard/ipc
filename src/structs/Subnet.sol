@@ -63,8 +63,8 @@ struct StakingRelease {
     uint256 amount;
 }
 
-/// Tracks the staking relases of an address. Mimics the implementation of array in solidity, this
-/// way is more aigned with our use case.
+/// Tracks the staking releases of an address. Mimics the implementation of array in solidity, this
+/// way is more aligned with our use case.
 struct AddressStakingReleases {
     uint16 length;
     uint16 startIdx;
@@ -85,8 +85,8 @@ struct StakingReleaseQueue {
 struct ValidatorInfo {
     uint256 confirmedCollateral;
     uint256 totalCollateral;
-    /// The metadata associated with the validator, i.e. offchain network address.
-    /// This information is not important to the protocol, offchain should know how
+    /// The metadata associated with the validator, i.e. off-chain network address.
+    /// This information is not important to the protocol, off-chain should know how
     /// to parse or decode the bytes.
     bytes metadata;
 }
@@ -111,7 +111,7 @@ struct ValidatorSet {
     mapping(address => ValidatorInfo) validators;
     /// @notice The active validators tracked using min priority queue.
     MinPQ activeValidators;
-    /// @notice The waiting validators trakced using max priority queue.
+    /// @notice The waiting validators tracked using max priority queue.
     MaxPQ waitingValidators;
 }
 

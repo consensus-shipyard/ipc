@@ -24,11 +24,12 @@ abstract contract ReentrancyGuard {
     }
 
     /// @dev fetch local storage
-    function reentrancyStorage() private pure returns (ReentrancyStorage storage data) {
+    function reentrancyStorage() private pure returns (ReentrancyStorage storage ds) {
         bytes32 position = NAMESPACE;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            data.slot := position
+            ds.slot := position
         }
+        return ds;
     }
 }

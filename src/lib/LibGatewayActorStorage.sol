@@ -81,6 +81,7 @@ library LibGatewayActorStorage {
         assembly {
             ds.slot := 0
         }
+        return ds;
     }
 }
 

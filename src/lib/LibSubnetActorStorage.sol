@@ -60,6 +60,7 @@ library LibSubnetActorStorage {
         assembly {
             ds.slot := 0
         }
+        return ds;
     }
 }
 

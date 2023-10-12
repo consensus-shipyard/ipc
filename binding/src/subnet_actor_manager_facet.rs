@@ -427,6 +427,17 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("CannotConfirmFutureChanges"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "CannotConfirmFutureChanges",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("CollateralIsZero"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -789,6 +800,22 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "AddressShouldBeValidator", abi = "AddressShouldBeValidator()")]
     pub struct AddressShouldBeValidator;
+    ///Custom Error type `CannotConfirmFutureChanges` with signature `CannotConfirmFutureChanges()` and selector `0x0815540a`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "CannotConfirmFutureChanges",
+        abi = "CannotConfirmFutureChanges()"
+    )]
+    pub struct CannotConfirmFutureChanges;
     ///Custom Error type `CollateralIsZero` with signature `CollateralIsZero()` and selector `0xb4f18b02`
     #[derive(
         Clone,
@@ -1010,6 +1037,7 @@ pub mod subnet_actor_manager_facet {
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorManagerFacetErrors {
         AddressShouldBeValidator(AddressShouldBeValidator),
+        CannotConfirmFutureChanges(CannotConfirmFutureChanges),
         CollateralIsZero(CollateralIsZero),
         InvalidCheckpointEpoch(InvalidCheckpointEpoch),
         InvalidCheckpointMessagesHash(InvalidCheckpointMessagesHash),
@@ -1044,6 +1072,11 @@ pub mod subnet_actor_manager_facet {
                 <AddressShouldBeValidator as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::AddressShouldBeValidator(decoded));
+            }
+            if let Ok(decoded) =
+                <CannotConfirmFutureChanges as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::CannotConfirmFutureChanges(decoded));
             }
             if let Ok(decoded) = <CollateralIsZero as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -1123,6 +1156,9 @@ pub mod subnet_actor_manager_facet {
                 Self::AddressShouldBeValidator(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::CannotConfirmFutureChanges(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::CollateralIsZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidCheckpointEpoch(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -1169,6 +1205,10 @@ pub mod subnet_actor_manager_facet {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
                 _ if selector
                     == <AddressShouldBeValidator as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotConfirmFutureChanges as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1237,6 +1277,7 @@ pub mod subnet_actor_manager_facet {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::AddressShouldBeValidator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CannotConfirmFutureChanges(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CollateralIsZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCheckpointEpoch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCheckpointMessagesHash(element) => {
@@ -1267,6 +1308,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<AddressShouldBeValidator> for SubnetActorManagerFacetErrors {
         fn from(value: AddressShouldBeValidator) -> Self {
             Self::AddressShouldBeValidator(value)
+        }
+    }
+    impl ::core::convert::From<CannotConfirmFutureChanges> for SubnetActorManagerFacetErrors {
+        fn from(value: CannotConfirmFutureChanges) -> Self {
+            Self::CannotConfirmFutureChanges(value)
         }
     }
     impl ::core::convert::From<CollateralIsZero> for SubnetActorManagerFacetErrors {

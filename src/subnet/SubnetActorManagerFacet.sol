@@ -69,6 +69,9 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
             s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
+            // confirming the changes in membership in the child
+            LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+
             IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint, messages);
         } else if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight) {
             // If the checkpoint height is equal to the last checkpoint height, then this is a repeated submission.
@@ -87,7 +90,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice method that allows a validator to join the subnet
-    /// @param publicKey The offchain public key that should be associated with the validator
+    /// @param publicKey The off-chain public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant notKilled {
         if (msg.value == 0) {
             revert CollateralIsZero();

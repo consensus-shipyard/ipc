@@ -416,7 +416,7 @@ library LibStaking {
 
     uint64 public constant INITIAL_CONFIGURATION_NUMBER = 1;
 
-    event ConfigurantionNumberConfirmed(uint64 number);
+    event ConfigurationNumberConfirmed(uint64 number);
     event CollateralClaimed(address validator, uint256 amount);
 
     // =============== Getters =============
@@ -602,7 +602,7 @@ library LibStaking {
 
         changeSet.startConfigurationNumber = configurationNumber + 1;
 
-        emit ConfigurantionNumberConfirmed(configurationNumber);
+        emit ConfigurationNumberConfirmed(configurationNumber);
     }
 }
 

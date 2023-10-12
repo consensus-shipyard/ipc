@@ -82,7 +82,7 @@ library LibGateway {
                 revert OldConfigurationNumber();
             }
 
-            // Check if the memmbersip is equal and return if it is the case
+            // Check if the membership is equal and return if it is the case
             if (membershipEqual(membership, s.currentMembership)) {
                 return;
             }
@@ -91,11 +91,11 @@ library LibGateway {
         s.lastMembership = s.currentMembership;
 
         uint256 inputLength = membership.validators.length;
-        uint256 storLength = s.currentMembership.validators.length;
+        uint256 storeLength = s.currentMembership.validators.length;
         // memory arrays can't be copied directly from memory into storage,
         // we need to explicitly increase the size of the array in storage.
         for (uint256 i = 0; i < inputLength; ) {
-            if (i < storLength) {
+            if (i < storeLength) {
                 s.currentMembership.validators[i] = membership.validators[i];
             } else {
                 s.currentMembership.validators.push(membership.validators[i]);
@@ -106,8 +106,8 @@ library LibGateway {
         }
         // finally we need to remove any outstanding membership from
         // storage.
-        if (storLength > inputLength) {
-            for (uint256 i = inputLength; i < storLength; ) {
+        if (storeLength > inputLength) {
+            for (uint256 i = inputLength; i < storeLength; ) {
                 s.currentMembership.validators.pop();
                 unchecked {
                     ++i;
