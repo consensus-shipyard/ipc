@@ -27,6 +27,7 @@ pub struct StorableMsg {
     pub params: RawBytes,
     pub value: TokenAmount,
     pub nonce: u64,
+    pub fee: TokenAmount,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize_tuple, Deserialize_tuple)]
