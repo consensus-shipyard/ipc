@@ -76,12 +76,33 @@ impl AppState {
     pub fn state_root(&self) -> Cid {
         self.state_params.state_root
     }
+
     pub fn chain_id(&self) -> ChainID {
         ChainID::from(self.state_params.chain_id)
     }
+
+    /// Produce an appliction hash that is a commitment to all data replicated by consensus,
+    /// that is, all nodes participating in the network must agree on this otherwise we have
+    /// a consensus failure.
+    ///
+    /// Notably it contains the actor state root _as well as_ some of the metadata maintained
+    /// outside the FVM, such as the timestamp and the circulating supply.
     pub fn app_hash(&self) -> tendermint::hash::AppHash {
-        tendermint::hash::AppHash::try_from(self.state_root().to_bytes())
-            .expect("hash can be wrapped")
+        // Create an artifical CID from the FVM state params, which include everything that
+        // deterministically changes under consensus.
+        let state_params_cid =
+            fendermint_vm_message::cid(&self.state_params).expect("state params have a CID");
+
+        // We could reduce it to a hash to ephasize that this is not something that we can return at the moment,
+        // but we could just as easily store the record in the Blockstore to make it retrievable.
+        // It is generally not a goal to serve the entire state over the IPLD Resolver or ABCI queries, though;
+        // for that we should rely on the CometBFT snapshot mechanism.
+        // But to keep our options open, we can return the hash as a CID that nobody can retrieve, and change our mind later.
+
+        // let state_params_hash = state_params_cid.hash();
+        let state_params_hash = state_params_cid.to_bytes();
+
+        tendermint::hash::AppHash::try_from(state_params_hash).expect("hash can be wrapped")
     }
 }
 
@@ -418,8 +439,8 @@ where
         };
 
         tracing::info!(
-            state_root = format!("{}", app_state.state_root()),
-            app_hash = format!("{}", app_state.app_hash()),
+            state_root = app_state.state_root().to_string(),
+            app_hash = app_state.app_hash().to_string(),
             "init chain"
         );
 
@@ -647,9 +668,11 @@ where
         state.state_params.state_root = exec_state.commit().context("failed to commit FVM")?;
 
         let state_root = state.state_root();
+        let app_hash = state.app_hash();
 
         tracing::debug!(
             state_root = state_root.to_string(),
+            app_hash = app_hash.to_string(),
             timestamp = state.state_params.timestamp.0,
             "commit state"
         );
@@ -679,7 +702,7 @@ where
         tracing::debug!("committed state");
 
         let response = response::Commit {
-            data: state_root.to_bytes().into(),
+            data: app_hash.into(),
             // We have to retain blocks until we can support Snapshots.
             retain_height: Default::default(),
         };
