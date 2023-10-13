@@ -106,6 +106,12 @@ And to generate coverage report run
 forge coverage
 ```
 
+To create the Rust bindings for the contract you can run:
+
+```bash
+make compile-abi && make rust-binding
+```
+
 # Development
 
 Run `make install-dev` to install all necessary dependencies for development.
