@@ -19,7 +19,6 @@ contract SubnetRegistryTest is Test {
 
     address private constant DEFAULT_IPC_GATEWAY_ADDR = address(1024);
     uint64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
-    bytes32 private constant DEFAULT_NETWORK_NAME = bytes32("test");
     uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
     uint256 private constant DEFAULT_RELAYER_REWARD = 10 gwei;
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
