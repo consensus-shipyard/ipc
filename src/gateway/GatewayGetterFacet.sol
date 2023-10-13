@@ -86,9 +86,8 @@ contract GatewayGetterFacet {
     function getTopDownMsgs(
         SubnetID calldata subnetId,
         uint256 blockNumber
-    ) external view returns (CrossMsg[] memory msgs, bytes32 blockHash) {
+    ) external view returns (CrossMsg[] memory msgs) {
         msgs = LibGateway.getTopDownMsgs({subnetId: subnetId, fromBlock: blockNumber, toBlock: blockNumber});
-        blockHash = blockhash(blockNumber);
     }
 
     /// @notice Get the latest applied top down nonce

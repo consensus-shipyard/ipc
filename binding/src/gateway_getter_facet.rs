@@ -964,15 +964,6 @@ pub mod gateway_getter_facet {
                                         ::std::borrow::ToOwned::to_owned("struct CrossMsg[]"),
                                     ),
                                 },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("blockHash"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
-                                        32usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes32"),
-                                    ),
-                                },
                             ],
                             constant: ::core::option::Option::None,
                             state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
@@ -1468,8 +1459,7 @@ pub mod gateway_getter_facet {
             &self,
             subnet_id: SubnetID,
             block_number: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, (::std::vec::Vec<CrossMsg>, [u8; 32])>
-        {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<CrossMsg>> {
             self.0
                 .method_hash([168, 35, 203, 35], (subnet_id, block_number))
                 .expect("method not found (this should never happen)")
@@ -2701,7 +2691,6 @@ pub mod gateway_getter_facet {
     )]
     pub struct GetTopDownMsgsReturn {
         pub msgs: ::std::vec::Vec<CrossMsg>,
-        pub block_hash: [u8; 32],
     }
     ///Container type for all return fields from the `listSubnets` function with signature `listSubnets()` and selector `0x5d029685`
     #[derive(

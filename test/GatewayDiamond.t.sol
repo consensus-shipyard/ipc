@@ -1744,7 +1744,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             require(circSupply == expectedCircSupply);
         }
 
-        (CrossMsg[] memory topDownMsgs, ) = gwGetter.getTopDownMsgs(subnetId, block.number);
+        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(subnetId, block.number);
         for (uint256 msgIndex = 0; msgIndex < expectedTopDownMsgsLength; msgIndex++) {
             CrossMsg memory topDownMsg = topDownMsgs[msgIndex];
 
