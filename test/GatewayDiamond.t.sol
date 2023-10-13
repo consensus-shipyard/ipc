@@ -45,7 +45,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
     uint64 constant MAX_NONCE = type(uint64).max;
     address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
-    bytes32 private constant DEFAULT_NETWORK_NAME = bytes32("test");
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     uint64 constant DEFAULT_COLLATERAL_AMOUNT = 1 ether;
@@ -234,7 +233,6 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         SubnetActorDiamond.ConstructorParams memory saConstructorParams = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(gatewayDiamond),
             consensus: ConsensusType.Fendermint,
             minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,

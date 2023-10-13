@@ -62,10 +62,6 @@ contract SubnetActorGetterFacet {
         return s.minActivationCollateral;
     }
 
-    function name() external view returns (bytes32) {
-        return s.name;
-    }
-
     /// @notice Get the information of a validator
     function getValidator(address validatorAddress) external view returns (ValidatorInfo memory validator) {
         validator = s.validatorSet.validators[validatorAddress];

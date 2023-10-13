@@ -19,7 +19,6 @@ contract SubnetActorDiamond {
 
     struct ConstructorParams {
         SubnetID parentId;
-        bytes32 name;
         address ipcGatewayAddr;
         ConsensusType consensus;
         uint256 minActivationCollateral;
@@ -52,7 +51,6 @@ contract SubnetActorDiamond {
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 
         s.parentId = params.parentId;
-        s.name = params.name;
         s.ipcGatewayAddr = params.ipcGatewayAddr;
         s.consensus = params.consensus;
         s.minActivationCollateral = params.minActivationCollateral;

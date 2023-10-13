@@ -22,8 +22,6 @@ struct SubnetActorStorage {
     uint64 bottomUpCheckPeriod;
     /// @notice Minimal number of validators required for the subnet to be able to validate new blocks.
     uint64 minValidators;
-    /// @notice Human-readable name of the subnet.
-    bytes32 name;
     // @notice Hash of the current subnet id
     bytes32 currentSubnetHash;
     /// @notice Address of the IPC gateway for the subnet

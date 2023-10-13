@@ -36,7 +36,6 @@ contract SubnetActorDiamondTest is Test {
 
     address private constant DEFAULT_IPC_GATEWAY_ADDR = address(1024);
     uint64 private constant DEFAULT_CHECKPOINT_PERIOD = 10;
-    bytes32 private constant DEFAULT_NETWORK_NAME = bytes32("test");
     uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
     uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
     string private constant DEFAULT_NET_ADDR = "netAddr";
@@ -92,7 +91,6 @@ contract SubnetActorDiamondTest is Test {
         gatewayAddress = address(gatewayContract);
 
         _assertDeploySubnetActor(
-            DEFAULT_NETWORK_NAME,
             gatewayAddress,
             ConsensusType.Fendermint,
             DEFAULT_MIN_VALIDATOR_STAKE,
@@ -115,7 +113,6 @@ contract SubnetActorDiamondTest is Test {
     }
 
     function testSubnetActorDiamond_Deployment_Works(
-        bytes32 _networkName,
         address _ipcGatewayAddr,
         uint256 _minActivationCollateral,
         uint64 _minValidators,
@@ -129,7 +126,6 @@ contract SubnetActorDiamondTest is Test {
         vm.assume(_ipcGatewayAddr != address(0));
 
         _assertDeploySubnetActor(
-            _networkName,
             _ipcGatewayAddr,
             ConsensusType.Fendermint,
             _minActivationCollateral,
@@ -152,7 +148,6 @@ contract SubnetActorDiamondTest is Test {
         createSubnetActorDiamondWithFaucets(
             SubnetActorDiamond.ConstructorParams({
                 parentId: SubnetID(ROOTNET_CHAINID, new address[](0)),
-                name: DEFAULT_NETWORK_NAME,
                 ipcGatewayAddr: address(0),
                 consensus: ConsensusType.Fendermint,
                 minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
@@ -689,7 +684,6 @@ contract SubnetActorDiamondTest is Test {
     // }
 
     function _assertDeploySubnetActor(
-        bytes32 _name,
         address _ipcGatewayAddr,
         ConsensusType _consensus,
         uint256 _minActivationCollateral,
@@ -724,7 +718,6 @@ contract SubnetActorDiamondTest is Test {
             diamondCut,
             SubnetActorDiamond.ConstructorParams({
                 parentId: _parentId,
-                name: _name,
                 ipcGatewayAddr: _ipcGatewayAddr,
                 consensus: _consensus,
                 minActivationCollateral: _minActivationCollateral,
@@ -739,10 +732,6 @@ contract SubnetActorDiamondTest is Test {
         saManager = SubnetManagerTestUtil(address(saDiamond));
         saGetter = SubnetActorGetterFacet(address(saDiamond));
 
-        require(
-            keccak256(abi.encodePacked(saGetter.name())) == keccak256(abi.encodePacked(_name)),
-            "keccak256(abi.encodePacked(saGetter.name())) == keccak256(abi.encodePacked(_networkName))"
-        );
         require(saGetter.ipcGatewayAddr() == _ipcGatewayAddr, "saGetter.ipcGatewayAddr() == _ipcGatewayAddr");
         require(
             saGetter.minActivationCollateral() == _minActivationCollateral,

@@ -68,7 +68,6 @@ contract SubnetRegistryTest is Test {
     function test_Registry_Deployment_DifferentGateway() public {
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: address(1),
             consensus: ConsensusType.Fendermint,
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
@@ -86,7 +85,6 @@ contract SubnetRegistryTest is Test {
         vm.startPrank(DEFAULT_SENDER);
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: DEFAULT_IPC_GATEWAY_ADDR,
             consensus: ConsensusType.Fendermint,
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
@@ -105,7 +103,6 @@ contract SubnetRegistryTest is Test {
         vm.startPrank(DEFAULT_SENDER);
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            name: DEFAULT_NETWORK_NAME,
             ipcGatewayAddr: DEFAULT_IPC_GATEWAY_ADDR,
             consensus: ConsensusType.Fendermint,
             minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
@@ -122,7 +119,6 @@ contract SubnetRegistryTest is Test {
 
     function test_Registry_Deployment_Works() public {
         _assertDeploySubnetActor(
-            DEFAULT_NETWORK_NAME,
             DEFAULT_IPC_GATEWAY_ADDR,
             ConsensusType.Fendermint,
             DEFAULT_MIN_VALIDATOR_STAKE,
@@ -134,7 +130,6 @@ contract SubnetRegistryTest is Test {
     }
 
     function _assertDeploySubnetActor(
-        bytes32 _name,
         address _ipcGatewayAddr,
         ConsensusType _consensus,
         uint256 _minActivationCollateral,
@@ -146,7 +141,6 @@ contract SubnetRegistryTest is Test {
         vm.startPrank(DEFAULT_SENDER);
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            name: _name,
             ipcGatewayAddr: _ipcGatewayAddr,
             consensus: _consensus,
             minActivationCollateral: _minActivationCollateral,
