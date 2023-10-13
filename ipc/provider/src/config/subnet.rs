@@ -6,12 +6,10 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::config::deserialize::{
-    deserialize_accounts, deserialize_address_from_str, deserialize_eth_accounts,
-    deserialize_eth_address_from_str, deserialize_subnet_id,
+    deserialize_address_from_str, deserialize_eth_address_from_str, deserialize_subnet_id,
 };
 use crate::config::serialize::{
-    serialize_accounts, serialize_address_to_str, serialize_eth_accounts,
-    serialize_eth_address_to_str, serialize_subnet_id_to_str,
+    serialize_address_to_str, serialize_eth_address_to_str, serialize_subnet_id_to_str,
 };
 
 /// Represents a subnet declaration in the config.
@@ -20,7 +18,6 @@ pub struct Subnet {
     #[serde(deserialize_with = "deserialize_subnet_id")]
     #[serde(serialize_with = "serialize_subnet_id_to_str")]
     pub id: SubnetID,
-    pub network_name: String,
     pub config: SubnetConfig,
 }
 
@@ -61,12 +58,6 @@ impl Subnet {
             SubnetConfig::Fevm(s) => s.gateway_addr,
         }
     }
-
-    pub fn accounts(&self) -> Vec<Address> {
-        match &self.config {
-            SubnetConfig::Fevm(s) => s.accounts.clone(),
-        }
-    }
 }
 
 /// The FVM subnet config parameters
@@ -77,9 +68,6 @@ pub struct FVMSubnet {
     pub gateway_addr: Address,
     pub jsonrpc_api_http: Url,
     pub auth_token: Option<String>,
-    #[serde(deserialize_with = "deserialize_accounts", default)]
-    #[serde(serialize_with = "serialize_accounts")]
-    pub accounts: Vec<Address>,
 }
 
 /// The EVM subnet config parameters
@@ -93,7 +81,4 @@ pub struct EVMSubnet {
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     #[serde(serialize_with = "serialize_eth_address_to_str")]
     pub gateway_addr: Address,
-    #[serde(deserialize_with = "deserialize_eth_accounts", default)]
-    #[serde(serialize_with = "serialize_eth_accounts")]
-    pub accounts: Vec<Address>,
 }

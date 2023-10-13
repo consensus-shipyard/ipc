@@ -51,29 +51,6 @@ where
     s.serialize_str(&format!("0x{:?}", addr))
 }
 
-pub fn serialize_eth_accounts<S>(addrs: &Vec<Address>, s: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut seq = s.serialize_seq(Some(addrs.len()))?;
-    for element in addrs {
-        let addr = address_to_eth_address(element).map_err(S::Error::custom)?;
-        seq.serialize_element(&format!("0x{:?}", addr))?;
-    }
-    seq.end()
-}
-
-pub fn serialize_accounts<S>(addrs: &Vec<Address>, s: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut seq = s.serialize_seq(Some(addrs.len()))?;
-    for element in addrs {
-        seq.serialize_element(&element.to_string())?;
-    }
-    seq.end()
-}
-
 fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
     match addr.payload() {
         Payload::Delegated(inner) => {
@@ -99,7 +76,6 @@ mod tests {
 
     [[subnets]]
     id = "/r1234"
-    network_name = "test2"
 
     [subnets.config]
     network_type = "fevm"
@@ -107,13 +83,11 @@ mod tests {
     registry_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
     gateway_addr = "0x6be1ccf648c74800380d0520d797a170c808b624"
     private_key = "0x6BE1Ccf648c74800380d0520D797a170c808b624"
-    accounts = ["0x6be1ccf648c74800380d0520d797a170c808b624", "0x6be1ccf648c74800380d0520d797a170c808b624"]
     "#;
 
     const EMPTY_KEYSTORE: &str = r#"
     [[subnets]]
     id = "/r1234"
-    network_name = "test2"
 
     [subnets.config]
     network_type = "fevm"
@@ -152,12 +126,10 @@ mod tests {
         let eth_addr1 = EthAddress::from_str("0x6BE1Ccf648c74800380d0520D797a170c808b624").unwrap();
         let subnet2 = Subnet {
             id: SubnetID::new_root(1234),
-            network_name: "test2".to_string(),
             config: SubnetConfig::Fevm(EVMSubnet {
                 gateway_addr: Address::from(eth_addr1),
                 provider_http: "http://127.0.0.1:3030/rpc/v1".parse().unwrap(),
                 auth_token: None,
-                accounts: vec![Address::from(eth_addr1), Address::from(eth_addr1)],
                 registry_addr: Address::from(eth_addr1),
             }),
         };

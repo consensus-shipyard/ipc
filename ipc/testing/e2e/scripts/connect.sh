@@ -42,11 +42,9 @@ write_subnet_config() {
 [[subnets]]
 id = "${IPC_SUBNET_ID}"
 gateway_addr = "t064"
-network_name = "${IPC_SUBNET_NAME}"
 # node_type = "${IPC_NODE_TYPE}"
 jsonrpc_api_http = "http://node-${IPC_NODE_NR}:1234/rpc/v1"
 auth_token = "${TOKEN}"
-accounts = ["${WALLET}"]
 
 EOF
 }

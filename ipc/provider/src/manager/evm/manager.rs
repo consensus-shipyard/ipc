@@ -225,7 +225,6 @@ impl SubnetManager for EthSubnetManager {
                 root: params.parent.root_id(),
                 route,
             },
-            name,
             ipc_gateway_addr: self.ipc_contract_info.gateway_addr,
             consensus: params.consensus as u64 as u8,
             min_activation_collateral: ethers::types::U256::from(min_validator_stake),

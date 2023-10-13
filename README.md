@@ -93,9 +93,7 @@ In order to use the IPC agent with Calibration we need to have access to a full 
 # Default configuration for Filecoin Calibration
 [[subnets]]
 id = "/r314159"
-network_name = "calibration"
 [subnets.config]
-accounts = []
 gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
@@ -135,7 +133,6 @@ The `/r31415926` section of the agent's `config.toml` must be updated to connect
 ```toml
 [[subnets]]
 id = "/r31415926"
-network_name = "root"
 
 [subnets.config]
 network_type = "fvm"

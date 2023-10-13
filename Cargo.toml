@@ -41,6 +41,10 @@ rand = "0.8"
 hex = "0.4.3"
 tempfile = "3.4.0"
 serde_json = { version = "1.0.91", features = ["raw_value"] }
+libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
+ethers = "2.0.8"
+ethers-contract = "2.0.8"
+
 ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "dev" }
 ipc-sdk = { path = "./ipc/sdk" }
 
@@ -49,10 +53,7 @@ fvm_ipld_encoding = "0.3.3"
 fvm_ipld_hamt = "0.6"
 fvm_shared = { version = "=3.2.0", default-features = false, features = ["crypto"] }
 fil_actors_runtime = { git = "https://github.com/consensus-shipyard/fvm-utils", features = ["fil-actor"] }
-libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
 primitives = { git = "https://github.com/consensus-shipyard/fvm-utils" }
-ethers = "2.0.8"
-ethers-contract = "2.0.8"
 
 # Uncomment to point to you local versions
 # [patch."https://github.com/consensus-shipyard/fvm-utils"]
