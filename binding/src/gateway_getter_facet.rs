@@ -890,16 +890,7 @@ pub mod gateway_getter_facet {
                                     ),
                                 },
                                 ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("fromBlock"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("toBlock"),
+                                    name: ::std::borrow::ToOwned::to_owned("blockNumber"),
                                     kind: ::ethers::core::abi::ethabi::ParamType::Uint(
                                         256usize,
                                     ),
@@ -910,7 +901,7 @@ pub mod gateway_getter_facet {
                             ],
                             outputs: ::std::vec![
                                 ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
+                                    name: ::std::borrow::ToOwned::to_owned("msgs"),
                                     kind: ::ethers::core::abi::ethabi::ParamType::Array(
                                         ::std::boxed::Box::new(
                                             ::ethers::core::abi::ethabi::ParamType::Tuple(
@@ -971,6 +962,15 @@ pub mod gateway_getter_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("struct CrossMsg[]"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("blockHash"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes32"),
                                     ),
                                 },
                             ],
@@ -1463,15 +1463,15 @@ pub mod gateway_getter_facet {
                 .method_hash([157, 48, 112, 181], (subnet_id,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getTopDownMsgs` (0x77296bb1) function
+        ///Calls the contract's `getTopDownMsgs` (0xa823cb23) function
         pub fn get_top_down_msgs(
             &self,
             subnet_id: SubnetID,
-            from_block: ::ethers::core::types::U256,
-            to_block: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<CrossMsg>> {
+            block_number: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, (::std::vec::Vec<CrossMsg>, [u8; 32])>
+        {
             self.0
-                .method_hash([119, 41, 107, 177], (subnet_id, from_block, to_block))
+                .method_hash([168, 35, 203, 35], (subnet_id, block_number))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `listSubnets` (0x5d029685) function
@@ -1868,7 +1868,7 @@ pub mod gateway_getter_facet {
     pub struct GetSubnetTopDownMsgsLengthCall {
         pub subnet_id: SubnetID,
     }
-    ///Container type for all input parameters for the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint256,uint256)` and selector `0x77296bb1`
+    ///Container type for all input parameters for the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint256)` and selector `0xa823cb23`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1881,12 +1881,11 @@ pub mod gateway_getter_facet {
     )]
     #[ethcall(
         name = "getTopDownMsgs",
-        abi = "getTopDownMsgs((uint64,address[]),uint256,uint256)"
+        abi = "getTopDownMsgs((uint64,address[]),uint256)"
     )]
     pub struct GetTopDownMsgsCall {
         pub subnet_id: SubnetID,
-        pub from_block: ::ethers::core::types::U256,
-        pub to_block: ::ethers::core::types::U256,
+        pub block_number: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `listSubnets` function with signature `listSubnets()` and selector `0x5d029685`
     #[derive(
@@ -2689,7 +2688,7 @@ pub mod gateway_getter_facet {
         Hash,
     )]
     pub struct GetSubnetTopDownMsgsLengthReturn(pub ::ethers::core::types::U256);
-    ///Container type for all return fields from the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint256,uint256)` and selector `0x77296bb1`
+    ///Container type for all return fields from the `getTopDownMsgs` function with signature `getTopDownMsgs((uint64,address[]),uint256)` and selector `0xa823cb23`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2700,7 +2699,10 @@ pub mod gateway_getter_facet {
         Eq,
         Hash,
     )]
-    pub struct GetTopDownMsgsReturn(pub ::std::vec::Vec<CrossMsg>);
+    pub struct GetTopDownMsgsReturn {
+        pub msgs: ::std::vec::Vec<CrossMsg>,
+        pub block_hash: [u8; 32],
+    }
     ///Container type for all return fields from the `listSubnets` function with signature `listSubnets()` and selector `0x5d029685`
     #[derive(
         Clone,
