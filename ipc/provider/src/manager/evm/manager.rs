@@ -54,7 +54,6 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 
 /// The majority vote percentage for checkpoint submission when creating a subnet.
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
-const SUBNET_NAME_MAX_LEN: usize = 32;
 
 pub struct EthSubnetManager {
     keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
@@ -201,13 +200,6 @@ impl TopDownCheckpointQuery for EthSubnetManager {
 impl SubnetManager for EthSubnetManager {
     async fn create_subnet(&self, from: Address, params: ConstructParams) -> Result<Address> {
         self.ensure_same_gateway(&params.ipc_gateway_addr)?;
-
-        let name_len = params.name.as_bytes().len();
-        if name_len > SUBNET_NAME_MAX_LEN {
-            return Err(anyhow!("subnet name too long"));
-        }
-        let mut name = [0u8; SUBNET_NAME_MAX_LEN];
-        name[0..name_len].copy_from_slice(params.name.as_bytes());
 
         let min_validator_stake = params
             .min_validator_stake
