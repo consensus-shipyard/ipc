@@ -17,7 +17,6 @@ pub const MANIFEST_ID: &str = "ipc_subnet_actor";
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple, PartialEq, Eq)]
 pub struct ConstructParams {
     pub parent: SubnetID,
-    pub name: String,
     pub ipc_gateway_addr: Address,
     pub consensus: ConsensusType,
     pub min_validator_stake: TokenAmount,

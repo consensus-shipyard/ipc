@@ -92,20 +92,12 @@ fn check_subnets_config() {
     let child_id = SubnetID::from_str(CHILD_ID).unwrap();
     let child = &config[&child_id];
     assert_eq!(child.id, child_id);
-    assert_eq!(child.network_name, "child");
     assert_eq!(
         child.gateway_addr(),
         Address::from(EthAddress::from_str(ETH_ADDRESS).unwrap())
     );
     assert_eq!(*child.rpc_http(), Url::from_str(PROVIDER_HTTP).unwrap(),);
     assert_eq!(child.auth_token().as_ref().unwrap(), CHILD_AUTH_TOKEN);
-    assert_eq!(
-        child.accounts(),
-        vec![
-            Address::from(EthAddress::from_str(ETH_ADDRESS).unwrap()),
-            Address::from(EthAddress::from_str(ETH_ADDRESS).unwrap())
-        ],
-    );
 }
 
 fn config_str() -> String {
@@ -115,7 +107,6 @@ fn config_str() -> String {
 
         [[subnets]]
         id = "{CHILD_ID}"
-        network_name = "child"
 
         [subnets.config]
         network_type = "fevm"
@@ -123,7 +114,6 @@ fn config_str() -> String {
         provider_http = "{PROVIDER_HTTP}"
         registry_addr = "{ETH_ADDRESS}"
         gateway_addr = "{ETH_ADDRESS}"
-        accounts = ["{ETH_ADDRESS}", "{ETH_ADDRESS}"]
         "#
     )
 }
@@ -135,7 +125,6 @@ fn config_str_diff_addr() -> String {
 
         [[subnets]]
         id = "{CHILD_ID}"
-        network_name = "child"
 
         [subnets.config]
         network_type = "fevm"
@@ -143,7 +132,6 @@ fn config_str_diff_addr() -> String {
         provider_http = "{PROVIDER_HTTP}"
         registry_addr = "{ETH_ADDRESS}"
         gateway_addr = "{ETH_ADDRESS}"
-        accounts = ["{ETH_ADDRESS}", "{ETH_ADDRESS}"]
         "#
     )
 }

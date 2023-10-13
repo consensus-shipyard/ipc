@@ -102,36 +102,6 @@ where
     deserializer.deserialize_str(SubnetIDVisitor)
 }
 
-/// A serde deserialization method to deserialize a list of account strings into a vector of
-/// [`Address`].
-pub(crate) fn deserialize_accounts<'de, D>(
-    deserializer: D,
-) -> anyhow::Result<Vec<Address>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let addrs: Result<Vec<Address>, _> = <Vec<String>>::deserialize(deserializer)?
-        .iter()
-        .map(|raw_addr| Address::from_str(raw_addr))
-        .collect();
-    addrs.map_err(D::Error::custom)
-}
-
-/// A serde deserialization method to deserialize a list of eth account strings into a vector of
-/// [`Address`].
-pub(crate) fn deserialize_eth_accounts<'de, D>(
-    deserializer: D,
-) -> anyhow::Result<Vec<Address>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let addrs: Result<Vec<Address>, _> = <Vec<String>>::deserialize(deserializer)?
-        .iter()
-        .map(|raw_addr| eth_addr_str_to_address(raw_addr))
-        .collect();
-    addrs.map_err(D::Error::custom)
-}
-
 fn eth_addr_str_to_address(s: &str) -> anyhow::Result<Address> {
     let addr = EthAddress::from_str(s)?;
     Ok(Address::from(addr))

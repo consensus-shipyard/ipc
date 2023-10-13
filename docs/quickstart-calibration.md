@@ -72,7 +72,6 @@ id = "/r314159"
 network_name = "calibration"
 
 [subnets.config]
-accounts = []
 gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"

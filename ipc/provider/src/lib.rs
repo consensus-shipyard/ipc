@@ -228,7 +228,6 @@ impl IpcProvider {
         &mut self,
         from: Option<Address>,
         parent: SubnetID,
-        subnet_name: String,
         min_validators: u64,
         min_validator_stake: TokenAmount,
         bottomup_check_period: ChainEpoch,
@@ -244,7 +243,6 @@ impl IpcProvider {
 
         let constructor_params = ConstructParams {
             parent,
-            name: subnet_name,
             ipc_gateway_addr: subnet_config.gateway_addr(),
             consensus: ConsensusType::Mir,
             min_validators,

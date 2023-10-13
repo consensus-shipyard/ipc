@@ -34,7 +34,6 @@ impl CreateSubnet {
             .create_subnet(
                 from,
                 parent,
-                arguments.name.clone(),
                 arguments.min_validators,
                 f64_to_token_amount(arguments.min_validator_stake)?,
                 arguments.bottomup_check_period,
@@ -75,8 +74,6 @@ pub struct CreateSubnetArgs {
     #[arg(long, short, help = "The parent subnet to create the new actor in")]
     pub parent: String,
     #[arg(long, short, help = "The name of the subnet")]
-    pub name: String,
-    #[arg(long, help = "The minimal validator stake amount (in whole FIL units)")]
     pub min_validator_stake: f64,
     #[arg(long, help = "The minimal number of validators")]
     pub min_validators: u64,
