@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use ethers::types::H256;
 use ipc_actors_abis::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
@@ -15,7 +16,7 @@ use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
-use crate::manager::subnet::TopDownCheckpointQuery;
+use crate::manager::subnet::{GetBlockHashResult, TopDownCheckpointQuery, TopDownQueryPayload};
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -24,7 +25,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{Eip1559TransactionRequest, I256, U256};
+use ethers::types::{BlockId, Eip1559TransactionRequest, I256, U256};
 use futures_util::StreamExt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -100,32 +101,63 @@ impl TopDownCheckpointQuery for EthSubnetManager {
     async fn get_top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        start_epoch: ChainEpoch,
-        end_epoch: ChainEpoch,
-    ) -> Result<Vec<ipc_sdk::cross::CrossMsg>> {
-        self.top_down_msgs(subnet_id, start_epoch, end_epoch).await
+        epoch: ChainEpoch,
+        block_hash: &[u8],
+    ) -> Result<Vec<CrossMsg>> {
+        if block_hash.len() != 32 {
+            return Err(anyhow!("invalid block hash len"));
+        }
+
+        let route = subnet_id_to_evm_addresses(subnet_id)?;
+        log::debug!("getting top down messages for route: {route:?}");
+
+        let subnet_id = gateway_getter_facet::SubnetID {
+            root: subnet_id.root_id(),
+            route,
+        };
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let call = gateway_contract
+            .get_top_down_msgs(subnet_id, U256::from(epoch))
+            .block(BlockId::from(H256::from_slice(block_hash)));
+        let raw_msgs = call
+            .call()
+            .await
+            .map_err(|e| anyhow!("cannot get evm top down messages: {e:}"))?;
+
+        let mut msgs = vec![];
+        for c in raw_msgs {
+            msgs.push(ipc_sdk::cross::CrossMsg::try_from(c)?);
+        }
+        Ok(msgs)
     }
 
-    async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>> {
+    async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult> {
         let block = self
             .ipc_contract_info
             .provider
             .get_block(height as u64)
             .await?
             .ok_or_else(|| anyhow!("height does not exist"))?;
-        Ok(block
-            .hash
-            .ok_or_else(|| anyhow!("block hash is empty"))?
-            .to_fixed_bytes()
-            .to_vec())
+
+        Ok(GetBlockHashResult {
+            parent_block_hash: block.parent_hash.to_fixed_bytes().to_vec(),
+            block_hash: block
+                .hash
+                .ok_or_else(|| anyhow!("block hash is empty"))?
+                .to_fixed_bytes()
+                .to_vec(),
+        })
     }
 
     async fn get_validator_changeset(
         &self,
         subnet_id: &SubnetID,
-        start: ChainEpoch,
-        end: ChainEpoch,
-    ) -> Result<Vec<StakingChangeRequest>> {
+        epoch: ChainEpoch,
+    ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
         let address = contract_address_from_subnet(subnet_id)?;
         log::info!("querying validator changes in evm subnet contract: {address:}");
 
@@ -136,16 +168,32 @@ impl TopDownCheckpointQuery for EthSubnetManager {
 
         let ev = contract
             .event::<NewStakingRequest>()
-            .from_block(start as u64)
-            .to_block(end as u64);
-        let mut event_stream = ev.stream().await?;
+            .from_block(epoch as u64)
+            .to_block(epoch as u64);
+        let mut event_stream = ev.stream_with_meta().await?;
 
         let mut changes = vec![];
-        while let Some(Ok(event)) = event_stream.next().await {
+        let mut hash = None;
+        while let Some(Ok((event, meta))) = event_stream.next().await {
+            if let Some(h) = hash {
+                if h != meta.block_hash {
+                    return Err(anyhow!("block hash not equal"));
+                }
+            } else {
+                hash = Some(meta.block_hash);
+            }
             changes.push(StakingChangeRequest::try_from(event)?);
         }
 
-        Ok(changes)
+        let block_hash = if let Some(h) = hash {
+            h.0.to_vec()
+        } else {
+            self.get_block_hash(epoch).await?.block_hash
+        };
+        Ok(TopDownQueryPayload {
+            value: changes,
+            block_hash,
+        })
     }
 }
 
@@ -614,44 +662,6 @@ impl EthManager for EthSubnetManager {
         } else {
             Ok(nonce)
         }
-    }
-
-    async fn top_down_msgs(
-        &self,
-        subnet_id: &SubnetID,
-        start_epoch: ChainEpoch,
-        end_epoch: ChainEpoch,
-    ) -> Result<Vec<ipc_sdk::cross::CrossMsg>> {
-        let route = subnet_id_to_evm_addresses(subnet_id)?;
-        log::debug!("getting top down messages for route: {route:?}");
-
-        let subnet_id = gateway_getter_facet::SubnetID {
-            root: subnet_id.root_id(),
-            route,
-        };
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let raw_msgs = gateway_contract
-            .method::<_, Vec<gateway_getter_facet::CrossMsg>>(
-                "getTopDownMsgs",
-                gateway_getter_facet::GetTopDownMsgsCall {
-                    subnet_id,
-                    from_block: U256::from(start_epoch),
-                    to_block: U256::from(end_epoch),
-                },
-            )
-            .map_err(|e| anyhow!("cannot create the top down msg call: {e:}"))?
-            .call()
-            .await
-            .map_err(|e| anyhow!("cannot get evm top down messages: {e:}"))?;
-
-        let mut msgs = vec![];
-        for c in raw_msgs {
-            msgs.push(ipc_sdk::cross::CrossMsg::try_from(c)?);
-        }
-        Ok(msgs)
     }
 
     async fn subnet_bottom_up_checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {

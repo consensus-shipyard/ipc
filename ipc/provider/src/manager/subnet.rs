@@ -113,6 +113,20 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
     async fn get_chain_id(&self) -> Result<String>;
 }
 
+/// The generic payload that returns the block hash of the data returning block with the actual
+/// data payload.
+#[derive(Debug)]
+pub struct TopDownQueryPayload<T> {
+    pub value: T,
+    pub block_hash: Vec<u8>,
+}
+
+#[derive(Default, Debug)]
+pub struct GetBlockHashResult {
+    pub parent_block_hash: Vec<u8>,
+    pub block_hash: Vec<u8>,
+}
+
 /// Trait to interact with a subnet to query the necessary information for top down checkpoint.
 #[async_trait]
 pub trait TopDownCheckpointQuery: Send + Sync {
@@ -124,16 +138,15 @@ pub trait TopDownCheckpointQuery: Send + Sync {
     async fn get_top_down_msgs(
         &self,
         subnet_id: &SubnetID,
-        start_epoch: ChainEpoch,
-        end_epoch: ChainEpoch,
+        epoch: ChainEpoch,
+        block_hash: &[u8],
     ) -> Result<Vec<CrossMsg>>;
     /// Get the block hash
-    async fn get_block_hash(&self, height: ChainEpoch) -> Result<Vec<u8>>;
+    async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult>;
     /// Get the validator change set from start to end block.
     async fn get_validator_changeset(
         &self,
         subnet_id: &SubnetID,
-        start: ChainEpoch,
-        end: ChainEpoch,
-    ) -> Result<Vec<StakingChangeRequest>>;
+        epoch: ChainEpoch,
+    ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>>;
 }

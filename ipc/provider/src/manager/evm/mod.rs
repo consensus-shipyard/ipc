@@ -5,7 +5,6 @@ mod manager;
 
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
-use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
@@ -26,14 +25,6 @@ pub trait EthManager: SubnetManager {
 
     /// Get the latest applied top down nonce
     async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> anyhow::Result<u64>;
-
-    /// Get the bottom up checkpoint a certain epoch
-    async fn top_down_msgs(
-        &self,
-        subnet_id: &SubnetID,
-        start_epoch: ChainEpoch,
-        end_epoch: ChainEpoch,
-    ) -> anyhow::Result<Vec<CrossMsg>>;
 
     /// Get the subnet contract bottom up checkpoint period
     async fn subnet_bottom_up_checkpoint_period(

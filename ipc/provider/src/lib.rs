@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
+use crate::manager::{GetBlockHashResult, TopDownQueryPayload};
 use anyhow::anyhow;
 use base64::Engine;
 use config::Config;
@@ -540,24 +541,21 @@ impl IpcProvider {
     pub async fn get_validator_changeset(
         &self,
         subnet: &SubnetID,
-        start: ChainEpoch,
-        end: ChainEpoch,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
+        epoch: ChainEpoch,
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
         };
 
-        conn.manager()
-            .get_validator_changeset(subnet, start, end)
-            .await
+        conn.manager().get_validator_changeset(subnet, epoch).await
     }
 
     pub async fn get_top_down_msgs(
         &self,
         subnet: &SubnetID,
-        start_epoch: ChainEpoch,
-        end_epoch: ChainEpoch,
+        epoch: ChainEpoch,
+        block_hash: &[u8],
     ) -> anyhow::Result<Vec<CrossMsg>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
@@ -566,7 +564,7 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .get_top_down_msgs(subnet, start_epoch, end_epoch)
+            .get_top_down_msgs(subnet, epoch, block_hash)
             .await
     }
 
@@ -574,7 +572,7 @@ impl IpcProvider {
         &self,
         subnet: &SubnetID,
         height: ChainEpoch,
-    ) -> anyhow::Result<Vec<u8>> {
+    ) -> anyhow::Result<GetBlockHashResult> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
