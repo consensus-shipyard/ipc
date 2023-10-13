@@ -53,6 +53,11 @@ struct SubnetActorStorage {
     mapping(address => uint256) relayerRewards;
     /// @notice The addresses of the relayers sent the checkpoint at height `h`.
     mapping(uint64 => EnumerableSet.AddressSet) rewardedRelayers;
+    /// =============
+    /// mapping of bootstrap owner to its bootstrap node address
+    mapping(address => string) bootstrapNodes;
+    /// @notice the list ov validators that announces bootstrap nodes
+    EnumerableSet.AddressSet bootstrapOwners;
 }
 
 library LibSubnetActorStorage {

@@ -187,6 +187,36 @@ contract SubnetActorDiamondTest is Test {
         saManager.join(publicKey);
     }
 
+    function testSubnetActorDiamond_Bootstrap_Node() public {
+        (address validator, bytes memory publicKey) = deriveValidatorAddress(100);
+
+        vm.deal(validator, 10 gwei);
+        vm.prank(validator);
+        saManager.join{value: 10}(publicKey);
+
+        // validator adds a node
+        vm.prank(validator);
+        saManager.addBootstrapNode("1.2.3.4");
+
+        // not-validator adds a node
+        vm.prank(vm.addr(200));
+        vm.expectRevert(NotValidator.selector);
+        saManager.addBootstrapNode("3.4.5.6");
+
+        string[] memory nodes = saGetter.getBootstrapNodes();
+        require(nodes.length == 1, "it returns one node");
+        require(
+            keccak256(abi.encodePacked((nodes[0]))) == keccak256(abi.encodePacked(("1.2.3.4"))),
+            "it returns correct address"
+        );
+
+        vm.prank(validator);
+        saManager.leave();
+
+        nodes = saGetter.getBootstrapNodes();
+        require(nodes.length == 0, "no nodes");
+    }
+
     /// @notice Testing the basic join, stake, leave lifecycle of validators
     function testSubnetActorDiamond_BasicLifeCycle() public {
         (address validator1, bytes memory publicKey1) = deriveValidatorAddress(100);

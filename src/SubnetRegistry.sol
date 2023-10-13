@@ -10,8 +10,8 @@ contract SubnetRegistry is ReentrancyGuard {
     address public immutable GATEWAY;
 
     /// The getter and manager facet shared by diamond
-    address public getterFacet;
-    address public managerFacet;
+    address public immutable SUBNET_GETTER_FACET;
+    address public immutable SUBNET_MANAGER_FACET;
 
     /// The subnet getter facet functions selectors
     bytes4[] public subnetGetterSelectors;
@@ -55,8 +55,8 @@ contract SubnetRegistry is ReentrancyGuard {
         }
 
         GATEWAY = _gateway;
-        getterFacet = _getterFacet;
-        managerFacet = _managerFacet;
+        SUBNET_GETTER_FACET = _getterFacet;
+        SUBNET_MANAGER_FACET = _managerFacet;
 
         subnetGetterSelectors = _subnetGetterSelectors;
         subnetManagerSelectors = _subnetManagerSelectors;
@@ -75,14 +75,14 @@ contract SubnetRegistry is ReentrancyGuard {
 
         // set the diamond cut for subnet getter
         diamondCut[0] = IDiamond.FacetCut({
-            facetAddress: getterFacet,
+            facetAddress: SUBNET_GETTER_FACET,
             action: IDiamond.FacetCutAction.Add,
             functionSelectors: subnetGetterSelectors
         });
 
         // set the diamond cut for subnet manager
         diamondCut[1] = IDiamond.FacetCut({
-            facetAddress: managerFacet,
+            facetAddress: SUBNET_MANAGER_FACET,
             action: IDiamond.FacetCutAction.Add,
             functionSelectors: subnetManagerSelectors
         });

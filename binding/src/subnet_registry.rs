@@ -78,6 +78,38 @@ pub mod subnet_registry {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("SUBNET_GETTER_FACET"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("SUBNET_GETTER_FACET",),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("SUBNET_MANAGER_FACET"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("SUBNET_MANAGER_FACET",),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getSubnetDeployedByNonce"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("getSubnetDeployedByNonce",),
@@ -109,22 +141,6 @@ pub mod subnet_registry {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("getterFacet"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("getterFacet"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("latestSubnetDeployed"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("latestSubnetDeployed",),
@@ -137,22 +153,6 @@ pub mod subnet_registry {
                         },],
                         outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
                             name: ::std::borrow::ToOwned::to_owned("subnet"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("managerFacet"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("managerFacet"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
                             kind: ::ethers::core::abi::ethabi::ParamType::Address,
                             internal_type: ::core::option::Option::Some(
                                 ::std::borrow::ToOwned::to_owned("address"),
@@ -410,6 +410,22 @@ pub mod subnet_registry {
                 .method_hash([51, 140, 83, 113], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `SUBNET_GETTER_FACET` (0x7da1d64b) function
+        pub fn subnet_getter_facet(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+            self.0
+                .method_hash([125, 161, 214, 75], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `SUBNET_MANAGER_FACET` (0x6ec26a49) function
+        pub fn subnet_manager_facet(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+            self.0
+                .method_hash([110, 194, 106, 73], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getSubnetDeployedByNonce` (0x9836b75f) function
         pub fn get_subnet_deployed_by_nonce(
             &self,
@@ -420,14 +436,6 @@ pub mod subnet_registry {
                 .method_hash([152, 54, 183, 95], (owner, nonce))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `getterFacet` (0xa0a1ca33) function
-        pub fn getter_facet(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
-            self.0
-                .method_hash([160, 161, 202, 51], ())
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `latestSubnetDeployed` (0x1163dca5) function
         pub fn latest_subnet_deployed(
             &self,
@@ -435,14 +443,6 @@ pub mod subnet_registry {
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([17, 99, 220, 165], owner)
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `managerFacet` (0xd7dbbc48) function
-        pub fn manager_facet(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
-            self.0
-                .method_hash([215, 219, 188, 72], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `newSubnetActor` (0xaf275cd3) function
@@ -770,6 +770,32 @@ pub mod subnet_registry {
     )]
     #[ethcall(name = "GATEWAY", abi = "GATEWAY()")]
     pub struct GatewayCall;
+    ///Container type for all input parameters for the `SUBNET_GETTER_FACET` function with signature `SUBNET_GETTER_FACET()` and selector `0x7da1d64b`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "SUBNET_GETTER_FACET", abi = "SUBNET_GETTER_FACET()")]
+    pub struct SubnetGetterFacetCall;
+    ///Container type for all input parameters for the `SUBNET_MANAGER_FACET` function with signature `SUBNET_MANAGER_FACET()` and selector `0x6ec26a49`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "SUBNET_MANAGER_FACET", abi = "SUBNET_MANAGER_FACET()")]
+    pub struct SubnetManagerFacetCall;
     ///Container type for all input parameters for the `getSubnetDeployedByNonce` function with signature `getSubnetDeployedByNonce(address,uint64)` and selector `0x9836b75f`
     #[derive(
         Clone,
@@ -789,19 +815,6 @@ pub mod subnet_registry {
         pub owner: ::ethers::core::types::Address,
         pub nonce: u64,
     }
-    ///Container type for all input parameters for the `getterFacet` function with signature `getterFacet()` and selector `0xa0a1ca33`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "getterFacet", abi = "getterFacet()")]
-    pub struct GetterFacetCall;
     ///Container type for all input parameters for the `latestSubnetDeployed` function with signature `latestSubnetDeployed(address)` and selector `0x1163dca5`
     #[derive(
         Clone,
@@ -817,19 +830,6 @@ pub mod subnet_registry {
     pub struct LatestSubnetDeployedCall {
         pub owner: ::ethers::core::types::Address,
     }
-    ///Container type for all input parameters for the `managerFacet` function with signature `managerFacet()` and selector `0xd7dbbc48`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[ethcall(name = "managerFacet", abi = "managerFacet()")]
-    pub struct ManagerFacetCall;
     ///Container type for all input parameters for the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),bytes32,address,uint8,uint256,uint64,uint64,uint8,uint16,int8))` and selector `0xaf275cd3`
     #[derive(
         Clone,
@@ -907,10 +907,10 @@ pub mod subnet_registry {
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetRegistryCalls {
         Gateway(GatewayCall),
+        SubnetGetterFacet(SubnetGetterFacetCall),
+        SubnetManagerFacet(SubnetManagerFacetCall),
         GetSubnetDeployedByNonce(GetSubnetDeployedByNonceCall),
-        GetterFacet(GetterFacetCall),
         LatestSubnetDeployed(LatestSubnetDeployedCall),
-        ManagerFacet(ManagerFacetCall),
         NewSubnetActor(NewSubnetActorCall),
         SubnetGetterSelectors(SubnetGetterSelectorsCall),
         SubnetManagerSelectors(SubnetManagerSelectorsCall),
@@ -926,21 +926,24 @@ pub mod subnet_registry {
                 return Ok(Self::Gateway(decoded));
             }
             if let Ok(decoded) =
+                <SubnetGetterFacetCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::SubnetGetterFacet(decoded));
+            }
+            if let Ok(decoded) =
+                <SubnetManagerFacetCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::SubnetManagerFacet(decoded));
+            }
+            if let Ok(decoded) =
                 <GetSubnetDeployedByNonceCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::GetSubnetDeployedByNonce(decoded));
-            }
-            if let Ok(decoded) = <GetterFacetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::GetterFacet(decoded));
             }
             if let Ok(decoded) =
                 <LatestSubnetDeployedCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::LatestSubnetDeployed(decoded));
-            }
-            if let Ok(decoded) = <ManagerFacetCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::ManagerFacet(decoded));
             }
             if let Ok(decoded) =
                 <NewSubnetActorCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -970,14 +973,16 @@ pub mod subnet_registry {
         fn encode(self) -> Vec<u8> {
             match self {
                 Self::Gateway(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SubnetGetterFacet(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SubnetManagerFacet(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetSubnetDeployedByNonce(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::GetterFacet(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::LatestSubnetDeployed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::ManagerFacet(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NewSubnetActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::SubnetGetterSelectors(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -994,10 +999,10 @@ pub mod subnet_registry {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::Gateway(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SubnetGetterFacet(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SubnetManagerFacet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetSubnetDeployedByNonce(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetterFacet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::LatestSubnetDeployed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ManagerFacet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewSubnetActor(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetGetterSelectors(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetManagerSelectors(element) => ::core::fmt::Display::fmt(element, f),
@@ -1011,24 +1016,24 @@ pub mod subnet_registry {
             Self::Gateway(value)
         }
     }
+    impl ::core::convert::From<SubnetGetterFacetCall> for SubnetRegistryCalls {
+        fn from(value: SubnetGetterFacetCall) -> Self {
+            Self::SubnetGetterFacet(value)
+        }
+    }
+    impl ::core::convert::From<SubnetManagerFacetCall> for SubnetRegistryCalls {
+        fn from(value: SubnetManagerFacetCall) -> Self {
+            Self::SubnetManagerFacet(value)
+        }
+    }
     impl ::core::convert::From<GetSubnetDeployedByNonceCall> for SubnetRegistryCalls {
         fn from(value: GetSubnetDeployedByNonceCall) -> Self {
             Self::GetSubnetDeployedByNonce(value)
         }
     }
-    impl ::core::convert::From<GetterFacetCall> for SubnetRegistryCalls {
-        fn from(value: GetterFacetCall) -> Self {
-            Self::GetterFacet(value)
-        }
-    }
     impl ::core::convert::From<LatestSubnetDeployedCall> for SubnetRegistryCalls {
         fn from(value: LatestSubnetDeployedCall) -> Self {
             Self::LatestSubnetDeployed(value)
-        }
-    }
-    impl ::core::convert::From<ManagerFacetCall> for SubnetRegistryCalls {
-        fn from(value: ManagerFacetCall) -> Self {
-            Self::ManagerFacet(value)
         }
     }
     impl ::core::convert::From<NewSubnetActorCall> for SubnetRegistryCalls {
@@ -1068,6 +1073,30 @@ pub mod subnet_registry {
         Hash,
     )]
     pub struct GatewayReturn(pub ::ethers::core::types::Address);
+    ///Container type for all return fields from the `SUBNET_GETTER_FACET` function with signature `SUBNET_GETTER_FACET()` and selector `0x7da1d64b`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct SubnetGetterFacetReturn(pub ::ethers::core::types::Address);
+    ///Container type for all return fields from the `SUBNET_MANAGER_FACET` function with signature `SUBNET_MANAGER_FACET()` and selector `0x6ec26a49`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct SubnetManagerFacetReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `getSubnetDeployedByNonce` function with signature `getSubnetDeployedByNonce(address,uint64)` and selector `0x9836b75f`
     #[derive(
         Clone,
@@ -1082,18 +1111,6 @@ pub mod subnet_registry {
     pub struct GetSubnetDeployedByNonceReturn {
         pub subnet: ::ethers::core::types::Address,
     }
-    ///Container type for all return fields from the `getterFacet` function with signature `getterFacet()` and selector `0xa0a1ca33`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct GetterFacetReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `latestSubnetDeployed` function with signature `latestSubnetDeployed(address)` and selector `0x1163dca5`
     #[derive(
         Clone,
@@ -1108,18 +1125,6 @@ pub mod subnet_registry {
     pub struct LatestSubnetDeployedReturn {
         pub subnet: ::ethers::core::types::Address,
     }
-    ///Container type for all return fields from the `managerFacet` function with signature `managerFacet()` and selector `0xd7dbbc48`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct ManagerFacetReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),bytes32,address,uint8,uint256,uint64,uint64,uint8,uint16,int8))` and selector `0xaf275cd3`
     #[derive(
         Clone,

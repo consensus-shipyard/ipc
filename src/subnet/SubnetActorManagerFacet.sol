@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, MessagesNotSorted, NotEnoughBalanceForRewards, NoValidatorsInSubnet, NotValidator, NotAllValidatorsHaveLeft, SubnetNotActive, WrongCheckpointSource, NoRewardToWithdraw, NotStakedBefore, InconsistentPrevCheckpoint, InvalidSignatureErr, HeightAlreadyExecuted, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
-import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Validator, ValidatorSet} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -146,10 +145,16 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice method that allows a validator to leave the subnet
     function leave() external notKilled {
+        // remove bootstrap nodes added by this validator
+
         uint256 amount = LibStaking.totalValidatorCollateral(msg.sender);
         if (amount == 0) {
             revert NotValidator();
         }
+
+        // slither-disable-next-line unused-return
+        s.bootstrapOwners.remove(msg.sender);
+        delete s.bootstrapNodes[msg.sender];
 
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
@@ -176,6 +181,19 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice Relayer claims its reward
     function claimRewardForRelayer() external nonReentrant {
         LibStaking.claimRewardForRelayer(msg.sender);
+    }
+
+    /// @notice add a bootstrap node
+    function addBootstrapNode(string memory netAddress) external {
+        if (!s.validatorSet.isActiveValidator(msg.sender)) {
+            revert NotValidator();
+        }
+        if (bytes(netAddress).length == 0) {
+            revert EmptyAddress();
+        }
+        s.bootstrapNodes[msg.sender] = netAddress;
+        // slither-disable-next-line unused-return
+        s.bootstrapOwners.add(msg.sender);
     }
 
     /// @notice reward the relayers for processing checkpoint at height `height`.

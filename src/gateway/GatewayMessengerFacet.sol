@@ -6,7 +6,7 @@ import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {CrossMsg, StorableMsg} from "../structs/Checkpoint.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID} from "../structs/Subnet.sol";
-import {InvalidCrossMsgFromSubnet, NotEnoughFunds, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
+import {InvalidCrossMsgFromSubnet, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";

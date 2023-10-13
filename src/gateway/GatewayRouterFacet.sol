@@ -10,10 +10,9 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, Subnet, Validator, ValidatorInfo, ValidatorSet} from "../structs/Subnet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {InconsistentPrevCheckpoint, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
-import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, IncompleteCheckpointExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory, FailedAddSignature} from "../errors/IPCErrors.sol";
-import {MessagesNotSorted, NotEnoughBalance, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
-import {NotValidator, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
+import {NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
+import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory} from "../errors/IPCErrors.sol";
+import {NotEnoughBalance, NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -112,11 +111,11 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
-    /// @notice Apply all changes committed through the commitment of parent finality
+    /// @notice Apply all changes committed through the committment of parent finality
     function applyFinalityChanges() external systemActorOnly returns (uint64) {
         // get the latest configuration number for the change set
         uint64 configurationNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
-        // return immediately if there are no changes to confirm by looking at next configNumber
+        // return immedidately if there are no changes to confirm by looking at next configNumber
         if (
             // nextConfiguration == startConfiguration (i.e. no changes)
             (configurationNumber + 1) == s.validatorsTracker.changes.startConfigurationNumber
@@ -336,7 +335,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     }
 
     /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
-    /// @dev `retentionHeight` is the height of the first incomplete checkpoint that must be kept to implement checkpointing.
+    /// @dev `retentionHeight` is the height of the first incomplete checkpointswe must keep to implement checkpointing.
     /// All checkpoints with a height less than `retentionHeight` are removed from the history, assuming they are committed to the parent.
     /// @param newRetentionHeight - the height of the oldest checkpoint to keep
     function pruneBottomUpCheckpoints(uint64 newRetentionHeight) external systemActorOnly {
