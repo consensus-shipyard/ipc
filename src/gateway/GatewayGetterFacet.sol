@@ -100,15 +100,15 @@ contract GatewayGetterFacet {
         return (true, subnet.topDownNonce);
     }
 
-    function appliedTopDownNonce() public view returns (uint64) {
+    function appliedTopDownNonce() external view returns (uint64) {
         return s.appliedTopDownNonce;
     }
 
-    function postbox(bytes32 id) public view returns (StorableMsg memory storableMsg, bool wrapped) {
+    function postbox(bytes32 id) external view returns (StorableMsg memory storableMsg, bool wrapped) {
         return (s.postbox[id].message, s.postbox[id].wrapped);
     }
 
-    function majorityPercentage() public view returns (uint64) {
+    function majorityPercentage() external view returns (uint64) {
         return s.majorityPercentage;
     }
 
@@ -148,22 +148,22 @@ contract GatewayGetterFacet {
     }
 
     /// @notice get the checkpoint information corresponding to the block height
-    function getCheckpointInfo(uint64 h) public view returns (CheckpointInfo memory) {
+    function getCheckpointInfo(uint64 h) external view returns (CheckpointInfo memory) {
         return s.bottomUpCheckpointInfo[h];
     }
 
     /// @notice get the checkpoint current weight corresponding to the block height
-    function getCheckpointCurrentWeight(uint64 h) public view returns (uint256) {
+    function getCheckpointCurrentWeight(uint64 h) external view returns (uint256) {
         return s.bottomUpCheckpointInfo[h].currentWeight;
     }
 
     /// @notice get the incomplete checkpoint heights
-    function getIncompleteCheckpointHeights() public view returns (uint256[] memory) {
+    function getIncompleteCheckpointHeights() external view returns (uint256[] memory) {
         return s.incompleteCheckpoints.values();
     }
 
     /// @notice get the incomplete checkpoints
-    function getIncompleteCheckpoints() public view returns (BottomUpCheckpoint[] memory) {
+    function getIncompleteCheckpoints() external view returns (BottomUpCheckpoint[] memory) {
         uint256[] memory heights = s.incompleteCheckpoints.values();
         uint256 size = heights.length;
 
@@ -178,13 +178,13 @@ contract GatewayGetterFacet {
     }
 
     /// @notice get the bottom-up checkpoint retention index
-    function getBottomUpRetentionHeight() public view returns (uint64) {
+    function getBottomUpRetentionHeight() external view returns (uint64) {
         return s.bottomUpCheckpointRetentionHeight;
     }
 
     /// @notice Calculate the threshold required for quorum in this subnet
     /// based on the configured majority percentage and the total weight of the validators.
-    function getQuorumThreshold(uint256 totalWeight) public view returns (uint256) {
+    function getQuorumThreshold(uint256 totalWeight) external view returns (uint256) {
         return LibGateway.weightNeeded(totalWeight, s.majorityPercentage);
     }
 

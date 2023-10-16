@@ -96,8 +96,7 @@ contract SubnetRegistry is ReentrancyGuard {
         emit SubnetDeployed(subnetAddr);
     }
 
-    /// @notice Returns the address of the latest subnet actor
-    /// deployed by a user
+    /// @notice Returns the address of the latest subnet actor deployed by a user
     function latestSubnetDeployed(address owner) external view returns (address subnet) {
         uint64 nonce = userNonces[owner];
         // need unchecked when nonce == 0 or else will underflow
@@ -111,8 +110,7 @@ contract SubnetRegistry is ReentrancyGuard {
         }
     }
 
-    /// @notice Returns the address of a subnet actor deployed for a
-    /// specific nonce by a user
+    /// @notice Returns the address of a subnet actor deployed for a specific nonce by a user
     function getSubnetDeployedByNonce(address owner, uint64 nonce) external view returns (address subnet) {
         subnet = subnets[owner][nonce];
         if (subnet == address(0)) {

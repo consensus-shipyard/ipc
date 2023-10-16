@@ -31,7 +31,7 @@ check-subnet:
 lint:
 	solhint 'src/**/*.sol'
 
-format:
+fmt:
 	npx prettier --check -w 'src/**/*.sol' 'test/*.sol'
 
 build:
@@ -72,7 +72,7 @@ coverage:
 	genhtml -o coverage_report lcov.info --branch-coverage
 	./tools/check_coverage.sh
 
-prepare: format lint test slither
+prepare: fmt lint test slither
 
 # ==============================================================================
-.PHONY: deploy-ipc lint format check-subnet slither check-gateway test prepare storage build clean
+.PHONY: deploy-ipc lint fmt check-subnet slither check-gateway test prepare storage build clean
