@@ -45,7 +45,7 @@ libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] 
 ethers = "2.0.8"
 ethers-contract = "2.0.8"
 
-ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "fm-306-genesis-getters" }
+ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "dev" }
 ipc-sdk = { path = "./ipc/sdk" }
 
 fvm_ipld_blockstore = "0.1.1"
