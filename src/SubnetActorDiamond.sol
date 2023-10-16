@@ -26,6 +26,7 @@ contract SubnetActorDiamond {
         uint64 bottomUpCheckPeriod;
         uint8 majorityPercentage;
         uint16 activeValidatorsLimit;
+        uint256 minCrossMsgFee;
         int8 powerScale;
     }
 
@@ -58,6 +59,7 @@ contract SubnetActorDiamond {
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.majorityPercentage = params.majorityPercentage;
         s.powerScale = params.powerScale;
+        s.minCrossMsgFee = params.minCrossMsgFee;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;

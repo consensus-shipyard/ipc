@@ -34,6 +34,14 @@ contract SubnetActorGetterFacet {
         return s.minValidators;
     }
 
+    function majorityPercentage() external view returns (uint8) {
+        return s.majorityPercentage;
+    }
+
+    function activeValidatorsLimit() external view returns (uint16) {
+        return s.validatorSet.activeLimit;
+    }
+
     function getConfigurationNumbers() external view returns (uint64, uint64) {
         return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
     }
@@ -60,6 +68,10 @@ contract SubnetActorGetterFacet {
 
     function minActivationCollateral() external view returns (uint256) {
         return s.minActivationCollateral;
+    }
+
+    function minCrossMsgFee() external view returns (uint256) {
+        return s.minCrossMsgFee;
     }
 
     /// @notice Get the information of a validator

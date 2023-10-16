@@ -184,6 +184,7 @@ pub mod subnet_registry {
                                 ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                 ::ethers::core::abi::ethabi::ParamType::Int(8usize),
                             ],),
                             internal_type: ::core::option::Option::Some(
@@ -444,13 +445,13 @@ pub mod subnet_registry {
                 .method_hash([17, 99, 220, 165], owner)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `newSubnetActor` (0x6cb304f0) function
+        ///Calls the contract's `newSubnetActor` (0x1842679a) function
         pub fn new_subnet_actor(
             &self,
             params: ConstructorParams,
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
-                .method_hash([108, 179, 4, 240], (params,))
+                .method_hash([24, 66, 103, 154], (params,))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `subnetGetterSelectors` (0x3e2b8ad7) function
@@ -829,7 +830,7 @@ pub mod subnet_registry {
     pub struct LatestSubnetDeployedCall {
         pub owner: ::ethers::core::types::Address,
     }
-    ///Container type for all input parameters for the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,int8))` and selector `0x6cb304f0`
+    ///Container type for all input parameters for the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,uint256,int8))` and selector `0x1842679a`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -842,7 +843,7 @@ pub mod subnet_registry {
     )]
     #[ethcall(
         name = "newSubnetActor",
-        abi = "newSubnetActor(((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,int8))"
+        abi = "newSubnetActor(((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,uint256,int8))"
     )]
     pub struct NewSubnetActorCall {
         pub params: ConstructorParams,
@@ -1124,7 +1125,7 @@ pub mod subnet_registry {
     pub struct LatestSubnetDeployedReturn {
         pub subnet: ::ethers::core::types::Address,
     }
-    ///Container type for all return fields from the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,int8))` and selector `0x6cb304f0`
+    ///Container type for all return fields from the `newSubnetActor` function with signature `newSubnetActor(((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,uint256,int8))` and selector `0x1842679a`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1186,7 +1187,7 @@ pub mod subnet_registry {
         Hash,
     )]
     pub struct UserNoncesReturn(pub u64);
-    ///`ConstructorParams((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,int8)`
+    ///`ConstructorParams((uint64,address[]),address,uint8,uint256,uint64,uint64,uint8,uint16,uint256,int8)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1206,6 +1207,7 @@ pub mod subnet_registry {
         pub bottom_up_check_period: u64,
         pub majority_percentage: u8,
         pub active_validators_limit: u16,
+        pub min_cross_msg_fee: ::ethers::core::types::U256,
         pub power_scale: i8,
     }
     ///`SubnetID(uint64,address[])`

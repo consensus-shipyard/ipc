@@ -26,6 +26,7 @@ contract SubnetRegistryTest is Test {
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     int8 private constant DEFAULT_POWER_SCALE = 18;
     uint64 private constant ROOTNET_CHAINID = 123;
+    uint256 private constant CROSS_MSG_FEE = 10 gwei;
 
     SubnetRegistry registry;
     bytes4[] empty;
@@ -74,7 +75,8 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
-            powerScale: DEFAULT_POWER_SCALE
+            powerScale: DEFAULT_POWER_SCALE,
+            minCrossMsgFee: CROSS_MSG_FEE
         });
         vm.expectRevert(WrongGateway.selector);
         registry.newSubnetActor(params);
@@ -91,7 +93,8 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
-            powerScale: DEFAULT_POWER_SCALE
+            powerScale: DEFAULT_POWER_SCALE,
+            minCrossMsgFee: CROSS_MSG_FEE
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -109,7 +112,8 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
-            powerScale: DEFAULT_POWER_SCALE
+            powerScale: DEFAULT_POWER_SCALE,
+            minCrossMsgFee: CROSS_MSG_FEE
         });
         registry.newSubnetActor(params);
         vm.expectRevert(CannotFindSubnet.selector);
@@ -147,7 +151,8 @@ contract SubnetRegistryTest is Test {
             bottomUpCheckPeriod: _checkPeriod,
             majorityPercentage: _majorityPercentage,
             activeValidatorsLimit: 100,
-            powerScale: _powerScale
+            powerScale: _powerScale,
+            minCrossMsgFee: CROSS_MSG_FEE
         });
         registry.newSubnetActor(params);
         require(registry.latestSubnetDeployed(DEFAULT_SENDER) != address(0));

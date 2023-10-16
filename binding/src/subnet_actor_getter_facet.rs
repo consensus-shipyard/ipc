@@ -16,6 +16,22 @@ pub mod subnet_actor_getter_facet {
             constructor: ::core::option::Option::None,
             functions: ::core::convert::From::from([
                 (
+                    ::std::borrow::ToOwned::to_owned("activeValidatorsLimit"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("activeValidatorsLimit",),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint16"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("bootstrapped"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("bootstrapped"),
@@ -333,9 +349,41 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("majorityPercentage"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("majorityPercentage"),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint8"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("minActivationCollateral"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("minActivationCollateral",),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint256"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("minCrossMsgFee"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("minCrossMsgFee"),
                         inputs: ::std::vec![],
                         outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
                             name: ::std::string::String::new(),
@@ -426,6 +474,14 @@ pub mod subnet_actor_getter_facet {
                 SUBNETACTORGETTERFACET_ABI.clone(),
                 client,
             ))
+        }
+        ///Calls the contract's `activeValidatorsLimit` (0x3354c3e1) function
+        pub fn active_validators_limit(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u16> {
+            self.0
+                .method_hash([51, 84, 195, 225], ())
+                .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `bootstrapped` (0x35142c8c) function
         pub fn bootstrapped(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
@@ -535,12 +591,26 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([31, 58, 14, 65], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `majorityPercentage` (0x599c7bd1) function
+        pub fn majority_percentage(&self) -> ::ethers::contract::builders::ContractCall<M, u8> {
+            self.0
+                .method_hash([89, 156, 123, 209], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `minActivationCollateral` (0x9e33bd02) function
         pub fn min_activation_collateral(
             &self,
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([158, 51, 189, 2], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `minCrossMsgFee` (0x6704287c) function
+        pub fn min_cross_msg_fee(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([103, 4, 40, 124], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `minValidators` (0xc5ab2241) function
@@ -563,6 +633,19 @@ pub mod subnet_actor_getter_facet {
             Self::new(contract.address(), contract.client())
         }
     }
+    ///Container type for all input parameters for the `activeValidatorsLimit` function with signature `activeValidatorsLimit()` and selector `0x3354c3e1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "activeValidatorsLimit", abi = "activeValidatorsLimit()")]
+    pub struct ActiveValidatorsLimitCall;
     ///Container type for all input parameters for the `bootstrapped` function with signature `bootstrapped()` and selector `0x35142c8c`
     #[derive(
         Clone,
@@ -761,6 +844,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "killed", abi = "killed()")]
     pub struct KilledCall;
+    ///Container type for all input parameters for the `majorityPercentage` function with signature `majorityPercentage()` and selector `0x599c7bd1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "majorityPercentage", abi = "majorityPercentage()")]
+    pub struct MajorityPercentageCall;
     ///Container type for all input parameters for the `minActivationCollateral` function with signature `minActivationCollateral()` and selector `0x9e33bd02`
     #[derive(
         Clone,
@@ -774,6 +870,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "minActivationCollateral", abi = "minActivationCollateral()")]
     pub struct MinActivationCollateralCall;
+    ///Container type for all input parameters for the `minCrossMsgFee` function with signature `minCrossMsgFee()` and selector `0x6704287c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "minCrossMsgFee", abi = "minCrossMsgFee()")]
+    pub struct MinCrossMsgFeeCall;
     ///Container type for all input parameters for the `minValidators` function with signature `minValidators()` and selector `0xc5ab2241`
     #[derive(
         Clone,
@@ -803,6 +912,7 @@ pub mod subnet_actor_getter_facet {
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorGetterFacetCalls {
+        ActiveValidatorsLimit(ActiveValidatorsLimitCall),
         Bootstrapped(BootstrappedCall),
         BottomUpCheckPeriod(BottomUpCheckPeriodCall),
         BottomUpCheckpointAtEpoch(BottomUpCheckpointAtEpochCall),
@@ -817,7 +927,9 @@ pub mod subnet_actor_getter_facet {
         IsActiveValidator(IsActiveValidatorCall),
         IsWaitingValidator(IsWaitingValidatorCall),
         Killed(KilledCall),
+        MajorityPercentage(MajorityPercentageCall),
         MinActivationCollateral(MinActivationCollateralCall),
+        MinCrossMsgFee(MinCrossMsgFeeCall),
         MinValidators(MinValidatorsCall),
         PowerScale(PowerScaleCall),
     }
@@ -826,6 +938,11 @@ pub mod subnet_actor_getter_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
+            if let Ok(decoded) =
+                <ActiveValidatorsLimitCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::ActiveValidatorsLimit(decoded));
+            }
             if let Ok(decoded) = <BootstrappedCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::Bootstrapped(decoded));
@@ -889,9 +1006,19 @@ pub mod subnet_actor_getter_facet {
                 return Ok(Self::Killed(decoded));
             }
             if let Ok(decoded) =
+                <MajorityPercentageCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::MajorityPercentage(decoded));
+            }
+            if let Ok(decoded) =
                 <MinActivationCollateralCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::MinActivationCollateral(decoded));
+            }
+            if let Ok(decoded) =
+                <MinCrossMsgFeeCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::MinCrossMsgFee(decoded));
             }
             if let Ok(decoded) = <MinValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -906,6 +1033,9 @@ pub mod subnet_actor_getter_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorGetterFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
+                Self::ActiveValidatorsLimit(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Bootstrapped(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::BottomUpCheckPeriod(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -930,9 +1060,13 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::Killed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::MajorityPercentage(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::MinActivationCollateral(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::MinCrossMsgFee(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::MinValidators(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::PowerScale(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
@@ -941,6 +1075,7 @@ pub mod subnet_actor_getter_facet {
     impl ::core::fmt::Display for SubnetActorGetterFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
+                Self::ActiveValidatorsLimit(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Bootstrapped(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckPeriod(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BottomUpCheckpointAtEpoch(element) => ::core::fmt::Display::fmt(element, f),
@@ -957,10 +1092,17 @@ pub mod subnet_actor_getter_facet {
                 Self::IsActiveValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsWaitingValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Killed(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinActivationCollateral(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MinCrossMsgFee(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PowerScale(element) => ::core::fmt::Display::fmt(element, f),
             }
+        }
+    }
+    impl ::core::convert::From<ActiveValidatorsLimitCall> for SubnetActorGetterFacetCalls {
+        fn from(value: ActiveValidatorsLimitCall) -> Self {
+            Self::ActiveValidatorsLimit(value)
         }
     }
     impl ::core::convert::From<BootstrappedCall> for SubnetActorGetterFacetCalls {
@@ -1033,9 +1175,19 @@ pub mod subnet_actor_getter_facet {
             Self::Killed(value)
         }
     }
+    impl ::core::convert::From<MajorityPercentageCall> for SubnetActorGetterFacetCalls {
+        fn from(value: MajorityPercentageCall) -> Self {
+            Self::MajorityPercentage(value)
+        }
+    }
     impl ::core::convert::From<MinActivationCollateralCall> for SubnetActorGetterFacetCalls {
         fn from(value: MinActivationCollateralCall) -> Self {
             Self::MinActivationCollateral(value)
+        }
+    }
+    impl ::core::convert::From<MinCrossMsgFeeCall> for SubnetActorGetterFacetCalls {
+        fn from(value: MinCrossMsgFeeCall) -> Self {
+            Self::MinCrossMsgFee(value)
         }
     }
     impl ::core::convert::From<MinValidatorsCall> for SubnetActorGetterFacetCalls {
@@ -1048,6 +1200,18 @@ pub mod subnet_actor_getter_facet {
             Self::PowerScale(value)
         }
     }
+    ///Container type for all return fields from the `activeValidatorsLimit` function with signature `activeValidatorsLimit()` and selector `0x3354c3e1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct ActiveValidatorsLimitReturn(pub u16);
     ///Container type for all return fields from the `bootstrapped` function with signature `bootstrapped()` and selector `0x35142c8c`
     #[derive(
         Clone,
@@ -1221,6 +1385,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct KilledReturn(pub bool);
+    ///Container type for all return fields from the `majorityPercentage` function with signature `majorityPercentage()` and selector `0x599c7bd1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct MajorityPercentageReturn(pub u8);
     ///Container type for all return fields from the `minActivationCollateral` function with signature `minActivationCollateral()` and selector `0x9e33bd02`
     #[derive(
         Clone,
@@ -1233,6 +1409,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct MinActivationCollateralReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `minCrossMsgFee` function with signature `minCrossMsgFee()` and selector `0x6704287c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct MinCrossMsgFeeReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `minValidators` function with signature `minValidators()` and selector `0xc5ab2241`
     #[derive(
         Clone,

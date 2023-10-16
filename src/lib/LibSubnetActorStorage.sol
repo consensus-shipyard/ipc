@@ -28,6 +28,8 @@ struct SubnetActorStorage {
     address ipcGatewayAddr;
     /// @notice majority percentage value (must be greater than or equal to 51)
     uint8 majorityPercentage;
+    /// @notice minimum fee amount charged per cross message by the subnet
+    uint256 minCrossMsgFee;
     /// @notice ID of the parent subnet
     SubnetID parentId;
     /// immutable params
