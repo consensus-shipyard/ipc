@@ -33,7 +33,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CheckpointHelper for BottomUpCheckpoint;
     using CrossMsgHelper for CrossMsg;
-    using FvmAddressHelper for FvmAddress;
     using StorableMsgHelper for StorableMsg;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;

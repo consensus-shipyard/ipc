@@ -63,7 +63,6 @@ export async function deploy(libs: { [key in string]: string }) {
     // ----
 
     const managerFacetLibs: Libraries = {
-        "AccountHelper": libs["AccountHelper"],
         "CrossMsgHelper": libs["CrossMsgHelper"],
         "SubnetIDHelper": libs["SubnetIDHelper"]
     }
@@ -132,13 +131,12 @@ export async function deploy(libs: { [key in string]: string }) {
         bottomUpCheckPeriod: 10,
         minCollateral: 1000,
         msgFee: ethers.utils.parseUnits("10", "gwei"),
-        majorityPercentage: 66
+        majorityPercentage: 66,
         genesisValidators: [],
         activeValidatorsLimit: 100,
     }
 
     const diamondLibs: Libraries = {
-        "SubnetIDHelper": libs["SubnetIDHelper"]
     }
 
     // deploy Diamond

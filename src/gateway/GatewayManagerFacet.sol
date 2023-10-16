@@ -9,7 +9,6 @@ import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
-import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -18,7 +17,6 @@ import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
-    using FvmAddressHelper for FvmAddress;
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     function register() external payable {

@@ -3,14 +3,11 @@ pragma solidity 0.8.19;
 
 import {EMPTY_HASH} from "../constants/Constants.sol";
 import {SubnetID} from "../structs/Subnet.sol";
-import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 
 /// @title Helper library for manipulating Checkpoint struct
 /// @author LimeChain team
 library CheckpointHelper {
-    using SubnetIDHelper for SubnetID;
-
     bytes32 public constant EMPTY_BOTTOMUPCHECKPOINT_HASH =
         keccak256(
             abi.encode(

@@ -14,8 +14,8 @@ export async function deploy() {
     const txArgs = await getTransactionFees();
 
     const { address: accountHelperAddress } = await deployContractWithDeployer(deployer, "AccountHelper", {}, txArgs);
-    const { address: epochVoteSubmissionHelperAddress } = await deployContractWithDeployer(deployer, "EpochVoteSubmissionHelper", {}, txArgs);
-    const { address: executableQueueHelperAddress } = await deployContractWithDeployer(deployer, "ExecutableQueueHelper", {}, txArgs);
+    const { address: libStakingAddress } = await deployContractWithDeployer(deployer, "LibStaking", {}, txArgs);
+    
     const { address: subnetIDHelperAddress } = await deployContractWithDeployer(deployer, "SubnetIDHelper", {}, txArgs);
     // nested libs
     const { address: crossMsgHelperAddress } = await deployContractWithDeployer(deployer, "CrossMsgHelper",
@@ -26,19 +26,15 @@ export async function deploy() {
         "SubnetIDHelper": subnetIDHelperAddress
         },
         txArgs);
-    const { address: checkpointHelperAddress } = await deployContractWithDeployer(deployer, "CheckpointHelper", {
-        "SubnetIDHelper": subnetIDHelperAddress
-        },
-        txArgs);
+    const { address: checkpointHelperAddress } = await deployContractWithDeployer(deployer, "CheckpointHelper", {}, txArgs);
 
     return {
         "AccountHelper": accountHelperAddress,
         "CheckpointHelper": checkpointHelperAddress,
-        "EpochVoteSubmissionHelper": epochVoteSubmissionHelperAddress,
-        "ExecutableQueueHelper": executableQueueHelperAddress,
         "SubnetIDHelper": subnetIDHelperAddress,
         "CrossMsgHelper": crossMsgHelperAddress,
         "StorableMsgHelper": storableMsgHelperAddress,
+        "LibStaking": libStakingAddress,
     };
 }
 
