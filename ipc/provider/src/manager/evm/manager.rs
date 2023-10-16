@@ -16,7 +16,9 @@ use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
-use crate::manager::subnet::{GetBlockHashResult, TopDownCheckpointQuery, TopDownQueryPayload};
+use crate::manager::subnet::{
+    GetBlockHashResult, SubnetGenesisInfo, TopDownCheckpointQuery, TopDownQueryPayload,
+};
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -207,6 +209,12 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid min validator stake"))?;
 
+        let min_cross_msg_fee = params
+            .min_cross_msg_fee
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+
         log::debug!("calling create subnet for EVM manager");
 
         let route = subnet_id_to_evm_addresses(&params.parent)?;
@@ -225,6 +233,7 @@ impl SubnetManager for EthSubnetManager {
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
             active_validators_limit: params.active_validators_limit,
             power_scale: 3,
+            min_cross_msg_fee: ethers::types::U256::from(min_cross_msg_fee),
         };
 
         log::info!("creating subnet on evm with params: {params:?}");
@@ -595,6 +604,29 @@ impl SubnetManager for EthSubnetManager {
             .get_chainid()
             .await?
             .to_string())
+    }
+
+    async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(SubnetGenesisInfo {
+            // Active validators limit set for the child subnet.
+            active_validators_limit: contract.active_validators_limit().call().await?,
+            // Bottom-up checkpoint period set in the subnet actor.
+            bottom_up_checkpoint_period: contract.bottom_up_check_period().call().await?,
+            // Genesis epoch when the subnet was bootstrapped in the parent.
+            genesis_epoch: self.genesis_epoch(subnet).await?,
+            // Majority percentage of
+            majority_percentage: contract.majority_percentage().call().await?,
+            // Minimum collateral required for subnets to register into the subnet
+            min_collateral: eth_to_fil_amount(&contract.min_activation_collateral().call().await?)?,
+            // Custom message fee that the child subnet wants to set for cross-net messages
+            msg_fee: eth_to_fil_amount(&contract.min_cross_msg_fee().call().await?)?,
+            validators: contract.genesis_validators().call().await?,
+        })
     }
 }
 

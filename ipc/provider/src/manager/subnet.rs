@@ -7,6 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::subnet_actor_getter_facet;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::subnet::ConstructParams;
@@ -111,6 +112,20 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
     /// Returning as a `String` because the maximum value for an EVM
     /// networks is a `U256` that wouldn't fit in an integer type.
     async fn get_chain_id(&self) -> Result<String>;
+
+    /// Gets the genesis information required to bootstrap a child subnet
+    async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;
+}
+
+#[derive(Debug)]
+pub struct SubnetGenesisInfo {
+    pub bottom_up_checkpoint_period: u64,
+    pub msg_fee: TokenAmount,
+    pub majority_percentage: u8,
+    pub active_validators_limit: u16,
+    pub min_collateral: TokenAmount,
+    pub genesis_epoch: ChainEpoch,
+    pub validators: Vec<subnet_actor_getter_facet::Validator>,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual

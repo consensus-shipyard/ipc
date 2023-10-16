@@ -40,6 +40,7 @@ impl CreateSubnet {
                 arguments
                     .active_validators_limit
                     .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
+                f64_to_token_amount(arguments.min_cross_msg_fee)?,
             )
             .await?;
 
@@ -81,4 +82,11 @@ pub struct CreateSubnetArgs {
     pub bottomup_check_period: ChainEpoch,
     #[arg(long, help = "The max number of active validators in subnet")]
     pub active_validators_limit: Option<u16>,
+    #[arg(
+        long,
+        short,
+        default_value = "0.000001",
+        help = "Minimum fee for cross-net messages in subnet (in whole FIL)"
+    )]
+    pub min_cross_msg_fee: f64,
 }

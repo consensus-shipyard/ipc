@@ -22,7 +22,7 @@ use ipc_sdk::{
     subnet_id::SubnetID,
 };
 use lotus::message::wallet::WalletKeyType;
-use manager::{EthSubnetManager, SubnetInfo, SubnetManager};
+use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -232,6 +232,7 @@ impl IpcProvider {
         min_validator_stake: TokenAmount,
         bottomup_check_period: ChainEpoch,
         active_validators_limit: u16,
+        min_cross_msg_fee: TokenAmount,
     ) -> anyhow::Result<Address> {
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -249,6 +250,7 @@ impl IpcProvider {
             min_validator_stake,
             bottomup_check_period,
             active_validators_limit,
+            min_cross_msg_fee,
         };
 
         conn.manager()
@@ -547,6 +549,17 @@ impl IpcProvider {
         };
 
         conn.manager().get_validator_changeset(subnet, epoch).await
+    }
+
+    /// Get genesis info for a child subnet. This can be used to deterministically
+    /// generate the genesis of the subnet
+    pub async fn get_genesis_info(&self, subnet: &SubnetID) -> anyhow::Result<SubnetGenesisInfo> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("parent subnet config not found")),
+            Some(conn) => conn,
+        };
+        conn.manager().get_genesis_info(subnet).await
     }
 
     pub async fn get_top_down_msgs(
