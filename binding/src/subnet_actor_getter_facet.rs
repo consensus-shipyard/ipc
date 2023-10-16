@@ -349,6 +349,22 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("lastBottomUpCheckpointHeight"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("lastBottomUpCheckpointHeight",),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint64"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("majorityPercentage"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("majorityPercentage"),
@@ -589,6 +605,14 @@ pub mod subnet_actor_getter_facet {
         pub fn killed(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
                 .method_hash([31, 58, 14, 65], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `lastBottomUpCheckpointHeight` (0x72d0a0e0) function
+        pub fn last_bottom_up_checkpoint_height(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u64> {
+            self.0
+                .method_hash([114, 208, 160, 224], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `majorityPercentage` (0x599c7bd1) function
@@ -844,6 +868,22 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "killed", abi = "killed()")]
     pub struct KilledCall;
+    ///Container type for all input parameters for the `lastBottomUpCheckpointHeight` function with signature `lastBottomUpCheckpointHeight()` and selector `0x72d0a0e0`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "lastBottomUpCheckpointHeight",
+        abi = "lastBottomUpCheckpointHeight()"
+    )]
+    pub struct LastBottomUpCheckpointHeightCall;
     ///Container type for all input parameters for the `majorityPercentage` function with signature `majorityPercentage()` and selector `0x599c7bd1`
     #[derive(
         Clone,
@@ -927,6 +967,7 @@ pub mod subnet_actor_getter_facet {
         IsActiveValidator(IsActiveValidatorCall),
         IsWaitingValidator(IsWaitingValidatorCall),
         Killed(KilledCall),
+        LastBottomUpCheckpointHeight(LastBottomUpCheckpointHeightCall),
         MajorityPercentage(MajorityPercentageCall),
         MinActivationCollateral(MinActivationCollateralCall),
         MinCrossMsgFee(MinCrossMsgFeeCall),
@@ -1006,6 +1047,11 @@ pub mod subnet_actor_getter_facet {
                 return Ok(Self::Killed(decoded));
             }
             if let Ok(decoded) =
+                <LastBottomUpCheckpointHeightCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::LastBottomUpCheckpointHeight(decoded));
+            }
+            if let Ok(decoded) =
                 <MajorityPercentageCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::MajorityPercentage(decoded));
@@ -1060,6 +1106,9 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::Killed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::LastBottomUpCheckpointHeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::MajorityPercentage(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1092,6 +1141,9 @@ pub mod subnet_actor_getter_facet {
                 Self::IsActiveValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsWaitingValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Killed(element) => ::core::fmt::Display::fmt(element, f),
+                Self::LastBottomUpCheckpointHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::MajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinActivationCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinCrossMsgFee(element) => ::core::fmt::Display::fmt(element, f),
@@ -1173,6 +1225,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<KilledCall> for SubnetActorGetterFacetCalls {
         fn from(value: KilledCall) -> Self {
             Self::Killed(value)
+        }
+    }
+    impl ::core::convert::From<LastBottomUpCheckpointHeightCall> for SubnetActorGetterFacetCalls {
+        fn from(value: LastBottomUpCheckpointHeightCall) -> Self {
+            Self::LastBottomUpCheckpointHeight(value)
         }
     }
     impl ::core::convert::From<MajorityPercentageCall> for SubnetActorGetterFacetCalls {
@@ -1385,6 +1442,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct KilledReturn(pub bool);
+    ///Container type for all return fields from the `lastBottomUpCheckpointHeight` function with signature `lastBottomUpCheckpointHeight()` and selector `0x72d0a0e0`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct LastBottomUpCheckpointHeightReturn(pub u64);
     ///Container type for all return fields from the `majorityPercentage` function with signature `majorityPercentage()` and selector `0x599c7bd1`
     #[derive(
         Clone,
