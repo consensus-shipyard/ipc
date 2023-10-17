@@ -33,6 +33,7 @@ thiserror = { workspace = true }
 hex = { workspace = true }
 serde_tuple = { workspace = true }
 zeroize = "1.6.0"
+libsecp256k1 = { workspace = true }
 
 ethers-contract = { workspace = true }
 ethers = { workspace = true }

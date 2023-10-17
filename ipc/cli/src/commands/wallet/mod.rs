@@ -9,7 +9,7 @@ use clap::{Args, Subcommand};
 use self::default::{
     WalletGetDefault, WalletGetDefaultArgs, WalletSetDefault, WalletSetDefaultArgs,
 };
-use self::export::{WalletExport, WalletExportArgs};
+use self::export::{WalletExport, WalletExportArgs, WalletPublicKey, WalletPublicKeyArgs};
 use self::import::{WalletImport, WalletImportArgs};
 use self::remove::{WalletRemove, WalletRemoveArgs};
 
@@ -38,6 +38,7 @@ impl WalletCommandsArgs {
             Commands::Remove(args) => WalletRemove::handle(global, args).await,
             Commands::SetDefault(args) => WalletSetDefault::handle(global, args).await,
             Commands::GetDefault(args) => WalletGetDefault::handle(global, args).await,
+            Commands::PubKey(args) => WalletPublicKey::handle(global, args).await,
         }
     }
 }
@@ -51,4 +52,5 @@ pub(crate) enum Commands {
     Remove(WalletRemoveArgs),
     SetDefault(WalletSetDefaultArgs),
     GetDefault(WalletGetDefaultArgs),
+    PubKey(WalletPublicKeyArgs),
 }

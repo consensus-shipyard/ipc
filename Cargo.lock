@@ -2575,6 +2575,7 @@ dependencies = [
  "ipc-identity",
  "ipc-provider",
  "ipc-sdk",
+ "libsecp256k1",
  "log",
  "num-derive",
  "num-traits",
@@ -2691,7 +2692,7 @@ dependencies = [
 [[package]]
 name = "ipc_actors_abis"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#ad80d9b29c98473042c42b8f9cae5c7453620c25"
+source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#d0620b852c331cb12b84fda33963bf08c5634ca6"
 dependencies = [
  "anyhow",
  "ethers",
