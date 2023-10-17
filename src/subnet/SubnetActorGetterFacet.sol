@@ -93,6 +93,11 @@ contract SubnetActorGetterFacet {
         return LibStaking.isWaitingValidator(validator);
     }
 
+    function hasSubmittedInLastBottomUpCheckpointHeight(address validator) external view returns (bool) {
+        uint64 height = s.lastBottomUpCheckpointHeight;
+        return s.rewardedRelayers[height].contains(validator);
+    }
+
     /// @notice returns the committed bottom-up checkpoint at specific epoch
     /// @param epoch - the epoch to check
     /// @return exists - whether the checkpoint exists

@@ -273,6 +273,30 @@ pub mod subnet_actor_getter_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("hasSubmittedInLastBottomUpCheckpointHeight"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "hasSubmittedInLastBottomUpCheckpointHeight",
+                        ),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("validator"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bool"),
+                            ),
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("ipcGatewayAddr"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("ipcGatewayAddr"),
@@ -575,6 +599,15 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([25, 4, 187, 46], validator_address)
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `hasSubmittedInLastBottomUpCheckpointHeight` (0x2bc31eb3) function
+        pub fn has_submitted_in_last_bottom_up_checkpoint_height(
+            &self,
+            validator: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+            self.0
+                .method_hash([43, 195, 30, 179], validator)
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `ipcGatewayAddr` (0xcfca2824) function
         pub fn ipc_gateway_addr(
             &self,
@@ -812,6 +845,24 @@ pub mod subnet_actor_getter_facet {
     pub struct GetValidatorCall {
         pub validator_address: ::ethers::core::types::Address,
     }
+    ///Container type for all input parameters for the `hasSubmittedInLastBottomUpCheckpointHeight` function with signature `hasSubmittedInLastBottomUpCheckpointHeight(address)` and selector `0x2bc31eb3`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "hasSubmittedInLastBottomUpCheckpointHeight",
+        abi = "hasSubmittedInLastBottomUpCheckpointHeight(address)"
+    )]
+    pub struct HasSubmittedInLastBottomUpCheckpointHeightCall {
+        pub validator: ::ethers::core::types::Address,
+    }
     ///Container type for all input parameters for the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
         Clone,
@@ -963,6 +1014,7 @@ pub mod subnet_actor_getter_facet {
         GetConfigurationNumbers(GetConfigurationNumbersCall),
         GetParent(GetParentCall),
         GetValidator(GetValidatorCall),
+        HasSubmittedInLastBottomUpCheckpointHeight(HasSubmittedInLastBottomUpCheckpointHeightCall),
         IpcGatewayAddr(IpcGatewayAddrCall),
         IsActiveValidator(IsActiveValidatorCall),
         IsWaitingValidator(IsWaitingValidatorCall),
@@ -1027,6 +1079,11 @@ pub mod subnet_actor_getter_facet {
             if let Ok(decoded) = <GetValidatorCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::GetValidator(decoded));
+            }
+            if let Ok(decoded) = <HasSubmittedInLastBottomUpCheckpointHeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::HasSubmittedInLastBottomUpCheckpointHeight(decoded));
             }
             if let Ok(decoded) =
                 <IpcGatewayAddrCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1100,6 +1157,9 @@ pub mod subnet_actor_getter_facet {
                 }
                 Self::GetParent(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GetValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::HasSubmittedInLastBottomUpCheckpointHeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::IpcGatewayAddr(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IsActiveValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IsWaitingValidator(element) => {
@@ -1137,6 +1197,9 @@ pub mod subnet_actor_getter_facet {
                 Self::GetConfigurationNumbers(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetParent(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::HasSubmittedInLastBottomUpCheckpointHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::IpcGatewayAddr(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsActiveValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsWaitingValidator(element) => ::core::fmt::Display::fmt(element, f),
@@ -1205,6 +1268,13 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<GetValidatorCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetValidatorCall) -> Self {
             Self::GetValidator(value)
+        }
+    }
+    impl ::core::convert::From<HasSubmittedInLastBottomUpCheckpointHeightCall>
+        for SubnetActorGetterFacetCalls
+    {
+        fn from(value: HasSubmittedInLastBottomUpCheckpointHeightCall) -> Self {
+            Self::HasSubmittedInLastBottomUpCheckpointHeight(value)
         }
     }
     impl ::core::convert::From<IpcGatewayAddrCall> for SubnetActorGetterFacetCalls {
@@ -1394,6 +1464,18 @@ pub mod subnet_actor_getter_facet {
     pub struct GetValidatorReturn {
         pub validator: ValidatorInfo,
     }
+    ///Container type for all return fields from the `hasSubmittedInLastBottomUpCheckpointHeight` function with signature `hasSubmittedInLastBottomUpCheckpointHeight(address)` and selector `0x2bc31eb3`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct HasSubmittedInLastBottomUpCheckpointHeightReturn(pub bool);
     ///Container type for all return fields from the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
         Clone,
