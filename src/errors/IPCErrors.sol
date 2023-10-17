@@ -33,6 +33,7 @@ error InvalidRetentionHeight();
 error InvalidSignature();
 error InvalidSignatureErr(uint8);
 error InvalidSignatureLength();
+error InvalidPublicKeyLength();
 error InvalidSubmissionPeriod();
 error InvalidSubnet();
 error NoCollateralToWithdraw();

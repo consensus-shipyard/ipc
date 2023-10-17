@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
@@ -89,10 +89,15 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice method that allows a validator to join the subnet
-    /// @param publicKey The off-chain public key that should be associated with the validator
+    /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant notKilled {
         if (msg.value == 0) {
             revert CollateralIsZero();
+        }
+
+        if (publicKey.length != 65) {
+            // Taking 65 bytes because the FVM libraries have some assertions checking it, it's more convenient.
+            revert InvalidPublicKeyLength();
         }
 
         address convertedAddress = publicKeyToAddress(publicKey);
@@ -254,8 +259,12 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         }
     }
 
-    function publicKeyToAddress(bytes memory publicKey) internal pure returns (address) {
-        bytes32 hashed = keccak256(publicKey);
-        return address(uint160(bytes20(hashed)));
+    /**
+     * @notice Hash a 65 byte public key and return the corresponding address.
+     */
+    function publicKeyToAddress(bytes calldata publicKey) internal pure returns (address) {
+        assert(publicKey.length == 65);
+        bytes32 hashed = keccak256(publicKey[1:]);
+        return address(uint160(uint256(hashed)));
     }
 }

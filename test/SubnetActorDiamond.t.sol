@@ -106,10 +106,16 @@ contract SubnetActorDiamondTest is Test {
     }
 
     function deriveValidatorAddress(uint8 seq) internal pure returns (address addr, bytes memory data) {
-        data = new bytes(64);
-        data[0] = bytes1(seq);
+        data = new bytes(65);
+        data[1] = bytes1(seq);
 
-        addr = address(uint160(bytes20(keccak256(data))));
+        // use data[1:] for the hash
+        bytes memory dataSubset = new bytes(data.length - 1);
+        for (uint i = 1; i < data.length; i++) {
+            dataSubset[i - 1] = data[i];
+        }
+
+        addr = address(uint160(uint256(keccak256(dataSubset))));
     }
 
     function testSubnetActorDiamond_Deployment_Works(
@@ -170,7 +176,7 @@ contract SubnetActorDiamondTest is Test {
         vm.prank(validator);
         vm.expectRevert(NotOwnerOfPublicKey.selector);
 
-        saManager.join{value: 10}(new bytes(20));
+        saManager.join{value: 10}(new bytes(65));
     }
 
     function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {

@@ -498,6 +498,17 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("InvalidPublicKeyLength"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidPublicKeyLength",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("InvalidSignatureErr"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -909,6 +920,19 @@ pub mod subnet_actor_manager_facet {
         abi = "InvalidCheckpointMessagesHash()"
     )]
     pub struct InvalidCheckpointMessagesHash;
+    ///Custom Error type `InvalidPublicKeyLength` with signature `InvalidPublicKeyLength()` and selector `0x637297a4`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "InvalidPublicKeyLength", abi = "InvalidPublicKeyLength()")]
+    pub struct InvalidPublicKeyLength;
     ///Custom Error type `InvalidSignatureErr` with signature `InvalidSignatureErr(uint8)` and selector `0x282ef1c1`
     #[derive(
         Clone,
@@ -1093,6 +1117,7 @@ pub mod subnet_actor_manager_facet {
         EmptyAddress(EmptyAddress),
         InvalidCheckpointEpoch(InvalidCheckpointEpoch),
         InvalidCheckpointMessagesHash(InvalidCheckpointMessagesHash),
+        InvalidPublicKeyLength(InvalidPublicKeyLength),
         InvalidSignatureErr(InvalidSignatureErr),
         NoCollateralToWithdraw(NoCollateralToWithdraw),
         NotAllValidatorsHaveLeft(NotAllValidatorsHaveLeft),
@@ -1146,6 +1171,11 @@ pub mod subnet_actor_manager_facet {
                 <InvalidCheckpointMessagesHash as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::InvalidCheckpointMessagesHash(decoded));
+            }
+            if let Ok(decoded) =
+                <InvalidPublicKeyLength as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::InvalidPublicKeyLength(decoded));
             }
             if let Ok(decoded) =
                 <InvalidSignatureErr as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1222,6 +1252,9 @@ pub mod subnet_actor_manager_facet {
                 Self::InvalidCheckpointMessagesHash(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::InvalidPublicKeyLength(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidSignatureErr(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1279,6 +1312,10 @@ pub mod subnet_actor_manager_facet {
                 }
                 _ if selector
                     == <InvalidCheckpointMessagesHash as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidPublicKeyLength as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1342,6 +1379,7 @@ pub mod subnet_actor_manager_facet {
                 Self::InvalidCheckpointMessagesHash(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::InvalidPublicKeyLength(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSignatureErr(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoCollateralToWithdraw(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotAllValidatorsHaveLeft(element) => ::core::fmt::Display::fmt(element, f),
@@ -1392,6 +1430,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<InvalidCheckpointMessagesHash> for SubnetActorManagerFacetErrors {
         fn from(value: InvalidCheckpointMessagesHash) -> Self {
             Self::InvalidCheckpointMessagesHash(value)
+        }
+    }
+    impl ::core::convert::From<InvalidPublicKeyLength> for SubnetActorManagerFacetErrors {
+        fn from(value: InvalidPublicKeyLength) -> Self {
+            Self::InvalidPublicKeyLength(value)
         }
     }
     impl ::core::convert::From<InvalidSignatureErr> for SubnetActorManagerFacetErrors {
