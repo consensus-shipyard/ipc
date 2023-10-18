@@ -3,8 +3,8 @@
 pub use crate::lotus::message::ipc::SubnetInfo;
 pub use evm::{EthManager, EthSubnetManager};
 pub use subnet::{
-    GetBlockHashResult, SubnetGenesisInfo, SubnetManager, TopDownCheckpointQuery,
-    TopDownQueryPayload,
+    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, SubnetManager,
+    TopDownCheckpointQuery, TopDownQueryPayload,
 };
 
 pub mod evm;

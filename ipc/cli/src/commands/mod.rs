@@ -14,15 +14,18 @@ use crate::commands::checkpoint::CheckpointCommandsArgs;
 use crate::commands::crossmsg::CrossMsgsCommandsArgs;
 use crate::commands::util::UtilCommandsArgs;
 use crate::GlobalArguments;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::ethers_address_to_fil_address;
 
+use ipc_provider::config::{Config, Subnet};
+use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
 use std::io;
+use std::path::Path;
 use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
@@ -144,6 +147,19 @@ pub(crate) fn require_fil_addr_from_str(s: &str) -> anyhow::Result<fvm_shared::a
         Ok(addr) => addr,
     };
     Ok(addr)
+}
+
+/// Get the subnet configuration from the config path
+pub(crate) fn get_subnet_config(
+    config_path: impl AsRef<Path>,
+    subnet: &SubnetID,
+) -> Result<Subnet> {
+    let config = Config::from_file(&config_path)?;
+    Ok(config
+        .subnets
+        .get(subnet)
+        .ok_or_else(|| anyhow!("{subnet} is not configured"))?
+        .clone())
 }
 
 #[cfg(test)]

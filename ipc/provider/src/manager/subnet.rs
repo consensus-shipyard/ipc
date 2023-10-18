@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::subnet_actor_getter_facet;
+use ipc_sdk::checkpoint::BottomUpCheckpointBundle;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::subnet::ConstructParams;
@@ -17,7 +18,7 @@ use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
-pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery {
+pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpointRelayer {
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
     /// The result of the function is the ID address for the subnet actor from which the final
@@ -164,4 +165,31 @@ pub trait TopDownCheckpointQuery: Send + Sync {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>>;
+}
+
+/// The bottom up checkpoint manager that handles the bottom up relaying from child subnet to the parent
+/// subnet.
+#[async_trait]
+pub trait BottomUpCheckpointRelayer: Send + Sync {
+    /// Submit a checkpoint for execution.
+    /// It triggers the commitment of the checkpoint and the execution of related cross-net messages.
+    async fn submit_checkpoint(
+        &self,
+        submitter: &Address,
+        bundle: BottomUpCheckpointBundle,
+    ) -> Result<()>;
+    /// The last confirmed/submitted checkpoint height.
+    async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    /// Check if the submitter has already submitted in the `last_bottom_up_checkpoint_height`
+    async fn has_submitted_in_last_checkpoint_height(
+        &self,
+        subnet_id: &SubnetID,
+        submitter: &Address,
+    ) -> Result<bool>;
+    /// Get the checkpoint period, i.e the number of blocks to submit bottom up checkpoints.
+    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    /// Get the checkpoint bundle at a specific height. If it does not exist, it will through error.
+    async fn checkpoint_bundle_at(&self, height: ChainEpoch) -> Result<BottomUpCheckpointBundle>;
+    /// Get the current epoch in the current subnet
+    async fn current_epoch(&self) -> Result<ChainEpoch>;
 }
