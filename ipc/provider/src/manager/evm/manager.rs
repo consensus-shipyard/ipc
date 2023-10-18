@@ -30,7 +30,6 @@ use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, I256, U256};
-use futures_util::StreamExt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
@@ -175,11 +174,10 @@ impl TopDownCheckpointQuery for EthSubnetManager {
             .event::<NewStakingRequest>()
             .from_block(epoch as u64)
             .to_block(epoch as u64);
-        let mut event_stream = ev.stream_with_meta().await?;
 
         let mut changes = vec![];
         let mut hash = None;
-        while let Some(Ok((event, meta))) = event_stream.next().await {
+        for (event, meta) in ev.query_with_meta().await? {
             if let Some(h) = hash {
                 if h != meta.block_hash {
                     return Err(anyhow!("block hash not equal"));
