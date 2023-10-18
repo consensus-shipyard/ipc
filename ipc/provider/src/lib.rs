@@ -556,8 +556,9 @@ impl IpcProvider {
         subnet: &SubnetID,
         epoch: ChainEpoch,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target subnet parent not found")),
             Some(conn) => conn,
         };
 
