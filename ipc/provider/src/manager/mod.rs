@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: MIT
 pub use crate::lotus::message::ipc::SubnetInfo;
 pub use evm::{EthManager, EthSubnetManager};
-pub use subnet::{GetBlockHashResult, SubnetManager, TopDownCheckpointQuery, TopDownQueryPayload};
+pub use subnet::{
+    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetManager, TopDownCheckpointQuery,
+    TopDownQueryPayload,
+};
 
 pub mod evm;
 mod subnet;

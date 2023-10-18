@@ -1,18 +1,13 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use cid::Cid;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use ipc_sdk::address::IPCAddress;
-use ipc_sdk::checkpoint::BatchCrossMsgs;
-use ipc_sdk::checkpoint::BottomUpCheckpoint;
-use ipc_sdk::cross::{CrossMsg, StorableMsg};
 use ipc_sdk::gateway::Status;
 use ipc_sdk::subnet_id::SubnetID;
-use primitives::TCid;
 use serde::{Deserialize, Serialize};
 
 use crate::lotus::message::deserialize::{
@@ -119,45 +114,6 @@ pub struct Validator {
     pub weight: String,
 }
 
-/// This deserializes from the `gateway::BottomUpCheckpoint`, we need to redefine
-/// here because the Lotus API json serializes and the cbor tuple deserializer is not
-/// able to pick it up automatically
-#[derive(Deserialize, Serialize, Debug)]
-pub struct BottomUpCheckpointWrapper {
-    #[serde(rename(deserialize = "Data"))]
-    pub data: CheckDataWrapper,
-    #[serde(rename(deserialize = "Sig"))]
-    #[serde(with = "serde_bytes")]
-    pub sig: Option<Vec<u8>>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct CheckDataWrapper {
-    #[serde(rename(deserialize = "Source"))]
-    #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
-    pub source: SubnetID,
-    #[serde(rename(deserialize = "Proof"))]
-    #[serde(with = "serde_bytes")]
-    pub proof: Option<Vec<u8>>,
-    #[serde(rename(deserialize = "Epoch"))]
-    pub epoch: i64,
-    #[serde(rename(deserialize = "PrevCheck"))]
-    pub prev_check: Option<CIDMap>,
-    #[serde(rename(deserialize = "Children"))]
-    pub children: Option<Vec<CheckData>>,
-    #[serde(rename(deserialize = "CrossMsgs"))]
-    pub cross_msgs: Option<BatchCrossMsgsWrapper>,
-}
-
-#[derive(PartialEq, Eq, Clone, Debug, Default, Deserialize, Serialize)]
-pub struct BatchCrossMsgsWrapper {
-    #[serde(rename(deserialize = "CrossMsgs"))]
-    pub cross_msgs: Option<Vec<CrossMsgsWrapper>>,
-    #[serde(rename(deserialize = "Fee"))]
-    #[serde(deserialize_with = "deserialize_token_amount_from_str")]
-    pub fee: TokenAmount,
-}
-
 #[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct CrossMsgsWrapper {
@@ -177,96 +133,6 @@ pub struct StorableMsgsWrapper {
     pub value: TokenAmount,
     pub nonce: u64,
     pub fee: TokenAmount,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct CheckData {
-    #[serde(rename(deserialize = "Source"))]
-    #[serde(deserialize_with = "deserialize_subnet_id_from_map")]
-    pub source: SubnetID,
-    #[serde(rename(deserialize = "Checks"))]
-    pub checks: Vec<CIDMap>,
-}
-
-impl From<BatchCrossMsgsWrapper> for BatchCrossMsgs {
-    fn from(wrapper: BatchCrossMsgsWrapper) -> Self {
-        let cross_msgs = wrapper.cross_msgs.map(|cross_msgs| {
-            cross_msgs
-                .into_iter()
-                .map(|cross_wrapper| CrossMsg {
-                    msg: StorableMsg {
-                        from: cross_wrapper.msg.from,
-                        to: cross_wrapper.msg.to,
-                        method: cross_wrapper.msg.method,
-                        params: cross_wrapper.msg.params,
-                        value: cross_wrapper.msg.value,
-                        nonce: cross_wrapper.msg.nonce,
-                        fee: cross_wrapper.msg.fee,
-                    },
-                    wrapped: cross_wrapper.wrapped,
-                })
-                .collect::<Vec<_>>()
-        });
-
-        BatchCrossMsgs {
-            cross_msgs,
-            fee: wrapper.fee,
-        }
-    }
-}
-
-impl TryFrom<BottomUpCheckpointWrapper> for BottomUpCheckpoint {
-    type Error = anyhow::Error;
-
-    fn try_from(checkpoint_response: BottomUpCheckpointWrapper) -> Result<Self, Self::Error> {
-        let prev_check = if let Some(prev_check) = checkpoint_response.data.prev_check {
-            TCid::from(Cid::try_from(prev_check)?)
-        } else {
-            TCid::default()
-        };
-        log::debug!("previous checkpoint: {prev_check:?}");
-
-        let children = if let Some(children) = checkpoint_response.data.children {
-            children
-                .into_iter()
-                .map::<Result<_, Self::Error>, _>(|c| {
-                    let checks: Result<Vec<_>, _> = c
-                        .checks
-                        .into_iter()
-                        .map(|cid_map| Cid::try_from(cid_map).map(TCid::from))
-                        .collect();
-
-                    Ok(ipc_sdk::checkpoint::ChildCheck {
-                        source: c.source,
-                        checks: checks?,
-                    })
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            vec![]
-        };
-        log::debug!("children: {children:?}");
-
-        let cross_msgs = if let Some(cross_msgs) = checkpoint_response.data.cross_msgs {
-            BatchCrossMsgs::from(cross_msgs)
-        } else {
-            BatchCrossMsgs::default()
-        };
-        log::debug!("cross_msgs: {cross_msgs:?}");
-
-        let data = ipc_sdk::checkpoint::CheckData {
-            source: checkpoint_response.data.source,
-            proof: checkpoint_response.data.proof.unwrap_or_default(),
-            epoch: checkpoint_response.data.epoch,
-            prev_check,
-            children,
-            cross_msgs,
-        };
-        Ok(BottomUpCheckpoint {
-            data,
-            sig: checkpoint_response.sig.unwrap_or_default(),
-        })
-    }
 }
 
 #[cfg(test)]

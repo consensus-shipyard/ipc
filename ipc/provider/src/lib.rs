@@ -33,6 +33,7 @@ use std::{
 };
 use zeroize::Zeroize;
 
+pub mod checkpoint;
 pub mod config;
 pub mod jsonrpc;
 pub mod lotus;
@@ -230,6 +231,7 @@ impl IpcProvider {
         parent: SubnetID,
         min_validators: u64,
         min_validator_stake: TokenAmount,
+        min_cross_msg_fee: TokenAmount,
         bottomup_check_period: ChainEpoch,
         active_validators_limit: u16,
     ) -> anyhow::Result<Address> {
@@ -249,6 +251,7 @@ impl IpcProvider {
             min_validator_stake,
             bottomup_check_period,
             active_validators_limit,
+            min_cross_msg_fee,
         };
 
         conn.manager()

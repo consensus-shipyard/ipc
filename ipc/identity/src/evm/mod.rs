@@ -91,7 +91,7 @@ pub fn random_eth_key_info() -> KeyInfo {
 }
 
 #[cfg(feature = "with-ethers")]
-#[derive(Clone, Eq, Hash, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, Default)]
 pub struct EthKeyAddress {
     inner: ethers::types::Address,
 }

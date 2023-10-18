@@ -23,6 +23,7 @@ pub struct ConstructParams {
     pub min_validators: u64,
     pub bottomup_check_period: ChainEpoch,
     pub active_validators_limit: u16,
+    pub min_cross_msg_fee: TokenAmount,
 }
 
 /// Consensus types supported by hierarchical consensus

@@ -8,7 +8,6 @@ use crate::lotus::message::deserialize::{
     deserialize_ipc_address_from_map, deserialize_subnet_id_from_map,
     deserialize_token_amount_from_str,
 };
-use crate::lotus::message::ipc::BottomUpCheckpointWrapper;
 use crate::manager::SubnetInfo;
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::address::IPCAddress;
@@ -135,50 +134,4 @@ fn test_subnet_info_to_str() {
 
     let w = serde_json::to_string(&s);
     assert!(w.is_ok());
-}
-
-#[test]
-fn test_subnet_info_from_str() {
-    let raw_str = r#"
-    {
-        "ID": {
-            "Root": 123,
-            "Children": ["f010000000002"]
-        },
-        "Stake": "10000000000000000000",
-        "TopDownMsgs": {
-            "/": "bafy2bzacedijw74yui7otvo63nfl3hdq2vdzuy7wx2tnptwed6zml4vvz7wee"
-        },
-        "Nonce": 0,
-        "CircSupply": "0",
-        "Status": 0,
-        "PrevCheckpoint": null
-    }
-    "#;
-
-    let w: SubnetInfo = serde_json::from_str(raw_str).unwrap();
-    assert_eq!(w.id, SubnetID::from_str("/r123/f010000000002").unwrap());
-}
-
-#[test]
-fn test_checkpoint_template_from_str() {
-    let raw_str = r#"
-    {
-    "Data": {
-        "Source": {
-            "Root": 123,
-            "Children": ["f01002"]
-        },
-        "Proof": null,
-        "Epoch": 0,
-        "PrevCheck": null,
-        "Children": null,
-        "CrossMsgs": null
-    },
-    "Sig": null
-    }
-    "#;
-
-    let w: BottomUpCheckpointWrapper = serde_json::from_str(raw_str).unwrap();
-    assert_eq!(w.data.source, SubnetID::from_str("/r123/f01002").unwrap());
 }

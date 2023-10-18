@@ -16,7 +16,9 @@ use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
-use crate::manager::subnet::{GetBlockHashResult, TopDownCheckpointQuery, TopDownQueryPayload};
+use crate::manager::subnet::{
+    BottomUpCheckpointRelayer, GetBlockHashResult, TopDownCheckpointQuery, TopDownQueryPayload,
+};
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -30,12 +32,14 @@ use futures_util::StreamExt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
+use ipc_sdk::checkpoint::{BottomUpCheckpoint, BottomUpCheckpointBundle};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::gateway::Status;
 use ipc_sdk::staking::{NewStakingRequest, StakingChangeRequest};
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
+use std::result;
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
 
@@ -224,6 +228,7 @@ impl SubnetManager for EthSubnetManager {
             bottom_up_check_period: params.bottomup_check_period as u64,
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
             active_validators_limit: params.active_validators_limit,
+            min_cross_msg_fee: fil_to_eth_amount(&params.min_cross_msg_fee)?,
             power_scale: 3,
         };
 
@@ -778,9 +783,140 @@ impl EthSubnetManager {
     }
 }
 
+#[async_trait]
+impl BottomUpCheckpointRelayer for EthSubnetManager {
+    async fn submit_checkpoint(
+        &self,
+        submitter: &Address,
+        bundle: BottomUpCheckpointBundle,
+    ) -> anyhow::Result<()> {
+        let BottomUpCheckpointBundle {
+            checkpoint,
+            signatures,
+            signatories,
+            cross_msgs,
+        } = bundle;
+
+        let address = contract_address_from_subnet(&checkpoint.subnet_id)?;
+        log::info!(
+            "submit bottom up checkpoint: {checkpoint:?} in evm subnet contract: {address:}"
+        );
+
+        let signatures = signatures
+            .into_iter()
+            .map(ethers::types::Bytes::from)
+            .collect::<Vec<_>>();
+        let signatories = signatories
+            .into_iter()
+            .map(|addr| payload_to_evm_address(addr.payload()))
+            .collect::<result::Result<Vec<_>, _>>()?;
+        let cross_msgs = cross_msgs
+            .into_iter()
+            .map(subnet_actor_manager_facet::CrossMsg::try_from)
+            .collect::<result::Result<Vec<_>, _>>()?;
+        let checkpoint = subnet_actor_manager_facet::BottomUpCheckpoint::try_from(checkpoint)?;
+
+        let signer = Arc::new(self.get_signer(submitter)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+        let call = contract.submit_checkpoint(checkpoint, cross_msgs, signatories, signatures);
+        call_with_premium_estimation(signer, call)
+            .await?
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    async fn last_bottom_up_checkpoint_height(
+        &self,
+        subnet_id: &SubnetID,
+    ) -> anyhow::Result<ChainEpoch> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let epoch = contract.last_bottom_up_checkpoint_height().call().await?;
+        Ok(epoch as ChainEpoch)
+    }
+
+    async fn has_submitted_in_last_checkpoint_height(
+        &self,
+        subnet_id: &SubnetID,
+        submitter: &Address,
+    ) -> Result<bool> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let addr = payload_to_evm_address(submitter.payload())?;
+        Ok(contract
+            .has_submitted_in_last_bottom_up_checkpoint_height(addr)
+            .call()
+            .await?)
+    }
+
+    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let epoch = contract.bottom_up_check_period().call().await?;
+        Ok(epoch as ChainEpoch)
+    }
+
+    async fn checkpoint_bundle_at(
+        &self,
+        height: ChainEpoch,
+    ) -> anyhow::Result<BottomUpCheckpointBundle> {
+        let contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let (checkpoint, _, signatories, signatures) =
+            contract.get_signature_bundle(height as u64).call().await?;
+        let cross_msgs = contract.bottom_up_messages(height as u64).call().await?;
+
+        let checkpoint = BottomUpCheckpoint::try_from(checkpoint)?;
+        let signatories = signatories
+            .into_iter()
+            .map(|s| ethers_address_to_fil_address(&s))
+            .collect::<Result<Vec<_>, _>>()?;
+        let signatures = signatures
+            .into_iter()
+            .map(|s| s.to_vec())
+            .collect::<Vec<_>>();
+        let cross_msgs = cross_msgs
+            .into_iter()
+            .map(CrossMsg::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(BottomUpCheckpointBundle {
+            checkpoint,
+            signatures,
+            signatories,
+            cross_msgs,
+        })
+    }
+
+    async fn current_epoch(&self) -> Result<ChainEpoch> {
+        let epoch = self
+            .ipc_contract_info
+            .provider
+            .get_block_number()
+            .await?
+            .as_u64();
+        Ok(epoch as ChainEpoch)
+    }
+}
+
 /// Receives an input `FunctionCall` and returns a new instance
 /// after estimating an optimal `gas_premium` for the transaction
-async fn call_with_premium_estimation<B, D, M>(
+pub(crate) async fn call_with_premium_estimation<B, D, M>(
     signer: Arc<DefaultSignerMiddleware>,
     call: ethers_contract::FunctionCall<B, D, M>,
 ) -> Result<ethers_contract::FunctionCall<B, D, M>>
@@ -915,7 +1051,7 @@ fn block_number_from_receipt(
 
 /// Convert the ipc SubnetID type to an evm address. It extracts the last address from the Subnet id
 /// children and turns it into evm address.
-fn contract_address_from_subnet(subnet: &SubnetID) -> Result<ethers::types::Address> {
+pub(crate) fn contract_address_from_subnet(subnet: &SubnetID) -> Result<ethers::types::Address> {
     let children = subnet.children();
     let ipc_addr = children
         .last()

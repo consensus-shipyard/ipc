@@ -36,6 +36,7 @@ impl CreateSubnet {
                 parent,
                 arguments.min_validators,
                 f64_to_token_amount(arguments.min_validator_stake)?,
+                f64_to_token_amount(arguments.min_cross_msg_fee)?,
                 arguments.bottomup_check_period,
                 arguments
                     .active_validators_limit
@@ -73,8 +74,10 @@ pub struct CreateSubnetArgs {
     pub from: Option<String>,
     #[arg(long, short, help = "The parent subnet to create the new actor in")]
     pub parent: String,
-    #[arg(long, short, help = "The name of the subnet")]
+    #[arg(long, short, help = "The minimal validator stake")]
     pub min_validator_stake: f64,
+    #[arg(long, short, help = "The minimal cross message fee")]
+    pub min_cross_msg_fee: f64,
     #[arg(long, help = "The minimal number of validators")]
     pub min_validators: u64,
     #[arg(long, help = "The bottom up checkpoint period in number of blocks")]
