@@ -80,24 +80,42 @@ pub fn run<T: StateMachine>(
 ///
 /// ```ignore
 /// state_machine_test!(counter, 100 ms, 100 steps, CounterStateMachine { buggy: false });
+/// state_machine_test!(counter_seed_1, 0x001a560e00000020, 100 steps, CounterStateMachine { buggy: true });
 /// ```
 ///
 /// If the test fails, it will print out the seed which can be used to reproduce the error.
 /// One can use [state_machine_seed!] to do that with minimal changes to the parameters.
+///
+/// The machine instance is reused between tests, which makes it possible to use it for
+/// caching resources that take a long time to initialize, without having to resort to
+/// for example `lazy_static!` global variables.
 #[macro_export]
 macro_rules! state_machine_test {
     ($name:ident, $ms:literal ms, $steps:literal steps, $smt:expr) => {
         #[test]
         fn $name() {
+            let machine = $smt;
             arbtest::builder()
                 .budget_ms($ms)
-                .run(|u| $crate::smt::run(u, &$smt, $steps))
+                .run(|u| $crate::smt::run(u, &machine, $steps))
         }
     };
+
     ($name:ident, $steps:literal steps, $smt:expr) => {
         #[test]
         fn $name() {
-            arbtest::builder().run(|u| $crate::smt::run(u, &$smt, $steps))
+            let machine = $smt;
+            arbtest::builder().run(|u| $crate::smt::run(u, &machine, $steps))
+        }
+    };
+
+    ($name:ident, $seed:literal, $steps:literal steps, $smt:expr) => {
+        #[test]
+        fn $name() {
+            let machine = $smt;
+            arbtest::builder()
+                .seed($seed)
+                .run(|u| $crate::smt::run(u, &machine, $steps))
         }
     };
 }
@@ -115,9 +133,10 @@ macro_rules! state_machine_seed {
         paste::paste! {
           #[test]
           fn [<$name _with_seed_ $seed>]() {
-              arbtest::builder()
-                  .seed($seed)
-                  .run(|u| $crate::smt::run(u, &$smt, $steps))
+            let machine = $smt;
+            arbtest::builder()
+              .seed($seed)
+              .run(|u| $crate::smt::run(u, &machine, $steps))
           }
         }
     };

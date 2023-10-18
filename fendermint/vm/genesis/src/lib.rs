@@ -118,6 +118,12 @@ impl Collateral {
     }
 }
 
+impl Default for Collateral {
+    fn default() -> Self {
+        Self(TokenAmount::from_atto(0))
+    }
+}
+
 /// Secp256k1 public key of the validators.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ValidatorKey(pub PublicKey);

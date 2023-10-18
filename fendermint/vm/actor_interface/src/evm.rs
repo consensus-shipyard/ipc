@@ -53,3 +53,73 @@ pub struct ConstructorParams {
     /// The initcode that will construct the new EVM actor.
     pub initcode: RawBytes,
 }
+
+/// Define an error type that implements [ContractRevert] and is a union
+/// of multiple other such types. Intended to be used when a contract
+/// calls other contracts that can also revert with known custom error
+/// types, so that we can get something readable even if the error doesn't
+/// directly come from the contract we call.
+///
+/// # Example
+/// ```ignore
+/// revert_errors! {
+///    SubnetActorErrors {
+///        SubnetActorManagerFacetErrors,
+///        GatewayManagerFacetErrors
+///    }
+/// }
+/// ```
+#[macro_export]
+macro_rules! revert_errors {
+    ($typ:ident {$($elem:ident),+}) => {
+        #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+        pub enum $typ {
+            $($elem($elem),)+
+        }
+
+        impl ::ethers::core::abi::AbiDecode for $typ {
+            fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+                let data = data.as_ref();
+                $(
+                    if let Ok(decoded) =
+                        <$elem as ::ethers::core::abi::AbiDecode>::decode(data)
+                    {
+                        return Ok(Self::$elem(decoded));
+                    }
+                )+
+                Err(::ethers::core::abi::Error::InvalidData.into())
+            }
+        }
+
+        impl ::ethers::core::abi::AbiEncode for $typ {
+            fn encode(self) -> ::std::vec::Vec<u8> {
+                match self {
+                $(
+                    Self::$elem(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                )+
+                }
+            }
+        }
+
+        impl ::ethers::contract::ContractRevert for $typ {
+            fn valid_selector(selector: [u8; 4]) -> bool {
+                $(
+                    if <$elem as ::ethers::contract::ContractRevert>::valid_selector(selector) {
+                        return true;
+                    }
+                )+
+                false
+            }
+        }
+
+        impl ::core::fmt::Display for $typ {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                match self {
+                $(
+                    Self::$elem(element) => ::core::fmt::Display::fmt(element, f),
+                )+
+                }
+            }
+        }
+    };
+}

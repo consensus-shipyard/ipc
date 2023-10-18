@@ -71,6 +71,18 @@ impl From<EthAddress> for Address {
     }
 }
 
+impl From<EthAddress> for ethers::types::Address {
+    fn from(value: EthAddress) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<ethers::types::Address> for EthAddress {
+    fn from(value: ethers::types::Address) -> Self {
+        Self(value.0)
+    }
+}
+
 impl AsRef<[u8]> for EthAddress {
     fn as_ref(&self) -> &[u8] {
         &self.0

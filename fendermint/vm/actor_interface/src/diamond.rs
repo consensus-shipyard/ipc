@@ -19,6 +19,8 @@ pub struct EthFacet {
 #[derive(Clone, Debug)]
 pub struct EthContract {
     /// Pre-determined ID for the contract.
+    ///
+    /// 0 means the contract will get a dynamic ID.
     pub actor_id: ActorID,
     pub abi: Abi,
     /// List of facets if the contract is using the diamond pattern.

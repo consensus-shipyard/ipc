@@ -36,6 +36,7 @@ use tendermint_rpc::{
 
 use crate::conv::from_eth::to_fvm_message;
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative};
+use crate::error::error_with_data;
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
 use crate::{
     conv::{
@@ -633,7 +634,17 @@ where
 
     // Based on Lotus, we should return the data from the receipt.
     if deliver_tx.code.is_err() {
-        error(ExitCode::new(deliver_tx.code.value()), deliver_tx.info)
+        // There might be some revert data encoded as ABI in the response.
+        let revert_data_hex = decode_fevm_invoke(&deliver_tx)
+            .ok()
+            .map(hex::encode)
+            .unwrap_or_default();
+
+        error_with_data(
+            ExitCode::new(deliver_tx.code.value()),
+            deliver_tx.info,
+            revert_data_hex,
+        )
     } else {
         let return_data = decode_fevm_invoke(&deliver_tx)
             .context("error decoding data from deliver_tx in query")?;

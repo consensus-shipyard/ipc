@@ -8,9 +8,11 @@
 use anyhow::Context;
 use ethers::core::types as et;
 use fendermint_vm_genesis::{Power, Validator};
+use fvm_shared::address::Error as AddressError;
+use fvm_shared::address::Payload;
 use ipc_actors_abis as ia;
-pub use ipc_actors_abis::gateway_manager_facet::SubnetID;
 pub use ipc_actors_abis::gateway_router_facet::BottomUpCheckpoint;
+use ipc_sdk::subnet_id::SubnetID;
 use lazy_static::lazy_static;
 use merkle_tree_rs::{
     core::{process_proof, Hash},
@@ -20,13 +22,14 @@ use merkle_tree_rs::{
 
 use crate::{
     diamond::{EthContract, EthContractMap, EthFacet},
-    eam::EthAddress,
+    eam::{EthAddress, EAM_ACTOR_ID},
 };
 
 define_id!(GATEWAY { id: 64 });
 define_id!(SUBNETREGISTRY { id: 65 });
 
 lazy_static! {
+    /// Contracts deployed at genesis with well-known IDs.
     pub static ref IPC_CONTRACTS: EthContractMap = {
         [
             (
@@ -78,9 +81,38 @@ lazy_static! {
         .into_iter()
         .collect()
     };
-}
 
-lazy_static! {
+    /// Contracts that need to be deployed afresh for each subnet.
+    ///
+    /// See [deploy-sa-diamond.ts](https://github.com/consensus-shipyard/ipc-solidity-actors/blob/dev/scripts/deploy-sa-diamond.ts)
+    ///
+    /// But it turns out that the [SubnetRegistry](https://github.com/consensus-shipyard/ipc-solidity-actors/blob/3b0f3528b79e53e3c90f15016a40892122938ef0/src/SubnetRegistry.sol#L67)
+    /// actor has this `SubnetActorDiamond` and its facets baked into it, and able to deploy without further ado.
+    pub static ref SUBNET_CONTRACTS: EthContractMap = {
+        [
+            (
+                "SubnetActorDiamond",
+                EthContract {
+                    actor_id: 0,
+                    abi: ia::subnet_actor_diamond::SUBNETACTORDIAMOND_ABI.to_owned(),
+                    facets: vec![
+                        EthFacet {
+                            name: "SubnetActorGetterFacet",
+                            abi: ia::subnet_actor_getter_facet::SUBNETACTORGETTERFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorManagerFacet",
+                            abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI.to_owned(),
+                        },
+                    ],
+                },
+            ),
+        ]
+        .into_iter()
+        .collect()
+    };
+
+    /// ABI types of the Merkle tree which contains validator addresses and their voting power.
     pub static ref VALIDATOR_TREE_FIELDS: Vec<String> =
         vec!["address".to_owned(), "uint256".to_owned()];
 }
@@ -146,19 +178,38 @@ impl ValidatorMerkleTree {
     }
 }
 
+/// Decompose a subnet ID into a root ID and a route of Ethereum addresses
+pub fn subnet_id_to_eth(subnet_id: &SubnetID) -> Result<(u64, Vec<et::Address>), AddressError> {
+    // Every step along the way in the subnet ID we have an Ethereum address.
+    let mut route = Vec::new();
+    for addr in subnet_id.children() {
+        let addr = match addr.payload() {
+            Payload::ID(id) => EthAddress::from_id(*id),
+            Payload::Delegated(da)
+                if da.namespace() == EAM_ACTOR_ID && da.subaddress().len() == 20 =>
+            {
+                EthAddress(da.subaddress().try_into().expect("checked length"))
+            }
+            _ => return Err(AddressError::InvalidPayload),
+        };
+        route.push(et::H160::from(addr.0))
+    }
+    Ok((subnet_id.root_id(), route))
+}
+
 pub mod gateway {
-    use super::SubnetID;
+    use super::subnet_id_to_eth;
     use ethers::contract::{EthAbiCodec, EthAbiType};
     use ethers::core::types::{Bytes, H160, U256};
     use fendermint_vm_genesis::ipc::GatewayParams;
     use fendermint_vm_genesis::{Collateral, Validator};
     use fvm_shared::address::Error as AddressError;
-    use fvm_shared::address::Payload;
     use fvm_shared::econ::TokenAmount;
 
     pub use ipc_actors_abis::gateway_getter_facet::Validator as GatewayValidator;
+    use ipc_actors_abis::gateway_router_facet::SubnetID as GatewaySubnetID;
 
-    use crate::eam::{self, EthAddress};
+    use crate::eam::EthAddress;
 
     pub const METHOD_INVOKE_CONTRACT: u64 = crate::evm::Method::InvokeContract as u64;
 
@@ -170,7 +221,7 @@ pub mod gateway {
     /// See [GatewayDiamond.sol](https://github.com/consensus-shipyard/ipc-solidity-actors/blob/255da67fd6ad885f0ab633311be276a4fa936d45/src/GatewayDiamond.sol#L21)
     #[derive(Clone, EthAbiType, EthAbiCodec, Default, Debug, PartialEq, Eq, Hash)]
     pub struct ConstructorParameters {
-        pub network_name: SubnetID,
+        pub network_name: GatewaySubnetID,
         pub bottom_up_check_period: u64,
         pub min_collateral: U256,
         pub msg_fee: U256,
@@ -184,21 +235,6 @@ pub mod gateway {
             params: GatewayParams,
             validators: Vec<Validator<Collateral>>,
         ) -> Result<Self, AddressError> {
-            // Every step along the way in the subnet ID we have an Ethereum address.
-            let mut route = Vec::new();
-            for addr in params.subnet_id.children() {
-                let addr = match addr.payload() {
-                    Payload::ID(id) => EthAddress::from_id(*id),
-                    Payload::Delegated(da)
-                        if da.namespace() == eam::EAM_ACTOR_ID && da.subaddress().len() == 20 =>
-                    {
-                        EthAddress(da.subaddress().try_into().expect("checked length"))
-                    }
-                    _ => return Err(AddressError::InvalidPayload),
-                };
-                route.push(H160::from(addr.0))
-            }
-
             // Every validator has an Ethereum address.
             let validators = validators
                 .into_iter()
@@ -214,11 +250,10 @@ pub mod gateway {
                 })
                 .collect::<Result<Vec<_>, AddressError>>()?;
 
+            let (root, route) = subnet_id_to_eth(&params.subnet_id)?;
+
             Ok(Self {
-                network_name: SubnetID {
-                    root: params.subnet_id.root_id(),
-                    route,
-                },
+                network_name: GatewaySubnetID { root, route },
                 bottom_up_check_period: params.bottom_up_check_period,
                 min_collateral: tokens_to_u256(params.min_collateral),
                 msg_fee: tokens_to_u256(params.msg_fee),
@@ -243,16 +278,17 @@ pub mod gateway {
         };
         use fvm_shared::{bigint::BigInt, econ::TokenAmount};
         use ipc_actors_abis::gateway_getter_facet::Validator as GatewayValidator;
+        use ipc_actors_abis::gateway_router_facet::SubnetID as GatewaySubnetID;
         use std::str::FromStr;
 
         use crate::ipc::tests::{check_param_types, constructor_param_types};
 
-        use super::{tokens_to_u256, ConstructorParameters, SubnetID};
+        use super::{tokens_to_u256, ConstructorParameters};
 
         #[test]
         fn tokenize_constructor_params() {
             let cp = ConstructorParameters {
-                network_name: SubnetID {
+                network_name: GatewaySubnetID {
                     root: 0,
                     route: Vec::new(),
                 },
@@ -293,6 +329,20 @@ pub mod gateway {
             value += 1;
             let value = TokenAmount::from_atto(value);
             let _ = tokens_to_u256(value);
+        }
+    }
+}
+
+pub mod subnet {
+    use crate::revert_errors;
+    use ipc_actors_abis::gateway_manager_facet::GatewayManagerFacetErrors;
+    use ipc_actors_abis::subnet_actor_manager_facet::SubnetActorManagerFacetErrors;
+
+    // The subnet actor has its own errors, but it also invokes the gateway, which might revert for its own reasons.
+    revert_errors! {
+        SubnetActorErrors {
+            SubnetActorManagerFacetErrors,
+            GatewayManagerFacetErrors
         }
     }
 }

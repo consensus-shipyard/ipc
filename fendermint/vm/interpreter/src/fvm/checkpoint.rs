@@ -4,13 +4,10 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Context};
-use ethers::types::U256;
 use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Collateral;
 use fendermint_vm_genesis::PowerScale;
-use fvm_shared::bigint::BigInt;
-use fvm_shared::bigint::Sign;
-use fvm_shared::econ::TokenAmount;
+use fendermint_vm_message::conv::from_eth;
 use ipc_actors_abis::gateway_getter_facet::Membership;
 use tendermint::block::Height;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
@@ -249,7 +246,7 @@ fn membership_to_power_table(m: &Membership, power_scale: PowerScale) -> PowerTa
     for v in m.validators.iter() {
         // Ignoring any metadata that isn't a public key.
         if let Ok(pk) = PublicKey::parse_slice(&v.metadata, None) {
-            let c = u256_to_tokens(v.weight);
+            let c = from_eth::to_fvm_tokens(&v.weight);
             pt.push(Validator {
                 public_key: ValidatorKey(pk),
                 power: Collateral(c).into_power(power_scale),
@@ -258,13 +255,6 @@ fn membership_to_power_table(m: &Membership, power_scale: PowerScale) -> PowerTa
     }
 
     PowerTable(pt)
-}
-
-fn u256_to_tokens(value: U256) -> TokenAmount {
-    let mut bz = [0u8; 32];
-    value.to_big_endian(&mut bz);
-    let atto = BigInt::from_bytes_be(Sign::Plus, &bz);
-    TokenAmount::from_atto(atto)
 }
 
 /// Calculate the difference between the current and the next power table, to return to CometBFT only what changed:
@@ -318,11 +308,10 @@ fn into_power_map(value: PowerTable) -> HashMap<[u8; 65], Validator<Power>> {
 
 #[cfg(test)]
 mod tests {
-    use ethers::core::types::U256;
     use fendermint_vm_genesis::{Power, Validator};
     use quickcheck_macros::quickcheck;
 
-    use crate::fvm::checkpoint::{into_power_map, power_diff, u256_to_tokens};
+    use crate::fvm::checkpoint::{into_power_map, power_diff};
 
     use super::{PowerTable, PowerUpdates};
 
@@ -369,14 +358,6 @@ mod tests {
                 next: PowerTable(nvs),
             }
         }
-    }
-
-    #[quickcheck]
-    fn prop_u256_to_tokens(value: u64) {
-        let atto = U256::from(value);
-        let tokens = u256_to_tokens(atto);
-        let atto: u64 = tokens.atto().try_into().unwrap();
-        assert_eq!(atto, value);
     }
 
     #[quickcheck]

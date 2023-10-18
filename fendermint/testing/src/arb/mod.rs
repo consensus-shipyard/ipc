@@ -10,5 +10,5 @@ mod token;
 pub use crate::arb::address::ArbAddress;
 pub use crate::arb::cid::ArbCid;
 pub use crate::arb::message::ArbMessage;
-pub use crate::arb::subnetid::ArbSubnetID;
+pub use crate::arb::subnetid::{ArbSubnetAddress, ArbSubnetID};
 pub use crate::arb::token::ArbTokenAmount;

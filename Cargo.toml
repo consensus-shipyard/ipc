@@ -36,6 +36,7 @@ bytes = "1.4"
 clap = { version = "4.1", features = ["derive", "env"] }
 config = "0.13"
 dirs = "5.0"
+erased-serde = "0.3"
 ethers = { version = "2.0", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0" }
 fnv = "1.0"
@@ -127,10 +128,10 @@ tendermint-config = "0.33.0"
 tendermint-rpc = { version = "0.31", features = ["secp256k1", "http-client", "websocket-client"] }
 tendermint-proto = { version = "0.31" }
 
-ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc-agent.git", branch = "dev" }
+ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc.git", branch = "dev" }
 ipc_ipld_resolver = { git = "https://github.com/consensus-shipyard/ipc-ipld-resolver.git", branch = "main" }
 ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "dev" }
-ipc-provider = { git = "https://github.com/consensus-shipyard/ipc-agent.git", branch = "dev" }
+ipc-provider = { git = "https://github.com/consensus-shipyard/ipc.git", branch = "dev" }
 
 [patch.crates-io]
 # Use stable-only features.
@@ -140,6 +141,6 @@ merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.g
 
 
 # Uncomment to point to your local versions
-# [patch."https://github.com/consensus-shipyard/ipc-agent"]
-# ipc-sdk = { path = "../ipc-agent/ipc/sdk" }
-# ipc-provider = { path = "../ipc-agent/ipc/provider" }
+# [patch."https://github.com/consensus-shipyard/ipc"]
+# ipc-sdk = { path = "../ipc/ipc/sdk" }
+# ipc-provider = { path = "../ipc/ipc/provider" }

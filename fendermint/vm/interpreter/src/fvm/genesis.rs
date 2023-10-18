@@ -385,7 +385,7 @@ where
     where
         T: Tokenize,
     {
-        let contract = self.contract(contract_name)?;
+        let contract = self.top_contract(contract_name)?;
         let contract_id = contract.actor_id;
         let contract_src = contract_src(contract_name);
 
@@ -414,7 +414,7 @@ where
 
     /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already deployed library facets.
     pub fn facets(&self, contract_name: &str) -> anyhow::Result<Vec<FacetCut>> {
-        let contract = self.contract(contract_name)?;
+        let contract = self.top_contract(contract_name)?;
         let mut facet_cuts = Vec::new();
 
         for facet in contract.facets.iter() {
@@ -446,7 +446,7 @@ where
         Ok(facet_cuts)
     }
 
-    fn contract(&self, contract_name: &str) -> anyhow::Result<&EthContract> {
+    fn top_contract(&self, contract_name: &str) -> anyhow::Result<&EthContract> {
         self.top_contracts
             .get(contract_name)
             .ok_or(anyhow!("unknown top contract name"))

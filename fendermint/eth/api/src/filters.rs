@@ -560,6 +560,7 @@ fn send_error(ws_sender: &WebSocketSender, exit_code: ExitCode, msg: String, id:
     let err = JsonRpcError {
         code: exit_code.value().into(),
         message: msg,
+        data: None,
     };
     let err = jsonrpc_v2::Error::from(err);
 

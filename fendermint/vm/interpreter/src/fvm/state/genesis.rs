@@ -355,6 +355,13 @@ where
         }
     }
 
+    pub fn into_exec_state(self) -> Result<FvmExecState<DB>, Self> {
+        match self.stage {
+            Stage::Tree(_) => Err(self),
+            Stage::Exec(exec) => Ok(exec),
+        }
+    }
+
     fn put_state(&mut self, state: impl Serialize) -> anyhow::Result<Cid> {
         self.store()
             .put_cbor(&state, Code::Blake2b256)

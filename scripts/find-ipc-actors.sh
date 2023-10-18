@@ -6,6 +6,7 @@ set -e
 
 CARGO_HOME=${CARGO_HOME}
 IPC_ACTORS_TAG=$1
+IPC_ACTORS_NOFETCH=${IPC_ACTORS_NOFETCH:-0}
 
 if [ -z "$CARGO_HOME" ]; then
   CARGO_HOME=$(dirname $(dirname $(which cargo)))
@@ -49,9 +50,11 @@ if [ $(echo "$IPC_ACTORS_BINDING" | wc -l) -gt 1 ]; then
       cd ..
       git clone https://github.com/consensus-shipyard/ipc-solidity-actors.git; \
     fi
-    cd $IPC_ACTORS_DIR
-    git fetch origin
-    git checkout origin/$IPC_ACTORS_TAG
+    if [ $IPC_ACTORS_NOFETCH != "1" ]; then
+      cd $IPC_ACTORS_DIR
+      git fetch origin
+      git checkout origin/$IPC_ACTORS_TAG
+    fi
   else
     exit 1
   fi
