@@ -156,7 +156,6 @@ done
 
 ./fendermint genesis --genesis-file $BASE_DIR/genesis.json ipc gateway \
     --subnet-id /r0 \
-    --top-down-check-period 10 \
     --bottom-up-check-period 10 \
     --msg-fee 10 \
     --majority-percentage 67 \

@@ -95,7 +95,6 @@ script = """
 cwd = "./target/release"
 script = """
 ./fendermint genesis --genesis-file ${GENESIS_FILE} ipc gateway --subnet-id /r0 \
-    --top-down-check-period 10 \
     --bottom-up-check-period 10 \
     --msg-fee 10 \
     --majority-percentage 67

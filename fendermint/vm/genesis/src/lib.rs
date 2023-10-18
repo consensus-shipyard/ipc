@@ -209,7 +209,6 @@ pub mod ipc {
         #[serde_as(as = "IsHumanReadable")]
         pub subnet_id: SubnetID,
         pub bottom_up_check_period: u64,
-        pub top_down_check_period: u64,
         #[serde_as(as = "IsHumanReadable")]
         pub msg_fee: TokenAmount,
         pub majority_percentage: u8,

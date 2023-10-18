@@ -6,8 +6,10 @@ use std::path::PathBuf;
 use clap::{Args, Subcommand, ValueEnum};
 use ipc_sdk::subnet_id::SubnetID;
 
-use super::parse::{parse_full_fil, parse_network_version, parse_percentage, parse_token_amount};
-use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
+use super::parse::{
+    parse_eth_address, parse_full_fil, parse_network_version, parse_percentage, parse_token_amount,
+};
+use fvm_shared::{address::Address, econ::TokenAmount, version::NetworkVersion};
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum AccountKind {
@@ -119,6 +121,7 @@ pub struct GenesisIntoTendermintArgs {
 pub enum GenesisIpcCommands {
     /// Set all gateway parameters.
     Gateway(GenesisIpcGatewayArgs),
+    FromParent(Box<GenesisFromParentArgs>),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -129,9 +132,6 @@ pub struct GenesisIpcGatewayArgs {
 
     #[arg(long, short)]
     pub bottom_up_check_period: u64,
-
-    #[arg(long, short)]
-    pub top_down_check_period: u64,
 
     /// Minimum collateral requirement for subnet in full FIL units.
     #[arg(long, short = 'c', value_parser = parse_full_fil)]
@@ -148,4 +148,35 @@ pub struct GenesisIpcGatewayArgs {
     /// Maximum number of active validators.
     #[arg(long, short = 'v', default_value = "100")]
     pub active_validators_limit: u16,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct GenesisFromParentArgs {
+    /// Child subnet for with the genesis file is being created
+    #[arg(long, short)]
+    pub subnet_id: SubnetID,
+
+    /// Endpoint to the RPC of the child subnet's parent
+    #[arg(long, short)]
+    pub parent_endpoint: url::Url,
+
+    /// IPC gateway of the parent; 20 byte Ethereum address in 0x prefixed hex format
+    #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000064")]
+    pub parent_gateway: Address,
+
+    /// IPC registry of the parent;  20 byte Ethereum address in 0x prefixed hex format
+    #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000065")]
+    pub parent_registry: Address,
+
+    /// Network version, governs which set of built-in actors to use.
+    #[arg(long, short = 'v', default_value = "18", value_parser = parse_network_version)]
+    pub network_version: NetworkVersion,
+
+    /// Base fee for running transactions in atto.
+    #[arg(long, short = 'f', value_parser = parse_token_amount, default_value = "1000")]
+    pub base_fee: TokenAmount,
+
+    /// Number of decimals to use during converting FIL to Power.
+    #[arg(long, default_value = "3")]
+    pub power_scale: i8,
 }

@@ -123,7 +123,6 @@ impl Arbitrary for ipc::GatewayParams {
             subnet_id: ArbSubnetID::arbitrary(g).0,
             // Gateway constructor would reject 0.
             bottom_up_check_period: u64::arbitrary(g).max(1),
-            top_down_check_period: u64::arbitrary(g),
             // Gateway constructor would reject 0.
             min_collateral: ArbTokenAmount::arbitrary(g)
                 .0

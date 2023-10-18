@@ -56,6 +56,7 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 ipc-sdk = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
+ipc-provider = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

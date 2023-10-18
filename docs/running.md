@@ -667,3 +667,54 @@ $ cargo run -p fendermint_rpc --release --example simplecoin -- --secret-key tes
 ```
 
 Note that the script figures out the Alice's nonce on its own, so we don't have to pass it in. It also has an example of running an EVM view method (which is read-only) either as as a distributed read-transaction (which is included on the chain and costs gas) or a query anwered by our node without involving the blockchain. Both have their uses, depending on our level of trust.
+
+## Deploy IPC child subnet
+
+### Crate genesis from parent
+Fendermint includes a command to automatically create the genesis file for an IPC child subnet according to the information for the subnet available in its parent. Here's an example of the generation of a genesis file for a subnet that has already been bootstrapped in the parent.
+```shell
+cargo run -p fendermint_app -- \
+    --network=test \
+    genesis --genesis-file test-network/genesis.json \
+    ipc from-parent --subnet-id <CHILD_SUBNET_ID> -p <PARENT_ENDPOINT> \
+    --parent-gateway <PARENT_GATEWAY_CONTRACT> \
+    --parent-registry <PARENT_REGISTRY_CONTRACT>
+```
+
+Here's a sample execution of the command for an already bootstrapped subnet in `/r314159`:
+```shell
+cargo run -p fendermint_app -- \
+    --network=test \
+    genesis --genesis-file test-network/genesis.json \
+    ipc from-parent \
+    --subnet-id /r314159/t410fdoh27lsddz4my2v3e77qnxdp5vsjxkdfokc7sti \
+    -p https://api.calibration.node.glif.io/rpc/v1 \
+    --parent-gateway 0x56948d2CFaa2EF355B8C08Ac925202db212146D1 \
+    --parent-registry 0x6A4884D2B6A597792dC68014D4B7C117cca5668e```
+
+Leading to the following genesis file:
+```console
+{
+  "chain_name": "/r314159/t410fdoh27lsddz4my2v3e77qnxdp5vsjxkdfokc7sti",
+  "timestamp": 1007560,
+  "network_version": 18,
+  "base_fee": "1000",
+  "power_scale": 3,
+  "validators": [
+    {
+      "public_key": "BDOFw7mriml8177GymI8vdD+oSk+i0ZN+CWxBOtYpEzI76zGo0grhmuF7N9zS11O9UlXN96zSGJc5qNVNhQtKVU=",
+      "power": "1000000000000000000"
+    }
+  ],
+  "accounts": [],
+  "ipc": {
+    "gateway": {
+      "subnet_id": "/r314159/t410fdoh27lsddz4my2v3e77qnxdp5vsjxkdfokc7sti",
+      "bottom_up_check_period": 30,
+      "msg_fee": "1000000000000",
+      "majority_percentage": 60,
+      "min_collateral": "1000000000000000000",
+      "active_validators_limit": 100
+    }
+}
+```
