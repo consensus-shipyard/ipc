@@ -2578,6 +2578,7 @@ dependencies = [
  "ipc-identity",
  "ipc-provider",
  "ipc-sdk",
+ "libsecp256k1",
  "log",
  "num-derive",
  "num-traits",

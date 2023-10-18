@@ -30,7 +30,7 @@ pub const JSON_RPC_VERSION: &str = "2.0";
 /// DefaulDEFAULT_CHAIN_IDSUBNET_e
 pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
 # Default configuration for Filecoin Calibration
-repo_path = "~/.ipc"
+keystore_path = "~/.ipc"
 
 [[subnets]]
 id = "/r314159"

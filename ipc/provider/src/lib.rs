@@ -22,7 +22,7 @@ use ipc_sdk::{
     subnet_id::SubnetID,
 };
 use lotus::message::wallet::WalletKeyType;
-use manager::{EthSubnetManager, SubnetInfo, SubnetManager};
+use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -143,7 +143,10 @@ impl IpcProvider {
                     let manager = Box::new(
                         EthSubnetManager::from_subnet_with_wallet_store(
                             subnet,
-                            self.evm_wallet().ok()?,
+                            match self.evm_wallet() {
+                                Ok(w) => Some(w),
+                                Err(_) => None,
+                            },
                         )
                         .ok()?,
                     );
@@ -162,8 +165,10 @@ impl IpcProvider {
         self.sender = Some(from);
     }
 
-    // FIXME: Reconcile these into a single wallet method that
-    // accepts an `ipc_identity::WalletType` as an input.
+    /// Returns the evm wallet if it is configured, and throws an error if no wallet configured.
+    ///
+    /// This method should be used when we want the wallet retrieval to throw an error
+    /// if it is not configured (i.e. when the provider needs to sign transactions).
     pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
         if let Some(wallet) = &self.evm_keystore {
             Ok(wallet.clone())
@@ -172,6 +177,8 @@ impl IpcProvider {
         }
     }
 
+    // FIXME: Reconcile these into a single wallet method that
+    // accepts an `ipc_identity::WalletType` as an input.
     pub fn fvm_wallet(&self) -> anyhow::Result<Arc<RwLock<Wallet>>> {
         if let Some(wallet) = &self.fvm_wallet {
             Ok(wallet.clone())
@@ -213,6 +220,11 @@ impl IpcProvider {
 
         Err(anyhow!("error fetching a valid sender"))
     }
+
+    /// Lists available subnet connections
+    pub fn list_connections(&self) -> HashMap<SubnetID, config::Subnet> {
+        self.config.subnets.clone()
+    }
 }
 
 /// IpcProvider spawns a daemon-less client to interact with IPC subnets.
@@ -231,9 +243,9 @@ impl IpcProvider {
         parent: SubnetID,
         min_validators: u64,
         min_validator_stake: TokenAmount,
-        min_cross_msg_fee: TokenAmount,
         bottomup_check_period: ChainEpoch,
         active_validators_limit: u16,
+        min_cross_msg_fee: TokenAmount,
     ) -> anyhow::Result<Address> {
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -552,6 +564,17 @@ impl IpcProvider {
         conn.manager().get_validator_changeset(subnet, epoch).await
     }
 
+    /// Get genesis info for a child subnet. This can be used to deterministically
+    /// generate the genesis of the subnet
+    pub async fn get_genesis_info(&self, subnet: &SubnetID) -> anyhow::Result<SubnetGenesisInfo> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("parent subnet config not found")),
+            Some(conn) => conn,
+        };
+        conn.manager().get_genesis_info(subnet).await
+    }
+
     pub async fn get_top_down_msgs(
         &self,
         subnet: &SubnetID,
@@ -694,7 +717,9 @@ fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<KeyStore> {
     if let Some(repo_str) = repo_str {
         new_fvm_keystore_from_path(repo_str)
     } else {
-        Err(anyhow!("No keystore repo found in config"))
+        Err(anyhow!(
+            "No keystore repo found in config. Try using absolute path"
+        ))
     }
 }
 

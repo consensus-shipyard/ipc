@@ -4,18 +4,14 @@
 
 use crate::cross::CrossMsg;
 use crate::subnet_id::SubnetID;
-use crate::ValidatorSet;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::econ::TokenAmount;
 use lazy_static::lazy_static;
-use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
 lazy_static! {
     // Default CID used for the genesis checkpoint. Using
@@ -59,28 +55,3 @@ pub struct BottomUpCheckpoint {
     /// approach we need with Lotus, where the messages are part of the relayed transaction.
     pub cross_messages_hash: Vec<u8>,
 }
-
-/// Validators tracks all the validator in the subnet. It is useful in handling top-down checkpoints.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct Validators {
-    /// The validator set that holds all the validators
-    pub validators: ValidatorSet,
-    /// Tracks the total weight of the validators
-    pub total_weight: TokenAmount,
-}
-
-impl Validators {
-    pub fn new(validators: ValidatorSet) -> Self {
-        let mut weight = TokenAmount::zero();
-        for v in validators.validators() {
-            weight += v.weight.clone();
-        }
-        Self {
-            validators,
-            total_weight: weight,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {}

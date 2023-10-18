@@ -11,13 +11,15 @@ use ipc_actors_abis::{
     subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
 };
 use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
+use ipc_sdk::validator::from_contract_validators;
 use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::subnet::{
-    BottomUpCheckpointRelayer, GetBlockHashResult, TopDownCheckpointQuery, TopDownQueryPayload,
+    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownCheckpointQuery,
+    TopDownQueryPayload,
 };
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
@@ -60,7 +62,7 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
 
 pub struct EthSubnetManager {
-    keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+    keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ipc_contract_info: IPCContractInfo,
 }
 
@@ -211,6 +213,12 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid min validator stake"))?;
 
+        let min_cross_msg_fee = params
+            .min_cross_msg_fee
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid min message fee"))?;
+
         log::debug!("calling create subnet for EVM manager");
 
         let route = subnet_id_to_evm_addresses(&params.parent)?;
@@ -228,8 +236,8 @@ impl SubnetManager for EthSubnetManager {
             bottom_up_check_period: params.bottomup_check_period as u64,
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
             active_validators_limit: params.active_validators_limit,
-            min_cross_msg_fee: fil_to_eth_amount(&params.min_cross_msg_fee)?,
             power_scale: 3,
+            min_cross_msg_fee: ethers::types::U256::from(min_cross_msg_fee),
         };
 
         log::info!("creating subnet on evm with params: {params:?}");
@@ -601,6 +609,29 @@ impl SubnetManager for EthSubnetManager {
             .await?
             .to_string())
     }
+
+    async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(SubnetGenesisInfo {
+            // Active validators limit set for the child subnet.
+            active_validators_limit: contract.active_validators_limit().call().await?,
+            // Bottom-up checkpoint period set in the subnet actor.
+            bottom_up_checkpoint_period: contract.bottom_up_check_period().call().await?,
+            // Genesis epoch when the subnet was bootstrapped in the parent.
+            genesis_epoch: self.genesis_epoch(subnet).await?,
+            // Majority percentage of
+            majority_percentage: contract.majority_percentage().call().await?,
+            // Minimum collateral required for subnets to register into the subnet
+            min_collateral: eth_to_fil_amount(&contract.min_activation_collateral().call().await?)?,
+            // Custom message fee that the child subnet wants to set for cross-net messages
+            msg_fee: eth_to_fil_amount(&contract.min_cross_msg_fee().call().await?)?,
+            validators: from_contract_validators(contract.genesis_validators().call().await?)?,
+        })
+    }
 }
 
 #[async_trait]
@@ -709,7 +740,7 @@ impl EthSubnetManager {
         registry_addr: ethers::types::Address,
         chain_id: u64,
         provider: Provider<Http>,
-        keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ) -> Self {
         Self {
             keystore,
@@ -731,13 +762,20 @@ impl EthSubnetManager {
         }
     }
 
+    pub fn keystore(&self) -> Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
+        self.keystore
+            .clone()
+            .ok_or(anyhow!("no evm keystore available"))
+    }
+
     /// Get the ethers singer instance.
     /// We use filecoin addresses throughout our whole code-base
     /// and translate them to evm addresses when relevant.
     fn get_signer(&self, addr: &Address) -> Result<DefaultSignerMiddleware> {
         // convert to its underlying eth address
         let addr = payload_to_evm_address(addr.payload())?;
-        let keystore = self.keystore.read().unwrap();
+        let keystore = self.keystore()?;
+        let keystore = keystore.read().unwrap();
         let private_key = keystore
             .get(&addr.into())?
             .ok_or_else(|| anyhow!("address {addr:} does not have private key in key store"))?;
@@ -752,7 +790,7 @@ impl EthSubnetManager {
 
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
-        keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ) -> Result<Self> {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();
