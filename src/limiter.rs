@@ -39,6 +39,7 @@ where
 
     /// Same as [`RateLimiter::add`] but allows passing in the time, for testing.
     pub fn add_at(&mut self, limit: &RateLimit, key: K, cost: u32, at: Instant) -> bool {
+        #[allow(clippy::unwrap_or_default)]
         let state = self.cache.entry(key).or_insert_with(GcraState::default);
 
         state.check_and_modify_at(limit, at, cost).is_ok()
