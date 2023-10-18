@@ -8,7 +8,7 @@ Bottom-up checkpoints are periodically submitted to the parent subnet, carrying:
 
 The high level steps are implemented in the [checkpoint](../fendermint/vm/interpreter/src/fvm/checkpoint.rs) module,
 which calls various methods on the [Gateway actor](https://github.com/consensus-shipyard/ipc-solidity-actors/tree/dev/src/gateway),
-but the end-to-end flow also relies on a working [IPC Agent](https://github.com/consensus-shipyard/ipc-agent/)
+but the end-to-end flow also relies on a working [IPC Agent](https://github.com/consensus-shipyard/ipc/)
 and potentially the [IPLD Resolver](https://github.com/consensus-shipyard/ipc-ipld-resolver).
 
 The following diagram illustrates the sequence of events in detail:
