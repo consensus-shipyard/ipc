@@ -142,7 +142,10 @@ impl IpcProvider {
                     let manager = Box::new(
                         EthSubnetManager::from_subnet_with_wallet_store(
                             subnet,
-                            self.evm_wallet().ok()?,
+                            match self.evm_wallet() {
+                                Ok(w) => Some(w),
+                                Err(_) => None,
+                            },
                         )
                         .ok()?,
                     );
@@ -161,8 +164,10 @@ impl IpcProvider {
         self.sender = Some(from);
     }
 
-    // FIXME: Reconcile these into a single wallet method that
-    // accepts an `ipc_identity::WalletType` as an input.
+    /// Returns the evm wallet if it is configured, and throws an error if no wallet configured.
+    ///
+    /// This method should be used when we want the wallet retrieval to throw an error
+    /// if it is not configured (i.e. when the provider needs to sign transactions).
     pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
         if let Some(wallet) = &self.evm_keystore {
             Ok(wallet.clone())
@@ -171,6 +176,8 @@ impl IpcProvider {
         }
     }
 
+    // FIXME: Reconcile these into a single wallet method that
+    // accepts an `ipc_identity::WalletType` as an input.
     pub fn fvm_wallet(&self) -> anyhow::Result<Arc<RwLock<Wallet>>> {
         if let Some(wallet) = &self.fvm_wallet {
             Ok(wallet.clone())
@@ -211,6 +218,11 @@ impl IpcProvider {
         };
 
         Err(anyhow!("error fetching a valid sender"))
+    }
+
+    /// Lists available subnet connections
+    pub fn list_connections(&self) -> HashMap<SubnetID, config::Subnet> {
+        self.config.subnets.clone()
     }
 }
 

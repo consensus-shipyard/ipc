@@ -58,7 +58,7 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
 
 pub struct EthSubnetManager {
-    keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+    keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ipc_contract_info: IPCContractInfo,
 }
 
@@ -736,7 +736,7 @@ impl EthSubnetManager {
         registry_addr: ethers::types::Address,
         chain_id: u64,
         provider: Provider<Http>,
-        keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ) -> Self {
         Self {
             keystore,
@@ -758,13 +758,20 @@ impl EthSubnetManager {
         }
     }
 
+    pub fn keystore(&self) -> Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
+        self.keystore
+            .clone()
+            .ok_or(anyhow!("no evm keystore available"))
+    }
+
     /// Get the ethers singer instance.
     /// We use filecoin addresses throughout our whole code-base
     /// and translate them to evm addresses when relevant.
     fn get_signer(&self, addr: &Address) -> Result<DefaultSignerMiddleware> {
         // convert to its underlying eth address
         let addr = payload_to_evm_address(addr.payload())?;
-        let keystore = self.keystore.read().unwrap();
+        let keystore = self.keystore()?;
+        let keystore = keystore.read().unwrap();
         let private_key = keystore
             .get(&addr.into())?
             .ok_or_else(|| anyhow!("address {addr:} does not have private key in key store"))?;
@@ -779,7 +786,7 @@ impl EthSubnetManager {
 
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
-        keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ) -> Result<Self> {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();
