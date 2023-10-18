@@ -7,12 +7,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_actors_abis::subnet_actor_getter_facet;
 use ipc_sdk::checkpoint::BottomUpCheckpointBundle;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
+use ipc_sdk::validator::Validator;
 
 use crate::lotus::message::ipc::SubnetInfo;
 
@@ -126,7 +126,7 @@ pub struct SubnetGenesisInfo {
     pub active_validators_limit: u16,
     pub min_collateral: TokenAmount,
     pub genesis_epoch: ChainEpoch,
-    pub validators: Vec<subnet_actor_getter_facet::Validator>,
+    pub validators: Vec<Validator>,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual

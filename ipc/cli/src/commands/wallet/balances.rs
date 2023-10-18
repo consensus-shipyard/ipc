@@ -53,7 +53,7 @@ impl CommandLineHandler for WalletBalances {
                     .collect::<anyhow::Result<Vec<(TokenAmount, &EthKeyAddress)>>>()?;
 
                 for (balance, addr) in r {
-                    if addr.to_string() != String::from("default-key") {
+                    if addr.to_string() != *"default-key".to_string() {
                         println!("{:?} - Balance: {}", addr.to_string(), balance);
                     }
                 }

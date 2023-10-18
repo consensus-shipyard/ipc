@@ -11,6 +11,7 @@ use ipc_actors_abis::{
     subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
 };
 use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
+use ipc_sdk::validator::from_contract_validators;
 use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 
 use crate::config::subnet::SubnetConfig;
@@ -216,7 +217,7 @@ impl SubnetManager for EthSubnetManager {
             .min_cross_msg_fee
             .atto()
             .to_u128()
-            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+            .ok_or_else(|| anyhow!("invalid min message fee"))?;
 
         log::debug!("calling create subnet for EVM manager");
 
@@ -235,7 +236,6 @@ impl SubnetManager for EthSubnetManager {
             bottom_up_check_period: params.bottomup_check_period as u64,
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
             active_validators_limit: params.active_validators_limit,
-            min_cross_msg_fee: fil_to_eth_amount(&params.min_cross_msg_fee)?,
             power_scale: 3,
             min_cross_msg_fee: ethers::types::U256::from(min_cross_msg_fee),
         };
@@ -629,7 +629,7 @@ impl SubnetManager for EthSubnetManager {
             min_collateral: eth_to_fil_amount(&contract.min_activation_collateral().call().await?)?,
             // Custom message fee that the child subnet wants to set for cross-net messages
             msg_fee: eth_to_fil_amount(&contract.min_cross_msg_fee().call().await?)?,
-            validators: contract.genesis_validators().call().await?,
+            validators: from_contract_validators(contract.genesis_validators().call().await?)?,
         })
     }
 }
