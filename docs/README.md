@@ -1,6 +1,6 @@
 # IPLD Resolver
 
-The IPLD Resolver is a library that [IPC Agents](https://github.com/consensus-shipyard/ipc-agent/) can use to exchange data between subnets in IPLD format.
+The IPLD Resolver is a library that [IPC Agents](https://github.com/consensus-shipyard/ipc/) can use to exchange data between subnets in IPLD format.
 
 ## Checkpointing
 
