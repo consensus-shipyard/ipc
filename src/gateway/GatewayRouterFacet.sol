@@ -98,10 +98,14 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         });
     }
 
-    /// @notice commit the ipc parent finality into storage
+    /// @notice commit the ipc parent finality into storage and returns the previous committed finality
+    /// This is useful to understand if the finalities are consistent or if there have been reorgs.
     /// @param finality - the parent finality
-    function commitParentFinality(ParentFinality calldata finality) external systemActorOnly {
-        LibGateway.commitParentFinality(finality);
+    function commitParentFinality(
+        ParentFinality calldata finality
+    ) external systemActorOnly returns (bool hasCommittedBefore, ParentFinality memory previousFinality) {
+        previousFinality = LibGateway.commitParentFinality(finality);
+        hasCommittedBefore = previousFinality.height != 0;
     }
 
     /// @notice Store the validator change requests from parent.

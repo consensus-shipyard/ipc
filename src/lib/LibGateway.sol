@@ -55,12 +55,17 @@ library LibGateway {
 
     /// @notice commit the ipc parent finality into storage
     /// @param finality - the finality to be committed
-    function commitParentFinality(ParentFinality calldata finality) internal {
+    function commitParentFinality(
+        ParentFinality calldata finality
+    ) internal returns (ParentFinality memory lastFinality) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        if (s.latestParentHeight > finality.height) {
+        uint256 lastHeight = s.latestParentHeight;
+        if (lastHeight > finality.height) {
             revert ParentFinalityAlreadyCommitted();
         }
+        lastFinality = s.finalitiesMap[lastHeight];
+
         s.finalitiesMap[finality.height] = finality;
         s.latestParentHeight = finality.height;
     }
