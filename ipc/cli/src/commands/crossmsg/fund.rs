@@ -26,7 +26,7 @@ impl CommandLineHandler for Fund {
         let mut provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
         let from = match &arguments.from {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
         let to = match &arguments.to {

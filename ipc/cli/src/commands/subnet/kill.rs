@@ -4,11 +4,10 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
 use std::{fmt::Debug, str::FromStr};
 
-use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
+use crate::{get_ipc_provider, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
 /// The command to kill an existing subnet.
 pub struct KillSubnet;
@@ -23,7 +22,7 @@ impl CommandLineHandler for KillSubnet {
         let mut provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
         let from = match &arguments.from {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
 
