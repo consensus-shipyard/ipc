@@ -30,6 +30,13 @@ docker run \
 """
 dependencies = ["cometbft-pull", "docker-network-create"]
 
+[tasks.cometbft-node-id]
+script = """
+id=`docker exec ${CMT_CONTAINER_NAME} cometbft show-node-id`
+ip=`docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CMT_CONTAINER_NAME}`
+echo $id@$ip:26656
+"""
+
 [tasks.cometbft-rm]
 extend = "docker-rm"
 env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }

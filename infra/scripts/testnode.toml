@@ -1,0 +1,114 @@
+########################################################################################################################
+# Testnode
+########################################################################################################################
+[tasks.testnode]
+workspace = false
+dependencies = [
+    "testnode-down",
+    "testnode-init",
+    "testnode-network-create",
+    "cometbft-init",
+    "fendermint-deps",
+    "testnode-config",
+    "fendermint-start",
+    "cometbft-start",
+    "cometbft-wait",
+    "ethapi-start"
+]
+
+[tasks.testnode-network-create]
+env = { "NETWORK_NAME"="${NETWORK_NAME}"}
+extend = "docker-network-create"
+
+
+[tasks.testnode-init]
+dependencies = [
+    "node-clear",
+    "node-mkdir",
+]
+
+[tasks.testnode-clear]
+script="""
+echo clearing all IPC data
+rm -rf ${BASE_DIR}
+"""
+
+[tasks.testnode-mkdir]
+script="""
+echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR
+mkdir -p $BASE_DIR
+mkdir -p $FM_DIR
+
+mkdir -p $CMT_DIR
+"""
+
+[tasks.testnode-down]
+# `dependencies` doesn't seem to work with `cleanup_task`.
+run_task = { name = [
+    "cometbft-stop",
+    "cometbft-rm",
+    "fendermint-stop",
+    "fendermint-rm",
+    "ethapi-stop",
+    "ethapi-rm",
+    "docker-network-rm"
+]}
+
+# This task create all necessary data structures to run Fendermint:
+# the genesis file with necessary entities and cryptographic keys.
+[tasks.testnode-config]
+dependencies = [
+    "testnode-script-new-genesis",
+    "testnode-script-new-key",
+    "testnode-script-new-account",
+    "testnode-script-add-validator",
+    "testnode-script-new-gateway",
+    "testnode-script-export-keys"
+]
+
+[tasks.testnode-script-new-genesis]
+cwd = "./target/release"
+script = """
+./fendermint genesis --genesis-file ${GENESIS_FILE} new --chain-name ${CHAIN_NAME} --base-fee ${BASE_FEE} --timestamp ${TIMESTAMP} --power-scale 3
+"""
+
+[tasks.testnode-script-new-key]
+cwd = "./target/release"
+script="""
+mkdir -p $KEYS_DIR
+
+./fendermint key gen --out-dir $KEYS_DIR --name $KEY_NAME;
+chmod 600 ${PRIV_KEY_PATH}
+"""
+
+[tasks.testnode-script-new-account]
+cwd = "./target/release"
+script="""
+./fendermint genesis --genesis-file ${GENESIS_FILE} add-account --public-key ${PUB_KEY_PATH} --balance ${BALANCE}
+"""
+
+
+[tasks.testnode-script-add-validator]
+cwd = "./target/release"
+script = """
+./fendermint genesis --genesis-file ${GENESIS_FILE} add-validator --public-key ${PUB_KEY_PATH} --power 1
+"""
+
+[tasks.testnode-script-new-gateway]
+cwd = "./target/release"
+script = """
+./fendermint genesis --genesis-file ${GENESIS_FILE} ipc gateway --subnet-id /r0 \
+    --bottom-up-check-period 10 \
+    --msg-fee 10 \
+    --majority-percentage 67 \
+    --min-collateral 1
+"""
+
+[tasks.testnode-script-export-keys]
+cwd = "./target/release"
+script = """
+./fendermint genesis --genesis-file ${GENESIS_FILE} into-tendermint --out ${CMT_DIR}/config/genesis.json
+
+./fendermint key into-tendermint --secret-key ${PRIV_KEY_PATH} --out ${CMT_DIR}/config/priv_validator_key.json
+chmod 600 ${CMT_DIR}/config/priv_validator_key.json
+"""

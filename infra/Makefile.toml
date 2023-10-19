@@ -4,7 +4,8 @@ extend = [
   { path = "scripts/fendermint.toml" },
   { path = "scripts/ethapi.toml" },
   { path = "scripts/node.toml" },
-  { path = "scripts/testnet.toml" }
+  { path = "scripts/testnet.toml" },
+  { path = "scripts/testnode.toml" }
 ]
 
 [config]
@@ -56,7 +57,6 @@ echo - Timestamp: ${TIMESTAMP}
 echo
 echo Single node testnet layout:
 echo - IPC directory: ${BASE_DIR}
-echo - IPC Testnet directory: ${BASE_TESTNET_DIR}
 echo - CometBFT directory: ${CMT_DIR}
 echo - Fendermint directory: ${FM_DIR}
 echo - Keys directory: ${KEYS_DIR}
@@ -68,7 +68,7 @@ echo - Fendermint container: ${FM_CONTAINER_NAME}
 echo
 echo
 echo 4 nodes testnet layout:
-echo - IPC directory: ${BASE_TESTNET_DIR}
+echo - IPC directory: ${BASE_DIR}
 echo - Genesis file: ${GENESIS_FILE}
 echo - Network: ${NETWORK_NAME}
 echo
@@ -80,12 +80,11 @@ script_runner = "@duckscript"
 script = ['''
     echo
     echo Main tasks:
-    echo - clear: Clear all information: private keys, cache, database, etc.
-    echo - init: Initialize the system
+    echo - testnet: run 4-nodes testnet
+    echo - testnet-down: stop the testnet
+    echo - testnode: run a test node
+    echo - testnode-down: stop the test node
     echo - info: Print the setup information
-    echo - start: Start Fendermint/CometBFT docker containers with the genesis
-    echo - teardown: Stop the system and clears all data
-    echo - run: Init and then start the system
     echo
     echo Most tasks use these environment variables:
     echo - CHAIN_NAME (default '${CHAIN_NAME}'): the target IPC subnet

@@ -9,7 +9,7 @@ make build docker-build
 
 To run IPC in the local rootnet just perform the following :
 ```bash
-cargo make --makefile ./infra/Makefile.toml node
+cargo make --makefile ./infra/Makefile.toml testnode
 
 ```
 
@@ -17,7 +17,7 @@ It will create three docker containers (cometbft, fendermint, and eth-api).
 
 To stop run the following:
 ```bash
-cargo make --makefile ./infra/Makefile.toml node-down
+cargo make --makefile ./infra/Makefile.toml testnode-down
 ```
 
 ## Local 4-nodes deployment
