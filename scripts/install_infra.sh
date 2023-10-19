@@ -59,7 +59,7 @@ if [[ "$#" -gt 0 && "$1" == "-f" ]]; then
     exit 0
 fi
 
-if docker images "$image_name" &> /dev/null ; then
+if docker inspect "$image_name" &> /dev/null ; then
     echo "[*] Docker image '$image_name' already exists."
 else
     build_infra
