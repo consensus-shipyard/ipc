@@ -40,8 +40,8 @@ To build the IPC Agent you need to have Rust installed in your environment. We c
 
 To build the binary for the `ipc-cli` you need to build the requirements in your environment, clone this repo, and build the binary following these steps:
 ```bash
-git clone https://github.com/consensus-shipyard/ipc-agent.git
-cd ipc-agent
+git clone https://github.com/consensus-shipyard/ipc.git
+cd ipc
 rustup target add wasm32-unknown-unknown
 make build
 ```
@@ -54,35 +54,42 @@ IPC uses [Fendermint](https://github.com/consensus-shipyard/fendermint) as the u
 
 >💡 Some users have reported some issues trying to build the required images using Docker Desktop. Consider installing a version of [Docker engine](https://docs.docker.com/engine/install/#server) supported by your system.
 
-<!-- With Docker installed, you can then `make install-infra` in the root of the `ipc-agent` repo. This will clone the eudico repo, build the docker image that you need to run subnets, and install the infrastructure scripts in the `./bin` folder. -->
+With Docker installed, you can then `make install-infra` in the root of the `ipc` repo. This will clone the fendermint repo, build the docker image that you need to run subnets, and make the infrastructure scripts available in `./bin/ipc-infra/fendermint/infra` folder.
 
-<!-- In Unix-based systems, it is highly recommended to include your user in the `docker` group to avoid having to run many of the commands from this tutorial using `sudo`. You can achieve this running: -->
-<!-- ```bash -->
-<!-- sudo usermod -aG docker $USER -->
-<!-- newgrp docker -->
-<!-- ``` -->
+In Unix-based systems, it is highly recommended to include your user in the `docker` group to avoid having to run many of the commands from this tutorial using `sudo`. You can achieve this running:
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
 
-<!-- ## Connecting to a rootnet -->
+## Connecting to a rootnet
 
-<!-- You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also deploy your own.  -->
+You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also deploy your own.
 
-<!-- ### Option 1: Calibration -->
-<!-- Calibration is the primary testnet for Filecoin. It already hosts the IPC actors and can be used as a rootnet on which to deploy new subnets.  -->
+### Running a subnet in Calibration
+Calibration is the primary testnet for Filecoin. It already hosts the IPC actors and can be used as a rootnet on which to deploy new subnets.
 
-<!-- In order to use the IPC agent with Calibration we need to have access to a full node syncing with the network. The easiest way to achieve this is to use a [public RPC](https://docs.filecoin.io/networks/calibration/rpcs/). You also need the addresses of the deployed contracts The suggested configuration for the IPC agent is: -->
+In order to use the `ipc-cli` with Calibration we need to have access to a full node syncing with the network. The easiest way to achieve this is to use a [public RPC](https://docs.filecoin.io/networks/calibration/rpcs/). You also need the addresses of the deployed contracts.
 
-<!-- ``` -->
-<!-- # Default configuration for Filecoin Calibration -->
-<!-- [[subnets]] -->
-<!-- id = "/r314159" -->
-<!-- [subnets.config] -->
-<!-- gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F" -->
-<!-- network_type = "fevm" -->
-<!-- provider_http = "https://api.calibration.node.glif.io/rpc/v1" -->
-<!-- registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d" -->
-<!-- ``` -->
+If it is the first time that you use your `ipc-cli`, to initialize cli configuration you can run `./bin/ipc-cli config init`. This will populate a new default config file in `~/.ipc/config.toml`.
 
-<!-- To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html). -->
+The suggested configuration for the IPC agent is:
+
+```
+# Default configuration for Filecoin Calibration
+keystore_path = "~/.ipc"
+
+[[subnets]]
+id = "/r314159"
+
+[subnets.config]
+gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
+network_type = "fevm"
+provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
+```
+
+To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).
 
 <!-- ### Option 2: Local deployment -->
 <!-- To deploy a Example rootnet locally for testing you can use the IPC scripts installed in `./bin/ipc-infra` by running: -->
@@ -101,50 +108,6 @@ IPC uses [Fendermint](https://github.com/consensus-shipyard/fendermint) as the u
 <!-- >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq -->
 <!-- ``` -->
 <!-- This information will be relevant to configure our agent to connect to this rootnet node. -->
-
-<!-- ## Configuring the agent -->
-
-<!-- The default config path for the agent is `~/.ipc-agent/config.toml`. The agent will always try to pick up the config from this path unless told otherwise. To populate an example config file in the default path, you can run the following command: -->
-<!-- ```bash -->
-<!-- ./bin/ipc-agent config init -->
-<!-- ``` -->
-
-<!-- The `/r31415926` section of the agent's `config.toml` must be updated to connect to your node. In the examples above, we need to set the endpoint of our rootnet node to be `127.0.0.1:1234`, and replace the `auth_token` and `account` with the ones provided by our node. -->
-
-<!-- *Example*: -->
-<!-- ```toml -->
-<!-- [[subnets]] -->
-<!-- id = "/r31415926" -->
-
-<!-- [subnets.config] -->
-<!-- network_type = "fvm" -->
-<!-- accounts = ["t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq"] -->
-<!-- auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0" -->
-<!-- gateway_addr = "t064" -->
-<!-- jsonrpc_api_http = "http://127.0.0.1:1234/rpc/v1" -->
-<!-- ``` -->
-
-<!-- > 💡 In the current implementation of subnets, the gateway is always deployed in the `t064` address, but this may change in the future. For Calibration as the parent, the gateay address is provided above. -->
-
-<!-- > 💡 If you are already running the daemon, then run `./bin/ipc-agent config reload` to pick up the config changes. -->
-
-<!-- ## Running -->
-<!-- The IPC agent runs as a foreground daemon process that spawns a new JSON RPC server to interact with it, and all the processes to automatically handle checkpoints and the execution of cross-net messages for the subnets our agent is participating in. The agent determines the list of subnets it should interact with from its config file. -->
-
-<!-- Alternatively, the agent can also be used as a CLI to interact with IPC. Under the hood, this cli sends new commands to the RPC server of the daemon. To run the IPC agent daemon you can run: -->
-<!-- ```bash -->
-<!-- ./bin/ipc-agent daemon -->
-<!-- ``` -->
-
-<!-- The RPC server of the daemon will be listening to the endpoint determined in the `json_rpc_address` field of the config. If you are looking for your agent to be accessible from Docker or externally, remember to listen on `0.0.0.0` instead of `127.0.0.1` as specified in the default config. -->
-
-<!-- To check if the agent has connected to the rootnet successfully, you can try using it to create a new wallet. -->
-
-<!-- *Example*: -->
-<!-- ```console -->
-<!-- $ ./bin/ipc-agent wallet new -w fvm --key-type bls -->
-<!-- 2023-03-30T12:01:11Z INFO  ipc_agent::cli::commands::manager::wallet] created new wallet with address WalletNewResponse { address: "t3u7djutz4kwshntg4abams37ssy63irkfykqimodh4fs7krdst3y5qwcptvexmvic6gs5q6qygerminm2r3la" } in subnet "/r31415926" -->
-<!-- ``` -->
 
 ## Help
 

@@ -29,17 +29,16 @@ pub const JSON_RPC_VERSION: &str = "2.0";
 
 /// DefaulDEFAULT_CHAIN_IDSUBNET_e
 pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
-# Default configuration for Filecoin Calibration
 keystore_path = "~/.ipc"
 
 [[subnets]]
 id = "/r314159"
 
 [subnets.config]
-gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
+gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
+registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
 
 # Subnet template - uncomment and adjust before using
 # [[subnets]]

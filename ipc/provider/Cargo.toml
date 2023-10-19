@@ -27,6 +27,7 @@ strum = { version = "0.24", features = ["derive"] }
 toml = "0.7.2"
 url = { workspace = true }
 bytes = "1.4.0"
+dirs = "5.0"
 serde_bytes = "0.11.9"
 thiserror = { workspace = true }
 hex = { workspace = true }

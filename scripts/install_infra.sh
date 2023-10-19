@@ -1,21 +1,86 @@
 #!/bin/bash
 #
-# Builds docker image and install the ipc-scripts required to conveniently
-# deploy the infrastructure for IPC subnets.
+# Installs and builds all the infrastructure required
+# to run Fendermint-based subnets.
 
 set -e
 
-rm -rf ./lotus
-git clone https://github.com/consensus-shipyard/lotus.git
-cd ./lotus
+PWD=$(pwd)
+infra_path="$PWD/bin/ipc-infra"
+git_repo_url="https://github.com/consensus-shipyard/fendermint.git"
 
-uname=$(uname);
-case "$uname" in
-    (*Darwin*) docker build -t eudico --build-arg FFI_BUILD_FROM_SOURCE=1 . ;;
-    (*) docker build -t eudico . ;;
-esac;
+build_infra() {
+    echo "[*] Building fendermint..."
+    make build docker-build
+    cd $PWD
+}
 
-cd ..
-mkdir -p ./bin/ipc-infra
-cp -rf ./lotus/scripts/ipc/* ./bin/ipc-infra
-rm -rf ./lotus
+# Function to display help message
+function show_help() {
+    echo "Usage: ./scripts/install-infra.sh [options]"
+    echo "Options:"
+    echo "  -h      Show help message"
+    echo "  -f      Force the build of the infra"
+}
+
+# Main script logic
+if [ "$1" == "-h" ]; then
+    show_help
+    exit 0
+fi
+
+# Check if infra path exists
+if [ ! -d "$infra_path" ]; then
+    echo "[*] Infra directory doesn't exist, creating infra path"
+    mkdir -p $infra_path
+fi
+
+
+# Check if fendermint exists
+if [ ! -d "$infra_path/fendermint" ]; then
+    cd "$infra_path"
+    echo "[*] Fendermint directory doesn't, cloning code"
+    git clone https://github.com/consensus-shipyard/fendermint.git fendermint
+    echo "[*] Building infrastructure assets"
+    cd "fendermint"
+    build_infra
+    exit 0
+else
+    echo "[*] Fendermint code already pulled"
+fi
+
+image_name="fendermint"
+cd "$infra_path/fendermint"
+
+
+if [[ "$#" -gt 0 && "$1" == "-f" ]]; then
+    echo "[*] -f is set. Forcing new build"
+    build_infra
+    exit 0
+fi
+
+if docker images -q "$image_name" &> /dev/null ; then
+    echo "[*] Docker image '$image_name' already exists."
+else
+    build_infra
+    exit 0
+fi
+
+# Perform a Git pull to update the repository
+git_output=$(git pull)
+
+# Check if there are changes
+if [[ "$git_output" == *"Already up to date."* ]]; then
+    echo "[*] No changes in the repository."
+else
+    build_infra
+    exit 0
+fi
+
+# Check if there are changes
+if [ -n "$(git status --porcelain)" ]; then
+    build_infra
+else
+    echo "[*] No changes detected in the repository. Doing nothing!"
+fi
+

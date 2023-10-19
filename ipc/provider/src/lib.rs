@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     collections::HashMap,
+    path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, RwLock},
 };
@@ -738,12 +739,14 @@ fn new_evm_keystore_from_config(
 pub fn new_evm_keystore_from_path(
     repo_str: &str,
 ) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
-    let repo = std::path::Path::new(&repo_str).join(ipc_identity::DEFAULT_KEYSTORE_NAME);
+    let repo = Path::new(&repo_str).join(ipc_identity::DEFAULT_KEYSTORE_NAME);
+    let repo = expand_tilde(&repo);
     PersistentKeyStore::new(repo).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
 pub fn new_fvm_keystore_from_path(repo_str: &str) -> anyhow::Result<KeyStore> {
-    let repo = std::path::Path::new(&repo_str);
+    let repo = Path::new(&repo_str);
+    let repo = expand_tilde(&repo);
     let keystore_config = KeyStoreConfig::Persistent(repo.join(ipc_identity::KEYSTORE_NAME));
     // TODO: we currently only support persistent keystore in the default repo directory.
     KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
@@ -759,4 +762,26 @@ pub fn default_repo_path() -> String {
 
 pub fn default_config_path() -> String {
     format!("{}/{:}", default_repo_path(), DEFAULT_CONFIG_NAME)
+}
+
+/// Expand paths that begin with "~" to `$HOME`.
+pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
+    let p = path.as_ref().to_path_buf();
+    if !p.starts_with("~") {
+        return p;
+    }
+    if p == Path::new("~") {
+        return dirs::home_dir().unwrap_or(p);
+    }
+    dirs::home_dir()
+        .map(|mut h| {
+            if h == Path::new("/") {
+                // `~/foo` becomes just `/foo` instead of `//foo` if `/` is home.
+                p.strip_prefix("~").unwrap().to_path_buf()
+            } else {
+                h.push(p.strip_prefix("~/").unwrap());
+                h
+            }
+        })
+        .unwrap_or(p)
 }
