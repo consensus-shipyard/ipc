@@ -289,7 +289,29 @@ pub mod gateway_router_facet {
                                     ),
                                 },
                             ],
-                            outputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned(
+                                        "hasCommittedBefore",
+                                    ),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bool"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("previousFinality"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct ParentFinality"),
+                                    ),
+                                },
+                            ],
                             constant: ::core::option::Option::None,
                             state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
                         },
@@ -959,7 +981,7 @@ pub mod gateway_router_facet {
         pub fn commit_parent_finality(
             &self,
             finality: ParentFinality,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        ) -> ::ethers::contract::builders::ContractCall<M, (bool, ParentFinality)> {
             self.0
                 .method_hash([17, 25, 105, 116], (finality,))
                 .expect("method not found (this should never happen)")
@@ -2565,6 +2587,21 @@ pub mod gateway_router_facet {
         Hash,
     )]
     pub struct ApplyFinalityChangesReturn(pub u64);
+    ///Container type for all return fields from the `commitParentFinality` function with signature `commitParentFinality((uint256,bytes32))` and selector `0x11196974`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct CommitParentFinalityReturn {
+        pub has_committed_before: bool,
+        pub previous_finality: ParentFinality,
+    }
     ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`
     #[derive(
         Clone,
