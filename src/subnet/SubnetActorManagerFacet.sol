@@ -45,7 +45,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         // the checkpoint height must be equal to the last bottom-up checkpoint height or
         // the next one
         if (
-            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod ||
+            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod &&
             checkpoint.blockHeight != s.lastBottomUpCheckpointHeight
         ) {
             revert InvalidCheckpointEpoch();
