@@ -747,7 +747,7 @@ pub fn new_evm_keystore_from_path(
 pub fn new_fvm_keystore_from_path(repo_str: &str) -> anyhow::Result<KeyStore> {
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
-    let keystore_config = KeyStoreConfig::Persistent(repo.join(ipc_identity::KEYSTORE_NAME));
+    let keystore_config = KeyStoreConfig::Persistent(repo);
     // TODO: we currently only support persistent keystore in the default repo directory.
     KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
 }
