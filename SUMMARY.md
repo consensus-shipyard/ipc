@@ -1,3 +1,3 @@
 # Table of contents
 
-* [Page](README.md)
+* [Welcome to IPC Docs](README.md)
