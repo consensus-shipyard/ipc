@@ -319,7 +319,6 @@ contract SubnetActorDiamondTest is Test {
 
         // ======== Step. Leave ======
         vm.startPrank(validator1);
-
         saManager.leave();
 
         v = saGetter.getValidator(validator1);
@@ -352,6 +351,31 @@ contract SubnetActorDiamondTest is Test {
             startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
             "start config num not 5 after confirm leave"
         );
+    }
+
+    function testSubnetActorDiamond_Unstake() public {
+        (address validator, bytes memory publicKey) = deriveValidatorAddress(100);
+
+        vm.prank(validator);
+        vm.expectRevert(NotValidator.selector);
+        saManager.unstake(10);
+
+        vm.deal(validator, 10 gwei);
+        vm.prank(validator);
+        saManager.join{value: 10}(publicKey);
+        require(saGetter.getValidator(validator).totalCollateral == 10, "initial collateral correct");
+
+        vm.prank(validator);
+        vm.expectRevert(NotEnoughCollateral.selector);
+        saManager.unstake(100);
+
+        vm.prank(validator);
+        vm.expectRevert(NotEnoughCollateral.selector);
+        saManager.unstake(10);
+
+        vm.prank(validator);
+        saManager.unstake(5);
+        require(saGetter.getValidator(validator).totalCollateral == 5, "collateral correct after unstaking");
     }
 
     // function testSubnetActorDiamond_MultipleJoins_Works_GetValidators() public {

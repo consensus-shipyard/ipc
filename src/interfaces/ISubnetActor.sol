@@ -18,6 +18,9 @@ interface ISubnetActor {
     /// Method that allows a validator to increase their stake
     function stake() external payable;
 
+    /// Method that allows a validator to unstake their collateral from a subnet
+    function unstake(uint256 amount) external;
+
     /// Unregister the subnet from the hierarchy, making it no longer discoverable.
     function kill() external;
 

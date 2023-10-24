@@ -44,6 +44,7 @@ error NotAuthorized(address);
 error NotEmptySubnetCircSupply();
 error NotEnoughBalance();
 error NotEnoughBalanceForRewards();
+error NotEnoughCollateral();
 error NotEnoughFee();
 error NotEnoughFunds();
 error NotEnoughFundsToRelease();

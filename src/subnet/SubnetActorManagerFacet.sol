@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
@@ -130,7 +130,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         }
     }
 
-    /// @notice method that allows a validator to increase their stake
+    /// @notice method that allows a validator to increase its stake
     function stake() external payable notKilled {
         if (msg.value == 0) {
             revert CollateralIsZero();
@@ -146,6 +146,23 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         }
 
         LibStaking.deposit(msg.sender, msg.value);
+    }
+
+    /// @notice method that allows a validator to unstake a part of its collateral from a subnet
+    /// @dev `leave` must be used to unstake the entire stake.
+    function unstake(uint256 amount) external notKilled {
+        if (LibStaking.totalValidatorCollateral(msg.sender) == 0) {
+            revert NotValidator();
+        }
+        if (LibStaking.totalValidatorCollateral(msg.sender) <= amount) {
+            revert NotEnoughCollateral();
+        }
+        if (!s.bootstrapped) {
+            LibStaking.withdrawWithConfirm(msg.sender, amount);
+            return;
+        }
+
+        LibStaking.withdraw(msg.sender, amount);
     }
 
     /// @notice method that allows a validator to leave the subnet
