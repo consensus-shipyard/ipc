@@ -63,7 +63,7 @@ impl CommandLineHandler for ListBootstraps {
         for s in provider.list_bootstrap_nodes(&subnet).await? {
             print!("{s},");
         }
-        println!("");
+        print!("\n");
         Ok(())
     }
 }
