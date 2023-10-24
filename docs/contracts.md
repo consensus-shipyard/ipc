@@ -12,12 +12,9 @@ In order to connect the Ethereum tooling to your subnet, you'll need to get the 
 
 # Sample command
 $ ./bin/ipc-agent subnet rpc --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
-[2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] rpc endpoint for subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq: http://127.0.0.1:1240/rpc/v1
-[2023-05-17T15:10:57Z INFO  ipc_agent::cli::commands::subnet::rpc] chainID for subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq: 31415926
+rpc: http://127.0.0.1:1240/rpc/v1
+chainID: 31415926
 ```
-
-You can also inspect the `json_rpcapi_http` field of your subnet on your config directly to get the RPC endpoint for your subnet.
-This RPC endpoint and `chainID will be the ones needed to configure any EVM tooling to connect to your subnet.
 
 
 ### Example: Connect Metamask to your subnet
@@ -49,7 +46,7 @@ It is important to note that the IPC agent doesn't understand Ethereum addresses
 ./bin/ipc-agent util eth-to-f4-addr --addr <eth-adddress>
 
 $ ./bin/ipc-agent util eth-to-f4-addr --addr 0x6BE1Ccf648c74800380d0520D797a170c808b624
-[2023-05-17T13:37:37Z INFO  ipc_agent::cli::commands::util::f4] f4 address: t410fnpq4z5siy5eaaoanauqnpf5bodearnren5fxyoi
+t410fnpq4z5siy5eaaoanauqnpf5bodearnren5fxyoi
 ```
 
 >💡 For more information about the relationship between `f4` and Ethereum addresses refer to [this page](https://docs.filecoin.io/smart-contracts/filecoin-evm-runtime/address-types/).

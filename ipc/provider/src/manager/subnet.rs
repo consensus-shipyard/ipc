@@ -124,6 +124,9 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
         from: &Address,
         endpoint: String,
     ) -> Result<()>;
+
+    /// Lists the bootstrap nodes of a subnet
+    async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> Result<Vec<String>>;
 }
 
 #[derive(Debug)]

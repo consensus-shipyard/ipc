@@ -46,3 +46,31 @@ pub struct AddBootstrapArgs {
     #[arg(long, short, help = "The bootstrap node's network endpoint")]
     pub endpoint: String,
 }
+
+/// The command to list bootstrap nodes in a subnet
+pub struct ListBootstraps;
+
+#[async_trait]
+impl CommandLineHandler for ListBootstraps {
+    type Arguments = ListBootstrapsArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("add subnet bootstrap with args: {:?}", arguments);
+
+        let provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+
+        for s in provider.list_bootstrap_nodes(&subnet).await? {
+            print!("{s},");
+        }
+        println!("");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(name = "list-bootstraps", about = "List bootstraps in the subnet")]
+pub struct ListBootstrapsArgs {
+    #[arg(long, short, help = "The subnet to list bootstraps from")]
+    pub subnet: String,
+}

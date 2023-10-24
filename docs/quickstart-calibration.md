@@ -142,31 +142,65 @@ Before we deploy the infrastructure for the subnet, we will have to bootstrap th
 ```
 
 ## Step 6: Deploy the infrastructure
-> Work in progress
-> - Deploy bootstrap
-> - Deploy Fendermint nodes
+With the collateral and number of minimum validators fulfilled, the subnet is bootstrapped in teh parent, and we can deploy the infrastructure.
 
-<!-- We can deploy the subnet nodes. Note that each node should be importing a different worker wallet key for their validator, and should be exposing different ports. If these ports are unavailable in your system, please pick different ones. -->
+### Deploying a bootstrap node
+Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
 
-<!-- * Deploy and run a container for each validator, importing the corresponding wallet keys -->
-<!-- ```bash -->
-<!-- ./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1251 1351 /r314159/<SUBNET_ID> ~/.ipc-agent/worker-wallet1.key -->
-<!-- ./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1252 1352 /r314159/<SUBNET_ID> ~/.ipc-agent/worker-wallet2.key -->
-<!-- ./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1253 1353 /r314159/<SUBNET_ID> ~/.ipc-agent/worker-wallet3.key -->
-<!-- ``` -->
+* We can deploy a new bootstrap node in the subnet by running: 
+```bash
+cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap
+```
 
-<!-- * If the deployment is successful, each of these nodes should return the following output at the end of their logs. Save the information for the next step. -->
-<!-- ``` -->
-<!-- >>> Subnet /r314159/<SUBNET_ID> daemon running in container: <CONTAINER_ID_#> (friendly name: <CONTAINER_NAME_#>) -->
-<!-- >>> Token to /r314159/<SUBNET_ID> daemon: <AUTH_TOKEN_#> -->
-<!-- >>> Default wallet: <WORKER_#> -->
-<!-- >>> Subnet validator info: -->
-<!-- <VALIDATOR_ADDR_#> -->
-<!-- >>> API listening in host port <PORT_#> -->
-<!-- >>> Validator listening in host port <VALIDATOR_PORT_#> -->
-<!-- ``` -->
+At the end of the output, this command should return the ID of your new bootstrap node:
+```console
 
-## Step 7: Update the IPC Agent configuration
+[cargo-make] INFO - Running Task: cometbft-wait
+[cargo-make] INFO - Running Task: cometbft-node-id
+2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
+[cargo-make] INFO - Build Done in 13.38 seconds.
+```
+Remember the address of your bootstrap for the next step. This address has the following format `id@ip:port`, and by default shows its Docker address. Feel free to adjust the `ip` to use a reachable IP for your deployment so other nodes can contact it (in our case our localhost IP, `127.0.0.1`).
+
+* To advertise the endpoint to the rest of nodes in the network we need to run:
+```bash
+# Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
+./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint=<BOOTSRAP_ENDPOINT>
+```
+
+* The bootstrap nodes currently deployed in the network can be queried through the following command: 
+```bash
+./bin/ipc-cli subnet list-bootstraps --subnet=<SUBNET_ID>
+```
+
+### Deploying the validator infrastructure
+With the bootstrap node deployed and advertised to the network, we are now ready to deploy the validators that will run the subnet.
+
+* First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
+```bash
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+```
+
+* Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
+
+```bash
+cargo make --makefile /bin/ipc-infra/Makefile.toml \
+    -e NODE_NAME=validator-<n> \
+    -e VALIDATOR_PRIV_KEY=<PATH_PRIV_KEY_VALIDATOR_n> \
+    -e CHAIN_NAME=<SUBNET_ID>
+    -e CMT_HOST_PORT=<COMETBFT_PORT_n> -e ETHAPI_HOST_PORT=<ETH_RPC_PORT_n> \
+    -e COMMA_SEPARATED_BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
+    -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
+    -e PARENT_GATEAY=<GATEWAY__REGISTRY_CONTRACT_ADDR> \
+    child-validator
+```
+`PARENT_REGISTRY` and `PARENT_GATEWAY` are the contract addresses of the IPC contracts in Calibration. This command also uses the calibration endpoint as default. Finally, you'll need to choose a different `NODE_NAME`, `CMT_HOST_PORT`, `ETHAPI_HOST_PORT` for each of the validators.
+
+With this, we have everything in place, and our subnet should start automatically validating new blocks. You can find additional documentation on how to run the infrastructure in the [Fendermint docs](https://github.com/consensus-shipyard/fendermint/blob/main/docs/ipc.md).
+
+## Step 7: Configure your subnet in the IPC CLI
 
 * Edit the `ipc-cli` configuration `config.toml`
 ```bash
@@ -176,33 +210,26 @@ nano ~/.ipc/config.toml
 * Append the new subnet to the configuration
 ```toml
 [[subnets]]
-id = "/r314159/<SUBNET_ID>"
-network_name = "andromeda"
+id = "/r314159"
 
 [subnets.config]
-gateway_addr = "t064"
-accounts = ["<WORKER_1>", "<WORKER_2>", "<WORKER_3>"]
-jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
-auth_token = "<AUTH_TOKEN_1>"
-network_type = "fvm"
+gateway_addr = "0xff00000000000000000000000000000000000064"
+network_type = "fevm"
+provider_http = "http://127.0.0.1:<ETH_RPC_PORT>"
+registry_addr = "0xff00000000000000000000000000000000000065"
 ```
-## Step 10: Start validating!
 
-We have everything in place now to start validating. Run the following script for each of the validators [**each in a new session**], passing the container names:
+With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through:
 ```bash
-./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_1> 
-./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_2> 
-./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_3> 
+./bin/ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
 ```
 
->💡 When starting mining and reloading the config to include the new subnet, you can sometimes get errors in the agent logs saying that the checkpoint manager couldn't be spawned successfully because the on-chain ID of the validator couldn't be change. This is because the subnet hasn't been fully initialized yet. You can `./ipc-agent/bin/ipc-agent config reload` to re-spawn the checkpoint manager and fix the error.
+## Step 8: Interact with your the ETH RPC
 
+For information about how to connect your Ethereum tooling with your subnet refer to the [following docs](./contracts.md).
 
-## Step 11: Interact with your the ETH RPC
-> WIP: Connect Metamask and Eth tooling.
-
-## Step 11: What now?
-> WIP: Update
-* Proceed to the [usage](usage.md) guide to learn how you can test your new subnet.
-* If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc-agent). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience!
-* Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system.
+## Step 9: What now?
+> WIP: Docs in progress
+<!-- * Proceed to the [usage](usage.md) guide to learn how you can test your new subnet. -->
+<!-- * If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc-agent). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience! -->
+<!-- * Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system. -->

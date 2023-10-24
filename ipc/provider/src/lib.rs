@@ -645,6 +645,17 @@ impl IpcProvider {
             .add_bootstrap(subnet, &sender, endpoint)
             .await
     }
+
+    /// Lists the bootstrap nodes of a subnet
+    pub async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> anyhow::Result<Vec<String>> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().list_bootstrap_nodes(subnet).await
+    }
 }
 
 /// Lotus JSON keytype format

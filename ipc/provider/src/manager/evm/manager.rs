@@ -657,6 +657,15 @@ impl SubnetManager for EthSubnetManager {
 
         Ok(())
     }
+
+    async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> Result<Vec<String>> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract.get_bootstrap_nodes().call().await?)
+    }
 }
 
 #[async_trait]

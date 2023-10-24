@@ -9,10 +9,21 @@ PWD=$(pwd)
 infra_path="$PWD/bin/ipc-infra"
 git_repo_url="https://github.com/consensus-shipyard/fendermint.git"
 
+if ! command -v cargo-make &> /dev/null
+then
+    echo "[*] 'cargo make' not found. Installing..."
+    cargo install cargo-make
+else
+    echo "[*] 'cargo make' is already installed."
+fi
+
 build_infra() {
     echo "[*] Building fendermint..."
     make build docker-build
     cd $PWD
+
+    echo "[*] Updating infra scripts..."
+    cp -r $infra_path/fendermint/infra/* $infra_path
 }
 
 # Function to display help message
@@ -83,4 +94,3 @@ if [ -n "$(git status --porcelain)" ]; then
 else
     echo "[*] No changes detected in the repository. Doing nothing!"
 fi
-
