@@ -11,9 +11,11 @@ use crate::commands::subnet::send_value::{SendValue, SendValueArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
+use self::bootstrap::{AddBootstrap, AddBootstrapArgs};
 use self::join::{StakeSubnet, StakeSubnetArgs};
 use self::leave::{Claim, ClaimArgs};
 
+pub mod bootstrap;
 pub mod create;
 pub mod join;
 pub mod kill;
@@ -45,6 +47,7 @@ impl SubnetCommandsArgs {
             Commands::SendValue(args) => SendValue::handle(global, args).await,
             Commands::Stake(args) => StakeSubnet::handle(global, args).await,
             Commands::Claim(args) => Claim::handle(global, args).await,
+            Commands::AddBootstrap(args) => AddBootstrap::handle(global, args).await,
         }
     }
 }
@@ -60,4 +63,5 @@ pub(crate) enum Commands {
     SendValue(SendValueArgs),
     Stake(StakeSubnetArgs),
     Claim(ClaimArgs),
+    AddBootstrap(AddBootstrapArgs),
 }
