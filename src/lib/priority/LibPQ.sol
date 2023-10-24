@@ -61,6 +61,9 @@ library LibPQ {
     }
 
     function exchange(PQ storage self, uint16 pos1, uint16 pos2) internal {
+        assert(pos1 <= self.size);
+        assert(pos2 <= self.size);
+
         address addr1 = self.posToAddress[pos1];
         address addr2 = self.posToAddress[pos2];
 

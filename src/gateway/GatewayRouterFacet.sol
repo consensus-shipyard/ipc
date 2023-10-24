@@ -60,9 +60,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         if (subnet.status != Status.Active) {
             revert SubnetNotActive();
         }
-        if (checkpoint.blockHeight != s.lastBottomUpExecutedCheckpointHeight + s.bottomUpCheckPeriod) {
-            revert CheckpointAlreadyProcessed();
-        }
 
         uint256 totalValue = 0;
         uint256 totalFee = 0;
@@ -82,9 +79,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         }
 
         subnet.circSupply -= totalAmount;
-        // seal the checkpoint for the height `lastBottomUpExecutedCheckpointHeight`
-        uint64 previousCheckpointHeight = s.lastBottomUpExecutedCheckpointHeight;
-        s.lastBottomUpExecutedCheckpointHeight = checkpoint.blockHeight;
 
         // execute cross-messages
         _applyMessages(checkpoint.subnetID, messages);
@@ -93,7 +87,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         // slither-disable-next-line unused-return
         Address.functionCallWithValue({
             target: msg.sender,
-            data: abi.encodeCall(ISubnetActor.distributeRewardToRelayers, (previousCheckpointHeight, totalFee)),
+            data: abi.encodeCall(ISubnetActor.distributeRewardToRelayers, (checkpoint.blockHeight, totalFee)),
             value: totalFee
         });
     }

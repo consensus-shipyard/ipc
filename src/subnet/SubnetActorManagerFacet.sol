@@ -68,10 +68,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
             s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
+            // Execute messages.
+            IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint, messages);
+
             // confirming the changes in membership in the child
             LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
-
-            IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint, messages);
         } else if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight) {
             // If the checkpoint height is equal to the last checkpoint height, then this is a repeated submission.
             // We should store the relayer, but not to execute checkpoint again.
@@ -152,7 +153,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @dev `leave` must be used to unstake the entire stake.
     function unstake(uint256 amount) external notKilled {
         if (LibStaking.totalValidatorCollateral(msg.sender) == 0) {
-            revert NotValidator();
+            revert NotValidator(msg.sender);
         }
         if (LibStaking.totalValidatorCollateral(msg.sender) <= amount) {
             revert NotEnoughCollateral();
@@ -171,7 +172,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
         uint256 amount = LibStaking.totalValidatorCollateral(msg.sender);
         if (amount == 0) {
-            revert NotValidator();
+            revert NotValidator(msg.sender);
         }
 
         // slither-disable-next-line unused-return
@@ -208,7 +209,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice add a bootstrap node
     function addBootstrapNode(string memory netAddress) external {
         if (!s.validatorSet.isActiveValidator(msg.sender)) {
-            revert NotValidator();
+            revert NotValidator(msg.sender);
         }
         if (bytes(netAddress).length == 0) {
             revert EmptyAddress();
@@ -218,7 +219,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         s.bootstrapOwners.add(msg.sender);
     }
 
-    /// @notice reward the relayers for processing checkpoint at height `height`.
+    /// @notice reward the relayers for of the previous checkpoint after processing the one at height `height`.
     /// @dev The reward includes the fixed relayer reward and accumulated cross-message fees received from the gateway.
     /// @param height height of the checkpoint the relayers are rewarded for
     /// @param reward The sum of cross-message fees in the checkpoint
@@ -226,13 +227,17 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         if (reward == 0) {
             return;
         }
-        address[] memory relayers = s.rewardedRelayers[height].values();
+        uint64 previousHeight = height - s.bottomUpCheckPeriod;
+        address[] memory relayers = s.rewardedRelayers[previousHeight].values();
         uint256 relayersLength = relayers.length;
         if (relayersLength == 0) {
             return;
         }
         if (reward < relayersLength) {
-            revert NotEnoughBalanceForRewards();
+            // Reverting here would mean a single message with 1 atto reward
+            // relayed by 2 validators would mean the checkpoint cannot be
+            // submitted.
+            return;
         }
         uint256 relayerReward = reward / relayersLength;
 
@@ -260,8 +265,9 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     ) public view {
         // This call reverts if at least one of the signatories (validator) is not in the active validator set.
         uint256[] memory collaterals = s.validatorSet.getConfirmedCollaterals(signatories);
+        uint256 activeCollateral = s.validatorSet.getActiveCollateral();
 
-        uint256 threshold = (s.validatorSet.totalConfirmedCollateral * s.majorityPercentage) / 100;
+        uint256 threshold = (activeCollateral * s.majorityPercentage) / 100;
 
         (bool valid, MultisignatureChecker.Error err) = MultisignatureChecker.isValidWeightedMultiSignature({
             signatories: signatories,

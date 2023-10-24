@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator} from "../structs/Subnet.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
@@ -138,5 +138,10 @@ contract SubnetActorGetterFacet {
             }
         }
         return nodes;
+    }
+
+    // This exists for testing purposes.
+    function crossMsgsHash(CrossMsg[] calldata messages) external pure returns (bytes32) {
+        return keccak256(abi.encode(messages));
     }
 }

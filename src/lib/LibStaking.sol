@@ -174,8 +174,6 @@ library LibStakingReleaseQueue {
             delete self.releases[validator];
         }
 
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        IGateway(s.ipcGatewayAddr).releaseStake(amount);
         payable(validator).transfer(amount);
 
         return amount;
@@ -225,6 +223,18 @@ library LibValidatorSet {
         return addresses;
     }
 
+    /// @notice Get the total collateral of *active* validators.
+    function getActiveCollateral(ValidatorSet storage validators) internal view returns (uint256 collateral) {
+        uint16 size = validators.activeValidators.getSize();
+        for (uint16 i = 1; i <= size; ) {
+            address validator = validators.activeValidators.getAddress(i);
+            collateral += getConfirmedCollateral(validators, validator);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     /// @notice Get the confirmed collaterals of the validators.
     /// The function reverts if at least one validator is not in the active validator set.
     function getConfirmedCollaterals(
@@ -236,7 +246,7 @@ library LibValidatorSet {
 
         for (uint256 i = 0; i < size; ) {
             if (!isActiveValidator(validators, addresses[i])) {
-                revert NotValidator();
+                revert NotValidator(addresses[i]);
             }
             activeCollaterals[i] = validators.validators[addresses[i]].confirmedCollateral;
             unchecked {
@@ -286,8 +296,9 @@ library LibValidatorSet {
 
     function confirmWithdraw(ValidatorSet storage self, address validator, uint256 amount) internal {
         uint256 newCollateral = self.validators[validator].confirmedCollateral - amount;
+        uint256 totalCollateral = self.validators[validator].totalCollateral;
 
-        if (newCollateral == 0) {
+        if (newCollateral == 0 && totalCollateral == 0) {
             delete self.validators[validator];
         } else {
             self.validators[validator].confirmedCollateral = newCollateral;
@@ -573,6 +584,8 @@ library LibStaking {
 
         if (configurationNumber >= changeSet.nextConfigurationNumber) {
             revert CannotConfirmFutureChanges();
+        } else if (configurationNumber < changeSet.startConfigurationNumber) {
+            return;
         }
 
         uint64 start = changeSet.startConfigurationNumber;
@@ -588,6 +601,7 @@ library LibStaking {
                 if (change.op == StakingOperation.Withdraw) {
                     s.validatorSet.confirmWithdraw(validator, amount);
                     s.releaseQueue.addNewRelease(validator, amount);
+                    IGateway(s.ipcGatewayAddr).releaseStake(amount);
                 } else {
                     s.validatorSet.confirmDeposit(validator, amount);
                     IGateway(s.ipcGatewayAddr).addStake{value: amount}();
@@ -645,6 +659,8 @@ library LibValidatorTracking {
     function confirmChange(ParentValidatorsTracker storage self, uint64 configurationNumber) internal {
         if (configurationNumber >= self.changes.nextConfigurationNumber) {
             revert CannotConfirmFutureChanges();
+        } else if (configurationNumber < self.changes.startConfigurationNumber) {
+            return;
         }
 
         uint64 start = self.changes.startConfigurationNumber;

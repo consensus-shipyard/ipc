@@ -69,6 +69,10 @@ library LibMaxPQ {
         self.inner.size = size - 1;
         self.inner.del(size);
 
+        if (size == pos) {
+            return;
+        }
+
         // swim pos up in case exchanged index is smaller
         uint256 val = self.inner.getConfirmedCollateral(validators, pos);
         swim({self: self, validators: validators, pos: pos, value: val});

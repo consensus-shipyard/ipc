@@ -1243,11 +1243,11 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         StakingChangeRequest[] memory changes = new StakingChangeRequest[](2);
 
         changes[0] = StakingChangeRequest({
-            configurationNumber: 0,
+            configurationNumber: 1,
             change: StakingChange({validator: val1, op: StakingOperation.Deposit, payload: abi.encode(amount)})
         });
         changes[1] = StakingChangeRequest({
-            configurationNumber: 1,
+            configurationNumber: 2,
             change: StakingChange({validator: val2, op: StakingOperation.Deposit, payload: abi.encode(amount)})
         });
 
@@ -1255,7 +1255,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
 
         gwRouter.storeValidatorChanges(changes);
         uint64 configNumber = gwRouter.applyFinalityChanges();
-        require(configNumber == 1, "wrong config number after applying finality");
+        require(configNumber == 2, "wrong config number after applying finality");
         require(gwGetter.getCurrentMembership().validators.length == 2, "current membership should be 2");
 
         vm.stopPrank();
@@ -1264,14 +1264,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         changes = new StakingChangeRequest[](1);
 
         changes[0] = StakingChangeRequest({
-            configurationNumber: 2,
+            configurationNumber: 3,
             change: StakingChange({validator: val1, op: StakingOperation.Withdraw, payload: abi.encode(amount)})
         });
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
         gwRouter.storeValidatorChanges(changes);
         configNumber = gwRouter.applyFinalityChanges();
-        require(configNumber == 2, "wrong config number after applying finality");
+        require(configNumber == 3, "wrong config number after applying finality");
         require(gwGetter.getCurrentMembership().validators.length == 1, "current membership should be 1");
         require(gwGetter.getLastMembership().validators.length == 2, "last membership should be 2");
 

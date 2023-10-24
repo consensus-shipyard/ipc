@@ -572,17 +572,6 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotEnoughBalanceForRewards"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "NotEnoughBalanceForRewards",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("NotEnoughCollateral"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -627,7 +616,15 @@ pub mod subnet_actor_manager_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("NotValidator"),
-                            inputs: ::std::vec![],
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
                         },
                     ],
                 ),
@@ -1014,22 +1011,6 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "NotAllValidatorsHaveLeft", abi = "NotAllValidatorsHaveLeft()")]
     pub struct NotAllValidatorsHaveLeft;
-    ///Custom Error type `NotEnoughBalanceForRewards` with signature `NotEnoughBalanceForRewards()` and selector `0x60e9957e`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "NotEnoughBalanceForRewards",
-        abi = "NotEnoughBalanceForRewards()"
-    )]
-    pub struct NotEnoughBalanceForRewards;
     ///Custom Error type `NotEnoughCollateral` with signature `NotEnoughCollateral()` and selector `0x34477cc0`
     #[derive(
         Clone,
@@ -1082,7 +1063,7 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "NotStakedBefore", abi = "NotStakedBefore()")]
     pub struct NotStakedBefore;
-    ///Custom Error type `NotValidator` with signature `NotValidator()` and selector `0x2ec5b449`
+    ///Custom Error type `NotValidator` with signature `NotValidator(address)` and selector `0xed3db8ac`
     #[derive(
         Clone,
         ::ethers::contract::EthError,
@@ -1093,8 +1074,8 @@ pub mod subnet_actor_manager_facet {
         Eq,
         Hash,
     )]
-    #[etherror(name = "NotValidator", abi = "NotValidator()")]
-    pub struct NotValidator;
+    #[etherror(name = "NotValidator", abi = "NotValidator(address)")]
+    pub struct NotValidator(pub ::ethers::core::types::Address);
     ///Custom Error type `PQDoesNotContainAddress` with signature `PQDoesNotContainAddress()` and selector `0xf2755e37`
     #[derive(
         Clone,
@@ -1176,7 +1157,6 @@ pub mod subnet_actor_manager_facet {
         InvalidSignatureErr(InvalidSignatureErr),
         NoCollateralToWithdraw(NoCollateralToWithdraw),
         NotAllValidatorsHaveLeft(NotAllValidatorsHaveLeft),
-        NotEnoughBalanceForRewards(NotEnoughBalanceForRewards),
         NotEnoughCollateral(NotEnoughCollateral),
         NotGateway(NotGateway),
         NotOwnerOfPublicKey(NotOwnerOfPublicKey),
@@ -1247,11 +1227,6 @@ pub mod subnet_actor_manager_facet {
                 <NotAllValidatorsHaveLeft as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::NotAllValidatorsHaveLeft(decoded));
-            }
-            if let Ok(decoded) =
-                <NotEnoughBalanceForRewards as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::NotEnoughBalanceForRewards(decoded));
             }
             if let Ok(decoded) =
                 <NotEnoughCollateral as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1325,9 +1300,6 @@ pub mod subnet_actor_manager_facet {
                 Self::NotAllValidatorsHaveLeft(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEnoughBalanceForRewards(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::NotEnoughCollateral(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1395,10 +1367,6 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
-                    == <NotEnoughBalanceForRewards as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <NotEnoughCollateral as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1451,7 +1419,6 @@ pub mod subnet_actor_manager_facet {
                 Self::InvalidSignatureErr(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoCollateralToWithdraw(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotAllValidatorsHaveLeft(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughBalanceForRewards(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotGateway(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotOwnerOfPublicKey(element) => ::core::fmt::Display::fmt(element, f),
@@ -1519,11 +1486,6 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<NotAllValidatorsHaveLeft> for SubnetActorManagerFacetErrors {
         fn from(value: NotAllValidatorsHaveLeft) -> Self {
             Self::NotAllValidatorsHaveLeft(value)
-        }
-    }
-    impl ::core::convert::From<NotEnoughBalanceForRewards> for SubnetActorManagerFacetErrors {
-        fn from(value: NotEnoughBalanceForRewards) -> Self {
-            Self::NotEnoughBalanceForRewards(value)
         }
     }
     impl ::core::convert::From<NotEnoughCollateral> for SubnetActorManagerFacetErrors {
