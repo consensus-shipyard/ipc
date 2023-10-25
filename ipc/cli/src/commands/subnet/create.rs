@@ -4,14 +4,13 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
 use std::str::FromStr;
 
 use crate::commands::get_ipc_provider;
-use crate::{f64_to_token_amount, CommandLineHandler, GlobalArguments};
+use crate::{f64_to_token_amount, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
 const DEFAULT_ACTIVE_VALIDATORS: u16 = 100;
 
@@ -25,8 +24,9 @@ impl CreateSubnet {
     ) -> anyhow::Result<String> {
         let mut provider = get_ipc_provider(global)?;
         let parent = SubnetID::from_str(&arguments.parent)?;
+
         let from = match &arguments.from {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
 

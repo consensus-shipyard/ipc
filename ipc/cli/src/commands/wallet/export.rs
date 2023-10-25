@@ -27,6 +27,10 @@ impl WalletExport {
             .get(&address.into())?
             .ok_or_else(|| anyhow!("key does not exists"))?;
 
+        if arguments.fendermint {
+            return Ok(BASE64_STANDARD.encode(key_info.private_key()));
+        }
+
         let info = PersistentKeyInfo::new(
             format!("{:?}", address),
             hex::encode(key_info.private_key()),
@@ -39,6 +43,9 @@ impl WalletExport {
 
         let addr = Address::from_str(&arguments.address)?;
         let key_info = wallet.write().unwrap().export(&addr)?;
+        if arguments.fendermint {
+            return Ok(BASE64_STANDARD.encode(key_info.private_key()));
+        }
         Ok(serde_json::to_string(&LotusJsonKeyType {
             r#type: WalletKeyType::try_from(*key_info.key_type())?.to_string(),
             private_key: BASE64_STANDARD.encode(key_info.private_key()),
@@ -71,8 +78,7 @@ impl CommandLineHandler for WalletExport {
                 );
             }
             None => {
-                println!("exported new wallet with address {:?}", arguments.address);
-                println!("Key: {:?}", v);
+                println!("{}", v);
             }
         }
 
@@ -93,6 +99,12 @@ pub(crate) struct WalletExportArgs {
     pub output: Option<String>,
     #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
+    #[arg(
+        long,
+        short,
+        help = "Only returns the secret key in base64 as Fendermint expects"
+    )]
+    pub fendermint: bool,
 }
 
 pub(crate) struct WalletPublicKey;

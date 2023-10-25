@@ -2,7 +2,7 @@
 
 >💡 For background and setup information, make sure to start with the [README](/README.md).
 
-To spawn a new subnet, our IPC agent should be connected to the parent subnet (or rootnet) from which we plan to deploy a new subnet. Please refer to the [README](/README.md) for information on how to run or connect to a rootnet. This instructions will assume the deployment of a subnet from `/r31415926`, but the steps are equivalent for any other parent subnet. 
+To spawn a new subnet, we should configure our `ipc-cli` to point to the parent subnet (or rootnet) from which we plan to deploy a new subnet. Please refer to the [README](/README.md) for information on how to run or connect to a rootnet. This instructions will assume the deployment of a subnet from `/r314159` (i.e. Calibration), but the steps are equivalent for any other parent subnet.
 
 We provide instructions for running both a [simple single-validator subnet](#running-a-simple-subnet-with-a-single-validator) and a more useful [multi-validator subnet](#running-a-subnet-with-several-validators). The two sets mostly overlap.
 

@@ -11,13 +11,11 @@ This repo is your entrypoint to the world of IPC. In this repo you will find:
 >💡 **We've prepared a [quick start guide](/docs/quickstart-calibration.md) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
 See:
-- [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture
-- [docs/usage.md](docs/usage.md) for instructions on how to use the IPC Agent to interact with subnets
-- [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own IPC root contract and hierarchy
 - [docs/contracts.md](docs/contracts.md) for instructions on how to deploy FEVM actors on subnets
-- [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions
-
-For a detailed overview of the entire IPC stack design, please check the up-to-date **[IPC Design Reference](https://github.com/consensus-shipyard/IPC-design-reference-spec/blob/main/main.pdf)** doc.
+- __NEEDS UPDATE/REMOVE:__ [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture)
+- __NEEDS UPDATE/REMOVE:__ [docs/usage.md](docs/usage.md) for instructions on how to use the IPC Agent to interact with subnets
+- __NEEDS UPDATE/REMOVE:__ [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own IPC root contract and hierarchy
+- __NEEDS UPDATE/REMOVE:__ [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions
 
 ## Branching Strategy
 

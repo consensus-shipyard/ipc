@@ -36,8 +36,35 @@ impl CommandLineHandler for RPCSubnet {
 #[derive(Debug, Args)]
 #[command(name = "rpc", about = "RPC endpoint for a subnet")]
 pub struct RPCSubnetArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
-    pub ipc_agent_url: Option<String>,
-    #[arg(long, short, help = "The subnet to get the RPC from")]
+    #[arg(long, short, help = "The subnet to get the ChainId from")]
+    pub subnet: String,
+}
+
+/// The command to get the chain ID for a subnet
+pub struct ChainIdSubnet;
+
+#[async_trait]
+impl CommandLineHandler for ChainIdSubnet {
+    type Arguments = ChainIdSubnetArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("get chain-id for subnet with args: {:?}", arguments);
+
+        let provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let conn = match provider.connection(&subnet) {
+            None => return Err(anyhow::anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        println!("{:}", conn.manager().get_chain_id().await?);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(name = "chain-id", about = "Chain ID endpoint for a subnet")]
+pub struct ChainIdSubnetArgs {
+    #[arg(long, short, help = "The subnet to get the Chain ID from")]
     pub subnet: String,
 }

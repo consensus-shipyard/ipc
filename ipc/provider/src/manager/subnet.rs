@@ -116,6 +116,17 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
 
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;
+
+    /// Advertises the endpoint of a bootstrap node for the subnet.
+    async fn add_bootstrap(
+        &self,
+        subnet: &SubnetID,
+        from: &Address,
+        endpoint: String,
+    ) -> Result<()>;
+
+    /// Lists the bootstrap nodes of a subnet
+    async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> Result<Vec<String>>;
 }
 
 #[derive(Debug)]

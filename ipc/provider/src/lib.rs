@@ -624,6 +624,38 @@ impl IpcProvider {
 
         conn.manager().chain_head_height().await
     }
+
+    /// Advertises the endpoint of a bootstrap node for the subnet.
+    pub async fn add_bootstrap(
+        &mut self,
+        subnet: &SubnetID,
+        from: Option<Address>,
+        endpoint: String,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager()
+            .add_bootstrap(subnet, &sender, endpoint)
+            .await
+    }
+
+    /// Lists the bootstrap nodes of a subnet
+    pub async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> anyhow::Result<Vec<String>> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().list_bootstrap_nodes(subnet).await
+    }
 }
 
 /// Lotus JSON keytype format
@@ -747,7 +779,7 @@ pub fn new_evm_keystore_from_path(
 pub fn new_fvm_keystore_from_path(repo_str: &str) -> anyhow::Result<KeyStore> {
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
-    let keystore_config = KeyStoreConfig::Persistent(repo.join(ipc_identity::KEYSTORE_NAME));
+    let keystore_config = KeyStoreConfig::Persistent(repo);
     // TODO: we currently only support persistent keystore in the default repo directory.
     KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
 }

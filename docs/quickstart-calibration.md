@@ -2,13 +2,13 @@
 
 >💡 Background and detailed are available in the [README](/README.md).
 
-Ready to test the waters with your first subnet? This guide will deploy a subnet with three local validators orchestrated by the same IPC agent. This subnet will be anchored to the public [Calibration testnet](https://docs.filecoin.io/networks/calibration/details/). This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
+Ready to test the waters with your first subnet? This guide will deploy a subnet with three local validators orchestrated by `ipc-cli`. This subnet will be anchored to the public [Calibration testnet](https://docs.filecoin.io/networks/calibration/details/). This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
 
 Several steps in this guide involve running long-lived processes. In each of these cases, the guide advises starting a new *session*. Depending on your set-up, you may do this using tools like `screen` or `tmux`, or, if using a graphical environment, by opening a new terminal tab, pane, or window.
 
->💡A video walkthrough of this guide is current being prepared. We still encourage you to try it for yourself!
+<!-- >💡A video walkthrough of this guide is current being prepared. We still encourage you to try it for yourself! -->
 
->💡If you're only looking to connect to an existing subnet, please see the [README](deploying-hierarchy.md) instead.
+<!-- >💡If you're only looking to connect to an existing subnet, please see the [README](deploying-hierarchy.md) instead. -->
 
 ## Step 0: Prepare your system
 
@@ -41,238 +41,195 @@ sudo usermod -aG docker $USER && newgrp docker
 
 ## Step 1: Build the IPC stack
 
-Next, we'll download and build the different components (IPC agent, docker images, and eudico).
+Next, we'll download and build the different components (mainly, `ipc-cli` and Fendermint).
 
-* Pick a folder where to build the IPC stack. In this example, we'll go with `~/ipc/`.
+* Pick a folder where to build the IPC stack.
+* Download and compile the `ipc-cli`.
 ```bash
-mkdir -p ~/ipc/ && cd ~/ipc/ 
+git clone https://github.com/consensus-shipyard/ipc.git
+(cd ipc && make build && make install-infra)
 ```
 
-* Download and compile the IPC Agent (might take a while)
-```bash
-git clone https://github.com/consensus-shipyard/ipc-agent.git
-(cd ipc-agent && make build && make install-infra)
-```
-
-## Step 2: Initialise and start the IPC Agent
+## Step 2: Initialise your config
 
 * Initialise the config
 ```bash
-./ipc-agent/bin/ipc-agent config init
-nano ~/.ipc-agent/config.toml
+./bin/ipc-cli config init
 ```
 
-* Replace the content of `config.toml` with the text below, including the reference contract on Calibration.
+This should have populated an default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs. You may need to replace the content of the config to reflect the address of the up-to-date contracts in Calibration.
+
+
+* You can run `nano ~/.ipc/config.toml` to double-check that the config file has been populated with the following content:
 ```toml
-[server]
-json_rpc_address = "0.0.0.0:3030"
+keystore_path = "~/.ipc"
 
 [[subnets]]
 id = "/r314159"
-network_name = "calibration"
 
 [subnets.config]
-gateway_addr = "0x5fBdA31a37E05D8cceF146f7704f4fCe33e2F96F"
+gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-registry_addr = "0xb505eD453138A782b5c51f45952E067798F4777d"
+registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
+
+# Subnet template - uncomment and adjust before using
+# [[subnets]]
+# id = "/r314159/<SUBNET_ID>"
+
+# [subnets.config]
+# gateway_addr = "t064"
+# jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
+# auth_token = "<AUTH_TOKEN_1>"
+# network_type = "fvm"
 ```
 
-* [**In a new session**] Start your IPC Agent
+## Step 3: Set up your wallets
+
+You'll need to create a set of wallets to spawn and interact of the subnet. Please make a note of the addresses as you go along, it may make your life easier.
+
+* Create the three different wallets
 ```bash
-./ipc-agent/bin/ipc-agent daemon
+./bin/ipc-cli wallet new -w evm
+./bin/ipc-cli wallet new -w evm
+./bin/ipc-cli wallet new -w evm
 ```
 
-
-## Step 3: Set up your owner wallets
-
-You'll need to create a set of owner wallets. Please make a note of the addresses as you go along.
-
-* Create the owner wallets for each validator (OWNER_1, OWNER_2, and OWNER_3) 
+* You can optionally set one of the wallets as your default so you don't have to use the `--from` flag explicitly in some of the commands:
 ```bash
-./ipc-agent/bin/ipc-agent wallet new -w evm
-./ipc-agent/bin/ipc-agent wallet new -w evm
-./ipc-agent/bin/ipc-agent wallet new -w evm
+./bin/ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
 ```
 
-* Copy your new wallet addresses into `~/.ipc-agent/config.toml`
-```toml
-...
-accounts = ["<OWNER_1>", "<OWNER_2>", "<OWNER_3>"]
-...
-```
-
-* Reload the config to apply the changes.
-```bash
-./ipc-agent/bin/ipc-agent config reload
-```
-
-* Convert the 0x addresses to f4 addresses for later usage (OWNER_1_F4, OWNER_2_F4, and OWNER_3_F4) 
-```bash
-./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_1>
-./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_2>
-./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_3>
-```
+<!-- * Convert the 0x addresses to f4 addresses for later usage (OWNER_1_F4, OWNER_2_F4, and OWNER_3_F4)  -->
+<!-- ```bash -->
+<!-- ./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_1> -->
+<!-- ./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_2> -->
+<!-- ./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_3> -->
+<!-- ``` -->
 
 * Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses 
 
->💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./ipc-agent/bin/ipc-agent wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
+>💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./bin/ipc-cli wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
 
 >💡 Note that you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
 
 
-## Step 4: Set up your validator worker wallets
+## Step 4: Create a child subnet
 
-Mir validators do not support the use of EVM addresses to create new blocks. Therefore, we'll need to create separate worker wallets for each validator.
-
-* First, create a worker wallet for each validator (WORKER_1, WORKER_2, and WORKER_3) 
+* The next step is to create a subnet under `/r314159` in calibration. Remember to set a default wallet or explicitly specifying the wallet from which you want to perform the action with the `--from` flag.
 ```bash
-./ipc-agent/bin/ipc-agent wallet new -w fvm --key-type secp256k1
-./ipc-agent/bin/ipc-agent wallet new -w fvm --key-type secp256k1
-./ipc-agent/bin/ipc-agent wallet new -w fvm --key-type secp256k1
-```
-
-* Export each wallet by substituting their addresses below
-```bash
-./ipc-agent/bin/ipc-agent wallet export -w fvm --address <WORKER_1> --output ~/.ipc-agent/worker-wallet1.key
-./ipc-agent/bin/ipc-agent wallet export -w fvm --address <WORKER_2> --output ~/.ipc-agent/worker-wallet2.key
-./ipc-agent/bin/ipc-agent wallet export -w fvm --address <WORKER_3> --output ~/.ipc-agent/worker-wallet3.key
-```
-
-
-## Step 5: Create a child subnet
-
-* The next step is to create a subnet under `/r314159` in calibration
-```bash
-./ipc-agent/bin/ipc-agent subnet create --parent /r314159 --name andromeda --min-validator-stake 10 --min-validators 2 --bottomup-check-period 30 --topdown-check-period 30
+./bin/ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
 ```
 
 * Make a note of the address of the subnet you created (`/r314159/<SUBNET_ID>`)
 
+## Step 5: Join the subnet
+
+Before we deploy the infrastructure for the subnet, we will have to bootstrap the subnet and join from our validators, putting some initial collateral into the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses providing their corresponding public key.
+
+* Get the public key for all of your wallets and note it down. This is the public key that each of your validators will use to sign blocks in the subnet.
+```bash
+./bin/ipc-cli wallet pub-key -w evm --address <WALLET_ADDR1>
+./bin/ipc-cli wallet pub-key -w evm --address <WALLET_ADDR2>
+./bin/ipc-cli wallet pub-key -w evm --address <WALLET_ADDR3>
+```
+
+* Join the subnet with each validator
+```bash
+./bin/ipc-cli subnet join --from=<WALLET_ADDR1> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET1>
+./bin/ipc-cli subnet join --from=<WALLET_ADDR2> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET2>
+./bin/ipc-cli subnet join --from=<WALLET_ADDR3> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET3>
+```
 
 ## Step 6: Deploy the infrastructure
+With the collateral and number of minimum validators fulfilled, the subnet is bootstrapped in teh parent, and we can deploy the infrastructure.
 
-We can deploy the subnet nodes. Note that each node should be importing a different worker wallet key for their validator, and should be exposing different ports. If these ports are unavailable in your system, please pick different ones.
+### Deploying a bootstrap node
+Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
 
-* Deploy and run a container for each validator, importing the corresponding wallet keys
+* We can deploy a new bootstrap node in the subnet by running: 
 ```bash
-./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1251 1351 /r314159/<SUBNET_ID> ~/.ipc-agent/worker-wallet1.key
-./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1252 1352 /r314159/<SUBNET_ID> ~/.ipc-agent/worker-wallet2.key
-./ipc-agent/bin/ipc-infra/run-subnet-docker.sh 1253 1353 /r314159/<SUBNET_ID> ~/.ipc-agent/worker-wallet3.key
+cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap
 ```
 
-* If the deployment is successful, each of these nodes should return the following output at the end of their logs. Save the information for the next step.
-```
->>> Subnet /r314159/<SUBNET_ID> daemon running in container: <CONTAINER_ID_#> (friendly name: <CONTAINER_NAME_#>)
->>> Token to /r314159/<SUBNET_ID> daemon: <AUTH_TOKEN_#>
->>> Default wallet: <WORKER_#>
->>> Subnet validator info:
-<VALIDATOR_ADDR_#>
->>> API listening in host port <PORT_#>
->>> Validator listening in host port <VALIDATOR_PORT_#>
-```
+At the end of the output, this command should return the ID of your new bootstrap node:
+```console
 
-## Step 7: Interconnect the validators
+[cargo-make] INFO - Running Task: cometbft-wait
+[cargo-make] INFO - Running Task: cometbft-node-id
+2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
+[cargo-make] INFO - Build Done in 13.38 seconds.
+```
+Remember the address of your bootstrap for the next step. This address has the following format `id@ip:port`, and by default shows its Docker address. Feel free to adjust the `ip` to use a reachable IP for your deployment so other nodes can contact it (in our case our localhost IP, `127.0.0.1`).
 
-* Establish pairwise peer connections between all validators
+* To advertise the endpoint to the rest of nodes in the network we need to run:
 ```bash
-docker exec -it <CONTAINER_NAME_1> eudico net connect `docker exec -it <CONTAINER_NAME_2> eudico net listen | head -n 1 | tr -d '\r'`
-docker exec -it <CONTAINER_NAME_1> eudico net connect `docker exec -it <CONTAINER_NAME_3> eudico net listen | head -n 1 | tr -d '\r'`
-docker exec -it <CONTAINER_NAME_2> eudico net connect `docker exec -it <CONTAINER_NAME_3> eudico net listen | head -n 1 | tr -d '\r'`
+# Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
+./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint=<BOOTSRAP_ENDPOINT>
 ```
 
-## Step 8: Update the IPC Agent configuration
-
-* Edit the IPC agent configuration `config.toml`
+* The bootstrap nodes currently deployed in the network can be queried through the following command: 
 ```bash
-nano ~/.ipc-agent/config.toml
+./bin/ipc-cli subnet list-bootstraps --subnet=<SUBNET_ID>
+```
+
+### Deploying the validator infrastructure
+With the bootstrap node deployed and advertised to the network, we are now ready to deploy the validators that will run the subnet.
+
+* First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
+```bash
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+```
+
+* Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
+
+```bash
+cargo make --makefile /bin/ipc-infra/Makefile.toml \
+    -e NODE_NAME=validator-<n> \
+    -e VALIDATOR_PRIV_KEY=<PATH_PRIV_KEY_VALIDATOR_n> \
+    -e CHAIN_NAME=<SUBNET_ID>
+    -e CMT_HOST_PORT=<COMETBFT_PORT_n> -e ETHAPI_HOST_PORT=<ETH_RPC_PORT_n> \
+    -e COMMA_SEPARATED_BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
+    -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
+    -e PARENT_GATEAY=<GATEWAY__REGISTRY_CONTRACT_ADDR> \
+    child-validator
+```
+`PARENT_REGISTRY` and `PARENT_GATEWAY` are the contract addresses of the IPC contracts in Calibration. This command also uses the calibration endpoint as default. Finally, you'll need to choose a different `NODE_NAME`, `CMT_HOST_PORT`, `ETHAPI_HOST_PORT` for each of the validators.
+
+With this, we have everything in place, and our subnet should start automatically validating new blocks. You can find additional documentation on how to run the infrastructure in the [Fendermint docs](https://github.com/consensus-shipyard/fendermint/blob/main/docs/ipc.md).
+
+## Step 7: Configure your subnet in the IPC CLI
+
+* Edit the `ipc-cli` configuration `config.toml`
+```bash
+nano ~/.ipc/config.toml
 ```
 
 * Append the new subnet to the configuration
 ```toml
 [[subnets]]
-id = "/r314159/<SUBNET_ID>"
-network_name = "andromeda"
+id = "/r314159"
 
 [subnets.config]
-gateway_addr = "t064"
-accounts = ["<WORKER_1>", "<WORKER_2>", "<WORKER_3>"]
-jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
-auth_token = "<AUTH_TOKEN_1>"
-network_type = "fvm"
+gateway_addr = "0xff00000000000000000000000000000000000064"
+network_type = "fevm"
+provider_http = "http://127.0.0.1:<ETH_RPC_PORT>"
+registry_addr = "0xff00000000000000000000000000000000000065"
 ```
 
-* Reload the config
-```bash 
-./ipc-agent/bin/ipc-agent config reload
-```
-
-
-## Step 9: Join the subnet 
-
-All the infrastructure for the subnet is now deployed, and we can join our validators to the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses providing the validators multiaddress. 
-
-* Join the subnet with each validator
+With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through:
 ```bash
-./ipc-agent/bin/ipc-agent subnet join --subnet /r314159/<SUBNET_ID> --collateral 10 --from <OWNER_1_F4> --validator-net-addr <VALIDATOR_ADDR_1> --worker-addr <WORKER_1> 
-./ipc-agent/bin/ipc-agent subnet join --subnet /r314159/<SUBNET_ID> --collateral 10 --from <OWNER_2_F4> --validator-net-addr <VALIDATOR_ADDR_2> --worker-addr <WORKER_2>
-./ipc-agent/bin/ipc-agent subnet join --subnet /r314159/<SUBNET_ID> --collateral 10 --from <OWNER_3_F4> --validator-net-addr <VALIDATOR_ADDR_3> --worker-addr <WORKER_3>
+./bin/ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
 ```
 
->💡 Make sure to use the f4 addresses for the owner wallets
+## Step 8: Interact with your the ETH RPC
 
+For information about how to connect your Ethereum tooling with your subnet refer to the [following docs](./contracts.md).
 
-## Step 10: Start validating! 
-
-We have everything in place now to start validating. Run the following script for each of the validators [**each in a new session**], passing the container names:
-```bash
-./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_1> 
-./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_2> 
-./ipc-agent/bin/ipc-infra/mine-subnet.sh <CONTAINER_NAME_3> 
-```
-
->💡 When starting mining and reloading the config to include the new subnet, you can sometimes get errors in the agent logs saying that the checkpoint manager couldn't be spawned successfully because the on-chain ID of the validator couldn't be change. This is because the subnet hasn't been fully initialized yet. You can `./ipc-agent/bin/ipc-agent config reload` to re-spawn the checkpoint manager and fix the error.
-
-
-## Step 11: Deploy IPC Gateway [optional]
-
-If you'd like to interact with your subnet using Metamask or other tooling, you should deploy a `lotus-gateway` instance for tokenless RPC access.
-
->💡 The instructions below assume you do not have a local `lotus` set-up. If you do, you may want to create a separate directory for `lotus-gw` and pass it as an argument to the application.
-
-* Install Go [Linux] ([details](https://go.dev/doc/install))
-```bash
-curl -fsSL https://golang.org/dl/go1.19.7.linux-amd64.tar.gz | sudo tar -xz -C /usr/local
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
-```
-
-* Download and compile eudico (might take a while)
-```bash
-git clone https://github.com/consensus-shipyard/lotus.git
-(cd lotus && make spacenet && make lotus-gateway)
-```
-
-* Create the config directory and populate the configuration
-```bash
-mkdir -p ~/.lotus/datastore
-echo '/ip4/127.0.0.1/tcp/1251/http' > ~/.lotus/api
-echo '<AUTH_TOKEN_1>' > ~/.lotus/token
-```
-
-* Obtain your Chain ID
-```bash
-./ipc-agent/bin/ipc-agent subnet rpc --subnet <SUBNET_ID>
-```
-
-* [**In a new session**] Start your lotus-gateway
-```bash
-./lotus/lotus-gateway run --api-max-lookback=1600000h --api-wait-lookback-limit 2000
-```
-
->💡 You may now use your chain ID and `http://<IP_ADDR>:2346/rpc/v1` as your RPC endpoint in EVM tooling.
-
-
-## Step 11: What now?
-* Proceed to the [usage](usage.md) guide to learn how you can test your new subnet.
-* If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc-agent). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience!
-* Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system.
+## Step 9: What now?
+> WIP: Docs in progress
+<!-- * Proceed to the [usage](usage.md) guide to learn how you can test your new subnet. -->
+<!-- * If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc-agent). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience! -->
+<!-- * Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system. -->
