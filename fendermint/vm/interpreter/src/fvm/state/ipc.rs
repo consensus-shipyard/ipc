@@ -16,15 +16,21 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_message::signed::sign_secp256k1;
+use fendermint_vm_topdown::IPCParentFinality;
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_router_facet as router;
 use ipc_actors_abis::gateway_router_facet::GatewayRouterFacet;
+use ipc_sdk::cross::CrossMsg;
+use ipc_sdk::staking::StakingChangeRequest;
 
 use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
     FvmExecState,
 };
+use crate::fvm::FvmApplyRet;
+use fendermint_vm_actor_interface::ipc;
+use fvm_shared::econ::TokenAmount;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -187,6 +193,78 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .ok_or_else(|| anyhow!("no calldata for adding signature"))?;
 
         Ok(calldata)
+    }
+
+    /// Commit the parent finality to the gateway and returns the previously committed finality.
+    /// None implies there is no previously committed finality.
+    pub fn commit_parent_finality(
+        &self,
+        state: &mut FvmExecState<DB>,
+        finality: IPCParentFinality,
+    ) -> anyhow::Result<Option<IPCParentFinality>> {
+        let evm_finality = router::ParentFinality::try_from(finality)?;
+        let (has_committed, prev_finality) = self
+            .router
+            .call(state, |c| c.commit_parent_finality(evm_finality))?;
+        Ok(if !has_committed {
+            None
+        } else {
+            Some(IPCParentFinality::try_from(prev_finality)?)
+        })
+    }
+
+    pub fn store_validator_changes(
+        &self,
+        state: &mut FvmExecState<DB>,
+        changes: Vec<StakingChangeRequest>,
+    ) -> anyhow::Result<()> {
+        let mut change_requests = vec![];
+        for c in changes {
+            change_requests.push(router::StakingChangeRequest::try_from(c)?);
+        }
+
+        self.router
+            .call(state, |c| c.store_validator_changes(change_requests))
+    }
+
+    /// Call this function to mint some FIL to the gateway contract
+    pub fn mint_to_gateway(
+        &self,
+        state: &mut FvmExecState<DB>,
+        value: TokenAmount,
+    ) -> anyhow::Result<()> {
+        let state_tree = state.state_tree_mut();
+        state_tree.mutate_actor(ipc::GATEWAY_ACTOR_ID, |actor_state| {
+            actor_state.balance += value;
+            Ok(())
+        })?;
+        Ok(())
+    }
+
+    pub fn apply_cross_messages(
+        &self,
+        state: &mut FvmExecState<DB>,
+        cross_messages: Vec<CrossMsg>,
+    ) -> anyhow::Result<FvmApplyRet> {
+        let messages = cross_messages
+            .into_iter()
+            .map(router::CrossMsg::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .context("failed to convert cross messages")?;
+        let r = self
+            .router
+            .call_with_return(state, |c| c.apply_cross_messages(messages))?;
+        Ok(r.into_return())
+    }
+
+    pub fn get_latest_parent_finality(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<IPCParentFinality> {
+        let r = self
+            .getter
+            .call(state, |c| c.get_latest_parent_finality())?;
+        Ok(IPCParentFinality::try_from(r)?)
     }
 }
 

@@ -5,6 +5,7 @@ use std::any::type_name;
 use std::fmt::Debug;
 use std::{marker::PhantomData, sync::Arc};
 
+use crate::fvm::FvmApplyRet;
 use anyhow::{anyhow, bail, Context};
 use ethers::abi::{AbiDecode, AbiEncode, Detokenize};
 use ethers::core::types as et;
@@ -53,6 +54,31 @@ where
             }
             ContractError::Raw(bz) => write!(f, "0x{}", hex::encode(bz)),
         }
+    }
+}
+
+pub struct ContractCallerReturn<T> {
+    ret: FvmApplyRet,
+    call: MockContractCall<T>,
+}
+
+impl<T: Detokenize> ContractCallerReturn<T> {
+    pub fn into_decoded(self) -> anyhow::Result<T> {
+        let data = self
+            .ret
+            .apply_ret
+            .msg_receipt
+            .return_data
+            .deserialize::<BytesDe>()
+            .context("failed to deserialize return data")?;
+
+        let value = decode_function_data(&self.call.function, data.0, false)
+            .context("failed to decode bytes")?;
+        Ok(value)
+    }
+
+    pub fn into_return(self) -> FvmApplyRet {
+        self.ret
     }
 }
 
@@ -150,7 +176,23 @@ where
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,
     {
-        match self.try_call(state, f)? {
+        self.call_with_return(state, f)?.into_decoded()
+    }
+
+    /// Call an EVM method implicitly to read its raw return value.
+    ///
+    /// Returns an error if the return code shows is not successful;
+    /// intended to be used with methods that are expected succeed.
+    pub fn call_with_return<T, F>(
+        &self,
+        state: &mut FvmExecState<DB>,
+        f: F,
+    ) -> anyhow::Result<ContractCallerReturn<T>>
+    where
+        F: FnOnce(&C) -> MockContractCall<T>,
+        T: Detokenize,
+    {
+        match self.try_call_with_ret(state, f)? {
             Ok(value) => Ok(value),
             Err(CallError {
                 exit_code,
@@ -177,6 +219,25 @@ where
         state: &mut FvmExecState<DB>,
         f: F,
     ) -> anyhow::Result<ContractResult<T, E>>
+    where
+        F: FnOnce(&C) -> MockContractCall<T>,
+        T: Detokenize,
+    {
+        Ok(match self.try_call_with_ret(state, f)? {
+            Ok(r) => Ok(r.into_decoded()?),
+            Err(e) => Err(e),
+        })
+    }
+
+    /// Call an EVM method implicitly to read its return value and its original apply return.
+    ///
+    /// Returns either the result or the exit code if it's not successful;
+    /// intended to be used with methods that are expected to fail under certain conditions.
+    pub fn try_call_with_ret<T, F>(
+        &self,
+        state: &mut FvmExecState<DB>,
+        f: F,
+    ) -> anyhow::Result<ContractResult<ContractCallerReturn<T>, E>>
     where
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,
@@ -212,7 +273,7 @@ where
         };
 
         //eprintln!("\nCALLING FVM: {msg:?}");
-        let (ret, _) = state.execute_implicit(msg).context("failed to call FEVM")?;
+        let (ret, emitters) = state.execute_implicit(msg).context("failed to call FEVM")?;
         //eprintln!("\nRESULT FROM FVM: {ret:?}");
 
         if !ret.msg_receipt.exit_code.is_success() {
@@ -239,16 +300,15 @@ where
                 error,
             }))
         } else {
-            let data = ret
-                .msg_receipt
-                .return_data
-                .deserialize::<BytesDe>()
-                .context("failed to deserialize return data")?;
-
-            let value = decode_function_data(&call.function, data.0, false)
-                .context("failed to decode bytes")?;
-
-            Ok(Ok(value))
+            let ret = FvmApplyRet {
+                apply_ret: ret,
+                from,
+                to: self.addr,
+                method_num: evm::Method::InvokeContract as u64,
+                gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+                emitters,
+            };
+            Ok(Ok(ContractCallerReturn { call, ret }))
         }
     }
 }

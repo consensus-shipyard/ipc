@@ -8,7 +8,7 @@ use crate::{
     BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
     ParentFinalityProvider, Toggle,
 };
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
@@ -63,7 +63,10 @@ async fn query_starting_finality<T: ParentFinalityStateQuery + Send + Sync + 'st
         // the genesis epoch of the current subnet and its corresponding block hash.
         if finality.height == 0 {
             let genesis_epoch = parent_client.get_genesis_epoch().await?;
+            tracing::debug!("obtained genesis epoch: {genesis_epoch:?}");
             let r = parent_client.get_block_hash(genesis_epoch).await?;
+            tracing::debug!("obtained genesis block hash: {:?}", r.block_hash);
+
             finality = IPCParentFinality {
                 height: genesis_epoch,
                 block_hash: r.block_hash,
@@ -88,11 +91,12 @@ pub async fn launch_polling_syncer<T: ParentFinalityStateQuery + Send + Sync + '
         return Err(anyhow!("provider not enabled, enable to run syncer"));
     }
 
+    tracing::info!("launching polling syncer");
+
     let query = Arc::new(query);
-
     let finality = query_starting_finality(&query, &parent_client).await?;
-
-    atomically(|| view_provider.set_new_finality(finality.clone())).await;
+    atomically(|| view_provider.set_new_finality(finality.clone(), None)).await;
+    tracing::info!("obtained last committed finality: {finality:?}");
 
     let poll = PollingParentSyncer::new(config, view_provider, parent_client, query);
     poll.start();
@@ -124,7 +128,7 @@ impl<T: ParentFinalityStateQuery + Send + Sync + 'static> PollingParentSyncer<T>
         let parent_client = self.parent_client;
         let query = self.committed_state_query;
 
-        let mut interval = tokio::time::interval(Duration::from_secs(config.polling_interval_secs));
+        let mut interval = tokio::time::interval(config.polling_interval);
 
         tokio::spawn(async move {
             loop {
@@ -158,10 +162,7 @@ async fn sync_with_parent<T: ParentFinalityStateQuery + Send + Sync + 'static>(
             return Ok(());
         };
 
-    let parent_chain_head_height = parent_proxy
-        .get_chain_head_height()
-        .await
-        .context("cannot fetch parent chain head")?;
+    let parent_chain_head_height = parent_proxy.get_chain_head_height().await?;
     // sanity check
     if parent_chain_head_height < config.chain_head_delay {
         tracing::debug!("latest height not more than the chain head delay");
@@ -188,6 +189,9 @@ async fn sync_with_parent<T: ParentFinalityStateQuery + Send + Sync + 'static>(
     // than our previously fetched head. It could be a chain reorg. We clear all the cache
     // in `provider` and start from scratch
     if last_recorded_height > ending_height {
+        tracing::warn!(
+            "last recorded height: {last_recorded_height} more than ending height: {ending_height}"
+        );
         return reset_cache(parent_proxy, provider, query).await;
     }
 
@@ -279,30 +283,52 @@ async fn get_new_parent_views(
         let block_hash_res = parent_proxy
             .get_block_hash(h)
             .await
-            .context("cannot fetch block hash")
             .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
         if block_hash_res.parent_block_hash != previous_hash {
+            tracing::warn!(
+                "parent block hash at {h} is {:02x?} diff than previous hash: {previous_hash:02x?}",
+                block_hash_res.parent_block_hash
+            );
             return Err(Error::ParentChainReorgDetected);
         }
 
         let changes_res = parent_proxy
             .get_validator_changes(h)
             .await
-            .context("cannot fetch validator set")
             .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
         if changes_res.block_hash != block_hash_res.block_hash {
+            tracing::warn!(
+                "change set block hash at {h} is {:02x?} diff than hash: {:02x?}",
+                block_hash_res.parent_block_hash,
+                block_hash_res.block_hash
+            );
             return Err(Error::ParentChainReorgDetected);
         }
 
-        let top_down_msgs_res = parent_proxy
-            .get_top_down_msgs_with_hash(h, &block_hash_res.block_hash)
+        // for `lotus`, the state at height h is only finalized at h + 1. The block hash
+        // at height h will return empty top down messages. In this case, we need to get
+        // the block hash at height h + 1 to query the top down messages.
+        let next_hash = parent_proxy
+            .get_block_hash(h + 1)
             .await
-            .context("cannot fetch top down messages")
+            .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
+        if next_hash.parent_block_hash != block_hash_res.block_hash {
+            tracing::warn!(
+                "next block hash at {} is {:02x?} diff than hash: {:02x?}",
+                h + 1,
+                next_hash.parent_block_hash,
+                block_hash_res.block_hash
+            );
+            return Err(Error::ParentChainReorgDetected);
+        }
+        let top_down_msgs_res = parent_proxy
+            .get_top_down_msgs_with_hash(h, &next_hash.block_hash)
+            .await
             .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
 
         total_top_down_msgs += top_down_msgs_res.len();
 
-        previous_hash = block_hash_res.parent_block_hash;
+        previous_hash = block_hash_res.block_hash.clone();
 
         block_height_to_update.push((
             h,
@@ -314,5 +340,8 @@ async fn get_new_parent_views(
             break;
         }
     }
+
+    tracing::debug!("obtained updates: {block_height_to_update:?}");
+
     Ok(block_height_to_update)
 }

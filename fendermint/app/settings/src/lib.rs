@@ -1,19 +1,24 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use config::{Config, ConfigError, Environment, File};
+use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::Deserialize;
+use serde_with::{serde_as, DurationSeconds};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tendermint_rpc::Url;
 
 use fendermint_vm_encoding::{human_readable_delegate, human_readable_str};
+use fendermint_vm_topdown::BlockHeight;
 
 use self::eth::EthSettings;
 use self::fvm::FvmSettings;
 use self::resolver::ResolverSettings;
+use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
 pub mod eth;
 pub mod fvm;
@@ -93,6 +98,54 @@ pub struct BroadcastSettings {
     pub max_retries: u8,
 }
 
+#[serde_as]
+#[derive(Debug, Deserialize, Clone)]
+pub struct TopDownConfig {
+    /// The number of blocks to delay before reporting a height as final on the parent chain.
+    /// To propose a certain number of epochs delayed from the latest height, we see to be
+    /// conservative and avoid other from rejecting the proposal because they don't see the
+    /// height as final yet.
+    pub chain_head_delay: BlockHeight,
+    /// Parent syncing cron period, in seconds
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub polling_interval: Duration,
+    /// Top down exponential back off retry base
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub exponential_back_off: Duration,
+    /// The max number of retries for exponential backoff before giving up
+    pub exponential_retry_limit: usize,
+    /// The parent rpc http endpoint
+    pub parent_http_endpoint: Url,
+    /// The parent registry address
+    #[serde(deserialize_with = "deserialize_eth_address_from_str")]
+    pub parent_registry: Address,
+    /// The parent gateway address
+    #[serde(deserialize_with = "deserialize_eth_address_from_str")]
+    pub parent_gateway: Address,
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize, Clone)]
+pub struct IpcSettings {
+    #[serde_as(as = "IsHumanReadable")]
+    pub subnet_id: SubnetID,
+    /// The config for top down checkpoint. It's None if subnet id is root or not activating
+    /// any top down checkpoint related operations
+    pub topdown: Option<TopDownConfig>,
+}
+
+impl IpcSettings {
+    pub fn is_topdown_enabled(&self) -> bool {
+        !self.subnet_id.is_root() && self.topdown.is_some()
+    }
+
+    pub fn topdown_config(&self) -> anyhow::Result<&TopDownConfig> {
+        self.topdown
+            .as_ref()
+            .ok_or_else(|| anyhow!("top down config missing"))
+    }
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
@@ -115,6 +168,7 @@ pub struct Settings {
     pub fvm: FvmSettings,
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
+    pub ipc: IpcSettings,
 }
 
 #[macro_export]

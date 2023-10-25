@@ -168,3 +168,7 @@ event_buffer_capacity = 100
 rate_limit_bytes = 0
 # Length of the time period at which the consumption limit fills. 0 means no limit.
 rate_limit_period = 0
+
+# IPC related configuration parameters
+[ipc]
+subnet_id = "/r0"

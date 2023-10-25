@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, bail, Context};
 use fendermint_abci::ApplicationService;
-use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
+use fendermint_app::{App, AppConfig, AppParentFinalityQuery, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
@@ -15,13 +15,44 @@ use fendermint_vm_interpreter::{
     signed::SignedMessageInterpreter,
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
+use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::sync::launch_polling_syncer;
+use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
 use fvm_shared::address::Address;
+use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
+use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
+use std::sync::Arc;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
+
+fn create_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderProxy> {
+    let topdown_config = settings.ipc.topdown_config()?;
+    let subnet = ipc_provider::config::Subnet {
+        id: settings
+            .ipc
+            .subnet_id
+            .parent()
+            .ok_or_else(|| anyhow!("subnet has no parent"))?,
+        config: SubnetConfig::Fevm(EVMSubnet {
+            provider_http: topdown_config
+                .parent_http_endpoint
+                .to_string()
+                .parse()
+                .unwrap(),
+            auth_token: None,
+            registry_addr: topdown_config.parent_registry,
+            gateway_addr: topdown_config.parent_gateway,
+        }),
+    };
+    tracing::info!("init ipc provider with subnet: {subnet:?}");
+
+    let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
+    IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
+}
 
 cmd! {
   RunArgs(self, settings) {
@@ -78,7 +109,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.exec_in_check,
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
-    let interpreter = ChainMessageInterpreter::new(interpreter);
+    let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
     let interpreter =
         BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::AppendOnly, false);
 
@@ -123,6 +154,25 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tracing::info!("IPLD Resolver disabled.")
     }
 
+    let (parent_finality_provider, ipc_tuple) = if settings.ipc.is_topdown_enabled() {
+        info!("topdown finality enabled");
+        let topdown_config = settings.ipc.topdown_config()?;
+        let config = fendermint_vm_topdown::Config {
+            chain_head_delay: topdown_config.chain_head_delay,
+            polling_interval: topdown_config.polling_interval,
+            exponential_back_off: topdown_config.exponential_back_off,
+            exponential_retry_limit: topdown_config.exponential_retry_limit,
+        };
+        let ipc_provider = Arc::new(create_ipc_provider_proxy(&settings)?);
+        let finality_provider =
+            CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+        let p = Arc::new(Toggle::enabled(finality_provider));
+        (p, Some((ipc_provider, config)))
+    } else {
+        info!("topdown finality disabled");
+        (Arc::new(Toggle::disabled()), None)
+    };
+
     let app: App<_, _, AppStore, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
@@ -134,7 +184,25 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         state_store,
         interpreter,
         resolve_pool,
+        parent_finality_provider.clone(),
     )?;
+
+    if let Some((agent_proxy, config)) = ipc_tuple {
+        let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
+        tokio::spawn(async move {
+            match launch_polling_syncer(
+                app_parent_finality_query,
+                config,
+                parent_finality_provider,
+                agent_proxy,
+            )
+            .await
+            {
+                Ok(_) => {}
+                Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
+            }
+        });
+    }
 
     let service = ApplicationService(app);
 

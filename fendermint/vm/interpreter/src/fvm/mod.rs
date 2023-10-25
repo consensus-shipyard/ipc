@@ -14,6 +14,7 @@ pub mod store;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
+pub(crate) mod topdown;
 
 use anyhow::Context;
 pub use check::FvmCheckRet;

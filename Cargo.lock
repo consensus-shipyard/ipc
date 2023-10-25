@@ -2833,6 +2833,7 @@ dependencies = [
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
+ "fendermint_vm_topdown",
  "fvm",
  "fvm_ipld_blockstore",
  "fvm_ipld_car",
@@ -2893,8 +2894,10 @@ dependencies = [
  "config 0.13.3",
  "dirs",
  "fendermint_vm_encoding",
+ "fendermint_vm_topdown",
  "fvm_ipld_encoding 0.3.3",
  "fvm_shared",
+ "ipc-provider",
  "ipc-sdk",
  "multiaddr 0.16.0",
  "serde",
@@ -3138,6 +3141,7 @@ dependencies = [
  "fendermint_vm_genesis",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
+ "fendermint_vm_topdown",
  "futures-core",
  "futures-util",
  "fvm",
@@ -3146,6 +3150,7 @@ dependencies = [
  "fvm_ipld_encoding 0.3.3",
  "fvm_shared",
  "hex",
+ "ipc-sdk",
  "ipc_actors_abis",
  "libipld",
  "num-traits",
@@ -3160,7 +3165,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio-util 0.7.9",
+ "tokio-util 0.7.10",
  "tracing",
 ]
 
@@ -4105,7 +4110,7 @@ dependencies = [
  "indexmap 1.9.3",
  "slab",
  "tokio",
- "tokio-util 0.7.9",
+ "tokio-util 0.7.10",
  "tracing",
 ]
 
@@ -4632,7 +4637,7 @@ dependencies = [
 [[package]]
 name = "ipc-identity"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#25e060715fc03859ae5db4a6d1326a6e7fdf2df0"
+source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#dcfb0e99eed4c9781b1d634cb122c521e718cd07"
 dependencies = [
  "ahash 0.8.6",
  "anyhow",
@@ -4659,7 +4664,7 @@ dependencies = [
 [[package]]
 name = "ipc-provider"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#25e060715fc03859ae5db4a6d1326a6e7fdf2df0"
+source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#dcfb0e99eed4c9781b1d634cb122c521e718cd07"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -4667,6 +4672,7 @@ dependencies = [
  "base64 0.21.5",
  "bytes",
  "cid",
+ "dirs",
  "ethers",
  "ethers-contract",
  "fil_actors_runtime 0.0.1",
@@ -4698,7 +4704,7 @@ dependencies = [
 [[package]]
 name = "ipc-sdk"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#25e060715fc03859ae5db4a6d1326a6e7fdf2df0"
+source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#dcfb0e99eed4c9781b1d634cb122c521e718cd07"
 dependencies = [
  "anyhow",
  "cid",
@@ -4722,7 +4728,7 @@ dependencies = [
 [[package]]
 name = "ipc_actors_abis"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#7ecad9a249e9a93f5ea28dd3db1080ce5a7d6270"
+source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#3f72d21d0ad601fbb673b6a9bc650d14f7be9c9f"
 dependencies = [
  "anyhow",
  "ethers",
@@ -5523,7 +5529,7 @@ dependencies = [
  "thiserror",
  "tinytemplate",
  "tokio",
- "tokio-util 0.7.9",
+ "tokio-util 0.7.10",
  "webrtc",
 ]
 
@@ -9194,9 +9200,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.9"
+version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d68074620f57a0b21594d9735eb2e98ab38b17f80d3fcb189fca266771ca60d"
+checksum = "5419f34732d9eb6ee4c3578b7989078579b7f039cbbb9ca2c4da015749371e15"
 dependencies = [
  "bytes",
  "futures-core",
@@ -9265,7 +9271,7 @@ dependencies = [
  "rand 0.8.5",
  "slab",
  "tokio",
- "tokio-util 0.7.9",
+ "tokio-util 0.7.10",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -10658,18 +10664,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.7.14"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c48d63854f77746c68a5fbb4aa17f3997ece1cb301689a257af8cb80610d21"
+checksum = "81ba595b9f2772fbee2312de30eeb80ec773b4cb2f1e8098db024afadda6c06f"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.7.14"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c258c1040279e4f88763a113de72ce32dde2d50e2a94573f15dd534cea36a16d"
+checksum = "772666c41fb6dceaf520b564b962d738a8e1a83b41bd48945f50837aed78bb1d"
 dependencies = [
  "proc-macro2",
  "quote",

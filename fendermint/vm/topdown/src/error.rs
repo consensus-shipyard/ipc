@@ -7,8 +7,8 @@ use thiserror::Error;
 /// The errors for top down checkpointing
 #[derive(Error, Debug, Eq, PartialEq, Clone)]
 pub enum Error {
-    #[error("Incoming top down messages are not order by nonce sequentially")]
-    NonceNotSequential,
+    #[error("Incoming items are not order sequentially")]
+    NotSequential,
     #[error("The parent view update with block height is not sequential")]
     NonSequentialParentViewInsert(SequentialAppendError),
     #[error("Parent chain reorg detected")]

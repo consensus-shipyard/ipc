@@ -42,6 +42,24 @@ impl<P> Toggle<P> {
 
 #[async_trait::async_trait]
 impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggle<P> {
+    fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
+        match self.inner.as_ref() {
+            Some(p) => p.genesis_epoch(),
+            None => Err(anyhow!("provider is toggled off")),
+        }
+    }
+
+    async fn validator_changes_from(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
+        match self.inner.as_ref() {
+            Some(p) => p.validator_changes_from(from, to).await,
+            None => Err(anyhow!("provider is toggled off")),
+        }
+    }
+
     async fn validator_changes(
         &self,
         height: BlockHeight,
@@ -62,6 +80,18 @@ impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggl
             None => Err(anyhow!("provider is toggled off")),
         }
     }
+
+    async fn top_down_msgs_from(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+        block_hash: &BlockHash,
+    ) -> anyhow::Result<Vec<CrossMsg>> {
+        match self.inner.as_ref() {
+            Some(p) => p.top_down_msgs_from(from, to, block_hash).await,
+            None => Err(anyhow!("provider is toggled off")),
+        }
+    }
 }
 
 impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider for Toggle<P> {
@@ -73,8 +103,12 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
         self.perform_or_else(|p| p.check_proposal(proposal), false)
     }
 
-    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
-        self.perform_or_else(|p| p.set_new_finality(finality), ())
+    fn set_new_finality(
+        &self,
+        finality: IPCParentFinality,
+        previous_finality: Option<IPCParentFinality>,
+    ) -> Stm<()> {
+        self.perform_or_else(|p| p.set_new_finality(finality, previous_finality), ())
     }
 }
 

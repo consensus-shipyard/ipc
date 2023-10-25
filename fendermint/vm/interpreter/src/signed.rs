@@ -38,6 +38,8 @@ pub enum VerifiableMessage {
     Signed(SignedMessage),
     /// Something we constructed to pass on to the FVM.
     Synthetic(SyntheticMessage),
+    /// Does not require verification
+    NotVerify(FvmMessage),
 }
 
 impl VerifiableMessage {
@@ -45,6 +47,7 @@ impl VerifiableMessage {
         match self {
             Self::Signed(m) => m.verify(chain_id),
             Self::Synthetic(m) => m.verify(chain_id),
+            Self::NotVerify(_) => Ok(()),
         }
     }
 
@@ -52,6 +55,7 @@ impl VerifiableMessage {
         match self {
             Self::Signed(m) => m.into_message(),
             Self::Synthetic(m) => m.message,
+            Self::NotVerify(m) => m,
         }
     }
 
@@ -62,6 +66,7 @@ impl VerifiableMessage {
         match self {
             Self::Signed(m) => m.domain_hash(chain_id),
             Self::Synthetic(_) => Ok(None),
+            Self::NotVerify(_) => Ok(None),
         }
     }
 }

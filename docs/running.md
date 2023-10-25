@@ -26,6 +26,11 @@ In the following sections we will create a Genesis file for a network named `tes
 mkdir test-network
 ```
 
+If you are running in test network, define the network using env variable.
+```shell
+export FM_NETWORK=test
+```
+
 ### Create a new Genesis file
 
 First, create a new `genesis.json` file devoid of accounts and validators. The `--base-fee` here is completely arbitrary.
@@ -33,7 +38,7 @@ The `--power-scale` value of `0` means we'll grant 1 voting power per 1 FIL; to 
 to use milliFIL for example.
 
 ```shell
-cargo run -p fendermint_app -- \
+cargo run -p fendermint_app --release -- \
   genesis --genesis-file test-network/genesis.json \
   new \
   --chain-name test \
@@ -64,7 +69,7 @@ Next, let's create some cryptographic key pairs we want want to use either for a
 ```shell
 mkdir test-network/keys
 for NAME in alice bob charlie dave; do
-  cargo run -p fendermint_app -- key gen --out-dir test-network/keys --name $NAME;
+  cargo run -p fendermint_app --release -- key gen --out-dir test-network/keys --name $NAME;
 done
 ```
 
@@ -83,7 +88,7 @@ Ak5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkq
 Add one of the keys we created to the Genesis file as a stand-alone account:
 
 ```shell
- cargo run -p fendermint_app -- \
+ cargo run -p fendermint_app --release -- \
         genesis --genesis-file test-network/genesis.json \
         add-account --public-key test-network/keys/alice.pk --balance 10
 ```
@@ -110,7 +115,7 @@ but it has to be one based on a public key, otherwise we would not be able to va
 Let's add an example of the other possible account type, a multi-sig account:
 
 ```shell
-cargo run -p fendermint_app -- \
+cargo run -p fendermint_app --release -- \
         genesis --genesis-file test-network/genesis.json \
         add-multisig --public-key test-network/keys/bob.pk --public-key test-network/keys/charlie.pk --public-key test-network/keys/dave.pk \
           --threshold 2 --vesting-start 0 --vesting-duration 1000000 --balance 30
@@ -142,7 +147,7 @@ $ cat test-network/genesis.json | jq .accounts[1]
 Finally, let's add one validator to the Genesis, with a monopoly on voting power, so we can run a standalone node:
 
 ```shell
-cargo run -p fendermint_app -- \
+cargo run -p fendermint_app --release -- \
       genesis --genesis-file test-network/genesis.json \
       add-validator --public-key test-network/keys/bob.pk --power 1;
 ```
@@ -165,6 +170,32 @@ $ cat test-network/genesis.json | jq .validators
 The public key was spliced in as it was, in base64 format, which is how it would appear in Tendermint's
 own genesis file format. Note that here we don't have the option to use `Address`, because we have to return
 these as actual `PublicKey` types to Tendermint through ABCI, not as a hash of a key.
+
+### (Optional) Add ipc to the Genesis file
+
+If you need ipc related function, let's add the subnet info to the Genesis with deployed subnet id: /r31415926
+
+```shell
+cargo run -p fendermint_app --release -- \
+      genesis --genesis-file test-network/genesis.json \
+      ipc \
+      gateway --subnet-id /r31415926 \
+      --bottom-up-check-period 10 \
+      --msg-fee 1 --majority-percentage 65 --min-collateral 1
+```
+Check the result:
+```console
+$ cat test-network/genesis.json | jq .ipc
+{
+  "gateway": {
+    "subnet_id": "/r31415926",
+    "bottom_up_check_period": 10,
+    "top_down_check_period": 10,
+    "msg_fee": "1",
+    "majority_percentage": 65
+  }
+}
+```
 
 ### Configure CometBFT
 
@@ -191,7 +222,7 @@ file we created earlier to the format CometBFT accepts. Start with the genesis f
 
 ```shell
 mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig
-cargo run -p fendermint_app -- \
+cargo run -p fendermint_app --release -- \
   genesis --genesis-file test-network/genesis.json \
   into-tendermint --out ~/.cometbft/config/genesis.json
 ```
@@ -281,7 +312,7 @@ one of the validators we created.
 
 ```shell
 mv ~/.cometbft/config/priv_validator_key.json ~/.cometbft/config/priv_validator_key.json.orig
-cargo run -p fendermint_app -- \
+cargo run -p fendermint_app --release -- \
   key into-tendermint --secret-key test-network/keys/bob.sk --out ~/.cometbft/config/priv_validator_key.json
 ```
 

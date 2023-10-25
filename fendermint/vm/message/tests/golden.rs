@@ -37,7 +37,7 @@ mod chain {
 
     golden_cbor! { "chain", ipc_top_down, |g| {
         loop {
-            if let msg @ ChainMessage::Ipc(IpcMessage::TopDown) = ChainMessage::arbitrary(g) {
+            if let msg @ ChainMessage::Ipc(IpcMessage::TopDownExec(_)) = ChainMessage::arbitrary(g) {
                 return msg
             }
         }

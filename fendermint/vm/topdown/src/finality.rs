@@ -11,7 +11,6 @@ use async_stm::{abort, atomically, Stm, StmResult, TVar};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 use std::sync::Arc;
-use std::time::Duration;
 
 type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<CrossMsg>);
 
@@ -19,6 +18,7 @@ type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<CrossMsg>);
 #[derive(Clone)]
 pub struct CachedFinalityProvider<T> {
     config: Config,
+    genesis_epoch: BlockHeight,
     /// Cached data that always syncs with the latest parent chain proactively
     cached_data: CachedData,
     /// This is a in memory view of the committed parent finality. We need this as a starting point
@@ -44,13 +44,12 @@ macro_rules! retry {
             let res = $f;
             if let Err(e) = &res {
                 tracing::warn!(
-                    "cannot query ipc parent_client due to: {e}, retires: {retries}, wait: {wait}"
+                    "cannot query ipc parent_client due to: {e}, retires: {retries}, wait: {wait:?}"
                 );
                 if retries > 0 {
                     retries -= 1;
 
-                    let to_sleep = Duration::from_secs(wait);
-                    tokio::time::sleep(to_sleep).await;
+                    tokio::time::sleep(wait).await;
 
                     wait *= 2;
                     continue;
@@ -64,6 +63,28 @@ macro_rules! retry {
 
 #[async_trait::async_trait]
 impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedFinalityProvider<T> {
+    fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
+        Ok(self.genesis_epoch)
+    }
+
+    async fn validator_changes_from(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
+        let mut v = vec![];
+        for h in from..=to {
+            let mut r = self.validator_changes(h).await?;
+            tracing::debug!(
+                "obtained validator change set (len {}) at height {h}",
+                r.len()
+            );
+            v.append(&mut r);
+        }
+
+        Ok(v)
+    }
+
     /// Should always return the validator set, only when ipc parent_client is down after exponeitial
     /// retries
     async fn validator_changes(
@@ -76,7 +97,7 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         }
 
         retry!(
-            self.config.exponential_back_off_secs,
+            self.config.exponential_back_off,
             self.config.exponential_retry_limit,
             self.parent_client
                 .get_validator_changes(height)
@@ -98,12 +119,26 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         }
 
         retry!(
-            self.config.exponential_back_off_secs,
+            self.config.exponential_back_off,
             self.config.exponential_retry_limit,
             self.parent_client
                 .get_top_down_msgs_with_hash(height, block_hash)
                 .await
         )
+    }
+
+    async fn top_down_msgs_from(
+        &self,
+        from: BlockHeight,
+        to: BlockHeight,
+        block_hash: &BlockHash,
+    ) -> anyhow::Result<Vec<CrossMsg>> {
+        let mut v = vec![];
+        for h in from..=to {
+            let mut r = self.top_down_msgs(h, block_hash).await?;
+            v.append(&mut r);
+        }
+        Ok(v)
     }
 }
 
@@ -114,13 +149,16 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
         let height = if let Some(h) = self.cached_data.latest_height()? {
             h
         } else {
+            tracing::debug!("no proposal yet as height not available");
             return Ok(None);
         };
 
         // safe to unwrap as latest height exists
         let block_hash = self.cached_data.block_hash(height)?.unwrap();
 
-        Ok(Some(IPCParentFinality { height, block_hash }))
+        let proposal = IPCParentFinality { height, block_hash };
+        tracing::debug!("new proposal: {proposal:?}");
+        Ok(Some(proposal))
     }
 
     fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
@@ -130,7 +168,13 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
         self.check_block_hash(proposal)
     }
 
-    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
+    fn set_new_finality(
+        &self,
+        finality: IPCParentFinality,
+        previous_finality: Option<IPCParentFinality>,
+    ) -> Stm<()> {
+        debug_assert!(previous_finality == self.last_committed_finality.read_clone()?);
+
         // the height to clear
         let height = finality.height;
 
@@ -143,23 +187,28 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
     }
 }
 
-impl<T> CachedFinalityProvider<T> {
+impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
     /// Creates an uninitialized provider
     /// We need this because `fendermint` has yet to be initialized and might
     /// not be able to provide an existing finality from the storage. This provider requires an
     /// existing committed finality. Providing the finality will enable other functionalities.
-    pub fn uninitialized(config: Config, parent_client: Arc<T>) -> Self {
-        Self::new(config, None, parent_client)
+    pub async fn uninitialized(config: Config, parent_client: Arc<T>) -> anyhow::Result<Self> {
+        let genesis = parent_client.get_genesis_epoch().await?;
+        Ok(Self::new(config, genesis, None, parent_client))
     }
+}
 
+impl<T> CachedFinalityProvider<T> {
     fn new(
         config: Config,
+        genesis_epoch: BlockHeight,
         committed_finality: Option<IPCParentFinality>,
         parent_client: Arc<T>,
     ) -> Self {
         let height_data = SequentialKeyCache::sequential();
         Self {
             config,
+            genesis_epoch,
             cached_data: CachedData {
                 height_data: TVar::new(height_data),
             },
@@ -198,9 +247,11 @@ impl<T> CachedFinalityProvider<T> {
     ) -> StmResult<(), Error> {
         if !top_down_msgs.is_empty() {
             // make sure incoming top down messages are ordered by nonce sequentially
+            tracing::debug!("top down messages: {top_down_msgs:#?}");
             ensure_sequential(&top_down_msgs, |msg| msg.msg.nonce)?;
         };
         if !validator_changes.is_empty() {
+            tracing::debug!("validator changes: {validator_changes:#?}");
             ensure_sequential(&validator_changes, |change| change.configuration_number)?;
         }
 
@@ -284,7 +335,7 @@ fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Err
     let mut nonce = f(first);
     for msg in msgs.iter().skip(1) {
         if nonce + 1 != f(msg) {
-            return abort(Error::NonceNotSequential);
+            return abort(Error::NotSequential);
         }
         nonce += 1;
     }
@@ -350,21 +401,22 @@ mod tests {
         Arc::new(MockedParentQuery)
     }
 
+    fn genesis_finality() -> IPCParentFinality {
+        IPCParentFinality {
+            height: 0,
+            block_hash: vec![0; 32],
+        }
+    }
+
     fn new_provider() -> CachedFinalityProvider<MockedParentQuery> {
         let config = Config {
             chain_head_delay: 20,
-            polling_interval_secs: 10,
-            ipc_parent_endpoint: "".to_string(),
-            exponential_back_off_secs: 10,
+            polling_interval: Duration::from_secs(10),
+            exponential_back_off: Duration::from_secs(10),
             exponential_retry_limit: 10,
         };
 
-        let genesis_finality = IPCParentFinality {
-            height: 0,
-            block_hash: vec![0; 32],
-        };
-
-        CachedFinalityProvider::new(config, Some(genesis_finality), mocked_agent_proxy())
+        CachedFinalityProvider::new(config, 10, Some(genesis_finality()), mocked_agent_proxy())
     }
 
     fn new_cross_msg(nonce: u64) -> CrossMsg {
@@ -435,7 +487,7 @@ mod tests {
                 height: target_block,
                 block_hash: vec![1u8; 32],
             };
-            provider.set_new_finality(finality.clone())?;
+            provider.set_new_finality(finality.clone(), Some(genesis_finality()))?;
 
             // all cache should be cleared
             let r = provider.next_proposal()?;
@@ -459,10 +511,13 @@ mod tests {
 
             // inject data
             provider.new_parent_view(target_block, vec![1u8; 32], vec![], vec![])?;
-            provider.set_new_finality(IPCParentFinality {
-                height: target_block - 1,
-                block_hash: vec![1u8; 32],
-            })?;
+            provider.set_new_finality(
+                IPCParentFinality {
+                    height: target_block - 1,
+                    block_hash: vec![1u8; 32],
+                },
+                Some(genesis_finality()),
+            )?;
 
             let finality = IPCParentFinality {
                 height: target_block,
@@ -481,9 +536,8 @@ mod tests {
     async fn test_top_down_msgs_works() {
         let config = Config {
             chain_head_delay: 2,
-            polling_interval_secs: 10,
-            ipc_parent_endpoint: "".to_string(),
-            exponential_back_off_secs: 10,
+            polling_interval: Duration::from_secs(10),
+            exponential_back_off: Duration::from_secs(10),
             exponential_retry_limit: 10,
         };
 
@@ -493,7 +547,7 @@ mod tests {
         };
 
         let provider =
-            CachedFinalityProvider::new(config, Some(genesis_finality), mocked_agent_proxy());
+            CachedFinalityProvider::new(config, 10, Some(genesis_finality), mocked_agent_proxy());
 
         let cross_msgs_batch1 = vec![new_cross_msg(0), new_cross_msg(1), new_cross_msg(2)];
         let cross_msgs_batch2 = vec![new_cross_msg(3), new_cross_msg(4), new_cross_msg(5)];
@@ -541,7 +595,7 @@ mod tests {
             nums_run: AtomicUsize::new(0),
         };
 
-        let res = retry!(1, 2, t.run().await);
+        let res = retry!(Duration::from_secs(1), 2, t.run().await);
         assert!(res.is_err());
         // execute the first time, retries twice
         assert_eq!(t.nums_run.load(Ordering::SeqCst), 3);

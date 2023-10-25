@@ -17,7 +17,9 @@ use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
-use fendermint_vm_interpreter::chain::{ChainMessageApplyRet, CheckpointPool, IllegalMessage};
+use fendermint_vm_interpreter::chain::{
+    ChainMessageApplyRet, CheckpointPool, IllegalMessage, TopDownFinalityProvider,
+};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
 };
@@ -31,6 +33,7 @@ use fendermint_vm_message::query::FvmQueryHeight;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use num_traits::Zero;
@@ -157,6 +160,8 @@ where
     interpreter: Arc<I>,
     /// CID resolution pool.
     resolve_pool: CheckpointPool,
+    /// The parent finality provider for top down checkpoint
+    parent_finality_provider: TopDownFinalityProvider,
     /// State accumulating changes during block execution.
     exec_state: Arc<Mutex<Option<FvmExecState<SS>>>>,
     /// Projected (partial) state accumulating during transaction checks.
@@ -183,6 +188,7 @@ where
         state_store: SS,
         interpreter: I,
         resolve_pool: CheckpointPool,
+        parent_finality_provider: TopDownFinalityProvider,
     ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
@@ -194,6 +200,7 @@ where
             state_hist_size: config.state_hist_size,
             interpreter: Arc::new(interpreter),
             resolve_pool,
+            parent_finality_provider,
             exec_state: Arc::new(Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
         };
@@ -298,13 +305,53 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce((CheckpointPool, FvmExecState<SS>)) -> R,
-        R: Future<Output = Result<((CheckpointPool, FvmExecState<SS>), T)>>,
+        F: FnOnce((CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>)) -> R,
+        R: Future<
+            Output = Result<(
+                (CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>),
+                T,
+            )>,
+        >,
     {
         let state = self.take_exec_state();
-        let ((_pool, state), ret) = f((self.resolve_pool.clone(), state)).await?;
+        let ((_pool, _provider, state), ret) = f((
+            self.resolve_pool.clone(),
+            self.parent_finality_provider.clone(),
+            state,
+        ))
+        .await?;
         self.put_exec_state(state);
         Ok(ret)
+    }
+
+    /// Get a read only fvm execution state. This is useful to perform query commands targeting
+    /// the latest state.
+    pub fn new_read_only_exec_state(
+        &self,
+    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<SS>>>>> {
+        let maybe_app_state = self.get_committed_state()?;
+
+        Ok(if let Some(app_state) = maybe_app_state {
+            let block_height = app_state.block_height;
+            let state_params = app_state.state_params;
+
+            // wait for block production
+            if block_height == 0 {
+                return Ok(None);
+            }
+
+            let exec_state = FvmExecState::new(
+                ReadOnlyBlockstore::new(self.state_store.clone()),
+                self.multi_engine.as_ref(),
+                block_height as ChainEpoch,
+                state_params,
+            )
+            .context("error creating execution state")?;
+
+            Some(exec_state)
+        } else {
+            None
+        })
     }
 
     /// Look up a past state at a particular height Tendermint Core is looking for.
@@ -356,9 +403,9 @@ where
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<State = CheckpointPool, Message = Vec<u8>>,
+    I: ProposalInterpreter<State = (CheckpointPool, TopDownFinalityProvider), Message = Vec<u8>>,
     I: ExecInterpreter<
-        State = (CheckpointPool, FvmExecState<SS>),
+        State = (CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>),
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
@@ -554,7 +601,13 @@ where
 
         let txs = self
             .interpreter
-            .prepare(self.resolve_pool.clone(), txs)
+            .prepare(
+                (
+                    self.resolve_pool.clone(),
+                    self.parent_finality_provider.clone(),
+                ),
+                txs,
+            )
             .await
             .context("failed to prepare proposal")?;
 
@@ -573,7 +626,13 @@ where
 
         let accept = self
             .interpreter
-            .process(self.resolve_pool.clone(), txs)
+            .process(
+                (
+                    self.resolve_pool.clone(),
+                    self.parent_finality_provider.clone(),
+                ),
+                txs,
+            )
             .await
             .context("failed to process proposal")?;
 
@@ -630,6 +689,7 @@ where
                     invalid_deliver_tx(AppError::InvalidSignature, d)
                 }
                 ChainMessageApplyRet::Signed(Ok(ret)) => to_deliver_tx(ret.fvm, ret.domain_hash),
+                ChainMessageApplyRet::Ipc(ret) => to_deliver_tx(ret, None),
             },
         };
 

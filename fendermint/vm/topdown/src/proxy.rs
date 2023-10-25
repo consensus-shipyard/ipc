@@ -71,7 +71,7 @@ impl ParentQueryProxy for IPCProviderProxy {
     /// Get the genesis epoch of the child subnet, i.e. the epoch that the subnet was created in
     /// the parent subnet.
     async fn get_genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
-        let height = self.ipc_provider.genesis_epoch(&self.parent_subnet).await?;
+        let height = self.ipc_provider.genesis_epoch(&self.child_subnet).await?;
         Ok(height as BlockHeight)
     }
 
@@ -98,8 +98,15 @@ impl ParentQueryProxy for IPCProviderProxy {
         &self,
         height: BlockHeight,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
-        self.ipc_provider
+        let mut v = self
+            .ipc_provider
             .get_validator_changeset(&self.child_subnet, height as ChainEpoch)
-            .await
+            .await?;
+
+        // sort ascending, we dont assume the changes are ordered
+        v.value
+            .sort_by(|a, b| a.configuration_number.cmp(&b.configuration_number));
+
+        Ok(v)
     }
 }
