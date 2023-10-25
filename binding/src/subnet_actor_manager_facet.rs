@@ -480,6 +480,15 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("CollateralIsZero"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -904,6 +913,19 @@ pub mod subnet_actor_manager_facet {
         abi = "CannotConfirmFutureChanges()"
     )]
     pub struct CannotConfirmFutureChanges;
+    ///Custom Error type `CannotReleaseZero` with signature `CannotReleaseZero()` and selector `0xc79cad7b`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "CannotReleaseZero", abi = "CannotReleaseZero()")]
+    pub struct CannotReleaseZero;
     ///Custom Error type `CollateralIsZero` with signature `CollateralIsZero()` and selector `0xb4f18b02`
     #[derive(
         Clone,
@@ -1149,6 +1171,7 @@ pub mod subnet_actor_manager_facet {
     pub enum SubnetActorManagerFacetErrors {
         AddressShouldBeValidator(AddressShouldBeValidator),
         CannotConfirmFutureChanges(CannotConfirmFutureChanges),
+        CannotReleaseZero(CannotReleaseZero),
         CollateralIsZero(CollateralIsZero),
         EmptyAddress(EmptyAddress),
         InvalidCheckpointEpoch(InvalidCheckpointEpoch),
@@ -1190,6 +1213,10 @@ pub mod subnet_actor_manager_facet {
                 <CannotConfirmFutureChanges as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::CannotConfirmFutureChanges(decoded));
+            }
+            if let Ok(decoded) = <CannotReleaseZero as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::CannotReleaseZero(decoded));
             }
             if let Ok(decoded) = <CollateralIsZero as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -1280,6 +1307,7 @@ pub mod subnet_actor_manager_facet {
                 Self::CannotConfirmFutureChanges(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::CannotReleaseZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::CollateralIsZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::EmptyAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidCheckpointEpoch(element) => {
@@ -1334,6 +1362,10 @@ pub mod subnet_actor_manager_facet {
                 }
                 _ if selector
                     == <CannotConfirmFutureChanges as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotReleaseZero as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1409,6 +1441,7 @@ pub mod subnet_actor_manager_facet {
             match self {
                 Self::AddressShouldBeValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotConfirmFutureChanges(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CollateralIsZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EmptyAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCheckpointEpoch(element) => ::core::fmt::Display::fmt(element, f),
@@ -1446,6 +1479,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<CannotConfirmFutureChanges> for SubnetActorManagerFacetErrors {
         fn from(value: CannotConfirmFutureChanges) -> Self {
             Self::CannotConfirmFutureChanges(value)
+        }
+    }
+    impl ::core::convert::From<CannotReleaseZero> for SubnetActorManagerFacetErrors {
+        fn from(value: CannotReleaseZero) -> Self {
+            Self::CannotReleaseZero(value)
         }
     }
     impl ::core::convert::From<CollateralIsZero> for SubnetActorManagerFacetErrors {

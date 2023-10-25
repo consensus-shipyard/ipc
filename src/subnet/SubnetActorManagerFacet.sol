@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CollateralIsZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
+import {CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
@@ -152,10 +152,16 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice method that allows a validator to unstake a part of its collateral from a subnet
     /// @dev `leave` must be used to unstake the entire stake.
     function unstake(uint256 amount) external notKilled {
-        if (LibStaking.totalValidatorCollateral(msg.sender) == 0) {
+        if (amount == 0) {
+            revert CannotReleaseZero();
+        }
+
+        uint256 collateral = LibStaking.totalValidatorCollateral(msg.sender);
+
+        if (collateral == 0) {
             revert NotValidator(msg.sender);
         }
-        if (LibStaking.totalValidatorCollateral(msg.sender) <= amount) {
+        if (collateral <= amount) {
             revert NotEnoughCollateral();
         }
         if (!s.bootstrapped) {
