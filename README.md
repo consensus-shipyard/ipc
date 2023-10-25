@@ -13,7 +13,7 @@ This repo is your entrypoint to the world of IPC. In this repo you will find:
 See:
 - [docs/contracts.md](docs/contracts.md) for instructions on how to deploy FEVM actors on subnets
 - __NEEDS UPDATE/REMOVE:__ [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture)
-- __NEEDS UPDATE/REMOVE:__ [docs/usage.md](docs/usage.md) for instructions on how to use the IPC Agent to interact with subnets
+- __NEEDS UPDATE/REMOVE:__ [docs/usage.md](docs/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets
 - __NEEDS UPDATE/REMOVE:__ [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own IPC root contract and hierarchy
 - __NEEDS UPDATE/REMOVE:__ [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions
 
@@ -32,7 +32,7 @@ The primary development branch is `dev`.
 
 ## Building
 
-To build the IPC Agent you need to have Rust installed in your environment. We currently use Rust `stable` (as described in the `toolchain`). You can look for instructions on [how to run Rust and rustup following this link](https://www.rust-lang.org/tools/install).
+To build the `ipc-cli` you need to have Rust installed in your environment. We currently use Rust `stable` (as described in the `toolchain`). You can look for instructions on [how to run Rust and rustup following this link](https://www.rust-lang.org/tools/install).
 
 >💡 According to the operating system you are running, you may have to install additional dependencies not installed in your system to follow these instructions like `build-essential`, `libssl-dev`, `git`, `curl`, and `pkg-config`. If something fails while building the binaries double-check these dependencies.
 
@@ -71,7 +71,7 @@ In order to use the `ipc-cli` with Calibration we need to have access to a full 
 
 If it is the first time that you use your `ipc-cli`, to initialize cli configuration you can run `./bin/ipc-cli config init`. This will populate a new default config file in `~/.ipc/config.toml`.
 
-The suggested configuration for the IPC agent is:
+The suggested configuration for the `ipc-cli` is:
 
 ```
 # Default configuration for Filecoin Calibration
@@ -87,7 +87,7 @@ provider_http = "https://api.calibration.node.glif.io/rpc/v1"
 registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
 ```
 
-To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the agent to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).
+To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the `ipc-cli` to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).
 
 <!-- ### Option 2: Local deployment -->
 <!-- To deploy a Example rootnet locally for testing you can use the IPC scripts installed in `./bin/ipc-infra` by running: -->
