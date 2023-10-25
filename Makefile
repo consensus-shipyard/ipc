@@ -13,7 +13,6 @@ IPC_ACTORS_ABI        := .make/.ipc-actors-abi
 # Note that without `:=`, just `=`, it should evaluate it every time it appears in a target.
 IPC_ACTORS_DIR         = $(shell $(IPC_ACTORS_FIND))
 IPC_ACTORS_OUT         = $(IPC_ACTORS_DIR)/out
-
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
 # Override PROFILE env var to choose between `local | ci`

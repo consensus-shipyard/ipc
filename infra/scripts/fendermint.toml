@@ -16,6 +16,33 @@ docker run \
   --env LOG_LEVEL=info \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
+  --network=${NETWORK_TYPE} ${CMD}
+"""
+dependencies = ["docker-network-create", "fendermint-deps"]
+
+[tasks.fendermint-start-ipc]
+extend = "fendermint-run"
+env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+
+[tasks.fendermint-run-ipc]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${FM_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${BASE_DIR}:/data \
+  --env FM_DATA_DIR=/data/fendermint/data \
+  --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env FM_IPC__SUBNET_ID=${NETWORK_NAME} \
+  --env FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY=${TOPDOWN_CHAIN_HEAD_DELAY} \
+  --env FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT=${PARENT_ENDPOINT} \
+  --env FM_IPC__TOPDOWN__PARENT_REGISTRY=${PARENT_REGISTRY} \
+  --env FM_IPC__TOPDOWN__PARENT_GATEWAY=${PARENT_GATEWAY} \
+  --env LOG_LEVEL=info \
+  --entrypoint ${ENTRY} \
+  ${FM_DOCKER_IMAGE} \
   ${CMD}
 """
 dependencies = ["docker-network-create", "fendermint-deps"]

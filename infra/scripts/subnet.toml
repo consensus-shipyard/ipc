@@ -1,0 +1,57 @@
+########################################################################################################################
+# Child subnet peer
+########################################################################################################################
+
+
+[tasks.child-validator]
+env = {"BASE_DIR"="${HOME}/.ipc/${NODE_NAME}", "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/cometbft", "FM_DIR"="${BASE_DIR}/fendermint", "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}", "ETHAPI_CONTAINER_NAME" = "eth-${NODE_NAME}", "FM_CONTAINER_NAME"= "fendermint-${NODE_NAME}", "GENESIS_FILE"="${FM_DIR}/genesis.json" }
+
+run_task = "validator-run"
+
+[tasks.child-validator-down]
+env = {"BASE_DIR"="${HOME}/.ipc/${NODE_NAME}", "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/cometbft", "FM_DIR"="${BASE_DIR}/fendermint", "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}", "ETHAPI_CONTAINER_NAME" = "eth-${NODE_NAME}", "FM_CONTAINER_NAME"= "fendermint-${NODE_NAME}", "GENESIS_FILE"="${FM_DIR}/genesis.json" }
+
+run_task = "testnode-down"
+
+[tasks.validator-run]
+workspace = false
+dependencies = [
+    "testnode-down",
+    "node-init",
+    "testnode-network-create",
+    "cometbft-init",
+    "fendermint-deps",
+    "subnet-config",
+    "fendermint-start-ipc",
+    "cometbft-start",
+    "cometbft-wait",
+    "ethapi-start"
+]
+
+# Subnet validator
+# ENV variable for where things are put.
+# Merge everything and test
+[tasks.subnet-config]
+dependencies = [
+    "subnet-genesis",
+    "subnet-fm-prepare",
+]
+
+
+[tasks.subnet-genesis]
+cwd = "./target/release"
+script = """
+
+./fendermint --network=${NETWORK_TYPE} genesis --genesis-file ${GENESIS_FILE} ipc from-parent --subnet-id ${SUBNET_ID} -p ${PARENT_ENDPOINT}  --parent-gateway ${PARENT_GATEWAY}  --parent-registry ${PARENT_REGISTRY} --base-fee ${BASE_FEE} --power-scale ${POWER_SCALE}
+
+"""
+
+[tasks.subnet-fm-prepare]
+cwd = "./target/release"
+script = """
+
+./fendermint --network=${NETWORK_TYPE} genesis --genesis-file ${GENESIS_FILE} into-tendermint --out ${CMT_DIR}/config/genesis.json
+
+./fendermint --network=${NETWORK_TYPE} key into-tendermint --secret-key ${VALIDATOR_PRIV_KEY} --out ${CMT_DIR}/config/priv_validator_key.json
+chmod 600 ${CMT_DIR}/config/priv_validator_key.json
+"""

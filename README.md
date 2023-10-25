@@ -9,6 +9,8 @@ Fendermint is an effort to implement [IPC with Tendermint Core](https://docs.goo
 
 Please have a look in the [docs](./docs/README.md) to see an overview of the project, how to run the components, and previous demos.
 
+## IPC
+Fendermint is built with support for [IPC](https://github.com/consensus-shipyard/ipc) by design. If you are looking to deploy the infrastructure Fendermint-based IPC subnet, refer to the [IPC main repo](https://github.com/consensus-shipyard/ipc), or have a look at the [IPC infrastructure docs](./docs/ipc.md).
 
 ## Testing
 

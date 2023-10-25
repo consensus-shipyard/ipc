@@ -1,19 +1,36 @@
 ########################################################################################################################
 # Node helpers
 ########################################################################################################################
+
+[tasks.bootstrap]
+env = { "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/bootstrap/cometbft", "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
+run_task = "new-node"
+
+[tasks.bootstrap-id]
+env = { "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
+run_task = "cometbft-node-id"
+
+[tasks.bootstrap-down]
+env = { "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
+run_task = "node-down"
+
 [tasks.node-down]
 dependencies = [
     "cometbft-stop",
     "cometbft-rm"
 ]
 
+
 [tasks.new-node]
 dependencies = [
     "node-down",
-    "node-init",
+    "bootstrap-mkdir",
     "cometbft-init",
     "seed-enable",
-    "cometbft-start"
+    "set-seeds",
+    "cometbft-start",
+    "cometbft-wait",
+    "cometbft-node-id",
 ]
 
 [tasks.node-init]
@@ -28,16 +45,28 @@ echo clearing all IPC data
 rm -rf ${BASE_DIR}
 """
 
+[tasks.bootstrap-mkdir]
+script="""
+echo creating directories: $BASE_DIR $CMT_DIR
+mkdir -p $BASE_DIR
+mkdir -p $CMT_DIR
+"""
+
 [tasks.node-mkdir]
 script="""
 echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR
 mkdir -p $BASE_DIR
-mkdir -p $FM_DIR
 
+mkdir -p $FM_DIR
 mkdir -p $CMT_DIR
 """
 
 [tasks.seed-enable]
 script="""
-sed -i'bak' "s/seed_mode = false/seed_mode = true/" ${BASE_DIR}/cometbft/config/config.toml
+sed -i'bak' "s/seed_mode = false/seed_mode = true/" ${CMT_DIR}/config/config.toml
+"""
+
+[tasks.set-seeds]
+script="""
+sed -i 's/seeds = ""/seeds = "${BOOTSTRAPS}"/g' ${CMT_DIR}/config/config.toml
 """

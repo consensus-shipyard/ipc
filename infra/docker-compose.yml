@@ -28,7 +28,7 @@ services:
     image: "fendermint:latest"
     environment:
       - FM_DATA_DIR=/data/fendermint/data
-      - FM_CHAIN_NAME=$CHAIN_NAME
+      - FM_CHAIN_NAME=$SUBNET_ID
       - LOG_LEVEL=info
     volumes:
       - $BASE_DIR/node${NODE_ID}:/data

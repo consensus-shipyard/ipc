@@ -10,7 +10,7 @@ use ipc_provider::IpcProvider;
 use std::path::PathBuf;
 
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_core::Timestamp;
+use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, SignerAddr, Validator,
     ValidatorKey,
@@ -189,9 +189,13 @@ where
 fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
     let genesis = read_genesis(genesis_file)?;
     let genesis_json = serde_json::to_value(&genesis)?;
+
+    let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();
+    let chain_id = chain_id.to_string();
+
     let tmg = tendermint::Genesis {
         genesis_time: tendermint::time::Time::from_unix_timestamp(genesis.timestamp.as_secs(), 0)?,
-        chain_id: tendermint::chain::Id::try_from(genesis.chain_name)?,
+        chain_id: tendermint::chain::Id::try_from(chain_id)?,
         initial_height: 0,
         // Values are based on the default produced by `tendermint init`
         consensus_params: tendermint::consensus::Params {

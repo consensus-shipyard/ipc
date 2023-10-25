@@ -69,7 +69,7 @@ dependencies = [
 [tasks.testnode-script-new-genesis]
 cwd = "./target/release"
 script = """
-./fendermint genesis --genesis-file ${GENESIS_FILE} new --chain-name ${CHAIN_NAME} --base-fee ${BASE_FEE} --timestamp ${TIMESTAMP} --power-scale 3
+./fendermint genesis --genesis-file ${GENESIS_FILE} new --chain-name ${SUBNET_ID} --base-fee ${BASE_FEE} --timestamp ${TIMESTAMP} --power-scale ${POWER_SCALE}
 """
 
 [tasks.testnode-script-new-key]
