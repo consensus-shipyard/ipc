@@ -314,7 +314,7 @@ impl SubnetManager for EthSubnetManager {
         let collateral = collateral
             .atto()
             .to_u128()
-            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+            .ok_or_else(|| anyhow!("invalid collateral amount"))?;
 
         let address = contract_address_from_subnet(&subnet)?;
         log::info!(
@@ -329,6 +329,32 @@ impl SubnetManager for EthSubnetManager {
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
 
+        txn.send().await?.await?;
+
+        Ok(())
+    }
+
+    async fn unstake(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        collateral: TokenAmount,
+    ) -> Result<()> {
+        let collateral = collateral
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid collateral amount"))?;
+
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!(
+            "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
+        );
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        let txn = call_with_premium_estimation(signer, contract.unstake(collateral.into())).await?;
         txn.send().await?.await?;
 
         Ok(())

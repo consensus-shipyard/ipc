@@ -11,7 +11,7 @@ use crate::commands::subnet::send_value::{SendValue, SendValueArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
-use self::join::{StakeSubnet, StakeSubnetArgs};
+use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
 use self::leave::{Claim, ClaimArgs};
 
 pub mod create;
@@ -44,6 +44,7 @@ impl SubnetCommandsArgs {
             Commands::Kill(args) => KillSubnet::handle(global, args).await,
             Commands::SendValue(args) => SendValue::handle(global, args).await,
             Commands::Stake(args) => StakeSubnet::handle(global, args).await,
+            Commands::Unstake(args) => UnstakeSubnet::handle(global, args).await,
             Commands::Claim(args) => Claim::handle(global, args).await,
         }
     }
@@ -59,5 +60,6 @@ pub(crate) enum Commands {
     Kill(KillSubnetArgs),
     SendValue(SendValueArgs),
     Stake(StakeSubnetArgs),
+    Unstake(UnstakeSubnetArgs),
     Claim(ClaimArgs),
 }
