@@ -25,6 +25,7 @@ pub type MockContractCall<T> = ethers::prelude::ContractCall<MockProvider, T>;
 /// Result of trying to decode the data returned in failures as reverts.
 ///
 /// The `E` type is supposed to be the enum unifying all errors that the contract can emit.
+#[derive(Clone)]
 pub enum ContractError<E> {
     /// The contract reverted with one of the expected custom errors.
     Revert(E),
@@ -33,10 +34,11 @@ pub enum ContractError<E> {
 }
 
 /// Error returned by calling a contract.
+#[derive(Clone, Debug)]
 pub struct CallError<E> {
-    exit_code: ExitCode,
-    failure_info: Option<ApplyFailure>,
-    error: ContractError<E>,
+    pub exit_code: ExitCode,
+    pub failure_info: Option<ApplyFailure>,
+    pub error: ContractError<E>,
 }
 
 impl<E> std::fmt::Debug for ContractError<E>
@@ -53,6 +55,8 @@ where
         }
     }
 }
+
+pub type ContractResult<T, E> = Result<T, CallError<E>>;
 
 /// Type we can use if a contract does not return revert errors, e.g. because it's all read-only views.
 #[derive(Clone)]
@@ -172,7 +176,7 @@ where
         &self,
         state: &mut FvmExecState<DB>,
         f: F,
-    ) -> anyhow::Result<Result<T, CallError<E>>>
+    ) -> anyhow::Result<ContractResult<T, E>>
     where
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,

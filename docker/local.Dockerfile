@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Builder
-FROM rust:1.69 as builder
+FROM rust:1.73 as builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler && \

@@ -291,7 +291,7 @@ where
                 let manager_facet = facets.remove(1);
                 let getter_facet = facets.remove(0);
 
-                assert!(facets.is_empty(), "SubnetRegistry has 2 facets");
+                debug_assert!(facets.is_empty(), "SubnetRegistry has 2 facets");
 
                 deployer.deploy_contract(
                     &mut state,
@@ -409,7 +409,8 @@ where
             "deployed Ethereum contract"
         );
 
-        Ok(id_addr)
+        // The Ethereum address is more usable inside the EVM than the ID address.
+        Ok(eth_addr)
     }
 
     /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already deployed library facets.

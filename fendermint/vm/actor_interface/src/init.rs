@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::Context;
-use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fendermint_vm_genesis::{Actor, ActorMeta};
 use fvm_ipld_blockstore::Blockstore;
@@ -11,7 +10,7 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID, HAMT_BIT_WIDTH};
 
-use crate::eam::{EthAddress, EAM_ACTOR_ID};
+use crate::eam::EthAddress;
 
 /// Defines first available ID address after builtin actors
 pub const FIRST_NON_SINGLETON_ADDR: ActorID = 100;
@@ -21,14 +20,9 @@ define_singleton!(INIT { id: 1, code_id: 2 });
 pub type AddressMap = HashMap<Address, ActorID>;
 
 /// Delegated address of an Ethereum built-in actor.
-pub fn eth_builtin_deleg_addr(id: ActorID) -> Address {
+fn eth_builtin_deleg_addr(id: ActorID) -> Address {
     // The EVM actor would reject a delegated address that looks like an ID address, so let's hash it.
-    let eth_addr = EthAddress::from_id(id).0;
-    // Based on `hash20` in the EAM actor.
-    let eth_addr = cid::multihash::Code::Keccak256.digest(&eth_addr);
-    let eth_addr: [u8; 20] = eth_addr.digest()[12..32].try_into().unwrap();
-
-    Address::new_delegated(EAM_ACTOR_ID, &eth_addr).expect("EthAddress within size limit")
+    Address::from(EthAddress::from_id(id).into_non_masked())
 }
 
 #[derive(Serialize_tuple, Deserialize_tuple, Clone, Debug)]

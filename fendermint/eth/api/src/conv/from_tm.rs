@@ -148,7 +148,8 @@ pub fn to_eth_transaction(
     hash: et::TxHash,
 ) -> anyhow::Result<et::Transaction> {
     // Based on https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2048
-    let sig = to_eth_signature(msg.signature()).context("failed to convert to eth signature")?;
+    let sig =
+        to_eth_signature(msg.signature(), true).context("failed to convert to eth signature")?;
     let msg = msg.message;
 
     let tx = et::Transaction {

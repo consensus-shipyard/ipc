@@ -82,7 +82,7 @@ impl From<&RocksDbConfig> for Options {
             opts.set_data_block_index_type(DataBlockIndexType::BinaryAndHash);
             opts.set_data_block_hash_ratio(0.75);
             opts.set_bloom_filter(10.0, false);
-            let cache = Cache::new_lru_cache(cache_size * 1024 * 1024).unwrap();
+            let cache = Cache::new_lru_cache(cache_size * 1024 * 1024);
             opts.set_block_cache(&cache);
             db_opts.set_block_based_table_factory(&opts);
             db_opts.set_memtable_prefix_bloom_ratio(0.02);

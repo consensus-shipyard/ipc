@@ -14,6 +14,7 @@ ethers = { workspace = true }
 fvm = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
+hex = { workspace = true }
 rand = { workspace = true }
 tendermint-rpc = { workspace = true }
 

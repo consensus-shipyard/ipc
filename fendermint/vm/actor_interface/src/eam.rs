@@ -1,6 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::fmt::{Debug, Display};
+
 use cid::multihash::MultihashDigest;
 use fvm_ipld_encoding::{
     strict_bytes,
@@ -26,7 +28,9 @@ pub enum Method {
 }
 
 // TODO: We could re-export `fil_evm_actor_shared::address::EvmAddress`.
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord,
+)]
 pub struct EthAddress(#[serde(with = "strict_bytes")] pub [u8; 20]);
 
 impl EthAddress {
@@ -56,6 +60,28 @@ impl EthAddress {
     pub fn is_masked_id(&self) -> bool {
         self.0[0] == 0xff && self.0[1..].starts_with(&[0u8; 11])
     }
+
+    pub fn into_non_masked(self) -> EthAddress {
+        if !self.is_masked_id() {
+            return self;
+        }
+        // Based on `hash20` in the EAM actor.
+        let eth_addr = cid::multihash::Code::Keccak256.digest(&self.0);
+        let eth_addr: [u8; 20] = eth_addr.digest()[12..32].try_into().unwrap();
+        Self(eth_addr)
+    }
+}
+
+impl Display for EthAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&ethers::types::Address::from(self.0), f)
+    }
+}
+
+impl Debug for EthAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&ethers::types::Address::from(self.0), f)
+    }
 }
 
 impl From<EthAddress> for Address {
@@ -73,6 +99,12 @@ impl From<EthAddress> for Address {
 
 impl From<EthAddress> for ethers::types::Address {
     fn from(value: EthAddress) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<&EthAddress> for ethers::types::Address {
+    fn from(value: &EthAddress) -> Self {
         Self(value.0)
     }
 }

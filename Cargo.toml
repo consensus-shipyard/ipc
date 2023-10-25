@@ -89,7 +89,7 @@ url = "2.4.1"
 # Using the 3.3 version of the FVM because the newer ones update the IPLD dependencies
 # to version which are different than the ones in the builtin-actors project, and since
 # they are 0.x cargo cannot upgrade them automatically, which leads to version conflicts.
-fvm = { version = "~3.2", default-features = false }     # no opencl feature or it fails on CI
+fvm = { version = "~3.2", default-features = false }                     # no opencl feature or it fails on CI
 fvm_shared = { version = "~3.2", features = ["crypto"] }
 primitives = { git = "https://github.com/consensus-shipyard/fvm-utils" }
 
@@ -130,8 +130,9 @@ tendermint-proto = { version = "0.31" }
 
 ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc.git", branch = "dev" }
 ipc_ipld_resolver = { git = "https://github.com/consensus-shipyard/ipc-ipld-resolver.git", branch = "main" }
-ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "dev" }
 ipc-provider = { git = "https://github.com/consensus-shipyard/ipc.git", branch = "dev" }
+# NOTE: If you change the branch here make sure to change IPC_ACTORS_TAG in the Makefile as well.
+ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "dev" }
 
 [patch.crates-io]
 # Use stable-only features.
@@ -144,3 +145,6 @@ merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.g
 # [patch."https://github.com/consensus-shipyard/ipc"]
 # ipc-sdk = { path = "../ipc/ipc/sdk" }
 # ipc-provider = { path = "../ipc/ipc/provider" }
+
+# [patch."https://github.com/consensus-shipyard/ipc-solidity-actors.git"]
+# ipc_actors_abis = { path = "../ipc-solidity-actors/binding" }

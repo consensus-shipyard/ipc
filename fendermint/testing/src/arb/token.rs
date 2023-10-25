@@ -38,7 +38,9 @@ impl quickcheck::Arbitrary for ArbTokenAmount {
 
 impl arbitrary::Arbitrary<'_> for ArbTokenAmount {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        let atto = u.arbitrary::<BigInt>()?;
+        // Using double because the way it's generated is base don vectors,
+        // and they are often empty when the `size` parameter is small.
+        let atto = BigInt::arbitrary(u)? + BigInt::arbitrary(u)?;
         let atto = atto.mod_floor(&MAX_ATTO);
         Ok(Self(TokenAmount::from_atto(atto)))
     }

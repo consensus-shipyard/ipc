@@ -7,7 +7,7 @@
 FROM ubuntu:latest
 
 RUN apt-get update && \
-  apt-get install -y libstdc++6 && \
+  apt-get install -y libstdc++6 openssl && \
   rm -rf /var/lib/apt/lists/*
 
 ENV FM_HOME_DIR=/fendermint

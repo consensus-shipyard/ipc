@@ -35,7 +35,7 @@ impl<DB> RegistryCaller<DB> {
     pub fn new(actor_id: ActorID) -> Self {
         let addr = EthAddress::from_id(actor_id);
         Self {
-            addr,
+            addr: addr.into_non_masked(),
             registry: ContractCaller::new(addr, SubnetRegistry::new),
             _getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
             _manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),

@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context};
 use ethers::types as et;
 use ethers::{abi::Tokenize, utils::keccak256};
 
+use fendermint_vm_message::conv::from_fvm;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::ActorID;
 
@@ -40,9 +41,12 @@ impl<DB> Default for GatewayCaller<DB> {
 
 impl<DB> GatewayCaller<DB> {
     pub fn new(actor_id: ActorID) -> Self {
+        // A masked ID works for invoking the contract, but internally the EVM uses a different
+        // ID and if we used this address for anything like validating that the sender is the gateway,
+        // we'll face bitter disappointment. For that we have to use the hashed version.
         let addr = EthAddress::from_id(actor_id);
         Self {
-            addr,
+            addr: addr.into_non_masked(),
             getter: ContractCaller::new(addr, GatewayGetterFacet::new),
             router: ContractCaller::new(addr, GatewayRouterFacet::new),
         }
@@ -153,8 +157,13 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         let height = checkpoint.block_height;
         let weight = et::U256::from(validator.power.0);
 
-        let hash = abi_hash(checkpoint);
-        let signature = et::Bytes::from(sign_secp256k1(secret_key, &hash));
+        // Checkpoint has to be hashed as a tuple.
+        let hash = abi_hash((checkpoint,));
+
+        let signature = sign_secp256k1(secret_key, &hash);
+        let signature =
+            from_fvm::to_eth_signature(&signature, false).context("invalid signature")?;
+        let signature = et::Bytes::from(signature.to_vec());
 
         let tree =
             ValidatorMerkleTree::new(power_table).context("failed to construct Merkle tree")?;
@@ -182,6 +191,9 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 }
 
 /// Hash some value in the same way we'd hash it in Solidity.
-fn abi_hash<T: Tokenize>(value: T) -> [u8; 32] {
+///
+/// Be careful that if we have to hash a single struct, Solidity's `abi.encode`
+/// function will treat it as a tuple.
+pub fn abi_hash<T: Tokenize>(value: T) -> [u8; 32] {
     keccak256(ethers::abi::encode(&value.into_tokens()))
 }

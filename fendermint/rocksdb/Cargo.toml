@@ -10,7 +10,7 @@ license.workspace = true
 
 [dependencies]
 num_cpus = "1.14"
-rocksdb = { version = "0.19", features = ["multi-threaded-cf"] }
+rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 anyhow = { workspace = true }
 fendermint_storage = { path = "../storage", optional = true, features = ["testing"] }
 serde = { workspace = true }

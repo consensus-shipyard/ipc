@@ -69,14 +69,24 @@ fn parse_secp256k1(sig: &[u8]) -> anyhow::Result<(RecoveryId, Signature)> {
     Ok((rec_id, sig))
 }
 
-pub fn to_eth_signature(sig: &FvmSignature) -> anyhow::Result<et::Signature> {
+/// Convert an FVM signature, which is a normal Secp256k1 signature, to an Ethereum one,
+/// where the `v` is optionally shifted by 27 to make it compatible with Solidity.
+///
+/// In theory we could incorporate the chain ID into it as well, but that hasn't come up.
+///
+/// Ethers normalizes Ethereum signatures during conversion to RLP.
+pub fn to_eth_signature(sig: &FvmSignature, normalized: bool) -> anyhow::Result<et::Signature> {
     let (v, sig) = match sig.sig_type {
         SignatureType::Secp256k1 => parse_secp256k1(&sig.bytes)?,
         other => return Err(anyhow!("unexpected signature type: {other:?}")),
     };
 
+    // By adding 27 to the recovery ID we make this compatible with Ethereum,
+    // so that we can verify such signatures in Solidity with e.g. openzeppelin ECDSA.sol
+    let shift = if normalized { 0 } else { 27 };
+
     let sig = et::Signature {
-        v: et::U64::from(v.serialize()).as_u64(),
+        v: et::U64::from(v.serialize() + shift).as_u64(),
         r: et::U256::from_big_endian(sig.r.b32().as_ref()),
         s: et::U256::from_big_endian(sig.s.b32().as_ref()),
     };
@@ -169,6 +179,7 @@ pub mod tests {
         to_eth_tokens(&tokens).unwrap();
     }
 
+    /// Check that converting a signature from FVM to ETH and back preserves it.
     #[quickcheck]
     fn prop_signature(msg: SignedMessage, seed: u64, chain_id: u64) -> Result<(), String> {
         let chain_id = ChainID::from(chain_id);
@@ -181,8 +192,8 @@ pub mod tests {
 
         let sig0 = msg.signature();
 
-        let sig1 =
-            to_eth_signature(sig0).map_err(|e| format!("failed to convert signature: {e}"))?;
+        let sig1 = to_eth_signature(sig0, true)
+            .map_err(|e| format!("failed to convert signature: {e}"))?;
 
         let sig2 = fvm_shared::crypto::signature::Signature::new_secp256k1(sig1.to_vec());
 
@@ -203,6 +214,7 @@ pub mod tests {
         assert_eq!(msg1, msg0)
     }
 
+    /// Check that decoding a signed ETH transaction and converting to FVM can be verified with the signature produced by a Wallet.
     #[quickcheck]
     fn prop_eth_signature(msg: EthMessage, chain_id: u64, key_pair: KeyPair) {
         // ethers has `to_eip155_v` which would fail with u64 overflow if the chain ID is too big.

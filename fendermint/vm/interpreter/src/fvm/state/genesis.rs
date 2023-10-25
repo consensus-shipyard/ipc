@@ -10,8 +10,7 @@ use fendermint_vm_actor_interface::{
     account::{self, ACCOUNT_ACTOR_CODE_ID},
     eam::{self, EthAddress},
     ethaccount::ETHACCOUNT_ACTOR_CODE_ID,
-    evm,
-    init::{self, eth_builtin_deleg_addr},
+    evm, init,
     multisig::{self, MULTISIG_ACTOR_CODE_ID},
     system, EMPTY_ARR,
 };
@@ -24,7 +23,7 @@ use fvm::{
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::load_car_unchecked;
-use fvm_ipld_encoding::{CborStore, RawBytes};
+use fvm_ipld_encoding::{BytesDe, CborStore, RawBytes};
 use fvm_shared::{
     address::{Address, Payload},
     clock::ChainEpoch,
@@ -295,8 +294,8 @@ where
 
         // When a contract is constructed the EVM actor verifies that it has an Ethereum delegated address.
         // This has been inserted into the Init actor state as well.
-        let f4_addr = eth_builtin_deleg_addr(id);
         let f0_addr = Address::new_id(id);
+        let f4_addr = Address::from(EthAddress::from_id(id).into_non_masked());
 
         let msg = Message {
             version: 0,
@@ -329,10 +328,22 @@ where
         };
 
         if !apply_ret.msg_receipt.exit_code.is_success() {
+            let error_data = apply_ret.msg_receipt.return_data;
+            let error_data = if error_data.is_empty() {
+                Vec::new()
+            } else {
+                // The EVM actor might return some revert in the output.
+                error_data
+                    .deserialize::<BytesDe>()
+                    .map(|bz| bz.0)
+                    .context("failed to deserialize error data")?
+            };
+
             bail!(
-                "failed to deploy EVM actor: {}; {:?}",
+                "failed to deploy EVM actor: code = {}; data = 0x{}; info = {:?}",
                 apply_ret.msg_receipt.exit_code,
-                apply_ret.failure_info
+                hex::encode(error_data),
+                apply_ret.failure_info,
             );
         }
 
