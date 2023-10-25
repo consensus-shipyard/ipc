@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 pub use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
+use crate::commands::subnet::genesis_epoch::{GenesisEpoch, GenesisEpochArgs};
 pub use crate::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
 pub use crate::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
 pub use crate::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
@@ -15,6 +16,7 @@ use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs}
 use self::leave::{Claim, ClaimArgs};
 
 pub mod create;
+mod genesis_epoch;
 pub mod join;
 pub mod kill;
 pub mod leave;
@@ -46,6 +48,7 @@ impl SubnetCommandsArgs {
             Commands::Stake(args) => StakeSubnet::handle(global, args).await,
             Commands::Unstake(args) => UnstakeSubnet::handle(global, args).await,
             Commands::Claim(args) => Claim::handle(global, args).await,
+            Commands::GenesisEpoch(args) => GenesisEpoch::handle(global, args).await,
         }
     }
 }
@@ -62,4 +65,5 @@ pub(crate) enum Commands {
     Stake(StakeSubnetArgs),
     Unstake(UnstakeSubnetArgs),
     Claim(ClaimArgs),
+    GenesisEpoch(GenesisEpochArgs),
 }

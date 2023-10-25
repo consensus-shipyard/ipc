@@ -33,11 +33,12 @@ impl CommandLineHandler for ListSubnets {
 
         for (_, s) in ls.iter() {
             println!(
-                "{:?} - status: {:?}, collateral: {:?} FIL, circ.supply: {:?} FIL",
+                "{:?} - status: {:?}, collateral: {:?} FIL, circ.supply: {:?} FIL, genesis: {:}",
                 s.id.to_string(),
                 s.status,
                 TokenAmount::from_whole(s.stake.atto().clone()),
                 TokenAmount::from_whole(s.circ_supply.atto().clone()),
+                s.genesis_epoch
             );
         }
 

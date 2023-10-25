@@ -35,7 +35,7 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
         from: Address,
         collateral: TokenAmount,
         metadata: Vec<u8>,
-    ) -> Result<()>;
+    ) -> Result<ChainEpoch>;
 
     /// Allows validators that have already joined the subnet to stake more collateral
     /// and increase their power in the subnet

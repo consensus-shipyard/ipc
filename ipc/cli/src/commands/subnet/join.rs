@@ -27,14 +27,17 @@ impl CommandLineHandler for JoinSubnet {
             None => None,
         };
         let public_key = hex::decode(&arguments.public_key)?;
-        provider
+        let epoch = provider
             .join_subnet(
                 subnet,
                 from,
                 f64_to_token_amount(arguments.collateral)?,
                 public_key,
             )
-            .await
+            .await?;
+        log::info!("joined at epoch: {epoch}");
+
+        Ok(())
     }
 }
 

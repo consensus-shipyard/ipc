@@ -277,7 +277,7 @@ impl IpcProvider {
         from: Option<Address>,
         collateral: TokenAmount,
         public_key: Vec<u8>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
