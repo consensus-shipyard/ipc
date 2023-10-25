@@ -14,6 +14,10 @@ pub mod gateway_router_facet;
 #[allow(clippy::all)]
 pub mod i_diamond;
 #[allow(clippy::all)]
+pub mod lib_staking;
+#[allow(clippy::all)]
+pub mod lib_staking_change_log;
+#[allow(clippy::all)]
 pub mod subnet_actor_diamond;
 #[allow(clippy::all)]
 pub mod subnet_actor_getter_facet;
