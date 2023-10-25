@@ -278,7 +278,7 @@ impl IpcProvider {
         from: Option<Address>,
         collateral: TokenAmount,
         public_key: Vec<u8>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -309,6 +309,24 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
 
         conn.manager().stake(subnet, sender, collateral).await
+    }
+
+    pub async fn unstake(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        collateral: TokenAmount,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().unstake(subnet, sender, collateral).await
     }
 
     pub async fn leave_subnet(

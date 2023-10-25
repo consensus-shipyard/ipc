@@ -35,11 +35,16 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
         from: Address,
         collateral: TokenAmount,
         metadata: Vec<u8>,
-    ) -> Result<()>;
+    ) -> Result<ChainEpoch>;
 
     /// Allows validators that have already joined the subnet to stake more collateral
     /// and increase their power in the subnet
     async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()>;
+
+    /// Allows validators that have already joined the subnet to unstake collateral
+    /// and reduce their power in the subnet
+    async fn unstake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount)
+        -> Result<()>;
 
     /// Sends a request to leave a subnet from a wallet address.
     async fn leave_subnet(&self, subnet: SubnetID, from: Address) -> Result<()>;

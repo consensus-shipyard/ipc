@@ -4,8 +4,8 @@
 //! Staking module related types and functions
 
 use crate::ethers_address_to_fil_address;
-use ethers::contract::EthEvent;
 use fvm_shared::address::Address;
+use ipc_actors_abis::lib_staking_change_log;
 
 pub type ConfigurationNumber = u64;
 
@@ -40,19 +40,12 @@ pub struct StakingChange {
     pub validator: Address,
 }
 
-/// The event emitted when a staking request is perform in solidity contracts
-#[derive(Clone, Debug, EthEvent)]
-pub struct NewStakingRequest {
-    op: u8,
-    validator: ethers::types::Address,
-    payload: ethers::types::Bytes,
-    configuration_number: u64,
-}
-
-impl TryFrom<NewStakingRequest> for StakingChangeRequest {
+impl TryFrom<lib_staking_change_log::NewStakingChangeRequestFilter> for StakingChangeRequest {
     type Error = anyhow::Error;
 
-    fn try_from(value: NewStakingRequest) -> Result<Self, Self::Error> {
+    fn try_from(
+        value: lib_staking_change_log::NewStakingChangeRequestFilter,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             configuration_number: value.configuration_number,
             change: StakingChange {

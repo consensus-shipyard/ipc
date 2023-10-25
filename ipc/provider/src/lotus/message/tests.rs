@@ -130,6 +130,7 @@ fn test_subnet_info_to_str() {
         stake: Default::default(),
         circ_supply: Default::default(),
         status: Status::Active,
+        genesis_epoch: 0,
     };
 
     let w = serde_json::to_string(&s);

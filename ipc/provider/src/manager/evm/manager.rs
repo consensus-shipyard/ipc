@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use ethers::types::H256;
 use ipc_actors_abis::{
-    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
+    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, lib_staking_change_log,
     subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
 };
 use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
@@ -38,7 +38,7 @@ use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::checkpoint::{BottomUpCheckpoint, BottomUpCheckpointBundle};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::gateway::Status;
-use ipc_sdk::staking::{NewStakingRequest, StakingChangeRequest};
+use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
@@ -173,7 +173,7 @@ impl TopDownCheckpointQuery for EthSubnetManager {
         );
 
         let ev = contract
-            .event::<NewStakingRequest>()
+            .event::<lib_staking_change_log::NewStakingChangeRequestFilter>()
             .from_block(epoch as u64)
             .to_block(epoch as u64);
 
@@ -288,7 +288,7 @@ impl SubnetManager for EthSubnetManager {
         from: Address,
         collateral: TokenAmount,
         pub_key: Vec<u8>,
-    ) -> Result<()> {
+    ) -> Result<ChainEpoch> {
         let collateral = collateral
             .atto()
             .to_u128()
@@ -307,16 +307,16 @@ impl SubnetManager for EthSubnetManager {
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
 
-        txn.send().await?.await?;
-
-        Ok(())
+        let pending_tx = txn.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
     }
 
     async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()> {
         let collateral = collateral
             .atto()
             .to_u128()
-            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+            .ok_or_else(|| anyhow!("invalid collateral amount"))?;
 
         let address = contract_address_from_subnet(&subnet)?;
         log::info!(
@@ -331,6 +331,32 @@ impl SubnetManager for EthSubnetManager {
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
 
+        txn.send().await?.await?;
+
+        Ok(())
+    }
+
+    async fn unstake(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        collateral: TokenAmount,
+    ) -> Result<()> {
+        let collateral = collateral
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid collateral amount"))?;
+
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!(
+            "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
+        );
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        let txn = call_with_premium_estimation(signer, contract.unstake(collateral.into())).await?;
         txn.send().await?.await?;
 
         Ok(())
@@ -1155,6 +1181,7 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
             id: SubnetID::try_from(value.id)?,
             stake: eth_to_fil_amount(&value.stake)?,
             circ_supply: eth_to_fil_amount(&value.circ_supply)?,
+            genesis_epoch: value.genesis_epoch.as_u64() as ChainEpoch,
             status: match value.status {
                 1 => Status::Active,
                 2 => Status::Inactive,

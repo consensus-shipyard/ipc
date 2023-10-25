@@ -82,6 +82,7 @@ pub struct SubnetInfo {
     /// State of the Subnet (Initialized, Active, Killed)
     #[serde(rename(deserialize = "Status"))]
     pub status: Status,
+    pub genesis_epoch: ChainEpoch,
 }
 
 /// We need to redefine the struct here due to:
