@@ -12,9 +12,12 @@ use crate::commands::subnet::send_value::{SendValue, SendValueArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
+use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootstrapsArgs};
 use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
 use self::leave::{Claim, ClaimArgs};
+use self::rpc::{ChainIdSubnet, ChainIdSubnetArgs};
 
+pub mod bootstrap;
 pub mod create;
 mod genesis_epoch;
 pub mod join;
@@ -42,12 +45,15 @@ impl SubnetCommandsArgs {
             Commands::List(args) => ListSubnets::handle(global, args).await,
             Commands::Join(args) => JoinSubnet::handle(global, args).await,
             Commands::Rpc(args) => RPCSubnet::handle(global, args).await,
+            Commands::ChainId(args) => ChainIdSubnet::handle(global, args).await,
             Commands::Leave(args) => LeaveSubnet::handle(global, args).await,
             Commands::Kill(args) => KillSubnet::handle(global, args).await,
             Commands::SendValue(args) => SendValue::handle(global, args).await,
             Commands::Stake(args) => StakeSubnet::handle(global, args).await,
             Commands::Unstake(args) => UnstakeSubnet::handle(global, args).await,
             Commands::Claim(args) => Claim::handle(global, args).await,
+            Commands::AddBootstrap(args) => AddBootstrap::handle(global, args).await,
+            Commands::ListBootstraps(args) => ListBootstraps::handle(global, args).await,
             Commands::GenesisEpoch(args) => GenesisEpoch::handle(global, args).await,
         }
     }
@@ -59,11 +65,14 @@ pub(crate) enum Commands {
     List(ListSubnetsArgs),
     Join(JoinSubnetArgs),
     Rpc(RPCSubnetArgs),
+    ChainId(ChainIdSubnetArgs),
     Leave(LeaveSubnetArgs),
     Kill(KillSubnetArgs),
     SendValue(SendValueArgs),
     Stake(StakeSubnetArgs),
     Unstake(UnstakeSubnetArgs),
     Claim(ClaimArgs),
+    AddBootstrap(AddBootstrapArgs),
+    ListBootstraps(ListBootstrapsArgs),
     GenesisEpoch(GenesisEpochArgs),
 }

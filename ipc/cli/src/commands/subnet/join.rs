@@ -4,11 +4,13 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
 use std::{fmt::Debug, str::FromStr};
 
-use crate::{f64_to_token_amount, get_ipc_provider, CommandLineHandler, GlobalArguments};
+use crate::{
+    f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str, CommandLineHandler,
+    GlobalArguments,
+};
 
 /// The command to join a subnet
 pub struct JoinSubnet;
@@ -23,7 +25,7 @@ impl CommandLineHandler for JoinSubnet {
         let mut provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
         let from = match &arguments.from {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
         let public_key = hex::decode(&arguments.public_key)?;
@@ -71,7 +73,7 @@ impl CommandLineHandler for StakeSubnet {
         let mut provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
         let from = match &arguments.from {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
         provider
@@ -108,7 +110,7 @@ impl CommandLineHandler for UnstakeSubnet {
         let mut provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
         let from = match &arguments.from {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
         provider

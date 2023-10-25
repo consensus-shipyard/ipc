@@ -16,7 +16,7 @@ use argon2::{
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
 use fvm_shared::crypto::signature::SignatureType;
-use log::{error, warn};
+use log::{debug, error};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -221,7 +221,7 @@ impl KeyStore {
                     }
                     Err(e) => {
                         if e.kind() == ErrorKind::NotFound {
-                            warn!(
+                            debug!(
                                 "Keystore does not exist, initializing new keystore at: {:?}",
                                 file_path
                             );
@@ -255,7 +255,7 @@ impl KeyStore {
 
                         if read_bytes == 0 {
                             // New encrypted keystore if file exists but is zero bytes (i.e., touch)
-                            warn!(
+                            debug!(
                                 "Keystore does not exist, initializing new keystore at {:?}",
                                 file_path
                             );
@@ -309,7 +309,7 @@ impl KeyStore {
                         }
                     }
                     Err(_) => {
-                        warn!("Encrypted keystore does not exist, initializing new keystore");
+                        debug!("Encrypted keystore does not exist, initializing new keystore");
 
                         let (salt, encryption_key) =
                             EncryptedKeyStore::derive_key(&passphrase, None).map_err(|error| {

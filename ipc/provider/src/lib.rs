@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     collections::HashMap,
+    path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, RwLock},
 };
@@ -641,6 +642,38 @@ impl IpcProvider {
 
         conn.manager().chain_head_height().await
     }
+
+    /// Advertises the endpoint of a bootstrap node for the subnet.
+    pub async fn add_bootstrap(
+        &mut self,
+        subnet: &SubnetID,
+        from: Option<Address>,
+        endpoint: String,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager()
+            .add_bootstrap(subnet, &sender, endpoint)
+            .await
+    }
+
+    /// Lists the bootstrap nodes of a subnet
+    pub async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> anyhow::Result<Vec<String>> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().list_bootstrap_nodes(subnet).await
+    }
 }
 
 /// Lotus JSON keytype format
@@ -756,13 +789,15 @@ fn new_evm_keystore_from_config(
 pub fn new_evm_keystore_from_path(
     repo_str: &str,
 ) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
-    let repo = std::path::Path::new(&repo_str).join(ipc_identity::DEFAULT_KEYSTORE_NAME);
+    let repo = Path::new(&repo_str).join(ipc_identity::DEFAULT_KEYSTORE_NAME);
+    let repo = expand_tilde(repo);
     PersistentKeyStore::new(repo).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
 pub fn new_fvm_keystore_from_path(repo_str: &str) -> anyhow::Result<KeyStore> {
-    let repo = std::path::Path::new(&repo_str);
-    let keystore_config = KeyStoreConfig::Persistent(repo.join(ipc_identity::KEYSTORE_NAME));
+    let repo = Path::new(&repo_str);
+    let repo = expand_tilde(repo);
+    let keystore_config = KeyStoreConfig::Persistent(repo);
     // TODO: we currently only support persistent keystore in the default repo directory.
     KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
 }
@@ -777,4 +812,26 @@ pub fn default_repo_path() -> String {
 
 pub fn default_config_path() -> String {
     format!("{}/{:}", default_repo_path(), DEFAULT_CONFIG_NAME)
+}
+
+/// Expand paths that begin with "~" to `$HOME`.
+pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
+    let p = path.as_ref().to_path_buf();
+    if !p.starts_with("~") {
+        return p;
+    }
+    if p == Path::new("~") {
+        return dirs::home_dir().unwrap_or(p);
+    }
+    dirs::home_dir()
+        .map(|mut h| {
+            if h == Path::new("/") {
+                // `~/foo` becomes just `/foo` instead of `//foo` if `/` is home.
+                p.strip_prefix("~").unwrap().to_path_buf()
+            } else {
+                h.push(p.strip_prefix("~/").unwrap());
+                h
+            }
+        })
+        .unwrap_or(p)
 }
