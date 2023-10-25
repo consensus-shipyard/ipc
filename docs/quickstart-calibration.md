@@ -189,9 +189,9 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 cargo make --makefile /bin/ipc-infra/Makefile.toml \
     -e NODE_NAME=validator-<n> \
     -e VALIDATOR_PRIV_KEY=<PATH_PRIV_KEY_VALIDATOR_n> \
-    -e CHAIN_NAME=<SUBNET_ID>
+    -e SUBNET_ID=<SUBNET_ID>
     -e CMT_HOST_PORT=<COMETBFT_PORT_n> -e ETHAPI_HOST_PORT=<ETH_RPC_PORT_n> \
-    -e COMMA_SEPARATED_BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
+    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
     -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
     -e PARENT_GATEAY=<GATEWAY__REGISTRY_CONTRACT_ADDR> \
     child-validator
