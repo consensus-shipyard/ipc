@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 
 # Builder
-FROM rust:1.73 as builder
+FROM rust:bookworm as builder
 
 RUN apt-get update && \
-  apt-get install -y build-essential clang cmake protobuf-compiler && \
+  apt-get install -y build-essential clang cmake protobuf-compiler libssl3 && \
   rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -18,7 +18,11 @@ RUN --mount=type=cache,target=$RUSTUP_HOME,from=rust,source=$RUSTUP_HOME \
 
 
 # Runner
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
+
+RUN apt-get update && \
+  apt-get install -y libssl3 && \
+  rm -rf /var/lib/apt/lists/*
 
 ENV FM_HOME_DIR=/fendermint
 ENV HOME=$FM_HOME_DIR
