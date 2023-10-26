@@ -1,4 +1,4 @@
-.PHONY: all build test lint license check-fmt check-clippy diagrams install_infra
+.PHONY: all build test lint license check-fmt check-clippy diagrams install-infra clean-infra
 
 all: test build
 
@@ -27,6 +27,9 @@ license:
 
 install-infra:
 	./scripts/install_infra.sh
+
+clean-infra:
+	rm -rf ./bin/ipc-infra
 
 check-fmt:
 	cargo fmt --all --check
