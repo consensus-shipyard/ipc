@@ -1,11 +1,9 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+use self::topdown_cross::{ListTopdownMsgs, ListTopdownMsgsArgs};
 use crate::commands::crossmsg::fund::Fund;
 use crate::commands::crossmsg::propagate::Propagate;
 use crate::commands::crossmsg::release::Release;
-use crate::commands::crossmsg::topdown_cross::{
-    ListTopdownCrossMessages, ListTopdownCrossMessagesArgs,
-};
 use crate::{CommandLineHandler, GlobalArguments};
 use fund::FundArgs;
 use propagate::PropagateArgs;
@@ -32,9 +30,7 @@ impl CrossMsgsCommandsArgs {
             Commands::Fund(args) => Fund::handle(global, args).await,
             Commands::Release(args) => Release::handle(global, args).await,
             Commands::Propagate(args) => Propagate::handle(global, args).await,
-            Commands::ListTopdownCrossMsgs(args) => {
-                ListTopdownCrossMessages::handle(global, args).await
-            }
+            Commands::ListTopdownMsgs(args) => ListTopdownMsgs::handle(global, args).await,
         }
     }
 }
@@ -44,5 +40,5 @@ pub(crate) enum Commands {
     Fund(FundArgs),
     Release(ReleaseArgs),
     Propagate(PropagateArgs),
-    ListTopdownCrossMsgs(ListTopdownCrossMessagesArgs),
+    ListTopdownMsgs(ListTopdownMsgsArgs),
 }

@@ -167,6 +167,10 @@ The epoch were the message is performed can give you a sense of the time the mes
 
 >💡 Top-down proofs-of-finality is the underlying process used for IPC to propagate information from the parent to the child. Validators in the child subnet include information in every block in the child subnet about the height of the parent they agree to consider final. When this information is committed on-chain, changes into the validator set of the subnet, and the execution of top-down messages are correspondingly triggered.
 
+* In order to list the top-down messages sent for a subnet from a parent network for a specific epoch, run the following command: 
+```bash
+./bin/ipc-cli cross-msg list-topdown-msgs --subnet=<SUBNET_ID> --epoch=<EPOCH>
+```
 ### Release
 In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following commnd:
 ```bash
