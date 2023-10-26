@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
+import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {CrossMsg} from "../structs/Checkpoint.sol";
 import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
@@ -149,5 +150,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         });
 
         LibGateway.commitBottomUpMsg(crossMsg);
+        // burn funds that are being released
+        payable(BURNT_FUNDS_ACTOR).sendValue(msg.value);
     }
 }

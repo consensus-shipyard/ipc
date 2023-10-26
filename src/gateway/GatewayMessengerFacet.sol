@@ -36,7 +36,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         }
 
         // commit cross-message for propagation
-        (bool shouldBurn, ) = _commitCrossMessage(crossMsg);
+        bool shouldBurn = _commitCrossMessage(crossMsg);
 
         _crossMsgSideEffects({v: crossMsg.message.value, shouldBurn: shouldBurn});
     }
@@ -49,7 +49,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         CrossMsg storage crossMsg = s.postbox[msgCid];
         validateFee(crossMsg.message.fee);
 
-        (bool shouldBurn, ) = _commitCrossMessage(crossMsg);
+        bool shouldBurn = _commitCrossMessage(crossMsg);
         // We must delete the message first to prevent potential re-entrancies,
         // and as the message is deleted and we don't have a reference to the object
         // anymore, we need to pull the data from the message to trigger the side-effects.
@@ -68,14 +68,12 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     /**
      * @dev Commit the cross message to storage. It outputs a flag signaling
      * if the committed messages was bottom-up and some funds need to be
-     * burnt or if a top-down message fee needs to be distributed.
+     * burnt.
      *
      * It also validates that destination subnet ID is not empty
      * and not equal to the current network.
      */
-    function _commitCrossMessage(
-        CrossMsg memory crossMessage
-    ) internal returns (bool shouldBurn, bool shouldDistributeRewards) {
+    function _commitCrossMessage(CrossMsg memory crossMessage) internal returns (bool shouldBurn) {
         SubnetID memory to = crossMessage.message.to.subnetId;
         if (to.isEmpty()) {
             revert InvalidCrossMsgDstSubnet();
@@ -98,7 +96,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         if (shouldCommitBottomUp) {
             LibGateway.commitBottomUpMsg(crossMessage);
 
-            return (shouldBurn = crossMessage.message.value > 0, shouldDistributeRewards = false);
+            return (shouldBurn = crossMessage.message.value > 0);
         }
 
         if (applyType == IPCMsgType.TopDown) {
@@ -107,12 +105,12 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
 
         LibGateway.commitTopDownMsg(crossMessage);
 
-        return (shouldBurn = false, shouldDistributeRewards = true);
+        return (shouldBurn = false);
     }
 
     /**
-     * @dev Performs transaction side-effects from the commitment of a cross-net message. It burns funds
-     * and propagates the corresponding rewards.
+     * @dev Performs transaction side-effects from the commitment of a cross-net message. Like
+     * burning funds when bottom-up messages are propagated.
      *
      * @param v - the value of the committed cross-net message
      * @param shouldBurn - flag if the message should burn funds
