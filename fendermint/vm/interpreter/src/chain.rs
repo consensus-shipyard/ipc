@@ -8,7 +8,7 @@ use crate::{
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
-use anyhow::{anyhow, Context};
+use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
 use fendermint_vm_actor_interface::ipc;
@@ -209,7 +209,8 @@ where
                     let (state, ret) = self
                         .inner
                         .deliver(state, VerifiableMessage::Synthetic(smsg))
-                        .await?;
+                        .await
+                        .context("failed to deliver bottom up checkpoint")?;
 
                     // If successful, add the CID to the background resolution pool.
                     let is_success = match ret {
@@ -236,9 +237,7 @@ where
                 }
                 IpcMessage::TopDownExec(p) => {
                     if !provider.is_enabled() {
-                        return Err(anyhow!(
-                            "cannot execute IPC top-down message: parent provider disabled"
-                        ));
+                        bail!("cannot execute IPC top-down message: parent provider disabled");
                     }
 
                     // commit parent finality first
@@ -249,26 +248,34 @@ where
                         finality.clone(),
                         &provider,
                     )
-                    .await?;
+                    .await
+                    .context("failed to commit finality")?;
 
                     // error happens if we cannot get the validator set from ipc agent after retries
                     let validator_changes = provider
                         .validator_changes_from(prev_height + 1, finality.height)
-                        .await?;
+                        .await
+                        .context("failed to fetch validator changes")?;
+
                     self.gateway_caller
-                        .store_validator_changes(&mut state, validator_changes)?;
+                        .store_validator_changes(&mut state, validator_changes)
+                        .context("failed to store validator changes")?;
 
                     // error happens if we cannot get the cross messages from ipc agent after retries
                     let msgs = provider
                         .top_down_msgs_from(prev_height + 1, p.height as u64, &finality.block_hash)
-                        .await?;
+                        .await
+                        .context("failed to fetch top down messages")?;
+
                     let ret = topdown::execute_topdown_msgs(&self.gateway_caller, &mut state, msgs)
-                        .await?;
+                        .await
+                        .context("failed to execute top down messages")?;
 
                     atomically(|| {
                         provider.set_new_finality(finality.clone(), prev_finality.clone())
                     })
                     .await;
+
                     tracing::debug!("new finality updated: {:?}", finality);
 
                     Ok(((pool, provider, state), ChainMessageApplyRet::Ipc(ret)))
@@ -328,7 +335,8 @@ where
                         let (state, ret) = self
                             .inner
                             .check(state, VerifiableMessage::Synthetic(msg), is_recheck)
-                            .await?;
+                            .await
+                            .context("failed to check bottom up resolve")?;
 
                         Ok((state, Ok(ret)))
                     }

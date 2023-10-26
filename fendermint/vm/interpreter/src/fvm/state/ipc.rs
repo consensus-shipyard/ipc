@@ -203,9 +203,11 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         finality: IPCParentFinality,
     ) -> anyhow::Result<Option<IPCParentFinality>> {
         let evm_finality = router::ParentFinality::try_from(finality)?;
+
         let (has_committed, prev_finality) = self
             .router
             .call(state, |c| c.commit_parent_finality(evm_finality))?;
+
         Ok(if !has_committed {
             None
         } else {

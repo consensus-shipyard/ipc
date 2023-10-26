@@ -6,6 +6,7 @@ use crate::chain::TopDownFinalityProvider;
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmApplyRet;
+use anyhow::Context;
 use fendermint_vm_topdown::{BlockHeight, IPCParentFinality, ParentViewProvider};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
@@ -28,14 +29,16 @@ where
         } else {
             (provider.genesis_epoch()?, None)
         };
+
     tracing::debug!(
         "commit finality parsed: prev_height {prev_height}, prev_finality: {prev_finality:?}"
     );
+
     Ok((prev_height, prev_finality))
 }
 
 /// Execute the top down messages implicitly. Before the execution, mint to the gateway of the funds
-/// transferred in the messages.
+/// transferred in the messages, and increase the circulating supply with the incoming value.
 pub async fn execute_topdown_msgs<DB>(
     gateway_caller: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
@@ -45,7 +48,14 @@ where
     DB: Blockstore + Sync + Send + 'static,
 {
     let total_value: TokenAmount = messages.iter().map(|a| a.msg.value.clone()).sum();
-    gateway_caller.mint_to_gateway(state, total_value)?;
+
+    gateway_caller
+        .mint_to_gateway(state, total_value.clone())
+        .context("failed to mint to gateway")?;
+
+    state.update_circ_supply(|circ_supply| {
+        *circ_supply += total_value;
+    });
 
     gateway_caller.apply_cross_messages(state, messages)
 }

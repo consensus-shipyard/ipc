@@ -22,6 +22,7 @@ use fendermint_vm_interpreter::chain::{
 };
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
+    FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput};
@@ -725,9 +726,20 @@ where
         let mut state = self.committed_state()?;
         state.block_height = exec_state.block_height().try_into()?;
         state.state_params.timestamp = exec_state.timestamp();
-        state.state_params.state_root = exec_state.commit().context("failed to commit FVM")?;
 
-        let state_root = state.state_root();
+        let (
+            state_root,
+            FvmUpdatableParams {
+                power_scale,
+                circ_supply,
+            },
+            _,
+        ) = exec_state.commit().context("failed to commit FVM")?;
+
+        state.state_params.state_root = state_root;
+        state.state_params.power_scale = power_scale;
+        state.state_params.circ_supply = circ_supply;
+
         let app_hash = state.app_hash();
 
         tracing::debug!(

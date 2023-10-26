@@ -48,6 +48,22 @@ pub struct FvmStateParams {
     pub power_scale: PowerScale,
 }
 
+/// Parts of the state which can be updated by message execution, apart from the actor state.
+///
+/// This is just a technical thing to help us not forget about saving something.
+///
+/// TODO: `base_fee` should surely be here.
+#[derive(Debug)]
+pub struct FvmUpdatableParams {
+    /// The circulating supply changes if IPC is enabled and
+    /// funds/releases are carried out with the parent.
+    pub circ_supply: TokenAmount,
+    /// Conversion between collateral and voting power.
+    /// Doesn't change at the moment but in theory it could,
+    /// and it doesn't have a place within the FVM.
+    pub power_scale: PowerScale,
+}
+
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns> as Machine>::Blockstore;
 
 /// A state we create for the execution of all the messages in a block.
@@ -64,8 +80,11 @@ where
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
 
-    /// Conversion between collateral and voting power.
-    power_scale: PowerScale,
+    /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
+    params: FvmUpdatableParams,
+
+    /// Indicate whether the parameters have been updated.
+    params_dirty: bool,
 }
 
 impl<DB> FvmExecState<DB>
@@ -90,7 +109,7 @@ where
         // * base_fee; by default it's zero
         let mut mc = nc.for_epoch(block_height, params.timestamp.0, params.state_root);
         mc.set_base_fee(params.base_fee);
-        mc.set_circulating_supply(params.circ_supply);
+        mc.set_circulating_supply(params.circ_supply.clone());
 
         // Creating a new machine every time is prohibitively slow.
         // let ec = EngineConfig::from(&nc);
@@ -103,7 +122,11 @@ where
         Ok(Self {
             executor,
             block_hash: None,
-            power_scale: params.power_scale,
+            params: FvmUpdatableParams {
+                circ_supply: params.circ_supply,
+                power_scale: params.power_scale,
+            },
+            params_dirty: false,
         })
     }
 
@@ -142,8 +165,9 @@ where
     /// semantics we can hope to provide if the middlewares call each other: did it go
     /// all the way down, or did it stop somewhere? Easier to have one commit of the state
     /// as a whole.
-    pub fn commit(mut self) -> anyhow::Result<Cid> {
-        self.executor.flush()
+    pub fn commit(mut self) -> anyhow::Result<(Cid, FvmUpdatableParams, bool)> {
+        let cid = self.executor.flush()?;
+        Ok((cid, self.params, self.params_dirty))
     }
 
     /// The height of the currently executing block.
@@ -163,7 +187,7 @@ where
 
     /// Conversion between collateral and voting power.
     pub fn power_scale(&self) -> PowerScale {
-        self.power_scale
+        self.params.power_scale
     }
 
     /// Get a mutable reference to the underlying [StateTree].
@@ -200,6 +224,23 @@ where
         }
 
         Ok(emitters)
+    }
+
+    /// Update the circulating supply, effective from the next block.
+    pub fn update_circ_supply<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut TokenAmount),
+    {
+        self.update_params(|p| f(&mut p.circ_supply))
+    }
+
+    /// Update the parameters and mark them as dirty.
+    fn update_params<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut FvmUpdatableParams),
+    {
+        f(&mut self.params);
+        self.params_dirty = true;
     }
 }
 

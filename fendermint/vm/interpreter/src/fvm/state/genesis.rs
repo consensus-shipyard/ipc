@@ -151,7 +151,10 @@ where
     pub fn commit(self) -> anyhow::Result<Cid> {
         match self.stage {
             Stage::Tree(mut state_tree) => Ok(state_tree.flush()?),
-            Stage::Exec(exec_state) => exec_state.commit(),
+            Stage::Exec(exec_state) => match exec_state.commit()? {
+                (_, _, true) => bail!("FVM parameters are not expected to be updated in genesis"),
+                (cid, _, _) => Ok(cid),
+            },
         }
     }
 
