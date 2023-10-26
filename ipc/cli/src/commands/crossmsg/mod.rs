@@ -3,6 +3,9 @@
 use crate::commands::crossmsg::fund::Fund;
 use crate::commands::crossmsg::propagate::Propagate;
 use crate::commands::crossmsg::release::Release;
+use crate::commands::crossmsg::topdown_cross::{
+    ListTopdownCrossMessages, ListTopdownCrossMessagesArgs,
+};
 use crate::{CommandLineHandler, GlobalArguments};
 use fund::FundArgs;
 use propagate::PropagateArgs;
@@ -13,6 +16,7 @@ use clap::{Args, Subcommand};
 pub mod fund;
 pub mod propagate;
 pub mod release;
+mod topdown_cross;
 
 #[derive(Debug, Args)]
 #[command(name = "crossmsg", about = "cross network messages related commands")]
@@ -28,6 +32,9 @@ impl CrossMsgsCommandsArgs {
             Commands::Fund(args) => Fund::handle(global, args).await,
             Commands::Release(args) => Release::handle(global, args).await,
             Commands::Propagate(args) => Propagate::handle(global, args).await,
+            Commands::ListTopdownCrossMsgs(args) => {
+                ListTopdownCrossMessages::handle(global, args).await
+            }
         }
     }
 }
@@ -37,4 +44,5 @@ pub(crate) enum Commands {
     Fund(FundArgs),
     Release(ReleaseArgs),
     Propagate(PropagateArgs),
+    ListTopdownCrossMsgs(ListTopdownCrossMessagesArgs),
 }
