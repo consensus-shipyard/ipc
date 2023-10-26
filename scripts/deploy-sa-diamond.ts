@@ -49,6 +49,22 @@ async function deploySubnetActorDiamond (gatewayDiamondAddress: string, libs: { 
 
     // ----
 
+    let diamondCutFacet = await deployContractWithDeployer(
+        deployer,
+        "DiamondCutFacet",
+        {}, txArgs
+    );
+    await diamondCutFacet.deployed();
+
+    facetCuts.push({
+        facetAddress: diamondCutFacet.address,
+        action: FacetCutAction.Add,
+        functionSelectors: getSelectors(diamondCutFacet)
+    })
+
+
+    // ----
+
     const managerFacetLibs: Libraries = {
         "CrossMsgHelper": libs["CrossMsgHelper"],
         "SubnetIDHelper": libs["SubnetIDHelper"],

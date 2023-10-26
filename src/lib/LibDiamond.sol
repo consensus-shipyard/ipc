@@ -14,6 +14,15 @@ library LibDiamond {
     error CannotAddFunctionToDiamondThatAlreadyExists(bytes4 _selector);
     error CannotAddSelectorsToZeroAddress(bytes4[] _selectors);
     error InitializationFunctionReverted(address _initializationContractAddress, bytes _calldata);
+    error NoSelectorsGivenToAdd();
+    error NotContractOwner(address _user, address _contractOwner);
+    error CannotReplaceFunctionsFromFacetWithZeroAddress(bytes4[] _selectors);
+    error CannotReplaceImmutableFunction(bytes4 _selector);
+    error CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(bytes4 _selector);
+    error CannotReplaceFunctionThatDoesNotExists(bytes4 _selector);
+    error RemoveFacetAddressMustBeZeroAddress(address _facetAddress);
+    error CannotRemoveFunctionThatDoesNotExist(bytes4 _selector);
+    error CannotRemoveImmutableFunction(bytes4 _selector);
 
     event DiamondCut(IDiamondCut.FacetCut[] _diamondCut, address _init, bytes _calldata);
 
@@ -54,6 +63,12 @@ library LibDiamond {
         _;
     }
 
+    function enforceIsContractOwner() internal view {
+        if (msg.sender != diamondStorage().contractOwner) {
+            revert NotOwner();
+        }
+    }
+
     function diamondCut(IDiamond.FacetCut[] memory _diamondCut, address _init, bytes memory _calldata) internal {
         uint256 length = _diamondCut.length;
         for (uint256 facetIndex = 0; facetIndex < length; ) {
@@ -65,6 +80,10 @@ library LibDiamond {
             IDiamondCut.FacetCutAction action = _diamondCut[facetIndex].action;
             if (action == IDiamond.FacetCutAction.Add) {
                 addFunctions(facetAddress, functionSelectors);
+            } else if (action == IDiamond.FacetCutAction.Replace) {
+                replaceFunctions(facetAddress, functionSelectors);
+            } else if (action == IDiamond.FacetCutAction.Remove) {
+                removeFunctions(facetAddress, functionSelectors);
             } else {
                 revert IncorrectFacetCutAction(action);
             }
@@ -99,6 +118,62 @@ library LibDiamond {
             unchecked {
                 ++selectorIndex;
             }
+        }
+    }
+
+    function replaceFunctions(address _facetAddress, bytes4[] memory _functionSelectors) internal {
+        DiamondStorage storage ds = diamondStorage();
+        if (_facetAddress == address(0)) {
+            revert CannotReplaceFunctionsFromFacetWithZeroAddress(_functionSelectors);
+        }
+        enforceHasContractCode(_facetAddress, "LibDiamondCut: Replace facet has no code");
+        for (uint256 selectorIndex; selectorIndex < _functionSelectors.length; selectorIndex++) {
+            bytes4 selector = _functionSelectors[selectorIndex];
+            address oldFacetAddress = ds.facetAddressAndSelectorPosition[selector].facetAddress;
+            // can't replace immutable functions -- functions defined directly in the diamond in this case
+            if (oldFacetAddress == address(this)) {
+                revert CannotReplaceImmutableFunction(selector);
+            }
+            if (oldFacetAddress == _facetAddress) {
+                revert CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(selector);
+            }
+            if (oldFacetAddress == address(0)) {
+                revert CannotReplaceFunctionThatDoesNotExists(selector);
+            }
+            // replace old facet address
+            ds.facetAddressAndSelectorPosition[selector].facetAddress = _facetAddress;
+        }
+    }
+
+    function removeFunctions(address _facetAddress, bytes4[] memory _functionSelectors) internal {
+        DiamondStorage storage ds = diamondStorage();
+        uint256 selectorCount = ds.selectors.length;
+        if (_facetAddress != address(0)) {
+            revert RemoveFacetAddressMustBeZeroAddress(_facetAddress);
+        }
+        for (uint256 selectorIndex; selectorIndex < _functionSelectors.length; selectorIndex++) {
+            bytes4 selector = _functionSelectors[selectorIndex];
+            FacetAddressAndSelectorPosition memory oldFacetAddressAndSelectorPosition = ds
+                .facetAddressAndSelectorPosition[selector];
+            if (oldFacetAddressAndSelectorPosition.facetAddress == address(0)) {
+                revert CannotRemoveFunctionThatDoesNotExist(selector);
+            }
+
+            // can't remove immutable functions -- functions defined directly in the diamond
+            if (oldFacetAddressAndSelectorPosition.facetAddress == address(this)) {
+                revert CannotRemoveImmutableFunction(selector);
+            }
+            // replace selector with last selector
+            selectorCount--;
+            if (oldFacetAddressAndSelectorPosition.selectorPosition != selectorCount) {
+                bytes4 lastSelector = ds.selectors[selectorCount];
+                ds.selectors[oldFacetAddressAndSelectorPosition.selectorPosition] = lastSelector;
+                ds.facetAddressAndSelectorPosition[lastSelector].selectorPosition = oldFacetAddressAndSelectorPosition
+                    .selectorPosition;
+            }
+            // delete last selector
+            ds.selectors.pop();
+            delete ds.facetAddressAndSelectorPosition[selector];
         }
     }
 

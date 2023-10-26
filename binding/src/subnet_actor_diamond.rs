@@ -101,6 +101,100 @@ pub mod subnet_actor_diamond {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("CannotRemoveFunctionThatDoesNotExist"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "CannotRemoveFunctionThatDoesNotExist",
+                        ),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selector"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4"),
+                            ),
+                        },],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("CannotRemoveImmutableFunction"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("CannotRemoveImmutableFunction",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selector"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4"),
+                            ),
+                        },],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("CannotReplaceFunctionThatDoesNotExists"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "CannotReplaceFunctionThatDoesNotExists",
+                        ),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selector"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4"),
+                            ),
+                        },],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned(
+                        "CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet",
+                    ),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet",
+                        ),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selector"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4"),
+                            ),
+                        },],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned(
+                        "CannotReplaceFunctionsFromFacetWithZeroAddress",
+                    ),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "CannotReplaceFunctionsFromFacetWithZeroAddress",
+                        ),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selectors"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                ::std::boxed::Box::new(
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
+                                ),
+                            ),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4[]"),
+                            ),
+                        },],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("CannotReplaceImmutableFunction"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("CannotReplaceImmutableFunction",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_selector"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("bytes4"),
+                            ),
+                        },],
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("FunctionNotFound"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("FunctionNotFound"),
@@ -227,6 +321,21 @@ pub mod subnet_actor_diamond {
                         inputs: ::std::vec![],
                     },],
                 ),
+                (
+                    ::std::borrow::ToOwned::to_owned("RemoveFacetAddressMustBeZeroAddress"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned(
+                            "RemoveFacetAddressMustBeZeroAddress",
+                        ),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("_facetAddress"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                    },],
+                ),
             ]),
             receive: true,
             fallback: true,
@@ -236,7 +345,7 @@ pub mod subnet_actor_diamond {
     pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
         ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x91W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`oWP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[=\x90\xFD[c\n\x82\xDDs`\xE3\x1B`\x80R`\x01`\x01`\xE0\x1B\x03\x19\x16`\x84R`\x7F\x19`\xA4\x01`\x80\xFD[`\x06T`\x01`\x01`\xA0\x1B\x03\x163\x03`\xA4W\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\x80R`\x04`\x80\xFD\xFE\xA2dipfsX\"\x12 \xBA\xB0*4\xDBU\xC3\x89t\xE4\"\xC7>\xD3\r\xE0\x9C\xCC\x9A\xA8|}-\\\nt\xEA\x0BZKr>dsolcC\0\x08\x13\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x91W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`oWP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[=\x90\xFD[c\n\x82\xDDs`\xE3\x1B`\x80R`\x01`\x01`\xE0\x1B\x03\x19\x16`\x84R`\x7F\x19`\xA4\x01`\x80\xFD[`\x06T`\x01`\x01`\xA0\x1B\x03\x163\x03`\xA4W\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\x80R`\x04`\x80\xFD\xFE\xA2dipfsX\"\x12 \xE1Z:\xBA\xA74\xA6;\"\xFC\xA9 \xEEn\x89\xED\xE0@\xFB\x82\xE2l\xDD\xA0\x90\x7F8\x84\x069?\x16dsolcC\0\x08\x13\x003";
     /// The deployed bytecode of the contract.
     pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
@@ -320,6 +429,114 @@ pub mod subnet_actor_diamond {
     )]
     pub struct CannotAddSelectorsToZeroAddress {
         pub selectors: ::std::vec::Vec<[u8; 4]>,
+    }
+    ///Custom Error type `CannotRemoveFunctionThatDoesNotExist` with signature `CannotRemoveFunctionThatDoesNotExist(bytes4)` and selector `0x7a08a22d`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "CannotRemoveFunctionThatDoesNotExist",
+        abi = "CannotRemoveFunctionThatDoesNotExist(bytes4)"
+    )]
+    pub struct CannotRemoveFunctionThatDoesNotExist {
+        pub selector: [u8; 4],
+    }
+    ///Custom Error type `CannotRemoveImmutableFunction` with signature `CannotRemoveImmutableFunction(bytes4)` and selector `0x6fafeb08`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "CannotRemoveImmutableFunction",
+        abi = "CannotRemoveImmutableFunction(bytes4)"
+    )]
+    pub struct CannotRemoveImmutableFunction {
+        pub selector: [u8; 4],
+    }
+    ///Custom Error type `CannotReplaceFunctionThatDoesNotExists` with signature `CannotReplaceFunctionThatDoesNotExists(bytes4)` and selector `0x7479f939`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "CannotReplaceFunctionThatDoesNotExists",
+        abi = "CannotReplaceFunctionThatDoesNotExists(bytes4)"
+    )]
+    pub struct CannotReplaceFunctionThatDoesNotExists {
+        pub selector: [u8; 4],
+    }
+    ///Custom Error type `CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet` with signature `CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(bytes4)` and selector `0x358d9d1a`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet",
+        abi = "CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(bytes4)"
+    )]
+    pub struct CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet {
+        pub selector: [u8; 4],
+    }
+    ///Custom Error type `CannotReplaceFunctionsFromFacetWithZeroAddress` with signature `CannotReplaceFunctionsFromFacetWithZeroAddress(bytes4[])` and selector `0xcd98a96f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "CannotReplaceFunctionsFromFacetWithZeroAddress",
+        abi = "CannotReplaceFunctionsFromFacetWithZeroAddress(bytes4[])"
+    )]
+    pub struct CannotReplaceFunctionsFromFacetWithZeroAddress {
+        pub selectors: ::std::vec::Vec<[u8; 4]>,
+    }
+    ///Custom Error type `CannotReplaceImmutableFunction` with signature `CannotReplaceImmutableFunction(bytes4)` and selector `0x520300da`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "CannotReplaceImmutableFunction",
+        abi = "CannotReplaceImmutableFunction(bytes4)"
+    )]
+    pub struct CannotReplaceImmutableFunction {
+        pub selector: [u8; 4],
     }
     ///Custom Error type `FunctionNotFound` with signature `FunctionNotFound(bytes4)` and selector `0x5416eb98`
     #[derive(
@@ -491,11 +708,39 @@ pub mod subnet_actor_diamond {
     )]
     #[etherror(name = "NotGateway", abi = "NotGateway()")]
     pub struct NotGateway;
+    ///Custom Error type `RemoveFacetAddressMustBeZeroAddress` with signature `RemoveFacetAddressMustBeZeroAddress(address)` and selector `0xd091bc81`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "RemoveFacetAddressMustBeZeroAddress",
+        abi = "RemoveFacetAddressMustBeZeroAddress(address)"
+    )]
+    pub struct RemoveFacetAddressMustBeZeroAddress {
+        pub facet_address: ::ethers::core::types::Address,
+    }
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorDiamondErrors {
         CannotAddFunctionToDiamondThatAlreadyExists(CannotAddFunctionToDiamondThatAlreadyExists),
         CannotAddSelectorsToZeroAddress(CannotAddSelectorsToZeroAddress),
+        CannotRemoveFunctionThatDoesNotExist(CannotRemoveFunctionThatDoesNotExist),
+        CannotRemoveImmutableFunction(CannotRemoveImmutableFunction),
+        CannotReplaceFunctionThatDoesNotExists(CannotReplaceFunctionThatDoesNotExists),
+        CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(
+            CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet,
+        ),
+        CannotReplaceFunctionsFromFacetWithZeroAddress(
+            CannotReplaceFunctionsFromFacetWithZeroAddress,
+        ),
+        CannotReplaceImmutableFunction(CannotReplaceImmutableFunction),
         FunctionNotFound(FunctionNotFound),
         GatewayCannotBeZero(GatewayCannotBeZero),
         IncorrectFacetCutAction(IncorrectFacetCutAction),
@@ -507,6 +752,7 @@ pub mod subnet_actor_diamond {
         NoBytecodeAtAddress(NoBytecodeAtAddress),
         NoSelectorsProvidedForFacetForCut(NoSelectorsProvidedForFacetForCut),
         NotGateway(NotGateway),
+        RemoveFacetAddressMustBeZeroAddress(RemoveFacetAddressMustBeZeroAddress),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
         RevertString(::std::string::String),
@@ -530,6 +776,44 @@ pub mod subnet_actor_diamond {
                 <CannotAddSelectorsToZeroAddress as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::CannotAddSelectorsToZeroAddress(decoded));
+            }
+            if let Ok(decoded) =
+                <CannotRemoveFunctionThatDoesNotExist as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
+                return Ok(Self::CannotRemoveFunctionThatDoesNotExist(decoded));
+            }
+            if let Ok(decoded) =
+                <CannotRemoveImmutableFunction as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::CannotRemoveImmutableFunction(decoded));
+            }
+            if let Ok(decoded) =
+                <CannotReplaceFunctionThatDoesNotExists as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
+                return Ok(Self::CannotReplaceFunctionThatDoesNotExists(decoded));
+            }
+            if let Ok(decoded) = <CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(
+                    Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(
+                        decoded,
+                    ),
+                );
+            }
+            if let Ok(decoded) = <CannotReplaceFunctionsFromFacetWithZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::CannotReplaceFunctionsFromFacetWithZeroAddress(decoded));
+            }
+            if let Ok(decoded) =
+                <CannotReplaceImmutableFunction as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::CannotReplaceImmutableFunction(decoded));
             }
             if let Ok(decoded) = <FunctionNotFound as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -581,6 +865,13 @@ pub mod subnet_actor_diamond {
             if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotGateway(decoded));
             }
+            if let Ok(decoded) =
+                <RemoveFacetAddressMustBeZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                )
+            {
+                return Ok(Self::RemoveFacetAddressMustBeZeroAddress(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -591,6 +882,24 @@ pub mod subnet_actor_diamond {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::CannotAddSelectorsToZeroAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CannotRemoveFunctionThatDoesNotExist(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CannotRemoveImmutableFunction(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CannotReplaceFunctionThatDoesNotExists(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CannotReplaceFunctionsFromFacetWithZeroAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CannotReplaceImmutableFunction(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::FunctionNotFound(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -618,6 +927,9 @@ pub mod subnet_actor_diamond {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotGateway(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RemoveFacetAddressMustBeZeroAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -632,6 +944,30 @@ pub mod subnet_actor_diamond {
                 }
                 _ if selector
                     == <CannotAddSelectorsToZeroAddress as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotRemoveFunctionThatDoesNotExist as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotRemoveImmutableFunction as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotReplaceFunctionThatDoesNotExists as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotReplaceFunctionsFromFacetWithZeroAddress as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotReplaceImmutableFunction as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -676,6 +1012,10 @@ pub mod subnet_actor_diamond {
                 }
                 _ if selector
                     == <NotGateway as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <RemoveFacetAddressMustBeZeroAddress as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ => false,
             }
         }
@@ -687,6 +1027,24 @@ pub mod subnet_actor_diamond {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::CannotAddSelectorsToZeroAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CannotRemoveFunctionThatDoesNotExist(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CannotRemoveImmutableFunction(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CannotReplaceFunctionThatDoesNotExists(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CannotReplaceFunctionsFromFacetWithZeroAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CannotReplaceImmutableFunction(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::FunctionNotFound(element) => ::core::fmt::Display::fmt(element, f),
@@ -704,6 +1062,9 @@ pub mod subnet_actor_diamond {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NotGateway(element) => ::core::fmt::Display::fmt(element, f),
+                Self::RemoveFacetAddressMustBeZeroAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -723,6 +1084,40 @@ pub mod subnet_actor_diamond {
     impl ::core::convert::From<CannotAddSelectorsToZeroAddress> for SubnetActorDiamondErrors {
         fn from(value: CannotAddSelectorsToZeroAddress) -> Self {
             Self::CannotAddSelectorsToZeroAddress(value)
+        }
+    }
+    impl ::core::convert::From<CannotRemoveFunctionThatDoesNotExist> for SubnetActorDiamondErrors {
+        fn from(value: CannotRemoveFunctionThatDoesNotExist) -> Self {
+            Self::CannotRemoveFunctionThatDoesNotExist(value)
+        }
+    }
+    impl ::core::convert::From<CannotRemoveImmutableFunction> for SubnetActorDiamondErrors {
+        fn from(value: CannotRemoveImmutableFunction) -> Self {
+            Self::CannotRemoveImmutableFunction(value)
+        }
+    }
+    impl ::core::convert::From<CannotReplaceFunctionThatDoesNotExists> for SubnetActorDiamondErrors {
+        fn from(value: CannotReplaceFunctionThatDoesNotExists) -> Self {
+            Self::CannotReplaceFunctionThatDoesNotExists(value)
+        }
+    }
+    impl ::core::convert::From<CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet>
+        for SubnetActorDiamondErrors
+    {
+        fn from(value: CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet) -> Self {
+            Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(value)
+        }
+    }
+    impl ::core::convert::From<CannotReplaceFunctionsFromFacetWithZeroAddress>
+        for SubnetActorDiamondErrors
+    {
+        fn from(value: CannotReplaceFunctionsFromFacetWithZeroAddress) -> Self {
+            Self::CannotReplaceFunctionsFromFacetWithZeroAddress(value)
+        }
+    }
+    impl ::core::convert::From<CannotReplaceImmutableFunction> for SubnetActorDiamondErrors {
+        fn from(value: CannotReplaceImmutableFunction) -> Self {
+            Self::CannotReplaceImmutableFunction(value)
         }
     }
     impl ::core::convert::From<FunctionNotFound> for SubnetActorDiamondErrors {
@@ -778,6 +1173,11 @@ pub mod subnet_actor_diamond {
     impl ::core::convert::From<NotGateway> for SubnetActorDiamondErrors {
         fn from(value: NotGateway) -> Self {
             Self::NotGateway(value)
+        }
+    }
+    impl ::core::convert::From<RemoveFacetAddressMustBeZeroAddress> for SubnetActorDiamondErrors {
+        fn from(value: RemoveFacetAddressMustBeZeroAddress) -> Self {
+            Self::RemoveFacetAddressMustBeZeroAddress(value)
         }
     }
 }

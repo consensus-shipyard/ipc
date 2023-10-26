@@ -6,6 +6,7 @@ import {TestUtils} from "./TestUtils.sol";
 import {console} from "forge-std/console.sol";
 import "../src/errors/IPCErrors.sol";
 import {TestUtils} from "./TestUtils.sol";
+import {NumberContractFacetSeven, NumberContractFacetEight} from "./NumberContract.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {Status} from "../src/enums/Status.sol";
@@ -20,9 +21,11 @@ import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CheckpointHelper} from "../src/lib/CheckpointHelper.sol";
 import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
-import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
+import {SubnetActorDiamond, FunctionNotFound} from "../src/SubnetActorDiamond.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
+import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
+import {LibDiamond} from "../src/lib/LibDiamond.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {LibStaking} from "../src/lib/LibStaking.sol";
 
@@ -50,14 +53,18 @@ contract SubnetActorDiamondTest is Test {
 
     bytes4[] private saGetterSelectors;
     bytes4[] private saManagerSelectors;
+    bytes4[] dcFacetSelectors;
+    bytes4[] ncGetterSelectors;
 
     SubnetActorDiamond private saDiamond;
     SubnetManagerTestUtil private saManager;
     SubnetActorGetterFacet private saGetter;
+    DiamondCutFacet dcFacet;
 
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
         saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetManagerTestUtil");
+        dcFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
     }
 
     function createSubnetActorDiamondWithFaucets(
@@ -65,7 +72,7 @@ contract SubnetActorDiamondTest is Test {
         address getterFaucet,
         address managerFaucet
     ) public returns (SubnetActorDiamond) {
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](3);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -80,6 +87,13 @@ contract SubnetActorDiamondTest is Test {
                 facetAddress: managerFaucet,
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: saManagerSelectors
+            })
+        );
+        diamondCut[2] = (
+            IDiamond.FacetCut({
+                facetAddress: address(dcFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: dcFacetSelectors
             })
         );
 
@@ -660,6 +674,75 @@ contract SubnetActorDiamondTest is Test {
         require(b2 - b1 == validator1Reward, "reward received");
     }
 
+    function testSubnetActorDiamond_DiamondCut() public {
+        // add method getNum to subnet actor diamond and assert it can be correctly called
+        // replace method getNum and assert it was correctly updated
+        // delete method getNum and assert it no longer is callable
+        // assert that diamondCut cannot be called by non-owner
+
+        NumberContractFacetSeven ncFacetA = new NumberContractFacetSeven();
+        NumberContractFacetEight ncFacetB = new NumberContractFacetEight();
+
+        DiamondCutFacet saDiamondCutter = DiamondCutFacet(address(saDiamond));
+        IDiamond.FacetCut[] memory saDiamondCut = new IDiamond.FacetCut[](1);
+        ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetSeven");
+
+        saDiamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ncFacetA),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: ncGetterSelectors
+            })
+        );
+        //test that other user cannot call diamondcut to add function
+        vm.prank(0x1234567890123456789012345678901234567890);
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
+
+        saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
+
+        NumberContractFacetSeven saNumberContract = NumberContractFacetSeven(address(saDiamond));
+        assert(saNumberContract.getNum() == 7);
+
+        ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetEight");
+        saDiamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ncFacetB),
+                action: IDiamond.FacetCutAction.Replace,
+                functionSelectors: ncGetterSelectors
+            })
+        );
+
+        //test that other user cannot call diamondcut to replace function
+        vm.prank(0x1234567890123456789012345678901234567890);
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
+
+        saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
+
+        assert(saNumberContract.getNum() == 8);
+
+        //remove facet for getNum
+        saDiamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: 0x0000000000000000000000000000000000000000,
+                action: IDiamond.FacetCutAction.Remove,
+                functionSelectors: ncGetterSelectors
+            })
+        );
+
+        //test that other user cannot call diamondcut to remove function
+        vm.prank(0x1234567890123456789012345678901234567890);
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
+
+        saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
+
+        //assert that calling getNum fails
+        vm.expectRevert(abi.encodePacked(FunctionNotFound.selector, ncGetterSelectors));
+        saNumberContract.getNum();
+    }
+
     function testSubnetActorDiamond_Unstake() public {
         (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
@@ -1039,8 +1122,9 @@ contract SubnetActorDiamondTest is Test {
 
         saManager = new SubnetManagerTestUtil();
         saGetter = new SubnetActorGetterFacet();
+        dcFacet = new DiamondCutFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](3);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -1055,6 +1139,13 @@ contract SubnetActorDiamondTest is Test {
                 facetAddress: address(saGetter),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: saGetterSelectors
+            })
+        );
+        diamondCut[2] = (
+            IDiamond.FacetCut({
+                facetAddress: address(dcFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: dcFacetSelectors
             })
         );
 

@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
 import "../src/errors/IPCErrors.sol";
 import {TestUtils} from "./TestUtils.sol";
+import {NumberContractFacetSeven, NumberContractFacetEight} from "./NumberContract.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {Status} from "../src/enums/Status.sol";
@@ -23,7 +24,7 @@ import {CheckpointHelper} from "../src/lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
 import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {GatewayDiamond} from "../src/GatewayDiamond.sol";
+import {GatewayDiamond, FunctionNotFound} from "../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
@@ -32,6 +33,9 @@ import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
+import {LibDiamond} from "../src/lib/LibDiamond.sol";
+
 import {MerkleTreeHelper} from "./MerkleTreeHelper.sol";
 
 import {SubnetManagerTestUtil} from "./subnetActorMock/SubnetManagerTestUtil.sol";
@@ -62,12 +66,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
     bytes4[] gwMessengerSelectors;
+    bytes4[] dcFacetSelectors;
 
     GatewayDiamond gatewayDiamond;
     GatewayManagerFacet gwManager;
     GatewayGetterFacet gwGetter;
     GatewayRouterFacet gwRouter;
     GatewayMessengerFacet gwMessenger;
+    DiamondCutFacet dcFacet;
 
     GatewayDiamond gatewayDiamond2;
     GatewayManagerFacet gwManager2;
@@ -84,6 +90,8 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     bytes4[] louperSelectors;
     DiamondLoupeFacet louper;
 
+    bytes4[] ncGetterSelectors;
+
     uint64 private constant ROOTNET_CHAINID = 123;
     address public constant ROOTNET_ADDRESS = address(1);
 
@@ -97,6 +105,7 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
         gwManagerSelectors = TestUtils.generateSelectors(vm, "GatewayManagerFacet");
         gwMessengerSelectors = TestUtils.generateSelectors(vm, "GatewayMessengerFacet");
+        dcFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
 
         louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
     }
@@ -106,8 +115,9 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwManager = new GatewayManagerFacet();
         gwGetter = new GatewayGetterFacet();
         gwMessenger = new GatewayMessengerFacet();
+        dcFacet = new DiamondCutFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](5);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -141,6 +151,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
             })
         );
 
+        diamondCut[4] = (
+            IDiamond.FacetCut({
+                facetAddress: address(dcFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: dcFacetSelectors
+            })
+        );
+
         gatewayDiamond = new GatewayDiamond(diamondCut, params);
 
         return gatewayDiamond;
@@ -171,8 +189,9 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
         gwGetter = new GatewayGetterFacet();
         gwMessenger = new GatewayMessengerFacet();
         louper = new DiamondLoupeFacet();
+        dcFacet = new DiamondCutFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](5);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](6);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -211,6 +230,14 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
                 facetAddress: address(louper),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: louperSelectors
+            })
+        );
+
+        gwDiamondCut[5] = (
+            IDiamond.FacetCut({
+                facetAddress: address(dcFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: dcFacetSelectors
             })
         );
 
@@ -296,7 +323,76 @@ contract GatewayDiamondDeploymentTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(louper.facets().length == 5);
+        require(louper.facets().length == 6);
+    }
+
+    function testGatewayDiamond_DiamondCut() public {
+        // add method getNum to gateway diamond and assert it can be correctly called
+        // replace method getNum and assert it was correctly updated
+        // delete method getNum and assert it no longer is callable
+        // assert that diamondCut cannot be called by non-owner
+
+        NumberContractFacetSeven ncFacetA = new NumberContractFacetSeven();
+        NumberContractFacetEight ncFacetB = new NumberContractFacetEight();
+
+        DiamondCutFacet gwDiamondCutter = DiamondCutFacet(address(gatewayDiamond));
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](1);
+        ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetSeven");
+
+        gwDiamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ncFacetA),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: ncGetterSelectors
+            })
+        );
+        //test that other user cannot call diamondcut to add function
+        vm.prank(0x1234567890123456789012345678901234567890);
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
+
+        gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
+
+        NumberContractFacetSeven gwNumberContract = NumberContractFacetSeven(address(gatewayDiamond));
+        assert(gwNumberContract.getNum() == 7);
+
+        ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetEight");
+        gwDiamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ncFacetB),
+                action: IDiamond.FacetCutAction.Replace,
+                functionSelectors: ncGetterSelectors
+            })
+        );
+
+        //test that other user cannot call diamondcut to replace function
+        vm.prank(0x1234567890123456789012345678901234567890);
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
+
+        gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
+
+        assert(gwNumberContract.getNum() == 8);
+
+        //remove facet for getNum
+        gwDiamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: 0x0000000000000000000000000000000000000000,
+                action: IDiamond.FacetCutAction.Remove,
+                functionSelectors: ncGetterSelectors
+            })
+        );
+
+        //test that other user cannot call diamondcut to remove function
+        vm.prank(0x1234567890123456789012345678901234567890);
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
+
+        gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
+
+        //assert that calling getNum fails
+        vm.expectRevert(abi.encodePacked(FunctionNotFound.selector, ncGetterSelectors));
+        gwNumberContract.getNum();
     }
 
     function testGatewayDiamond_Deployment_Works_Root(uint64 checkpointPeriod) public {
