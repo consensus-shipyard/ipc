@@ -394,6 +394,36 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getRelayerReward"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("getRelayerReward"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("relayer"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getValidator"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -814,6 +844,15 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([128, 247, 96, 33], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getRelayerReward` (0xb2bd295e) function
+        pub fn get_relayer_reward(
+            &self,
+            relayer: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([178, 189, 41, 94], relayer)
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getValidator` (0x1904bb2e) function
         pub fn get_validator(
             &self,
@@ -1072,6 +1111,21 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "getParent", abi = "getParent()")]
     pub struct GetParentCall;
+    ///Container type for all input parameters for the `getRelayerReward` function with signature `getRelayerReward(address)` and selector `0xb2bd295e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "getRelayerReward", abi = "getRelayerReward(address)")]
+    pub struct GetRelayerRewardCall {
+        pub relayer: ::ethers::core::types::Address,
+    }
     ///Container type for all input parameters for the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,
@@ -1256,6 +1310,7 @@ pub mod subnet_actor_getter_facet {
         GetBootstrapNodes(GetBootstrapNodesCall),
         GetConfigurationNumbers(GetConfigurationNumbersCall),
         GetParent(GetParentCall),
+        GetRelayerReward(GetRelayerRewardCall),
         GetValidator(GetValidatorCall),
         HasSubmittedInLastBottomUpCheckpointHeight(HasSubmittedInLastBottomUpCheckpointHeightCall),
         IpcGatewayAddr(IpcGatewayAddrCall),
@@ -1322,6 +1377,11 @@ pub mod subnet_actor_getter_facet {
             }
             if let Ok(decoded) = <GetParentCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetParent(decoded));
+            }
+            if let Ok(decoded) =
+                <GetRelayerRewardCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::GetRelayerReward(decoded));
             }
             if let Ok(decoded) = <GetValidatorCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -1404,6 +1464,7 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetParent(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRelayerReward(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GetValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::HasSubmittedInLastBottomUpCheckpointHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -1445,6 +1506,7 @@ pub mod subnet_actor_getter_facet {
                 Self::GetBootstrapNodes(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetConfigurationNumbers(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetParent(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetRelayerReward(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::HasSubmittedInLastBottomUpCheckpointHeight(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -1517,6 +1579,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<GetParentCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetParentCall) -> Self {
             Self::GetParent(value)
+        }
+    }
+    impl ::core::convert::From<GetRelayerRewardCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetRelayerRewardCall) -> Self {
+            Self::GetRelayerReward(value)
         }
     }
     impl ::core::convert::From<GetValidatorCall> for SubnetActorGetterFacetCalls {
@@ -1716,6 +1783,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct GetParentReturn(pub SubnetID);
+    ///Container type for all return fields from the `getRelayerReward` function with signature `getRelayerReward(address)` and selector `0xb2bd295e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GetRelayerRewardReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,

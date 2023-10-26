@@ -5,9 +5,13 @@ import {IGateway} from "../../src/interfaces/IGateway.sol";
 import {BottomUpCheckpoint, CrossMsg, ParentFinality} from "../../src/structs/Checkpoint.sol";
 import {SubnetID} from "../../src/structs/Subnet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
+import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 contract DefaultGatewayMock is IGateway {
+    using Address for address payable;
+
     uint8 private dummy;
+    address subnetActor;
 
     function register() external payable {
         // silent warning
@@ -15,6 +19,8 @@ contract DefaultGatewayMock is IGateway {
 
         // make method perform txn
         dummy = 1;
+
+        subnetActor = msg.sender;
     }
 
     function addStake() external payable {
@@ -29,6 +35,8 @@ contract DefaultGatewayMock is IGateway {
         amount;
         // make method perform txn
         dummy = 1;
+
+        payable(subnetActor).sendValue(amount);
     }
 
     function releaseRewardForRelayer(uint256 amount) external {

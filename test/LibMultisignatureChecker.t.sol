@@ -2,10 +2,30 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
+import {TestUtils} from "./TestUtils.sol";
 import {MultisignatureChecker} from "../src/lib/LibMultisignatureChecker.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 
 contract MultisignatureCheckerTest is StdInvariant, Test {
+    /// @dev `derivePubKey` is going to be used only in tests. This test is not complete, and covers only usage of
+    /// foundry tools.
+    function testPublicKeyDerivation(uint256 key) public pure {
+        vm.assume(key > 2);
+        vm.assume(key < 10000000000000000);
+
+        (uint256 pubKeyX, uint256 pubKeyY) = TestUtils.derivePubKey(key);
+        address signer = address(uint160(uint256(keccak256(abi.encode(pubKeyX, pubKeyY)))));
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, hash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        address s1 = ECDSA.recover(hash, signature);
+        require(s1 == signer, "s1 == signer");
+    }
+
     function testBasicSignerInterface() public pure {
         uint256 PRIVATE_KEY = 1000;
         address signer = vm.addr(PRIVATE_KEY);

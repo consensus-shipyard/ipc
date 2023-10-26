@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {Test} from "forge-std/Test.sol";
+import {TestUtils} from "./TestUtils.sol";
 import {console} from "forge-std/console.sol";
 import "../src/errors/IPCErrors.sol";
 import {TestUtils} from "./TestUtils.sol";
@@ -100,24 +101,6 @@ contract SubnetActorDiamondTest is Test {
         );
     }
 
-    function ensureBytesEqual(bytes memory _a, bytes memory _b) internal pure {
-        require(_a.length == _b.length, "bytes len not equal");
-        require(keccak256(_a) == keccak256(_b), "bytes not equal");
-    }
-
-    function deriveValidatorAddress(uint8 seq) internal pure returns (address addr, bytes memory data) {
-        data = new bytes(65);
-        data[1] = bytes1(seq);
-
-        // use data[1:] for the hash
-        bytes memory dataSubset = new bytes(data.length - 1);
-        for (uint i = 1; i < data.length; i++) {
-            dataSubset[i - 1] = data[i];
-        }
-
-        addr = address(uint160(uint256(keccak256(dataSubset))));
-    }
-
     function testSubnetActorDiamond_Deployment_Works(
         address _ipcGatewayAddr,
         uint256 _minActivationCollateral,
@@ -180,7 +163,7 @@ contract SubnetActorDiamondTest is Test {
     }
 
     function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {
-        (address validator, bytes memory publicKey) = deriveValidatorAddress(100);
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
         vm.deal(validator, 1 gwei);
         vm.prank(validator);
@@ -190,11 +173,11 @@ contract SubnetActorDiamondTest is Test {
     }
 
     function testSubnetActorDiamond_Bootstrap_Node() public {
-        (address validator, bytes memory publicKey) = deriveValidatorAddress(100);
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
-        vm.deal(validator, 10 gwei);
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.prank(validator);
-        saManager.join{value: 10}(publicKey);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
 
         // validator adds a node
         vm.prank(validator);
@@ -214,65 +197,136 @@ contract SubnetActorDiamondTest is Test {
 
         vm.prank(validator);
         saManager.leave();
+        saManager.confirmChange(1);
 
         nodes = saGetter.getBootstrapNodes();
         require(nodes.length == 0, "no nodes");
     }
 
+    function testSubnetActorDiamond_Kill() public {
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        vm.prank(validator);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+
+        // non-empty subnet can't be killed
+        vm.expectRevert(NotAllValidatorsHaveLeft.selector);
+        saManager.kill();
+
+        // leave the subnet and kill it
+        vm.startPrank(validator);
+        saManager.leave();
+        saManager.confirmChange(1);
+
+        // anyone can kill a subnet
+        vm.startPrank(vm.addr(101));
+        saManager.kill();
+    }
+
+    function testSubnetActorDiamond_Stake() public {
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator, 10 gwei);
+
+        vm.prank(validator);
+        vm.expectRevert(CollateralIsZero.selector);
+        saManager.stake();
+
+        vm.prank(validator);
+        vm.expectRevert(NotStakedBefore.selector);
+        saManager.stake{value: 10}();
+
+        vm.prank(validator);
+        saManager.join{value: 3}(publicKey);
+
+        ValidatorInfo memory info = saGetter.getValidator(validator);
+        require(info.totalCollateral == 3);
+    }
+
     /// @notice Testing the basic join, stake, leave lifecycle of validators
     function testSubnetActorDiamond_BasicLifeCycle() public {
-        (address validator1, bytes memory publicKey1) = deriveValidatorAddress(100);
-        (address validator2, bytes memory publicKey2) = deriveValidatorAddress(101);
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
 
-        uint256 collateral = DEFAULT_MIN_VALIDATOR_STAKE;
+        // total collateral in the gateway
+        uint256 collateral = 0;
+        uint256 stake = 10;
+
+        require(!saGetter.isActiveValidator(validator1), "active validator1");
+        require(!saGetter.isWaitingValidator(validator1), "waiting validator1");
+
+        require(!saGetter.isActiveValidator(validator2), "active validator2");
+        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
 
         // ======== Step. Join ======
         // initial validator joins
-        vm.startPrank(validator1);
-        vm.deal(validator1, collateral);
+        vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
 
-        saManager.join{value: collateral}(publicKey1);
+        vm.startPrank(validator1);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        collateral = DEFAULT_MIN_VALIDATOR_STAKE;
+
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator1 joining");
 
         // collateral confirmed immediately and network boostrapped
         ValidatorInfo memory v = saGetter.getValidator(validator1);
-        require(v.totalCollateral == collateral, "total collateral not expected");
-        require(v.confirmedCollateral == collateral, "confirmed collateral not 0");
-        ensureBytesEqual(v.metadata, publicKey1);
+        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected");
+        require(v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "confirmed collateral not equal to collateral");
+        require(saGetter.isActiveValidator(validator1), "not active validator 1");
+        require(!saGetter.isWaitingValidator(validator1), "waiting validator 1");
+        require(!saGetter.isActiveValidator(validator2), "active validator2");
+        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
+        TestUtils.ensureBytesEqual(v.metadata, publicKey1);
         require(saGetter.bootstrapped(), "subnet not bootstrapped");
-        require(saGetter.genesisValidators().length == 1, "genesis validators not 1");
+        require(!saGetter.killed(), "subnet killed");
+        require(saGetter.genesisValidators().length == 1, "not one validator in genesis");
 
         (uint64 nextConfigNum, uint64 startConfigNum) = saGetter.getConfigurationNumbers();
         require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "next config num not 1");
         require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
 
-        // second validator joins
-        vm.startPrank(validator2);
-        vm.deal(validator2, collateral);
+        vm.stopPrank();
 
+        // second validator joins
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.startPrank(validator2);
         // subnet bootstrapped and should go through queue
-        saManager.join{value: collateral}(publicKey2);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2);
 
         // collateral not confirmed yet
         v = saGetter.getValidator(validator2);
-        require(v.totalCollateral == collateral, "total collateral not expected");
-        require(v.confirmedCollateral == 0, "confirmed collateral not 0");
-        ensureBytesEqual(v.metadata, new bytes(0));
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator2 joining");
+        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected");
+        require(v.confirmedCollateral == 0, "confirmed collateral not equal to collateral");
+        require(saGetter.isActiveValidator(validator1), "not active validator 1");
+        require(!saGetter.isWaitingValidator(validator1), "waiting validator 1");
+        require(!saGetter.isActiveValidator(validator2), "active validator2");
+        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
+        TestUtils.ensureBytesEqual(v.metadata, new bytes(0));
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
         // join will update the metadata, incr by 1
-        // join will call deposit, incre by 1
+        // join will call deposit, incr by 1
         require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2, "next config num not 3");
         require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
+        vm.stopPrank();
 
         // ======== Step. Confirm join operation ======
+        collateral += DEFAULT_MIN_VALIDATOR_STAKE;
         saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 1);
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator2 joining");
 
         v = saGetter.getValidator(validator2);
-        require(v.totalCollateral == collateral, "total collateral not expected after confirm join");
+        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected after confirm join");
         require(
             v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE,
-            "confirmed collateral not expected after confrim join"
+            "confirmed collateral not expected after confirm join"
         );
+        require(saGetter.isActiveValidator(validator1), "not active validator1");
+        require(!saGetter.isWaitingValidator(validator1), "waiting validator1");
+        require(saGetter.isActiveValidator(validator2), "not active validator2");
+        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
         require(
@@ -286,25 +340,42 @@ contract SubnetActorDiamondTest is Test {
 
         // ======== Step. Stake more ======
         vm.startPrank(validator1);
-        vm.deal(validator1, 10);
+        vm.deal(validator1, stake);
 
-        saManager.stake{value: 10}();
+        saManager.stake{value: stake}();
 
-        collateral += 10;
         v = saGetter.getValidator(validator1);
-        require(v.totalCollateral == collateral, "total collateral not expected after stake");
+        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake, "total collateral not expected after stake");
         require(v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "confirmed collateral not 0 after stake");
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator1 stakes more");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
         require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3, "next config num not 4 after stake");
         require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2, "start config num not 3 after stake");
 
+        vm.stopPrank();
+
         // ======== Step. Confirm stake operation ======
+        collateral += stake;
         saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 2);
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after confirm stake");
 
         v = saGetter.getValidator(validator1);
-        require(v.totalCollateral == collateral, "total collateral not expected after confirm stake");
-        require(v.confirmedCollateral == collateral, "confirmed collateral not expected after confrim stake");
+        require(
+            v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake,
+            "total collateral not expected after confirm stake"
+        );
+        require(
+            v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake,
+            "confirmed collateral not expected after confirm stake"
+        );
+
+        v = saGetter.getValidator(validator2);
+        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected after confirm stake");
+        require(
+            v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE,
+            "confirmed collateral not expected after confirm stake"
+        );
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
         require(
@@ -323,7 +394,11 @@ contract SubnetActorDiamondTest is Test {
 
         v = saGetter.getValidator(validator1);
         require(v.totalCollateral == 0, "total collateral not 0 after confirm leave");
-        require(v.confirmedCollateral == collateral, "confirmed collateral not 0 after confrim leave");
+        require(
+            v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake,
+            "confirmed collateral incorrect after confirm leave"
+        );
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator 1 leaving");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
         require(
@@ -334,13 +409,19 @@ contract SubnetActorDiamondTest is Test {
             startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3,
             "start config num not 4 after confirm leave"
         );
+        require(saGetter.isActiveValidator(validator1), "not active validator 1");
+        require(saGetter.isActiveValidator(validator2), "not active validator 2");
+
+        vm.stopPrank();
 
         // ======== Step. Confirm leave ======
         saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 3);
+        collateral -= (DEFAULT_MIN_VALIDATOR_STAKE + stake);
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after confirming validator 1 leaving");
 
         v = saGetter.getValidator(validator1);
         require(v.totalCollateral == 0, "total collateral not 0 after confirm leave");
-        require(v.confirmedCollateral == 0, "confirmed collateral not 0 after confrim leave");
+        require(v.confirmedCollateral == 0, "confirmed collateral not 0 after confirm leave");
 
         (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
         require(
@@ -351,31 +432,263 @@ contract SubnetActorDiamondTest is Test {
             startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
             "start config num not 5 after confirm leave"
         );
+        require(!saGetter.isActiveValidator(validator1), "active validator 1");
+        require(saGetter.isActiveValidator(validator2), "not active validator 2");
+
+        // ======== Step. Claim collateral ======
+        uint256 b1 = validator1.balance;
+        vm.startPrank(validator1);
+        saManager.claim();
+        uint256 b2 = validator1.balance;
+        require(b2 - b1 == DEFAULT_MIN_VALIDATOR_STAKE + stake, "collateral not received");
+    }
+
+    function testSubnetActorDiamond_validateActiveQuorumSignatures() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.deal(validators[i], 10 gwei);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        saManager.validateActiveQuorumSignatures(validators, hash, signatures);
+    }
+
+    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidSignature() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+        bytes32 hash0 = keccak256(abi.encodePacked("test1"));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.deal(validators[i], 10 gwei);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        vm.expectRevert();
+        saManager.validateActiveQuorumSignatures(validators, hash0, signatures);
+    }
+
+    function testSubnetActorDiamond_submitCheckpoint() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(validators[i], 10 gwei);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: new bytes(0),
+                fee: CROSS_MSG_FEE
+            }),
+            wrapped: false
+        });
+        CrossMsg[] memory msgs = new CrossMsg[](1);
+        msgs[0] = crossMsg;
+
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: saGetter.getParent(),
+            blockHeight: saGetter.bottomUpCheckPeriod(),
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            crossMessagesHash: keccak256(abi.encode(msgs))
+        });
+
+        BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
+            subnetID: saGetter.getParent(),
+            blockHeight: 1,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            crossMessagesHash: keccak256(abi.encode(msgs))
+        });
+
+        BottomUpCheckpoint memory checkpointWithIncorrectHash = BottomUpCheckpoint({
+            subnetID: saGetter.getParent(),
+            blockHeight: saGetter.bottomUpCheckPeriod(),
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            crossMessagesHash: keccak256(abi.encode("1"))
+        });
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        vm.expectRevert(InvalidCheckpointEpoch.selector);
+        vm.prank(validators[0]);
+        saManager.submitCheckpoint(checkpointWithIncorrectHeight, msgs, validators, signatures);
+
+        vm.expectRevert(InvalidCheckpointMessagesHash.selector);
+        vm.prank(validators[0]);
+        saManager.submitCheckpoint(checkpointWithIncorrectHash, msgs, validators, signatures);
+
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitBottomUpCheckpoint, (checkpoint, msgs)), 1);
+        vm.prank(validators[0]);
+        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
+        require(
+            saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
+            " checkpoint height correct"
+        );
+
+        vm.prank(validators[1]);
+        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[1]), "validator rewarded");
+        require(
+            saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
+            " checkpoint height correct"
+        );
+    }
+
+    function testSubnetActorDiamond_submitCheckpointWithReward() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(validators[i], 10 gwei);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        // send the first checkpoint
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: new bytes(0),
+                fee: CROSS_MSG_FEE
+            }),
+            wrapped: false
+        });
+        CrossMsg[] memory msgs = new CrossMsg[](1);
+        msgs[0] = crossMsg;
+
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: saGetter.getParent(),
+            blockHeight: saGetter.bottomUpCheckPeriod(),
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            crossMessagesHash: keccak256(abi.encode(msgs))
+        });
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitBottomUpCheckpoint, (checkpoint, msgs)), 1);
+        vm.prank(validators[0]);
+        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+
+        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
+        require(
+            saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
+            " checkpoint height correct"
+        );
+
+        require(saGetter.getRelayerReward(validators[0]) == 0, "there is a reward");
+        vm.startPrank(gatewayAddress);
+        saManager.distributeRewardToRelayers(saGetter.bottomUpCheckPeriod(), 10);
+        require(saGetter.getRelayerReward(validators[0]) == 0, "there is the reward for block 0");
+
+        // send the second checkpoint
+        checkpoint = BottomUpCheckpoint({
+            subnetID: saGetter.getParent(),
+            blockHeight: 2 * saGetter.bottomUpCheckPeriod(),
+            blockHash: keccak256("block2"),
+            nextConfigurationNumber: 0,
+            crossMessagesHash: keccak256(abi.encode(msgs))
+        });
+
+        hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        vm.startPrank(gatewayAddress);
+        saManager.distributeRewardToRelayers(2 * saGetter.bottomUpCheckPeriod(), 0);
+        require(saGetter.getRelayerReward(validators[0]) == 0, "reword more than 0");
+
+        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        vm.startPrank(gatewayAddress);
+        saManager.distributeRewardToRelayers(2 * saGetter.bottomUpCheckPeriod(), 10);
+        uint256 validator1Reward = saGetter.getRelayerReward(validators[0]);
+        require(validator1Reward == 10, "there is no reward for block 1");
+
+        uint256 b1 = validators[0].balance;
+        vm.startPrank(validators[0]);
+        saManager.claimRewardForRelayer();
+        uint256 b2 = validators[0].balance;
+        require(b2 - b1 == validator1Reward, "reward received");
     }
 
     function testSubnetActorDiamond_Unstake() public {
-        (address validator, bytes memory publicKey) = deriveValidatorAddress(100);
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
-        vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, validator));
+        vm.prank(validator);
         saManager.unstake(10);
 
-        vm.deal(validator, 10 gwei);
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.prank(validator);
-        saManager.join{value: 10}(publicKey);
-        require(saGetter.getValidator(validator).totalCollateral == 10, "initial collateral correct");
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+        require(
+            saGetter.getValidator(validator).totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE,
+            "initial collateral correct"
+        );
 
-        vm.prank(validator);
         vm.expectRevert(NotEnoughCollateral.selector);
-        saManager.unstake(100);
+        vm.prank(validator);
+        saManager.unstake(DEFAULT_MIN_VALIDATOR_STAKE + 100);
 
-        vm.prank(validator);
         vm.expectRevert(NotEnoughCollateral.selector);
-        saManager.unstake(10);
+        vm.prank(validator);
+        saManager.unstake(DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.prank(validator);
         saManager.unstake(5);
-        require(saGetter.getValidator(validator).totalCollateral == 5, "collateral correct after unstaking");
+        require(
+            saGetter.getValidator(validator).totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE - 5,
+            "collateral correct after unstaking"
+        );
     }
 
     // function testSubnetActorDiamond_MultipleJoins_Works_GetValidators() public {
@@ -770,7 +1083,13 @@ contract SubnetActorDiamondTest is Test {
             "saGetter.minActivationCollateral() == _minActivationCollateral"
         );
         require(saGetter.minValidators() == _minValidators, "saGetter.minValidators() == _minValidators");
-        require(saGetter.consensus() == _consensus);
+        require(saGetter.consensus() == _consensus, "consensus");
+        require(saGetter.getParent().equals(_parentId), "parent");
+        require(saGetter.activeValidatorsLimit() == 100, "activeValidatorsLimit");
+        require(saGetter.powerScale() == 12, "powerscale");
+        require(saGetter.minCrossMsgFee() == CROSS_MSG_FEE, "cross-msg fee");
+        require(saGetter.bottomUpCheckPeriod() == _checkPeriod, "bottom-up period");
+        require(saGetter.majorityPercentage() == _majorityPercentage, "majority percentage");
         require(
             saGetter.getParent().toHash() == _parentId.toHash(),
             "parent.toHash() == SubnetID({root: ROOTNET_CHAINID, route: path}).toHash()"
