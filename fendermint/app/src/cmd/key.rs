@@ -13,7 +13,8 @@ use super::{from_b64, to_b64};
 use crate::{
     cmd,
     options::key::{
-        AddPeer, KeyAddressArgs, KeyArgs, KeyCommands, KeyGenArgs, KeyIntoTendermintArgs,
+        AddPeer, EthToFendermintArgs, KeyAddressArgs, KeyArgs, KeyCommands, KeyGenArgs,
+        KeyIntoTendermintArgs,
     },
 };
 
@@ -24,7 +25,20 @@ cmd! {
             KeyCommands::IntoTendermint(args) => args.exec(()).await,
             KeyCommands::AddPeer(args) => args.exec(()).await,
             KeyCommands::Address(args) => args.exec(()).await,
+            KeyCommands::EthToFendermint(args) => args.exec(()).await,
         }
+    }
+}
+
+cmd! {
+    EthToFendermintArgs(self) {
+        let sk = read_secret_key_hex(&self.secret_key)?;
+        let pk = sk.public_key();
+
+        export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
+        export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
+
+        Ok(())
     }
 }
 
@@ -121,6 +135,17 @@ pub fn read_public_key(public_key: &PathBuf) -> anyhow::Result<PublicKey> {
     let b64 = std::fs::read_to_string(public_key).context("failed to read public key")?;
     let pk = b64_to_public(&b64).context("failed to parse public key")?;
     Ok(pk)
+}
+
+pub fn read_secret_key_hex(private_key: &PathBuf) -> anyhow::Result<SecretKey> {
+    let hex_str = std::fs::read_to_string(private_key).context("failed to read private key")?;
+    let mut hex_str = hex_str.trim();
+    if hex_str.starts_with("0x") {
+        hex_str = &hex_str[2..];
+    }
+    let raw_secret = hex::decode(hex_str).context("cannot decode hex private key")?;
+    let sk = SecretKey::try_from(raw_secret).context("failed to parse secret key")?;
+    Ok(sk)
 }
 
 pub fn read_secret_key(secret_key: &PathBuf) -> anyhow::Result<SecretKey> {
