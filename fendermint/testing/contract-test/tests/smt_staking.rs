@@ -16,7 +16,7 @@ use fendermint_testing::{arb::ArbTokenAmount, smt::StateMachine, state_machine_t
 
 mod staking;
 
-use fendermint_vm_interpreter::fvm::state::ipc::abi_hash;
+use fendermint_vm_actor_interface::ipc::{abi_hash, AbiHash};
 use fendermint_vm_message::conv::from_fvm;
 use ipc_actors_abis::subnet_actor_getter_facet;
 use staking::machine::StakingMachine;
@@ -82,6 +82,7 @@ fn prop_cross_msgs_hash() {
             fendermint_testing::smt::ensure_has_randomness(u)?;
 
             // It doesn't seem to actually matter whether we pass these as tuples or arrays.
+            let cross_msgs_hash = cross_msgs.clone().abi_hash();
             let cross_msgs_hash_0 = abi_hash(cross_msgs.clone());
             let cross_msgs_hash_1 = abi_hash((cross_msgs.clone(),));
             let cross_msgs_hash_2 = abi_hash(((cross_msgs.clone(),),));
@@ -91,6 +92,7 @@ fn prop_cross_msgs_hash() {
                 .cross_msgs_hash(&mut exec_state, cross_msgs)
                 .expect("failed to call cross_msgs_hash");
 
+            assert_eq!(cross_msgs_hash, hash, "impl OK");
             assert_eq!(cross_msgs_hash_0, hash, "array OK");
             assert_eq!(cross_msgs_hash_1, hash, "tuple of array OK");
             assert_ne!(cross_msgs_hash_2, hash, "tuple of tuple of array NOT OK");

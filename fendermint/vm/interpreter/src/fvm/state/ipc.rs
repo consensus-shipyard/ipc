@@ -3,22 +3,21 @@
 
 use anyhow::{anyhow, Context};
 use ethers::types as et;
-use ethers::{abi::Tokenize, utils::keccak256};
 
-use fendermint_vm_message::conv::from_fvm;
+use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::ActorID;
 
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
-    ipc::{ValidatorMerkleTree, GATEWAY_ACTOR_ID},
+    ipc::{AbiHash, ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
-use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
+use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
 use ipc_actors_abis::gateway_router_facet as router;
 use ipc_actors_abis::gateway_router_facet::GatewayRouterFacet;
 use ipc_sdk::cross::CrossMsg;
@@ -96,16 +95,6 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         self.getter.call(state, |c| c.bottom_up_messages(height))
     }
 
-    /// Fetch the bottom-up messages enqueued in a given checkpoint.
-    pub fn bottom_up_msgs_hash(
-        &self,
-        state: &mut FvmExecState<DB>,
-        height: u64,
-    ) -> anyhow::Result<[u8; 32]> {
-        let msgs = self.bottom_up_msgs(state, height)?;
-        Ok(abi_hash(msgs))
-    }
-
     /// Insert a new checkpoint at the period boundary.
     pub fn create_bottom_up_checkpoint(
         &self,
@@ -163,8 +152,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         let height = checkpoint.block_height;
         let weight = et::U256::from(validator.power.0);
 
-        // Checkpoint has to be hashed as a tuple.
-        let hash = abi_hash((checkpoint,));
+        let hash = checkpoint.abi_hash();
 
         let signature = sign_secp256k1(secret_key, &hash);
         let signature =
@@ -270,10 +258,27 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     }
 }
 
-/// Hash some value in the same way we'd hash it in Solidity.
-///
-/// Be careful that if we have to hash a single struct, Solidity's `abi.encode`
-/// function will treat it as a tuple.
-pub fn abi_hash<T: Tokenize>(value: T) -> [u8; 32] {
-    keccak256(ethers::abi::encode(&value.into_tokens()))
+/// Total amount of tokens to mint as a result of top-down messages arriving at the subnet.
+pub fn tokens_to_mint(msgs: &[ipc_sdk::cross::CrossMsg]) -> TokenAmount {
+    msgs.iter()
+        .fold(TokenAmount::from_atto(0), |mut total, msg| {
+            // Both fees and value are considered to enter the ciruculating supply of the subnet.
+            // Fees might be distributed among subnet validators.
+            total += &msg.msg.value;
+            total += &msg.msg.fee;
+            total
+        })
+}
+
+/// Total amount of tokens to burn as a result of bottom-up messages leaving the subnet.
+pub fn tokens_to_burn(msgs: &[gateway_getter_facet::CrossMsg]) -> TokenAmount {
+    msgs.iter()
+        .fold(TokenAmount::from_atto(0), |mut total, msg| {
+            // Both fees and value were taken from the sender, and both are going up to the parent subnet:
+            // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/e4ec0046e2e73e2f91d7ab8ae370af2c487ce526/src/gateway/GatewayManagerFacet.sol#L143-L150
+            // Fees might be distirbuted among relayers.
+            total += from_eth::to_fvm_tokens(&msg.message.value);
+            total += from_eth::to_fvm_tokens(&msg.message.fee);
+            total
+        })
 }

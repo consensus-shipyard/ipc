@@ -9,8 +9,9 @@ use crate::fvm::FvmApplyRet;
 use anyhow::Context;
 use fendermint_vm_topdown::{BlockHeight, IPCParentFinality, ParentViewProvider};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::econ::TokenAmount;
 use ipc_sdk::cross::CrossMsg;
+
+use super::state::ipc::tokens_to_mint;
 
 /// Commit the parent finality. Returns the height that the previous parent finality is committed and
 /// the committed finality itself. If there is no parent finality committed, genesis epoch is returned.
@@ -47,14 +48,14 @@ pub async fn execute_topdown_msgs<DB>(
 where
     DB: Blockstore + Sync + Send + 'static,
 {
-    let total_value: TokenAmount = messages.iter().map(|a| a.msg.value.clone()).sum();
+    let minted_tokens = tokens_to_mint(&messages);
 
     gateway_caller
-        .mint_to_gateway(state, total_value.clone())
+        .mint_to_gateway(state, minted_tokens.clone())
         .context("failed to mint to gateway")?;
 
     state.update_circ_supply(|circ_supply| {
-        *circ_supply += total_value;
+        *circ_supply += minted_tokens;
     });
 
     gateway_caller.apply_cross_messages(state, messages)

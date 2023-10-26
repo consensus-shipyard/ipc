@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Context};
 use fendermint_crypto::PublicKey;
+use fendermint_vm_actor_interface::ipc::AbiHash;
 use fendermint_vm_genesis::Collateral;
 use fendermint_vm_genesis::PowerScale;
 use fendermint_vm_message::conv::from_eth;
@@ -21,6 +22,7 @@ use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_actors_abis::gateway_router_facet as router;
 
+use super::state::ipc::tokens_to_burn;
 use super::{
     broadcast::Broadcaster,
     state::{ipc::GatewayCaller, FvmExecState},
@@ -74,9 +76,28 @@ where
                 .context("failed to apply validator changes")?;
 
             // Retrieve the bottom-up messages so we can put their hash into the checkpoint.
-            let cross_messages_hash = gateway
-                .bottom_up_msgs_hash(state, height.value())
-                .context("failed to retrieve bottom-up messages hash")?;
+            let cross_msgs = gateway
+                .bottom_up_msgs(state, height.value())
+                .context("failed to retrieve bottom-up messages")?;
+
+            // Sum up the value leaving the subnet as part of the bottom-up messages.
+            let burnt_tokens = tokens_to_burn(&cross_msgs);
+
+            // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
+            // we don't have to burn them here, because it's already being done in
+            // https://github.com/consensus-shipyard/ipc-solidity-actors/pull/263
+            // by sending the funds to the BURNTFUNDS_ACTOR.
+            // Ostensibly we could opt _not_ to decrease the circ supply here, but rather
+            // look up the burnt funds balance at the beginning of each block and subtract
+            // it from the monotonically increasing supply, in which case it could reflect
+            // a wider range of burning activity than just IPC.
+            // It might still be inconsistent if someone uses another address for burning tokens.
+            // By decreasing here, at least `circ_supply` is consistent with IPC.
+            state.update_circ_supply(|circ_supply| {
+                *circ_supply -= burnt_tokens;
+            });
+
+            let cross_messages_hash = cross_msgs.abi_hash();
 
             // Construct checkpoint.
             let checkpoint = BottomUpCheckpoint {

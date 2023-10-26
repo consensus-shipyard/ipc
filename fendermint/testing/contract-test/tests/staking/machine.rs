@@ -9,15 +9,11 @@ use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_testing::smt::StateMachine;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
-    ipc::{subnet::SubnetActorErrors, subnet_id_to_eth},
+    ipc::{subnet::SubnetActorErrors, subnet_id_to_eth, AbiHash},
 };
 use fendermint_vm_genesis::{Collateral, Validator, ValidatorKey};
 use fendermint_vm_interpreter::fvm::{
-    state::{
-        fevm::ContractResult,
-        ipc::{abi_hash, GatewayCaller},
-        FvmExecState,
-    },
+    state::{fevm::ContractResult, ipc::GatewayCaller, FvmExecState},
     store::memory::MemoryBlockstore,
 };
 use fendermint_vm_message::{conv::from_fvm, signed::sign_secp256k1};
@@ -282,7 +278,7 @@ impl StateMachine for StakingMachine {
                 // What I'm mainly interested in is whether the ABI hash is calculated correctly
                 // for a vector, which we can test by trying to pass the empty vector as a tuple.
                 let cross_messages = Vec::<subnet_manager::CrossMsg>::new();
-                let cross_messages_hash = abi_hash(cross_messages);
+                let cross_messages_hash = cross_messages.abi_hash();
 
                 let (root, route) = subnet_id_to_eth(&system.subnet_id).unwrap();
 
@@ -293,10 +289,7 @@ impl StateMachine for StakingMachine {
                     next_configuration_number: *next_configuration_number,
                     cross_messages_hash,
                 };
-
-                // Checkpoint has to be a tuple to match Solidity.
-                let checkpoint_tuple = (checkpoint.clone(),);
-                let checkpoint_hash = abi_hash(checkpoint_tuple);
+                let checkpoint_hash = checkpoint.clone().abi_hash();
 
                 let mut signatures = Vec::new();
 

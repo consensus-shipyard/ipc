@@ -6,7 +6,9 @@
 // Solidity contracts during genesis.
 
 use anyhow::Context;
+use ethers::core::abi::Tokenize;
 use ethers::core::types as et;
+use ethers::core::utils::keccak256;
 use fendermint_vm_genesis::{Power, Validator};
 use fvm_shared::address::Error as AddressError;
 use fvm_shared::address::Payload;
@@ -196,6 +198,47 @@ pub fn subnet_id_to_eth(subnet_id: &SubnetID) -> Result<(u64, Vec<et::Address>),
     }
     Ok((subnet_id.root_id(), route))
 }
+
+/// Hash some value in the same way we'd hash it in Solidity.
+///
+/// Be careful that if we have to hash a single struct,
+/// Solidity's `abi.encode` function will treat it as a tuple,
+/// so it has to be passed as a tuple in Rust. Vectors are fine.
+pub fn abi_hash<T: Tokenize>(value: T) -> [u8; 32] {
+    keccak256(ethers::abi::encode(&value.into_tokens()))
+}
+
+/// Types where we need to match the way we sign them in Solidity and Rust.
+pub trait AbiHash {
+    /// Hash the item the way we would in Solidity.
+    fn abi_hash(self) -> [u8; 32];
+}
+
+macro_rules! abi_hash {
+    (struct $name:ty) => {
+        // Structs have to be hashed as a tuple.
+        impl AbiHash for $name {
+            fn abi_hash(self) -> [u8; 32] {
+                abi_hash((self,))
+            }
+        }
+    };
+
+    (Vec < $name:ty >) => {
+        // Vectors can be hashed as-is
+        impl AbiHash for Vec<$name> {
+            fn abi_hash(self) -> [u8; 32] {
+                abi_hash(self)
+            }
+        }
+    };
+}
+
+abi_hash!(struct ipc_actors_abis::gateway_router_facet::BottomUpCheckpoint);
+abi_hash!(struct ipc_actors_abis::subnet_actor_manager_facet::BottomUpCheckpoint);
+abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::CrossMsg>);
+abi_hash!(Vec<ipc_actors_abis::subnet_actor_manager_facet::CrossMsg>);
+abi_hash!(Vec<ipc_actors_abis::subnet_actor_getter_facet::CrossMsg>);
 
 pub mod gateway {
     use super::subnet_id_to_eth;
