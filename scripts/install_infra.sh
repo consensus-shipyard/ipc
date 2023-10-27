@@ -24,6 +24,10 @@ build_infra() {
 
     echo "[*] Updating infra scripts..."
     cp -r $infra_path/fendermint/infra/* $infra_path
+    # TODO: This will no longer be necessary once https://github.com/consensus-shipyard/fendermint/pull/329
+    # is merged
+    mkdir -p ./target/release
+    mv $infra_path/fendermint/target/release/fendermint $PWD/target/release
 }
 
 # Function to display help message
@@ -81,7 +85,8 @@ fi
 git_output=$(git pull)
 
 # Check if there are changes
-if [[ "$git_output" == *"Already up to date."* ]]; then
+git fetch
+if [[ "$(git rev-list HEAD...origin/master --count)" -gt 0  ]]; then
     echo "[*] No changes in the repository."
 else
     build_infra

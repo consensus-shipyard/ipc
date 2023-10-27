@@ -47,13 +47,11 @@ impl CommandLineHandler for WalletBalances {
                     })
                     .collect::<Vec<_>>();
 
-                let r = join_all(r)
-                    .await
-                    .into_iter()
-                    .collect::<anyhow::Result<Vec<(TokenAmount, &EthKeyAddress)>>>()?;
+                let v: Vec<anyhow::Result<(TokenAmount, &EthKeyAddress)>> = join_all(r).await;
 
-                for (balance, addr) in r {
-                    if addr.to_string() != *"default-key".to_string() {
+                for r in v.into_iter().filter_map(|r| r.ok()) {
+                    let (balance, addr) = r;
+                    if addr.to_string() != "default-key" {
                         println!("{:?} - Balance: {}", addr.to_string(), balance);
                     }
                 }

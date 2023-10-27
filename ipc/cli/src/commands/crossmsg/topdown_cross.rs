@@ -41,7 +41,14 @@ impl CommandLineHandler for ListTopdownMsgs {
             .get_top_down_msgs(&subnet, arguments.epoch, &hash)
             .await?;
         for msg in msgs {
-            println!("{msg:?}");
+            println!(
+                "from: {}, to: {}, value: {}, nonce: {}, fee: {} ",
+                msg.msg.from.to_string()?,
+                msg.msg.to.to_string()?,
+                msg.msg.value,
+                msg.msg.nonce,
+                msg.msg.fee
+            );
         }
 
         Ok(())
