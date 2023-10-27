@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::subnet_id::SubnetID;
 use fvm_shared::address::{Address, Protocol};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 const IPC_SEPARATOR_ADDR: &str = ":";
 
@@ -75,6 +75,13 @@ impl IPCAddress {
     }
 }
 
+impl fmt::Display for IPCAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", self.subnet_id, IPC_SEPARATOR_ADDR)?;
+        write!(f, "{}", self.raw_address)
+    }
+}
+
 impl FromStr for IPCAddress {
     type Err = Error;
 
@@ -120,6 +127,8 @@ mod tests {
         let addr = IPCAddress::new(&sub_id, &Address::new_id(101)).unwrap();
         let st = addr.to_string().unwrap();
         let addr_out = IPCAddress::from_str(&st).unwrap();
+        assert_eq!(addr, addr_out);
+        let addr_out = IPCAddress::from_str(&format!("{}", addr)).unwrap();
         assert_eq!(addr, addr_out);
     }
 

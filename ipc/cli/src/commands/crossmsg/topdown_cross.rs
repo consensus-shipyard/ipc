@@ -15,11 +15,11 @@ use crate::commands::get_ipc_provider;
 use crate::{CommandLineHandler, GlobalArguments};
 
 /// The command to list top down cross messages in a subnet
-pub(crate) struct ListTopdownCrossMessages;
+pub(crate) struct ListTopdownMsgs;
 
 #[async_trait]
-impl CommandLineHandler for ListTopdownCrossMessages {
-    type Arguments = ListTopdownCrossMessagesArgs;
+impl CommandLineHandler for ListTopdownMsgs {
+    type Arguments = ListTopdownMsgsArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("list topdown messages with args: {:?}", arguments);
@@ -41,7 +41,14 @@ impl CommandLineHandler for ListTopdownCrossMessages {
             .get_top_down_msgs(&subnet, arguments.epoch, &hash)
             .await?;
         for msg in msgs {
-            println!("{msg:?}");
+            println!(
+                "from: {}, to: {}, value: {}, nonce: {}, fee: {} ",
+                msg.msg.from.to_string()?,
+                msg.msg.to.to_string()?,
+                msg.msg.value,
+                msg.msg.nonce,
+                msg.msg.fee
+            );
         }
 
         Ok(())
@@ -50,7 +57,7 @@ impl CommandLineHandler for ListTopdownCrossMessages {
 
 #[derive(Debug, Args)]
 #[command(about = "List topdown cross messages for a specific epoch")]
-pub(crate) struct ListTopdownCrossMessagesArgs {
+pub(crate) struct ListTopdownMsgsArgs {
     #[arg(long, short, help = "The subnet id of the topdown subnet")]
     pub subnet: String,
     #[arg(long, short, help = "Include topdown messages of this epoch")]

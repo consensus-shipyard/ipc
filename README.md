@@ -13,9 +13,9 @@ This repo is your entrypoint to the world of IPC. In this repo you will find:
 See:
 - [docs/contracts.md](docs/contracts.md) for instructions on how to deploy FEVM actors on subnets
 - __NEEDS UPDATE/REMOVE:__ [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture)
-- __NEEDS UPDATE/REMOVE:__ [docs/usage.md](docs/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets
-- __NEEDS UPDATE/REMOVE:__ [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own IPC root contract and hierarchy
-- __NEEDS UPDATE/REMOVE:__ [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions
+- [docs/usage.md](docs/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
+<!-- - __NEEDS UPDATE/REMOVE:__ [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own IPC root contract and hierarchy -->
+<!-- - __NEEDS UPDATE/REMOVE:__ [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions -->
 
 ## Branching Strategy
 
@@ -88,24 +88,6 @@ registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
 ```
 
 To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the `ipc-cli` to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).
-
-<!-- ### Option 2: Local deployment -->
-<!-- To deploy a Example rootnet locally for testing you can use the IPC scripts installed in `./bin/ipc-infra` by running: -->
-<!-- ```bash -->
-<!-- ./bin/ipc-infra/run-root-docker-1val.sh <lotus-api-port> <validator-libp2p-port> -->
-<!-- ``` -->
-
-<!-- For instance, running `./bin/ipc-infra/run-root-docker-1val.sh 1234 1235` will run a rootnet daemon listening at `localhost:1234`, and a single validator mining in the rootnet listening through its libp2p host in `localhost:1235`. -->
-
-<!-- *Example*: -->
-<!-- ```console -->
-<!-- $ ./bin/ipc-infra/run-root-docker-1val.sh 1234 1235 -->
-<!-- (...) -->
-<!-- >>> Root daemon running in container: 84711d67cf162e30747c4525d69728c4dea8c6b4b35cd89f6d0947fee14bf908 -->
-<!-- >>> Token to /r31415926 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.j94YYOr8_AWhGGHQd0q8JuQVuNhJA017SK9EUkqDOO0 -->
-<!-- >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq -->
-<!-- ``` -->
-<!-- This information will be relevant to configure our agent to connect to this rootnet node. -->
 
 ## Help
 

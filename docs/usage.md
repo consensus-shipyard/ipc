@@ -1,37 +1,40 @@
-# Using the IPC Agent
+# Using the IPC CLI
 
 >💡 For background and setup information, make sure to start with the [README](/README.md).
 
 ## Key management
-The IPC agent has internally an EVM wallet that it uses to sign transactions and interact with IPC on behalf of specific addresses. Some of the features available for EVM addresses through the EVM are: 
+The `ipc-cli` has internally an EVM wallet that it uses to sign transactions and interact with IPC on behalf of specific addresses. Some of the features available for EVM addresses through the EVM are:
 * Creating new Ethereum addresses
 ```bash
-./bin/ipc-agent wallet new -w evm
+./bin/ipc-cli wallet new -w evm
 ```
 ```console
 # Sample execution
-./bin/ipc-agent wallet new -w evm
-[2023-07-12T10:58:37Z INFO  ipc_agent::cli::commands::wallet::new] created new wallet with address WalletNewResponse { address: "0x6972968294f71daba16939f77dfd738525796a63" }
+./bin/ipc-cli wallet new -w evm
+"0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
-* Exporting a key stored in the IPC agent. 
+* Exporting a key stored in the IPC cli keystore.
 ```bash
-./bin/ipc-agent wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE>
+./bin/ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE>
 ```
 ```console
 # Sample execution
-./bin/ipc-agent wallet export -w evm -a 0x92e2dd319dae2f5698ef5cbde610ad611983de0d -o ~/.ipc-agent/evm-wallet.key
-[2023-07-12T11:00:01Z INFO  ipc_agent::cli::commands::wallet::export] exported new wallet with address "0x92e2dd319dae2f5698ef5cbde610ad611983de0d" in file "~/.ipc-agent/evm-wallet.key"
-```
+./bin/ipc-cli wallet export -w evm -a 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec -o /tmp/priv.key                                                                                     ✔  12:21:38 
+exported new wallet with address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec in file "/tmp/priv.key"```
+
+* You can also export your private key in a format that can be consumed by Fendermint by adding the `--fendermint` flag.
+```bash
+./bin/ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE> --fendermint
 
 * Importing a key from a file
 ```bash
-./bin/ipc-agent wallet import -w evm --path=<INPUT_FILE_WITH_KEY>
+./bin/ipc-cli wallet import -w evm --path=<INPUT_FILE_WITH_KEY>
 ```
 ```console
 # Sample execution
-./bin/ipc-agent wallet import -w evm --path=~/.ipc-agent/evm-wallet.key
-[2023-07-12T11:00:59Z INFO  ipc_agent::cli::commands::wallet::import] imported wallet with address "0x92e2…de0d"
+$ ./bin/ipc-cli wallet import -w evm --path=~/tmp/wallet.key
+imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
 > 💡 The format expected to import new EVM keys is the following:
@@ -42,146 +45,208 @@ The IPC agent has internally an EVM wallet that it uses to sign transactions and
 
 * Importing an identity directly from its private key
 ```bash
-./bin/ipc-agent wallet import -w evm --private-key <PRIVATE_KEY>
+./bin/ipc-cli wallet import -w evm --private-key <PRIVATE_KEY>
 ```
 ```console
 # Sample execution
-./bin/ipc-agent wallet import -w evm --private-key=0x405f50458008edd6e2eb2efc3bf34846db1d6689b89fe1a9f9ccfe7f6e301d8d
-[2023-07-12T11:00:59Z INFO  ipc_agent::cli::commands::wallet::import] imported wallet with address "0x92e2…de0d"
+$ ./bin/ipc-cli wallet import -w evm --private-key=0x405f50458008edd6e2eb2efc3bf34846db1d6689b89fe1a9f9ccfe7f6e301d8d
+imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
+```
+
+* You can set a default key for your wallet so it is always the one used when the `--from` flag is not explicitly set
+```bash
+./bin/ipc-cli wallet set-default --address <EVM-ADDRESS> -w evm
+```
+
+* And check what is your current default key:
+```bash
+./bin/ipc-cli wallet get-default -w evm
+```
+
+* Check the hex encoded public key of your address with:
+```bash
+./bin/ipc-cli wallet pub-key -w evm --address=<EVM-address>
 ```
 
 ## Listing active subnets
 
-As a sanity-check that we have joined the subnet successfully and that we provided enough collateral to register the subnet to IPC, we can list the child subnets of our parent with the following command:
+As a sanity-check that we have joined the subnet successfully and that the subnet has been registered in IPC successfully can be performed through:
 
 ```bash
-./bin/ipc-agent list-subnets --gateway-address <gateway-addr> --subnet <parent-subnet-id>
+./bin/ipc-cli subnet list --subnet=<PARENT_SUBBNET_ID>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent list-subnets --gateway-address=f064 --subnet=/r31415926
-[2023-03-30T17:00:25Z INFO  ipc_agent::cli::commands::manager::list_subnets] /r31415926/t01003 - status: 0, collateral: 2 FIL, circ.supply: 0.0 FIL
+$ ./bin/ipc-cli subnet list --subnet=/r31415926
+/r31415926/t01003 - status: 0, collateral: 2 FIL, circ.supply: 0.0 FIL
 ```
 
 This command only shows subnets that have been registered to the gateway, i.e. that have provided enough collateral to participate in the IPC protocol and haven't been killed. It is not an exhaustive list of all of the subnet actors deployed over the network.
 
-## Joining a subnet
+## Joining a subnet and adding collateral
 
-With the daemon for a subnet deployed (see [instructions](/docs/subnet.md)), one can join the subnet:
+* To join a subnet with the `ipc-cli`
 ```bash
-./bin/ipc-agent subnet join --subnet <subnet-id> --collateral <collateral_amount> --validator-net-addr <libp2p-add-validator>
+./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount> --public-key <public_key_validator_addr>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent subnet join --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --collateral 2 --validator-net-addr /dns/host.docker.internal/tcp/1349/p2p/12D3KooWN5hbWkCxwvrX9xYxMwFbWm2Jpa1o4qhwifmSw3Fb
+$ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1 \
+    --public-key=043385c3b9ab8a697cd7bec6ca623cbdd0fea1293e8b464df825b104eb58a44cc8efacc6a3482b866b85ecdf734b5d4ef5495737deb348625ce6a35536142d2955
 ```
-This command specifies the subnet to join, the amount of collateral to provide and the validator net address used by other validators to dial them.
+This command specifies the subnet to join, the amount of collateral to provide and the public key of the `--from` address that is joining as a validator.
+
+* And to stake more collateral as a validator:
+
+```bash
+./bin/ipc-cli subnet stake --subnet <subnet-id> --collateral <collateral_amount>
+```
+```console
+# Example execution
+$ ./bin/ipc-cli subnet stake --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1
+```
+
+> 💡 Note that changes in collateral and the power table are not reflected immediately in the parent. They need to be confirmed in the execution of the next bottom-up checkpoint, so until this happen, even if there has been a change in collateral, you may not be the change immediately when running `ipc-cli subnet list`. This impacts any change to the collateral of validators, i.e. `stake`, `unstake` and `leave` commands. In order to inspect the changes to the power table that have been performed between two epochs you can use the following command:
+> ```bash
+> ./bin/ipc-cli checkpoint list-validator-changes --from-epoch=<START_EPOCH> --to-epoch=<END_EPOCH>
+> ```
 
 ## Listing your balance in a subnet
 In order to send messages in a subnet, you'll need to have funds in your subnt account. You can use the following command to list the balance of your wallets in a subnet:
 ```bash
-./bin/ipc-agent wallet balances --subnet <subnet-id>
+./bin/ipc-cli wallet balances -w evm --subnet <subnet-id>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent wallet balances --subnet=/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
-[2023-06-07T09:36:53Z INFO  ipc_agent::cli::commands::wallet::balances] wallets in subnet --subnet=/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq are {"t1ycyy4ruvhyoskdhihetbmohyjaruz6nrxoorjfa": "1.978777008362780242", "t1zsfereuvaiszd54vtgyf3p47urg7fdi72yeq43y": "9.999993934693663367", "t13ehykbvdpdhdhg46vixbkxzrp23ve7uvcvoipti": "0.820843443226907064", "t1yvgsyu4ar2ogags5gizoao2fpz3lanqayjdqhzq": "0.98232851709680446"}
+$ ./bin/ipc-cli wallet balances --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
 ```
 
 ## Sending funds in a subnet
 
 The agent provides a command to conveniently exchange funds between addresses of the same subnet. This can be achieved through the following command:
 ```bash
-./bin/ipc-agent subnet send-value --subnet <subnet-id> [--from <from-addr>] --to <to-addr> <value>
+./bin/ipc-cli subnet send-value --subnet <subnet-id> [--from <from-addr>] --to <to-addr> <value>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent subnet send-value --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to t1xbevqterae2tanmh2kaqksnoacflrv6w2dflq4i 10
+$ ./bin/ipc-cli subnet send-value --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to t1xbevqterae2tanmh2kaqksnoacflrv6w2dflq4i 10
 ```
 
 ## Sending funds between subnets
 
 At the moment, the IPC agent only expose commands to perform the basic IPC interoperability primitives for cross-net communication, which is the exchange of FIL (the native token for IPC) between the same address of a subnet. Mainly:
-- `fund`, which sends FIL from one public key address, to the same public key address in the child.
-- `release` that moves FIL from one account in a child subnet to its counter-part in the parent.
+- `fund`, which sends native token from one public key address, to the same public key address in the child.
+- `release` that movesnative token from one account in a child subnet to its counter-part in the parent.
 
-Complex behavior can be implemented using these primitives: sending value to a user in another subnet can be implemented a set of `release/fund` and `sendValue` operations. Calling  smart contract from one subnet to another works by providing funds to one account in the destination subnet, and then calling the contract. The agent doesn't currently include abstractions for this complex operations, but it will in the future. That being said, users can still leverage the agent's API to easily compose the basic primitives into complex functionality.
+Complex behavior can be implemented using these primitives: sending value to a user in another subnet can be implemented a set of `release/fund` and `sendValue` operations. Calling  smart contract from one subnet to another works by providing funds to one account in the destination subnet, and then calling the contract. The `ipc-cli` doesn't currently include abstractions for this complex operations, but it will in the future. That being said, users can still leverage the `ipc-cli` or even the `IpcProvider` library to easily compose the basic primitives into complex functionality (in case you want to hack something cool and contribute to the project :) ).
 
 >💡 All cross-net operations need to pay an additional cross-msg fee (apart from the gas cost of the message). This is reason why even if you sent `X FIL` you may see `X - fee FIL` arriving to you account at destination. This fee is used to reward subnet validators for their work committing the checkpoint that carries the message.
 
 ### Fund
 Funding a subnet can be performed by using the following command:
 ```bash
-./bin/ipc-agent cross-msg fund --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
+./bin/ipc-cli cross-msg fund --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent cross-msg fund --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 100
+$ ./bin/ipc-cli cross-msg fund --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 100
 ```
-This command includes the cross-net message into the next top-down checkpoint after the current epoch. Once the top-down checkpoint is committed, you should see the funds in your account of the child subnet.
+This command includes the cross-net message into the next top-down proof-of-finality. Once the top-down finality is committed in the child, the message will be executed and you should see the funds in your account of the child subnet. If the `--to` is not set explicitly, the funds are send to the address of the `--from` in the subnet.
 
 Alternatively, we can pass an additional parameter to send the funds to a specific address in the child subnet
 
 ```console
 # Example execution
-$ ./bin/ipc-agent cross-msg fund --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to=t17o2heqfzxfvtlopxilwoofte3akece2tgps7uny 100
+$ ./bin/ipc-cli cross-msg fund --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to=0x406a7a1d002b71ece175cc7e067620ae5b58e9ec 100
+fund performed in epoch 1030279
 ```
->💡 Top-down checkpoints are not used to anchor the security of the parent into the child (as is the case for bottom-up checkpoints). They just include information of the top-down messages that need to be executed in the child subnet, and are a way for validators in the subnet to reach consensus on the finality on their parent.
 
-### Release
-In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following comand:
+The epoch were the message is performed can give you a sense of the time the message will take to be propagated. You can check the current finality in a subnet and wait for the finality height that includes your message to be committed.
+
+> TODO: Add a cli command to check the finality committed in a child.
+
+>💡 Top-down proofs-of-finality is the underlying process used for IPC to propagate information from the parent to the child. Validators in the child subnet include information in every block in the child subnet about the height of the parent they agree to consider final. When this information is committed on-chain, changes into the validator set of the subnet, and the execution of top-down messages are correspondingly triggered.
+
+* In order to list the top-down messages sent for a subnet from a parent network for a specific epoch, run the following command: 
 ```bash
-./bin/ipc-agent cross-msg release --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
+./bin/ipc-cli cross-msg list-topdown-msgs --subnet=<SUBNET_ID> --epoch=<EPOCH>
+```
+### Release
+In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following commnd:
+```bash
+./bin/ipc-cli cross-msg release --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent cross-msg release --subnet=/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 100
+$ ./bin/ipc-cli cross-msg release --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 100
 ```
-This command includes the cross-net message into a bottom-up checkpoint after the current epoch. Once the bottom-up checkpoint is committed, you should see the funds in your account in the parent. 
+This command includes the cross-net message into a bottom-up checkpoint after the current epoch. Once the bottom-up checkpoint is committed in the parent, you should see the funds in your account in the parent. If the `--to` is not set explicitly, the funds are send to the address of the `--from` in the parent.
 
 Alternatively, we can pass an additional parameter to release the funds to a specific address in the parent subnet
 
 ```console
 # Example execution
-$ ./bin/ipc-agent cross-msg release --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to=t17o2heqfzxfvtlopxilwoofte3akece2tgps7uny 100
-
+$ ./bin/ipc-cli cross-msg release --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to=0x406a7a1d002b71ece175cc7e067620ae5b58e9ec 100
+release performed in epoch 1030
+```
+As with top-down messages, you can get a sense of the time that your message will take to get to the parent by looking at the epoch in which your bottom-up message was triggered (the output of the command), and listing the latest bottom-up checkpoints to see how far it is from being propagated.
 
 ## Listing checkpoints from a subnet
 
 Subnets are periodically committing checkpoints to their parent every `bottomup-check-period` (parameter defined when creating the subnet). If you want to inspect the information of a range of bottom-up checkpoints committed in the parent for a subnet, you can use the `checkpoint list-bottomup` command provided by the agent as follows: 
 ```bash
-./bin/ipc-agent checkpoint list-bottomup --from-epoch <range-start> --to-epoch <range-end> --subnet <subnet-id>
+./bin/ipc-cli checkpoint list-bottomup --from-epoch <range-start> --to-epoch <range-end> --subnet <subnet-id>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent checkpoint list-bottomup --from-epoch 0 --to-epoch 100 --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
-[2023-03-29T12:43:42Z INFO  ipc_agent::cli::commands::manager::list_checkpoints] epoch 0 - prev_check={"/":"bafy2bzacedkoa623kvi5gfis2yks7xxjl73vg7xwbojz4tpq63dd5jpfz757i"}, cross_msgs=null, child_checks=null
-[2023-03-29T12:43:42Z INFO  ipc_agent::cli::commands::manager::list_checkpoints] epoch 10 - prev_check={"/":"bafy2bzacecsatvda6lodrorh7y7foxjt3a2dexxx5jiyvtl7gimrrvywb7l5m"}, cross_msgs=null, child_checks=null
-[2023-03-29T12:43:42Z INFO  ipc_agent::cli::commands::manager::list_checkpoints] epoch 30 - prev_check={"/":"bafy2bzaceauzdx22hna4e4cqf55jqmd64a4fx72sxprzj72qhrwuxhdl7zexu"}, cross_msgs=null, child_checks=null
+$ ./bin/ipc-cli checkpoint list-bottomup --from-epoch 0 --to-epoch 100 --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
+epoch 0 - prev_check={"/":"bafy2bzacedkoa623kvi5gfis2yks7xxjl73vg7xwbojz4tpq63dd5jpfz757i"}, cross_msgs=null, child_checks=null
+epoch 10 - prev_check={"/":"bafy2bzacecsatvda6lodrorh7y7foxjt3a2dexxx5jiyvtl7gimrrvywb7l5m"}, cross_msgs=null, child_checks=null
+epoch 30 - prev_check={"/":"bafy2bzaceauzdx22hna4e4cqf55jqmd64a4fx72sxprzj72qhrwuxhdl7zexu"}, cross_msgs=null, child_checks=null
 ```
 You can find the checkpoint where your cross-message was included by listing the checkpoints around the epoch where your message was sent.
 
-## Checking the health of top-down checkpoints
-In order to check the health of top-down checkpointing in a subnet, the following command can be run:
+## Leaving a subnet and releasing collateral
+
+* To join a subnet with the `ipc-cli`
 ```bash
-./bin/ipc-agent checkpoint last-topdown --subnet <subnet-id>
+./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount> --public-key <public_key_validator_addr>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent checkpoint last-topdown --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
-[2023-04-18T17:11:34Z INFO  ipc_agent::cli::commands::checkpoint::topdown_executed] Last top-down checkpoint executed in epoch: 9866
+$ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1 \
+    --public-key=043385c3b9ab8a697cd7bec6ca623cbdd0fea1293e8b464df825b104eb58a44cc8efacc6a3482b866b85ecdf734b5d4ef5495737deb348625ce6a35536142d2955
 ```
+This command specifies the subnet to join, the amount of collateral to provide and the public key of the `--from` address that is joining as a validator.
 
-This command returns the epoch of the last top-down checkpoint executed in the child. If you see that this epoch is way below the current epoch of the parent subnet, then top-down checkpointing may be lagging, validators need to catch-up, and the forwarding of top-down messages (from parent to child) may take longer to be committed.
 
-## Leaving a subnet
-
-To leave a subnet, the following agent command can be used:
+* To leave a subnet, the following agent command can be used:
 ```bash
-./bin/ipc-agent subnet leave --subnet <subnet-id>
+./bin/ipc-cli subnet leave --subnet <subnet-id>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-agent subnet leave --subnet /r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
+$ ./bin/ipc-cli subnet leave --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
 ```
 Leaving a subnet will release the collateral for the validator and remove all the validation rights from its account. This means that if you have a validator running in that subnet, its validation process will immediately terminate.
+
+
+* Validators can also reduce their collateral in the subnet through `unstake`
+
+```bash
+./bin/ipc-cli subnet stake --subnet <subnet-id> --collateral <collateral_amount>
+```
+```console
+# Example execution
+$ ./bin/ipc-cli subnet stake --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1
+```
+
+> 💡 Remember, as described in the joining and leaving collateral section, that changes to the validator set and their collateral are not reflected immediately. Validator changes between two epochs can be inspected through: 
+> ```bash
+> ./bin/ipc-cli checkpoint list-validator-changes --from-epoch=<START_EPOCH> --to-epoch=<END_EPOCH>
+> ```
+
+* Once the reduction of collateral has been confirmed by the subnet, validators can claim their collateral back through:
+```bash
+./bin/ipc-cli subnet claim --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i
+```
