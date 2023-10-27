@@ -159,6 +159,7 @@ docker run \
   --volume ${TEST_SCRIPTS_DIR}:/scripts \
   --env FM_DATA_DIR=/data/fendermint/data \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=info \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \

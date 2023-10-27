@@ -64,9 +64,11 @@ cmd! {
 ///
 /// This method acts as our composition root.
 async fn run(settings: Settings) -> anyhow::Result<()> {
-    let client: tendermint_rpc::HttpClient =
-        tendermint_rpc::HttpClient::new(settings.tendermint_rpc_url()?)
-            .context("failed to create Tendermint client")?;
+    let tendermint_rpc_url = settings.tendermint_rpc_url()?;
+    tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
+
+    let client: tendermint_rpc::HttpClient = tendermint_rpc::HttpClient::new(tendermint_rpc_url)
+        .context("failed to create Tendermint client")?;
 
     let validator = match settings.validator_key {
         Some(ref key) => {

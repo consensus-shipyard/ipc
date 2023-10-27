@@ -13,6 +13,7 @@ docker run \
   --volume ${BASE_DIR}:/data \
   --env FM_DATA_DIR=/data/fendermint/data \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=info \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
@@ -21,7 +22,7 @@ docker run \
 dependencies = ["docker-network-create", "fendermint-deps"]
 
 [tasks.fendermint-start-ipc]
-extend = "fendermint-run"
+extend = "fendermint-run-ipc"
 env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-run-ipc]
@@ -40,9 +41,17 @@ docker run \
   --env FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT=${PARENT_ENDPOINT} \
   --env FM_IPC__TOPDOWN__PARENT_REGISTRY=${PARENT_REGISTRY} \
   --env FM_IPC__TOPDOWN__PARENT_GATEWAY=${PARENT_GATEWAY} \
+  --env FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF=5 \
+  --env FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT=5 \
+  --env FM_IPC__TOPDOWN__POLLING_INTERVAL=10 \
+  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
+  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
+  --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=info \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
+  --network=${NETWORK_TYPE} \
   ${CMD}
 """
 dependencies = ["docker-network-create", "fendermint-deps"]
