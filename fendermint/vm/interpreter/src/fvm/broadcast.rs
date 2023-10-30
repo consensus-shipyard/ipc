@@ -1,6 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::time::Duration;
+
 use anyhow::{anyhow, bail, Context};
 use ethers::types as et;
 use fvm_shared::error::ExitCode;
@@ -16,7 +18,7 @@ use fendermint_rpc::{client::FendermintClient, message::MessageFactory};
 use fendermint_vm_message::query::FvmQueryHeight;
 
 macro_rules! retry {
-    ($max_retries:expr, $block:expr) => {{
+    ($max_retries:expr, $retry_delay:expr, $block:expr) => {{
         let mut attempt = 0;
         let value = loop {
             match $block {
@@ -31,6 +33,7 @@ macro_rules! retry {
                     break value;
                 }
             }
+            tokio::time::sleep($retry_delay).await;
         };
         value
     }};
@@ -52,6 +55,7 @@ pub struct Broadcaster<C> {
     gas_fee_cap: TokenAmount,
     gas_premium: TokenAmount,
     max_retries: u8,
+    retry_delay: Duration,
 }
 
 impl<C> Broadcaster<C>
@@ -73,6 +77,8 @@ where
             gas_fee_cap,
             gas_premium,
             max_retries: 0,
+            // Set the retry delay to rougly the block creation time.
+            retry_delay: Duration::from_secs(1),
         }
     }
 
@@ -81,13 +87,22 @@ where
         self
     }
 
+    pub fn with_retry_delay(mut self, retry_delay: Duration) -> Self {
+        self.retry_delay = retry_delay;
+        self
+    }
+
+    pub fn retry_delay(&self) -> Duration {
+        self.retry_delay
+    }
+
     pub async fn fevm_invoke(
         &self,
         contract: Address,
         calldata: et::Bytes,
         chain_id: ChainID,
     ) -> anyhow::Result<()> {
-        let tx_hash = retry!(self.max_retries, {
+        let tx_hash = retry!(self.max_retries, self.retry_delay, {
             let sequence = self
                 .sequence()
                 .await

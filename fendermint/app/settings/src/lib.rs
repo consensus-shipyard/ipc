@@ -92,10 +92,14 @@ pub struct DbSettings {
 /// Settings affecting how we deal with failures in trying to send transactions to the local CometBFT node.
 /// It is not expected to be unavailable, however we might get into race conditions about the nonce which
 /// would need us to try creating a completely new transaction and try again.
+#[serde_as]
 #[derive(Debug, Deserialize, Clone)]
 pub struct BroadcastSettings {
     /// Number of times to retry broadcasting a transaction.
     pub max_retries: u8,
+    /// Time to wait between retries. This should roughly correspond to the block interval.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub retry_delay: Duration,
 }
 
 #[serde_as]

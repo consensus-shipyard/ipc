@@ -40,6 +40,8 @@ state_hist_size = 0
 [broadcast]
 # Maximum number of times to retry broadcasting a transaction after failure.
 max_retries = 5
+# Tome to wait between retries, in seconds. It should roughly correspond to the block interval.
+retry_delay = 2
 
 # FVM configuration
 [fvm]
