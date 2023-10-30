@@ -860,8 +860,14 @@ where
                         _ => continue,
                     };
 
+                    let emitters = from_tm::collect_emitters(&tx_result.events);
+
                     // Filter by address.
-                    if !addrs.is_empty() && !addrs.contains(&msg.message().from) {
+                    if !addrs.is_empty()
+                        && !addrs.contains(&msg.message().from)
+                        && !addrs.contains(&msg.message().to)
+                        && addrs.intersection(&emitters).next().is_none()
+                    {
                         continue;
                     }
 
