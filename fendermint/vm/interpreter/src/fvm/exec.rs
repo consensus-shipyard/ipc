@@ -143,10 +143,9 @@ where
                 // Do not resend past signatures.
                 if !self.syncing().await? {
                     // Fetch any incomplete checkpoints synchronously because the state can't be shared across threads.
-                    let incomplete_checkpoints = self
-                        .gateway
-                        .incomplete_checkpoints(&mut state)
-                        .context("failed to fetch incomplete checkpoints")?;
+                    let incomplete_checkpoints =
+                        checkpoint::unsigned_checkpoints(&self.gateway, &mut state, ctx.public_key)
+                            .context("failed to fetch incomplete checkpoints")?;
 
                     debug_assert!(
                         incomplete_checkpoints

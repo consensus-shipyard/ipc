@@ -4,6 +4,7 @@
 use std::fmt::{Debug, Display};
 
 use cid::multihash::MultihashDigest;
+use fendermint_crypto::PublicKey;
 use fvm_ipld_encoding::{
     strict_bytes,
     tuple::{Deserialize_tuple, Serialize_tuple},
@@ -105,6 +106,12 @@ impl From<ethers::types::Address> for EthAddress {
     }
 }
 
+impl From<PublicKey> for EthAddress {
+    fn from(value: PublicKey) -> Self {
+        Self::new_secp256k1(&value.serialize()).expect("length is 65")
+    }
+}
+
 impl AsRef<[u8]> for EthAddress {
     fn as_ref(&self) -> &[u8] {
         &self.0
@@ -140,12 +147,11 @@ mod tests {
     fn prop_new_secp256k1(seed: u64) -> bool {
         let mut rng = StdRng::seed_from_u64(seed);
         let sk = SecretKey::random(&mut rng);
-        let pk = sk.public_key();
 
         let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
         let address = ethers_core::utils::secret_key_to_address(&signing_key);
 
-        let eth_address = EthAddress::new_secp256k1(&pk.serialize()).unwrap();
+        let eth_address = EthAddress::from(sk.public_key());
 
         address.0 == eth_address.0
     }

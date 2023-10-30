@@ -133,7 +133,7 @@ impl StateMachine for StakingMachine {
 
         // Make all the validators join the subnet by putting down collateral according to their power.
         for v in state.child_genesis.validators.iter() {
-            let _addr = EthAddress::new_secp256k1(&v.public_key.0.serialize()).unwrap();
+            let _addr = EthAddress::from(v.public_key.0);
             eprintln!("\n> JOINING SUBNET: addr={_addr} deposit={}", v.power.0);
 
             subnet

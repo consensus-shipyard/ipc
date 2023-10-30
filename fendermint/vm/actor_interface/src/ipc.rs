@@ -170,7 +170,7 @@ impl ValidatorMerkleTree {
 
     /// Convert a validator to what we can pass to the tree.
     fn validator_to_vec(validator: &Validator<Power>) -> anyhow::Result<Vec<String>> {
-        let addr = EthAddress::new_secp256k1(&validator.public_key.0.serialize())?;
+        let addr = EthAddress::from(validator.public_key.0);
         let addr = et::Address::from_slice(&addr.0);
         let addr = format!("{addr:?}");
 

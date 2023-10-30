@@ -257,6 +257,21 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .call(state, |c| c.get_latest_parent_finality())?;
         Ok(IPCParentFinality::try_from(r)?)
     }
+
+    /// Get the Ethereum adresses of validators who signed a checkpoint.
+    pub fn checkpoint_signatories(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: u64,
+    ) -> anyhow::Result<Vec<EthAddress>> {
+        let (_, _, addrs, _) = self
+            .getter
+            .call(state, |c| c.get_signature_bundle(height))?;
+
+        let addrs = addrs.into_iter().map(|a| a.into()).collect();
+
+        Ok(addrs)
+    }
 }
 
 /// Total amount of tokens to mint as a result of top-down messages arriving at the subnet.

@@ -180,8 +180,7 @@ struct TestAccount {
 impl TestAccount {
     pub fn new(sk: &Path) -> anyhow::Result<Self> {
         let sk = MessageFactory::read_secret_key(sk)?;
-        let pk = sk.public_key();
-        let ea = EthAddress::new_secp256k1(&pk.serialize())?;
+        let ea = EthAddress::from(sk.public_key());
         let h = Address::from_slice(&ea.0);
 
         Ok(Self {

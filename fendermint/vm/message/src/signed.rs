@@ -340,7 +340,7 @@ mod tests {
         let KeyPair { sk, pk } = key;
 
         // Set the message to the address we are going to sign with.
-        let ea = EthAddress::new_secp256k1(&pk.serialize()).map_err(|e| e.to_string())?;
+        let ea = EthAddress::from(pk);
         let mut msg = msg.0;
         msg.from = Address::from(ea);
 
