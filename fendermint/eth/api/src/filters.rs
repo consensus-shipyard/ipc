@@ -15,6 +15,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_message::{chain::ChainMessage, query::FvmQueryHeight, signed::DomainHash};
 use futures::{Future, StreamExt};
 use fvm_shared::{address::Address, chainid::ChainID, error::ExitCode};
+use lru_time_cache::LruCache;
 use serde::Serialize;
 use tendermint_rpc::{
     event::{Event, EventData},
@@ -27,7 +28,7 @@ use tokio::sync::{
 };
 
 use crate::{
-    conv::from_tm::{self, find_hash_event, map_rpc_block_txs, msg_hash},
+    conv::from_tm::{self, find_hash_event, map_rpc_block_txs, msg_hash, tx_hash},
     error::JsonRpcError,
     handlers::ws::{MethodNotification, Notification},
     state::{enrich_block, WebSocketSender},
@@ -417,7 +418,24 @@ impl FilterDriver {
             .await
             .map(|state_params| ChainID::from(state_params.value.chain_id));
 
+        // Because there are multiple potentially overlapping subscriptions, we might see the same transaction twice,
+        // e.g. because we were interested in ones that emit events "A or B" we had to subscribe to "A" and also to "B",
+        // so if a transaction emits both "A" and "B" we'll get it twice. Most likely they will be at the same time,
+        // so a short time based cache should help get rid of the duplicates.
+        let mut tx_cache: LruCache<tendermint::Hash, bool> =
+            LruCache::with_expiry_duration(Duration::from_secs(60));
+
         while let Some(cmd) = self.rx.recv().await {
+            // Skip duplicate transactions. We won't see duplidate blocks because there is only 1 query for that.
+            if let FilterCommand::Update(ref event) = cmd {
+                if let EventData::Tx { ref tx_result } = event.data {
+                    let tx_hash = tx_hash(&tx_result.tx);
+                    if tx_cache.insert(tx_hash, true).is_some() {
+                        continue;
+                    }
+                }
+            }
+
             match self.state {
                 FilterState::Poll(ref mut state) => {
                     match cmd {

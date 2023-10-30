@@ -456,7 +456,7 @@ pub fn to_chain_message(tx: &[u8]) -> anyhow::Result<ChainMessage> {
 ///
 /// This is here for reference only and should not be returned to Ethereum tools which expect
 /// the hash to be based on RLP and Keccak256.
-fn message_hash(tx: &[u8]) -> tendermint::Hash {
+pub fn tx_hash(tx: &[u8]) -> tendermint::Hash {
     // based on how `tendermint::Header::hash` works.
     let hash = tendermint::crypto::default::Sha256::digest(tx);
     tendermint::Hash::Sha256(hash)
@@ -479,7 +479,7 @@ pub fn msg_hash(events: &[Event], tx: &[u8]) -> et::TxHash {
         h
     } else {
         // Return the default hash, at least there is something
-        et::TxHash::from_slice(message_hash(tx).as_bytes())
+        et::TxHash::from_slice(tx_hash(tx).as_bytes())
     }
 }
 
