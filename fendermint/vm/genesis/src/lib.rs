@@ -102,7 +102,10 @@ impl Collateral {
     pub fn into_power(self: Collateral, scale: PowerScale) -> Power {
         let atto_per_power = Self::atto_per_power(scale);
         let atto = self.0.atto();
-        let power = atto.div_floor(&atto_per_power);
+        // Rounding away from zero, so with little collateral (e.g. in testing)
+        // we don't end up with everyone having 0 power and then being unable
+        // to produce a checkpoint because the threshold is 0.
+        let power = atto.div_ceil(&atto_per_power);
         let power = power.min(BigInt::from(u64::MAX));
         Power(power.try_into().expect("clipped to u64::MAX"))
     }
@@ -253,14 +256,20 @@ mod tests {
     #[test]
     fn tokens_to_power() {
         // Collateral given in atto (18 digits after the decimal)
+        // Instead of truncating, the remainder is rounded up, to avoid giving 0 power.
         let examples: Vec<(&str, u64)> = vec![
-            ("0.000999999999999999", 0),
+            ("0.000000000000000000", 0),
+            ("0.000000000000000001", 1),
+            ("0.000999999999999999", 1),
             ("0.001000000000000000", 1),
-            ("0.001999999999999999", 1),
+            ("0.001999999999999999", 2),
             ("1.000000000000000000", 1000),
-            ("0.999999999999999999", 999),
-            ("1.999999999999999999", 1999),
-            ("2.999999999999999999", 2999),
+            ("0.999999999999999999", 1000),
+            ("1.998000000000000001", 1999),
+            ("1.999000000000000000", 1999),
+            ("1.999000000000000001", 2000),
+            ("1.999999999999999999", 2000),
+            ("2.999999999999999999", 3000),
         ];
 
         for (atto, expected) in examples {
