@@ -73,7 +73,11 @@ pub fn http_client(url: Url, proxy_url: Option<Url>) -> anyhow::Result<HttpClien
 pub async fn ws_client(url: Url) -> anyhow::Result<(WebSocketClient, WebSocketClientDriver)> {
     // TODO: Doesn't handle proxy.
     tracing::debug!("Using WS client to submit request to: {}", url);
-    let (client, driver) = WebSocketClient::new(url).await?;
+
+    let (client, driver) = WebSocketClient::new(url.clone())
+        .await
+        .with_context(|| format!("failed to create WS client to: {}", url))?;
+
     Ok((client, driver))
 }
 
