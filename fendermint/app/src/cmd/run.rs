@@ -7,7 +7,7 @@ use fendermint_app::{App, AppConfig, AppParentFinalityQuery, AppStore, BitswapBl
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
-use fendermint_vm_actor_interface::eam;
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
@@ -76,6 +76,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             if sk.exists() && sk.is_file() {
                 let sk = read_secret_key(&sk).context("failed to read validator key")?;
                 let addr = to_address(&sk, &key.kind)?;
+                tracing::info!("validator key address: {addr} detected");
                 Some((sk, addr))
             } else {
                 bail!("validator key does not exist: {}", sk.to_string_lossy());
@@ -327,6 +328,6 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
     let pk = sk.public_key().serialize();
     match kind {
         AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
-        AccountKind::Ethereum => Ok(Address::new_delegated(eam::EAM_ACTOR_ID, &pk)?),
+        AccountKind::Ethereum => Ok(Address::from(EthAddress::new_secp256k1(&pk)?)),
     }
 }

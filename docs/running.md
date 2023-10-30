@@ -99,6 +99,14 @@ Add one of the keys we created to the Genesis file as a stand-alone account:
         add-account --public-key test-network/keys/alice.pk --balance 10
 ```
 
+If your key is from ethereum, add a `kind` flag to indicate that:
+
+```shell
+ cargo run -p fendermint_app --release -- \
+        genesis --genesis-file test-network/genesis.json \
+        add-account --public-key test-network/keys/alice.pk --balance 10 --kind ethereum
+```
+
 Check that the balance is correct:
 
 ```console

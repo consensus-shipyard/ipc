@@ -30,7 +30,7 @@ use tendermint_rpc::HttpClient;
 
 use fendermint_rpc::message::{GasParams, MessageFactory};
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
-use fendermint_vm_actor_interface::eam::{self, CreateReturn};
+use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
 use crate::cmd;
 use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
@@ -385,6 +385,6 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
     let pk = sk.public_key().serialize();
     match kind {
         AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
-        AccountKind::Ethereum => Ok(Address::new_delegated(eam::EAM_ACTOR_ID, &pk)?),
+        AccountKind::Ethereum => Ok(Address::from(EthAddress::new_secp256k1(&pk)?)),
     }
 }
