@@ -303,6 +303,15 @@ where
         guard.take().expect("exec state empty")
     }
 
+    /// Apply a function on the state, if it exists.
+    fn map_exec_state<T, F>(&self, f: F) -> Option<T>
+    where
+        F: FnOnce(&FvmExecState<SS>) -> T,
+    {
+        let guard = self.exec_state.lock().expect("mutex poisoned");
+        guard.as_ref().map(f)
+    }
+
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
@@ -683,14 +692,18 @@ where
             .await
             .context("deliver failed")?;
 
+        let block_hash = self.map_exec_state(|s| s.block_hash()).flatten();
+
         let response = match result {
             Err(e) => invalid_deliver_tx(AppError::InvalidEncoding, e.description),
             Ok(ret) => match ret {
                 ChainMessageApplyRet::Signed(Err(InvalidSignature(d))) => {
                     invalid_deliver_tx(AppError::InvalidSignature, d)
                 }
-                ChainMessageApplyRet::Signed(Ok(ret)) => to_deliver_tx(ret.fvm, ret.domain_hash),
-                ChainMessageApplyRet::Ipc(ret) => to_deliver_tx(ret, None),
+                ChainMessageApplyRet::Signed(Ok(ret)) => {
+                    to_deliver_tx(ret.fvm, ret.domain_hash, block_hash)
+                }
+                ChainMessageApplyRet::Ipc(ret) => to_deliver_tx(ret, None, block_hash),
             },
         };
 

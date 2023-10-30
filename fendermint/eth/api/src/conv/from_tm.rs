@@ -461,20 +461,20 @@ fn message_hash(tx: &[u8]) -> tendermint::Hash {
     tendermint::Hash::Sha256(hash)
 }
 
-/// Best effort to find and parse any `eco.hash` attribute emitted among the events.
-fn find_eth_hash(events: &[abci::Event]) -> Option<et::TxHash> {
+/// Best effort to find and parse any `<kind>.hash` attribute emitted among the events.
+pub fn find_hash_event(kind: &str, events: &[abci::Event]) -> Option<et::H256> {
     events
         .iter()
-        .find(|e| e.kind == "eth")
+        .find(|e| e.kind == kind)
         .and_then(|e| e.attributes.iter().find(|a| a.key == "hash"))
         .and_then(|a| hex::decode(&a.value).ok())
         .filter(|bz| bz.len() == 32)
-        .map(|bz| et::TxHash::from_slice(&bz))
+        .map(|bz| et::H256::from_slice(&bz))
 }
 
 // Calculate some kind of hash for the message, preferrably one the tools expect.
 pub fn msg_hash(events: &[Event], tx: &[u8]) -> et::TxHash {
-    if let Some(h) = find_eth_hash(events) {
+    if let Some(h) = find_hash_event("eth", events) {
         h
     } else {
         // Return the default hash, at least there is something

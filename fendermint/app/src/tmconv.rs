@@ -4,7 +4,7 @@
 use anyhow::{anyhow, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmCheckRet, FvmQueryRet};
+use fendermint_vm_interpreter::fvm::{state::BlockHash, FvmApplyRet, FvmCheckRet, FvmQueryRet};
 use fendermint_vm_message::signed::DomainHash;
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
 use prost::Message;
@@ -53,7 +53,11 @@ pub fn invalid_query(err: AppError, description: String) -> response::Query {
     }
 }
 
-pub fn to_deliver_tx(ret: FvmApplyRet, domain_hash: Option<DomainHash>) -> response::DeliverTx {
+pub fn to_deliver_tx(
+    ret: FvmApplyRet,
+    domain_hash: Option<DomainHash>,
+    block_hash: Option<BlockHash>,
+) -> response::DeliverTx {
     let receipt = ret.apply_ret.msg_receipt;
 
     // Based on the sanity check in the `DefaultExecutor`.
@@ -66,7 +70,23 @@ pub fn to_deliver_tx(ret: FvmApplyRet, domain_hash: Option<DomainHash>) -> respo
     let data: bytes::Bytes = receipt.return_data.to_vec().into();
     let mut events = to_events("message", ret.apply_ret.events, ret.emitters);
 
+    // Emit the block hash. It's not useful to subscribe by as it's a-priori unknown,
+    // but we can use it during subscription to fill in the block hash field which Ethereum
+    // subscriptions expect, and it's otherwise not available.
+    if let Some(h) = block_hash {
+        events.push(Event::new(
+            "block",
+            vec![EventAttribute {
+                key: "hash".to_string(),
+                value: hex::encode(h),
+                index: true,
+            }],
+        ));
+    }
+
     // Emit an event which causes Tendermint to index our transaction with a custom hash.
+    // In theory we could emit multiple values under `tx.hash`, but in subscriptions we are
+    // looking to emit the one expected by Ethereum clients.
     if let Some(h) = domain_hash {
         events.push(to_domain_hash_event(&h));
     }
@@ -223,7 +243,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
             // Send back an entire Tendermint deliver_tx response, encoded as IPLD.
             // This is so there is a single representation of a call result, instead
             // of a normal delivery being one way and a query exposing `FvmApplyRet`.
-            let dtx = to_deliver_tx(ret, None);
+            let dtx = to_deliver_tx(ret, None, None);
             let dtx = tendermint_proto::abci::ResponseDeliverTx::from(dtx);
             let mut buf = bytes::BytesMut::new();
             dtx.encode(&mut buf)?;

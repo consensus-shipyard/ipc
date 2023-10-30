@@ -27,7 +27,7 @@ use tokio::sync::{
 };
 
 use crate::{
-    conv::from_tm::{self, map_rpc_block_txs, msg_hash},
+    conv::from_tm::{self, find_hash_event, map_rpc_block_txs, msg_hash},
     error::JsonRpcError,
     handlers::ws::{MethodNotification, Notification},
     state::{enrich_block, WebSocketSender},
@@ -104,9 +104,12 @@ impl FilterKind {
                     Query::from(EventType::Tx)
                 };
 
-                if let Some(block_hash) = filter.get_block_hash() {
-                    // TODO #220: This looks wrong, tx.hash is the transaction hash, not the block.
-                    query = query.and_eq("tx.hash", hex::encode(block_hash.0));
+                if let Some(_block_hash) = filter.get_block_hash() {
+                    // Currently we only use these filters for subscribing to future events,
+                    // we don't go back to retireve past ones (although I think Lotus does that).
+                    // As such, it is impossible to subscribe to future block hashes, they are unknown.
+                    // We could add a `block.hash` to the index, but there are other ways to find transactions
+                    // in a block, so it would be storing data for little reason.
                 }
                 if let Some(from_block) = filter.get_from_block() {
                     query = query.and_gte("tx.height", from_block.as_u64());
@@ -295,10 +298,13 @@ where
                 //     })
                 // }
 
-                // TODO: There is no easy way here to tell the block hash. Maybe it has been given in a preceding event,
+                // There is no easy way here to tell the block hash. Maybe it has been given in a preceding event,
                 // but other than that our only option is to query the Tendermint API. If we do that we should have caching,
                 // otherwise all the transactions in a block hammering the node will act like a DoS attack.
-                let block_hash = et::H256::default();
+                // Or we can add it to the indexed fields.
+                let block_hash =
+                    find_hash_event("block", &tx_result.result.events).unwrap_or_default();
+
                 let block_number = et::U64::from(tx_result.height);
 
                 let transaction_hash = msg_hash(&tx_result.result.events, &tx_result.tx);
