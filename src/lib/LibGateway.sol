@@ -109,6 +109,7 @@ library LibGateway {
                 ++i;
             }
         }
+        s.currentMembership.configurationNumber = membership.configurationNumber;
         // finally we need to remove any outstanding membership from
         // storage.
         if (storeLength > inputLength) {

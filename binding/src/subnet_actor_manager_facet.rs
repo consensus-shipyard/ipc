@@ -88,7 +88,7 @@ pub mod subnet_actor_manager_facet {
                             ],
                             outputs: ::std::vec![],
                             constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
                         },
                     ],
                 ),

@@ -38,6 +38,34 @@ library TestUtils {
         facetSelectors = abi.decode(res, (bytes4[]));
     }
 
+    function getFourValidators(
+        Vm vm
+    ) internal returns (uint256[] memory validatorKeys, address[] memory addresses, uint256[] memory weights) {
+        validatorKeys = new uint256[](4);
+        validatorKeys[0] = 100;
+        validatorKeys[1] = 200;
+        validatorKeys[2] = 300;
+        validatorKeys[3] = 400;
+
+        addresses = new address[](4);
+        addresses[0] = vm.addr(validatorKeys[0]);
+        addresses[1] = vm.addr(validatorKeys[1]);
+        addresses[2] = vm.addr(validatorKeys[2]);
+        addresses[3] = vm.addr(validatorKeys[3]);
+
+        weights = new uint256[](4);
+        vm.deal(vm.addr(validatorKeys[0]), 1);
+        vm.deal(vm.addr(validatorKeys[1]), 1);
+        vm.deal(vm.addr(validatorKeys[2]), 1);
+        vm.deal(vm.addr(validatorKeys[3]), 1);
+
+        weights = new uint256[](4);
+        weights[0] = 100;
+        weights[1] = 101;
+        weights[2] = 102;
+        weights[3] = 103;
+    }
+
     function getThreeValidators(
         Vm vm
     ) internal returns (uint256[] memory validatorKeys, address[] memory addresses, uint256[] memory weights) {

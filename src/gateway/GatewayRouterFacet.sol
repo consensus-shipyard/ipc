@@ -109,11 +109,11 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
-    /// @notice Apply all changes committed through the committment of parent finality
+    /// @notice Apply all changes committed through the commitment of parent finality
     function applyFinalityChanges() external systemActorOnly returns (uint64) {
         // get the latest configuration number for the change set
         uint64 configurationNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
-        // return immedidately if there are no changes to confirm by looking at next configNumber
+        // return immediately if there are no changes to confirm by looking at next configNumber
         if (
             // nextConfiguration == startConfiguration (i.e. no changes)
             (configurationNumber + 1) == s.validatorsTracker.changes.startConfigurationNumber

@@ -356,7 +356,6 @@ contract SubnetActorDiamondRealTest is Test {
         // ======== Step. Confirm leave ======
         saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 3);
         collateral -= (DEFAULT_MIN_VALIDATOR_STAKE + stake);
-        console.log("gw balance:", gatewayAddress.balance);
         require(gatewayAddress.balance == collateral, "gw balance is incorrect after confirming validator 1 leaving");
 
         v = saGetter.getValidator(validator1);
@@ -376,15 +375,10 @@ contract SubnetActorDiamondRealTest is Test {
         require(saGetter.isActiveValidator(validator2), "not active validator 2");
 
         // ======== Step. Claim collateral ======
-        console.log("gateway balance", gatewayAddress.balance);
-        console.log("sa balance", address(saDiamond).balance);
         uint256 b1 = validator1.balance;
-        console.log("validator 1 balance", b1);
         vm.startPrank(validator1);
         saManager.claim();
-        console.log("sa balance", address(saDiamond).balance);
         uint256 b2 = validator1.balance;
-        console.log("validator 1 balance", b2);
         require(b2 - b1 == DEFAULT_MIN_VALIDATOR_STAKE + stake, "collateral not received");
     }
 

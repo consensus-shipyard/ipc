@@ -176,6 +176,16 @@ contract SubnetActorDiamondTest is Test {
         saManager.join{value: 10}(new bytes(65));
     }
 
+    function testSubnetActorDiamond_Join_Fail_InvalidPublicKeyLength() public {
+        address validator = vm.addr(100);
+
+        vm.deal(validator, 1 gwei);
+        vm.prank(validator);
+        vm.expectRevert(InvalidPublicKeyLength.selector);
+
+        saManager.join{value: 10}(new bytes(64));
+    }
+
     function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {
         (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
@@ -192,6 +202,11 @@ contract SubnetActorDiamondTest is Test {
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.prank(validator);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+
+        // validator adds empty node
+        vm.prank(validator);
+        vm.expectRevert(EmptyAddress.selector);
+        saManager.addBootstrapNode("");
 
         // validator adds a node
         vm.prank(validator);
@@ -215,6 +230,15 @@ contract SubnetActorDiamondTest is Test {
 
         nodes = saGetter.getBootstrapNodes();
         require(nodes.length == 0, "no nodes");
+    }
+
+    function testSubnetActorDiamond_Leave_NotValidator() public {
+        (address validator, ) = TestUtils.deriveValidatorAddress(100);
+
+        // non-empty subnet can't be killed
+        vm.startPrank(validator);
+        vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, validator));
+        saManager.leave();
     }
 
     function testSubnetActorDiamond_Kill() public {
@@ -255,6 +279,23 @@ contract SubnetActorDiamondTest is Test {
 
         ValidatorInfo memory info = saGetter.getValidator(validator);
         require(info.totalCollateral == 3);
+    }
+
+    function testSubnetActorDiamond_crossMsgGetter() public view {
+        CrossMsg[] memory msgs = new CrossMsg[](1);
+        msgs[0] = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: new bytes(0),
+                fee: CROSS_MSG_FEE
+            }),
+            wrapped: false
+        });
+        require(saGetter.crossMsgsHash(msgs) == keccak256(abi.encode(msgs)));
     }
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
@@ -494,11 +535,11 @@ contract SubnetActorDiamondTest is Test {
             saManager.join{value: 10}(pubKeys[i]);
         }
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(InvalidSignatureErr.selector, 4));
         saManager.validateActiveQuorumSignatures(validators, hash0, signatures);
     }
 
-    function testSubnetActorDiamond_submitCheckpoint() public {
+    function testSubnetActorDiamond_submitCheckpoint_basic() public {
         (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory pubKeys = new bytes[](3);
         bytes[] memory signatures = new bytes[](3);
@@ -580,6 +621,17 @@ contract SubnetActorDiamondTest is Test {
             saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
             " checkpoint height correct"
         );
+
+        (bool exists, BottomUpCheckpoint memory recvCheckpoint) = saGetter.bottomUpCheckpointAtEpoch(
+            saGetter.bottomUpCheckPeriod()
+        );
+        require(exists, "checkpoint does not exist");
+        require(hash == keccak256(abi.encode(recvCheckpoint)), "checkpoint hashes are not the same");
+
+        bytes32 recvHash;
+        (exists, recvHash) = saGetter.bottomUpCheckpointHashAtEpoch(saGetter.bottomUpCheckPeriod());
+        require(exists, "checkpoint does not exist");
+        require(hash == recvHash, "hashes are not the same");
     }
 
     function testSubnetActorDiamond_submitCheckpointWithReward() public {
@@ -745,6 +797,10 @@ contract SubnetActorDiamondTest is Test {
 
     function testSubnetActorDiamond_Unstake() public {
         (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+
+        vm.expectRevert(CannotReleaseZero.selector);
+        vm.prank(validator);
+        saManager.unstake(0);
 
         vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, validator));
         vm.prank(validator);

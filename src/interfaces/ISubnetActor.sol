@@ -42,5 +42,5 @@ interface ISubnetActor {
 
     /// reward the relayers for processing checkpoint at height `height`.
     /// The reword includes the fixed reward for a relayer defined in the contract and `amount` of fees from the cross-messages.
-    function distributeRewardToRelayers(uint64 height, uint256 amount) external;
+    function distributeRewardToRelayers(uint64 height, uint256 amount) external payable;
 }

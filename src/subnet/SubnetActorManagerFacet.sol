@@ -229,7 +229,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @dev The reward includes the fixed relayer reward and accumulated cross-message fees received from the gateway.
     /// @param height height of the checkpoint the relayers are rewarded for
     /// @param reward The sum of cross-message fees in the checkpoint
-    function distributeRewardToRelayers(uint64 height, uint256 reward) external onlyGateway {
+    function distributeRewardToRelayers(uint64 height, uint256 reward) external payable onlyGateway {
         if (reward == 0) {
             return;
         }
