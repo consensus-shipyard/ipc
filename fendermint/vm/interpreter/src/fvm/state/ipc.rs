@@ -11,6 +11,7 @@ use fvm_shared::ActorID;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
+    init::builtin_actor_eth_addr,
     ipc::{AbiHash, ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
 use fendermint_vm_genesis::{Power, Validator};
@@ -48,10 +49,10 @@ impl<DB> GatewayCaller<DB> {
     pub fn new(actor_id: ActorID) -> Self {
         // A masked ID works for invoking the contract, but internally the EVM uses a different
         // ID and if we used this address for anything like validating that the sender is the gateway,
-        // we'll face bitter disappointment. For that we have to use the hashed version.
-        let addr = EthAddress::from_id(actor_id);
+        // we'll face bitter disappointment. For that we have to use the delegated address we have in genesis.
+        let addr = builtin_actor_eth_addr(actor_id);
         Self {
-            addr: addr.into_non_masked(),
+            addr,
             getter: ContractCaller::new(addr, GatewayGetterFacet::new),
             router: ContractCaller::new(addr, GatewayRouterFacet::new),
         }

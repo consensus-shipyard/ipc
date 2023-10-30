@@ -3,6 +3,7 @@
 
 use anyhow::Context;
 use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::init::builtin_actor_eth_addr;
 use fendermint_vm_actor_interface::ipc::SUBNETREGISTRY_ACTOR_ID;
 use fendermint_vm_interpreter::fvm::state::fevm::{ContractCaller, MockProvider, NoRevert};
 use fendermint_vm_interpreter::fvm::state::FvmExecState;
@@ -33,9 +34,9 @@ impl<DB> Default for RegistryCaller<DB> {
 
 impl<DB> RegistryCaller<DB> {
     pub fn new(actor_id: ActorID) -> Self {
-        let addr = EthAddress::from_id(actor_id);
+        let addr = builtin_actor_eth_addr(actor_id);
         Self {
-            addr: addr.into_non_masked(),
+            addr,
             registry: ContractCaller::new(addr, SubnetRegistry::new),
             _getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
             _manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),

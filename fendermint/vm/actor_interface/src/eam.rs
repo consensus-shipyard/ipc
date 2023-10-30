@@ -60,16 +60,6 @@ impl EthAddress {
     pub fn is_masked_id(&self) -> bool {
         self.0[0] == 0xff && self.0[1..].starts_with(&[0u8; 11])
     }
-
-    pub fn into_non_masked(self) -> EthAddress {
-        if !self.is_masked_id() {
-            return self;
-        }
-        // Based on `hash20` in the EAM actor.
-        let eth_addr = cid::multihash::Code::Keccak256.digest(&self.0);
-        let eth_addr: [u8; 20] = eth_addr.digest()[12..32].try_into().unwrap();
-        Self(eth_addr)
-    }
 }
 
 impl Display for EthAddress {

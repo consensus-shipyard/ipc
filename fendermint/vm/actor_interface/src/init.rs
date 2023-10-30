@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::Context;
+use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fendermint_vm_genesis::{Actor, ActorMeta};
 use fvm_ipld_blockstore::Blockstore;
@@ -20,9 +21,22 @@ define_singleton!(INIT { id: 1, code_id: 2 });
 pub type AddressMap = HashMap<Address, ActorID>;
 
 /// Delegated address of an Ethereum built-in actor.
-fn eth_builtin_deleg_addr(id: ActorID) -> Address {
+///
+/// This is based on what seems to be going on in the `CREATE_EXTERNAL` method
+/// of the EAM actor when it determines a robust address for an account ID,
+/// in that we take something known (a public key, or in this case the ID),
+/// hash it and truncate the results to 20 bytes.
+///
+/// But it's not a general rule of turning actor IDs into Ethereum addresses!
+/// It's just something we do to assign an address that looks like an Ethereum one.
+pub fn builtin_actor_eth_addr(id: ActorID) -> EthAddress {
     // The EVM actor would reject a delegated address that looks like an ID address, so let's hash it.
-    Address::from(EthAddress::from_id(id).into_non_masked())
+    // Based on `hash20` in the EAM actor:
+    // https://github.com/filecoin-project/builtin-actors/blob/v11.0.0/actors/eam/src/lib.rs#L213-L216
+    let eth_addr = EthAddress::from_id(id);
+    let eth_addr = cid::multihash::Code::Keccak256.digest(&eth_addr.0);
+    let eth_addr: [u8; 20] = eth_addr.digest()[12..32].try_into().unwrap();
+    EthAddress(eth_addr)
 }
 
 #[derive(Serialize_tuple, Deserialize_tuple, Clone, Debug)]
@@ -84,7 +98,7 @@ impl State {
 
         // Insert top-level EVM contracts which have fixed IDs.
         for id in eth_builtin_ids {
-            let addr = eth_builtin_deleg_addr(*id);
+            let addr = Address::from(builtin_actor_eth_addr(*id));
             address_map
                 .set(addr.to_bytes().into(), *id)
                 .context("cannot set ID of eth address")?;
@@ -92,7 +106,7 @@ impl State {
 
         // Insert dynamic EVM library contracts.
         for _ in 0..eth_library_count {
-            let addr = eth_builtin_deleg_addr(next_id);
+            let addr = Address::from(builtin_actor_eth_addr(next_id));
             address_map
                 .set(addr.to_bytes().into(), next_id)
                 .context("cannot set ID of eth address")?;
