@@ -233,6 +233,7 @@ where
         event: Event,
         to_block: F,
         chain_id: &ChainID,
+        filter: &Option<et::Filter>,
     ) -> anyhow::Result<()>
     where
         F: FnOnce(tendermint::Block) -> Pin<Box<dyn Future<Output = anyhow::Result<B>> + Send>>,
@@ -319,7 +320,7 @@ where
                 // TODO: We have no way to tell where the logs start within the block.
                 let log_index_start = Default::default();
 
-                let tx_logs = from_tm::to_logs(
+                let mut tx_logs = from_tm::to_logs(
                     &tx_result.result.events,
                     block_hash,
                     block_number,
@@ -327,6 +328,10 @@ where
                     transaction_index,
                     log_index_start,
                 )?;
+
+                if let Some(filter) = filter {
+                    tx_logs.retain(|log| matches_topics(filter, log));
+                }
 
                 logs.extend(tx_logs)
             }
@@ -348,6 +353,7 @@ fn to_json_vec<R: Serialize>(records: &[R]) -> anyhow::Result<Vec<serde_json::Va
 
 pub struct FilterDriver {
     id: FilterId,
+    kind: FilterKind,
     state: FilterState,
     rx: Receiver<FilterCommand>,
 }
@@ -369,7 +375,6 @@ struct PollState {
 
 /// Send changes to a WebSocket as soon as they happen, one by one, not in batches.
 struct SubscriptionState {
-    kind: FilterKind,
     ws_sender: WebSocketSender,
 }
 
@@ -383,7 +388,7 @@ impl FilterDriver {
         let (tx, rx) = tokio::sync::mpsc::channel(10);
 
         let state = match ws_sender {
-            Some(ws_sender) => FilterState::Subscription(SubscriptionState { kind, ws_sender }),
+            Some(ws_sender) => FilterState::Subscription(SubscriptionState { ws_sender }),
             None => FilterState::Poll(PollState {
                 timeout,
                 last_poll: Instant::now(),
@@ -392,7 +397,12 @@ impl FilterDriver {
             }),
         };
 
-        let r = Self { id, state, rx };
+        let r = Self {
+            id,
+            kind,
+            state,
+            rx,
+        };
 
         (r, tx)
     }
@@ -417,6 +427,13 @@ impl FilterDriver {
             .state_params(FvmQueryHeight::default())
             .await
             .map(|state_params| ChainID::from(state_params.value.chain_id));
+
+        // Logs need to be filtered by topics.
+        let filter = if let FilterKind::Logs(ref filter) = self.kind {
+            Some(filter.as_ref().to_owned())
+        } else {
+            None
+        };
 
         // Because there are multiple potentially overlapping subscriptions, we might see the same transaction twice,
         // e.g. because we were interested in ones that emit events "A or B" we had to subscribe to "A" and also to "B",
@@ -463,6 +480,7 @@ impl FilterDriver {
                                                 })
                                             },
                                             chain_id,
+                                            &filter,
                                         )
                                         .await
                                 }
@@ -498,7 +516,7 @@ impl FilterDriver {
                 }
                 FilterState::Subscription(ref state) => match cmd {
                     FilterCommand::Update(event) => {
-                        let mut records = FilterRecords::<et::Block<et::TxHash>>::new(&state.kind);
+                        let mut records = FilterRecords::<et::Block<et::TxHash>>::new(&self.kind);
 
                         let res = match &chain_id {
                             Ok(chain_id) => {
@@ -515,6 +533,7 @@ impl FilterDriver {
                                             })
                                         },
                                         chain_id,
+                                        &filter,
                                     )
                                     .await
                             }
@@ -565,7 +584,7 @@ impl FilterDriver {
                         // This should not be used, but because we treat subscriptions and filters
                         // under the same umbrella, it is possible to send a request to get changes.
                         // Respond with empty, because all of the changes were already sent to the socket.
-                        let _ = tx.send(Ok(Some(FilterRecords::new(&state.kind))));
+                        let _ = tx.send(Ok(Some(FilterRecords::new(&self.kind))));
                     }
                     FilterCommand::Uninstall => {
                         tracing::debug!(?id, "subscription uninstalled");
