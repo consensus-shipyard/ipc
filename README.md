@@ -3,6 +3,7 @@
 Fendermint is an effort to implement [IPC with Tendermint Core](https://docs.google.com/document/d/1cFoTdoRuYgxmWJia6K-b5vmEj-4MvyHCNvShZpyconU/edit#). There is a preliminary [roadmap](https://docs.google.com/spreadsheets/d/1eVwkHEPGNg0js8DKRDIX7sugf5JqbI9zRBddIqzJFfI/edit#gid=0) that lays out the tasks towards implementing subnets that run IPLD and FVM under the Filecoin rootnet, sharing components with the Lotus/Eudico based implementation.
 
 ## Quick Start
+
 - [Local testnets](./docs/localnet.md)
 
 ## Docs
@@ -10,7 +11,18 @@ Fendermint is an effort to implement [IPC with Tendermint Core](https://docs.goo
 Please have a look in the [docs](./docs/README.md) to see an overview of the project, how to run the components, and previous demos.
 
 ## IPC
+
 Fendermint is built with support for [IPC](https://github.com/consensus-shipyard/ipc) by design. If you are looking to deploy the infrastructure Fendermint-based IPC subnet, refer to the [IPC main repo](https://github.com/consensus-shipyard/ipc), or have a look at the [IPC infrastructure docs](./docs/ipc.md).
+
+## Building from source
+
+**Linux.** Install the following pre-requisites (instructions for Ubuntu):
+
+- Install system packages: `sudo apt install build-essential clang cmake pkg-config libssl-dev protobuf-compiler`.
+- Install Rust. See [instructions](https://www.rust-lang.org/tools/install).
+- Install cargo-make: `cargo install --force cargo-make`.
+- Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
+- Install Docker (if you intend to build Docker images). See [instructions](https://docs.docker.com/engine/install/ubuntu/).
 
 ## Testing
 
@@ -27,7 +39,6 @@ while the next command builds docker images and runs an end-to-end test using th
 ```bash
 make e2e
 ```
-
 
 ## IPC Solidity Actors
 
@@ -46,7 +57,6 @@ To test whether the genesis process works, we can run the following unit test:
 ```bash
 cargo test --release -p fendermint_vm_interpreter load_genesis
 ```
-
 
 ## Pre-built Docker Image
 

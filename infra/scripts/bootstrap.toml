@@ -1,0 +1,11 @@
+[tasks.bootstrap]
+env = { "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/bootstrap/cometbft", "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
+run_task = "new-node"
+
+[tasks.bootstrap-id]
+env = { "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
+run_task = "cometbft-node-id"
+
+[tasks.bootstrap-down]
+env = { "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
+run_task = "node-down"

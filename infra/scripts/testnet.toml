@@ -6,7 +6,6 @@ dependencies = [
     "testnet-down",
     "testnet-init",
     "fendermint-deps",
-    "testnet-config",
     "testnet-up"
 ]
 
@@ -23,12 +22,6 @@ export BASE_DIR=$BASE_DIR
 """
 
 [tasks.testnet-down]
-dependencies = [
-    "testnet-docker-compose-down",
-    "docker-network-rm",
-]
-
-[tasks.testnet-docker-compose-down]
 script = """
 export CMT_PERSISTENT_PEERS="UNDEFINED"
 if [ -z $GID ]; then GID=$(id -g); fi
@@ -41,15 +34,48 @@ export GID
 [tasks.testnet-init]
 dependencies = [
     "testnet-clear",
-    "testnet-network-create",
+    "fendermint-pull",
+    "docker-network-create",
     "cometbft-pull",
     "testnet-mkdir",
-    "testnet-cometbft-init",
+    "genesis-new",
+    "testnet-init-nodes",
+    "genesis-write",
+    "testnet-copy-genesis",
+    "testnet-setup-persistent-peers",
 ]
 
-[tasks.testnet-network-create]
-env = { "NETWORK_NAME"="${NETWORK_NAME}"}
-extend = "docker-network-create"
+[tasks.testnet-init-nodes]
+script_runner = "@duckscript"
+script = """
+nodes = range 0 4
+
+for i in ${nodes}
+    NUMBER = set ${i}
+    NODE_NAME = set "node${NUMBER}"
+
+    mkdir -p ${BASE_DIR}/${NODE_NAME}
+    mkdir -p ${BASE_DIR}/${NODE_NAME}/fendermint
+    mkdir -p ${BASE_DIR}/${NODE_NAME}/cometbft
+
+    set_env NODE_NAME ${NODE_NAME}
+    set_env NUMBER ${NUMBER}
+
+    cm_run_task testnet-cometbft-init
+    cm_run_task genesis-new-key
+    cm_run_task genesis-new-accounts
+    cm_run_task genesis-add-validator
+
+    IP_LAST = calc ${NUMBER}+2
+    NETWORK_ADDR = set "192.167.10.${IP_LAST}:26656"
+    set_env NETWORK_ADDR ${NETWORK_ADDR}
+    cm_run_task testnet-add-peer
+
+    cm_run_task testnode-export-keys
+end
+
+release ${nodes}
+"""
 
 [tasks.testnet-clear]
 script="""
@@ -59,82 +85,23 @@ rm -rf ${BASE_DIR}
 
 [tasks.testnet-mkdir]
 script="""
-mkdir -p $BASE_DIR
-mkdir -p $BASE_DIR/out
-
-for i in $(seq 0 3); do
-    mkdir -p $BASE_DIR/node${i}
-    mkdir -p $BASE_DIR/node${i}/fendermint
-    mkdir -p $BASE_DIR/node${i}/cometbft
-done
+mkdir -p ${BASE_DIR}
 """
 
 [tasks.testnet-cometbft-init]
-dependencies = ["testnet-cometbft-init-node0", "testnet-cometbft-init-node1", "testnet-cometbft-init-node2", "testnet-cometbft-init-node3"]
-
-[tasks.testnet-cometbft-init-node0]
 extend = "cometbft-init"
-env = { "CMD" = "init", "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/node0/cometbft", "CMT_CONTAINER_NAME" = "cometbft-node0", "FLAGS" = "-a STDOUT -a STDERR --rm"}
+env = { "CMD" = "init", "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/${NODE_NAME}/cometbft", "CMT_CONTAINER_NAME" = "cometbft-node${NUMBER}", "FLAGS" = "-a STDOUT -a STDERR --rm"}
 
-[tasks.testnet-cometbft-init-node1]
-extend = "cometbft-init"
-env = { "CMD" = "init", "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/node1/cometbft", "CMT_CONTAINER_NAME" = "cometbft-node1", "FLAGS" = "-a STDOUT -a STDERR --rm"  }
+[tasks.testnet-add-peer]
+extend = "fendermint-tool"
+env = { "ENTRY" = "fendermint", "CMD" = """key add-peer \
+        --node-key-file /data/${NODE_NAME}/${COMETBFT_SUBDIR}/config/node_key.json \
+        --network-addr ${NETWORK_ADDR} \
+        --local-peers-file /data/peers \
+""" }
 
-[tasks.testnet-cometbft-init-node2]
-extend = "cometbft-init"
-env = { "CMD" = "init", "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/node2/cometbft", "CMT_CONTAINER_NAME" = "cometbft-node2", "FLAGS" = "-a STDOUT -a STDERR --rm"  }
-
-[tasks.testnet-cometbft-init-node3]
-extend = "cometbft-init"
-env = { "CMD" = "init", "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/node3/cometbft", "CMT_CONTAINER_NAME" = "cometbft-node3", "FLAGS" = "-a STDOUT -a STDERR --rm"  }
-
-[tasks.testnet-config]
-dependencies = [
-    "testnet-script-new-genesis",
-    "testnet-script-add-peers",
-    "testnet-script-new-key",
-    "testnet-script-new-account",
-    "testnet-script-new-gateway",
-    "testnet-script-share-genesis"
-]
-
-[tasks.testnet-script-new-genesis]
-cwd = "./target/release"
-script = """
-./fendermint genesis --genesis-file $BASE_DIR/genesis.json \
-      new --chain-name ${SUBNET_ID} --base-fee ${BASE_FEE} --timestamp ${TIMESTAMP} --power-scale ${POWER_SCALE}
-
-cat $BASE_DIR/genesis.json
-"""
-
-[tasks.testnet-script-new-key]
-cwd = "./target/release"
+[tasks.testnet-setup-persistent-peers]
 script="""
-for i in $(seq 0 3); do
-    mkdir -p $BASE_DIR/node${i}/fendermint/keys
-    ./fendermint key gen --out-dir $BASE_DIR/node${i}/fendermint/keys --name validator${i}_key
-done
-"""
-
-[tasks.testnet-script-new-account]
-cwd = "./target/release"
-script="""
-for i in $(seq 0 3); do
-./fendermint genesis --genesis-file $BASE_DIR/genesis.json add-account \
-        --public-key $BASE_DIR/node${i}/fendermint/keys/validator${i}_key.pk --balance ${BALANCE}
-done
-"""
-
-[tasks.testnet-script-add-peers]
-cwd = "./target/release"
-script="""
-for i in $(seq 0 3); do
-    ./fendermint key add-peer \
-        --node-key-file $BASE_DIR/node${i}/cometbft/config/node_key.json \
-        --network-addr 192.167.10.$((${i}+2)):26656 \
-        --local-peers-file $BASE_DIR/peers
-done
-
 unset CMT_PERSISTENT_PEERS
 export CMT_PERSISTENT_PEERS=`cat $BASE_DIR/peers`
 echo Persistent peers: $CMT_PERSISTENT_PEERS
@@ -144,41 +111,9 @@ for i in $(seq 0 3); do
 done
 """
 
-[tasks.testnet-script-new-gateway]
-cwd = "./target/release"
+[tasks.testnet-copy-genesis]
 script = """
 for i in $(seq 0 3); do
-    ./fendermint genesis \
-        --genesis-file $BASE_DIR/genesis.json add-validator \
-        --public-key $BASE_DIR/node${i}/fendermint/keys/validator${i}_key.pk \
-        --power 1
-done
-
-./fendermint genesis --genesis-file $BASE_DIR/genesis.json ipc gateway \
-    --subnet-id /r0 \
-    --bottom-up-check-period 10 \
-    --msg-fee 10 \
-    --majority-percentage 67 \
-    --min-collateral 1
-
-./fendermint \
-    genesis --genesis-file $BASE_DIR/genesis.json \
-    into-tendermint --out $BASE_DIR/out/genesis.json
-
-for i in $(seq 0 3); do
-    ./fendermint key into-tendermint \
-        --secret-key $BASE_DIR/node${i}/fendermint/keys/validator${i}_key.sk \
-        --out $BASE_DIR/node${i}/cometbft/config/priv_validator_key.json
-done
-
-echo "GENESIS:"
-cat $BASE_DIR/genesis.json
-"""
-
-[tasks.testnet-script-share-genesis]
-cwd = "./target/release"
-script = """
-for i in $(seq 0 3); do
-    cp $BASE_DIR/out/genesis.json $BASE_DIR/node${i}/cometbft/config/genesis.json
+    cp $BASE_DIR/genesis.committed.json $BASE_DIR/node${i}/cometbft/config/genesis.json
 done
 """

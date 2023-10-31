@@ -49,7 +49,7 @@ Once a child subnet has been bootstrapped in its parent, its subnet actor has be
 In order to spawn a validator node in a child subnet, you need to run:
 ```bash
 cargo make --makefile infra/Makefile.toml \
-    -e VALIDATOR_PRIV_KEY=<VALIDATOR_PRIV_KEY> \
+    -e PRIVATE_KEY_PATH=<VALIDATOR_PRIV_KEY> \
     -e SUBNET_ID=<SUBNET_ID> \
     -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT> \
     -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
@@ -66,7 +66,7 @@ This command will run the infrastructure for a Fendermint validator in the child
 - `CMT_RPC_HOST_PORT` (optional): Specifies the listening port in the localhost for CometBFT's RPC.
 - `ETHAPI_HOST_PORT` (optional): Specifies the listening port in the localhost for the ETH RPC of the node.
 - `NODE_NAME` (optional): Name for the node deployment. Along with `CMT_P2P_HOST_PORT`, `CMT_RPC_HOST_PORT` and `ETHAPI_HOST_PORT`, these variables come really handy for the deployment of several validator nodes over the same system.
-- `VALIDATOR_PRIV_KEY`: Path of the private key for your validator (it should be the corresponding one used to join the subnet in the parent).
+- `PRIVATE_KEY_PATH`: Path of the hex encoded private key for your validator (it should be the corresponding one used to join the subnet in the parent). This can be exported from the `ipc-cli` or any other wallet like Metamask.
 - `SUBNET_ID`: SubnetID for the child subnet.
 - `BOOTSTRAPS`: Comma separated list of bootstraps (or seeds in CometBFT parlance).
 - `PARENT_ENDPOINT`: Public endpoint that the validator should use to connect to the parent.

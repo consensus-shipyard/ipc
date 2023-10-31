@@ -5,21 +5,18 @@
 workspace = false
 dependencies = [
     "testnode-down",
+    "fendermint-pull",
     "testnode-init",
-    "testnode-network-create",
+    "docker-network-create",
     "cometbft-init",
     "fendermint-deps",
     "testnode-config",
     "fendermint-start",
     "cometbft-start",
     "cometbft-wait",
-    "ethapi-start"
+    "ethapi-start",
+    "testnode-report",
 ]
-
-[tasks.testnode-network-create]
-env = { "NETWORK_NAME"="${NETWORK_NAME}"}
-extend = "docker-network-create"
-
 
 [tasks.testnode-init]
 dependencies = [
@@ -58,57 +55,46 @@ run_task = { name = [
 # the genesis file with necessary entities and cryptographic keys.
 [tasks.testnode-config]
 dependencies = [
-    "testnode-script-new-genesis",
-    "testnode-script-new-key",
-    "testnode-script-new-account",
-    "testnode-script-add-validator",
-    "testnode-script-new-gateway",
-    "testnode-script-export-keys"
+    "genesis-new",
+    "genesis-new-key",
+    "genesis-new-accounts",
+    "genesis-add-validator",
+    "genesis-new-gateway",
+    "genesis-write",
+    "testnode-export-keys"
 ]
 
-[tasks.testnode-script-new-genesis]
-cwd = "./target/release"
-script = """
-./fendermint genesis --genesis-file ${GENESIS_FILE} new --chain-name ${SUBNET_ID} --base-fee ${BASE_FEE} --timestamp ${TIMESTAMP} --power-scale ${POWER_SCALE}
-"""
+[tasks.testnode-export-keys]
+extend = "fendermint-tool"
+env = { "ENTRY" = "fendermint", "CMD" = "key into-tendermint --secret-key /data/${NODE_NAME}/${PRIV_KEY_PATH} --out /data/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json" }
+script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json"
 
-[tasks.testnode-script-new-key]
-cwd = "./target/release"
-script="""
-mkdir -p $KEYS_DIR
+[tasks.testnode-report]
+script = """cat << EOF
+############################
+#                          #
+# Testnode ready! 🚀       #
+#                          #
+############################
 
-./fendermint key gen --out-dir $KEYS_DIR --name $KEY_NAME;
-chmod 600 ${PRIV_KEY_PATH}
-"""
+Eth API:
+\thttp://0.0.0.0:8545
 
-[tasks.testnode-script-new-account]
-cwd = "./target/release"
-script="""
-./fendermint genesis --genesis-file ${GENESIS_FILE} add-account --public-key ${PUB_KEY_PATH} --balance ${BALANCE}
-"""
+Accounts:
+$(jq -r '.accounts[] | "\t\\(.meta.Account.owner): \\(.balance) coin units"' ${BASE_DIR}/genesis.json)
 
+Private key (hex ready to import in MetaMask):
+\t$(cat ${BASE_DIR}/${NODE_NAME}/${PRIV_KEY_PATH} | base64 -d | xxd -p -c 1000000)
 
-[tasks.testnode-script-add-validator]
-cwd = "./target/release"
-script = """
-./fendermint genesis --genesis-file ${GENESIS_FILE} add-validator --public-key ${PUB_KEY_PATH} --power 1
-"""
+Note: both accounts use the same private key @ ${BASE_DIR}/${PRIV_KEY_PATH}
 
-[tasks.testnode-script-new-gateway]
-cwd = "./target/release"
-script = """
-./fendermint genesis --genesis-file ${GENESIS_FILE} ipc gateway --subnet-id /r0 \
-    --bottom-up-check-period 10 \
-    --msg-fee 10 \
-    --majority-percentage 67 \
-    --min-collateral 1
-"""
+Chain ID:
+\t$(curl -s --location --request POST 'http://localhost:8545/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
 
-[tasks.testnode-script-export-keys]
-cwd = "./target/release"
-script = """
-./fendermint genesis --genesis-file ${GENESIS_FILE} into-tendermint --out ${CMT_DIR}/config/genesis.json
+Fendermint API:
+\thttp://localhost:26658
 
-./fendermint key into-tendermint --secret-key ${PRIV_KEY_PATH} --out ${CMT_DIR}/config/priv_validator_key.json
-chmod 600 ${CMT_DIR}/config/priv_validator_key.json
+CometBFT API:
+\thttp://0.0.0.0:26657
+EOF
 """
