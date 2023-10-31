@@ -182,6 +182,14 @@ where
                     });
                 }
             }
+
+            // If the gas_limit is zero, set it to the block gas limit so that call will not hit
+            // gas limit not set error. It is possible, in the future, to estimate the gas limit
+            // based on the account balance and base fee + premium for higher accuracy.
+            if msg.gas_limit == 0 {
+                msg.gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+            }
+
             if msg.from == SYSTEM_ACTOR_ADDR {
                 // Explicit execution requires `from` to be an account kind.
                 s.execute_implicit(msg)
