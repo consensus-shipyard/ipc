@@ -79,6 +79,7 @@ where
     }
 
     /// Write the snapshot to car file.
+    ///
     /// The root cid points to the metadata, i.e `SnapshotMetadata` struct. From the snapshot metadata
     /// one can query the version and root data cid. Based on the version, one can parse the underlying
     /// data of the snapshot from the root cid.
