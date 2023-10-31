@@ -30,6 +30,7 @@ impl CommandLineHandler for WalletBalances {
             WalletType::Evm => {
                 let wallet = provider.evm_wallet()?;
                 let addresses = wallet.read().unwrap().list()?;
+                let mut no_balance = addresses.clone();
                 let r = addresses
                     .iter()
                     .map(|addr| {
@@ -52,8 +53,12 @@ impl CommandLineHandler for WalletBalances {
                 for r in v.into_iter().filter_map(|r| r.ok()) {
                     let (balance, addr) = r;
                     if addr.to_string() != "default-key" {
-                        println!("{:?} - Balance: {}", addr.to_string(), balance);
+                        println!("{} - Balance: {}", addr.to_string(), balance);
+                        no_balance.retain(|a| a != addr);
                     }
+                }
+                for addr in no_balance {
+                    println!("{} - Balance: 0", addr.to_string());
                 }
             }
             WalletType::Fvm => {

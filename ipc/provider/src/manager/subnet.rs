@@ -82,7 +82,6 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
     /// Returns the epoch that the released is executed in the child.
     async fn release(
         &self,
-        subnet: SubnetID,
         gateway_addr: Address,
         from: Address,
         to: Address,

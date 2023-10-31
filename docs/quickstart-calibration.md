@@ -68,9 +68,9 @@ keystore_path = "~/.ipc"
 id = "/r314159"
 
 [subnets.config]
-gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
 registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
 
 # Subnet template - uncomment and adjust before using
@@ -78,10 +78,10 @@ registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
 # id = "/r314159/<SUBNET_ID>"
 
 # [subnets.config]
-# gateway_addr = "t064"
-# jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
-# auth_token = "<AUTH_TOKEN_1>"
-# network_type = "fvm"
+# network_type = "fevm"
+# provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+# gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+# registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
 ## Step 3: Set up your wallets
@@ -214,10 +214,10 @@ nano ~/.ipc/config.toml
 id = "/r314159"
 
 [subnets.config]
-gateway_addr = "0xff00000000000000000000000000000000000064"
 network_type = "fevm"
 provider_http = "http://127.0.0.1:<ETH_RPC_PORT>"
-registry_addr = "0xff00000000000000000000000000000000000065"
+gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
 With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through:
@@ -225,12 +225,13 @@ With this you should be able to start interacting with your local subnet directl
 ./bin/ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
 ```
 
+> The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7, respectively.
+
 ## Step 8: Interact with your the ETH RPC
 
 For information about how to connect your Ethereum tooling with your subnet refer to the [following docs](./contracts.md).
 
 ## Step 9: What now?
-> WIP: Docs in progress
-<!-- * Proceed to the [usage](usage.md) guide to learn how you can test your new subnet. -->
-<!-- * If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc-agent). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience! -->
-<!-- * Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system. -->
+* Proceed to the [usage](usage.md) guide to learn how you can test your new subnet.
+* If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience!
+* Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system.

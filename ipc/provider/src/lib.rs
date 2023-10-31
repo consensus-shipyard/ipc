@@ -141,18 +141,23 @@ impl IpcProvider {
         match subnets.get(subnet) {
             Some(subnet) => match &subnet.config {
                 config::subnet::SubnetConfig::Fevm(_) => {
-                    let manager = Box::new(
-                        EthSubnetManager::from_subnet_with_wallet_store(
-                            subnet,
-                            match self.evm_wallet() {
-                                Ok(w) => Some(w),
-                                Err(_) => None,
-                            },
-                        )
-                        .ok()?,
-                    );
+                    let wallet = match self.evm_wallet() {
+                        Ok(w) => Some(w),
+                        Err(e) => {
+                            log::warn!("error initializing evm wallet: {e}");
+                            None
+                        }
+                    };
+                    let manager =
+                        match EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet) {
+                            Ok(w) => Some(w),
+                            Err(e) => {
+                                log::warn!("error initializing evm wallet: {e}");
+                                return None;
+                            }
+                        };
                     Some(Connection {
-                        manager,
+                        manager: Box::new(manager.unwrap()),
                         subnet: subnet.clone(),
                     })
                 }
@@ -471,14 +476,7 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .release(
-                subnet,
-                gateway_addr,
-                sender,
-                to.unwrap_or(sender),
-                amount,
-                fee,
-            )
+            .release(gateway_addr, sender, to.unwrap_or(sender), amount, fee)
             .await
     }
 

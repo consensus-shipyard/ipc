@@ -35,9 +35,9 @@ keystore_path = "~/.ipc"
 id = "/r314159"
 
 [subnets.config]
-gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
 registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
 
 # Subnet template - uncomment and adjust before using
@@ -45,10 +45,10 @@ registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
 # id = "/r314159/<SUBNET_ID>"
 
 # [subnets.config]
-# gateway_addr = "t064"
-# jsonrpc_api_http = "http://127.0.0.1:1251/rpc/v1"
-# auth_token = "<AUTH_TOKEN_1>"
-# network_type = "fvm"
+# network_type = "fevm"
+# provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+# gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+# registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 "#;
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
