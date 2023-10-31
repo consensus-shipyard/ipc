@@ -1,3 +1,17 @@
 # Table of contents
 
-* [Welcome to IPC Docs](README.md)
+* [Overview](README.md)
+  * [What is IPC](overview/what-is-ipc.md)
+  * [Applications of IPC](overview/applications-of-ipc.md)
+* [Quickstart](quickstart/README.md)
+  * [Deploy a subnet](quickstart/deploy-a-subnet.md)
+  * [Deploy smart contracts to a subnet](quickstart/deploy-smart-contracts-to-a-subnet.md)
+* [Key Concepts](key-concepts/README.md)
+  * [IPC Architecture](key-concepts/ipc-architecture/README.md)
+    * [IPLD Resolver](key-concepts/ipc-architecture/ipld-resolver.md)
+    * [Checkpointing](key-concepts/ipc-architecture/checkpointing.md)
+  * [Approving Transactions on IPC Subnets](key-concepts/approving-transactions-on-ipc-subnets.md)
+  * [Interoperability](key-concepts/interoperability.md)
+  * [Testnets](key-concepts/testnets.md)
+* [Advanced](advanced/README.md)
+  * [Closing a subnet](advanced/closing-a-subnet.md)
