@@ -9,7 +9,9 @@ use fvm_shared::address::Address;
 use ipc_identity::{EvmKeyStore, PersistentKeyInfo, WalletType};
 use ipc_provider::{lotus::message::wallet::WalletKeyType, IpcProvider, LotusJsonKeyType};
 use std::fmt::Debug;
+use std::fs::Permissions;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::str::FromStr;
 
 use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
@@ -81,6 +83,7 @@ impl CommandLineHandler for WalletExport {
         match &arguments.output {
             Some(p) => {
                 let mut file = std::fs::File::create(p)?;
+                file.set_permissions(Permissions::from_mode(0o600))?;
                 file.write_all(v.as_bytes())?;
                 println!(
                     "exported new wallet with address {:?} in file {:?}",
