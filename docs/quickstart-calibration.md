@@ -175,7 +175,7 @@ cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-down
 * To advertise the endpoint to the rest of nodes in the network we need to run:
 ```bash
 # Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
-./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint=<BOOTSRAP_ENDPOINT>
+./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint="<BOOTSRAP_ENDPOINT>"
 ```
 
 * The bootstrap nodes currently deployed in the network can be queried through the following command: 
