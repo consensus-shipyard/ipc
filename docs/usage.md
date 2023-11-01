@@ -20,12 +20,19 @@ The `ipc-cli` has internally an EVM wallet that it uses to sign transactions and
 ```
 ```console
 # Sample execution
-./bin/ipc-cli wallet export -w evm -a 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec -o /tmp/priv.key                                                                                     ✔  12:21:38 
-exported new wallet with address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec in file "/tmp/priv.key"```
+./bin/ipc-cli wallet export -w evm -a 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec -o /tmp/priv.key
+exported new wallet with address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec in file "/tmp/priv.key"
+```
 
-* You can also export your private key in a format that can be consumed by Fendermint by adding the `--fendermint` flag.
+* You can also export your private key encoded in base64 in a format that can be consumed by Fendermint by adding the `--fendermint` flag.
 ```bash
 ./bin/ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE> --fendermint
+```
+
+* Or hex encoded as expected by Ethereum tooling (like Metamask or hardhat).
+```bash
+./bin/ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE> --hex
+```
 
 * Importing a key from a file
 ```bash

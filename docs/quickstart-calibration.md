@@ -168,7 +168,7 @@ Remember the address of your bootstrap for the next step. This address has the f
 ./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint=<BOOTSRAP_ENDPOINT>
 ```
 
-* The bootstrap nodes currently deployed in the network can be queried through the following command: 
+* The bootstrap nodes currently deployed in the network can be queried through the following command:
 ```bash
 ./bin/ipc-cli subnet list-bootstraps --subnet=<SUBNET_ID>
 ```
@@ -178,9 +178,9 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 
 * First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
 ```bash
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --fendermint -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
 ```
 
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
@@ -188,7 +188,7 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 ```bash
 cargo make --makefile /bin/ipc-infra/Makefile.toml \
     -e NODE_NAME=validator-<n> \
-    -e VALIDATOR_PRIV_KEY=<PATH_PRIV_KEY_VALIDATOR_n> \
+    -e PRIVATE_KEY_PATH=<PATH_PRIV_KEY_VALIDATOR_n> \
     -e SUBNET_ID=<SUBNET_ID> \
     -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT_n> -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT_n> \
     -e ETHAPI_HOST_PORT=<ETH_RPC_PORT_n> \
