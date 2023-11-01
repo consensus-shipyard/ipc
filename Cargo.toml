@@ -1,12 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-	# "ipc/daemon", 
+	# "ipc/daemon",
 	"ipc/cli",
-	# "ipc/testing/e2e", 
+	# "ipc/testing/e2e",
 	# "ipc/testing/*",
 	"ipc/provider",
-	"ipc/identity", 
+	"ipc/identity",
 	"ipc/sdk"
 ]
 
@@ -42,7 +42,7 @@ hex = "0.4.3"
 tempfile = "3.4.0"
 serde_json = { version = "1.0.91", features = ["raw_value"] }
 
-ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "dev" }
+ipc_actors_abis = { git = "https://github.com/consensus-shipyard/ipc-solidity-actors.git", branch = "fm-347-subnet-prefund" }
 
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
 libsecp256k1 = "0.7"

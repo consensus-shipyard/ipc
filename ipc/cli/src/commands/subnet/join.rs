@@ -29,6 +29,16 @@ impl CommandLineHandler for JoinSubnet {
             None => None,
         };
         let public_key = hex::decode(&arguments.public_key)?;
+        if let Some(initial_balance) = arguments.initial_balance {
+            println!("pre-funding address with {initial_balance}");
+            provider
+                .prefund_subnet(
+                    subnet.clone(),
+                    from,
+                    f64_to_token_amount(initial_balance.clone())?,
+                )
+                .await?;
+        }
         let epoch = provider
             .join_subnet(
                 subnet,
@@ -37,7 +47,7 @@ impl CommandLineHandler for JoinSubnet {
                 public_key,
             )
             .await?;
-        log::info!("joined at epoch: {epoch}");
+        println!("joined at epoch: {epoch}");
 
         Ok(())
     }
@@ -58,6 +68,11 @@ pub struct JoinSubnetArgs {
     pub collateral: f64,
     #[arg(long, short, help = "The validator's metadata, hex encoded")]
     pub public_key: String,
+    #[arg(
+        long,
+        help = "Optionally add an initial balance to the validator in genesis in the subnet"
+    )]
+    pub initial_balance: Option<f64>,
 }
 
 /// The command to stake in a subnet from validator
@@ -135,4 +150,46 @@ pub struct UnstakeSubnetArgs {
         help = "The collateral to unstake from the subnet (in whole FIL units)"
     )]
     pub collateral: f64,
+}
+
+pub struct PreFundSubnet;
+
+#[async_trait]
+impl CommandLineHandler for PreFundSubnet {
+    type Arguments = PreFundSubnetArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("pre-fund subnet with args: {:?}", arguments);
+
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
+        provider
+            .prefund_subnet(
+                subnet.clone(),
+                from,
+                f64_to_token_amount(arguments.initial_balance)?,
+            )
+            .await?;
+        println!("address pre-funded successfully");
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(
+    name = "pre-fund",
+    about = "Pre fund with some funds in genesis in a child-subnet"
+)]
+pub struct PreFundSubnetArgs {
+    #[arg(long, short, help = "The address funded in the subnet")]
+    pub from: Option<String>,
+    #[arg(long, short, help = "The subnet to add balance to")]
+    pub subnet: String,
+    #[arg(help = "Optionally add an initial balance to the validator in genesis in the subnet")]
+    pub initial_balance: f64,
 }

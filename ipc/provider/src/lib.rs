@@ -298,6 +298,24 @@ impl IpcProvider {
             .await
     }
 
+    pub async fn prefund_subnet(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        balance: TokenAmount,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().pre_fund(subnet, sender, balance).await
+    }
+
     pub async fn stake(
         &mut self,
         subnet: SubnetID,

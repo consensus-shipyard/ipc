@@ -37,12 +37,16 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
         metadata: Vec<u8>,
     ) -> Result<ChainEpoch>;
 
+    /// Adds some initial balance to an address before a child subnet bootstraps to make
+    /// it available in the subnet at genesis.
+    async fn pre_fund(&self, subnet: SubnetID, from: Address, balance: TokenAmount) -> Result<()>;
+
     /// Allows validators that have already joined the subnet to stake more collateral
-    /// and increase their power in the subnet
+    /// and increase their power in the subnet.
     async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()>;
 
     /// Allows validators that have already joined the subnet to unstake collateral
-    /// and reduce their power in the subnet
+    /// and reduce their power in the subnet.
     async fn unstake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount)
         -> Result<()>;
 
@@ -142,6 +146,7 @@ pub struct SubnetGenesisInfo {
     pub min_collateral: TokenAmount,
     pub genesis_epoch: ChainEpoch,
     pub validators: Vec<Validator>,
+    pub genesis_balances: HashMap<Address, TokenAmount>,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual

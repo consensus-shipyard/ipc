@@ -312,6 +312,27 @@ impl SubnetManager for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
+    async fn pre_fund(&self, subnet: SubnetID, from: Address, balance: TokenAmount) -> Result<()> {
+        let balance = balance
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!("interacting with evm subnet contract: {address:} with balance: {balance:}");
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        let mut txn = contract.pre_fund();
+        txn.tx.set_value(balance);
+        let txn = call_with_premium_estimation(signer, txn).await?;
+
+        txn.send().await?;
+        Ok(())
+    }
+
     async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()> {
         let collateral = collateral
             .atto()
@@ -642,6 +663,9 @@ impl SubnetManager for EthSubnetManager {
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
+
+        let genesis_balances = contract.genesis_balances().await?;
+
         Ok(SubnetGenesisInfo {
             // Active validators limit set for the child subnet.
             active_validators_limit: contract.active_validators_limit().call().await?,
@@ -656,6 +680,7 @@ impl SubnetManager for EthSubnetManager {
             // Custom message fee that the child subnet wants to set for cross-net messages
             msg_fee: eth_to_fil_amount(&contract.min_cross_msg_fee().call().await?)?,
             validators: from_contract_validators(contract.genesis_validators().call().await?)?,
+            genesis_balances: into_genesis_balance_map(genesis_balances.0, genesis_balances.1)?,
         })
     }
 
@@ -1160,6 +1185,17 @@ fn is_valid_bootstrap_addr(input: &str) -> Option<(String, IpAddr, u16)> {
     }
 
     None
+}
+
+fn into_genesis_balance_map(
+    addrs: Vec<ethers::types::Address>,
+    balances: Vec<ethers::types::U256>,
+) -> Result<HashMap<Address, TokenAmount>> {
+    let mut map = HashMap::new();
+    for (a, b) in addrs.into_iter().zip(balances) {
+        map.insert(ethers_address_to_fil_address(&a)?, eth_to_fil_amount(&b)?);
+    }
+    Ok(map)
 }
 
 /// Convert the ipc SubnetID type to an evm address. It extracts the last address from the Subnet id
