@@ -2697,7 +2697,7 @@ dependencies = [
 [[package]]
 name = "ipc_actors_abis"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=fm-347-subnet-prefund#55f427ba3f786db6c5463f28061d2ea25a12e292"
+source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#cec4e7ede1e16589b86da91b18d197601c90d14b"
 dependencies = [
  "anyhow",
  "ethers",
