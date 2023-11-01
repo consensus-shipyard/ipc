@@ -20,8 +20,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using SubnetIDHelper for SubnetID;
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
-    function register() external payable {
-        if (msg.value < s.minStake) {
+    /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
+    /// subnet from genesis (without having to wait for the subnet to be spawned to propagate the funds).
+    function register(uint256 genesisCircSupply) external payable {
+        uint256 collateral = msg.value - genesisCircSupply;
+        if (collateral < s.minStake) {
             revert NotEnoughFunds();
         }
 
@@ -34,9 +37,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
 
         subnet.id = subnetId;
-        subnet.stake = msg.value;
+        subnet.stake = collateral;
         subnet.status = Status.Active;
         subnet.genesisEpoch = block.number;
+        subnet.circSupply = genesisCircSupply;
 
         s.subnetKeys.push(subnetId.toHash());
 

@@ -137,6 +137,18 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("preFund"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("preFund"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("stake"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -592,6 +604,15 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NotGateway"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -662,6 +683,17 @@ pub mod subnet_actor_manager_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("ReentrancyError"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("SubnetAlreadyBootstrapped"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "SubnetAlreadyBootstrapped",
+                            ),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -785,6 +817,12 @@ pub mod subnet_actor_manager_facet {
         pub fn leave(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([214, 109, 158, 25], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `preFund` (0x0b7fbe60) function
+        pub fn pre_fund(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([11, 127, 190, 96], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `stake` (0x3a4b66f1) function
@@ -1046,6 +1084,19 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "NotEnoughCollateral", abi = "NotEnoughCollateral()")]
     pub struct NotEnoughCollateral;
+    ///Custom Error type `NotEnoughFunds` with signature `NotEnoughFunds()` and selector `0x81b5ad68`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "NotEnoughFunds", abi = "NotEnoughFunds()")]
+    pub struct NotEnoughFunds;
     ///Custom Error type `NotGateway` with signature `NotGateway()` and selector `0xe7e601db`
     #[derive(
         Clone,
@@ -1137,6 +1188,22 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "ReentrancyError", abi = "ReentrancyError()")]
     pub struct ReentrancyError;
+    ///Custom Error type `SubnetAlreadyBootstrapped` with signature `SubnetAlreadyBootstrapped()` and selector `0x3673e5e6`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "SubnetAlreadyBootstrapped",
+        abi = "SubnetAlreadyBootstrapped()"
+    )]
+    pub struct SubnetAlreadyBootstrapped;
     ///Custom Error type `SubnetAlreadyKilled` with signature `SubnetAlreadyKilled()` and selector `0x49191df6`
     #[derive(
         Clone,
@@ -1181,6 +1248,7 @@ pub mod subnet_actor_manager_facet {
         NoCollateralToWithdraw(NoCollateralToWithdraw),
         NotAllValidatorsHaveLeft(NotAllValidatorsHaveLeft),
         NotEnoughCollateral(NotEnoughCollateral),
+        NotEnoughFunds(NotEnoughFunds),
         NotGateway(NotGateway),
         NotOwnerOfPublicKey(NotOwnerOfPublicKey),
         NotStakedBefore(NotStakedBefore),
@@ -1188,6 +1256,7 @@ pub mod subnet_actor_manager_facet {
         PQDoesNotContainAddress(PQDoesNotContainAddress),
         PQEmpty(PQEmpty),
         ReentrancyError(ReentrancyError),
+        SubnetAlreadyBootstrapped(SubnetAlreadyBootstrapped),
         SubnetAlreadyKilled(SubnetAlreadyKilled),
         WithdrawExceedingCollateral(WithdrawExceedingCollateral),
         /// The standard solidity revert string, with selector
@@ -1260,6 +1329,9 @@ pub mod subnet_actor_manager_facet {
             {
                 return Ok(Self::NotEnoughCollateral(decoded));
             }
+            if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::NotEnoughFunds(decoded));
+            }
             if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotGateway(decoded));
             }
@@ -1284,6 +1356,11 @@ pub mod subnet_actor_manager_facet {
             }
             if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ReentrancyError(decoded));
+            }
+            if let Ok(decoded) =
+                <SubnetAlreadyBootstrapped as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::SubnetAlreadyBootstrapped(decoded));
             }
             if let Ok(decoded) =
                 <SubnetAlreadyKilled as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1331,6 +1408,7 @@ pub mod subnet_actor_manager_facet {
                 Self::NotEnoughCollateral(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::NotEnoughFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotGateway(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotOwnerOfPublicKey(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -1342,6 +1420,9 @@ pub mod subnet_actor_manager_facet {
                 }
                 Self::PQEmpty(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ReentrancyError(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SubnetAlreadyBootstrapped(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::SubnetAlreadyKilled(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1403,6 +1484,10 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
+                    == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <NotGateway as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <NotOwnerOfPublicKey as ::ethers::contract::EthError>::selector() => {
@@ -1422,6 +1507,10 @@ pub mod subnet_actor_manager_facet {
                     == <PQEmpty as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SubnetAlreadyBootstrapped as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1453,6 +1542,7 @@ pub mod subnet_actor_manager_facet {
                 Self::NoCollateralToWithdraw(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotAllValidatorsHaveLeft(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughCollateral(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotGateway(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotOwnerOfPublicKey(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotStakedBefore(element) => ::core::fmt::Display::fmt(element, f),
@@ -1460,6 +1550,7 @@ pub mod subnet_actor_manager_facet {
                 Self::PQDoesNotContainAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PQEmpty(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SubnetAlreadyBootstrapped(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetAlreadyKilled(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WithdrawExceedingCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
@@ -1531,6 +1622,11 @@ pub mod subnet_actor_manager_facet {
             Self::NotEnoughCollateral(value)
         }
     }
+    impl ::core::convert::From<NotEnoughFunds> for SubnetActorManagerFacetErrors {
+        fn from(value: NotEnoughFunds) -> Self {
+            Self::NotEnoughFunds(value)
+        }
+    }
     impl ::core::convert::From<NotGateway> for SubnetActorManagerFacetErrors {
         fn from(value: NotGateway) -> Self {
             Self::NotGateway(value)
@@ -1564,6 +1660,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<ReentrancyError> for SubnetActorManagerFacetErrors {
         fn from(value: ReentrancyError) -> Self {
             Self::ReentrancyError(value)
+        }
+    }
+    impl ::core::convert::From<SubnetAlreadyBootstrapped> for SubnetActorManagerFacetErrors {
+        fn from(value: SubnetAlreadyBootstrapped) -> Self {
+            Self::SubnetAlreadyBootstrapped(value)
         }
     }
     impl ::core::convert::From<SubnetAlreadyKilled> for SubnetActorManagerFacetErrors {
@@ -1817,6 +1918,19 @@ pub mod subnet_actor_manager_facet {
     )]
     #[ethcall(name = "leave", abi = "leave()")]
     pub struct LeaveCall;
+    ///Container type for all input parameters for the `preFund` function with signature `preFund()` and selector `0x0b7fbe60`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "preFund", abi = "preFund()")]
+    pub struct PreFundCall;
     ///Container type for all input parameters for the `stake` function with signature `stake()` and selector `0x3a4b66f1`
     #[derive(
         Clone,
@@ -1896,6 +2010,7 @@ pub mod subnet_actor_manager_facet {
         Join(JoinCall),
         Kill(KillCall),
         Leave(LeaveCall),
+        PreFund(PreFundCall),
         Stake(StakeCall),
         SubmitCheckpoint(SubmitCheckpointCall),
         Unstake(UnstakeCall),
@@ -1933,6 +2048,9 @@ pub mod subnet_actor_manager_facet {
             if let Ok(decoded) = <LeaveCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Leave(decoded));
             }
+            if let Ok(decoded) = <PreFundCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::PreFund(decoded));
+            }
             if let Ok(decoded) = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Stake(decoded));
             }
@@ -1966,6 +2084,7 @@ pub mod subnet_actor_manager_facet {
                 Self::Join(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Leave(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PreFund(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Stake(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::SubmitCheckpoint(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Unstake(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -1985,6 +2104,7 @@ pub mod subnet_actor_manager_facet {
                 Self::Join(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Leave(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PreFund(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Stake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubmitCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Unstake(element) => ::core::fmt::Display::fmt(element, f),
@@ -2027,6 +2147,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<LeaveCall> for SubnetActorManagerFacetCalls {
         fn from(value: LeaveCall) -> Self {
             Self::Leave(value)
+        }
+    }
+    impl ::core::convert::From<PreFundCall> for SubnetActorManagerFacetCalls {
+        fn from(value: PreFundCall) -> Self {
+            Self::PreFund(value)
         }
     }
     impl ::core::convert::From<StakeCall> for SubnetActorManagerFacetCalls {

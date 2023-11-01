@@ -67,3 +67,4 @@ error SubnetNotActive();
 error SubnetNotFound();
 error WithdrawExceedingCollateral();
 error ZeroMembershipWeight();
+error SubnetAlreadyBootstrapped();

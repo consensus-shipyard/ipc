@@ -18,6 +18,9 @@ interface ISubnetActor {
     /// Method that allows a validator to increase their stake
     function stake() external payable;
 
+    /// Method that allows to pre-fund an address in the subnet before it bootstraps.
+    function preFund() external payable;
+
     /// Method that allows a validator to unstake their collateral from a subnet
     function unstake(uint256 amount) external;
 

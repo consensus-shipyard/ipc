@@ -10,7 +10,7 @@ import {FvmAddress} from "../structs/FvmAddress.sol";
 interface IGateway {
     /// @notice Register is called by subnet actors to put the required collateral
     /// and register the subnet to the hierarchy.
-    function register() external payable;
+    function register(uint256 genesisCircSupply) external payable;
 
     /// @notice AddStake adds stake to the collateral of a subnet.
     function addStake() external payable;

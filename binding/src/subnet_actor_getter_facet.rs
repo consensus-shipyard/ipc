@@ -282,6 +282,63 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("genesisBalances"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("genesisBalances"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address[]"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256[]"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("genesisCircSupply"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("genesisCircSupply"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("genesisValidators"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -813,6 +870,28 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([61, 163, 50, 65], messages)
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `genesisBalances` (0x903e6930) function
+        pub fn genesis_balances(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            (
+                ::std::vec::Vec<::ethers::core::types::Address>,
+                ::std::vec::Vec<::ethers::core::types::U256>,
+            ),
+        > {
+            self.0
+                .method_hash([144, 62, 105, 48], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `genesisCircSupply` (0x948628a9) function
+        pub fn genesis_circ_supply(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([148, 134, 40, 169], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `genesisValidators` (0xd92e8f12) function
         pub fn genesis_validators(
             &self,
@@ -1059,6 +1138,32 @@ pub mod subnet_actor_getter_facet {
     pub struct CrossMsgsHashCall {
         pub messages: ::std::vec::Vec<CrossMsg>,
     }
+    ///Container type for all input parameters for the `genesisBalances` function with signature `genesisBalances()` and selector `0x903e6930`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "genesisBalances", abi = "genesisBalances()")]
+    pub struct GenesisBalancesCall;
+    ///Container type for all input parameters for the `genesisCircSupply` function with signature `genesisCircSupply()` and selector `0x948628a9`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "genesisCircSupply", abi = "genesisCircSupply()")]
+    pub struct GenesisCircSupplyCall;
     ///Container type for all input parameters for the `genesisValidators` function with signature `genesisValidators()` and selector `0xd92e8f12`
     #[derive(
         Clone,
@@ -1306,6 +1411,8 @@ pub mod subnet_actor_getter_facet {
         BottomUpCheckpointHashAtEpoch(BottomUpCheckpointHashAtEpochCall),
         Consensus(ConsensusCall),
         CrossMsgsHash(CrossMsgsHashCall),
+        GenesisBalances(GenesisBalancesCall),
+        GenesisCircSupply(GenesisCircSupplyCall),
         GenesisValidators(GenesisValidatorsCall),
         GetBootstrapNodes(GetBootstrapNodesCall),
         GetConfigurationNumbers(GetConfigurationNumbersCall),
@@ -1359,6 +1466,16 @@ pub mod subnet_actor_getter_facet {
             if let Ok(decoded) = <CrossMsgsHashCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::CrossMsgsHash(decoded));
+            }
+            if let Ok(decoded) =
+                <GenesisBalancesCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::GenesisBalances(decoded));
+            }
+            if let Ok(decoded) =
+                <GenesisCircSupplyCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::GenesisCircSupply(decoded));
             }
             if let Ok(decoded) =
                 <GenesisValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1458,6 +1575,8 @@ pub mod subnet_actor_getter_facet {
                 }
                 Self::Consensus(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::CrossMsgsHash(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GenesisBalances(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GenesisCircSupply(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GenesisValidators(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GetBootstrapNodes(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GetConfigurationNumbers(element) => {
@@ -1502,6 +1621,8 @@ pub mod subnet_actor_getter_facet {
                 }
                 Self::Consensus(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CrossMsgsHash(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GenesisBalances(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GenesisCircSupply(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetBootstrapNodes(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetConfigurationNumbers(element) => ::core::fmt::Display::fmt(element, f),
@@ -1559,6 +1680,16 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<CrossMsgsHashCall> for SubnetActorGetterFacetCalls {
         fn from(value: CrossMsgsHashCall) -> Self {
             Self::CrossMsgsHash(value)
+        }
+    }
+    impl ::core::convert::From<GenesisBalancesCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GenesisBalancesCall) -> Self {
+            Self::GenesisBalances(value)
+        }
+    }
+    impl ::core::convert::From<GenesisCircSupplyCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GenesisCircSupplyCall) -> Self {
+            Self::GenesisCircSupply(value)
         }
     }
     impl ::core::convert::From<GenesisValidatorsCall> for SubnetActorGetterFacetCalls {
@@ -1735,6 +1866,33 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct CrossMsgsHashReturn(pub [u8; 32]);
+    ///Container type for all return fields from the `genesisBalances` function with signature `genesisBalances()` and selector `0x903e6930`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GenesisBalancesReturn(
+        pub ::std::vec::Vec<::ethers::core::types::Address>,
+        pub ::std::vec::Vec<::ethers::core::types::U256>,
+    );
+    ///Container type for all return fields from the `genesisCircSupply` function with signature `genesisCircSupply()` and selector `0x948628a9`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GenesisCircSupplyReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `genesisValidators` function with signature `genesisValidators()` and selector `0xd92e8f12`
     #[derive(
         Clone,

@@ -10,7 +10,9 @@ contract SubnetRegistry is ReentrancyGuard {
     address public immutable GATEWAY;
 
     /// The getter and manager facet shared by diamond
+    // solhint-disable-next-line var-name-mixedcase
     address public immutable SUBNET_GETTER_FACET;
+    // solhint-disable-next-line var-name-mixedcase
     address public immutable SUBNET_MANAGER_FACET;
 
     /// The subnet getter facet functions selectors

@@ -13,9 +13,12 @@ contract DefaultGatewayMock is IGateway {
     uint8 private dummy;
     address subnetActor;
 
-    function register() external payable {
+    function register(uint256 _genesisCircSupply) external payable {
         // silent warning
         msg.value;
+
+        // silent warning
+        _genesisCircSupply;
 
         // make method perform txn
         dummy = 1;

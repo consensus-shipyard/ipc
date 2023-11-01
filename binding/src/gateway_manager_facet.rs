@@ -74,7 +74,13 @@ pub mod gateway_manager_facet {
                     ::std::borrow::ToOwned::to_owned("register"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("register"),
-                        inputs: ::std::vec![],
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("genesisCircSupply"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint256"),
+                            ),
+                        },],
                         outputs: ::std::vec![],
                         constant: ::core::option::Option::None,
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
@@ -287,10 +293,13 @@ pub mod gateway_manager_facet {
                 .method_hash([65, 192, 225, 181], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `register` (0x1aa3a008) function
-        pub fn register(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        ///Calls the contract's `register` (0xf207564e) function
+        pub fn register(
+            &self,
+            genesis_circ_supply: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([26, 163, 160, 8], ())
+                .method_hash([242, 7, 86, 78], genesis_circ_supply)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `release` (0x9ba53580) function
@@ -747,7 +756,7 @@ pub mod gateway_manager_facet {
     )]
     #[ethcall(name = "kill", abi = "kill()")]
     pub struct KillCall;
-    ///Container type for all input parameters for the `register` function with signature `register()` and selector `0x1aa3a008`
+    ///Container type for all input parameters for the `register` function with signature `register(uint256)` and selector `0xf207564e`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -758,8 +767,10 @@ pub mod gateway_manager_facet {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "register", abi = "register()")]
-    pub struct RegisterCall;
+    #[ethcall(name = "register", abi = "register(uint256)")]
+    pub struct RegisterCall {
+        pub genesis_circ_supply: ::ethers::core::types::U256,
+    }
     ///Container type for all input parameters for the `release` function with signature `release((uint8,bytes),uint256)` and selector `0x9ba53580`
     #[derive(
         Clone,

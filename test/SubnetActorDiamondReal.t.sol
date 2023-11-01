@@ -450,4 +450,63 @@ contract SubnetActorDiamondRealTest is Test {
             "parent.toHash() == SubnetID({root: ROOTNET_CHAINID, route: path}).toHash()"
         );
     }
+
+    function testSubnetActorDiamondReal_PreFund_works() public {
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        address preFunder = address(102);
+
+        // total collateral in the gateway
+        uint256 collateral = 0;
+        uint256 fundAmount = 100;
+
+        require(!saGetter.isActiveValidator(validator1), "active validator1");
+        require(!saGetter.isWaitingValidator(validator1), "waiting validator1");
+
+        // ======== Step. Join ======
+        // pre-fund from validator and from pre-funder
+        vm.startPrank(validator1);
+        vm.deal(validator1, fundAmount);
+        saManager.preFund{value: fundAmount}();
+        vm.startPrank(preFunder);
+        vm.deal(preFunder, fundAmount);
+        saManager.preFund{value: fundAmount}();
+
+        // initial validator joins
+        vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.startPrank(validator1);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        collateral = DEFAULT_MIN_VALIDATOR_STAKE;
+
+        require(
+            gatewayAddress.balance == collateral + 2 * fundAmount,
+            "gw balance is incorrect after validator1 joining"
+        );
+
+        require(saGetter.genesisCircSupply() == 2 * fundAmount, "genesis circ supply not correct");
+        (address[] memory genesisAddrs, ) = saGetter.genesisBalances();
+        require(genesisAddrs.length == 2, "not two genesis addresses");
+
+        // collateral confirmed immediately and network boostrapped
+        ValidatorInfo memory v = saGetter.getValidator(validator1);
+        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected");
+        require(v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "confirmed collateral not equal to collateral");
+        require(saGetter.isActiveValidator(validator1), "not active validator 1");
+        require(!saGetter.isWaitingValidator(validator1), "waiting validator 1");
+        TestUtils.ensureBytesEqual(v.metadata, publicKey1);
+        require(saGetter.bootstrapped(), "subnet not bootstrapped");
+        require(!saGetter.killed(), "subnet killed");
+        require(saGetter.genesisValidators().length == 1, "not one validator in genesis");
+
+        (uint64 nextConfigNum, uint64 startConfigNum) = saGetter.getConfigurationNumbers();
+        require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "next config num not 1");
+        require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
+
+        vm.startPrank(preFunder);
+        vm.expectRevert(SubnetAlreadyBootstrapped.selector);
+        vm.deal(preFunder, fundAmount);
+        saManager.preFund{value: fundAmount}();
+
+        vm.stopPrank();
+    }
 }

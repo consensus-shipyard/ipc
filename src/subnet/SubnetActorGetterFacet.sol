@@ -50,6 +50,27 @@ contract SubnetActorGetterFacet {
         return s.genesisValidators;
     }
 
+    function genesisCircSupply() external view returns (uint256) {
+        return s.genesisCircSupply;
+    }
+
+    function genesisBalances() external view returns (address[] memory, uint256[] memory) {
+        uint256 numAddresses = s.genesisBalanceKeys.length;
+        address[] memory addresses = new address[](numAddresses);
+        uint256[] memory balances = new uint256[](numAddresses);
+
+        for (uint256 i = 0; i < numAddresses; ) {
+            address addr = s.genesisBalanceKeys[i];
+            addresses[i] = addr;
+            balances[i] = s.genesisBalance[addr];
+
+            unchecked {
+                ++i;
+            }
+        }
+        return (addresses, balances);
+    }
+
     function bottomUpCheckPeriod() external view returns (uint64) {
         return s.bottomUpCheckPeriod;
     }

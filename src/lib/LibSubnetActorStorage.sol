@@ -12,8 +12,15 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
 struct SubnetActorStorage {
     /// @notice contains all committed bottom-up checkpoint at specific epoch
     mapping(uint64 => BottomUpCheckpoint) committedCheckpoints;
-    // @notice initial set of validators joining in genesis
+    /// @notice initial set of validators joining in genesis
     Validator[] genesisValidators;
+    /// @notice initial circulating supply provided by genesis validators to use when bootstrapping
+    /// the network.
+    uint256 genesisCircSupply;
+    /// @notice genesis balance to be allocated to the subnet in genesis.
+    mapping(address => uint256) genesisBalance;
+    /// @notice genesis balance addresses
+    address[] genesisBalanceKeys;
     /// @notice The height of the last committed bottom-up checkpoint.
     uint64 lastBottomUpCheckpointHeight;
     /// @notice Minimal activation collateral

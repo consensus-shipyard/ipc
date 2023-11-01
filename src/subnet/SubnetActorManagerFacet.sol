@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
+import {SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
@@ -89,6 +89,26 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         }
     }
 
+    /// @notice method to add some initial balance into a subnet that hasn't yet bootstrapped.
+    /// @dev This balance is added to user addresses in genesis, and becomes part of the genesis
+    /// circulating supply.
+    function preFund() external payable {
+        if (msg.value == 0) {
+            revert NotEnoughFunds();
+        }
+
+        if (s.bootstrapped) {
+            revert SubnetAlreadyBootstrapped();
+        }
+
+        if (s.genesisBalance[msg.sender] == 0) {
+            s.genesisBalanceKeys.push(msg.sender);
+        }
+
+        s.genesisBalance[msg.sender] += msg.value;
+        s.genesisCircSupply += msg.value;
+    }
+
     /// @notice method that allows a validator to join the subnet
     /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant notKilled {
@@ -122,7 +142,10 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
                     s.bootstrapped = true;
                     emit SubnetBootstrapped(s.genesisValidators);
 
-                    IGateway(s.ipcGatewayAddr).register{value: totalCollateral}();
+                    // register adding the genesis circulating supply (if it exists)
+                    IGateway(s.ipcGatewayAddr).register{value: totalCollateral + s.genesisCircSupply}(
+                        s.genesisCircSupply
+                    );
                 }
             }
         } else {
