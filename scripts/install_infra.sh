@@ -19,15 +19,10 @@ fi
 
 build_infra() {
     echo "[*] Building fendermint..."
-    make build docker-build
     cd $PWD
 
     echo "[*] Updating infra scripts..."
     cp -r $infra_path/fendermint/infra/* $infra_path
-    # TODO: This will no longer be necessary once https://github.com/consensus-shipyard/fendermint/pull/329
-    # is merged
-    mkdir -p ./target/release
-    mv $infra_path/fendermint/target/release/fendermint $PWD/target/release
 }
 
 # Function to display help message
