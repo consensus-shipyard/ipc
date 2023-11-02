@@ -79,3 +79,41 @@ pub(crate) struct ReleaseArgs {
     #[arg(help = "The amount to release in FIL, in whole FIL")]
     pub amount: f64,
 }
+
+pub struct PreRelease;
+
+#[async_trait]
+impl CommandLineHandler for PreRelease {
+    type Arguments = PreReleaseArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("pre-release subnet with args: {:?}", arguments);
+
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
+        provider
+            .pre_release(subnet.clone(), from, f64_to_token_amount(arguments.amount)?)
+            .await?;
+        println!("address pre-release successfully");
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(
+    name = "pre-release",
+    about = "Release some funds from the genesis balance of the child subnet"
+)]
+pub struct PreReleaseArgs {
+    #[arg(long, short, help = "The address funded in the subnet")]
+    pub from: Option<String>,
+    #[arg(long, short, help = "The subnet to release balance from")]
+    pub subnet: String,
+    #[arg(help = "Amount to release from the genesis balance of a child subnet")]
+    pub amount: f64,
+}

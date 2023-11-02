@@ -298,7 +298,7 @@ impl IpcProvider {
             .await
     }
 
-    pub async fn prefund_subnet(
+    pub async fn pre_fund(
         &mut self,
         subnet: SubnetID,
         from: Option<Address>,
@@ -314,6 +314,24 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
 
         conn.manager().pre_fund(subnet, sender, balance).await
+    }
+
+    pub async fn pre_release(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        amount: TokenAmount,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().pre_release(subnet, sender, amount).await
     }
 
     pub async fn stake(

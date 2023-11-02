@@ -2697,7 +2697,7 @@ dependencies = [
 [[package]]
 name = "ipc_actors_abis"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#cec4e7ede1e16589b86da91b18d197601c90d14b"
+source = "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git?branch=dev#b4c23f216b813f10dfa6fa54ea4cb248012cf312"
 dependencies = [
  "anyhow",
  "ethers",

@@ -1,5 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
+use self::fund::{PreFund, PreFundArgs};
+use self::release::{PreRelease, PreReleaseArgs};
 use self::topdown_cross::{ListTopdownMsgs, ListTopdownMsgsArgs};
 use crate::commands::crossmsg::fund::Fund;
 use crate::commands::crossmsg::propagate::Propagate;
@@ -28,7 +30,9 @@ impl CrossMsgsCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
             Commands::Fund(args) => Fund::handle(global, args).await,
+            Commands::PreFund(args) => PreFund::handle(global, args).await,
             Commands::Release(args) => Release::handle(global, args).await,
+            Commands::PreRelease(args) => PreRelease::handle(global, args).await,
             Commands::Propagate(args) => Propagate::handle(global, args).await,
             Commands::ListTopdownMsgs(args) => ListTopdownMsgs::handle(global, args).await,
         }
@@ -38,7 +42,9 @@ impl CrossMsgsCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     Fund(FundArgs),
+    PreFund(PreFundArgs),
     Release(ReleaseArgs),
+    PreRelease(PreReleaseArgs),
     Propagate(PropagateArgs),
     ListTopdownMsgs(ListTopdownMsgsArgs),
 }

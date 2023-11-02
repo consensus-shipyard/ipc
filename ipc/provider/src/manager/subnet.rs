@@ -41,6 +41,10 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
     /// it available in the subnet at genesis.
     async fn pre_fund(&self, subnet: SubnetID, from: Address, balance: TokenAmount) -> Result<()>;
 
+    /// Releases initial funds from an address for a subnet that has not yet been bootstrapped
+    async fn pre_release(&self, subnet: SubnetID, from: Address, amount: TokenAmount)
+        -> Result<()>;
+
     /// Allows validators that have already joined the subnet to stake more collateral
     /// and increase their power in the subnet.
     async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()>;

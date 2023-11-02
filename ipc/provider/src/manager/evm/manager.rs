@@ -333,6 +333,33 @@ impl SubnetManager for EthSubnetManager {
         Ok(())
     }
 
+    async fn pre_release(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        amount: TokenAmount,
+    ) -> Result<()> {
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!("pre-release funds from {subnet:} at contract: {address:}");
+
+        let amount = amount
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid pre-release amount"))?;
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        call_with_premium_estimation(signer, contract.pre_release(amount.into()))
+            .await?
+            .send()
+            .await?
+            .await?;
+
+        Ok(())
+    }
+
     async fn stake(&self, subnet: SubnetID, from: Address, collateral: TokenAmount) -> Result<()> {
         let collateral = collateral
             .atto()

@@ -13,10 +13,7 @@ use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
 use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootstrapsArgs};
-use self::join::{
-    PreFundSubnet, PreFundSubnetArgs, StakeSubnet, StakeSubnetArgs, UnstakeSubnet,
-    UnstakeSubnetArgs,
-};
+use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
 use self::leave::{Claim, ClaimArgs};
 use self::rpc::{ChainIdSubnet, ChainIdSubnetArgs};
 
@@ -58,7 +55,6 @@ impl SubnetCommandsArgs {
             Commands::AddBootstrap(args) => AddBootstrap::handle(global, args).await,
             Commands::ListBootstraps(args) => ListBootstraps::handle(global, args).await,
             Commands::GenesisEpoch(args) => GenesisEpoch::handle(global, args).await,
-            Commands::PreFund(args) => PreFundSubnet::handle(global, args).await,
         }
     }
 }
@@ -79,5 +75,4 @@ pub(crate) enum Commands {
     AddBootstrap(AddBootstrapArgs),
     ListBootstraps(ListBootstrapsArgs),
     GenesisEpoch(GenesisEpochArgs),
-    PreFund(PreFundSubnetArgs),
 }
