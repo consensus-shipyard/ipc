@@ -30,7 +30,7 @@ impl CommandLineHandler for JoinSubnet {
         };
         let public_key = hex::decode(&arguments.public_key)?;
         if let Some(initial_balance) = arguments.initial_balance {
-            println!("pre-funding address with {initial_balance}");
+            log::info!("pre-funding address with {initial_balance}");
             provider
                 .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)
                 .await?;

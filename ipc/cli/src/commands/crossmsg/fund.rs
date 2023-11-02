@@ -96,7 +96,7 @@ impl CommandLineHandler for PreFund {
                 f64_to_token_amount(arguments.initial_balance)?,
             )
             .await?;
-        println!("address pre-funded successfully");
+        log::info!("address pre-funded successfully");
 
         Ok(())
     }

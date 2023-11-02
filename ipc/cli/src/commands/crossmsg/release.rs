@@ -98,7 +98,7 @@ impl CommandLineHandler for PreRelease {
         provider
             .pre_release(subnet.clone(), from, f64_to_token_amount(arguments.amount)?)
             .await?;
-        println!("address pre-release successfully");
+        log::info!("address pre-release successfully");
 
         Ok(())
     }
