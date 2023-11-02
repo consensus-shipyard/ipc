@@ -9,7 +9,6 @@ error CannotSendCrossMsgToItself();
 error CheckpointAlreadyExists();
 error CheckpointAlreadyProcessed();
 error CheckpointInfoAlreadyExists();
-error CheckpointMembershipNotCreated();
 error CheckpointNotCreated();
 error CollateralIsZero();
 error EmptyAddress();

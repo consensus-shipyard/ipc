@@ -12,7 +12,7 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
 import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory} from "../errors/IPCErrors.sol";
-import {NotEnoughBalance, NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated, CheckpointMembershipNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
+import {NotEnoughBalance, NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -225,14 +225,11 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         if (height < s.bottomUpCheckpointRetentionHeight) {
             revert CheckpointAlreadyProcessed();
         }
-        BottomUpCheckpoint memory checkpoint = s.bottomUpCheckpoints[height];
-        if (checkpoint.blockHeight == 0) {
-            revert CheckpointNotCreated();
-        }
 
-        CheckpointInfo storage checkpointInfo = s.bottomUpCheckpointInfo[height];
-        if (checkpointInfo.threshold == 0) {
-            revert CheckpointMembershipNotCreated();
+        (bool exists, BottomUpCheckpoint storage checkpoint, CheckpointInfo storage checkpointInfo) = LibGateway
+            .getBottomUpCheckpointWithInfo(height);
+        if (!exists) {
+            revert CheckpointNotCreated();
         }
 
         bytes32 checkpointHash = checkpointInfo.hash;
@@ -304,11 +301,8 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         if (checkpoint.blockHeight % s.bottomUpCheckPeriod != 0) {
             revert InvalidCheckpointEpoch();
         }
-        if (s.bottomUpCheckpoints[checkpoint.blockHeight].blockHeight > 0) {
+        if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
-        }
-        if (s.bottomUpCheckpointInfo[checkpoint.blockHeight].threshold > 0) {
-            revert CheckpointInfoAlreadyExists();
         }
 
         if (membershipWeight == 0) {
@@ -318,18 +312,19 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         uint256 threshold = LibGateway.weightNeeded(membershipWeight, s.majorityPercentage);
 
         // process the checkpoint
-        s.bottomUpCheckpoints[checkpoint.blockHeight] = checkpoint;
         bool ok = s.incompleteCheckpoints.add(checkpoint.blockHeight);
         if (!ok) {
             revert FailedAddIncompleteCheckpoint();
         }
-        s.bottomUpCheckpointInfo[checkpoint.blockHeight] = CheckpointInfo({
+        
+        CheckpointInfo memory info = CheckpointInfo({
             hash: checkpoint.toHash(),
             rootHash: membershipRootHash,
             threshold: threshold,
             currentWeight: 0,
             reached: false
         });
+        LibGateway.storeBottomUpCheckpointWithInfo(checkpoint, info);
     }
 
     /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)

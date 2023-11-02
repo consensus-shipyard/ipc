@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {CrossMsg, BottomUpCheckpoint, ParentFinality} from "../structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
 import {Membership, Validator} from "../structs/Subnet.sol";
 import {OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
@@ -38,6 +38,36 @@ library LibGateway {
         epoch = LibGateway.getNextEpoch(block.number, s.bottomUpCheckPeriod);
         checkpoint = s.bottomUpCheckpoints[epoch];
         exists = !checkpoint.subnetID.isEmpty();
+    }
+
+    /// @notice returns the bottom-up checkpoint and its info at the target epoch
+    function getBottomUpCheckpointWithInfo(
+        uint64 epoch
+    ) internal view returns (bool exists, BottomUpCheckpoint storage checkpoint, CheckpointInfo storage checkpointInfo) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        checkpoint = s.bottomUpCheckpoints[epoch];
+        checkpointInfo = s.bottomUpCheckpointInfo[epoch];
+
+        exists = checkpoint.blockHeight != 0;
+    }
+
+    /// @notice checks if the bottom-up checkpoint already exists at the target epoch
+    function bottomUpCheckpointExists(
+        uint64 epoch
+    ) internal view returns (bool) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        return s.bottomUpCheckpoints[epoch].blockHeight != 0;
+    }
+
+    /// @notice stores checkpoint and its info to storage.
+    function storeBottomUpCheckpointWithInfo(
+        BottomUpCheckpoint memory checkpoint, CheckpointInfo memory checkpointInfo
+    ) internal {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        s.bottomUpCheckpoints[checkpoint.blockHeight] = checkpoint;
+        s.bottomUpCheckpointInfo[checkpoint.blockHeight] = checkpointInfo;
     }
 
     /// @notice obtain the ipc parent finality at certain block number
