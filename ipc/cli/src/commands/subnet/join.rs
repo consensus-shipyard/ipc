@@ -179,13 +179,13 @@ impl CommandLineHandler for PreFundSubnet {
 #[derive(Debug, Args)]
 #[command(
     name = "pre-fund",
-    about = "Pre fund with some funds in genesis in a child-subnet"
+    about = "Add some funds in genesis to an address in a child-subnet"
 )]
 pub struct PreFundSubnetArgs {
     #[arg(long, short, help = "The address funded in the subnet")]
     pub from: Option<String>,
     #[arg(long, short, help = "The subnet to add balance to")]
     pub subnet: String,
-    #[arg(help = "Optionally add an initial balance to the validator in genesis in the subnet")]
+    #[arg(help = "Add an initial balance for the address in genesis in the subnet")]
     pub initial_balance: f64,
 }

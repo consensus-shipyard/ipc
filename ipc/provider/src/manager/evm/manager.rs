@@ -316,7 +316,7 @@ impl SubnetManager for EthSubnetManager {
         let balance = balance
             .atto()
             .to_u128()
-            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+            .ok_or_else(|| anyhow!("invalid initial balance"))?;
 
         let address = contract_address_from_subnet(&subnet)?;
         log::info!("interacting with evm subnet contract: {address:} with balance: {balance:}");
