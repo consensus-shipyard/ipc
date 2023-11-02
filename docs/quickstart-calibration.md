@@ -162,10 +162,20 @@ At the end of the output, this command should return the ID of your new bootstra
 ```
 Remember the address of your bootstrap for the next step. This address has the following format `id@ip:port`, and by default shows the public IP of your network interface. Feel free to adjust the `ip` to use a reachable IP for your deployment so other nodes can contact it (in our case our localhost IP, `127.0.0.1`).
 
+* We can get the address of the deployed bootstrap node by running:
+```bash
+cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-id
+```
+
+* To shut down the bootstrap node run:
+```bash
+cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-down
+```
+
 * To advertise the endpoint to the rest of nodes in the network we need to run:
 ```bash
 # Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
-./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint=<BOOTSRAP_ENDPOINT>
+./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint="<BOOTSRAP_ENDPOINT>"
 ```
 
 * The bootstrap nodes currently deployed in the network can be queried through the following command:

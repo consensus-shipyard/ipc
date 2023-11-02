@@ -60,9 +60,16 @@ impl CommandLineHandler for ListBootstraps {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        for s in provider.list_bootstrap_nodes(&subnet).await? {
-            print!("{s},");
-        }
+        print!(
+            "{}",
+            provider
+                .list_bootstrap_nodes(&subnet)
+                .await?
+                .iter()
+                .as_slice()
+                .join(",")
+        );
+
         println!();
         Ok(())
     }
