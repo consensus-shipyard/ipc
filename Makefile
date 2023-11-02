@@ -3,7 +3,7 @@
 all: test build
 
 build:
-	cargo build -Z unstable-options --release --out-dir ./bin -p ipc-cli
+	cargo build --release -p ipc-cli && cp target/release/ipc-cli ./bin
 
 test:
 	cargo test --release --workspace --exclude ipc_e2e itest
