@@ -16,7 +16,16 @@ IPC_ACTORS_OUT         = $(IPC_ACTORS_DIR)/out
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
 # Override PROFILE env var to choose between `local | ci`
-PROFILE?=local
+PROFILE ?= local
+
+# Set to `--push` to push the multiarch image during the build.
+# Leave on `--load` for local build, but it only works for a single platform.
+BUILDX_STORE ?= --load
+# Set according to what kind of `--platform` and `--cache` to use.
+# Leave empty for local builds, then the platform matches the local one.
+BUILDX_FLAGS ?=
+# Set to the `<repo>/<image>:<tag>` label the image.
+BUILDX_TAG   ?= fendermint:latest
 
 all: test build diagrams
 
@@ -59,22 +68,27 @@ check-fmt:
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
 
-docker-build: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE) $(IPC_ACTORS_ABI)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE) $(IPC_ACTORS_ABI)
+	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
-
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
 	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
 
+docker-build: docker-deps
 	if [ "$(PROFILE)" = "ci" ]; then \
-		$(MAKE) --no-print-directory build && \
-		cp ./target/release/fendermint docker/.artifacts ; \
-	fi && \
-	DOCKER_BUILDKIT=1 \
-	docker build \
-		-f docker/$(PROFILE).Dockerfile \
-		-t fendermint:latest $(PWD)
-
-	rm -rf docker/.artifacts
+		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
+		docker buildx build \
+			$(BUILDX_STORE) \
+			$(BUILDX_FLAGS) \
+			-f docker/Dockerfile \
+			-t $(BUILDX_TAG) $(PWD); \
+	else \
+		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
+		DOCKER_BUILDKIT=1 \
+		docker build \
+			-f docker/Dockerfile \
+			-t fendermint:latest $(PWD); \
+	fi
 
 
 # Build a bundle CAR; this is so we don't have to have a project reference,

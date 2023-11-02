@@ -86,6 +86,9 @@ tracing-subscriber = "0.3"
 url = "2.4.1"
 zeroize = "1.6"
 
+# Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
+openssl = { version = "0.10", features = ["vendored"] }
+
 # Stable FVM dependencies from crates.io
 
 # Using the 3.3 version of the FVM because the newer ones update the IPLD dependencies

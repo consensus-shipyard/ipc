@@ -19,6 +19,7 @@ libp2p = { workspace = true }
 libp2p-bitswap = { workspace = true }
 multiaddr = { workspace = true }
 num-traits = { workspace = true }
+openssl = { workspace = true }
 prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }

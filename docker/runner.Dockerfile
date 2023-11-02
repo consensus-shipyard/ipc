@@ -1,23 +1,9 @@
 # syntax=docker/dockerfile:1
 
-# Builder
-FROM rust:bookworm as builder
+# The builder and runner are in separate Dockerfile so that we can use different caching strategies
+# in the builder depending on whether we are building on CI or locally, but they are concatenated
+# just before the build.
 
-RUN apt-get update && \
-  apt-get install -y build-essential clang cmake protobuf-compiler && \
-  rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-COPY . .
-
-RUN --mount=type=cache,target=$RUSTUP_HOME,from=rust,source=$RUSTUP_HOME \
-  --mount=type=cache,target=$CARGO_HOME,from=rust,source=$CARGO_HOME \
-  --mount=type=cache,target=target \
-  cargo install --root output --path fendermint/app
-
-
-# Runner
 FROM debian:bookworm-slim
 
 RUN apt-get update && \

@@ -1,5 +1,6 @@
 target
 docker/.artifacts
+docker/Dockerfile
 cometbft
 test-network
 .idea
