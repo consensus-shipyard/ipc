@@ -73,3 +73,45 @@ pub(crate) struct FundArgs {
     #[arg(help = "The amount to fund in FIL, in whole FIL")]
     pub amount: f64,
 }
+
+pub struct PreFund;
+
+#[async_trait]
+impl CommandLineHandler for PreFund {
+    type Arguments = PreFundArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("pre-fund subnet with args: {:?}", arguments);
+
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
+        provider
+            .pre_fund(
+                subnet.clone(),
+                from,
+                f64_to_token_amount(arguments.initial_balance)?,
+            )
+            .await?;
+        log::info!("address pre-funded successfully");
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(
+    name = "pre-fund",
+    about = "Add some funds in genesis to an address in a child-subnet"
+)]
+pub struct PreFundArgs {
+    #[arg(long, short, help = "The address funded in the subnet")]
+    pub from: Option<String>,
+    #[arg(long, short, help = "The subnet to add balance to")]
+    pub subnet: String,
+    #[arg(help = "Add an initial balance for the address in genesis in the subnet")]
+    pub initial_balance: f64,
+}

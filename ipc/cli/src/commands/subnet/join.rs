@@ -29,6 +29,12 @@ impl CommandLineHandler for JoinSubnet {
             None => None,
         };
         let public_key = hex::decode(&arguments.public_key)?;
+        if let Some(initial_balance) = arguments.initial_balance {
+            log::info!("pre-funding address with {initial_balance}");
+            provider
+                .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)
+                .await?;
+        }
         let epoch = provider
             .join_subnet(
                 subnet,
@@ -37,7 +43,7 @@ impl CommandLineHandler for JoinSubnet {
                 public_key,
             )
             .await?;
-        log::info!("joined at epoch: {epoch}");
+        println!("joined at epoch: {epoch}");
 
         Ok(())
     }
@@ -58,6 +64,11 @@ pub struct JoinSubnetArgs {
     pub collateral: f64,
     #[arg(long, short, help = "The validator's metadata, hex encoded")]
     pub public_key: String,
+    #[arg(
+        long,
+        help = "Optionally add an initial balance to the validator in genesis in the subnet"
+    )]
+    pub initial_balance: Option<f64>,
 }
 
 /// The command to stake in a subnet from validator
