@@ -43,7 +43,11 @@ library LibGateway {
     /// @notice returns the bottom-up checkpoint and its info at the target epoch
     function getBottomUpCheckpointWithInfo(
         uint64 epoch
-    ) internal view returns (bool exists, BottomUpCheckpoint storage checkpoint, CheckpointInfo storage checkpointInfo) {
+    )
+        internal
+        view
+        returns (bool exists, BottomUpCheckpoint storage checkpoint, CheckpointInfo storage checkpointInfo)
+    {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         checkpoint = s.bottomUpCheckpoints[epoch];
@@ -53,16 +57,15 @@ library LibGateway {
     }
 
     /// @notice checks if the bottom-up checkpoint already exists at the target epoch
-    function bottomUpCheckpointExists(
-        uint64 epoch
-    ) internal view returns (bool) {
+    function bottomUpCheckpointExists(uint64 epoch) internal view returns (bool) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         return s.bottomUpCheckpoints[epoch].blockHeight != 0;
     }
 
     /// @notice stores checkpoint and its info to storage.
     function storeBottomUpCheckpointWithInfo(
-        BottomUpCheckpoint memory checkpoint, CheckpointInfo memory checkpointInfo
+        BottomUpCheckpoint memory checkpoint,
+        CheckpointInfo memory checkpointInfo
     ) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 

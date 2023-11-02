@@ -588,28 +588,6 @@ pub mod gateway_router_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("CheckpointInfoAlreadyExists"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CheckpointInfoAlreadyExists",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("CheckpointMembershipNotCreated"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CheckpointMembershipNotCreated",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("CheckpointNotCreated"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -1139,38 +1117,6 @@ pub mod gateway_router_facet {
         abi = "CheckpointAlreadyProcessed()"
     )]
     pub struct CheckpointAlreadyProcessed;
-    ///Custom Error type `CheckpointInfoAlreadyExists` with signature `CheckpointInfoAlreadyExists()` and selector `0xa04ff7c7`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "CheckpointInfoAlreadyExists",
-        abi = "CheckpointInfoAlreadyExists()"
-    )]
-    pub struct CheckpointInfoAlreadyExists;
-    ///Custom Error type `CheckpointMembershipNotCreated` with signature `CheckpointMembershipNotCreated()` and selector `0x009f833a`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "CheckpointMembershipNotCreated",
-        abi = "CheckpointMembershipNotCreated()"
-    )]
-    pub struct CheckpointMembershipNotCreated;
     ///Custom Error type `CheckpointNotCreated` with signature `CheckpointNotCreated()` and selector `0x58cdd2e7`
     #[derive(
         Clone,
@@ -1546,8 +1492,6 @@ pub mod gateway_router_facet {
         CannotConfirmFutureChanges(CannotConfirmFutureChanges),
         CheckpointAlreadyExists(CheckpointAlreadyExists),
         CheckpointAlreadyProcessed(CheckpointAlreadyProcessed),
-        CheckpointInfoAlreadyExists(CheckpointInfoAlreadyExists),
-        CheckpointMembershipNotCreated(CheckpointMembershipNotCreated),
         CheckpointNotCreated(CheckpointNotCreated),
         FailedAddIncompleteCheckpoint(FailedAddIncompleteCheckpoint),
         FailedAddSignatory(FailedAddSignatory),
@@ -1617,16 +1561,6 @@ pub mod gateway_router_facet {
                 <CheckpointAlreadyProcessed as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::CheckpointAlreadyProcessed(decoded));
-            }
-            if let Ok(decoded) =
-                <CheckpointInfoAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::CheckpointInfoAlreadyExists(decoded));
-            }
-            if let Ok(decoded) =
-                <CheckpointMembershipNotCreated as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::CheckpointMembershipNotCreated(decoded));
             }
             if let Ok(decoded) =
                 <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1767,12 +1701,6 @@ pub mod gateway_router_facet {
                 Self::CheckpointAlreadyProcessed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::CheckpointInfoAlreadyExists(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::CheckpointMembershipNotCreated(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::CheckpointNotCreated(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1864,14 +1792,6 @@ pub mod gateway_router_facet {
                 }
                 _ if selector
                     == <CheckpointAlreadyProcessed as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <CheckpointInfoAlreadyExists as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <CheckpointMembershipNotCreated as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -1993,10 +1913,6 @@ pub mod gateway_router_facet {
                 Self::CannotConfirmFutureChanges(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CheckpointAlreadyExists(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CheckpointAlreadyProcessed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CheckpointInfoAlreadyExists(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CheckpointMembershipNotCreated(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
                 Self::CheckpointNotCreated(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedAddIncompleteCheckpoint(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -2067,16 +1983,6 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<CheckpointAlreadyProcessed> for GatewayRouterFacetErrors {
         fn from(value: CheckpointAlreadyProcessed) -> Self {
             Self::CheckpointAlreadyProcessed(value)
-        }
-    }
-    impl ::core::convert::From<CheckpointInfoAlreadyExists> for GatewayRouterFacetErrors {
-        fn from(value: CheckpointInfoAlreadyExists) -> Self {
-            Self::CheckpointInfoAlreadyExists(value)
-        }
-    }
-    impl ::core::convert::From<CheckpointMembershipNotCreated> for GatewayRouterFacetErrors {
-        fn from(value: CheckpointMembershipNotCreated) -> Self {
-            Self::CheckpointMembershipNotCreated(value)
         }
     }
     impl ::core::convert::From<CheckpointNotCreated> for GatewayRouterFacetErrors {
