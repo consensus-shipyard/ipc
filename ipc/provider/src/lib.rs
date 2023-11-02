@@ -15,6 +15,7 @@ use fvm_shared::{
 use ipc_identity::{
     EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
 };
+use ipc_sdk::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_sdk::staking::StakingChangeRequest;
 use ipc_sdk::{
     cross::CrossMsg,
@@ -641,6 +642,63 @@ impl IpcProvider {
         conn.manager().chain_head_height().await
     }
 
+    pub async fn get_bottom_up_bundle(
+        &self,
+        subnet: &SubnetID,
+        height: ChainEpoch,
+    ) -> anyhow::Result<BottomUpCheckpointBundle> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().checkpoint_bundle_at(height).await
+    }
+
+    pub async fn has_submitted_in_last_checkpoint_height(
+        &self,
+        subnet: &SubnetID,
+        addr: &Address,
+    ) -> anyhow::Result<bool> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager()
+            .has_submitted_in_last_checkpoint_height(subnet, addr)
+            .await
+    }
+
+    pub async fn last_bottom_up_checkpoint_height(
+        &self,
+        subnet: &SubnetID,
+    ) -> anyhow::Result<ChainEpoch> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager()
+            .last_bottom_up_checkpoint_height(subnet)
+            .await
+    }
+
+    pub async fn quorum_reached_events(
+        &self,
+        subnet: &SubnetID,
+        height: ChainEpoch,
+    ) -> anyhow::Result<Vec<QuorumReachedEvent>> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().quorum_reached_events(height).await
+    }
+
     /// Advertises the endpoint of a bootstrap node for the subnet.
     pub async fn add_bootstrap(
         &mut self,
@@ -773,7 +831,7 @@ fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<KeyStore> {
     }
 }
 
-fn new_evm_keystore_from_config(
+pub fn new_evm_keystore_from_config(
     config: Arc<Config>,
 ) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo_str = &config.keystore_path;

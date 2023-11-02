@@ -7,11 +7,14 @@ use crate::subnet_id::SubnetID;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
+use ethers::utils::hex;
 use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 lazy_static! {
     // Default CID used for the genesis checkpoint. Using
@@ -22,6 +25,27 @@ lazy_static! {
 }
 
 pub type Signature = Vec<u8>;
+
+/// The event emitted
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct QuorumReachedEvent {
+    pub height: ChainEpoch,
+    /// The checkpoint hash
+    pub checkpoint: Vec<u8>,
+    pub quorum_weight: TokenAmount,
+}
+
+impl Display for QuorumReachedEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "QuorumReachedEvent<height: {}, checkpoint: {}, quorum_weight: {}>",
+            self.height,
+            hex::encode(&self.checkpoint),
+            self.quorum_weight
+        )
+    }
+}
 
 /// The collection of items for the bottom up checkpoint submission
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]

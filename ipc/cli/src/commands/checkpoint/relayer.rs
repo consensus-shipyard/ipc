@@ -7,9 +7,11 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
+use fvm_shared::clock::ChainEpoch;
 use ipc_identity::EvmKeyStore;
 use ipc_provider::checkpoint::BottomUpCheckpointManager;
-use ipc_provider::new_evm_keystore_from_path;
+use ipc_provider::config::Config;
+use ipc_provider::new_evm_keystore_from_config;
 use ipc_sdk::subnet_id::SubnetID;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
@@ -28,8 +30,8 @@ impl CommandLineHandler for BottomUpRelayer {
         log::debug!("start bottom up relayer with args: {:?}", arguments);
 
         let config_path = global.config_path();
-
-        let mut keystore = new_evm_keystore_from_path(&config_path)?;
+        let config = Arc::new(Config::from_file(&config_path)?);
+        let mut keystore = new_evm_keystore_from_config(config)?;
         let submitter = match (arguments.submitter.as_ref(), keystore.get_default()?) {
             (Some(submitter), _) => Address::from_str(submitter)?,
             (None, Some(addr)) => {
@@ -49,12 +51,16 @@ impl CommandLineHandler for BottomUpRelayer {
         let child = get_subnet_config(&config_path, &subnet)?;
         let parent = get_subnet_config(&config_path, &parent)?;
 
-        let manager = BottomUpCheckpointManager::new_evm_manager(
+        let mut manager = BottomUpCheckpointManager::new_evm_manager(
             parent.clone(),
             child.clone(),
             Arc::new(RwLock::new(keystore)),
         )
         .await?;
+
+        if let Some(v) = arguments.finalization_blocks {
+            manager = manager.with_finalization_blocks(v as ChainEpoch);
+        }
 
         let interval = Duration::from_secs(
             arguments
@@ -74,6 +80,13 @@ pub(crate) struct BottomUpRelayerArgs {
     pub subnet: String,
     #[arg(long, short, help = "The number of seconds to submit checkpoint")]
     pub checkpoint_interval_sec: Option<u64>,
+    #[arg(
+        long,
+        short,
+        default_value = "0",
+        help = "The number of blocks away from chain head that is considered final"
+    )]
+    pub finalization_blocks: Option<u64>,
     #[arg(long, short, help = "The hex encoded address of the submitter")]
     pub submitter: Option<String>,
 }

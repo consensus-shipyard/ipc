@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_identity::{EthKeyAddress, PersistentKeyStore};
+use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -27,6 +28,8 @@ pub struct BottomUpCheckpointManager<T> {
     metadata: CheckpointConfig,
     parent_handler: T,
     child_handler: T,
+    /// The number of blocks away from the chain head that is considered final
+    finalization_blocks: ChainEpoch,
 }
 
 impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
@@ -48,7 +51,13 @@ impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
             },
             parent_handler,
             child_handler,
+            finalization_blocks: 0,
         })
+    }
+
+    pub fn with_finalization_blocks(mut self, finalization_blocks: ChainEpoch) -> Self {
+        self.finalization_blocks = finalization_blocks;
+        self
     }
 }
 
@@ -70,7 +79,7 @@ impl<T: BottomUpCheckpointRelayer> Display for BottomUpCheckpointManager<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "bottom-up, parent: {:}, child: {:}",
+            "bottom-up relayer, parent: {:}, child: {:}",
             self.metadata.parent.id, self.metadata.child.id
         )
     }
@@ -94,6 +103,8 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
 
     /// Run the bottom up checkpoint submission daemon in the foreground
     pub async fn run(self, submitter: Address, submission_interval: Duration) {
+        log::info!("launching {self} for {submitter}");
+
         loop {
             if let Err(e) = self.submit_checkpoint(&submitter).await {
                 log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
@@ -125,7 +136,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
     async fn submit_last_epoch(&self, submitter: &Address) -> Result<()> {
         let subnet = &self.metadata.child.id;
         if self
-            .child_handler
+            .parent_handler
             .has_submitted_in_last_checkpoint_height(subnet, submitter)
             .await?
         {
@@ -133,16 +144,28 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         }
 
         let height = self
-            .child_handler
+            .parent_handler
             .last_bottom_up_checkpoint_height(subnet)
             .await?;
+
+        if height == 0 {
+            log::debug!("no previous checkpoint yet");
+            return Ok(());
+        }
+
         let bundle = self.child_handler.checkpoint_bundle_at(height).await?;
         log::debug!("bottom up bundle: {bundle:?}");
 
-        self.parent_handler
+        let epoch = self
+            .parent_handler
             .submit_checkpoint(submitter, bundle)
             .await
             .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+        log::info!(
+            "submitted bottom up checkpoint({}) in parent at height {}",
+            height,
+            epoch
+        );
 
         Ok(())
     }
@@ -151,21 +174,46 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
     async fn submit_next_epoch(&self, submitter: &Address) -> Result<()> {
         let next_submission_height = self.next_submission_height().await?;
         let current_height = self.child_handler.current_epoch().await?;
+        let finalized_height = max(1, current_height - self.finalization_blocks);
 
-        if current_height < next_submission_height {
+        log::debug!("next_submission_height: {next_submission_height}, current height: {current_height}, finalized_height: {finalized_height}");
+
+        if finalized_height < next_submission_height {
             return Ok(());
         }
 
-        let bundle = self
-            .child_handler
-            .checkpoint_bundle_at(next_submission_height)
-            .await?;
-        log::debug!("bottom up bundle: {bundle:?}");
+        let prev_h = next_submission_height - self.checkpoint_period();
+        log::debug!("start querying quorum reached events from : {prev_h} to {finalized_height}");
 
-        self.parent_handler
-            .submit_checkpoint(submitter, bundle)
-            .await
-            .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+        for h in (prev_h + 1)..=finalized_height {
+            let events = self.child_handler.quorum_reached_events(h).await?;
+            if events.is_empty() {
+                log::debug!("no reached events at height : {h}");
+                continue;
+            }
+
+            log::debug!("found reached events at height : {h}");
+
+            for event in events {
+                let bundle = self
+                    .child_handler
+                    .checkpoint_bundle_at(event.height)
+                    .await?;
+                log::debug!("bottom up bundle: {bundle:?}");
+
+                let epoch = self
+                    .parent_handler
+                    .submit_checkpoint(submitter, bundle)
+                    .await
+                    .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+
+                log::info!(
+                    "submitted bottom up checkpoint({}) in parent at height {}",
+                    event.height,
+                    epoch
+                );
+            }
+        }
 
         Ok(())
     }
