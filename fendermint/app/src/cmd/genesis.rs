@@ -312,6 +312,17 @@ async fn new_genesis_from_parent(
         })
     }
 
+    for (a, b) in genesis_info.genesis_balances {
+        let meta = ActorMeta::Account(Account {
+            owner: SignerAddr(a),
+        });
+        let actor = Actor {
+            meta,
+            balance: b.clone(),
+        };
+        genesis.accounts.push(actor);
+    }
+
     let json = serde_json::to_string_pretty(&genesis)?;
     std::fs::write(genesis_file, json)?;
 
