@@ -21,6 +21,9 @@ interface ISubnetActor {
     /// Method that allows to pre-fund an address in the subnet before it bootstraps.
     function preFund() external payable;
 
+    /// Method that allows to recover initial balance for an address from a subnet that hasn't bootstrapped yet.
+    function preRelease(uint256 amount) external;
+
     /// Method that allows a validator to unstake their collateral from a subnet
     function unstake(uint256 amount) external;
 

@@ -429,6 +429,8 @@ library LibStaking {
     }
 
     /// @notice Confirm the withdraw directly without going through the confirmation process
+    /// and releasing from the gateway.
+    /// @dev only use for non-bootstrapped subnets
     function withdrawWithConfirm(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
@@ -438,7 +440,6 @@ library LibStaking {
         s.validatorSet.confirmWithdraw(validator, amount);
 
         // release stake from gateway and transfer to user
-        IGateway(s.ipcGatewayAddr).releaseStake(amount);
         payable(validator).transfer(amount);
     }
 

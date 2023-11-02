@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
+import {SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
@@ -109,6 +109,32 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         s.genesisCircSupply += msg.value;
     }
 
+    /// @notice method to remove funds from the initial balance of a subnet.
+    /// @dev This method can be used by users looking to recover part of their
+    /// initial balance before the subnet bootstraps.
+    function preRelease(uint256 amount) external nonReentrant {
+        if (amount == 0) {
+            revert NotEnoughFunds();
+        }
+
+        if (s.bootstrapped) {
+            revert SubnetAlreadyBootstrapped();
+        }
+
+        if (s.genesisBalance[msg.sender] < amount) {
+            revert NotEnoughBalance();
+        }
+
+        s.genesisBalance[msg.sender] -= amount;
+        s.genesisCircSupply -= amount;
+
+        if (s.genesisBalance[msg.sender] == 0) {
+            rmAddressFromBalanceKey(msg.sender);
+        }
+
+        payable(msg.sender).sendValue(amount);
+    }
+
     /// @notice method that allows a validator to join the subnet
     /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant notKilled {
@@ -196,7 +222,9 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice method that allows a validator to leave the subnet
-    function leave() external notKilled {
+    /// @dev it also return the validators initial balance if the
+    /// subnet was not yet bootstrapped.
+    function leave() external notKilled nonReentrant {
         // remove bootstrap nodes added by this validator
 
         uint256 amount = LibStaking.totalValidatorCollateral(msg.sender);
@@ -210,6 +238,15 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+
+            // check if the validator had some initial balance and return it if not bootstrapped
+            uint256 genesisBalance = s.genesisBalance[msg.sender];
+            if (genesisBalance != 0) {
+                s.genesisBalance[msg.sender] == 0;
+                s.genesisCircSupply -= genesisBalance;
+                rmAddressFromBalanceKey(msg.sender);
+                payable(msg.sender).sendValue(genesisBalance);
+            }
             return;
         }
         LibStaking.withdraw(msg.sender, amount);
@@ -318,5 +355,21 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         assert(publicKey.length == 65);
         bytes32 hashed = keccak256(publicKey[1:]);
         return address(uint160(uint256(hashed)));
+    }
+
+    /// @notice Removes an address from the initial balance keys
+    function rmAddressFromBalanceKey(address addr) internal {
+        uint length = s.genesisBalanceKeys.length;
+        for (uint i = 0; i < length; ) {
+            if (s.genesisBalanceKeys[i] == addr) {
+                s.genesisBalanceKeys[i] = s.genesisBalanceKeys[length - 1];
+                s.genesisBalanceKeys.pop();
+                // exit after removing the key
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
     }
 }
