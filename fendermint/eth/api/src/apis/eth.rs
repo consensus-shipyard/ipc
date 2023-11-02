@@ -310,7 +310,7 @@ where
 
     match res.value {
         Some((_, state)) => Ok(to_eth_tokens(&state.balance)?),
-        None => error(ExitCode::USR_NOT_FOUND, format!("actor {addr} not found")),
+        None => Ok(et::U256::zero()),
     }
 }
 
@@ -450,7 +450,7 @@ where
             let nonce = state.sequence;
             Ok(et::U64::from(nonce))
         }
-        None => error(ExitCode::USR_NOT_FOUND, format!("actor {addr} not found")),
+        None => Ok(et::U64::zero()),
     }
 }
 

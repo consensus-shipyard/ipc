@@ -323,6 +323,12 @@ where
     )?;
 
     request(
+        "eth_getBalance (non-existent)",
+        provider.get_balance(Address::default(), None).await,
+        |b| b.is_zero(),
+    )?;
+
+    request(
         "eth_getUncleCountByBlockHash",
         provider
             .get_uncle_count(BlockId::Hash(H256([0u8; 32])))
@@ -352,15 +358,6 @@ where
             .get_uncle(BlockId::Number(BlockNumber::Number(bn)), U64::from(0))
             .await,
         |u| u.is_none(),
-    )?;
-
-    // Querying at genesis, so the transaction count should be zero.
-    request(
-        "eth_getTransactionCount",
-        provider
-            .get_transaction_count(from.eth_addr, Some(BlockId::Number(BlockNumber::Earliest)))
-            .await,
-        |u| u.is_zero(),
     )?;
 
     // Get a block without transactions
@@ -417,6 +414,21 @@ where
         TxHash::from(ethers_core::utils::keccak256(rlp))
     };
     assert_eq!(tx_hash, expected_hash, "Ethereum hash should match");
+
+    // Querying at latest, so the transaction count should be non-zero.
+    request(
+        "eth_getTransactionCount",
+        provider.get_transaction_count(from.eth_addr, None).await,
+        |u| !u.is_zero(),
+    )?;
+
+    request(
+        "eth_getTransactionCount (non-existent)",
+        provider
+            .get_transaction_count(Address::default(), None)
+            .await,
+        |b| b.is_zero(),
+    )?;
 
     // Get a block with transactions by number.
     let block = request(
