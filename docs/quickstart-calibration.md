@@ -125,7 +125,7 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 
 ## Step 5: Join the subnet
 
-Before we deploy the infrastructure for the subnet, we will have to bootstrap the subnet and join from our validators, putting some initial collateral into the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses providing their corresponding public key.
+Before we deploy the infrastructure for the subnet, we will have to bootstrap the subnet and join from our validators, putting some initial collateral into the subnet and giving our validator address some initial balance in the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses providing their corresponding public key.
 
 * Get the public key for all of your wallets and note it down. This is the public key that each of your validators will use to sign blocks in the subnet.
 ```bash
@@ -136,9 +136,9 @@ Before we deploy the infrastructure for the subnet, we will have to bootstrap th
 
 * Join the subnet with each validator
 ```bash
-./bin/ipc-cli subnet join --from=<WALLET_ADDR1> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET1>
-./bin/ipc-cli subnet join --from=<WALLET_ADDR2> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET2>
-./bin/ipc-cli subnet join --from=<WALLET_ADDR3> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET3>
+./bin/ipc-cli subnet join --from=<WALLET_ADDR1> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET1> --initial-balance 1
+./bin/ipc-cli subnet join --from=<WALLET_ADDR2> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET2> --initial-balance 1
+./bin/ipc-cli subnet join --from=<WALLET_ADDR3> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET3> --initial-balance 1
 ```
 
 ## Step 6: Deploy the infrastructure
@@ -230,7 +230,7 @@ gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
 registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
-With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through:
+With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through the following command. The result should show the initial balance that you have included for your validators address in genesis:
 ```bash
 ./bin/ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
 ```

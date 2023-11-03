@@ -174,10 +174,22 @@ The epoch were the message is performed can give you a sense of the time the mes
 
 >💡 Top-down proofs-of-finality is the underlying process used for IPC to propagate information from the parent to the child. Validators in the child subnet include information in every block in the child subnet about the height of the parent they agree to consider final. When this information is committed on-chain, changes into the validator set of the subnet, and the execution of top-down messages are correspondingly triggered.
 
-* In order to list the top-down messages sent for a subnet from a parent network for a specific epoch, run the following command: 
+* In order to list the top-down messages sent for a subnet from a parent network for a specific epoch, run the following command:
 ```bash
 ./bin/ipc-cli cross-msg list-topdown-msgs --subnet=<SUBNET_ID> --epoch=<EPOCH>
+
 ```
+
+#### Funding subnet address in genesis
+In order to fund your address in a child subnet genesis before it is bootstrapped, and include some funds on your address in the subnet in genesis, you can use the `pre-fund` command. This command can only be used before the subnet is bootsrapped and started. The inverse of this operation is `pre-release`, which allows you to recover some of these initial funds before the subnet starts:
+```bash
+./bin/ipc-cli cross-msg pre-fund --subnet <subnet-id> [--from <from-addr>] <amount>
+```
+```console
+# Example execution
+$ ./bin/ipc-cli cross-msg pre-fund --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 0.1
+```
+
 ### Release
 In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following commnd:
 ```bash
@@ -197,6 +209,16 @@ $ ./bin/ipc-cli cross-msg release --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctc
 release performed in epoch 1030
 ```
 As with top-down messages, you can get a sense of the time that your message will take to get to the parent by looking at the epoch in which your bottom-up message was triggered (the output of the command), and listing the latest bottom-up checkpoints to see how far it is from being propagated.
+
+#### Releasing initial subnet balance
+To recover some (or all) of the funds that were sent to a subnet through `pre-fund` to be included as genesis balance for your address, you can use the `pre-release` command as follows:
+```bash
+./bin/ipc-cli cross-msg pre-release --subnet <subnet-id> [--from <from-addr>] <amount>
+```
+```console
+# Example execution
+$ ./bin/ipc-cli cross-msg pre-release --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 0.1
+```
 
 ## Listing checkpoints from a subnet
 
@@ -226,6 +248,15 @@ $ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc
 ```
 This command specifies the subnet to join, the amount of collateral to provide and the public key of the `--from` address that is joining as a validator.
 
+* To join a subnet and also include some initial balance for the validator in the subnet, you can add the `--initial-balance` flag with the balance to be included in genesis:
+```bash
+./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount> --public-key <public_key_validator_addr> --initial-balance <genesis-balance>
+```
+```console
+# Example execution
+$ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1 \
+    --public-key=043385c3b9ab8a697cd7bec6ca623cbdd0fea1293e8b464df825b104eb58a44cc8efacc6a3482b866b85ecdf734b5d4ef5495737deb348625ce6a35536142d2955 --initial-balance 0.5
+```
 
 * To leave a subnet, the following agent command can be used:
 ```bash
