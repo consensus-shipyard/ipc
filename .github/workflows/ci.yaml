@@ -193,3 +193,13 @@ jobs:
           export BUILDX_STORE="--push"
           export BUILDX_FLAGS="--platform linux/amd64,linux/arm64 ${BUILDX_FLAGS}"
           make docker-build
+
+      # https://github.com/Chizkiyahu/delete-untagged-ghcr-action
+      - name: Delete all containers from package without tags
+        uses: Chizkiyahu/delete-untagged-ghcr-action@v3
+        with:
+            token: ${{ secrets.GITHUB_TOKEN }}
+            owner_type: org
+            package_name: fendermint
+            untagged_only: true
+            except_untagged_multiplatform: true
