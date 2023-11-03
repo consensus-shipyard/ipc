@@ -70,8 +70,8 @@ id = "/r314159"
 [subnets.config]
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1"
-registry_addr = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e"
+gateway_addr = "0x5Be26735Ab7A70B057e76e31953d8811f95b05AC"
+registry_addr = "0x2fdf1b18907341b751B32aF7088D32f6f5a617E0"
 
 # Subnet template - uncomment and adjust before using
 # [[subnets]]
@@ -121,7 +121,7 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 ./bin/ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
 ```
 
-* Make a note of the address of the subnet you created (`/r314159/<SUBNET_ID>`)
+* Make a note of the address of the subnet you created.
 
 ## Step 5: Join the subnet
 
@@ -196,7 +196,7 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
 
 ```bash
-cargo make --makefile /bin/ipc-infra/Makefile.toml \
+cargo make --makefile ./bin/ipc-infra/Makefile.toml \
     -e NODE_NAME=validator-<n> \
     -e PRIVATE_KEY_PATH=<PATH_PRIV_KEY_VALIDATOR_n> \
     -e SUBNET_ID=<SUBNET_ID> \
