@@ -96,10 +96,8 @@ jobs:
         continue-on-error: true
         with:
           # Caching everything separately, in case they don't ask for the same things to be compiled.
-          cache-key: ${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain', 'rust-toolchain.toml') }}
-          # Not sure why we should ever update a cache that has the hash of the lock file in it.
-          # In Forest it only contains the rust-toolchain, so it makes sense to update because dependencies could have changed.
-          cache-update: false
+          cache-prefix: ${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
+          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
       - name: ${{ matrix.make.name }}
         run: make ${{ matrix.make.task }}
@@ -131,10 +129,11 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
         with:
-          # Very likely that the Cargo.lock file will change between PRs,
-          # but since this only runs on the main branch we can update a single cache.
-          cache-key: publish-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
-          cache-update: true
+          # The Cargo.lock file is very likely to change between PRs, which would mean a cache miss.
+          # Ideally we want to download the previous cache and do an upload if something changed.
+          # That's why the Cargo.lock hash is used as a suffix, so we match on a stable one and upload if changed.
+          cache-prefix: publish-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
+          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
       # - name: Docker Build
       #   run: make docker-build
