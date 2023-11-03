@@ -1,18 +1,18 @@
 # IPC Quick Start: zero-to-subnet (on Calibration)
 
->💡 Background and detailed are available in the [README](/README.md).
+>💡 Background and details are available in the [README](/README.md).
 
 Ready to test the waters with your first subnet? This guide will deploy a subnet with three local validators orchestrated by `ipc-cli`. This subnet will be anchored to the public [Calibration testnet](https://docs.filecoin.io/networks/calibration/details/). This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
 
 Several steps in this guide involve running long-lived processes. In each of these cases, the guide advises starting a new *session*. Depending on your set-up, you may do this using tools like `screen` or `tmux`, or, if using a graphical environment, by opening a new terminal tab, pane, or window.
 
-<!-- >💡A video walkthrough of this guide is current being prepared. We still encourage you to try it for yourself! -->
+<!-- >💡A video walkthrough of this guide is currently being prepared. We still encourage you to try it for yourself! -->
 
 <!-- >💡If you're only looking to connect to an existing subnet, please see the [README](deploying-hierarchy.md) instead. -->
 
 ## Step 0: Prepare your system
 
-We assume a Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. Details on IPC-specific requirements can also be found in the [README](/README.md).
+We assume an Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. Details on IPC-specific requirements can also be found in the [README](/README.md).
 
 * Install basic dependencies [Ubuntu/Debian] ([details](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms))
 ```bash
@@ -57,7 +57,7 @@ git clone https://github.com/consensus-shipyard/ipc.git
 ./bin/ipc-cli config init
 ```
 
-This should have populated an default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs. You may need to replace the content of the config to reflect the address of the up-to-date contracts in Calibration.
+This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs. You may need to replace the content of the config to reflect the address of the up-to-date contracts in Calibration.
 
 
 * You can run `nano ~/.ipc/config.toml` to double-check that the config file has been populated with the following content:
@@ -86,7 +86,7 @@ registry_addr = "0x2fdf1b18907341b751B32aF7088D32f6f5a617E0"
 
 ## Step 3: Set up your wallets
 
-You'll need to create a set of wallets to spawn and interact of the subnet. Please make a note of the addresses as you go along, it may make your life easier.
+You'll need to create a set of wallets to spawn and interact of the subnet. Please make a note of the addresses as you go along. It may make your life easier.
 
 * Create the three different wallets
 ```bash
@@ -116,7 +116,7 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 
 ## Step 4: Create a child subnet
 
-* The next step is to create a subnet under `/r314159` in calibration. Remember to set a default wallet or explicitly specifying the wallet from which you want to perform the action with the `--from` flag.
+* The next step is to create a subnet under `/r314159` in calibration. Remember to set a default wallet or explicitly specify the wallet from which you want to perform the action with the `--from` flag.
 ```bash
 ./bin/ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
 ```
@@ -142,10 +142,10 @@ Before we deploy the infrastructure for the subnet, we will have to bootstrap th
 ```
 
 ## Step 6: Deploy the infrastructure
-With the collateral and number of minimum validators fulfilled, the subnet is bootstrapped in teh parent, and we can deploy the infrastructure.
+With the collateral and number of minimum validators fulfilled, the subnet is bootstrapped in the parent, and we can deploy the infrastructure.
 
 ### Deploying a bootstrap node
-Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
+Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators to discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
 
 * We can deploy a new bootstrap node in the subnet by running: 
 ```bash
@@ -172,7 +172,7 @@ cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-id
 cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-down
 ```
 
-* To advertise the endpoint to the rest of nodes in the network we need to run:
+* To advertise the endpoint to the rest of the nodes in the network we need to run:
 ```bash
 # Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
 ./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint="<BOOTSRAP_ENDPOINT>"
@@ -189,8 +189,8 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 * First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
 ```bash
 ./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR2> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_2>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR3> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_3>
 ```
 
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
