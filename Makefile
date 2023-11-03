@@ -5,7 +5,7 @@ BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 BUILTIN_ACTORS_DIR    := ../builtin-actors
 
 # Make sure this tag matches the one in Cargo.toml
-IPC_ACTORS_TAG				?= dev
+IPC_ACTORS_TAG				?= origin/dev
 IPC_ACTORS_DIR        := $(PWD)/../ipc-solidity-actors
 IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
 IPC_ACTORS_ABI        := .make/.ipc-actors-abi
@@ -30,7 +30,7 @@ all: test build diagrams
 diagrams:
 	make -C docs/diagrams diagrams
 
-build:
+build: | protoc
 	cargo build --release
 
 install:
@@ -113,8 +113,8 @@ $(BUILTIN_ACTORS_DIR):
 # Compile the ABI artifacts of the IPC Solidity actors.
 ipc-actors-abi: $(IPC_ACTORS_ABI)
 
-# Check out the IPC Solidity actors if necessary and compile the ABI, putting down a marker at the end.
-$(IPC_ACTORS_ABI): $(IPC_ACTORS_CODE) | forge
+# Check out the IPC Solidity actors if necessary so we get the ABI artifacts, putting down a marker at the end.
+$(IPC_ACTORS_ABI): $(IPC_ACTORS_CODE)
 	if [ ! -d $(IPC_ACTORS_DIR) ]; then \
 		mkdir -p $(IPC_ACTORS_DIR) && \
 		cd $(IPC_ACTORS_DIR) && \
@@ -123,13 +123,13 @@ $(IPC_ACTORS_ABI): $(IPC_ACTORS_CODE) | forge
 	cd $(IPC_ACTORS_DIR) && \
 	git fetch origin && \
 	git checkout $(IPC_ACTORS_TAG)
-	make -C $(IPC_ACTORS_DIR) compile-abi
+	@# The ABI are already checked in; otherwise we'd have to compile with foundry
+	@# make -C $(IPC_ACTORS_DIR) compile-abi
 	mkdir -p $(dir $@) && touch $@
 
-# Forge is used by the ipc-solidity-actors compilation steps.
-.PHONY: forge
-forge:
-	@if [ -z "$(shell which forge)" ]; then \
-		echo "Please install Foundry. See https://book.getfoundry.sh/getting-started/installation"; \
+.PHONY: protoc
+protoc:
+	@if [ -z "$(shell which protoc)" ]; then \
+		echo "Please install the Protobuf Compiler. See https://grpc.io/docs/protoc-installation/"; \
 		exit 1; \
 	fi
