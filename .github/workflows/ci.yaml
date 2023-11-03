@@ -173,7 +173,6 @@ jobs:
       - name: Docker Deps
         run: |
           make docker-deps
-          cd ../builtin-actors && cargo clean
 
       # https://github.com/marketplace/actions/free-disk-space-ubuntu
       - name: Free Disk Space (Ubuntu)
