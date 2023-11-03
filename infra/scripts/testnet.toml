@@ -54,9 +54,9 @@ for i in ${nodes}
     NUMBER = set ${i}
     NODE_NAME = set "node${NUMBER}"
 
-    mkdir -p ${BASE_DIR}/${NODE_NAME}
-    mkdir -p ${BASE_DIR}/${NODE_NAME}/fendermint
-    mkdir -p ${BASE_DIR}/${NODE_NAME}/cometbft
+    mkdir ${BASE_DIR}/${NODE_NAME}
+    mkdir ${BASE_DIR}/${NODE_NAME}/fendermint
+    mkdir ${BASE_DIR}/${NODE_NAME}/cometbft
 
     set_env NODE_NAME ${NODE_NAME}
     set_env NUMBER ${NUMBER}
