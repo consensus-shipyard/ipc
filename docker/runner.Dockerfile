@@ -24,9 +24,12 @@ STOPSIGNAL SIGTERM
 ENV FM_ABCI__LISTEN__HOST=0.0.0.0
 ENV FM_ETH__LISTEN__HOST=0.0.0.0
 
-# We could build the actor bundles in the `builder` as well,
-# but we should be able to copy it from somewhere.
-COPY docker/.artifacts/bundle.car $FM_HOME_DIR/bundle.car
+# Ideally we should be able to copy the builtin actors from a released artifact.
+# We could also use the bundle.car we built for the tests running on the host
+# but if we combine the actor-builder into a big multistage build we get caching on CI.
+# COPY docker/.artifacts/bundle.car $FM_HOME_DIR/bundle.car
+COPY --from=actor-exporter /bundle.car $FM_HOME_DIR/bundle.car
+
 COPY docker/.artifacts/contracts $FM_HOME_DIR/contracts
 COPY --from=builder /app/fendermint/app/config $FM_HOME_DIR/config
 COPY --from=builder /app/output/bin/fendermint /usr/local/bin/fendermint
