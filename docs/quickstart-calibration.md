@@ -196,7 +196,7 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
 
 ```bash
-cargo make --makefile /bin/ipc-infra/Makefile.toml \
+cargo make --makefile ./bin/ipc-infra/Makefile.toml \
     -e NODE_NAME=validator-<n> \
     -e PRIVATE_KEY_PATH=<PATH_PRIV_KEY_VALIDATOR_n> \
     -e SUBNET_ID=<SUBNET_ID> \
