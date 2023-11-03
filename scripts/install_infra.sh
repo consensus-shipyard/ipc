@@ -49,7 +49,7 @@ fi
 # Check if fendermint exists
 if [ ! -d "$infra_path/fendermint" ]; then
     cd "$infra_path"
-    echo "[*] Fendermint directory doesn't, cloning code"
+    echo "[*] Fendermint directory doesn't exist, cloning code"
     git clone https://github.com/consensus-shipyard/fendermint.git fendermint
     echo "[*] Building infrastructure assets"
     cd "fendermint"
