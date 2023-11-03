@@ -9,7 +9,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_sdk::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_sdk::cross::CrossMsg;
-use ipc_sdk::staking::StakingChangeRequest;
+use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_sdk::validator::Validator;
@@ -139,6 +139,13 @@ pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpoi
 
     /// Lists the bootstrap nodes of a subnet
     async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> Result<Vec<String>>;
+
+    /// Get the validator information
+    async fn get_validator_info(
+        &self,
+        subnet: &SubnetID,
+        validator: &Address,
+    ) -> Result<ValidatorInfo>;
 }
 
 #[derive(Debug)]

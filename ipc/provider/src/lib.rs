@@ -16,7 +16,7 @@ use ipc_identity::{
     EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
 };
 use ipc_sdk::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
-use ipc_sdk::staking::StakingChangeRequest;
+use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_sdk::{
     cross::CrossMsg,
     subnet::{ConsensusType, ConstructParams},
@@ -602,6 +602,21 @@ impl IpcProvider {
             Some(conn) => conn,
         };
         conn.manager().genesis_epoch(subnet).await
+    }
+
+    /// Get the validator information.
+    pub async fn get_validator_info(
+        &self,
+        subnet: &SubnetID,
+        validator: &Address,
+    ) -> anyhow::Result<ValidatorInfo> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target subnet parent not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().get_validator_info(subnet, validator).await
     }
 
     /// Get the changes in subnet validators. This is fetched from parent.
