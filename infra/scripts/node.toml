@@ -51,10 +51,10 @@ mkdir -p $CMT_DIR
 
 [tasks.seed-enable]
 script="""
-sed -i'bak' "s/seed_mode = false/seed_mode = true/" ${CMT_DIR}/config/config.toml
+sed -i'' -e "s|seed_mode = false|seed_mode = true|" ${CMT_DIR}/config/config.toml
 """
 
 [tasks.set-seeds]
 script="""
-sed -i 's/seeds = ""/seeds = "${BOOTSTRAPS}"/g' ${CMT_DIR}/config/config.toml
+sed -i'' -e 's|seeds = ""|seeds = "${BOOTSTRAPS}"|g' ${CMT_DIR}/config/config.toml
 """

@@ -107,7 +107,7 @@ export CMT_PERSISTENT_PEERS=`cat $BASE_DIR/peers`
 echo Persistent peers: $CMT_PERSISTENT_PEERS
 
 for i in $(seq 0 3); do
-    sed -i'bak' "s/persistent_peers = \\"\\"/persistent_peers = \\"$CMT_PERSISTENT_PEERS\\"/" $BASE_DIR/node${i}/cometbft/config/config.toml
+    sed -i'' -e "s|persistent_peers = \\"\\"|persistent_peers = \\"$CMT_PERSISTENT_PEERS\\"|" $BASE_DIR/node${i}/cometbft/config/config.toml
 done
 """
 
