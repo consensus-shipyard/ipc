@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
+use fendermint_app_options::key::FendermintToEthArgs;
 use fendermint_crypto::{PublicKey, SecretKey};
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fvm_shared::address::Address;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use serde_json::json;
@@ -26,6 +28,7 @@ cmd! {
             KeyCommands::AddPeer(args) => args.exec(()).await,
             KeyCommands::Address(args) => args.exec(()).await,
             KeyCommands::EthToFendermint(args) => args.exec(()).await,
+            KeyCommands::FendermintToEth(args) => args.exec(()).await,
         }
     }
 }
@@ -37,6 +40,18 @@ cmd! {
 
         export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
         export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
+
+        Ok(())
+    }
+}
+
+cmd! {
+    FendermintToEthArgs(self) {
+        let sk = read_secret_key(&self.secret_key)?;
+        let pk = sk.public_key();
+
+        export(&self.out_dir, &self.name, "sk", &hex::encode(sk.serialize()))?;
+        export(&self.out_dir, &self.name, "pk", &hex::encode(EthAddress::from(pk).0))?;
 
         Ok(())
     }
