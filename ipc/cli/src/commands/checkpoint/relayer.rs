@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::commands::get_subnet_config;
-use crate::{CommandLineHandler, GlobalArguments};
+use crate::{require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::Args;
@@ -33,7 +33,7 @@ impl CommandLineHandler for BottomUpRelayer {
         let config = Arc::new(Config::from_file(&config_path)?);
         let mut keystore = new_evm_keystore_from_config(config)?;
         let submitter = match (arguments.submitter.as_ref(), keystore.get_default()?) {
-            (Some(submitter), _) => Address::from_str(submitter)?,
+            (Some(submitter), _) => require_fil_addr_from_str(submitter)?,
             (None, Some(addr)) => {
                 log::info!("using default address: {addr:?}");
                 Address::try_from(addr)?
