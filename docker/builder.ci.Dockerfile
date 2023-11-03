@@ -5,6 +5,26 @@
 # https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/
 # https://github.com/cross-rs/cross/wiki/Recipes#openssl
 
+# The goal of this step is to copy the `Cargo.toml` and `Cargo.lock` files _without_ the source code,
+# so that we can run a step in `builder` that compiles the dependencies only. To do so we first
+# copy the whole codebase then get rid of everything except the dependencies and do a build.
+FROM --platform=$BUILDPLATFORM ubuntu:latest as stripper
+
+WORKDIR /app
+
+# Copy the Cargo artifacts and Rust sources.
+COPY Cargo.toml Cargo.lock ./
+COPY fendermint fendermint/
+
+# Delete anything other than cargo files: Rust sources, config files, Markdown, etc.
+RUN find fendermint -type f \! -name "Cargo.*" | xargs rm -rf
+
+# Construct dummy sources. Add a print to help debug the case if we failed to properly replace the file.
+RUN echo "fn main() { println!(\"I'm the dummy.\"); }" > fendermint/app/src/main.rs && \
+  for crate in $(find fendermint -name "Cargo.toml" | xargs dirname); do \
+  touch $crate/src/lib.rs; \
+  done
+
 # Using `ubuntu` here because when I try `rust:bookworm` like in `builder.local.Dockerfile` then
 # even though I add `aarch64` rustup target as a RUN step, it can't compile `core` later on
 # unless that step is repeated in the same command as the cargo build. That doesn't happen
@@ -39,12 +59,10 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
   rustup toolchain install stable-aarch64-unknown-linux-gnu; \
   fi
 
-COPY . .
+# Copy the stripped source code.
+COPY --from=stripper /app /app
 
-# On CI we use `docker buildx` with multiple `--platform` arguments, and `--cache-from=type=gha` to cache the layers.
-# If we used `--mount=type=cache` here then it looks like the different platforms would be mounted at the same place
-# and then one of them can get blocked trying to acquire a lock on the build directory.
-
+# Build the dependencies.
 RUN set -eux; \
   case "${TARGETARCH}" in \
   amd64) ARCH='x86_64'  ;; \
@@ -52,4 +70,18 @@ RUN set -eux; \
   *) echo >&2 "unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
   esac; \
   rustup show ; \
+  cargo build --release -p fendermint_app --target ${ARCH}-unknown-linux-gnu
+
+# Now copy the full source.
+COPY . .
+
+# Need to invalidate build caches otherwise they won't be recompiled with the real code.
+RUN find fendermint -type f \( -wholename "**/src/lib.rs" -o -wholename "**/src/main.rs" \) | xargs touch
+
+# Do the final build.
+RUN set -eux; \
+  case "${TARGETARCH}" in \
+  amd64) ARCH='x86_64'  ;; \
+  arm64) ARCH='aarch64' ;; \
+  esac; \
   cargo install --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu
