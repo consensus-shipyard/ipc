@@ -3,7 +3,7 @@
 all: test build
 
 build:
-	cargo build --release -p ipc-cli && cp target/release/ipc-cli ./bin
+	cargo build --release -p ipc-cli && mkdir -p bin/ && cp target/release/ipc-cli ./bin/ipc-cli
 
 test:
 	cargo test --release --workspace --exclude ipc_e2e itest
