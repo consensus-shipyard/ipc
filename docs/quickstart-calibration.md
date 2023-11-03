@@ -121,7 +121,7 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 ./bin/ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
 ```
 
-* Make a note of the address of the subnet you created (`/r314159/<SUBNET_ID>`)
+* Make a note of the address of the subnet you created.
 
 ## Step 5: Join the subnet
 
