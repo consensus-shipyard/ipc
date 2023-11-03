@@ -56,6 +56,9 @@ check-rust-binding:
 commit-rust-binding:
 	./ops/commit-rust-binding.sh
 
+commit-abi:
+	./ops/commit-abi.sh
+
 storage:
 	rm -rf ./cache
 	rm -rf ./cache_hardhat

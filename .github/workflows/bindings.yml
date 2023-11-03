@@ -29,9 +29,15 @@ jobs:
       - name: Create binding
         run: make compile-abi && make rust-binding && cargo fmt --manifest-path ./binding/Cargo.toml
 
-      - name: Commit bindings
+      - name: Git Config
         run: |
           git config --global user.name 'auto-commit'
           git config --global user.email 'auto-commit@users.noreply.github.com'
+
+      - name: Commit bindings
+        run: |
           make commit-rust-binding
-          
+
+      - name: Commit ABI
+        run: |
+          make commit-abi

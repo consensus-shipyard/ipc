@@ -1,0 +1,201 @@
+{
+  "abi": [],
+  "bytecode": {
+    "object": "0x",
+    "linkReferences": {}
+  },
+  "deployedBytecode": {
+    "object": "0x",
+    "linkReferences": {}
+  },
+  "ast": {
+    "absolutePath": "src/structs/FvmAddress.sol",
+    "id": 47128,
+    "exportedSymbols": {
+      "DelegatedAddress": [
+        47127
+      ],
+      "FvmAddress": [
+        47120
+      ]
+    },
+    "nodeType": "SourceUnit",
+    "src": "46:489:73",
+    "nodes": [
+      {
+        "id": 47115,
+        "nodeType": "PragmaDirective",
+        "src": "46:23:73",
+        "nodes": [],
+        "literals": [
+          "solidity",
+          "0.8",
+          ".19"
+        ]
+      },
+      {
+        "id": 47120,
+        "nodeType": "StructDefinition",
+        "src": "320:60:73",
+        "nodes": [],
+        "canonicalName": "FvmAddress",
+        "members": [
+          {
+            "constant": false,
+            "id": 47117,
+            "mutability": "mutable",
+            "name": "addrType",
+            "nameLocation": "350:8:73",
+            "nodeType": "VariableDeclaration",
+            "scope": 47120,
+            "src": "344:14:73",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_uint8",
+              "typeString": "uint8"
+            },
+            "typeName": {
+              "id": 47116,
+              "name": "uint8",
+              "nodeType": "ElementaryTypeName",
+              "src": "344:5:73",
+              "typeDescriptions": {
+                "typeIdentifier": "t_uint8",
+                "typeString": "uint8"
+              }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 47119,
+            "mutability": "mutable",
+            "name": "payload",
+            "nameLocation": "370:7:73",
+            "nodeType": "VariableDeclaration",
+            "scope": 47120,
+            "src": "364:13:73",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_bytes_storage_ptr",
+              "typeString": "bytes"
+            },
+            "typeName": {
+              "id": 47118,
+              "name": "bytes",
+              "nodeType": "ElementaryTypeName",
+              "src": "364:5:73",
+              "typeDescriptions": {
+                "typeIdentifier": "t_bytes_storage_ptr",
+                "typeString": "bytes"
+              }
+            },
+            "visibility": "internal"
+          }
+        ],
+        "name": "FvmAddress",
+        "nameLocation": "327:10:73",
+        "scope": 47128,
+        "visibility": "public"
+      },
+      {
+        "id": 47127,
+        "nodeType": "StructDefinition",
+        "src": "447:87:73",
+        "nodes": [],
+        "canonicalName": "DelegatedAddress",
+        "members": [
+          {
+            "constant": false,
+            "id": 47122,
+            "mutability": "mutable",
+            "name": "namespace",
+            "nameLocation": "484:9:73",
+            "nodeType": "VariableDeclaration",
+            "scope": 47127,
+            "src": "477:16:73",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_uint64",
+              "typeString": "uint64"
+            },
+            "typeName": {
+              "id": 47121,
+              "name": "uint64",
+              "nodeType": "ElementaryTypeName",
+              "src": "477:6:73",
+              "typeDescriptions": {
+                "typeIdentifier": "t_uint64",
+                "typeString": "uint64"
+              }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 47124,
+            "mutability": "mutable",
+            "name": "length",
+            "nameLocation": "507:6:73",
+            "nodeType": "VariableDeclaration",
+            "scope": 47127,
+            "src": "499:14:73",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_uint128",
+              "typeString": "uint128"
+            },
+            "typeName": {
+              "id": 47123,
+              "name": "uint128",
+              "nodeType": "ElementaryTypeName",
+              "src": "499:7:73",
+              "typeDescriptions": {
+                "typeIdentifier": "t_uint128",
+                "typeString": "uint128"
+              }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 47126,
+            "mutability": "mutable",
+            "name": "buffer",
+            "nameLocation": "525:6:73",
+            "nodeType": "VariableDeclaration",
+            "scope": 47127,
+            "src": "519:12:73",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_bytes_storage_ptr",
+              "typeString": "bytes"
+            },
+            "typeName": {
+              "id": 47125,
+              "name": "bytes",
+              "nodeType": "ElementaryTypeName",
+              "src": "519:5:73",
+              "typeDescriptions": {
+                "typeIdentifier": "t_bytes_storage_ptr",
+                "typeString": "bytes"
+              }
+            },
+            "visibility": "internal"
+          }
+        ],
+        "name": "DelegatedAddress",
+        "nameLocation": "454:16:73",
+        "scope": 47128,
+        "visibility": "public"
+      }
+    ],
+    "license": "MIT OR Apache-2.0"
+  },
+  "id": 73
+}

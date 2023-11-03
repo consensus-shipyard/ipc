@@ -1,0 +1,62 @@
+{
+  "abi": [],
+  "bytecode": {
+    "object": "0x",
+    "linkReferences": {}
+  },
+  "deployedBytecode": {
+    "object": "0x",
+    "linkReferences": {}
+  },
+  "ast": {
+    "absolutePath": "src/enums/IPCMsgType.sol",
+    "id": 36833,
+    "exportedSymbols": {
+      "IPCMsgType": [
+        36832
+      ]
+    },
+    "nodeType": "SourceUnit",
+    "src": "46:131:42",
+    "nodes": [
+      {
+        "id": 36829,
+        "nodeType": "PragmaDirective",
+        "src": "46:23:42",
+        "nodes": [],
+        "literals": [
+          "solidity",
+          "0.8",
+          ".19"
+        ]
+      },
+      {
+        "id": 36832,
+        "nodeType": "EnumDefinition",
+        "src": "131:45:42",
+        "nodes": [],
+        "canonicalName": "IPCMsgType",
+        "members": [
+          {
+            "id": 36830,
+            "name": "TopDown",
+            "nameLocation": "153:7:42",
+            "nodeType": "EnumValue",
+            "src": "153:7:42"
+          },
+          {
+            "id": 36831,
+            "name": "BottomUp",
+            "nameLocation": "166:8:42",
+            "nodeType": "EnumValue",
+            "src": "166:8:42"
+          }
+        ],
+        "name": "IPCMsgType",
+        "nameLocation": "136:10:42"
+      }
+    ],
+    "license": "MIT OR Apache-2.0"
+  },
+  "id": 42
+}

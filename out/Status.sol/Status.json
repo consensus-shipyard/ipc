@@ -1,0 +1,90 @@
+{
+  "abi": [],
+  "bytecode": {
+    "object": "0x",
+    "linkReferences": {}
+  },
+  "deployedBytecode": {
+    "object": "0x",
+    "linkReferences": {}
+  },
+  "ast": {
+    "absolutePath": "src/enums/Status.sol",
+    "id": 36842,
+    "exportedSymbols": {
+      "Status": [
+        36841
+      ]
+    },
+    "nodeType": "SourceUnit",
+    "src": "46:181:43",
+    "nodes": [
+      {
+        "id": 36834,
+        "nodeType": "PragmaDirective",
+        "src": "46:23:43",
+        "nodes": [],
+        "literals": [
+          "solidity",
+          "0.8",
+          ".19"
+        ]
+      },
+      {
+        "id": 36841,
+        "nodeType": "EnumDefinition",
+        "src": "128:98:43",
+        "nodes": [],
+        "canonicalName": "Status",
+        "members": [
+          {
+            "id": 36835,
+            "name": "Unset",
+            "nameLocation": "146:5:43",
+            "nodeType": "EnumValue",
+            "src": "146:5:43"
+          },
+          {
+            "id": 36836,
+            "name": "Active",
+            "nameLocation": "157:6:43",
+            "nodeType": "EnumValue",
+            "src": "157:6:43"
+          },
+          {
+            "id": 36837,
+            "name": "Inactive",
+            "nameLocation": "169:8:43",
+            "nodeType": "EnumValue",
+            "src": "169:8:43"
+          },
+          {
+            "id": 36838,
+            "name": "Killed",
+            "nameLocation": "183:6:43",
+            "nodeType": "EnumValue",
+            "src": "183:6:43"
+          },
+          {
+            "id": 36839,
+            "name": "Terminating",
+            "nameLocation": "195:11:43",
+            "nodeType": "EnumValue",
+            "src": "195:11:43"
+          },
+          {
+            "id": 36840,
+            "name": "Instantiated",
+            "nameLocation": "212:12:43",
+            "nodeType": "EnumValue",
+            "src": "212:12:43"
+          }
+        ],
+        "name": "Status",
+        "nameLocation": "133:6:43"
+      }
+    ],
+    "license": "MIT OR Apache-2.0"
+  },
+  "id": 43
+}

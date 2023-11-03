@@ -1,0 +1,1413 @@
+{
+  "abi": [
+    {
+      "inputs": [],
+      "name": "EMPTY_BOTTOMUPCHECKPOINT_HASH",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "uint64",
+                  "name": "root",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "address[]",
+                  "name": "route",
+                  "type": "address[]"
+                }
+              ],
+              "internalType": "struct SubnetID",
+              "name": "subnetID",
+              "type": "tuple"
+            },
+            {
+              "internalType": "uint64",
+              "name": "blockHeight",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "blockHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "nextConfigurationNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "crossMessagesHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct BottomUpCheckpoint",
+          "name": "bottomUpCheckpoint",
+          "type": "tuple"
+        }
+      ],
+      "name": "isEmpty",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "uint64",
+                  "name": "root",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "address[]",
+                  "name": "route",
+                  "type": "address[]"
+                }
+              ],
+              "internalType": "struct SubnetID",
+              "name": "subnetID",
+              "type": "tuple"
+            },
+            {
+              "internalType": "uint64",
+              "name": "blockHeight",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "blockHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "nextConfigurationNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "crossMessagesHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct BottomUpCheckpoint",
+          "name": "bottomupCheckpoint",
+          "type": "tuple"
+        }
+      ],
+      "name": "toHash",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "bytecode": {
+    "object": "0x6080806040523461001a576103a99081610020823930815050f35b600080fdfe6080604052600436101561001257600080fd5b60003560e01c806339aa47fb1461008457806345d51b12146100605763aa9fb5581461003d57600080fd5b600036600319011261005b5760206100536102dc565b604051908152f35b600080fd5b602061007361006e36610117565b61035e565b61007b6102dc565b14604051908152f35b602061005361006e36610117565b60a0810190811067ffffffffffffffff8211176100ae57604052565b634e487b7160e01b600052604160045260246000fd5b6040810190811067ffffffffffffffff8211176100ae57604052565b90601f8019910116810190811067ffffffffffffffff8211176100ae57604052565b359067ffffffffffffffff8216820361005b57565b60031991906020838201811361005b576004359067ffffffffffffffff9485831161005b5760a081848603011261005b576040519361015585610092565b836004013587811161005b57604090850192838303011261005b576040519161017d836100c4565b61018960048201610102565b835260248101359088821161005b57018160238201121561005b5760048101359788116100ae578760051b90604051986101c58684018b6100e0565b89526024858a019282010192831161005b57602401905b8282106102265750505060849394958282015284526101fd60248301610102565b908401526044810135604084015261021760648201610102565b60608401520135608082015290565b81356001600160a01b038116810361005b5781529084019084016101dc565b602091828252805160a0848401526101008301938067ffffffffffffffff928381511660c0870152015194604060e0860152855180915281610120860196019060005b8181106102bf57505050918160809260a0948301511660408601526040820151606086015260608201511682850152015191015290565b82516001600160a01b031688529683019691830191600101610288565b60408051906020820182811067ffffffffffffffff8211176100ae578152600080835281519261030b846100c4565b818452602084015281519261031f84610092565b835280602084015280828401528060608401526080830152516103588161034a602082019485610245565b03601f1981018352826100e0565b51902090565b6040516103588161034a60208201948561024556fea2646970667358221220172b9f097b73031ce1a15c94b8802500f70d1768c3afe1d90543925a0eda370964736f6c63430008130033",
+    "sourceMap": "335:774:56:-:0;;;;;;;;;;;;;;;;;;;;;",
+    "linkReferences": {}
+  },
+  "deployedBytecode": {
+    "object": "0x6080604052600436101561001257600080fd5b60003560e01c806339aa47fb1461008457806345d51b12146100605763aa9fb5581461003d57600080fd5b600036600319011261005b5760206100536102dc565b604051908152f35b600080fd5b602061007361006e36610117565b61035e565b61007b6102dc565b14604051908152f35b602061005361006e36610117565b60a0810190811067ffffffffffffffff8211176100ae57604052565b634e487b7160e01b600052604160045260246000fd5b6040810190811067ffffffffffffffff8211176100ae57604052565b90601f8019910116810190811067ffffffffffffffff8211176100ae57604052565b359067ffffffffffffffff8216820361005b57565b60031991906020838201811361005b576004359067ffffffffffffffff9485831161005b5760a081848603011261005b576040519361015585610092565b836004013587811161005b57604090850192838303011261005b576040519161017d836100c4565b61018960048201610102565b835260248101359088821161005b57018160238201121561005b5760048101359788116100ae578760051b90604051986101c58684018b6100e0565b89526024858a019282010192831161005b57602401905b8282106102265750505060849394958282015284526101fd60248301610102565b908401526044810135604084015261021760648201610102565b60608401520135608082015290565b81356001600160a01b038116810361005b5781529084019084016101dc565b602091828252805160a0848401526101008301938067ffffffffffffffff928381511660c0870152015194604060e0860152855180915281610120860196019060005b8181106102bf57505050918160809260a0948301511660408601526040820151606086015260608201511682850152015191015290565b82516001600160a01b031688529683019691830191600101610288565b60408051906020820182811067ffffffffffffffff8211176100ae578152600080835281519261030b846100c4565b818452602084015281519261031f84610092565b835280602084015280828401528060608401526080830152516103588161034a602082019485610245565b03601f1981018352826100e0565b51902090565b6040516103588161034a60208201948561024556fea2646970667358221220172b9f097b73031ce1a15c94b8802500f70d1768c3afe1d90543925a0eda370964736f6c63430008130033",
+    "sourceMap": "335:774:56:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;335:774:56;;;;;366:398;;:::i;:::-;335:774;;;;;;;;;;;;1041:26;335:774;;;:::i;:::-;1041:26;:::i;:::-;1071:29;;:::i;:::-;1041:59;335:774;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;:::o;:::-;-1:-1:-1;;335:774:56;;;;;;;-1:-1:-1;335:774:56;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;:::o;:::-;;;-1:-1:-1;;;;;335:774:56;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;-1:-1:-1;;;;;335:774:56;;;;;;;;;;;;;;;366:398;335:774;;;;;;;;;;;;;;;;;;541:1;335:774;;;;;;;;;:::i;:::-;;;;;532:29;;335:774;;;;;;;:::i;:::-;;;481:259;335:774;481:259;;335:774;481:259;;;;335:774;481:259;;;;335:774;481:259;;;335:774;;453:301;;;335:774;453:301;;;;;:::i;:::-;;335:774;;453:301;;;;;;:::i;:::-;335:774;430:334;;366:398;:::o;771:157::-;335:774;;890:30;;;;;;;;;:::i",
+    "linkReferences": {}
+  },
+  "methodIdentifiers": {
+    "EMPTY_BOTTOMUPCHECKPOINT_HASH()": "aa9fb558",
+    "isEmpty(BottomUpCheckpoint)": "45d51b12",
+    "toHash(BottomUpCheckpoint)": "39aa47fb"
+  },
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"EMPTY_BOTTOMUPCHECKPOINT_HASH\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"root\",\"type\":\"uint64\"},{\"internalType\":\"address[]\",\"name\":\"route\",\"type\":\"address[]\"}],\"internalType\":\"struct SubnetID\",\"name\":\"subnetID\",\"type\":\"tuple\"},{\"internalType\":\"uint64\",\"name\":\"blockHeight\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"blockHash\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"nextConfigurationNumber\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"crossMessagesHash\",\"type\":\"bytes32\"}],\"internalType\":\"struct BottomUpCheckpoint\",\"name\":\"bottomUpCheckpoint\",\"type\":\"tuple\"}],\"name\":\"isEmpty\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"root\",\"type\":\"uint64\"},{\"internalType\":\"address[]\",\"name\":\"route\",\"type\":\"address[]\"}],\"internalType\":\"struct SubnetID\",\"name\":\"subnetID\",\"type\":\"tuple\"},{\"internalType\":\"uint64\",\"name\":\"blockHeight\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"blockHash\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"nextConfigurationNumber\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"crossMessagesHash\",\"type\":\"bytes32\"}],\"internalType\":\"struct BottomUpCheckpoint\",\"name\":\"bottomupCheckpoint\",\"type\":\"tuple\"}],\"name\":\"toHash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"author\":\"LimeChain team\",\"kind\":\"dev\",\"methods\":{},\"title\":\"Helper library for manipulating Checkpoint struct\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/lib/CheckpointHelper.sol\":\"CheckpointHelper\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/fevmate/contracts/utils/FilAddress.sol\":{\"keccak256\":\"0x8707b4f152e92b852090c313419c0dc772eebf4428472a0659dd6b13dd6bee31\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://442fc3cb02e610424f0599f4cc519e4fbead47da09911697b62208a2ae51e4a7\",\"dweb:/ipfs/QmRpKJ9tWWTHgMpRB18DHJLbCT4YT9yp2G89H9mHGu5ss2\"]},\"lib/openzeppelin-contracts/contracts/utils/Address.sol\":{\"keccak256\":\"0x67ca7745e6032aeda339ba3f5813abf9eeb4ec683520944fa878c2867aea58f1\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://c13ff04f87357176e2b267730f288013269eefce0862ea8f4bf3f420948eb7d5\",\"dweb:/ipfs/QmQZRjF3CdCdoUvqhrT9KXYjrjmdmFQqENtuiHTMbyt6xo\"]},\"lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol\":{\"keccak256\":\"0xeefcbb8cb69f04a18f6dc61d4811133ce9aeff96ce60820f758abc52ef55b892\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://81c61c0dd40890f6a4b1fb792bc5b5b61e821fcafa2aae6c7eda6d4f1ece2593\",\"dweb:/ipfs/QmRLMrq6BiPS9wGu7ZC174SFYWCu6cxbU3agDw2XgJeDpT\"]},\"src/constants/Constants.sol\":{\"keccak256\":\"0xe09e20d591a8c9cabf6f2e44a90029fb3b2a8cdd6c09dc4105b81781ffb44546\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://b3c4df8d0fd2aa770abf8b43a134ce0fc0bc3091f97ec02415d09cca09f4f940\",\"dweb:/ipfs/QmSUpMfWLN8WWhvLmbZymCdR48ZmpsuyvBnSPeAtdorxDx\"]},\"src/enums/ConsensusType.sol\":{\"keccak256\":\"0xc5efd8c66b57dadaba4178c4b4d087b30cb84cbac38fb288a8c3b65075a9f59d\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://6fcffaa8e40322ae27958603884cc07d06e9efd59cf12764f28945b7a47e11d0\",\"dweb:/ipfs/Qmc3PBovpcvj7jgVq5GwR5SkiUXBymT1tw74mvu5ccNqoZ\"]},\"src/enums/Status.sol\":{\"keccak256\":\"0x8f5921e4df87420127988b54f67a3ccfb6fbfae767891e8ed4edbf371598e16c\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://7a81d9a00ea7a2a85cfe1b2662236412dddb55e09fa70c70a34dc4dfc5ffea33\",\"dweb:/ipfs/QmRh4uA4491B2DVjrUtdfCTTtjpoXpKEp3Zz9CBYueNW1R\"]},\"src/errors/IPCErrors.sol\":{\"keccak256\":\"0x3c5eef277d0386c1edbb7f55f454c81f23b3a86c0c113c1ce474da04348575de\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://5bddc2487c518086fde2542564cf0eda4bfdd5cc4c7a2b892474b85cc48b9d4b\",\"dweb:/ipfs/QmZz3F1FU4Efq7s4TSdGEGimhKrvVRi8ngPmUdvEq4AL8r\"]},\"src/interfaces/IGateway.sol\":{\"keccak256\":\"0xb4209b44c3965fd233387ece78149461bd64a47788c3af24edb7c99ea1ef8868\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://4db7a4573100063387e170c55a69772b20e403444e9d97b24cc220a71a52fbbb\",\"dweb:/ipfs/QmTYsSjmFsTwuNTXBByZKueJZLpe7RwNzLRWNPxXGA3YKB\"]},\"src/lib/AccountHelper.sol\":{\"keccak256\":\"0xd5f3c0079e3002218c63b70b43f6e018eb5d39f064b7d4321b6409c84f6a22b5\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://e5857fe645e020bc964cd53a33e1fbd4fd9d0de405170a8251cc0b040519cbdc\",\"dweb:/ipfs/QmaFUeVbA1mqn7dTJMqgX4DbKx6yzBrSkmeNTcaVjBJd9z\"]},\"src/lib/CheckpointHelper.sol\":{\"keccak256\":\"0x535a4206364efd860ca7e9548a657f62981235dcc7e58a30e9696147cc4b2ce7\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://40e6d5f34a943f845b6f5371302e289424ae8dfe731b735f73ac2abdb136e321\",\"dweb:/ipfs/QmUbE21bSc3CGtScW79RU7EdTpn1iYMFMyWJc3oTUamjRB\"]},\"src/lib/LibGatewayActorStorage.sol\":{\"keccak256\":\"0x88f2124aa3843fefae87d50af505872389399fd75223f14bf1f5d6350cf25af7\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://228a4dfe0514a271f08967cdeb09435bcce23becc3e195526e8cc51291334f31\",\"dweb:/ipfs/QmQX7KGm38gjfH2tP5gGAYQFT1RpMUpnMA47y3WaXvzMLq\"]},\"src/lib/LibStaking.sol\":{\"keccak256\":\"0x343edbc3ec1abbfdd217379f67b69a7f85a80a16b7e9710cf83e27176a0c4eb9\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://634b83bf09c42887727f6771efad7fe752ffce16643518911324f65c453ca427\",\"dweb:/ipfs/QmRBrC5j3CUuAYFnZVdjHV3UBtJKvgm1K38eG7aYAYAPWe\"]},\"src/lib/LibStakingChangeLog.sol\":{\"keccak256\":\"0x1ec44b7c417dae8bec87da6f1f48eb10a1eacdfb4935144dd9094dc1bbe9aa9b\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://d6fcbd14fe0743c0ea0a8a8d2ea851b4864559c3553773f07d6ae708bcc83318\",\"dweb:/ipfs/QmYb6v6U27FAY4ut6gCZy6oK1MjN165RTxUGhrY6zxtg93\"]},\"src/lib/LibSubnetActorStorage.sol\":{\"keccak256\":\"0xe11ae56d18ef43fd9ebdf9350977f9a26da4ee9a3288b46b04c5b973aa231f28\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://f616b61fde1528a8666d09c962d7f23a82b200229691794933f39c4d3781fc1c\",\"dweb:/ipfs/QmXQsNGv6R34wAx1fRoyMiwdtGgQVn1qDXGCr7cED92vvJ\"]},\"src/lib/priority/LibMaxPQ.sol\":{\"keccak256\":\"0xa5e251a61b85763e7f427a9e4880654eb6070a262ed0a062cd6b0dee9ff9ee43\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://351b3913af3db39b5c019733ae2db840bdc65280615ffd6dab4db5a5ac9f8e66\",\"dweb:/ipfs/QmaxL7DEGjY82Zd1G6WyhC1zLoLwfQNMPag867bEWn6MAF\"]},\"src/lib/priority/LibMinPQ.sol\":{\"keccak256\":\"0x64a2b2cd7cb7c472d82362f2f66b6fd1618c1c83afcddb13ede0b51bb1712a8f\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://a2229ecb94941f27f802cad254fe46aa2c374ebd9acf03fc27f3501345e26e27\",\"dweb:/ipfs/Qmd8sGA66TW5RidR9jCxWaS8U9KDby5RdYgyZxob2aeDx6\"]},\"src/lib/priority/LibPQ.sol\":{\"keccak256\":\"0x4d4290087995d669e80f8fdd405bfaae545323393c0c54689b84965ffb87303e\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://c21b563f6bf23afacb38fc97ab94d1afe12e4ad3dfde96d4484068bf26b13a2c\",\"dweb:/ipfs/Qmd5d3EnZwaSRnjG4ZFH2X8HKgymzd6vQgus8A6oEoh5pJ\"]},\"src/structs/Checkpoint.sol\":{\"keccak256\":\"0x1982a747516dce183434bbf0e96b5b1fedbf3a90928beffcc046cadf47ee0746\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://253b9df56334aae80fe4a0da805e4fdc3d186fb2624edade864ae06bfd472f2a\",\"dweb:/ipfs/QmVAaz1ViF96LjM9Aknn3vtwQ5a5oDiJRZP47ddJ1V9Fww\"]},\"src/structs/FvmAddress.sol\":{\"keccak256\":\"0xfc8c16b96bd5b7d4a163f586bd36936f7170304de70aa487a0b11c60e5ac9069\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://6b6572d5f28a9fa12ff91d45601c063cdaf68a12b9f8e46131c6dc4cd28255ac\",\"dweb:/ipfs/QmSC8gRWVuPKjobgDDyHbm2cmcPN8pWzbEmXKmdMZR8YKu\"]},\"src/structs/Subnet.sol\":{\"keccak256\":\"0x1ddb626039baf4a4411f06b5340aaa80dcd65e9980da7673b73ab16633d871ce\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://af017eef4cb46262ac29b4cf47faa1fc5d2b61970ec7d6d021eae4cf45b5577b\",\"dweb:/ipfs/QmZJiA2t934fbe62513neQYzxSNswnCRTJybp7d6X2RyWR\"]}},\"version\":1}",
+  "metadata": {
+    "compiler": {
+      "version": "0.8.19+commit.7dd6d404"
+    },
+    "language": "Solidity",
+    "output": {
+      "abi": [
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "EMPTY_BOTTOMUPCHECKPOINT_HASH",
+          "outputs": [
+            {
+              "internalType": "bytes32",
+              "name": "",
+              "type": "bytes32"
+            }
+          ]
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "struct BottomUpCheckpoint",
+              "name": "bottomUpCheckpoint",
+              "type": "tuple",
+              "components": [
+                {
+                  "internalType": "struct SubnetID",
+                  "name": "subnetID",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "internalType": "uint64",
+                      "name": "root",
+                      "type": "uint64"
+                    },
+                    {
+                      "internalType": "address[]",
+                      "name": "route",
+                      "type": "address[]"
+                    }
+                  ]
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "blockHeight",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "blockHash",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "nextConfigurationNumber",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "crossMessagesHash",
+                  "type": "bytes32"
+                }
+              ]
+            }
+          ],
+          "stateMutability": "pure",
+          "type": "function",
+          "name": "isEmpty",
+          "outputs": [
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "struct BottomUpCheckpoint",
+              "name": "bottomupCheckpoint",
+              "type": "tuple",
+              "components": [
+                {
+                  "internalType": "struct SubnetID",
+                  "name": "subnetID",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "internalType": "uint64",
+                      "name": "root",
+                      "type": "uint64"
+                    },
+                    {
+                      "internalType": "address[]",
+                      "name": "route",
+                      "type": "address[]"
+                    }
+                  ]
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "blockHeight",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "blockHash",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "nextConfigurationNumber",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "crossMessagesHash",
+                  "type": "bytes32"
+                }
+              ]
+            }
+          ],
+          "stateMutability": "pure",
+          "type": "function",
+          "name": "toHash",
+          "outputs": [
+            {
+              "internalType": "bytes32",
+              "name": "",
+              "type": "bytes32"
+            }
+          ]
+        }
+      ],
+      "devdoc": {
+        "kind": "dev",
+        "methods": {},
+        "version": 1
+      },
+      "userdoc": {
+        "kind": "user",
+        "methods": {},
+        "version": 1
+      }
+    },
+    "settings": {
+      "remappings": [
+        "ds-test/=lib/forge-std/lib/ds-test/src/",
+        "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
+        "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
+        "fevmate/=lib/fevmate/contracts/",
+        "forge-std/=lib/forge-std/src/",
+        "murky/=lib/murky/src/",
+        "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+        "openzeppelin/=lib/openzeppelin-contracts/contracts/"
+      ],
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "metadata": {
+        "bytecodeHash": "ipfs"
+      },
+      "compilationTarget": {
+        "src/lib/CheckpointHelper.sol": "CheckpointHelper"
+      },
+      "libraries": {},
+      "viaIR": true
+    },
+    "sources": {
+      "lib/fevmate/contracts/utils/FilAddress.sol": {
+        "keccak256": "0x8707b4f152e92b852090c313419c0dc772eebf4428472a0659dd6b13dd6bee31",
+        "urls": [
+          "bzz-raw://442fc3cb02e610424f0599f4cc519e4fbead47da09911697b62208a2ae51e4a7",
+          "dweb:/ipfs/QmRpKJ9tWWTHgMpRB18DHJLbCT4YT9yp2G89H9mHGu5ss2"
+        ],
+        "license": "MIT"
+      },
+      "lib/openzeppelin-contracts/contracts/utils/Address.sol": {
+        "keccak256": "0x67ca7745e6032aeda339ba3f5813abf9eeb4ec683520944fa878c2867aea58f1",
+        "urls": [
+          "bzz-raw://c13ff04f87357176e2b267730f288013269eefce0862ea8f4bf3f420948eb7d5",
+          "dweb:/ipfs/QmQZRjF3CdCdoUvqhrT9KXYjrjmdmFQqENtuiHTMbyt6xo"
+        ],
+        "license": "MIT"
+      },
+      "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol": {
+        "keccak256": "0xeefcbb8cb69f04a18f6dc61d4811133ce9aeff96ce60820f758abc52ef55b892",
+        "urls": [
+          "bzz-raw://81c61c0dd40890f6a4b1fb792bc5b5b61e821fcafa2aae6c7eda6d4f1ece2593",
+          "dweb:/ipfs/QmRLMrq6BiPS9wGu7ZC174SFYWCu6cxbU3agDw2XgJeDpT"
+        ],
+        "license": "MIT"
+      },
+      "src/constants/Constants.sol": {
+        "keccak256": "0xe09e20d591a8c9cabf6f2e44a90029fb3b2a8cdd6c09dc4105b81781ffb44546",
+        "urls": [
+          "bzz-raw://b3c4df8d0fd2aa770abf8b43a134ce0fc0bc3091f97ec02415d09cca09f4f940",
+          "dweb:/ipfs/QmSUpMfWLN8WWhvLmbZymCdR48ZmpsuyvBnSPeAtdorxDx"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/enums/ConsensusType.sol": {
+        "keccak256": "0xc5efd8c66b57dadaba4178c4b4d087b30cb84cbac38fb288a8c3b65075a9f59d",
+        "urls": [
+          "bzz-raw://6fcffaa8e40322ae27958603884cc07d06e9efd59cf12764f28945b7a47e11d0",
+          "dweb:/ipfs/Qmc3PBovpcvj7jgVq5GwR5SkiUXBymT1tw74mvu5ccNqoZ"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/enums/Status.sol": {
+        "keccak256": "0x8f5921e4df87420127988b54f67a3ccfb6fbfae767891e8ed4edbf371598e16c",
+        "urls": [
+          "bzz-raw://7a81d9a00ea7a2a85cfe1b2662236412dddb55e09fa70c70a34dc4dfc5ffea33",
+          "dweb:/ipfs/QmRh4uA4491B2DVjrUtdfCTTtjpoXpKEp3Zz9CBYueNW1R"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/errors/IPCErrors.sol": {
+        "keccak256": "0x3c5eef277d0386c1edbb7f55f454c81f23b3a86c0c113c1ce474da04348575de",
+        "urls": [
+          "bzz-raw://5bddc2487c518086fde2542564cf0eda4bfdd5cc4c7a2b892474b85cc48b9d4b",
+          "dweb:/ipfs/QmZz3F1FU4Efq7s4TSdGEGimhKrvVRi8ngPmUdvEq4AL8r"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/interfaces/IGateway.sol": {
+        "keccak256": "0xb4209b44c3965fd233387ece78149461bd64a47788c3af24edb7c99ea1ef8868",
+        "urls": [
+          "bzz-raw://4db7a4573100063387e170c55a69772b20e403444e9d97b24cc220a71a52fbbb",
+          "dweb:/ipfs/QmTYsSjmFsTwuNTXBByZKueJZLpe7RwNzLRWNPxXGA3YKB"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/AccountHelper.sol": {
+        "keccak256": "0xd5f3c0079e3002218c63b70b43f6e018eb5d39f064b7d4321b6409c84f6a22b5",
+        "urls": [
+          "bzz-raw://e5857fe645e020bc964cd53a33e1fbd4fd9d0de405170a8251cc0b040519cbdc",
+          "dweb:/ipfs/QmaFUeVbA1mqn7dTJMqgX4DbKx6yzBrSkmeNTcaVjBJd9z"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/CheckpointHelper.sol": {
+        "keccak256": "0x535a4206364efd860ca7e9548a657f62981235dcc7e58a30e9696147cc4b2ce7",
+        "urls": [
+          "bzz-raw://40e6d5f34a943f845b6f5371302e289424ae8dfe731b735f73ac2abdb136e321",
+          "dweb:/ipfs/QmUbE21bSc3CGtScW79RU7EdTpn1iYMFMyWJc3oTUamjRB"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/LibGatewayActorStorage.sol": {
+        "keccak256": "0x88f2124aa3843fefae87d50af505872389399fd75223f14bf1f5d6350cf25af7",
+        "urls": [
+          "bzz-raw://228a4dfe0514a271f08967cdeb09435bcce23becc3e195526e8cc51291334f31",
+          "dweb:/ipfs/QmQX7KGm38gjfH2tP5gGAYQFT1RpMUpnMA47y3WaXvzMLq"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/LibStaking.sol": {
+        "keccak256": "0x343edbc3ec1abbfdd217379f67b69a7f85a80a16b7e9710cf83e27176a0c4eb9",
+        "urls": [
+          "bzz-raw://634b83bf09c42887727f6771efad7fe752ffce16643518911324f65c453ca427",
+          "dweb:/ipfs/QmRBrC5j3CUuAYFnZVdjHV3UBtJKvgm1K38eG7aYAYAPWe"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/LibStakingChangeLog.sol": {
+        "keccak256": "0x1ec44b7c417dae8bec87da6f1f48eb10a1eacdfb4935144dd9094dc1bbe9aa9b",
+        "urls": [
+          "bzz-raw://d6fcbd14fe0743c0ea0a8a8d2ea851b4864559c3553773f07d6ae708bcc83318",
+          "dweb:/ipfs/QmYb6v6U27FAY4ut6gCZy6oK1MjN165RTxUGhrY6zxtg93"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/LibSubnetActorStorage.sol": {
+        "keccak256": "0xe11ae56d18ef43fd9ebdf9350977f9a26da4ee9a3288b46b04c5b973aa231f28",
+        "urls": [
+          "bzz-raw://f616b61fde1528a8666d09c962d7f23a82b200229691794933f39c4d3781fc1c",
+          "dweb:/ipfs/QmXQsNGv6R34wAx1fRoyMiwdtGgQVn1qDXGCr7cED92vvJ"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/priority/LibMaxPQ.sol": {
+        "keccak256": "0xa5e251a61b85763e7f427a9e4880654eb6070a262ed0a062cd6b0dee9ff9ee43",
+        "urls": [
+          "bzz-raw://351b3913af3db39b5c019733ae2db840bdc65280615ffd6dab4db5a5ac9f8e66",
+          "dweb:/ipfs/QmaxL7DEGjY82Zd1G6WyhC1zLoLwfQNMPag867bEWn6MAF"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/priority/LibMinPQ.sol": {
+        "keccak256": "0x64a2b2cd7cb7c472d82362f2f66b6fd1618c1c83afcddb13ede0b51bb1712a8f",
+        "urls": [
+          "bzz-raw://a2229ecb94941f27f802cad254fe46aa2c374ebd9acf03fc27f3501345e26e27",
+          "dweb:/ipfs/Qmd8sGA66TW5RidR9jCxWaS8U9KDby5RdYgyZxob2aeDx6"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/lib/priority/LibPQ.sol": {
+        "keccak256": "0x4d4290087995d669e80f8fdd405bfaae545323393c0c54689b84965ffb87303e",
+        "urls": [
+          "bzz-raw://c21b563f6bf23afacb38fc97ab94d1afe12e4ad3dfde96d4484068bf26b13a2c",
+          "dweb:/ipfs/Qmd5d3EnZwaSRnjG4ZFH2X8HKgymzd6vQgus8A6oEoh5pJ"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/structs/Checkpoint.sol": {
+        "keccak256": "0x1982a747516dce183434bbf0e96b5b1fedbf3a90928beffcc046cadf47ee0746",
+        "urls": [
+          "bzz-raw://253b9df56334aae80fe4a0da805e4fdc3d186fb2624edade864ae06bfd472f2a",
+          "dweb:/ipfs/QmVAaz1ViF96LjM9Aknn3vtwQ5a5oDiJRZP47ddJ1V9Fww"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/structs/FvmAddress.sol": {
+        "keccak256": "0xfc8c16b96bd5b7d4a163f586bd36936f7170304de70aa487a0b11c60e5ac9069",
+        "urls": [
+          "bzz-raw://6b6572d5f28a9fa12ff91d45601c063cdaf68a12b9f8e46131c6dc4cd28255ac",
+          "dweb:/ipfs/QmSC8gRWVuPKjobgDDyHbm2cmcPN8pWzbEmXKmdMZR8YKu"
+        ],
+        "license": "MIT OR Apache-2.0"
+      },
+      "src/structs/Subnet.sol": {
+        "keccak256": "0x1ddb626039baf4a4411f06b5340aaa80dcd65e9980da7673b73ab16633d871ce",
+        "urls": [
+          "bzz-raw://af017eef4cb46262ac29b4cf47faa1fc5d2b61970ec7d6d021eae4cf45b5577b",
+          "dweb:/ipfs/QmZJiA2t934fbe62513neQYzxSNswnCRTJybp7d6X2RyWR"
+        ],
+        "license": "MIT OR Apache-2.0"
+      }
+    },
+    "version": 1
+  },
+  "ast": {
+    "absolutePath": "src/lib/CheckpointHelper.sol",
+    "id": 39806,
+    "exportedSymbols": {
+      "BottomUpCheckpoint": [
+        47074
+      ],
+      "CheckpointHelper": [
+        39805
+      ],
+      "CrossMsg": [
+        47096
+      ],
+      "EMPTY_HASH": [
+        36334
+      ],
+      "SubnetID": [
+        47150
+      ]
+    },
+    "nodeType": "SourceUnit",
+    "src": "46:1064:56",
+    "nodes": [
+      {
+        "id": 39744,
+        "nodeType": "PragmaDirective",
+        "src": "46:23:56",
+        "nodes": [],
+        "literals": [
+          "solidity",
+          "0.8",
+          ".19"
+        ]
+      },
+      {
+        "id": 39746,
+        "nodeType": "ImportDirective",
+        "src": "71:54:56",
+        "nodes": [],
+        "absolutePath": "src/constants/Constants.sol",
+        "file": "../constants/Constants.sol",
+        "nameLocation": "-1:-1:-1",
+        "scope": 39806,
+        "sourceUnit": 36350,
+        "symbolAliases": [
+          {
+            "foreign": {
+              "id": 39745,
+              "name": "EMPTY_HASH",
+              "nodeType": "Identifier",
+              "overloadedDeclarations": [],
+              "referencedDeclaration": 36334,
+              "src": "79:10:56",
+              "typeDescriptions": {}
+            },
+            "nameLocation": "-1:-1:-1"
+          }
+        ],
+        "unitAlias": ""
+      },
+      {
+        "id": 39748,
+        "nodeType": "ImportDirective",
+        "src": "126:47:56",
+        "nodes": [],
+        "absolutePath": "src/structs/Subnet.sol",
+        "file": "../structs/Subnet.sol",
+        "nameLocation": "-1:-1:-1",
+        "scope": 39806,
+        "sourceUnit": 47283,
+        "symbolAliases": [
+          {
+            "foreign": {
+              "id": 39747,
+              "name": "SubnetID",
+              "nodeType": "Identifier",
+              "overloadedDeclarations": [],
+              "referencedDeclaration": 47150,
+              "src": "134:8:56",
+              "typeDescriptions": {}
+            },
+            "nameLocation": "-1:-1:-1"
+          }
+        ],
+        "unitAlias": ""
+      },
+      {
+        "id": 39751,
+        "nodeType": "ImportDirective",
+        "src": "174:71:56",
+        "nodes": [],
+        "absolutePath": "src/structs/Checkpoint.sol",
+        "file": "../structs/Checkpoint.sol",
+        "nameLocation": "-1:-1:-1",
+        "scope": 39806,
+        "sourceUnit": 47114,
+        "symbolAliases": [
+          {
+            "foreign": {
+              "id": 39749,
+              "name": "BottomUpCheckpoint",
+              "nodeType": "Identifier",
+              "overloadedDeclarations": [],
+              "referencedDeclaration": 47074,
+              "src": "182:18:56",
+              "typeDescriptions": {}
+            },
+            "nameLocation": "-1:-1:-1"
+          },
+          {
+            "foreign": {
+              "id": 39750,
+              "name": "CrossMsg",
+              "nodeType": "Identifier",
+              "overloadedDeclarations": [],
+              "referencedDeclaration": 47096,
+              "src": "202:8:56",
+              "typeDescriptions": {}
+            },
+            "nameLocation": "-1:-1:-1"
+          }
+        ],
+        "unitAlias": ""
+      },
+      {
+        "id": 39805,
+        "nodeType": "ContractDefinition",
+        "src": "335:774:56",
+        "nodes": [
+          {
+            "id": 39773,
+            "nodeType": "VariableDeclaration",
+            "src": "366:398:56",
+            "nodes": [],
+            "constant": true,
+            "functionSelector": "aa9fb558",
+            "mutability": "constant",
+            "name": "EMPTY_BOTTOMUPCHECKPOINT_HASH",
+            "nameLocation": "390:29:56",
+            "scope": 39805,
+            "stateVariable": true,
+            "storageLocation": "default",
+            "typeDescriptions": {
+              "typeIdentifier": "t_bytes32",
+              "typeString": "bytes32"
+            },
+            "typeName": {
+              "id": 39753,
+              "name": "bytes32",
+              "nodeType": "ElementaryTypeName",
+              "src": "366:7:56",
+              "typeDescriptions": {
+                "typeIdentifier": "t_bytes32",
+                "typeString": "bytes32"
+              }
+            },
+            "value": {
+              "arguments": [
+                {
+                  "arguments": [
+                    {
+                      "arguments": [
+                        {
+                          "arguments": [
+                            {
+                              "hexValue": "30",
+                              "id": 39759,
+                              "isConstant": false,
+                              "isLValue": false,
+                              "isPure": true,
+                              "kind": "number",
+                              "lValueRequested": false,
+                              "nodeType": "Literal",
+                              "src": "541:1:56",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_rational_0_by_1",
+                                "typeString": "int_const 0"
+                              },
+                              "value": "0"
+                            },
+                            {
+                              "arguments": [
+                                {
+                                  "hexValue": "30",
+                                  "id": 39763,
+                                  "isConstant": false,
+                                  "isLValue": false,
+                                  "isPure": true,
+                                  "kind": "number",
+                                  "lValueRequested": false,
+                                  "nodeType": "Literal",
+                                  "src": "558:1:56",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_rational_0_by_1",
+                                    "typeString": "int_const 0"
+                                  },
+                                  "value": "0"
+                                }
+                              ],
+                              "expression": {
+                                "argumentTypes": [
+                                  {
+                                    "typeIdentifier": "t_rational_0_by_1",
+                                    "typeString": "int_const 0"
+                                  }
+                                ],
+                                "id": 39762,
+                                "isConstant": false,
+                                "isLValue": false,
+                                "isPure": true,
+                                "lValueRequested": false,
+                                "nodeType": "NewExpression",
+                                "src": "544:13:56",
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_function_objectcreation_pure$_t_uint256_$returns$_t_array$_t_address_$dyn_memory_ptr_$",
+                                  "typeString": "function (uint256) pure returns (address[] memory)"
+                                },
+                                "typeName": {
+                                  "baseType": {
+                                    "id": 39760,
+                                    "name": "address",
+                                    "nodeType": "ElementaryTypeName",
+                                    "src": "548:7:56",
+                                    "stateMutability": "nonpayable",
+                                    "typeDescriptions": {
+                                      "typeIdentifier": "t_address",
+                                      "typeString": "address"
+                                    }
+                                  },
+                                  "id": 39761,
+                                  "nodeType": "ArrayTypeName",
+                                  "src": "548:9:56",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
+                                    "typeString": "address[]"
+                                  }
+                                }
+                              },
+                              "id": 39764,
+                              "isConstant": false,
+                              "isLValue": false,
+                              "isPure": true,
+                              "kind": "functionCall",
+                              "lValueRequested": false,
+                              "nameLocations": [],
+                              "names": [],
+                              "nodeType": "FunctionCall",
+                              "src": "544:16:56",
+                              "tryCall": false,
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_array$_t_address_$dyn_memory_ptr",
+                                "typeString": "address[] memory"
+                              }
+                            }
+                          ],
+                          "expression": {
+                            "argumentTypes": [
+                              {
+                                "typeIdentifier": "t_rational_0_by_1",
+                                "typeString": "int_const 0"
+                              },
+                              {
+                                "typeIdentifier": "t_array$_t_address_$dyn_memory_ptr",
+                                "typeString": "address[] memory"
+                              }
+                            ],
+                            "id": 39758,
+                            "name": "SubnetID",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 47150,
+                            "src": "532:8:56",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_type$_t_struct$_SubnetID_$47150_storage_ptr_$",
+                              "typeString": "type(struct SubnetID storage pointer)"
+                            }
+                          },
+                          "id": 39765,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": true,
+                          "kind": "structConstructorCall",
+                          "lValueRequested": false,
+                          "nameLocations": [],
+                          "names": [],
+                          "nodeType": "FunctionCall",
+                          "src": "532:29:56",
+                          "tryCall": false,
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_SubnetID_$47150_memory_ptr",
+                            "typeString": "struct SubnetID memory"
+                          }
+                        },
+                        {
+                          "hexValue": "30",
+                          "id": 39766,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": true,
+                          "kind": "number",
+                          "lValueRequested": false,
+                          "nodeType": "Literal",
+                          "src": "596:1:56",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          },
+                          "value": "0"
+                        },
+                        {
+                          "hexValue": "30",
+                          "id": 39767,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": true,
+                          "kind": "number",
+                          "lValueRequested": false,
+                          "nodeType": "Literal",
+                          "src": "630:1:56",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          },
+                          "value": "0"
+                        },
+                        {
+                          "hexValue": "30",
+                          "id": 39768,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": true,
+                          "kind": "number",
+                          "lValueRequested": false,
+                          "nodeType": "Literal",
+                          "src": "678:1:56",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          },
+                          "value": "0"
+                        },
+                        {
+                          "hexValue": "30",
+                          "id": 39769,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": true,
+                          "kind": "number",
+                          "lValueRequested": false,
+                          "nodeType": "Literal",
+                          "src": "720:1:56",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          },
+                          "value": "0"
+                        }
+                      ],
+                      "expression": {
+                        "argumentTypes": [
+                          {
+                            "typeIdentifier": "t_struct$_SubnetID_$47150_memory_ptr",
+                            "typeString": "struct SubnetID memory"
+                          },
+                          {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          },
+                          {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          },
+                          {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          },
+                          {
+                            "typeIdentifier": "t_rational_0_by_1",
+                            "typeString": "int_const 0"
+                          }
+                        ],
+                        "id": 39757,
+                        "name": "BottomUpCheckpoint",
+                        "nodeType": "Identifier",
+                        "overloadedDeclarations": [],
+                        "referencedDeclaration": 47074,
+                        "src": "481:18:56",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_type$_t_struct$_BottomUpCheckpoint_$47074_storage_ptr_$",
+                          "typeString": "type(struct BottomUpCheckpoint storage pointer)"
+                        }
+                      },
+                      "id": 39770,
+                      "isConstant": false,
+                      "isLValue": false,
+                      "isPure": true,
+                      "kind": "structConstructorCall",
+                      "lValueRequested": false,
+                      "nameLocations": [
+                        "522:8:56",
+                        "583:11:56",
+                        "619:9:56",
+                        "653:23:56",
+                        "701:17:56"
+                      ],
+                      "names": [
+                        "subnetID",
+                        "blockHeight",
+                        "blockHash",
+                        "nextConfigurationNumber",
+                        "crossMessagesHash"
+                      ],
+                      "nodeType": "FunctionCall",
+                      "src": "481:259:56",
+                      "tryCall": false,
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                        "typeString": "struct BottomUpCheckpoint memory"
+                      }
+                    }
+                  ],
+                  "expression": {
+                    "argumentTypes": [
+                      {
+                        "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                        "typeString": "struct BottomUpCheckpoint memory"
+                      }
+                    ],
+                    "expression": {
+                      "id": 39755,
+                      "name": "abi",
+                      "nodeType": "Identifier",
+                      "overloadedDeclarations": [],
+                      "referencedDeclaration": -1,
+                      "src": "453:3:56",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_magic_abi",
+                        "typeString": "abi"
+                      }
+                    },
+                    "id": 39756,
+                    "isConstant": false,
+                    "isLValue": false,
+                    "isPure": true,
+                    "lValueRequested": false,
+                    "memberLocation": "457:6:56",
+                    "memberName": "encode",
+                    "nodeType": "MemberAccess",
+                    "src": "453:10:56",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_function_abiencode_pure$__$returns$_t_bytes_memory_ptr_$",
+                      "typeString": "function () pure returns (bytes memory)"
+                    }
+                  },
+                  "id": 39771,
+                  "isConstant": false,
+                  "isLValue": false,
+                  "isPure": true,
+                  "kind": "functionCall",
+                  "lValueRequested": false,
+                  "nameLocations": [],
+                  "names": [],
+                  "nodeType": "FunctionCall",
+                  "src": "453:301:56",
+                  "tryCall": false,
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes_memory_ptr",
+                    "typeString": "bytes memory"
+                  }
+                }
+              ],
+              "expression": {
+                "argumentTypes": [
+                  {
+                    "typeIdentifier": "t_bytes_memory_ptr",
+                    "typeString": "bytes memory"
+                  }
+                ],
+                "id": 39754,
+                "name": "keccak256",
+                "nodeType": "Identifier",
+                "overloadedDeclarations": [],
+                "referencedDeclaration": -8,
+                "src": "430:9:56",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_function_keccak256_pure$_t_bytes_memory_ptr_$returns$_t_bytes32_$",
+                  "typeString": "function (bytes memory) pure returns (bytes32)"
+                }
+              },
+              "id": 39772,
+              "isConstant": false,
+              "isLValue": false,
+              "isPure": true,
+              "kind": "functionCall",
+              "lValueRequested": false,
+              "nameLocations": [],
+              "names": [],
+              "nodeType": "FunctionCall",
+              "src": "430:334:56",
+              "tryCall": false,
+              "typeDescriptions": {
+                "typeIdentifier": "t_bytes32",
+                "typeString": "bytes32"
+              }
+            },
+            "visibility": "public"
+          },
+          {
+            "id": 39789,
+            "nodeType": "FunctionDefinition",
+            "src": "771:157:56",
+            "nodes": [],
+            "body": {
+              "id": 39788,
+              "nodeType": "Block",
+              "src": "863:65:56",
+              "nodes": [],
+              "statements": [
+                {
+                  "expression": {
+                    "arguments": [
+                      {
+                        "arguments": [
+                          {
+                            "id": 39784,
+                            "name": "bottomupCheckpoint",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 39776,
+                            "src": "901:18:56",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                              "typeString": "struct BottomUpCheckpoint memory"
+                            }
+                          }
+                        ],
+                        "expression": {
+                          "argumentTypes": [
+                            {
+                              "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                              "typeString": "struct BottomUpCheckpoint memory"
+                            }
+                          ],
+                          "expression": {
+                            "id": 39782,
+                            "name": "abi",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": -1,
+                            "src": "890:3:56",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_magic_abi",
+                              "typeString": "abi"
+                            }
+                          },
+                          "id": 39783,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": true,
+                          "lValueRequested": false,
+                          "memberLocation": "894:6:56",
+                          "memberName": "encode",
+                          "nodeType": "MemberAccess",
+                          "src": "890:10:56",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_function_abiencode_pure$__$returns$_t_bytes_memory_ptr_$",
+                            "typeString": "function () pure returns (bytes memory)"
+                          }
+                        },
+                        "id": 39785,
+                        "isConstant": false,
+                        "isLValue": false,
+                        "isPure": false,
+                        "kind": "functionCall",
+                        "lValueRequested": false,
+                        "nameLocations": [],
+                        "names": [],
+                        "nodeType": "FunctionCall",
+                        "src": "890:30:56",
+                        "tryCall": false,
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_bytes_memory_ptr",
+                          "typeString": "bytes memory"
+                        }
+                      }
+                    ],
+                    "expression": {
+                      "argumentTypes": [
+                        {
+                          "typeIdentifier": "t_bytes_memory_ptr",
+                          "typeString": "bytes memory"
+                        }
+                      ],
+                      "id": 39781,
+                      "name": "keccak256",
+                      "nodeType": "Identifier",
+                      "overloadedDeclarations": [],
+                      "referencedDeclaration": -8,
+                      "src": "880:9:56",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_function_keccak256_pure$_t_bytes_memory_ptr_$returns$_t_bytes32_$",
+                        "typeString": "function (bytes memory) pure returns (bytes32)"
+                      }
+                    },
+                    "id": 39786,
+                    "isConstant": false,
+                    "isLValue": false,
+                    "isPure": false,
+                    "kind": "functionCall",
+                    "lValueRequested": false,
+                    "nameLocations": [],
+                    "names": [],
+                    "nodeType": "FunctionCall",
+                    "src": "880:41:56",
+                    "tryCall": false,
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "functionReturnParameters": 39780,
+                  "id": 39787,
+                  "nodeType": "Return",
+                  "src": "873:48:56"
+                }
+              ]
+            },
+            "functionSelector": "39aa47fb",
+            "implemented": true,
+            "kind": "function",
+            "modifiers": [],
+            "name": "toHash",
+            "nameLocation": "780:6:56",
+            "parameters": {
+              "id": 39777,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39776,
+                  "mutability": "mutable",
+                  "name": "bottomupCheckpoint",
+                  "nameLocation": "813:18:56",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39789,
+                  "src": "787:44:56",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                    "typeString": "struct BottomUpCheckpoint"
+                  },
+                  "typeName": {
+                    "id": 39775,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 39774,
+                      "name": "BottomUpCheckpoint",
+                      "nameLocations": [
+                        "787:18:56"
+                      ],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 47074,
+                      "src": "787:18:56"
+                    },
+                    "referencedDeclaration": 47074,
+                    "src": "787:18:56",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_storage_ptr",
+                      "typeString": "struct BottomUpCheckpoint"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "786:46:56"
+            },
+            "returnParameters": {
+              "id": 39780,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39779,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39789,
+                  "src": "854:7:56",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 39778,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "854:7:56",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "853:9:56"
+            },
+            "scope": 39805,
+            "stateMutability": "pure",
+            "virtual": false,
+            "visibility": "public"
+          },
+          {
+            "id": 39804,
+            "nodeType": "FunctionDefinition",
+            "src": "934:173:56",
+            "nodes": [],
+            "body": {
+              "id": 39803,
+              "nodeType": "Block",
+              "src": "1024:83:56",
+              "nodes": [],
+              "statements": [
+                {
+                  "expression": {
+                    "commonType": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    },
+                    "id": 39801,
+                    "isConstant": false,
+                    "isLValue": false,
+                    "isPure": false,
+                    "lValueRequested": false,
+                    "leftExpression": {
+                      "arguments": [
+                        {
+                          "id": 39798,
+                          "name": "bottomUpCheckpoint",
+                          "nodeType": "Identifier",
+                          "overloadedDeclarations": [],
+                          "referencedDeclaration": 39792,
+                          "src": "1048:18:56",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                            "typeString": "struct BottomUpCheckpoint memory"
+                          }
+                        }
+                      ],
+                      "expression": {
+                        "argumentTypes": [
+                          {
+                            "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                            "typeString": "struct BottomUpCheckpoint memory"
+                          }
+                        ],
+                        "id": 39797,
+                        "name": "toHash",
+                        "nodeType": "Identifier",
+                        "overloadedDeclarations": [],
+                        "referencedDeclaration": 39789,
+                        "src": "1041:6:56",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_function_internal_pure$_t_struct$_BottomUpCheckpoint_$47074_memory_ptr_$returns$_t_bytes32_$",
+                          "typeString": "function (struct BottomUpCheckpoint memory) pure returns (bytes32)"
+                        }
+                      },
+                      "id": 39799,
+                      "isConstant": false,
+                      "isLValue": false,
+                      "isPure": false,
+                      "kind": "functionCall",
+                      "lValueRequested": false,
+                      "nameLocations": [],
+                      "names": [],
+                      "nodeType": "FunctionCall",
+                      "src": "1041:26:56",
+                      "tryCall": false,
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_bytes32",
+                        "typeString": "bytes32"
+                      }
+                    },
+                    "nodeType": "BinaryOperation",
+                    "operator": "==",
+                    "rightExpression": {
+                      "id": 39800,
+                      "name": "EMPTY_BOTTOMUPCHECKPOINT_HASH",
+                      "nodeType": "Identifier",
+                      "overloadedDeclarations": [],
+                      "referencedDeclaration": 39773,
+                      "src": "1071:29:56",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_bytes32",
+                        "typeString": "bytes32"
+                      }
+                    },
+                    "src": "1041:59:56",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bool",
+                      "typeString": "bool"
+                    }
+                  },
+                  "functionReturnParameters": 39796,
+                  "id": 39802,
+                  "nodeType": "Return",
+                  "src": "1034:66:56"
+                }
+              ]
+            },
+            "functionSelector": "45d51b12",
+            "implemented": true,
+            "kind": "function",
+            "modifiers": [],
+            "name": "isEmpty",
+            "nameLocation": "943:7:56",
+            "parameters": {
+              "id": 39793,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39792,
+                  "mutability": "mutable",
+                  "name": "bottomUpCheckpoint",
+                  "nameLocation": "977:18:56",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39804,
+                  "src": "951:44:56",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_memory_ptr",
+                    "typeString": "struct BottomUpCheckpoint"
+                  },
+                  "typeName": {
+                    "id": 39791,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 39790,
+                      "name": "BottomUpCheckpoint",
+                      "nameLocations": [
+                        "951:18:56"
+                      ],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 47074,
+                      "src": "951:18:56"
+                    },
+                    "referencedDeclaration": 47074,
+                    "src": "951:18:56",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_struct$_BottomUpCheckpoint_$47074_storage_ptr",
+                      "typeString": "struct BottomUpCheckpoint"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "950:46:56"
+            },
+            "returnParameters": {
+              "id": 39796,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39795,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39804,
+                  "src": "1018:4:56",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bool",
+                    "typeString": "bool"
+                  },
+                  "typeName": {
+                    "id": 39794,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1018:4:56",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bool",
+                      "typeString": "bool"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1017:6:56"
+            },
+            "scope": 39805,
+            "stateMutability": "pure",
+            "virtual": false,
+            "visibility": "public"
+          }
+        ],
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "CheckpointHelper",
+        "contractDependencies": [],
+        "contractKind": "library",
+        "documentation": {
+          "id": 39752,
+          "nodeType": "StructuredDocumentation",
+          "src": "247:88:56",
+          "text": "@title Helper library for manipulating Checkpoint struct\n @author LimeChain team"
+        },
+        "fullyImplemented": true,
+        "linearizedBaseContracts": [
+          39805
+        ],
+        "name": "CheckpointHelper",
+        "nameLocation": "343:16:56",
+        "scope": 39806,
+        "usedErrors": []
+      }
+    ],
+    "license": "MIT OR Apache-2.0"
+  },
+  "id": 56
+}
