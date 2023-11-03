@@ -374,7 +374,7 @@ configuration will look for it at `~/.fendermint/bundle.car`, so we might as wel
 
 ```shell
 make actor-bundle
-cp ../builtin-actors/output/bundle.car ~/.fendermint/bundle.car
+cp ./builtin-actors/output/bundle.car ~/.fendermint/bundle.car
 ```
 
 Now, start the application.

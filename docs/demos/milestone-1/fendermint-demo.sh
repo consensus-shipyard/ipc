@@ -72,7 +72,7 @@ make actor-bundle
 rm -rf ~/.fendermint/data
 mkdir -p ~/.fendermint/data
 cp -r ./fendermint/app/config ~/.fendermint/config
-cp ../builtin-actors/output/bundle.car ~/.fendermint/bundle.car
+cp ./builtin-actors/output/bundle.car ~/.fendermint/bundle.car
 
 #17
 fendermint run
@@ -99,6 +99,7 @@ fendermint rpc transfer --secret-key test-network/keys/alice.sk --to $BOB_ADDR -
 fendermint rpc query actor-state --address $BOB_ADDR | jq .state.balance
 
 #24
+make ../builtin-actors
 fendermint \
   rpc fevm --secret-key test-network/keys/alice.sk --sequence 1 \
     create --contract ../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin
