@@ -12,10 +12,8 @@ This repo is your entrypoint to the world of IPC. In this repo you will find:
 
 See:
 - [docs/contracts.md](docs/contracts.md) for instructions on how to deploy FEVM actors on subnets
-- __NEEDS UPDATE/REMOVE:__ [docs/subnet.md](docs/subnet.md) for instructions on how to deploy a new subnet and the required architecture)
 - [docs/usage.md](docs/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
-<!-- - __NEEDS UPDATE/REMOVE:__ [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own IPC root contract and hierarchy -->
-<!-- - __NEEDS UPDATE/REMOVE:__ [docs/troubleshooting.md](docs/troubleshooting.md) for answers to some common questions -->
+- [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
 
 ## Branching Strategy
 
