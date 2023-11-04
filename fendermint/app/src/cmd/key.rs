@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
-use fendermint_app_options::key::FendermintToEthArgs;
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fvm_shared::address::Address;
@@ -15,7 +14,7 @@ use super::{from_b64, to_b64};
 use crate::{
     cmd,
     options::key::{
-        AddPeer, EthToFendermintArgs, KeyAddressArgs, KeyArgs, KeyCommands, KeyGenArgs,
+        AddPeer, KeyAddressArgs, KeyArgs, KeyCommands, KeyFromEthArgs, KeyGenArgs, KeyIntoEthArgs,
         KeyIntoTendermintArgs,
     },
 };
@@ -27,14 +26,14 @@ cmd! {
             KeyCommands::IntoTendermint(args) => args.exec(()).await,
             KeyCommands::AddPeer(args) => args.exec(()).await,
             KeyCommands::Address(args) => args.exec(()).await,
-            KeyCommands::EthToFendermint(args) => args.exec(()).await,
-            KeyCommands::FendermintToEth(args) => args.exec(()).await,
+            KeyCommands::FromEth(args) => args.exec(()).await,
+            KeyCommands::IntoEth(args) => args.exec(()).await,
         }
     }
 }
 
 cmd! {
-    EthToFendermintArgs(self) {
+    KeyFromEthArgs(self) {
         let sk = read_secret_key_hex(&self.secret_key)?;
         let pk = sk.public_key();
 
@@ -46,12 +45,13 @@ cmd! {
 }
 
 cmd! {
-    FendermintToEthArgs(self) {
+    KeyIntoEthArgs(self) {
         let sk = read_secret_key(&self.secret_key)?;
         let pk = sk.public_key();
 
         export(&self.out_dir, &self.name, "sk", &hex::encode(sk.serialize()))?;
-        export(&self.out_dir, &self.name, "pk", &hex::encode(EthAddress::from(pk).0))?;
+        export(&self.out_dir, &self.name, "pk", &hex::encode(pk.serialize()))?;
+        export(&self.out_dir, &self.name, "addr", &hex::encode(EthAddress::from(pk).0))?;
 
         Ok(())
     }

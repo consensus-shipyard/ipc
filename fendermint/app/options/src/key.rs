@@ -16,9 +16,10 @@ pub enum KeyCommands {
     /// Get the peer ID corresponding to a node ID and its network address and print it to a local file.
     AddPeer(AddPeer),
     /// Converts a hex encoded Ethereum private key into a Base64 encoded Fendermint keypair.
-    EthToFendermint(EthToFendermintArgs),
-    /// Converts a Base64 encoded Fendermint private key in a hex encoded Ethereum secret key and address.
-    FendermintToEth(FendermintToEthArgs),
+    #[clap(alias = "eth-to-fendermint")]
+    FromEth(KeyFromEthArgs),
+    /// Converts a Base64 encoded Fendermint private key into a hex encoded Ethereum secret key, public key and address (20 bytes).
+    IntoEth(KeyIntoEthArgs),
 }
 
 #[derive(Args, Debug)]
@@ -53,7 +54,7 @@ pub struct KeyGenArgs {
 }
 
 #[derive(Args, Debug)]
-pub struct EthToFendermintArgs {
+pub struct KeyFromEthArgs {
     /// Path to the file that stores the private key (hex format)
     #[arg(long, short)]
     pub secret_key: PathBuf,
@@ -66,7 +67,7 @@ pub struct EthToFendermintArgs {
 }
 
 #[derive(Args, Debug)]
-pub struct FendermintToEthArgs {
+pub struct KeyIntoEthArgs {
     /// Path to the file that stores the private key (base64 format)
     #[arg(long, short)]
     pub secret_key: PathBuf,
