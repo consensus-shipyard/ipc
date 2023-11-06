@@ -56,6 +56,8 @@ docker run \
   --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
   --env FM_ETH__LISTEN__HOST=0.0.0.0 \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${PRIV_KEY_PATH} \
+  --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=info \
   --env RUST_BACKTRACE=1 \
