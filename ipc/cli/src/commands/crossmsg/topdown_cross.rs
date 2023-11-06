@@ -65,3 +65,27 @@ pub(crate) struct ListTopdownMsgsArgs {
     #[arg(long, short, help = "The block hash to query until")]
     pub block_hash: Option<String>,
 }
+
+pub(crate) struct LatestParentFinality;
+
+#[async_trait]
+impl CommandLineHandler for LatestParentFinality {
+    type Arguments = LatestParentFinalityArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("latest parent finality: {:?}", arguments);
+
+        let provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+
+        println!("{}", provider.latest_parent_finality(&subnet).await?);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(about = "Latest height of parent finality committed in child subnet")]
+pub(crate) struct LatestParentFinalityArgs {
+    #[arg(long, short, help = "The subnet id to check parent finality")]
+    pub subnet: String,
+}

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 use self::fund::{PreFund, PreFundArgs};
 use self::release::{PreRelease, PreReleaseArgs};
-use self::topdown_cross::{ListTopdownMsgs, ListTopdownMsgsArgs};
+use self::topdown_cross::{
+    LatestParentFinality, LatestParentFinalityArgs, ListTopdownMsgs, ListTopdownMsgsArgs,
+};
 use crate::commands::crossmsg::fund::Fund;
 use crate::commands::crossmsg::propagate::Propagate;
 use crate::commands::crossmsg::release::Release;
@@ -35,6 +37,7 @@ impl CrossMsgsCommandsArgs {
             Commands::PreRelease(args) => PreRelease::handle(global, args).await,
             Commands::Propagate(args) => Propagate::handle(global, args).await,
             Commands::ListTopdownMsgs(args) => ListTopdownMsgs::handle(global, args).await,
+            Commands::ParentFinality(args) => LatestParentFinality::handle(global, args).await,
         }
     }
 }
@@ -47,4 +50,5 @@ pub(crate) enum Commands {
     PreRelease(PreReleaseArgs),
     Propagate(PropagateArgs),
     ListTopdownMsgs(ListTopdownMsgsArgs),
+    ParentFinality(LatestParentFinalityArgs),
 }

@@ -48,10 +48,10 @@ impl CheckpointCommandsArgs {
             Commands::QuorumReachedEvents(args) => {
                 GetQuorumReacehdEvents::handle(global, args).await
             }
-            Commands::LastBottomUpCheckpointHeight(args) => {
+            Commands::LastBottomupCheckpointHeight(args) => {
                 LastBottomUpCheckpointHeight::handle(global, args).await
             }
-            Commands::HasSubmittedBottomUpHeight(args) => {
+            Commands::HasSubmittedBottomupHeight(args) => {
                 SubmittedInBottomUpHeight::handle(global, args).await
             }
         }
@@ -65,6 +65,6 @@ pub(crate) enum Commands {
     ListValidatorChanges(ListValidatorChangesArgs),
     ListBottomupBundle(GetBottomUpBundlesArgs),
     QuorumReachedEvents(GetQuorumReachedEventsArgs),
-    LastBottomUpCheckpointHeight(LastBottomUpCheckpointHeightArgs),
-    HasSubmittedBottomUpHeight(SubmittedInBottomUpHeightArgs),
+    LastBottomupCheckpointHeight(LastBottomUpCheckpointHeightArgs),
+    HasSubmittedBottomupHeight(SubmittedInBottomUpHeightArgs),
 }

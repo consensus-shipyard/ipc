@@ -20,7 +20,7 @@ use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::subnet::{
-    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownCheckpointQuery,
+    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
     TopDownQueryPayload,
 };
 use crate::manager::{EthManager, SubnetManager};
@@ -76,7 +76,7 @@ struct IPCContractInfo {
 }
 
 #[async_trait]
-impl TopDownCheckpointQuery for EthSubnetManager {
+impl TopDownFinalityQuery for EthSubnetManager {
     async fn genesis_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
         log::info!("querying genesis epoch in evm subnet contract: {address:}");
@@ -199,6 +199,17 @@ impl TopDownCheckpointQuery for EthSubnetManager {
             value: changes,
             block_hash,
         })
+    }
+
+    async fn latest_parent_finality(&self) -> Result<ChainEpoch> {
+        log::info!("querying latest parent finality ");
+
+        let contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let finality = contract.get_latest_parent_finality().call().await?;
+        Ok(finality.height.as_u64() as ChainEpoch)
     }
 }
 
