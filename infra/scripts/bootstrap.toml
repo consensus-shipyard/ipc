@@ -4,6 +4,10 @@ run_task = "new-node"
 
 [tasks.bootstrap-id]
 env = { "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
+run_task = "cometbft-seed"
+
+[tasks.bootstrap-node-id]
+env = { "CMT_CONTAINER_NAME" = "cometbft-${NODE_NAME}-bootstrap" }
 run_task = "cometbft-node-id"
 
 [tasks.bootstrap-down]

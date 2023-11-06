@@ -31,21 +31,134 @@ docker run \
 """
 dependencies = ["cometbft-pull", "docker-network-create"]
 
+[tasks.get-external-ip]
+script_runner = "@rust"
+description = "This script resolve the external IP and sets NODE_EXTERNAL_IP variable using rust-env plugin"
+plugin = "rust-env"
+script="""
+//! ```cargo
+//! [dependencies]
+//! reqwest = { version = "0.11", features = ["blocking"] }
+//! tokio = { version = "1.33.0", features = ["macros"] }
+//! futures = "0.3.29"
+//! ```
+
+use futures::{stream, StreamExt};
+use reqwest::Client;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::time::Duration;
+
+const CONCURRENT_REQUESTS: usize = 2;
+
+#[tokio::main]
+async fn main() -> Result<(), &'static str> {
+    let client = Client::builder()
+        .user_agent("curl/7.79.1")
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap();
+
+    let urls = vec![
+        "https://ident.me",
+        "https://checkip.amazonaws.com",
+        "https://ifconfig.me",
+        "https://api.ipify.org",
+        "https://ifconfig.co",
+        "https://ipinfo.io/ip",
+        "https://icanhazip.com",
+        "https://api.ipify.org",
+    ];
+
+    let ips: HashMap<String, i32> = HashMap::new();
+    let ips_cell = RefCell::new(ips);
+
+    let bodies = stream::iter(urls)
+        .map(|url| {
+            let client = &client;
+            async move {
+                let resp = client.get(url).send().await?;
+                resp.text().await
+            }
+        })
+        .buffer_unordered(CONCURRENT_REQUESTS);
+
+    bodies
+        .for_each(|b| async {
+            let mut borrowed = ips_cell.borrow_mut();
+            match b {
+                Ok(b) => {
+                    if let Some(count) = borrowed.get_mut(&b) {
+                        *count += 1;
+                    } else {
+                        borrowed.insert(b.clone(), 1);
+                    }
+                }
+                Err(e) => eprintln!("Failed to get a response: {}", e),
+            }
+        })
+        .await;
+
+    let mut external_ip: Option<String> = None;
+    let threshold = 3;
+
+    for (ip, &n) in ips_cell.borrow().iter() {
+        if n >= threshold {
+            external_ip = Some(ip.to_string());
+            break;
+        }
+    }
+
+    match external_ip {
+        Some(ip) => {
+            let ip = format_ip_addr(ip);
+            println!("NODE_EXTERNAL_IP={}", ip);
+            Ok(())
+        }
+        None => Err("failed to resolve external IP"),
+    }
+}
+
+fn format_ip_addr(addr: String) -> String {
+    if addr.contains(':') {
+        return format!("[{}]", addr);
+    }
+    addr
+}
+"""
+
+[plugins.impl.rust-env]
+script = '''
+# make sure the task has a script
+assert ${task.has_script}
+
+taskjson = json_parse ${task.as_json}
+script = set ${taskjson.script}
+writefile ./target/_tempplugin/main.rs ${script}
+
+out = exec --fail-on-error rust-script ./target/_tempplugin/main.rs
+
+output = trim ${out.stdout}
+lines = split ${output} \n
+for line in ${lines}
+    parts = split ${line} =
+    key = array_get ${parts} 0
+    value = array_get ${parts} 1
+    set_env ${key} ${value}
+end
+'''
+
 [tasks.cometbft-node-id]
-# This script gets an external IP address, checks whether it is an IPv6 address,
-# and if so, adds square brackets to use it with a port number.
 script = """
 id=`docker exec ${CMT_CONTAINER_NAME} cometbft show-node-id`
-ip=`curl https://ifconfig.me`
+echo $id
+"""
 
-set +e
-echo ${ip} | grep --quiet ":"
-if [ $? = 0 ]; then
-  ip="[$ip]"
-fi
-set -e
-
-echo $id@$ip:${CMT_P2P_HOST_PORT}
+[tasks.cometbft-seed]
+dependencies = ["get-external-ip"]
+script = """
+id=`docker exec ${CMT_CONTAINER_NAME} cometbft show-node-id`
+echo $id@${NODE_EXTERNAL_IP}:${CMT_P2P_HOST_PORT}
 """
 
 [tasks.cometbft-rm]
