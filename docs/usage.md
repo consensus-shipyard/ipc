@@ -175,7 +175,7 @@ The epoch were the message is performed can give you a sense of the time the mes
 
 ```console
 # Example execution
-$ ./bin/ipc-cli cross-msg parent-finality --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --to=0x406a7a1d002b71ece175cc7e067620ae5b58e9ec 100
+$ ./bin/ipc-cli cross-msg parent-finality --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
 1030
 ```
 
@@ -219,16 +219,16 @@ As with top-down messages, you can get a sense of the time that your message wil
 
 The propagation of a bottom-up checkpoint from a child subnet to its parent follows these stages:
 * Validators in the child subnet populate the checkpoint, sign it, and agree on their validity. When validators have agreed on the validity of a checkpoint for a specific epoch, a new `QuorumReached` event is emitted in the child subnet. You can check if a checkpoint for certain epoch has already been signed by a majority of child validators through the following command: `./bin/ipc-cli checkpoint quorum-reached-events --from-epoch 600 --to-epoch 680 --subnet`.
-```console
+```shell
 # Sample execution
 ./bin/ipc-cli checkpoint quorum-reached-events --from-epoch 600 --to-epoch 680 --subnet /r314159/t410ffumhfeppdjixhkxtgagowxkdu77j7xz5aaa52vy
 ```
 
 * Once validators have agree on the checkpoint to be submitted in the parent for a specific epoch, relayers need to pick up the checkpoint and submit it in the parent. The following commands can be used to determine what is the state of this submission:
-  * Check if the address of a relayer has already submitted a checkpoint for execution in the parent: `./bin/ipc-cli checkpoint has-submitted-bottomup-height --subnet <SUBNET_ID> --submitted <RELAYER_ADDR>`
+  * Check if the address of a relayer has already submitted a checkpoint for execution in the parent for the latest checkpoint: `./bin/ipc-cli checkpoint has-submitted-bottomup-height --subnet <SUBNET_ID> --submitter <RELAYER_ADDR>`
   * Check the height of the latest checkpoint committed in the parent: `./bin/ipc-cli checkpoint last-bottomup-checkpoint-height --subnet <SUBNET_ID>`
 
-Finally, the bundle of checkpoints and signatures populated and already signed by a child subnet for their submission to the parent can be checked through the `./bin/ipc-cli checkpoint list-bottomup-bundle` command.
+Finally, the bundle of checkpoints and signatures populated and already signed by a child subnet for their submission to the parent on a window of heights can be checked through the command `./bin/ipc-cli checkpoint list-bottomup-bundle --subnet <SUBNET> --from-epoch <FROM_EPOCH> --to-epoch <TO_EPOCH>`
 
 #### Releasing initial subnet balance
 To recover some (or all) of the funds that were sent to a subnet through `pre-fund` to be included as genesis balance for your address, you can use the `pre-release` command as follows:

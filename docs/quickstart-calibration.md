@@ -142,7 +142,7 @@ Before we deploy the infrastructure for the subnet, we will have to bootstrap th
 ```
 
 ## Step 6: Deploy the infrastructure
-With the collateral and number of minimum validators fulfilled, the subnet is bootstrapped in teh parent, and we can deploy the infrastructure.
+With the collateral and number of minimum validators fulfilled, the subnet is bootstrapped in the parent, and we can deploy the infrastructure.
 
 ### Deploying a bootstrap node
 Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
@@ -189,8 +189,8 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 * First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
 ```bash
 ./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR2> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_2>
+./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR3> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_3>
 ```
 
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
