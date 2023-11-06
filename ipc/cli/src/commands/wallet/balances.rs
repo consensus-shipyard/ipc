@@ -26,6 +26,8 @@ impl CommandLineHandler for WalletBalances {
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let mut errors = Vec::new();
+
         match wallet_type {
             WalletType::Evm => {
                 let wallet = provider.evm_wallet()?;
@@ -58,9 +60,18 @@ impl CommandLineHandler for WalletBalances {
                             }
                         }
                         Err(e) => {
-                            return Err(e);
+                            errors.push(e);
                         }
                     }
+                }
+
+                if !errors.is_empty() {
+                    let error = errors
+                        .into_iter()
+                        .fold(anyhow::anyhow!("Error fetching balances"), |acc, err| {
+                            acc.context(err)
+                        });
+                    return Err(error);
                 }
             }
             WalletType::Fvm => {
