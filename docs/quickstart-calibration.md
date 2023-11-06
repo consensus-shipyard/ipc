@@ -1,18 +1,18 @@
 # IPC Quick Start: zero-to-subnet (on Calibration)
 
->💡 Background and detailed are available in the [README](/README.md).
+>💡 Background and details are available in the [README](/README.md).
 
 Ready to test the waters with your first subnet? This guide will deploy a subnet with three local validators orchestrated by `ipc-cli`. This subnet will be anchored to the public [Calibration testnet](https://docs.filecoin.io/networks/calibration/details/). This will be a minimal example and may not work on all systems. The full documentation provides more details on each step.
 
 Several steps in this guide involve running long-lived processes. In each of these cases, the guide advises starting a new *session*. Depending on your set-up, you may do this using tools like `screen` or `tmux`, or, if using a graphical environment, by opening a new terminal tab, pane, or window.
 
-<!-- >💡A video walkthrough of this guide is current being prepared. We still encourage you to try it for yourself! -->
+<!-- >💡A video walkthrough of this guide is currently being prepared. We still encourage you to try it for yourself! -->
 
 <!-- >💡If you're only looking to connect to an existing subnet, please see the [README](deploying-hierarchy.md) instead. -->
 
 ## Step 0: Prepare your system
 
-We assume a Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. Details on IPC-specific requirements can also be found in the [README](/README.md).
+We assume an Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. Details on IPC-specific requirements can also be found in the [README](/README.md).
 
 * Install basic dependencies [Ubuntu/Debian] ([details](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms))
 ```bash
@@ -57,7 +57,7 @@ git clone https://github.com/consensus-shipyard/ipc.git
 ./bin/ipc-cli config init
 ```
 
-This should have populated an default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs. You may need to replace the content of the config to reflect the address of the up-to-date contracts in Calibration.
+This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs. You may need to replace the content of the config to reflect the address of the up-to-date contracts in Calibration.
 
 
 * You can run `nano ~/.ipc/config.toml` to double-check that the config file has been populated with the following content:
