@@ -3,9 +3,12 @@
 
 //! Staking module related types and functions
 
-use crate::ethers_address_to_fil_address;
+use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
+use ethers::utils::hex;
 use fvm_shared::address::Address;
-use ipc_actors_abis::lib_staking_change_log;
+use fvm_shared::econ::TokenAmount;
+use ipc_actors_abis::{lib_staking_change_log, subnet_actor_getter_facet};
+use std::fmt::{Display, Formatter};
 
 pub type ConfigurationNumber = u64;
 
@@ -54,5 +57,57 @@ impl TryFrom<lib_staking_change_log::NewStakingChangeRequestFilter> for StakingC
                 validator: ethers_address_to_fil_address(&value.validator)?,
             },
         })
+    }
+}
+
+/// The staking validator information
+#[derive(Clone, Debug)]
+pub struct ValidatorStakingInfo {
+    confirmed_collateral: TokenAmount,
+    total_collateral: TokenAmount,
+    metadata: Vec<u8>,
+}
+
+impl Display for ValidatorStakingInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ValidatorStaking(confirmed_collateral: {}, total_collateral: {}, metadata: 0x{})",
+            self.confirmed_collateral,
+            self.total_collateral,
+            hex::encode(&self.metadata)
+        )
+    }
+}
+
+impl TryFrom<subnet_actor_getter_facet::ValidatorInfo> for ValidatorStakingInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: subnet_actor_getter_facet::ValidatorInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            confirmed_collateral: eth_to_fil_amount(&value.confirmed_collateral)?,
+            total_collateral: eth_to_fil_amount(&value.total_collateral)?,
+            metadata: value.metadata.to_vec(),
+        })
+    }
+}
+
+/// The full validator information with
+#[derive(Clone, Debug)]
+pub struct ValidatorInfo {
+    pub staking: ValidatorStakingInfo,
+    /// If the validator is active in block production
+    pub is_active: bool,
+    /// If the validator is current waiting to be promoted to active
+    pub is_waiting: bool,
+}
+
+impl Display for ValidatorInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ValidatorInfo(staking: {}, is_active: {}, is_waiting: {})",
+            self.staking, self.is_active, self.is_waiting
+        )
     }
 }

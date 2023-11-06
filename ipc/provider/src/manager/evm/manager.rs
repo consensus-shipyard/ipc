@@ -38,7 +38,7 @@ use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::checkpoint::{BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::gateway::Status;
-use ipc_sdk::staking::StakingChangeRequest;
+use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_sdk::subnet::ConstructParams;
 use ipc_sdk::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
@@ -743,6 +743,29 @@ impl SubnetManager for EthSubnetManager {
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
         Ok(contract.get_bootstrap_nodes().call().await?)
+    }
+
+    async fn get_validator_info(
+        &self,
+        subnet: &SubnetID,
+        validator: &Address,
+    ) -> Result<ValidatorInfo> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let validator = payload_to_evm_address(validator.payload())?;
+
+        let validator_info = contract.get_validator(validator).call().await?;
+        let is_active = contract.is_active_validator(validator).call().await?;
+        let is_waiting = contract.is_waiting_validator(validator).call().await?;
+
+        Ok(ValidatorInfo {
+            staking: ValidatorStakingInfo::try_from(validator_info)?,
+            is_active,
+            is_waiting,
+        })
     }
 }
 
