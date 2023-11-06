@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::econ::TokenAmount;
 use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -34,11 +33,7 @@ impl CommandLineHandler for ListSubnets {
         for (_, s) in ls.iter() {
             println!(
                 "{} - status: {:?}, collateral: {} FIL, circ.supply: {} FIL, genesis: {}",
-                s.id.to_string(),
-                s.status,
-                TokenAmount::from_atto(s.stake.atto().clone()),
-                TokenAmount::from_atto(s.circ_supply.atto().clone()),
-                s.genesis_epoch
+                s.id, s.status, s.stake, s.circ_supply, s.genesis_epoch
             );
         }
 
