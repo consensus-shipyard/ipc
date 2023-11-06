@@ -7,7 +7,7 @@ OUTPUT ?= ./out
 deploy-ipc:
 	./ops/deploy.sh $(NETWORK)
 
-compile-abi:
+compile-abi: | forge
 	./ops/compile-abi.sh $(OUTPUT)
 
 rust-binding:
@@ -34,7 +34,7 @@ lint:
 fmt:
 	npx prettier --check -w 'src/**/*.sol' 'test/*.sol'
 
-build:
+build: | forge
 	forge build
 
 test:
@@ -70,12 +70,20 @@ clean:
 	rm -rf ./cache_hardhat
 	rm -rf ./typechain
 
-coverage:
+coverage: | forge
 	forge coverage --ffi --report lcov -C ./src
 	genhtml -o coverage_report lcov.info --branch-coverage
 	./tools/check_coverage.sh
 
 prepare: fmt lint test slither
+
+# Forge is used by the ipc-solidity-actors compilation steps.
+.PHONY: forge
+forge:
+	@if [ -z "$(shell which forge)" ]; then \
+		echo "Please install Foundry. See https://book.getfoundry.sh/getting-started/installation"; \
+		exit 1; \
+	fi
 
 # ==============================================================================
 .PHONY: deploy-ipc lint fmt check-subnet slither check-gateway test prepare storage build clean
