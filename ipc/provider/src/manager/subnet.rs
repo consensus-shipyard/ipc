@@ -18,7 +18,7 @@ use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
-pub trait SubnetManager: Send + Sync + TopDownCheckpointQuery + BottomUpCheckpointRelayer {
+pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer {
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
     /// The result of the function is the ID address for the subnet actor from which the final
@@ -176,7 +176,7 @@ pub struct GetBlockHashResult {
 
 /// Trait to interact with a subnet to query the necessary information for top down checkpoint.
 #[async_trait]
-pub trait TopDownCheckpointQuery: Send + Sync {
+pub trait TopDownFinalityQuery: Send + Sync {
     /// Returns the genesis epoch that the subnet is created in parent network
     async fn genesis_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
     /// Returns the chain head height
@@ -196,6 +196,8 @@ pub trait TopDownCheckpointQuery: Send + Sync {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>>;
+    /// Returns the latest parent finality committed in a child subnet
+    async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
 }
 
 /// The bottom up checkpoint manager that handles the bottom up relaying from child subnet to the parent

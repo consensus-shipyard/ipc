@@ -4,7 +4,7 @@ pub use crate::lotus::message::ipc::SubnetInfo;
 pub use evm::{EthManager, EthSubnetManager};
 pub use subnet::{
     BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, SubnetManager,
-    TopDownCheckpointQuery, TopDownQueryPayload,
+    TopDownFinalityQuery, TopDownQueryPayload,
 };
 
 pub mod evm;

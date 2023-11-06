@@ -169,8 +169,15 @@ fund performed in epoch 1030279
 ```
 
 The epoch were the message is performed can give you a sense of the time the message will take to be propagated. You can check the current finality in a subnet and wait for the finality height that includes your message to be committed.
+```bash
+./bin/ipc-cli cross-msg parent-finality --subnet <SUBNET_ID>
+```
 
-> TODO: Add a cli command to check the finality committed in a child.
+```console
+# Example execution
+$ ./bin/ipc-cli cross-msg parent-finality --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq
+1030
+```
 
 >💡 Top-down proofs-of-finality is the underlying process used for IPC to propagate information from the parent to the child. Validators in the child subnet include information in every block in the child subnet about the height of the parent they agree to consider final. When this information is committed on-chain, changes into the validator set of the subnet, and the execution of top-down messages are correspondingly triggered.
 
@@ -210,6 +217,19 @@ release performed in epoch 1030
 ```
 As with top-down messages, you can get a sense of the time that your message will take to get to the parent by looking at the epoch in which your bottom-up message was triggered (the output of the command), and listing the latest bottom-up checkpoints to see how far it is from being propagated.
 
+The propagation of a bottom-up checkpoint from a child subnet to its parent follows these stages:
+* Validators in the child subnet populate the checkpoint, sign it, and agree on their validity. When validators have agreed on the validity of a checkpoint for a specific epoch, a new `QuorumReached` event is emitted in the child subnet. You can check if a checkpoint for certain epoch has already been signed by a majority of child validators through the following command: `./bin/ipc-cli checkpoint quorum-reached-events --from-epoch 600 --to-epoch 680 --subnet`.
+```shell
+# Sample execution
+./bin/ipc-cli checkpoint quorum-reached-events --from-epoch 600 --to-epoch 680 --subnet /r314159/t410ffumhfeppdjixhkxtgagowxkdu77j7xz5aaa52vy
+```
+
+* Once validators have agree on the checkpoint to be submitted in the parent for a specific epoch, relayers need to pick up the checkpoint and submit it in the parent. The following commands can be used to determine what is the state of this submission:
+  * Check if the address of a relayer has already submitted a checkpoint for execution in the parent for the latest checkpoint: `./bin/ipc-cli checkpoint has-submitted-bottomup-height --subnet <SUBNET_ID> --submitter <RELAYER_ADDR>`
+  * Check the height of the latest checkpoint committed in the parent: `./bin/ipc-cli checkpoint last-bottomup-checkpoint-height --subnet <SUBNET_ID>`
+
+Finally, the bundle of checkpoints and signatures populated and already signed by a child subnet for their submission to the parent on a window of heights can be checked through the command `./bin/ipc-cli checkpoint list-bottomup-bundle --subnet <SUBNET> --from-epoch <FROM_EPOCH> --to-epoch <TO_EPOCH>`
+
 #### Releasing initial subnet balance
 To recover some (or all) of the funds that were sent to a subnet through `pre-fund` to be included as genesis balance for your address, you can use the `pre-release` command as follows:
 ```bash
@@ -218,6 +238,23 @@ To recover some (or all) of the funds that were sent to a subnet through `pre-fu
 ```console
 # Example execution
 $ ./bin/ipc-cli cross-msg pre-release --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq 0.1
+```
+
+## Running a relayer
+IPC relies on the role of a specific type of peer on the network called the relayers that are responsible for submitting bottom-up checkpoints that have been finalized in a child subnet to its parent. This process is key for the commitment of child subnet checkpoints in the parent, and the execution of bottom-up cross-net messages. Without relayers, cross-net messages will only flow from top levels of the hierarchy to the bottom, but not the other way around.
+
+* *session* Run the relayer process for your subnet using your default address by calling:
+```bash
+./bin/ipc-cli checkpoint relayer --subnet <SUBNET_ID>
+```
+* In order to run the relayer from a different address you can use the `--submitted` flag: 
+```bash
+./bin/ipc-cli checkpoint relayer --subnet <SUBNET_ID> --submitter <RELAYER_ADDR>
+```
+
+Relayers are rewarded through cross-net messages fees for the timely submission of bottom-up checkpoints to the parent. In order to claim the checkpointing rewards collected for a subnet, the following command need to be run from the relayer address:
+```bash
+./bin/ipc-cli subnet claim --subnet=<SUBNET_ID> --reward
 ```
 
 ## Listing checkpoints from a subnet

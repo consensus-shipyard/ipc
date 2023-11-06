@@ -781,6 +781,16 @@ impl IpcProvider {
 
         conn.manager().list_bootstrap_nodes(subnet).await
     }
+
+    /// Returns the latest finality from the parent committed in a child subnet.
+    pub async fn latest_parent_finality(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().latest_parent_finality().await
+    }
 }
 
 /// Lotus JSON keytype format
