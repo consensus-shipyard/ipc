@@ -23,6 +23,7 @@ thiserror = { workspace = true }
 fvm_shared = { workspace = true }
 ipc_actors_abis = { workspace = true }
 ethers = { workspace = true}
+tendermint-rpc = { workspace = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }

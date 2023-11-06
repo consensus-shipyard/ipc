@@ -105,7 +105,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     });
 
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
-        client,
+        client.clone(),
         validator_ctx,
         settings.contracts_dir(),
         settings.fvm.gas_overestimation_rate,
@@ -199,6 +199,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 config,
                 parent_finality_provider,
                 agent_proxy,
+                client,
             )
             .await
             {
