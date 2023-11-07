@@ -79,10 +79,10 @@ keystore_path = "~/.ipc"
 id = "/r314159"
 
 [subnets.config]
-gateway_addr = "0x5Be26735Ab7A70B057e76e31953d8811f95b05AC"
+gateway_addr = "0x0341fA160C66aBB112195192aE359a6D61df45cd"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-registry_addr = "0x2fdf1b18907341b751B32aF7088D32f6f5a617E0"
+registry_addr = "0xc7068Cea947035560128a6a6F4c8913523A5A44C"
 ```
 
 To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the `ipc-cli` to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).

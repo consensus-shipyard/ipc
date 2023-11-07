@@ -37,8 +37,8 @@ id = "/r314159"
 [subnets.config]
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "0x5Be26735Ab7A70B057e76e31953d8811f95b05AC"
-registry_addr = "0x2fdf1b18907341b751B32aF7088D32f6f5a617E0"
+gateway_addr = "0x0341fA160C66aBB112195192aE359a6D61df45cd"
+registry_addr = "0xc7068Cea947035560128a6a6F4c8913523A5A44C"
 
 # Subnet template - uncomment and adjust before using
 # [[subnets]]
