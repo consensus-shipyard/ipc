@@ -108,6 +108,8 @@ pub fn to_eth_block(
                 .context("failed to convert to eth transaction")?;
 
             tx.transaction_index = Some(et::U64::from(idx));
+            tx.block_hash = Some(et::H256::from_slice(block.header.hash().as_bytes()));
+            tx.block_number = Some(et::U64::from(block.header.height.value()));
 
             transactions.push(tx);
         }
