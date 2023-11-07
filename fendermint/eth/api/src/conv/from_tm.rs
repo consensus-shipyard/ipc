@@ -25,6 +25,7 @@ use super::from_fvm::{to_eth_address, to_eth_signature, to_eth_tokens};
 
 lazy_static! {
     static ref EMPTY_ETH_HASH: et::H256 = et::H256::default();
+    static ref EMPTY_ETH_NONCE: et::H64 = et::H64::default();
 
     // Keccak-256 of an RLP of an empty array
     static ref EMPTY_UNCLE_HASH: et::H256 = et::H256::from_slice(
@@ -122,9 +123,9 @@ pub fn to_eth_block(
         transactions_root,
         base_fee_per_gas: Some(to_eth_tokens(&base_fee)?),
         difficulty: et::U256::zero(),
-        total_difficulty: None,
-        nonce: None,
-        mix_hash: None,
+        total_difficulty: Some(et::U256::zero()),
+        nonce: Some(*EMPTY_ETH_NONCE),
+        mix_hash: Some(*EMPTY_ETH_HASH),
         uncles: Vec::new(),
         uncles_hash: *EMPTY_UNCLE_HASH,
         receipts_root: *EMPTY_ROOT_HASH,
