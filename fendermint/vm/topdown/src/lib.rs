@@ -12,10 +12,12 @@ mod toggle;
 
 use async_stm::Stm;
 use async_trait::async_trait;
+use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
@@ -26,6 +28,9 @@ pub use crate::toggle::Toggle;
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
 pub type BlockHash = Bytes;
+
+/// The null round error message
+pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -61,6 +66,16 @@ impl IPCParentFinality {
     }
 }
 
+impl Display for IPCParentFinality {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "IPCParentFinality(height: {}, block_hash: {})",
+            self.height,
+            hex::encode(&self.block_hash)
+        )
+    }
+}
 #[async_trait]
 pub trait ParentViewProvider {
     /// Obtain the genesis epoch of the current subnet in the parent
@@ -102,4 +117,25 @@ pub trait ParentFinalityProvider: ParentViewProvider {
         finality: IPCParentFinality,
         previous_finality: Option<IPCParentFinality>,
     ) -> Stm<()>;
+}
+
+/// If res is null round error, returns the default value from f()
+pub(crate) fn handle_null_round<T, F: FnOnce() -> T>(
+    res: anyhow::Result<T>,
+    f: F,
+) -> anyhow::Result<T> {
+    match res {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            if is_null_round_error(&e) {
+                Ok(f())
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
+pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
+    err.to_string().contains(NULL_ROUND_ERR_MSG)
 }

@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::finality::ParentViewPayload;
 use crate::{
     BlockHash, BlockHeight, CachedFinalityProvider, Error, IPCParentFinality,
     ParentFinalityProvider, ParentViewProvider,
@@ -113,8 +114,16 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
 }
 
 impl<P> Toggle<CachedFinalityProvider<P>> {
-    pub fn latest_height_hash(&self) -> Stm<Option<(BlockHeight, BlockHash)>> {
-        self.perform_or_else(|p| p.latest_height_hash(), None)
+    pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
+        self.perform_or_else(|p| p.block_hash(height), None)
+    }
+
+    pub fn latest_height(&self) -> Stm<Option<BlockHeight>> {
+        self.perform_or_else(|p| p.latest_height(), None)
+    }
+
+    pub fn first_non_null_parent_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
+        self.perform_or_else(|p| p.first_non_null_parent_hash(height), None)
     }
 
     pub fn last_committed_finality(&self) -> Stm<Option<IPCParentFinality>> {
@@ -124,14 +133,9 @@ impl<P> Toggle<CachedFinalityProvider<P>> {
     pub fn new_parent_view(
         &self,
         height: BlockHeight,
-        block_hash: BlockHash,
-        validator_changes: Vec<StakingChangeRequest>,
-        top_down_msgs: Vec<CrossMsg>,
+        maybe_payload: Option<ParentViewPayload>,
     ) -> StmResult<(), Error> {
-        self.perform_or_else(
-            |p| p.new_parent_view(height, block_hash, validator_changes, top_down_msgs),
-            (),
-        )
+        self.perform_or_else(|p| p.new_parent_view(height, maybe_payload), ())
     }
 
     pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {

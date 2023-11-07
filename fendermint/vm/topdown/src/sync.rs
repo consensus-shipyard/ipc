@@ -3,16 +3,20 @@
 //! A constant running process that fetch or listener to parent state
 
 use crate::error::Error;
+use crate::finality::ParentViewPayload;
 use crate::proxy::{IPCProviderProxy, ParentQueryProxy};
 use crate::{
     BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
-    ParentFinalityProvider, Toggle,
+    ParentFinalityProvider, Toggle, NULL_ROUND_ERR_MSG,
 };
+
+use async_stm::{atomically, atomically_or_err, Stm};
+use ipc_provider::manager::GetBlockHashResult;
+
 use anyhow::{anyhow, Context};
-use async_stm::{atomically, atomically_or_err};
-use ipc_sdk::cross::CrossMsg;
-use ipc_sdk::staking::StakingChangeRequest;
-use std::cmp::min;
+
+use ethers::utils::hex;
+use std::cmp::{max, min};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -22,6 +26,8 @@ const MAX_PARENT_VIEW_BLOCK_GAP: BlockHeight = 100;
 /// When polling parent view, if the number of top down messages exceeds this limit,
 /// the polling will stop for this iteration and commit the result to cache.
 const TOPDOWN_MSG_LEN_THRESHOLD: usize = 500;
+
+type GetParentViewPayload = Vec<(BlockHeight, Option<ParentViewPayload>)>;
 
 /// Query the parent finality from the block chain state
 pub trait ParentFinalityStateQuery {
@@ -58,22 +64,25 @@ async fn query_starting_finality<T: ParentFinalityStateQuery + Send + Sync + 'st
                 continue;
             }
         };
-        tracing::info!("latest finality committed: {finality:?}");
+        tracing::info!("latest finality committed: {finality}");
 
         // this means there are no previous committed finality yet, we fetch from parent to get
         // the genesis epoch of the current subnet and its corresponding block hash.
         if finality.height == 0 {
             let genesis_epoch = parent_client.get_genesis_epoch().await?;
-            tracing::debug!("obtained genesis epoch: {genesis_epoch:?}");
+            tracing::debug!("obtained genesis epoch: {genesis_epoch}");
             let r = parent_client.get_block_hash(genesis_epoch).await?;
-            tracing::debug!("obtained genesis block hash: {:?}", r.block_hash);
+            tracing::debug!(
+                "obtained genesis block hash: {:?}",
+                hex::encode(&r.block_hash)
+            );
 
             finality = IPCParentFinality {
                 height: genesis_epoch,
                 block_hash: r.block_hash,
             };
             tracing::info!(
-                "no previous finality committed, fetched from genesis epoch: {finality:?}"
+                "no previous finality committed, fetched from genesis epoch: {finality}"
             );
         }
 
@@ -97,12 +106,11 @@ where
         return Err(anyhow!("provider not enabled, enable to run syncer"));
     }
 
-    tracing::info!("launching polling syncer");
-
     let query = Arc::new(query);
     let finality = query_starting_finality(&query, &parent_client).await?;
     atomically(|| view_provider.set_new_finality(finality.clone(), None)).await;
-    tracing::info!("obtained last committed finality: {finality:?}");
+
+    tracing::info!("launching parent syncer with last committed finality: {finality}");
 
     let poll = PollingParentSyncer::new(
         config,
@@ -197,7 +205,7 @@ where
     }
 
     let (last_recorded_height, last_height_hash) =
-        if let Some(h) = last_recorded_height(provider).await? {
+        if let Some(h) = last_recorded_data(provider).await? {
             h
         } else {
             // cannot get starting recorded height, we just wait for the next loop execution
@@ -243,26 +251,17 @@ where
     let ending_height = min(ending_height, MAX_PARENT_VIEW_BLOCK_GAP + starting_height);
     tracing::debug!("parent view range: {starting_height}-{ending_height}");
 
-    let new_parent_views = match get_new_parent_views(
+    let new_parent_views = parent_views_in_block_range(
         parent_proxy,
         last_height_hash,
         starting_height,
         ending_height,
     )
-    .await
-    {
-        Ok(views) => views,
-        Err(Error::ParentChainReorgDetected) => {
-            return reset_cache(parent_proxy, provider, query).await;
-        }
-        Err(Error::CannotQueryParent(e)) => return Err(anyhow!(e)),
-        _ => unreachable!(),
-    };
-    tracing::debug!("new parent views: {new_parent_views:?}");
+    .await?;
 
     atomically_or_err::<_, Error, _>(move || {
-        for (height, block_hash, validator_set, messages) in new_parent_views.clone() {
-            provider.new_parent_view(height, block_hash, validator_set, messages)?;
+        for (height, maybe_payload) in new_parent_views.clone() {
+            provider.new_parent_view(height, maybe_payload)?;
         }
         Ok(())
     })
@@ -284,106 +283,231 @@ async fn reset_cache<T: ParentFinalityStateQuery + Send + Sync + 'static>(
     Ok(())
 }
 
-/// Obtains the last recorded height from provider cache or from last committed finality height.
-async fn last_recorded_height(
+/// A util struct that tracks the last recorded height
+enum LastRecordedBlock {
+    FilledBlock {
+        height: BlockHeight,
+        hash: BlockHash,
+    },
+    NullBlock(BlockHeight),
+    Empty,
+}
+
+impl LastRecordedBlock {
+    fn filled(height: BlockHeight, hash: BlockHash) -> Self {
+        Self::FilledBlock { height, hash }
+    }
+
+    fn null(height: BlockHeight) -> Self {
+        Self::NullBlock(height)
+    }
+
+    fn empty() -> Self {
+        Self::Empty
+    }
+}
+
+/// Getting the last recorded block height/hash
+async fn last_recorded_data(
     provider: &Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>,
 ) -> anyhow::Result<Option<(BlockHeight, BlockHash)>> {
-    let result = atomically(|| {
-        let h = if let Some(h) = provider.latest_height_hash()? {
-            Some(h)
-        } else if let Some(f) = provider.last_committed_finality()? {
-            Some((f.height, f.block_hash))
-        } else {
-            None
-        };
-        Ok(h)
-    })
-    .await;
+    match atomically(|| last_recorded_block(provider)).await {
+        LastRecordedBlock::Empty => Ok(None),
+        LastRecordedBlock::FilledBlock { height, hash } => Ok(Some((height, hash))),
+        LastRecordedBlock::NullBlock(height) => {
+            tracing::info!("last recorded height {height} is a null block");
 
-    Ok(result)
+            // Imaging the list of blocks as follows:
+            //
+            // F0  B0  B1  N0  N1  B2  B3  B4
+            //
+            // where F0 represents the last committed finality, B* represents non-null blocks and
+            // N* represents null blocks.
+            //
+            // Currently the last recorded block is N1, so the next block to sync in parent is B2.
+            // The response from getting block hash at height B2 from fvm eth apis would return:
+            //
+            // Block height: B2, Block hash: hash(B2), Parent block hash: hash(B1)
+            //
+            // F0  B0  B1  N0  N1  B2
+            //     B0' N0' N1' N2' B2  B3  B4       <====== reorged chain case 1
+            //     B0  B1  B2' B3' B2               <====== reorged chain case 2
+            //     B0  B1  N0' B1' B2               <====== reorged chain case 3
+            //
+            // If last recorded block is null (say N1), to ensure the chain has not reorg before B2:
+            // we just need to get the first non null parent in cache or committed finality and use
+            // that block hash as previous block hash in following steps.
+            match atomically(|| provider.first_non_null_parent_hash(height)).await {
+                None => unreachable!("should have last committed finality at this point"),
+                Some(hash) => {
+                    tracing::info!("First non null parent hash: {hash:02x?} at height: {height}");
+                    Ok(Some((height, hash)))
+                }
+            }
+        }
+    }
+}
+
+/// Obtains the last recorded block from provider cache or from last committed finality height.
+fn last_recorded_block(
+    provider: &Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>,
+) -> Stm<LastRecordedBlock> {
+    let latest_height = if let Some(h) = provider.latest_height()? {
+        h
+    } else if let Some(f) = provider.last_committed_finality()? {
+        // this means provider has cleared cache, but only previous committed finality
+        return Ok(LastRecordedBlock::filled(f.height, f.block_hash));
+    } else {
+        return Ok(LastRecordedBlock::empty());
+    };
+
+    if let Some(hash) = provider.block_hash(latest_height)? {
+        Ok(LastRecordedBlock::filled(latest_height, hash))
+    } else {
+        Ok(LastRecordedBlock::null(latest_height))
+    }
 }
 
 /// Obtain the new parent views for the input block height range
-async fn get_new_parent_views(
+async fn parent_views_in_block_range(
     parent_proxy: &Arc<IPCProviderProxy>,
     mut previous_hash: BlockHash,
     start_height: BlockHeight,
     end_height: BlockHeight,
-) -> Result<
-    Vec<(
-        BlockHeight,
-        BlockHash,
-        Vec<StakingChangeRequest>,
-        Vec<CrossMsg>,
-    )>,
-    Error,
-> {
-    let mut block_height_to_update = vec![];
+) -> Result<GetParentViewPayload, Error> {
+    let mut updates = vec![];
     let mut total_top_down_msgs = 0;
 
     for h in start_height..=end_height {
-        let block_hash_res = parent_proxy
-            .get_block_hash(h)
-            .await
-            .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
-        if block_hash_res.parent_block_hash != previous_hash {
-            tracing::warn!(
-                "parent block hash at {h} is {:02x?} diff than previous hash: {previous_hash:02x?}",
-                block_hash_res.parent_block_hash
-            );
-            return Err(Error::ParentChainReorgDetected);
-        }
+        match parent_views_at_height(parent_proxy, &previous_hash, h, end_height).await {
+            Ok((hash, changeset, cross_msgs)) => {
+                total_top_down_msgs += cross_msgs.len();
 
-        let changes_res = parent_proxy
-            .get_validator_changes(h)
-            .await
-            .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
-        if changes_res.block_hash != block_hash_res.block_hash {
-            tracing::warn!(
-                "change set block hash at {h} is {:02x?} diff than hash: {:02x?}",
-                block_hash_res.parent_block_hash,
-                block_hash_res.block_hash
-            );
-            return Err(Error::ParentChainReorgDetected);
-        }
+                tracing::debug!(
+                    "previous previous hash: {:02x?}, previous hash: {:02x?}",
+                    previous_hash,
+                    hash
+                );
+                previous_hash = hash.clone();
 
-        // for `lotus`, the state at height h is only finalized at h + 1. The block hash
-        // at height h will return empty top down messages. In this case, we need to get
-        // the block hash at height h + 1 to query the top down messages.
-        let next_hash = parent_proxy
-            .get_block_hash(h + 1)
-            .await
-            .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
-        if next_hash.parent_block_hash != block_hash_res.block_hash {
-            tracing::warn!(
-                "next block hash at {} is {:02x?} diff than hash: {:02x?}",
-                h + 1,
-                next_hash.parent_block_hash,
-                block_hash_res.block_hash
-            );
-            return Err(Error::ParentChainReorgDetected);
-        }
-        let top_down_msgs_res = parent_proxy
-            .get_top_down_msgs_with_hash(h, &next_hash.block_hash)
-            .await
-            .map_err(|e| Error::CannotQueryParent(e.to_string()))?;
-
-        total_top_down_msgs += top_down_msgs_res.len();
-
-        previous_hash = block_hash_res.block_hash.clone();
-
-        block_height_to_update.push((
-            h,
-            block_hash_res.block_hash,
-            changes_res.value,
-            top_down_msgs_res,
-        ));
-        if total_top_down_msgs >= TOPDOWN_MSG_LEN_THRESHOLD {
-            break;
+                updates.push((h, Some((hash, changeset, cross_msgs))));
+                if total_top_down_msgs >= TOPDOWN_MSG_LEN_THRESHOLD {
+                    break;
+                }
+            }
+            // Handles lotus null round error.
+            //
+            // This is the error that we see when there is a null round:
+            // https://github.com/filecoin-project/lotus/blob/7bb1f98ac6f5a6da2cc79afc26d8cd9fe323eb30/node/impl/full/eth.go#L164
+            // This happens when we request the block for a round without blocks in the tipset.
+            // A null round will never have a block, which means that we can advance to the next height.
+            Err(e) => {
+                let err_msg = e.to_string();
+                if err_msg.contains(NULL_ROUND_ERR_MSG) {
+                    tracing::warn!("null round at height: {h} detected, skip");
+                    updates.push((h, None));
+                } else {
+                    return Err(e);
+                }
+            }
         }
     }
 
-    tracing::debug!("obtained updates: {block_height_to_update:?}");
+    tracing::debug!("obtained updates: {updates:?}");
 
-    Ok(block_height_to_update)
+    Ok(updates)
+}
+
+/// Obtain the new parent views for the target height
+async fn parent_views_at_height(
+    parent_proxy: &Arc<IPCProviderProxy>,
+    previous_hash: &BlockHash,
+    height: BlockHeight,
+    look_ahead_limit: BlockHeight,
+) -> Result<ParentViewPayload, Error> {
+    let block_hash_res = parent_proxy
+        .get_block_hash(height)
+        .await
+        .map_err(|e| Error::CannotQueryParent(e.to_string(), height))?;
+    if block_hash_res.parent_block_hash != *previous_hash {
+        tracing::warn!(
+                "parent block hash at {height} is {:02x?} diff than previous hash: {previous_hash:02x?}",
+                block_hash_res.parent_block_hash
+            );
+        return Err(Error::ParentChainReorgDetected);
+    }
+
+    let changes_res = parent_proxy
+        .get_validator_changes(height)
+        .await
+        .map_err(|e| Error::CannotQueryParent(e.to_string(), height))?;
+    if changes_res.block_hash != block_hash_res.block_hash {
+        tracing::warn!(
+            "change set block hash at {height} is {:02x?} diff than hash: {:02x?}",
+            block_hash_res.parent_block_hash,
+            block_hash_res.block_hash
+        );
+        return Err(Error::ParentChainReorgDetected);
+    }
+
+    // for `lotus`, the state at height h is only finalized at h + 1. The block hash
+    // at height h will return empty top down messages. In this case, we need to get
+    // the block hash at height h + 1 to query the top down messages.
+    // Sadly, the height h + 1 could be null block, we need to continuously look ahead
+    // until we found a height that is not null
+    let next_hash = next_block_hash(parent_proxy, height + 1, look_ahead_limit).await?;
+    if next_hash.parent_block_hash != block_hash_res.block_hash {
+        tracing::warn!(
+            "next block hash at {} is {:02x?} diff than hash: {:02x?}",
+            height + 1,
+            next_hash.parent_block_hash,
+            block_hash_res.block_hash
+        );
+        return Err(Error::ParentChainReorgDetected);
+    }
+    let top_down_msgs_res = parent_proxy
+        .get_top_down_msgs_with_hash(height, &next_hash.block_hash)
+        .await
+        .map_err(|e| Error::CannotQueryParent(e.to_string(), height))?;
+
+    Ok((
+        block_hash_res.block_hash,
+        changes_res.value,
+        top_down_msgs_res,
+    ))
+}
+
+/// Get the next non-null block hash. If height is a null round, then we need to look further util we
+/// find one that is not null round.
+async fn next_block_hash(
+    parent_proxy: &Arc<IPCProviderProxy>,
+    height: BlockHeight,
+    mut look_ahead_limit: BlockHeight,
+) -> Result<GetBlockHashResult, Error> {
+    // at least we run for height
+    look_ahead_limit = max(height, look_ahead_limit);
+
+    for h in height..=look_ahead_limit {
+        match parent_proxy.get_block_hash(h).await {
+            Ok(h) => return Ok(h),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains(NULL_ROUND_ERR_MSG) {
+                    tracing::warn!(
+                        "look ahead encountered error: height {h} is a null round, message: {e}"
+                    );
+                    continue;
+                } else {
+                    return Err(Error::CannotQueryParent(msg, h));
+                }
+            }
+        }
+    }
+    Err(Error::CannotQueryParent(
+        format!(
+            "cannot get next block hash in range {}-{}, check your parent chain",
+            height, look_ahead_limit
+        ),
+        look_ahead_limit,
+    ))
 }

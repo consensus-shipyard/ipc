@@ -48,7 +48,7 @@ fn create_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderP
             gateway_addr: topdown_config.parent_gateway,
         }),
     };
-    tracing::info!("init ipc provider with subnet: {subnet:?}");
+    info!("init ipc provider with subnet: {}", subnet.id);
 
     let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
