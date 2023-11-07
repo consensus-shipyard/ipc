@@ -19,6 +19,8 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --env FM_DATA_DIR=/data/fendermint/data \
+  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
+  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=info \
@@ -30,11 +32,11 @@ docker run \
 """
 dependencies = ["docker-network-create", "fendermint-deps"]
 
-[tasks.fendermint-start-ipc]
-extend = "fendermint-run-ipc"
+[tasks.fendermint-start-validator]
+extend = "fendermint-run-validator"
 env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 
-[tasks.fendermint-run-ipc]
+[tasks.fendermint-run-validator]
 script = """
 docker run \
   ${FLAGS} \

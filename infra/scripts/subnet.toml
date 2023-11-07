@@ -14,20 +14,45 @@ dependencies = [
     "docker-network-create",
     "cometbft-init",
     "fendermint-deps",
-    "subnet-config",
-    "fendermint-start-ipc",
+    "validator-config",
+    "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "validator-report",
+    "node-report",
+]
+
+[tasks.child-fullnode-down]
+run_task = "testnode-down"
+
+[tasks.child-fullnode]
+workspace = false
+dependencies = [
+    "testnode-down",
+    "fendermint-pull",
+    "node-init",
+    "docker-network-create",
+    "cometbft-init",
+    "fendermint-deps",
+    "subnet-config",
+    "fendermint-start",
+    "cometbft-start",
+    "cometbft-wait",
+    "ethapi-start",
+    "node-report",
 ]
 
 [tasks.subnet-config]
 dependencies = [
     "subnet-fetch-genesis",
+    "genesis-write",
+]
+
+[tasks.validator-config]
+dependencies = [
+    "subnet-config",
     "subnet-convert-eth-key",
     "testnode-export-keys",
-    "genesis-write",
 ]
 
 [tasks.subnet-convert-eth-key]
@@ -39,11 +64,11 @@ script.pre = "mkdir ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}; cp ${PRIVATE_KEY_PA
 extend = "fendermint-tool"
 env = { "ENTRY" = "fendermint", "CMD" = "genesis --genesis-file /data/genesis.json ipc from-parent --subnet-id ${SUBNET_ID} -p ${PARENT_ENDPOINT}  --parent-gateway ${PARENT_GATEWAY}  --parent-registry ${PARENT_REGISTRY} --base-fee ${BASE_FEE} --power-scale ${POWER_SCALE}" }
 
-[tasks.validator-report]
+[tasks.node-report]
 script = """cat << EOF
 #################################
 #                               #
-# Subnet validator ready! 🚀    #
+# Subnet node ready! 🚀         #
 #                               #
 #################################
 
