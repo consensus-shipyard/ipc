@@ -94,7 +94,11 @@ pub fn to_eth_signature(sig: &FvmSignature, normalized: bool) -> anyhow::Result<
     Ok(sig)
 }
 
-pub fn to_eth_transaction(msg: &Message, chain_id: &ChainID) -> anyhow::Result<TypedTransaction> {
+/// Turn an FVM `Message` back into an Ethereum transaction request, mainly for signature checking.
+pub fn to_eth_typed_transaction(
+    msg: &Message,
+    chain_id: &ChainID,
+) -> anyhow::Result<TypedTransaction> {
     let chain_id: u64 = (*chain_id).into();
 
     let Message {
@@ -154,7 +158,7 @@ pub mod tests {
         tests::{EthMessage, KeyPair},
     };
 
-    use super::{to_eth_signature, to_eth_tokens, to_eth_transaction};
+    use super::{to_eth_signature, to_eth_tokens, to_eth_typed_transaction};
 
     #[quickcheck]
     fn prop_to_eth_tokens(tokens: ArbTokenAmount) -> bool {
@@ -207,7 +211,7 @@ pub mod tests {
     fn prop_to_and_from_eth_transaction(msg: EthMessage, chain_id: u64) {
         let chain_id = ChainID::from(chain_id);
         let msg0 = msg.0;
-        let tx = to_eth_transaction(&msg0, &chain_id).expect("to_eth_transaction failed");
+        let tx = to_eth_typed_transaction(&msg0, &chain_id).expect("to_eth_transaction failed");
         let tx = tx.as_eip1559_ref().expect("not an eip1559 transaction");
         let msg1 = to_fvm_message(tx).expect("to_fvm_message failed");
 
@@ -222,7 +226,7 @@ pub mod tests {
 
         let chain_id = ChainID::from(chain_id);
         let msg0 = msg.0;
-        let tx = to_eth_transaction(&msg0, &chain_id).expect("to_eth_transaction failed");
+        let tx = to_eth_typed_transaction(&msg0, &chain_id).expect("to_eth_transaction failed");
 
         let wallet: Wallet<SigningKey> = Wallet::from_bytes(key_pair.sk.serialize().as_ref())
             .expect("failed to create wallet")

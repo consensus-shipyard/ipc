@@ -168,13 +168,15 @@ pub fn to_eth_transaction(
         gas: et::U256::from(msg.gas_limit),
         max_fee_per_gas: Some(to_eth_tokens(&msg.gas_fee_cap)?),
         max_priority_fee_per_gas: Some(to_eth_tokens(&msg.gas_premium)?),
-        gas_price: None,
+        // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
+        // has a database constraint that if a transaction is included in a block this can't be null.
+        gas_price: Some(to_eth_tokens(&msg.gas_fee_cap)? + to_eth_tokens(&msg.gas_premium)?),
         input: et::Bytes::from(msg.params.bytes().to_vec()),
         chain_id: Some(et::U256::from(u64::from(chain_id))),
         v: et::U64::from(sig.v),
         r: sig.r,
         s: sig.s,
-        transaction_type: None,
+        transaction_type: Some(2u64.into()),
         access_list: None,
         other: Default::default(),
     };

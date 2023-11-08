@@ -104,7 +104,7 @@ impl SignedMessage {
         // work with regular accounts.
         match maybe_eth_address(&message.from) {
             Some(addr) => {
-                let tx = from_fvm::to_eth_transaction(message, chain_id)
+                let tx = from_fvm::to_eth_typed_transaction(message, chain_id)
                     .map_err(SignedMessageError::Ethereum)?;
 
                 Ok(Signable::Ethereum((tx.sighash(), addr)))
@@ -155,7 +155,7 @@ impl SignedMessage {
         chain_id: &ChainID,
     ) -> Result<Option<DomainHash>, SignedMessageError> {
         if maybe_eth_address(&self.message.from).is_some() {
-            let tx = from_fvm::to_eth_transaction(self.message(), chain_id)
+            let tx = from_fvm::to_eth_typed_transaction(self.message(), chain_id)
                 .map_err(SignedMessageError::Ethereum)?;
 
             let sig = from_fvm::to_eth_signature(self.signature(), true)
