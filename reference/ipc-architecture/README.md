@@ -10,7 +10,7 @@ description: This page provides an in-depth explanation of IPC components
 
 Lotus, the reference implementation for Filecoin, serves as the rootnet for IPC subnets. The novelty of IPC is that these subnets run in parallel with unique consensus protocols. &#x20;
 
-Operators and validators of a subnet run a full node for both the parent and the subnet. Requiring the nodes of children to run the nodes of parents is a security parameter to ensure [checkpointed](checkpointing.md) states of the subnet are appropriately stored at the right time in the parent.&#x20;
+Operators and validators of a subnet run a full node for both the parent and the subnet. Requiring the nodes of children to run the nodes of parents is a security parameter to ensure [checkpointed](../../key-concepts/checkpointing.md) states of the subnet are appropriately stored at the right time in the parent.&#x20;
 
 Subnet users running nodes of the child and the parent repeats recursively as the tree of subnets is built.
 
@@ -30,15 +30,9 @@ The IGA is an actor that contains all IPC-related information and logic associat
 
 [Tendermint Core](https://tendermint.com/) is a byzantine fault tolerant (BFT) consensus engine for blockchains. For IPC, Tendermint Core enables [state machine replication](https://en.wikipedia.org/wiki/State\_machine\_replication) in each subnet.&#x20;
 
-An [ABCI++](https://members.delphidigital.io/learn/abci) interface is implemented in order to handle the IPC ledger logic, the transaction handling, using the [Filecoin Virtual Machine](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) (or Ethereum-compatible FVM). The ABCI can pass [checkpointed](checkpointing.md) headers to the parent and use the ledger to gather relevant signatures.&#x20;
+An [ABCI++](https://members.delphidigital.io/learn/abci) interface is implemented in order to handle the IPC ledger logic, the transaction handling, using the [Filecoin Virtual Machine](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) (or Ethereum-compatible FVM). The ABCI can pass [checkpointed](../../key-concepts/checkpointing.md) headers to the parent and use the ledger to gather relevant signatures.&#x20;
 
-### IPLD Resolver & Store
-
-The IPLD resolver is a library that allow users to exchange data between subnets in IPLD format. See more on IPLD resolver [here](ipld-resolver.md).
-
-An ABCI++ application can contact the [IPLD](https://docs.filecoin.io/basics/project-and-community/related-projects#ipld) resolver & store read/write data so that it is IPLD addressable.&#x20;
-
-The IPLD store is a common store that allows for read/write in IPLD format from the FVM and the resolver.&#x20;
+An ABCI++ application can contact the [IPLD](https://docs.filecoin.io/basics/project-and-community/related-projects#ipld) [resolver & store](ipld-resolver.md) to read and write data so that it is IPLD addressable.&#x20;
 
 ### Filecoin Virtual Machine (FVM)
 

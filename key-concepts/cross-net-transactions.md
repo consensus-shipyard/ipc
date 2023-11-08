@@ -4,7 +4,7 @@ description: >-
   transactions.
 ---
 
-# Approving Transactions on IPC Subnets
+# Cross-net transactions
 
 ## Proof of Finality
 
@@ -21,3 +21,5 @@ Each of the users of subnet runes a full node for that subnet.  By default, subn
 The state of a subnet can only be updated through transactions by users, and a batch of transactions can be included in a block.  Each transaction on a subnet has some transaction fee, referred to as gas, which is deducted from the user’s account on the subnet.  Insufficient funds will result in a failed execution.&#x20;
 
 As with any blockchain, spending coins is done when the user signs with their private key.
+
+### How fees work?
