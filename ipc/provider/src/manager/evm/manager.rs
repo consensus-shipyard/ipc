@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -1272,8 +1272,8 @@ fn is_valid_bootstrap_addr(input: &str) -> Option<(String, IpAddr, u16)> {
 fn into_genesis_balance_map(
     addrs: Vec<ethers::types::Address>,
     balances: Vec<ethers::types::U256>,
-) -> Result<HashMap<Address, TokenAmount>> {
-    let mut map = HashMap::new();
+) -> Result<BTreeMap<Address, TokenAmount>> {
+    let mut map = BTreeMap::new();
     for (a, b) in addrs.into_iter().zip(balances) {
         map.insert(ethers_address_to_fil_address(&a)?, eth_to_fil_amount(&b)?);
     }
