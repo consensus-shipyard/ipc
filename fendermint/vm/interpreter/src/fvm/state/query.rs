@@ -7,7 +7,7 @@ use std::{cell::RefCell, sync::Arc};
 use anyhow::{anyhow, Context};
 
 use cid::Cid;
-use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
+use fendermint_vm_actor_interface::system::is_system_addr;
 use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::query::ActorState;
 use fvm::engine::MultiEngine;
@@ -190,7 +190,7 @@ where
                 msg.gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
             }
 
-            if msg.from == SYSTEM_ACTOR_ADDR {
+            if is_system_addr(&msg.from) {
                 // Explicit execution requires `from` to be an account kind.
                 s.execute_implicit(msg)
             } else {

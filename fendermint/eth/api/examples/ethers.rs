@@ -490,6 +490,7 @@ where
     // Calling with 0 nonce so the node figures out the latest value.
     let mut probe_tx = transfer.clone();
     probe_tx.set_nonce(0);
+
     let probe_height = BlockId::Number(BlockNumber::Number(bn));
 
     request(
@@ -557,6 +558,15 @@ where
     request("eth_call", coin_balance.call().await, |coin_balance| {
         *coin_balance == U256::from(10000)
     })?;
+
+    // Calling with 0x00..00 address so we see if it world work for calls by clients that set nothing.
+    let coin_balance = coin_balance.from(Address::default());
+
+    request(
+        "eth_call w/ 0x00..00",
+        coin_balance.call().await,
+        |coin_balance| *coin_balance == U256::from(10000),
+    )?;
 
     // We could calculate the storage location of the balance of the owner of the contract,
     // but let's just see what it returns with at slot 0. See an example at

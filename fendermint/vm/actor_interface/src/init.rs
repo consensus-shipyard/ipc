@@ -11,7 +11,7 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID, HAMT_BIT_WIDTH};
 
-use crate::eam::EthAddress;
+use crate::{eam::EthAddress, system};
 
 /// Defines first available ID address after builtin actors
 pub const FIRST_NON_SINGLETON_ADDR: ActorID = 100;
@@ -112,6 +112,15 @@ impl State {
                 .context("cannot set ID of eth address")?;
             next_id += 1;
         }
+
+        // Insert the null-Ethereum address to equal the system actor,
+        // so the system actor can be identified by 0xff00..00 as well as 0x00..00
+        address_map
+            .set(
+                system::SYSTEM_ACTOR_ETH_ADDR.to_bytes().into(),
+                system::SYSTEM_ACTOR_ID,
+            )
+            .context("cannot set ID of null eth address")?;
 
         #[cfg(feature = "m2-native")]
         let installed_actors = store.put_cbor(&Vec::<Cid>::new(), Code::Blake2b256)?;
