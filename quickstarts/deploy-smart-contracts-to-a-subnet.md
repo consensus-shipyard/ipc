@@ -18,7 +18,7 @@ In this tutorial, we will guide you through the simple process of connecting to 
 
 ## Connect to an IPC subnet
 
-The Filecoin Calibration will the IPC rootnet to host multiple IPC subnets, each offering distinct features and capacities. Builders have the flexibility to select a subnet that suits their specific requirements for deploying smart contracts. Alternatively, if builders have unique needs, they can set up their own subnet. If you are interested in learning more about IPC rootnet and subnets, you can read more [here](broken-reference).&#x20;
+The Filecoin Calibration testnet will the IPC rootnet to host multiple IPC subnets for testing, each offering distinct features and capacities. Builders have the flexibility to select a subnet that suits their specific requirements for deploying smart contracts. Alternatively, if builders have unique needs, they can set up their own subnet. If you are interested in learning more about IPC rootnet and subnets, you can read more [here](../key-concepts/subnets.md).&#x20;
 
 In this quickstart guide, we will utilize an existing subnet, connected to Filecoin Calibration testnet, to deploy and interact with smart contracts.
 
@@ -46,7 +46,7 @@ Upon building `ipc-cli`, the resulting binary will be located in the `./bin` fol
 
 #### **2. Initialize `ipc-cli`**
 
-Executing the following command, will create a default folder`~/.ipc` for all IPC-related configurations and data.&#x20;
+Executing the following command will create a default folder`~/.ipc` for all IPC-related configurations and data.&#x20;
 
 ```
 ipc-cli config init
@@ -122,7 +122,7 @@ chainID: "4480179742025850"
 
 With the gathered information, you now have all the necessary details to manually add your subnet network to MetaMask.
 
-<figure><img src="broken-reference" alt=""><figcaption><p>Add Canopy network to the MetaMask.</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/metamask (1).png" alt=""><figcaption><p>Add Canopy network to the MetaMask.</p></figcaption></figure>
 
 ## Fund your address on the IPC subnet
 
@@ -144,9 +144,7 @@ ipc-cli wallet new --wallet-type evm
 
 After creating a wallet in `ipc-cli`, we can request tFIL on the Calibration either through the[ calibration faucet](https://faucet.calibration.fildev.network/funds.html) or [Beryx-Faucet](https://beryx.zondax.ch/faucet).&#x20;
 
-Please note that it may take a minute for the network to finalize the token transfer transaction.&#x20;
-
-You can use `ipc-cli` to check your wallet balance on the Calibration network.
+Please note that it may take a minute for the network to finalize the token transfer transaction. You can use `ipc-cli` to check your wallet balance on the Calibration network.
 
 ```bash
 ipc-cli wallet balances --subnet /r314159 --wallet-type evm
@@ -195,7 +193,7 @@ There are a couple of ways to check token balance in the IPC subnet.
     {% endcode %}
 *   **On MetaMask**
 
-    ![](broken-reference)
+    ![](../.gitbook/assets/tokenBalances.png)
 
 After acquiring some test tokens in the MetaMask wallet, we can begin working on the smart contract for the IPC subnet.
 
@@ -209,7 +207,7 @@ As mentioned earlier, IPC subnets are EVM-compatible, allowing us to utilize var
 
 Let's go to the [Remix](https://remix.ethereum.org) website and create a new workspace. We will use the ERC20 template from [OpenZeppelin](https://docs.openzeppelin.com/contracts/5.x/erc20) and add a mintable feature to customize the contract.
 
-<figure><img src="broken-reference" alt=""><figcaption><p>Create a new workspace</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/create_workspace (1).png" alt=""><figcaption><p>Create a new workspace</p></figcaption></figure>
 
 Remix will generate a standard Solidity project structure, including an ERC20 token contract template and the necessary libraries from OpenZeppelin.
 
@@ -217,7 +215,7 @@ Remix will generate a standard Solidity project structure, including an ERC20 to
 
 On the left file explorer section on Remix, open `contracts/MyToken.sol` and modify the name and symbol for the ERC20 token.
 
-<figure><img src="broken-reference" alt=""><figcaption><p>Customize the token details</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/token (1).png" alt=""><figcaption><p>Customize the token details</p></figcaption></figure>
 
 #### **3. Compile your token contract**
 
@@ -227,11 +225,11 @@ Set the Solidity compiler version to 0.8.20 on the Solidity Compiler page. This 
 
 In this step, we will utilize MetaMask to sign and send deployment transactions to the IPC subnet. Ensure that MetaMask is connected to the IPC subnet, and select `Injected Provider - MetaMask` as the deployment environment in Remix.
 
-<figure><img src="broken-reference" alt=""><figcaption><p>Use MetaMask to sign the transaction</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/InjectMM (1).png" alt=""><figcaption><p>Use MetaMask to sign the transaction</p></figcaption></figure>
 
 Set your wallet address (copy from MetaMask) as the initial owner of this ERC20 token when deploying it. Review and confirm the deployment transaction on the MetaMask pop-up window after clicking the **Deploy** button. Once confirmed, the ERC20 token contract will be deployed on the IPC subnet.
 
-<figure><img src="broken-reference" alt=""><figcaption><p>Deploy the smart contract</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/deployed.png" alt=""><figcaption><p>Deploy the smart contract</p></figcaption></figure>
 
 #### **5. Invoke smart contract on Remix**
 
@@ -240,7 +238,7 @@ After successfully deploying your contract to the IPC subnet, you will be able t
 * **to**: the address to receive the minted ERC20 token
 * **amount**: the amount of tokens to be minted.
 
-<figure><img src="broken-reference" alt=""><figcaption><p>Invoke smart contract</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/invoke (1).png" alt=""><figcaption><p>Invoke smart contract</p></figcaption></figure>
 
 After the transaction is confirmed on the IPC subnet, we will be able to call `balanceOf` to check if the tokens have been successfully minted to our wallet address.
 
