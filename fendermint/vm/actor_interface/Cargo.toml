@@ -17,6 +17,7 @@ merkle-tree-rs = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }
+tracing = { workspace = true }
 
 cid = { workspace = true }
 fvm_shared = { workspace = true }

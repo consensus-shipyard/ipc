@@ -189,6 +189,15 @@ where
             |s| s.set_actor(id, actor_state.clone()),
         );
 
+        {
+            let cid = self.with_state_tree(|s| s.flush(), |s| s.flush())?;
+            tracing::debug!(
+                state_root = cid.to_string(),
+                actor_id = id,
+                "interim state root after actor creation"
+            );
+        }
+
         Ok(())
     }
 
@@ -330,6 +339,15 @@ where
                 .execute_implicit(msg)
                 .context("failed to execute message")?,
         };
+
+        {
+            let cid = self.with_state_tree(|s| s.flush(), |s| s.flush())?;
+            tracing::debug!(
+                state_root = cid.to_string(),
+                actor_id = id,
+                "interim state root after EVM actor initialisation"
+            );
+        }
 
         if !apply_ret.msg_receipt.exit_code.is_success() {
             let error_data = apply_ret.msg_receipt.return_data;

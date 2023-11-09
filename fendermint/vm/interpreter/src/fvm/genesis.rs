@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
@@ -30,6 +30,7 @@ use crate::GenesisInterpreter;
 use super::state::FvmGenesisState;
 use super::FvmMessageInterpreter;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FvmGenesisOutput {
     pub chain_id: ChainID,
     pub timestamp: Timestamp,
@@ -77,6 +78,9 @@ where
         mut state: Self::State,
         genesis: Self::Genesis,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
+        // Log the genesis in JSON format, hopefully it's not enormous.
+        tracing::debug!(genesis = serde_json::to_string(&genesis)?, "init");
+
         // NOTE: We could consider adding the chain ID to the interpreter
         //       and rejecting genesis if it doesn't match the expectation,
         //       but the Tendermint genesis file also has this field, and
@@ -107,7 +111,7 @@ where
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
 
         // Pre-defined IDs for top-level Ethereum contracts.
-        let mut eth_builtin_ids = HashSet::new();
+        let mut eth_builtin_ids = BTreeSet::new();
         let mut eth_root_contracts = Vec::new();
         let mut eth_contracts = EthContractMap::default();
 
@@ -463,11 +467,13 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{str::FromStr, sync::Arc};
 
+    use cid::Cid;
     use fendermint_vm_genesis::{ipc::IpcParams, Genesis};
     use fvm::engine::MultiEngine;
     use quickcheck::Arbitrary;
+    use tendermint_rpc::{MockClient, MockRequestMethodMatcher};
 
     use crate::{
         fvm::{
@@ -483,27 +489,16 @@ mod tests {
 
     #[tokio::test]
     async fn load_genesis() {
-        let mut g = quickcheck::Gen::new(5);
-        let mut genesis = Genesis::arbitrary(&mut g);
+        let genesis = make_genesis();
+        let bundle = read_bundle();
+        let interpreter = make_interpreter();
 
-        // Make sure we have IPC enabled.
-        genesis.ipc = Some(IpcParams::arbitrary(&mut g));
-
-        eprintln!("genesis = {genesis:?}");
-
-        let bundle = std::fs::read(bundle_path()).expect("failed to read bundle");
-        let store = MemoryBlockstore::new();
         let multi_engine = Arc::new(MultiEngine::default());
+        let store = MemoryBlockstore::new();
 
         let state = FvmGenesisState::new(store, multi_engine, &bundle)
             .await
             .expect("failed to create state");
-
-        let (client, _) =
-            tendermint_rpc::MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default());
-
-        let interpreter =
-            FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false);
 
         let (mut state, out) = interpreter
             .init(state, genesis.clone())
@@ -523,5 +518,85 @@ mod tests {
         assert_eq!(period, genesis.ipc.unwrap().gateway.bottom_up_check_period);
 
         let _state_root = state.commit().expect("failed to commit");
+    }
+
+    #[tokio::test]
+    async fn load_genesis_deterministic() {
+        let genesis = make_genesis();
+        let bundle = read_bundle();
+        let interpreter = make_interpreter();
+        let multi_engine = Arc::new(MultiEngine::default());
+
+        // Create a couple of states and load the same thing.
+        let mut outputs = Vec::new();
+        for _ in 0..3 {
+            let store = MemoryBlockstore::new();
+            let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle)
+                .await
+                .expect("failed to create state");
+
+            let (state, out) = interpreter
+                .init(state, genesis.clone())
+                .await
+                .expect("failed to create actors");
+
+            let state_root_hash = state.commit().expect("failed to commit");
+            outputs.push((state_root_hash, out));
+        }
+
+        for out in &outputs[1..] {
+            assert_eq!(out.0, outputs[0].0, "state root hash is different");
+        }
+    }
+
+    // This is a sort of canary test, if it fails means something changed in the way we do genesis,
+    // which is probably fine, but it's better to know about it, and if anybody doesn't get the same
+    // then we might have some non-determinism.
+    #[tokio::test]
+    async fn load_genesis_known() {
+        let genesis_json = "{\"chain_name\":\"/r314159/f410fnfmitm2ww7oehhtbokf6wulhrr62sgq3sgqmenq\",\"timestamp\":1073250,\"network_version\":18,\"base_fee\":\"1000\",\"power_scale\":3,\"validators\":[{\"public_key\":\"BLX9ojqB+8Z26aMmKoCRb3Te6AnSU6zY8hPcf1X5Q69XCNaHVcRxzYO2xx7o/2vgdS7nkDTMRRbkDGzy+FYdAFc=\",\"power\":\"1000000000000000000\"},{\"public_key\":\"BFcOveVieknZiscWsfXa06aGbBkKeucBycd/w0N1QHlaZfa/5dJcH7D0hvcdfv3B2Rv1OPuxo1PkgsEbWegWKcA=\",\"power\":\"1000000000000000000\"},{\"public_key\":\"BEP30ykovfrQp3zo+JVRvDVL2emC+Ju1Kpox3zMVYZyFKvYt64qyN/HOVjridDrkEsnQU8BVen4Aegja4fBZ+LU=\",\"power\":\"1000000000000000000\"}],\"accounts\":[{\"meta\":{\"Account\":{\"owner\":\"f410fggjevhgketpz6gw6ordusynlgcd5piyug4aomuq\"}},\"balance\":\"1000000000000000000\"},{\"meta\":{\"Account\":{\"owner\":\"f410frbdnwklaitcjsqe7swjwp5naple6vthq4woyfry\"}},\"balance\":\"2000000000000000000\"},{\"meta\":{\"Account\":{\"owner\":\"f410fxo4lih4n2acr3oadalidwqjgoqkzhp5dw3zwkvy\"}},\"balance\":\"1000000000000000000\"}],\"ipc\":{\"gateway\":{\"subnet_id\":\"/r314159/f410fnfmitm2ww7oehhtbokf6wulhrr62sgq3sgqmenq\",\"bottom_up_check_period\":30,\"msg_fee\":\"1000000000000\",\"majority_percentage\":60,\"min_collateral\":\"1000000000000000000\",\"active_validators_limit\":100}}}";
+
+        let genesis: Genesis = serde_json::from_str(genesis_json).expect("failed to parse genesis");
+
+        let bundle = read_bundle();
+        let interpreter = make_interpreter();
+        let multi_engine = Arc::new(MultiEngine::default());
+
+        let store = MemoryBlockstore::new();
+        let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle)
+            .await
+            .expect("failed to create state");
+
+        let (state, _) = interpreter
+            .init(state, genesis.clone())
+            .await
+            .expect("failed to create actors");
+
+        let state_root_hash = state.commit().expect("failed to commit");
+
+        let expected_root_hash =
+            Cid::from_str("bafy2bzacecl5t5fxuqqbekae6racgvvoriv3o7xweerdngijwehukaao6bmlg")
+                .unwrap();
+
+        assert_eq!(state_root_hash, expected_root_hash);
+    }
+
+    fn make_genesis() -> Genesis {
+        let mut g = quickcheck::Gen::new(5);
+        let mut genesis = Genesis::arbitrary(&mut g);
+
+        // Make sure we have IPC enabled.
+        genesis.ipc = Some(IpcParams::arbitrary(&mut g));
+        genesis
+    }
+
+    fn make_interpreter(
+    ) -> FvmMessageInterpreter<MemoryBlockstore, MockClient<MockRequestMethodMatcher>> {
+        let (client, _) = MockClient::new(MockRequestMethodMatcher::default());
+        FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false)
+    }
+
+    fn read_bundle() -> Vec<u8> {
+        std::fs::read(bundle_path()).expect("failed to read bundle")
     }
 }

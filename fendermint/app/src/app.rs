@@ -464,9 +464,16 @@ where
             "pre-genesis state created"
         );
 
+        let genesis_bytes = request.app_state_bytes.to_vec();
+        let genesis_hash =
+            fendermint_vm_message::cid(&genesis_bytes).context("failed to compute genesis CID")?;
+
+        // Make it easy to spot any discrepancies between nodes.
+        tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
+
         let (state, out) = self
             .interpreter
-            .init(state, request.app_state_bytes.to_vec())
+            .init(state, genesis_bytes)
             .await
             .context("failed to init from genesis")?;
 

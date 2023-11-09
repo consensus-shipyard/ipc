@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
@@ -18,7 +18,7 @@ pub const FIRST_NON_SINGLETON_ADDR: ActorID = 100;
 
 define_singleton!(INIT { id: 1, code_id: 2 });
 
-pub type AddressMap = HashMap<Address, ActorID>;
+pub type AddressMap = BTreeMap<Address, ActorID>;
 
 /// Delegated address of an Ethereum built-in actor.
 ///
@@ -57,14 +57,23 @@ impl State {
         // Accounts from the Genesis file.
         accounts: &[Actor],
         // Pre-defined IDs for top-level EVM contracts.
-        eth_builtin_ids: &HashSet<ActorID>,
+        eth_builtin_ids: &BTreeSet<ActorID>,
         // Number of dynamically deployed EVM library contracts.
         eth_library_count: u64,
     ) -> anyhow::Result<(Self, AddressMap)> {
         // Returning only the addreses that belong to user accounts.
         let mut allocated_ids = AddressMap::new();
         // Inserting both user accounts and built-in EVM actors.
-        let mut address_map = Hamt::<_, ActorID>::new_with_bit_width(store, HAMT_BIT_WIDTH);
+        let mut address_map = Hamt::<&BS, ActorID>::new_with_bit_width(store, HAMT_BIT_WIDTH);
+
+        let mut set_address = |addr: Address, id: ActorID| {
+            tracing::debug!(
+                addr = addr.to_string(),
+                actor_id = id,
+                "setting init address"
+            );
+            address_map.set(addr.to_bytes().into(), id)
+        };
 
         let addresses = accounts.iter().flat_map(|a| match &a.meta {
             ActorMeta::Account(acc) => {
@@ -80,9 +89,7 @@ impl State {
                 continue;
             }
             allocated_ids.insert(addr, next_id);
-            address_map
-                .set(addr.to_bytes().into(), next_id)
-                .context("cannot set ID of address")?;
+            set_address(addr, next_id).context("cannot set ID of account address")?;
             next_id += 1;
         }
 
@@ -99,28 +106,20 @@ impl State {
         // Insert top-level EVM contracts which have fixed IDs.
         for id in eth_builtin_ids {
             let addr = Address::from(builtin_actor_eth_addr(*id));
-            address_map
-                .set(addr.to_bytes().into(), *id)
-                .context("cannot set ID of eth address")?;
+            set_address(addr, *id).context("cannot set ID of eth contract address")?;
         }
 
         // Insert dynamic EVM library contracts.
         for _ in 0..eth_library_count {
             let addr = Address::from(builtin_actor_eth_addr(next_id));
-            address_map
-                .set(addr.to_bytes().into(), next_id)
-                .context("cannot set ID of eth address")?;
+            set_address(addr, next_id).context("cannot set ID of eth library address")?;
             next_id += 1;
         }
 
         // Insert the null-Ethereum address to equal the system actor,
         // so the system actor can be identified by 0xff00..00 as well as 0x00..00
-        address_map
-            .set(
-                system::SYSTEM_ACTOR_ETH_ADDR.to_bytes().into(),
-                system::SYSTEM_ACTOR_ID,
-            )
-            .context("cannot set ID of null eth address")?;
+        set_address(*system::SYSTEM_ACTOR_ETH_ADDR, system::SYSTEM_ACTOR_ID)
+            .context("cannot set ID of system eth address")?;
 
         #[cfg(feature = "m2-native")]
         let installed_actors = store.put_cbor(&Vec::<Cid>::new(), Code::Blake2b256)?;
@@ -132,6 +131,8 @@ impl State {
             #[cfg(feature = "m2-native")]
             installed_actors,
         };
+
+        tracing::debug!(?state, "init actor state");
 
         Ok((state, allocated_ids))
     }
