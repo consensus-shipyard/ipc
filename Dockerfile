@@ -1,32 +1,24 @@
 # syntax=docker/dockerfile:1
 
 # Build stage
-FROM rust:1.68 as builder
+FROM rust:bookworm as builder
 
-RUN <<EOF
-    set -e
-
-    apt-get update
-    apt-get install -y build-essential
-
-    rm -rf /var/lib/apt/lists/*
-EOF
+RUN apt update && \
+    apt install -y build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg
 
 WORKDIR /app
 
 COPY . .
 
-RUN --mount=type=cache,target=$RUSTUP_HOME,from=rust,source=$RUSTUP_HOME \
-    --mount=type=cache,target=$CARGO_HOME,from=rust,source=$CARGO_HOME \
-    --mount=type=cache,target=target \
-    cargo install --root output --path .
-
+RUN make build
 
 # Main stage
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
-COPY --from=builder /app/output/bin/ipc-agent /usr/local/bin/ipc-agent
+RUN apt update && \
+    apt install -y build-essential libssl-dev curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["ipc-agent"]
+COPY --from=builder /app/bin/ipc-cli /usr/local/bin/ipc-cli
 
-EXPOSE 3030
+ENTRYPOINT ["/usr/local/bin/ipc-cli"]
