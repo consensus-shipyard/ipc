@@ -3003,6 +3003,7 @@ dependencies = [
  "lazy_static",
  "prost",
  "serde",
+ "serde_json",
  "tendermint 0.31.1",
  "tendermint-proto 0.31.1",
  "tendermint-rpc",

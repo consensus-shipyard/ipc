@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use cid::Cid;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     address::Address, econ::TokenAmount, error::ExitCode, message::Message as FvmMessage,
     version::NetworkVersion,
@@ -109,8 +110,10 @@ pub struct ActorState {
 pub struct GasEstimate {
     /// Exit code, potentially signalling out-of-gas errors, or that the actor was not found.
     pub exit_code: ExitCode,
-    /// Any information about failed estimations.
+    /// Any information about failed estimations from `ApplyRet::failure_info`.
     pub info: String,
+    /// Potential revert data as it appreared in `ApplyRet`.
+    pub return_data: RawBytes,
     /// Gas used during the probing.
     ///
     /// Potentially contains an over-estimate, but it should be within the account balance limit.

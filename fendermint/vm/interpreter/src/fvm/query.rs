@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate, StateParams};
 use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     bigint::BigInt, econ::TokenAmount, error::ExitCode, message::Message, ActorID, BLOCK_GAS_LIMIT,
 };
@@ -85,6 +86,11 @@ where
                     method_num,
                     exit_code = apply_ret.msg_receipt.exit_code.value(),
                     data = hex::encode(apply_ret.msg_receipt.return_data.bytes()),
+                    info = apply_ret
+                        .failure_info
+                        .as_ref()
+                        .map(|i| i.to_string())
+                        .unwrap_or_default(),
                     "query call"
                 );
 
@@ -168,6 +174,7 @@ where
                 Some(GasEstimate {
                     exit_code: ret.msg_receipt.exit_code,
                     info: ret.failure_info.map(|x| x.to_string()).unwrap_or_default(),
+                    return_data: ret.msg_receipt.return_data,
                     gas_limit: 0,
                 }),
             ));
@@ -223,6 +230,7 @@ where
                 let est = GasEstimate {
                     exit_code: ExitCode::OK,
                     info: "".to_string(),
+                    return_data: RawBytes::default(),
                     gas_limit: BLOCK_GAS_LIMIT,
                 };
                 return Ok((state, est));
@@ -254,6 +262,7 @@ where
                 .failure_info
                 .map(|x| x.to_string())
                 .unwrap_or_default(),
+            return_data: apply_ret.msg_receipt.return_data,
             gas_limit: apply_ret.msg_receipt.gas_used,
         };
 

@@ -14,7 +14,7 @@ use ethers_core::types::transaction::eip2718::TypedTransaction;
 use ethers_core::utils::rlp;
 use fendermint_rpc::message::MessageFactory;
 use fendermint_rpc::query::QueryClient;
-use fendermint_rpc::response::decode_fevm_invoke;
+use fendermint_rpc::response::{decode_fevm_invoke, decode_fevm_return_data};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
@@ -635,16 +635,14 @@ where
     // Based on Lotus, we should return the data from the receipt.
     if deliver_tx.code.is_err() {
         // There might be some revert data encoded as ABI in the response.
-        let revert_data_hex = decode_fevm_invoke(&deliver_tx)
-            .ok()
-            .map(hex::encode)
-            .unwrap_or_default();
-
-        error_with_data(
-            ExitCode::new(deliver_tx.code.value()),
-            deliver_tx.info,
-            revert_data_hex,
-        )
+        let (msg, data) = match decode_fevm_invoke(&deliver_tx).map(hex::encode) {
+            Ok(h) => (deliver_tx.info, h),
+            Err(e) => (
+                format!("{}\nfailed to decode return data: {:#}", deliver_tx.info, e),
+                "".to_string(),
+            ),
+        };
+        error_with_data(ExitCode::new(deliver_tx.code.value()), msg, data)
     } else {
         let return_data = decode_fevm_invoke(&deliver_tx)
             .context("error decoding data from deliver_tx in query")?;
@@ -684,12 +682,15 @@ where
 
     let estimate = response.value;
 
-    // Based on Lotus, we should return the data from the receipt.
     if !estimate.exit_code.is_success() {
-        error(
-            estimate.exit_code,
-            format!("failed to estimate gas: {}", estimate.info),
-        )
+        // There might be some revert data encoded as ABI in the response.
+        let msg = format!("failed to estimate gas: {}", estimate.info);
+        let (msg, data) = match decode_fevm_return_data(estimate.return_data).map(hex::encode) {
+            Ok(h) => (msg, h),
+            Err(e) => (format!("{msg}\n{e:#}"), "".to_string()),
+        };
+
+        error_with_data(estimate.exit_code, msg, data)
     } else {
         Ok(estimate.gas_limit.into())
     }

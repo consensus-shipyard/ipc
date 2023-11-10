@@ -174,7 +174,7 @@ async fn transaction(
                     .await
             })
         },
-        |data| serde_json::Value::String(hex::encode(data)),
+        |data| serde_json::Value::String(hex::encode(data.bytes())),
     )
     .await
 }

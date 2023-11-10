@@ -61,7 +61,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         params: RawBytes,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<Vec<u8>>> {
+    ) -> anyhow::Result<M::Response<RawBytes>> {
         let mf = self.message_factory_mut();
         let msg = mf.transaction(to, method_num, params, value, gas_params)?;
         let fut = self.perform(msg, decode_bytes);

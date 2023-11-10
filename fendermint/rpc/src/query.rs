@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use fvm_ipld_encoding::serde::Serialize;
 use fvm_shared::message::Message;
 use prost::Message as ProstMessage;
+use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint::v0_37::abci::response;
 use tendermint_rpc::endpoint::abci_query::AbciQuery;
@@ -58,21 +59,7 @@ pub trait QueryClient: Sync {
             .perform(FvmQuery::Call(Box::new(message)), height)
             .await?;
         let height = res.height;
-        let value = extract(res, |res| {
-            let bz: Vec<u8> = fvm_ipld_encoding::from_slice(&res.value)
-                .context("failed to decode IPLD as bytes")?;
-
-            let deliver_tx = tendermint_proto::abci::ResponseDeliverTx::decode(bz.as_ref())
-                .context("failed to deserialize ResponseDeliverTx from proto bytes")?;
-
-            let mut deliver_tx = tendermint::abci::response::DeliverTx::try_from(deliver_tx)
-                .context("failed to create DeliverTx from proto response")?;
-
-            // Mimic the Base64 encoding of the value that Tendermint does.
-            deliver_tx.data = encode_data(&deliver_tx.data);
-
-            Ok(deliver_tx)
-        })?;
+        let value = extract(res, parse_deliver_tx)?;
         Ok(QueryResponse { height, value })
     }
 
@@ -154,4 +141,41 @@ fn extract_actor_state(res: AbciQuery) -> anyhow::Result<Option<(ActorID, ActorS
 
 fn is_not_found(res: &AbciQuery) -> bool {
     res.code.value() == ExitCode::USR_NOT_FOUND.value()
+}
+
+fn parse_deliver_tx(res: AbciQuery) -> anyhow::Result<DeliverTx> {
+    let bz: Vec<u8> =
+        fvm_ipld_encoding::from_slice(&res.value).context("failed to decode IPLD as bytes")?;
+
+    let deliver_tx = tendermint_proto::abci::ResponseDeliverTx::decode(bz.as_ref())
+        .context("failed to deserialize ResponseDeliverTx from proto bytes")?;
+
+    let mut deliver_tx = tendermint::abci::response::DeliverTx::try_from(deliver_tx)
+        .context("failed to create DeliverTx from proto response")?;
+
+    // Mimic the Base64 encoding of the value that Tendermint does.
+    deliver_tx.data = encode_data(&deliver_tx.data);
+
+    Ok(deliver_tx)
+}
+
+#[cfg(test)]
+mod tests {
+    use tendermint_rpc::endpoint::abci_query::AbciQuery;
+
+    use crate::response::decode_fevm_invoke;
+
+    use super::parse_deliver_tx;
+
+    #[test]
+    fn parse_call_query_response() {
+        // Value extracted from a log captured in an issue.
+        let response = "{\"code\":0,\"log\":\"\",\"info\":\"\",\"index\":\"0\",\"key\":null,\"value\":\"mNwIGCESARhAGCIYVxhtGGUYcxhzGGEYZxhlGCAYZhhhGGkYbBhlGGQYIBh3GGkYdBhoGCAYYhhhGGMYaxh0GHIYYRhjGGUYOgoYMBgwGDoYIBh0GDAYMRgxGDkYIBgoGG0YZRh0GGgYbxhkGCAYMxg4GDQYNBg0GDUYMBg4GDMYNxgpGCAYLRgtGCAYYxhvGG4YdBhyGGEYYxh0GCAYchhlGHYYZRhyGHQYZRhkGCAYKBgzGDMYKQoYMBiuGK0YpAEYOhh3CgcYbRhlGHMYcxhhGGcYZRIYNgoEGGYYchhvGG0SGCwYdBg0GDEYMBhmGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhhGGEYYRhvGG4YYxg2GGkYahhpGBgBEhg0CgIYdBhvEhgsGHQYNBgxGDAYZhg3GG8YNhh3GHYYNBhtGGgYaRg2GG0YdRgzGHgYZhhpGGYYdhhmGGcYbxhyGGIYYRhtGDUYbhhwGGcYbBhpGG0YNBhkGHkYdRh2GGkYaRgYAQ==\",\"proofOps\":null,\"height\":\"6148\",\"codespace\":\"\"}";
+        let query = serde_json::from_str::<AbciQuery>(response).expect("failed to parse AbciQuery");
+        let deliver_tx = parse_deliver_tx(query).expect("failed to parse DeliverTx");
+        let return_data = decode_fevm_invoke(&deliver_tx).expect("failed to decode return data");
+        assert!(deliver_tx.code.is_err());
+        assert!(deliver_tx.info == "message failed with backtrace:\n00: t0119 (method 3844450837) -- contract reverted (33)\n");
+        assert!(return_data.is_empty(), "this error had no revert data");
+    }
 }
