@@ -8,7 +8,6 @@ extend = [
   { path = "scripts/testnet.toml" },
   { path = "scripts/testnode.toml" },
   { path = "scripts/subnet.toml" },
-  { path = "scripts/bootstrap.toml" },
 ]
 
 [config]
@@ -19,6 +18,8 @@ default_to_workspace = false
 SUBNET_ID = { value = "/r0", condition = { env_not_set = ["SUBNET_ID"] } }
 # The network name is derived from the SUBNET_ID, replacing slashes with dashes, and dropping the first dash if any.
 NETWORK_NAME = { script = ["echo $SUBNET_ID | sed -e 's|/|-|g' -e 's|^-||1'"] }
+# External P2P address advertised by CometBFT to other peers.
+CMT_EXTERNAL_ADDR = { value = "", condition = { env_not_set = ["CMT_EXTERNAL_ADDR"] }}
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] }}
 BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] }}
@@ -70,6 +71,8 @@ CARGO_MAKE_WAIT_MILLISECONDS = 5000
 CMT_WAIT_MILLIS = 20000
 # Keep example logs to a minimum.
 VERBOSITY = ""
+# supports info, error, debug, etc.
+LOG_LEVEL= "info"
 
 [tasks.info]
 script="""

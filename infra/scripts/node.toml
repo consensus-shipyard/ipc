@@ -2,25 +2,6 @@
 # Node helpers
 ########################################################################################################################
 
-[tasks.node-down]
-dependencies = [
-    "cometbft-stop",
-    "cometbft-rm"
-]
-
-
-[tasks.new-node]
-dependencies = [
-    "node-down",
-    "bootstrap-mkdir",
-    "cometbft-init",
-    "seed-enable",
-    "set-seeds",
-    "cometbft-start",
-    "cometbft-wait",
-    "cometbft-node-id",
-]
-
 [tasks.node-init]
 dependencies = [
     "node-clear",
@@ -33,13 +14,6 @@ echo clearing all IPC data
 rm -rf ${BASE_DIR}
 """
 
-[tasks.bootstrap-mkdir]
-script="""
-echo creating directories: $BASE_DIR $CMT_DIR
-mkdir -p $BASE_DIR
-mkdir -p $CMT_DIR
-"""
-
 [tasks.node-mkdir]
 script="""
 echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR
@@ -47,14 +21,4 @@ mkdir -p $BASE_DIR
 
 mkdir -p $FM_DIR
 mkdir -p $CMT_DIR
-"""
-
-[tasks.seed-enable]
-script="""
-sed -i'' -e "s|seed_mode = false|seed_mode = true|" ${CMT_DIR}/config/config.toml
-"""
-
-[tasks.set-seeds]
-script="""
-sed -i'' -e 's|seeds = ""|seeds = "${BOOTSTRAPS}"|g' ${CMT_DIR}/config/config.toml
 """

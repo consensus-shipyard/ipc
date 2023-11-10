@@ -172,3 +172,33 @@ env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
 [tasks.cometbft-logs]
 extend = "docker-logs"
 env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
+
+[tasks.seed-enable]
+script="""
+sed -i'' -e "s|seed_mode = false|seed_mode = true|" ${CMT_DIR}/config/config.toml
+"""
+
+[tasks.addr-book-enable]
+script="""
+sed -i'' -e "s|addr_book_strict = false|addr_book_strict = true|" ${CMT_DIR}/config/config.toml
+"""
+
+[tasks.set-seeds]
+script = """
+sed -i'' -e 's|^seeds = ""$|seeds = "{{PLACEHOLDER}}"|g' ${CMT_DIR}/config/config.toml
+sed -i'' -e "s/{{PLACEHOLDER}}/$BOOTSTRAPS/g" ${CMT_DIR}/config/config.toml
+"""
+
+[tasks.set-external-addr]
+script = """
+sed -i'' -e 's|^external_address = ""$|external_address = "{{PLACEHOLDER}}"|g' ${CMT_DIR}/config/config.toml
+sed -i'' -e "s/{{PLACEHOLDER}}/$CMT_EXTERNAL_ADDR/g" ${CMT_DIR}/config/config.toml
+"""
+
+[tasks.cometbft-config]
+dependencies = [
+    "cometbft-init",
+    "set-seeds",
+    "addr-book-enable",
+    "set-external-addr",
+]

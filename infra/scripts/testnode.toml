@@ -39,6 +39,17 @@ mkdir -p $FM_DIR
 mkdir -p $CMT_DIR
 """
 
+[tasks.testnode-restart]
+run_task = { name = [
+    "cometbft-stop",
+    "fendermint-stop",
+    "ethapi-stop",
+    "fendermint-start",
+    "cometbft-start",
+    "cometbft-wait",
+    "ethapi-start",
+]}
+
 [tasks.testnode-down]
 # `dependencies` doesn't seem to work with `cleanup_task`.
 run_task = { name = [

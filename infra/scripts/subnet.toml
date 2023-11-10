@@ -1,6 +1,47 @@
 ########################################################################################################################
-# Child subnet peer
+# Subnet peers
 ########################################################################################################################
+
+[tasks.bootstrap]
+env = { "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/bootstrap/cometbft" }
+run_task = "new-bootstrap"
+
+[tasks.new-bootstrap]
+dependencies = [
+    "bootstrap-down",
+    "fendermint-pull",
+    "node-init",
+    "docker-network-create",
+    "cometbft-config",
+    "seed-enable",
+    "fendermint-deps",
+    "subnet-config",
+    "fendermint-start-subnet",
+    "cometbft-start",
+    # "cometbft-wait",
+    "cometbft-node-id",
+    "node-report",
+]
+
+[tasks.bootstrap-node-id]
+run_task = "cometbft-node-id"
+
+[tasks.bootstrap-down]
+dependencies = [
+    "cometbft-stop",
+    "cometbft-rm",
+    "fendermint-stop",
+    "fendermint-rm",
+]
+
+[tasks.bootstrap-restart]
+dependencies = [
+    "cometbft-stop",
+    "fendermint-stop",
+    "fendermint-start-subnet",
+    "cometbft-start",
+    "cometbft-wait",
+]
 
 [tasks.child-validator-down]
 run_task = "testnode-down"
@@ -12,7 +53,7 @@ dependencies = [
     "fendermint-pull",
     "node-init",
     "docker-network-create",
-    "cometbft-init",
+    "cometbft-config",
     "fendermint-deps",
     "validator-config",
     "fendermint-start-validator",
@@ -22,8 +63,22 @@ dependencies = [
     "node-report",
 ]
 
+[tasks.child-validator-restart]
+run_task = { name = [
+    "cometbft-stop",
+    "fendermint-stop",
+    "ethapi-stop",
+    "fendermint-start-validator",
+    "cometbft-start",
+    "cometbft-wait",
+    "ethapi-start",
+]}
+
 [tasks.child-fullnode-down]
 run_task = "testnode-down"
+
+[tasks.child-fullnode-restart]
+run_task = "testnode-restart"
 
 [tasks.child-fullnode]
 workspace = false
@@ -32,10 +87,10 @@ dependencies = [
     "fendermint-pull",
     "node-init",
     "docker-network-create",
-    "cometbft-init",
+    "cometbft-config",
     "fendermint-deps",
     "subnet-config",
-    "fendermint-start",
+    "fendermint-start-subnet",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
@@ -86,6 +141,9 @@ Fendermint API:
 
 CometBFT API:
 \thttp://0.0.0.0:${CMT_RPC_HOST_PORT}
+
+CometBFT node ID:
+\t$(docker exec ${CMT_CONTAINER_NAME} cometbft show-node-id)
 
 CometBFT P2P:
 \thttp://0.0.0.0:${CMT_P2P_HOST_PORT}

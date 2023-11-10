@@ -23,7 +23,7 @@ docker run \
   --env FM_ETH__LISTEN__HOST=0.0.0.0 \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env LOG_LEVEL=info \
+  --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
@@ -61,7 +61,45 @@ docker run \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env LOG_LEVEL=info \
+  --env LOG_LEVEL=${LOG_LEVEL} \
+  --env RUST_BACKTRACE=1 \
+  --entrypoint ${ENTRY} \
+  ${FM_DOCKER_IMAGE} \
+  --network=${FM_NETWORK} \
+  ${CMD}
+"""
+dependencies = ["docker-network-create", "fendermint-deps"]
+
+# Fendermint-subnet recipes are used for bootstrap and full-nodes.
+# They don't configure any validator private key.
+[tasks.fendermint-start-subnet]
+extend = "fendermint-run-subnet"
+env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+
+[tasks.fendermint-run-subnet]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${FM_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${BASE_DIR}:/data \
+  --env FM_DATA_DIR=/data/fendermint/data \
+  --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
+  --env FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY=${TOPDOWN_CHAIN_HEAD_DELAY} \
+  --env FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT=${PARENT_ENDPOINT} \
+  --env FM_IPC__TOPDOWN__PARENT_REGISTRY=${PARENT_REGISTRY} \
+  --env FM_IPC__TOPDOWN__PARENT_GATEWAY=${PARENT_GATEWAY} \
+  --env FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF=5 \
+  --env FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT=5 \
+  --env FM_IPC__TOPDOWN__POLLING_INTERVAL=10 \
+  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
+  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
+  --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
@@ -77,7 +115,7 @@ docker run \
   --init \
   --user $(id -u) \
   --volume ${BASE_DIR}:/data \
-  --env LOG_LEVEL=info \
+  --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
