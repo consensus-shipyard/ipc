@@ -16,7 +16,7 @@ RUN make build
 FROM debian:bookworm-slim
 
 RUN apt update && \
-    apt install -y build-essential libssl-dev && \
+    apt install -y build-essential libssl-dev curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/bin/ipc-cli /usr/local/bin/ipc-cli
