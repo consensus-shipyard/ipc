@@ -55,18 +55,23 @@ async fn rpc_ws_handler_inner(state: AppState, socket: WebSocket) {
     let web_socket_id = state.rpc_state.add_web_socket(notif_tx).await;
 
     loop {
-        tokio::select! {
+        let keep = tokio::select! {
             Some(Ok(message)) = receiver.next() => {
                 handle_incoming(web_socket_id, &state.rpc_server, &mut sender, message).await
             },
             Some(notif) = notif_rx.recv() => {
-                handle_outgoing(&mut sender, notif).await
+                handle_outgoing(web_socket_id, &mut sender, notif).await
             },
             else => break,
+        };
+
+        if !keep {
+            break;
         }
     }
 
     // Clean up.
+    tracing::debug!(web_socket_id, "Removing WS connection");
     state.rpc_state.remove_web_socket(&web_socket_id).await;
 }
 
@@ -76,10 +81,10 @@ async fn handle_incoming(
     rpc_server: &JsonRpcServer,
     sender: &mut SplitSink<WebSocket, Message>,
     message: Message,
-) {
+) -> bool {
     if let Message::Text(mut request_text) = message {
         if !request_text.is_empty() {
-            tracing::debug!("WS Request Received: {:?}", &request_text);
+            tracing::debug!(web_socket_id, request = request_text, "WS Request Received");
 
             // We have to deserialize-add-reserialize becuase `JsonRpcRequest` can
             // only be parsed with `from_str`, not `from_value`.
@@ -87,7 +92,7 @@ async fn handle_incoming(
 
             match serde_json::from_str::<RequestObject>(&request_text) {
                 Ok(req) => {
-                    send_call_result(rpc_server, sender, req).await;
+                    return send_call_result(web_socket_id, rpc_server, sender, req).await;
                 }
                 Err(e) => {
                     deserialization_error("RequestObject", e);
@@ -95,6 +100,7 @@ async fn handle_incoming(
             }
         }
     }
+    true
 }
 
 fn deserialization_error(what: &str, e: serde_json::Error) {
@@ -139,7 +145,13 @@ fn maybe_add_web_socket_id(request_text: String, web_socket_id: WebSocketId) -> 
 }
 
 /// Send a message from the application, result of an async subscription.
-async fn handle_outgoing(sender: &mut SplitSink<WebSocket, Message>, notif: MethodNotification) {
+///
+/// Returns `false` if the socket has been closed, otherwise `true` to keep working.
+async fn handle_outgoing(
+    web_socket_id: WebSocketId,
+    sender: &mut SplitSink<WebSocket, Message>,
+    notif: MethodNotification,
+) -> bool {
     // Based on https://github.com/gakonst/ethers-rs/blob/ethers-v2.0.7/ethers-providers/src/rpc/transports/ws/types.rs#L145
     let message = json! ({
         "jsonrpc": V2,
@@ -155,38 +167,48 @@ async fn handle_outgoing(sender: &mut SplitSink<WebSocket, Message>, notif: Meth
             tracing::error!(error=?e, "failed to serialize notification to JSON");
         }
         Ok(json) => {
-            tracing::debug!(json, "sending notification to WS");
+            tracing::debug!(web_socket_id, json, "sending notification to WS");
             if let Err(e) = sender.send(Message::Text(json)).await {
-                tracing::warn!("failed to send notfication to WS: {e}");
+                tracing::warn!(web_socket_id, error =? e, "failed to send notfication to WS");
+                if is_closed_connection(e) {
+                    return false;
+                }
             }
         }
     }
+    true
 }
 
 /// Call the RPC method and respond through the Web Socket.
 async fn send_call_result(
+    web_socket_id: WebSocketId,
     server: &JsonRpcServer,
     sender: &mut SplitSink<WebSocket, Message>,
     request: RequestObject,
-) {
+) -> bool {
     let method = request.method_ref();
 
     tracing::debug!("RPC WS called method: {}", method);
 
     match server.handle(request).await {
-        ResponseObjects::Empty => {}
-        ResponseObjects::One(response) => {
-            send_response(sender, response).await;
-        }
+        ResponseObjects::Empty => true,
+        ResponseObjects::One(response) => send_response(web_socket_id, sender, response).await,
         ResponseObjects::Many(responses) => {
             for response in responses {
-                send_response(sender, response).await;
+                if !send_response(web_socket_id, sender, response).await {
+                    return false;
+                }
             }
+            true
         }
     }
 }
 
-async fn send_response(sender: &mut SplitSink<WebSocket, Message>, response: ResponseObject) {
+async fn send_response(
+    web_socket_id: WebSocketId,
+    sender: &mut SplitSink<WebSocket, Message>,
+    response: ResponseObject,
+) -> bool {
     let response = serde_json::to_string(&response);
 
     match response {
@@ -194,12 +216,20 @@ async fn send_response(sender: &mut SplitSink<WebSocket, Message>, response: Res
             tracing::error!(error=?e, "failed to serialize response to JSON");
         }
         Ok(json) => {
-            tracing::debug!(json, "sending response to WS");
+            tracing::debug!(web_socket_id, json, "sending response to WS");
             if let Err(e) = sender.send(Message::Text(json)).await {
-                tracing::warn!("failed to send response to WS: {e}");
+                tracing::warn!(web_socket_id, error=?e, "failed to send response to WS");
+                if is_closed_connection(e) {
+                    return false;
+                }
             }
         }
     }
+    true
+}
+
+fn is_closed_connection(e: axum::Error) -> bool {
+    e.to_string().contains("closed connection")
 }
 
 #[cfg(test)]
