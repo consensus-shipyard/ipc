@@ -108,6 +108,12 @@ impl AppState {
 
         tendermint::hash::AppHash::try_from(state_params_hash).expect("hash can be wrapped")
     }
+
+    /// The state is effective at the *next* block, that is, the effects of block N are visible in the header of block N+1,
+    /// so the height of the state itself as a "post-state" is one higher than the block which we executed to create it.
+    pub fn state_height(&self) -> BlockHeight {
+        self.block_height + 1
+    }
 }
 
 pub struct AppConfig<S: KVStore> {
@@ -238,7 +244,7 @@ where
                 state_params: FvmStateParams {
                     timestamp: Timestamp(0),
                     state_root,
-                    network_version: NetworkVersion::MAX,
+                    network_version: NetworkVersion::V0,
                     base_fee: TokenAmount::zero(),
                     circ_supply: TokenAmount::zero(),
                     chain_id: 0,
@@ -269,13 +275,16 @@ where
     fn set_committed_state(&self, mut state: AppState) -> Result<()> {
         self.db
             .with_write(|tx| {
-                // Insert latest state history point.
+                // Insert latest state history point at the `block_height + 1`,
+                // to be consistent with how CometBFT queries are supposed to work.
+                let state_height = state.state_height();
+
                 self.state_hist
-                    .put(tx, &state.block_height, &state.state_params)?;
+                    .put(tx, &state_height, &state.state_params)?;
 
                 // Prune state history.
-                if self.state_hist_size > 0 && state.block_height >= self.state_hist_size {
-                    let prune_height = state.block_height.saturating_sub(self.state_hist_size);
+                if self.state_hist_size > 0 && state_height >= self.state_hist_size {
+                    let prune_height = state_height.saturating_sub(self.state_hist_size);
                     while state.oldest_state_height <= prune_height {
                         self.state_hist.delete(tx, &state.oldest_state_height)?;
                         state.oldest_state_height += 1;
@@ -341,7 +350,7 @@ where
             let state_params = app_state.state_params;
 
             // wait for block production
-            if block_height == 0 {
+            if !Self::can_query_state(block_height, &state_params) {
                 return Ok(None);
             }
 
@@ -384,6 +393,14 @@ where
         }
         let state = self.committed_state()?;
         Ok((state.state_params, state.block_height))
+    }
+
+    /// Check whether the state has been initialized by genesis.
+    ///
+    /// We can't run queries on the initial empty state becase the actors haven't been inserted yet.
+    fn can_query_state(height: BlockHeight, params: &FvmStateParams) -> bool {
+        // It's really the empty state tree that would be the best indicator.
+        !(height == 0 && params.timestamp.0 == 0 && params.network_version == NetworkVersion::V0)
     }
 }
 
@@ -473,9 +490,20 @@ where
             .context("failed to init from genesis")?;
 
         let state_root = state.commit().context("failed to commit genesis state")?;
-        let height = request.initial_height.into();
         let validators =
             to_validator_updates(out.validators).context("failed to convert validators")?;
+
+        // Let's pretend that the genesis state is that of a fictive block at height 0.
+        // The record will be stored under height 1, and the record after the application
+        // of the actual block 1 will be at height 2, so they are distinct records.
+        // That is despite the fact that block 1 will share the timestamp with genesis,
+        // however it seems like it goes through a `prepare_proposal` phase too, which
+        // suggests it could have additional transactions affecting the state hash.
+        // By keeping them separate we can actually run queries at height=1 as well as height=2,
+        // to see the difference between `genesis.json` only and whatever else is in block 1.
+        let height: u64 = request.initial_height.into();
+        // Note that setting the `initial_height` to 0 doesn't seem to have an effect.
+        let height = height - 1;
 
         let app_state = AppState {
             block_height: height,
@@ -498,8 +526,11 @@ where
         };
 
         tracing::info!(
+            height,
             state_root = app_state.state_root().to_string(),
             app_hash = app_state.app_hash().to_string(),
+            timestamp = app_state.state_params.timestamp.0,
+            chain_id = app_state.state_params.chain_id,
             "init chain"
         );
 
@@ -514,7 +545,7 @@ where
         let height = FvmQueryHeight::from(request.height.value());
         let (state_params, block_height) = self.state_params_at_height(height)?;
 
-        tracing::info!(
+        tracing::debug!(
             query_height = request.height.value(),
             block_height,
             state_root = state_params.state_root.to_string(),
@@ -522,7 +553,7 @@ where
         );
 
         // Don't run queries on the empty state, they won't work.
-        if block_height == 0 {
+        if !Self::can_query_state(block_height, &state_params) {
             return Ok(invalid_query(
                 AppError::NotInitialized,
                 "The app hasn't been initialized yet.".to_owned(),
@@ -609,6 +640,11 @@ where
         &self,
         request: request::PrepareProposal,
     ) -> AbciResult<response::PrepareProposal> {
+        tracing::debug!(
+            height = request.height.value(),
+            time = request.time.to_string(),
+            "prepare proposal"
+        );
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let txs = self
@@ -634,6 +670,11 @@ where
         &self,
         request: request::ProcessProposal,
     ) -> AbciResult<response::ProcessProposal> {
+        tracing::debug!(
+            height = request.height.value(),
+            time = request.time.to_string(),
+            "process proposal"
+        );
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let accept = self
@@ -663,7 +704,11 @@ where
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
         };
 
-        tracing::debug!(block_height, "begin block");
+        tracing::debug!(
+            height = block_height,
+            app_hash = request.header.app_hash.to_string(),
+            "begin block"
+        );
 
         let db = self.state_store_clone();
         let state = self.committed_state()?;
@@ -760,6 +805,7 @@ where
         let app_hash = state.app_hash();
 
         tracing::debug!(
+            height = state.block_height,
             state_root = state_root.to_string(),
             app_hash = app_hash.to_string(),
             timestamp = state.state_params.timestamp.0,

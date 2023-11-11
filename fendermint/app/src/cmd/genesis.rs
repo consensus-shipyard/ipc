@@ -196,7 +196,9 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
     let tmg = tendermint::Genesis {
         genesis_time: tendermint::time::Time::from_unix_timestamp(genesis.timestamp.as_secs(), 0)?,
         chain_id: tendermint::chain::Id::try_from(chain_id)?,
-        initial_height: 0,
+        // CometBFT chains typically start from height 1. It doesn't seem to matter if we set this to 0,
+        // the `init_chain` ABCI method will still receive 1.
+        initial_height: 1,
         // Values are based on the default produced by `tendermint init`
         consensus_params: tendermint::consensus::Params {
             block: tendermint::block::Size {

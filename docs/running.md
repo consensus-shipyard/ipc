@@ -251,7 +251,7 @@ $ cat ~/.cometbft/config/genesis.json
 {
   "genesis_time": "2023-03-29T14:50:12Z",
   "chain_id": "test",
-  "initial_height": "0",
+  "initial_height": "1",
   "consensus_params": {
     "block": {
       "max_bytes": "22020096",
