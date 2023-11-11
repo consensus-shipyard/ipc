@@ -1,6 +1,6 @@
 # Deploy smart contracts to a subnet
 
-Before delving into this tutorial, hope you already have a basic understanding of IPC (Inter-Planetary Consensus) and have familiarized yourself with the fundamentals of setting up an IPC subnet. The IPC subnet functions as a fully operational EVM-compatible blockchain network, enabling you to deploy solidity smart contracts and build dApps (decentralized applications) on it.
+Before delving into this tutorial, you should have a [basic understanding of IPC](../) and [subnets](../key-concepts/subnets.md). You may want to familiarize yourself with the fundamentals of setting up an IPC subnet, in the [previous quickstart](deploy-a-subnet.md).&#x20;
 
 In this tutorial, we will guide you through the simple process of connecting to an IPC subnet and deploying smart contracts.  We will use the ERC20 contract as an example to illustrate the steps, including:
 
