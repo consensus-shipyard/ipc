@@ -14,3 +14,4 @@
   * [Testnets](reference/testnets.md)
   * [IPC Architecture](reference/ipc-architecture/README.md)
     * [IPLD Resolver](reference/ipc-architecture/ipld-resolver.md)
+  * [ipc-cli Usage](reference/ipc-cli-usage.md)
