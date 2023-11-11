@@ -13,3 +13,4 @@
   * [Testnets](reference/testnets.md)
   * [ipc-cli Usage](reference/ipc-cli-usage.md)
   * [IPLD Resolver](reference/ipld-resolver.md)
+* [Contact Us](contact-us.md)
