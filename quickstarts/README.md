@@ -1,6 +1,10 @@
-# Quickstart
+---
+description: Start building the basics on IPC.
+---
 
-This section covers quickstarts to get started on core functionalities of IPC. This includes tutorials for:
+# Quickstarts
 
-* Subnet operators/validators to set up a subnet
-* dApp developers to deploy smart contracts to an existing subnet, to run their application
+This section covers quickstarts to get started on core functionalities of IPC. We will cover:
+
+1. [How to deploy a subnet](deploy-a-subnet.md). This is for developers who want to operate their own private subnet.&#x20;
+2. [How to deploy smart contracts to a subnet](deploy-smart-contracts-to-a-subnet.md). This is for developers who want to build dApps on top of an existing subnet.&#x20;

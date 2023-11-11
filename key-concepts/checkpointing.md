@@ -63,4 +63,10 @@ After that, the parent subnet nodes resolve the messages referenced by the check
 
 This is just a high level view of what happens during message resolution.  In the next article, we will delve deeper into the internals of the IPLD Resolver.
 
-### How fees work?
+## Proof of Finality
+
+Subnets rely on a cryptographic Proof of Finality, which proves that a subnet irreversibly reached a certain state. &#x20;
+
+The proof tells a node that a state will not be rolled back and establishes a partial ordering between the states of two subnets. When a subnet checkpoints to a parent, it provides a Proof of Finality to the parent.
+
+Ordering protocols will determine the chronological order of states between two independent subnets. Ordering protocols are chosen at the genesis of a subnet, and may be unique to subnets. To learn more about proof of finality and ordering protocols, see the design reference doc.&#x20;
