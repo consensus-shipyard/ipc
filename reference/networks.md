@@ -12,7 +12,7 @@ The params to connect to IPC mycelium calibration testnet.
 
 * chainID : `3351407814553689`
 * subnet-id : `/r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi`
-* provider\_http : `https://api.calibration.node.glif.io/rpc/v1`
+* provider\_http : `https://api.mycelium.calibration.node.glif.io/`
 * gateway\_addr : `0x77aa40b105843728088c0132e43fc44348881da8`
 * registry\_addr : `0x74539671a1d2f1c8f200826baba665179f53a1b7`
 
