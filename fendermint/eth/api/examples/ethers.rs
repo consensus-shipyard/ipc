@@ -378,6 +378,33 @@ where
         |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
     )?;
 
+    // Get the synthetic zero block.
+    let b = request(
+        "eth_getBlockByNumber @ zero",
+        provider
+            .get_block(BlockId::Number(BlockNumber::Number(U64::from(0))))
+            .await,
+        |b| b.is_some(),
+    )?;
+
+    let bh = b.unwrap().hash.expect("hash should be set");
+
+    // Check that block 0 can be fetched by its hash.
+    request(
+        "eth_getBlockByHash @ zero",
+        provider.get_block(BlockId::Hash(bh)).await,
+        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(U64::from(0)),
+    )?;
+
+    // Check that block 1 points at the synthetic block 0 as parent.
+    request(
+        "eth_getBlockByNumber @ one",
+        provider
+            .get_block(BlockId::Number(BlockNumber::Number(U64::from(1))))
+            .await,
+        |b| b.is_some() && b.as_ref().map(|b| b.parent_hash) == Some(bh),
+    )?;
+
     let base_fee = request("eth_gasPrice", provider.get_gas_price().await, |id| {
         !id.is_zero()
     })?;

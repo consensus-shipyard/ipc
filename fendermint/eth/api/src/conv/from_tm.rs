@@ -11,6 +11,7 @@ use ethers_core::types::{self as et};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_shared::address::Address;
+use fvm_shared::bigint::Zero;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::{bigint::BigInt, econ::TokenAmount};
 use lazy_static::lazy_static;
@@ -45,6 +46,54 @@ lazy_static! {
     static ref FULL_ETH_BLOOM: [u8; 2048/8] = [0xff; 2048/8];
 
     static ref MAX_U256: BigInt = BigInt::from_str(&et::U256::MAX.to_string()).unwrap();
+
+    pub static ref BLOCK_ZERO: tendermint::Block = block_zero();
+    pub static ref BLOCK_ZERO_HASH: [u8; 32] = BLOCK_ZERO.header().hash().as_bytes().try_into().unwrap();
+}
+
+/// A pretend block at height 0 for some tools like The Graph which go there.
+fn block_zero() -> tendermint::Block {
+    let commit = tendermint::block::Commit {
+        height: tendermint::block::Height::try_from(0u64).unwrap(),
+        round: tendermint::block::Round::try_from(0).unwrap(),
+        block_id: tendermint::block::Id {
+            hash: tendermint::Hash::None,
+            part_set_header: tendermint::block::parts::Header::new(0, tendermint::Hash::None)
+                .unwrap(),
+        },
+        signatures: Vec::new(),
+    };
+
+    let empty_cid = fendermint_vm_message::cid(&[0u8; 0]).unwrap();
+
+    let header = tendermint::block::Header {
+        version: tendermint::block::header::Version { block: 0, app: 0 },
+        chain_id: tendermint::chain::Id::try_from("UNSPECIFIED").expect("invalid chainid"),
+        height: tendermint::block::Height::try_from(0u64).unwrap(),
+        time: tendermint::time::Time::unix_epoch(),
+        last_block_id: None,
+        last_commit_hash: None,
+        data_hash: None,
+        validators_hash: tendermint::Hash::None,
+        next_validators_hash: tendermint::Hash::None,
+        consensus_hash: tendermint::Hash::None,
+        app_hash: tendermint::AppHash::try_from(empty_cid.to_bytes()).unwrap(),
+        last_results_hash: None,
+        evidence_hash: None,
+        proposer_address: tendermint::account::Id::new([0u8; 20]),
+    };
+
+    tendermint::Block::new(
+        header,
+        Vec::new(),
+        tendermint::evidence::Data::default(),
+        Some(commit),
+    )
+    .unwrap()
+}
+
+pub fn is_block_zero(block: &tendermint::Block) -> bool {
+    block.header().hash() == tendermint::Hash::Sha256(*BLOCK_ZERO_HASH)
 }
 
 /// Convert a Tendermint block to Ethereum with only the block hashes in the body.
@@ -60,11 +109,16 @@ pub fn to_eth_block(
 
     let hash = et::H256::from_slice(block.header().hash().as_ref());
 
-    let parent_hash = block
-        .header()
-        .last_block_id
-        .map(|id| et::H256::from_slice(id.hash.as_bytes()))
-        .unwrap_or_default();
+    let parent_hash = if block.header.height.value() == 1 {
+        // Just in case the client tool wants to compare hashes.
+        et::H256::from_slice(BLOCK_ZERO_HASH.as_ref())
+    } else {
+        block
+            .header()
+            .last_block_id
+            .map(|id| et::H256::from_slice(id.hash.as_bytes()))
+            .unwrap_or_default()
+    };
 
     let transactions_root = if block.data.is_empty() {
         *EMPTY_ROOT_HASH
@@ -344,9 +398,14 @@ where
 
 fn app_hash_to_root(app_hash: &tendermint::AppHash) -> anyhow::Result<et::H256> {
     // Out app hash is a CID. We only need the hash part.
-    let state_root = cid::Cid::try_from(app_hash.as_bytes())?;
-    let state_root = et::H256::from_slice(state_root.hash().digest());
-    Ok(state_root)
+    // Actually it's not the state root of the actors, but it's still a CID.
+    let state_root = cid::Cid::try_from(app_hash.as_bytes()).context("app hash is not a CID")?;
+    // Just in case we returned `Cid::default()`
+    if state_root.hash().digest().is_empty() {
+        Ok(et::H256::default())
+    } else {
+        Ok(et::H256::from_slice(state_root.hash().digest()))
+    }
 }
 
 fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {
@@ -362,6 +421,23 @@ fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {
             // EthAddress::from_id(cr.actor_id)
             cr.eth_address
         })
+}
+
+/// Artificial block-zero.
+pub fn to_eth_block_zero(block: tendermint::Block) -> anyhow::Result<et::Block<serde_json::Value>> {
+    let block_results = tendermint_rpc::endpoint::block_results::Response {
+        height: block.header.height,
+        txs_results: None,
+        begin_block_events: None,
+        end_block_events: None,
+        validator_updates: Vec::new(),
+        consensus_param_updates: None,
+    };
+    let block = to_eth_block(block, block_results, TokenAmount::zero(), ChainID::from(0))
+        .context("failed to map block zero to eth")?;
+    let block =
+        map_rpc_block_txs(block, serde_json::to_value).context("failed to convert to JSON")?;
+    Ok(block)
 }
 
 /// Turn Events into Ethereum logs.
@@ -512,4 +588,21 @@ pub fn collect_emitters(events: &[abci::Event]) -> HashSet<Address> {
         }
     }
     emitters
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::conv::from_tm::is_block_zero;
+
+    use super::{to_eth_block_zero, BLOCK_ZERO};
+
+    #[test]
+    fn block_zero_can_be_created() {
+        assert!(is_block_zero(&BLOCK_ZERO))
+    }
+
+    #[test]
+    fn block_zero_can_be_turned_into_eth() {
+        let _ = to_eth_block_zero(BLOCK_ZERO.clone()).unwrap();
+    }
 }

@@ -29,6 +29,7 @@ use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::RwLock;
 
 use crate::cache::AddressCache;
+use crate::conv::from_tm;
 use crate::filters::{
     run_subscription, BlockHash, FilterCommand, FilterDriver, FilterId, FilterKind, FilterMap,
     FilterRecords,
@@ -121,6 +122,9 @@ where
         block_number: et::BlockNumber,
     ) -> JsonRpcResult<tendermint::Block> {
         let block = match block_number {
+            et::BlockNumber::Number(height) if height == et::U64::from(0) => {
+                from_tm::BLOCK_ZERO.clone()
+            }
             et::BlockNumber::Number(height) => {
                 let height =
                     Height::try_from(height.as_u64()).context("failed to convert to height")?;
@@ -153,6 +157,9 @@ where
         block_number: et::BlockNumber,
     ) -> JsonRpcResult<tendermint::block::Header> {
         let header = match block_number {
+            et::BlockNumber::Number(height) if height == et::U64::from(0) => {
+                from_tm::BLOCK_ZERO.header.clone()
+            }
             et::BlockNumber::Number(height) => {
                 let height =
                     Height::try_from(height.as_u64()).context("failed to convert to height")?;
@@ -212,6 +219,9 @@ where
         &self,
         block_hash: et::H256,
     ) -> JsonRpcResult<Option<tendermint::block::Block>> {
+        if block_hash.0 == *from_tm::BLOCK_ZERO_HASH {
+            return Ok(Some(from_tm::BLOCK_ZERO.clone()));
+        }
         let hash = tendermint::Hash::Sha256(*block_hash.as_fixed_bytes());
         let res: block_by_hash::Response = self.tm().block_by_hash(hash).await?;
         Ok(res.block)
@@ -222,6 +232,9 @@ where
         &self,
         block_hash: et::H256,
     ) -> JsonRpcResult<Option<tendermint::block::Header>> {
+        if block_hash.0 == *from_tm::BLOCK_ZERO_HASH {
+            return Ok(Some(from_tm::BLOCK_ZERO.header.clone()));
+        }
         let hash = tendermint::Hash::Sha256(*block_hash.as_fixed_bytes());
         let res: header_by_hash::Response = self.tm().header_by_hash(hash).await?;
         Ok(res.header)
