@@ -3,7 +3,7 @@
 * [Overview](README.md)
 * [Quickstarts](quickstarts/README.md)
   * [Deploy a subnet](quickstarts/deploy-a-subnet.md)
-  * [Deploy smart contracts to a subnet](quickstarts/deploy-smart-contracts-to-a-subnet.md)
+  * [Deploy smart contracts to Mycelium](quickstarts/deploy-smart-contracts-to-mycelium.md)
 * [Key Concepts](key-concepts/README.md)
   * [Architecture](key-concepts/architecture.md)
   * [Subnets](key-concepts/subnets.md)
