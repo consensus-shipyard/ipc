@@ -4,7 +4,7 @@ Before delving into this tutorial, you should have a [basic understanding of IPC
 
 Please note that you do not need to deploy your own subnet, in order to build on one. For deploying smart contracts to an existing subnet, check out [the next quickstart](deploy-smart-contracts-to-a-subnet.md).
 
-In this tutorial, we will guide you through the process of spinning up your own IPC subnet validator node and anchoring it to the [Filecoin Calibration testnet](../reference/testnets.md). We will use a repository with a pre-built docker image to simplify deployment of the IPC tooling. Steps include:
+In this tutorial, we will guide you through the process of spinning up your own IPC subnet validator node and anchoring it to the [Filecoin Calibration testnet](../reference/networks.md). We will use a repository with a pre-built docker image to simplify deployment of the IPC tooling. Steps include:
 
 * Initialize and setup our config
 * Fund our wallets needed to run our subnet

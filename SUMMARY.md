@@ -10,7 +10,7 @@
   * [Checkpointing](key-concepts/checkpointing.md)
   * [Fees](key-concepts/fees.md)
 * [Reference](reference/README.md)
-  * [Testnets](reference/testnets.md)
+  * [Networks](reference/networks.md)
   * [ipc-cli Usage](reference/ipc-cli-usage.md)
   * [IPLD Resolver](reference/ipld-resolver.md)
 * [Contact Us](contact-us.md)
