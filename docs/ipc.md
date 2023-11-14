@@ -17,7 +17,15 @@ On Linux (links and instructions for Ubuntu):
 ## Deploy subnet bootstrap
 In order not to expose directly the network address information from validators, subnets leverage the use of bootstrap nodes (or `seeds` in CometBFT parlance), for new nodes to discover peers in the network and connect to the subnet's validators. To run a bootstrap node you can run the following command from the root of the repo:
 ```bash
-cargo make --makefile infra/Makefile.toml bootstrap
+cargo make --makefile infra/Makefile.toml \
+    -e SUBNET_ID=<SUBNET_ID> \
+    -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT> \
+    -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
+    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
+    -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
+    -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
+    -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
+    bootstrap
 ```
 You'll see that by the end of the output, this command should output the network address of your bootstrap. You can use this endpoint to include this bootstrap node as a seed in the `seeds` configuration of CometBFT.
 ```console
@@ -30,12 +38,7 @@ You'll see that by the end of the output, this command should output the network
 If at any time you need to query the endpoint of your bootstrap, you can run:
 ```bash
 cargo make --makefile infra/Makefile.toml \
-    -e SUBNET_ID=<SUBNET_ID> \
-    -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
-    -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
-    -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
-    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \
-    bootstrap-node-id
+    bootstrap-id
 ```
 
 `cargo-make bootstrap` supports the following environment variables to customize the deployment:
