@@ -3,7 +3,7 @@
 //! Wallet import cli handler
 
 use async_trait::async_trait;
-use clap::Args;
+use clap::{ArgGroup, Args};
 use ipc_identity::WalletType;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -57,14 +57,25 @@ impl CommandLineHandler for WalletImport {
 
 #[derive(Debug, Args)]
 #[command(about = "Import a key into the agent's wallet")]
+#[clap(group(ArgGroup::new("key_source")
+.required(true)
+.multiple(false)
+.args(&["path", "private_key"]),
+))]
 pub(crate) struct WalletImportArgs {
     #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
-    #[arg(long, short, help = "Path of key info file for the key to import")]
+    #[arg(
+        long,
+        short,
+        group = "key_source",
+        help = "Path of key info file for the key to import"
+    )]
     pub path: Option<String>,
     #[arg(
         long,
         short,
+        group = "key_source",
         help = "The evm private key to import if path is not specified"
     )]
     pub private_key: Option<String>,

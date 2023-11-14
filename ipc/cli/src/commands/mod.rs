@@ -54,7 +54,7 @@ enum Commands {
     about = "The IPC agent command line tool",
     version = "v0.0.1"
 )]
-#[command(propagate_version = true)]
+#[command(propagate_version = true, arg_required_else_help = true)]
 struct IPCAgentCliCommands {
     // If provided, outputs the completion file for given shell
     #[arg(long = "cli-autocomplete-gen", value_enum)]
