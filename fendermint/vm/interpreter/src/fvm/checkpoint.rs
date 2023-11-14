@@ -284,10 +284,13 @@ where
         .add_checkpoint_signature_calldata(checkpoint, &power_table.0, validator, secret_key)
         .context("failed to produce checkpoint signature calldata")?;
 
-    broadcaster
+    let tx_hash = broadcaster
         .fevm_invoke(Address::from(gateway.addr()), calldata, chain_id)
         .await
         .context("failed to broadcast signature")?;
+
+    // The transaction should be in the mempool now.
+    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
 
     Ok(())
 }

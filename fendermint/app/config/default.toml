@@ -42,6 +42,8 @@ state_hist_size = 0
 max_retries = 5
 # Tome to wait between retries, in seconds. It should roughly correspond to the block interval.
 retry_delay = 2
+# Any over-estimation to apply on top of the estimate returned by the API.
+gas_overestimation_rate = 2
 
 # FVM configuration
 [fvm]

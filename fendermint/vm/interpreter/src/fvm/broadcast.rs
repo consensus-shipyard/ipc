@@ -5,6 +5,8 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
 use ethers::types as et;
+use fendermint_rpc::response::decode_fevm_return_data;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::error::ExitCode;
 use fvm_shared::{address::Address, chainid::ChainID, econ::TokenAmount, BLOCK_GAS_LIMIT};
 use num_traits::Zero;
@@ -13,7 +15,7 @@ use tendermint_rpc::Client;
 use fendermint_crypto::SecretKey;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::query::QueryClient;
-use fendermint_rpc::tx::{CallClient, TxClient, TxCommit};
+use fendermint_rpc::tx::{CallClient, TxClient, TxSync};
 use fendermint_rpc::{client::FendermintClient, message::MessageFactory};
 use fendermint_vm_message::query::FvmQueryHeight;
 
@@ -54,6 +56,7 @@ pub struct Broadcaster<C> {
     addr: Address,
     gas_fee_cap: TokenAmount,
     gas_premium: TokenAmount,
+    gas_overestimation_rate: f64,
     max_retries: u8,
     retry_delay: Duration,
 }
@@ -68,6 +71,7 @@ where
         secret_key: SecretKey,
         gas_fee_cap: TokenAmount,
         gas_premium: TokenAmount,
+        gas_overestimation_rate: f64,
     ) -> Self {
         let client = FendermintClient::new(client);
         Self {
@@ -76,6 +80,7 @@ where
             addr,
             gas_fee_cap,
             gas_premium,
+            gas_overestimation_rate,
             max_retries: 0,
             // Set the retry delay to rougly the block creation time.
             retry_delay: Duration::from_secs(1),
@@ -96,12 +101,19 @@ where
         self.retry_delay
     }
 
+    /// Send a transaction to the chain and return is hash.
+    ///
+    /// It currently doesn't wait for the execution, only that it has successfully been added to the mempool,
+    /// or if not then an error is returned. The reason for not waiting for the commit is that the Tendermint
+    /// client seems to time out if the check fails, waiting for the inclusion which will never come, instead of
+    /// returning the result with no `deliver_tx` and a failed `check_tx`. We can add our own mechanism to wait
+    /// for commits if we have to.
     pub async fn fevm_invoke(
         &self,
         contract: Address,
         calldata: et::Bytes,
         chain_id: ChainID,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<tendermint::hash::Hash> {
         let tx_hash = retry!(self.max_retries, self.retry_delay, {
             let sequence = self
                 .sequence()
@@ -140,7 +152,8 @@ where
                 .context("failed to estimate gas")?;
 
             if gas_estimate.value.exit_code.is_success() {
-                gas_params.gas_limit = gas_estimate.value.gas_limit;
+                gas_params.gas_limit =
+                    (gas_estimate.value.gas_limit as f64 * self.gas_overestimation_rate) as u64;
             } else {
                 bail!(
                     "failed to estimate gas: {} - {}",
@@ -149,7 +162,9 @@ where
                 );
             }
 
-            let res = TxClient::<TxCommit>::fevm_invoke(
+            // Using TxSync instead of TxCommit because TxCommit times out if the `check_tx` part fails,
+            // instead of returning as soon as the check failed with some default values for `deliver_tx`.
+            let res = TxClient::<TxSync>::fevm_invoke(
                 &mut client,
                 contract,
                 calldata.0.clone(),
@@ -159,22 +174,21 @@ where
             .await
             .context("failed to invoke contract")?;
 
-            if res.response.check_tx.code.is_err() {
+            if res.response.code.is_err() {
+                // Not sure what exactly arrives in the data and how it's encoded.
+                // It might need the Base64 decoding or it may not. Let's assume
+                // that it doesn't because unlike `DeliverTx::data`, this response
+                // does have some Base64 lreated annotations.
+                let data = decode_fevm_return_data(RawBytes::new(res.response.data.to_vec()))
+                    .map(hex::encode)
+                    .unwrap_or_else(|_| hex::encode(res.response.data));
+
                 Err((
-                    res.response.check_tx.code,
+                    res.response.code,
                     format!(
-                        "broadcasted transaction failed during check: {} - {}",
-                        res.response.check_tx.code.value(),
-                        res.response.check_tx.info
-                    ),
-                ))
-            } else if res.response.deliver_tx.code.is_err() {
-                Err((
-                    res.response.deliver_tx.code,
-                    format!(
-                        "broadcasted transaction failed during deliver: {} - {}",
-                        res.response.deliver_tx.code.value(),
-                        res.response.deliver_tx.info
+                        "broadcasted transaction failed during check: {}; data = {}",
+                        res.response.code.value(),
+                        data
                     ),
                 ))
             } else {
@@ -182,9 +196,7 @@ where
             }
         });
 
-        tracing::debug!(?tx_hash, "fevm transaction committed");
-
-        Ok(())
+        Ok(tx_hash)
     }
 
     /// Fetch the current nonce to be used in the next message.

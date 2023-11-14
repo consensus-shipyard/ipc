@@ -97,6 +97,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             sk.clone(),
             settings.fvm.gas_fee_cap.clone(),
             settings.fvm.gas_premium.clone(),
+            settings.fvm.gas_overestimation_rate,
         )
         .with_max_retries(settings.broadcast.max_retries)
         .with_retry_delay(settings.broadcast.retry_delay);

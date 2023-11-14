@@ -100,6 +100,8 @@ pub struct BroadcastSettings {
     /// Time to wait between retries. This should roughly correspond to the block interval.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub retry_delay: Duration,
+    /// Any over-estimation to apply on top of the estimate returned by the API.
+    pub gas_overestimation_rate: f64,
 }
 
 #[serde_as]
