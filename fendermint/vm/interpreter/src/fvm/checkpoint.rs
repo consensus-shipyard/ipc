@@ -12,6 +12,7 @@ use fendermint_vm_genesis::Collateral;
 use fendermint_vm_genesis::PowerScale;
 use fendermint_vm_message::conv::from_eth;
 use ipc_actors_abis::gateway_getter_facet::Membership;
+use ipc_sdk::staking::ConfigurationNumber;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::commit;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
@@ -45,13 +46,11 @@ pub struct PowerUpdates(pub Vec<Validator<Power>>);
 ///
 /// If we are the boundary, return the validators eligible to sign and any updates
 /// to the power table, along with the checkpoint that needs to be signed by validators.
-pub async fn maybe_create_checkpoint<C, DB>(
-    client: &C,
+pub fn maybe_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
 ) -> anyhow::Result<Option<(router::BottomUpCheckpoint, PowerUpdates)>>
 where
-    C: Client + Sync + Send + 'static,
     DB: Blockstore + Sync + Send + 'static,
 {
     // Epoch transitions for checkpointing.
@@ -67,11 +66,9 @@ where
     match should_create_checkpoint(gateway, state, height)? {
         None => Ok(None),
         Some(subnet_id) => {
-            // Get the current power table from CometBFT.
-            // NB: Here we could also get it from the IPC Gateway.
-            let power_table = bft_power_table(client, height)
-                .await
-                .context("failed to get the power table")?;
+            // Get the current power table from the ledger, not CometBFT.
+            let (_, curr_power_table) =
+                ipc_power_table(gateway, state).context("failed to get the current power table")?;
 
             // Apply any validator set transitions.
             let next_configuration_number = gateway
@@ -114,26 +111,19 @@ where
             // Save the checkpoint in the ledger.
             // Pass in the current power table, because these are the validators who can sign this checkpoint.
             gateway
-                .create_bottom_up_checkpoint(state, checkpoint.clone(), &power_table.0)
+                .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
                 .context("failed to store checkpoint")?;
 
             // Figure out the power updates if there was some change in the configuration.
             let power_updates = if next_configuration_number == 0 {
                 PowerUpdates(Vec::new())
             } else {
-                let next_membership = gateway
-                    .current_validator_set(state)
-                    .context("failed to get current validator set")?;
+                let (next_power_configuration_number, next_power_table) =
+                    ipc_power_table(gateway, state).context("failed to get next power table")?;
 
-                debug_assert_eq!(
-                    next_membership.configuration_number,
-                    next_configuration_number
-                );
+                debug_assert_eq!(next_power_configuration_number, next_configuration_number);
 
-                let next_power_table =
-                    membership_to_power_table(&next_membership, state.power_scale());
-
-                power_diff(power_table, next_power_table)
+                power_diff(curr_power_table, next_power_table)
             };
 
             Ok(Some((checkpoint, power_updates)))
@@ -225,6 +215,7 @@ where
 
     for cp in incomplete_checkpoints {
         let height = Height::try_from(cp.block_height)?;
+        // Getting the power table from CometBFT where the history is available.
         let power_table = bft_power_table(client, height)
             .await
             .context("failed to get power table")?;
@@ -319,6 +310,10 @@ where
 }
 
 /// Get the power table from CometBFT.
+///
+/// This is prone to failing, e.g. one theory is that CometBFT is trying to restart
+/// the application, and while doing that it does not open up its HTTP services,
+/// leading to a chicken-and-egg problem of failing to start.
 async fn bft_power_table<C>(client: &C, height: Height) -> anyhow::Result<PowerTable>
 where
     C: Client + Sync + Send + 'static,
@@ -334,6 +329,23 @@ where
     }
 
     Ok(PowerTable(power_table))
+}
+
+/// Get the current power table from the Gateway actor.
+fn ipc_power_table<DB>(
+    gateway: &GatewayCaller<DB>,
+    state: &mut FvmExecState<DB>,
+) -> anyhow::Result<(ConfigurationNumber, PowerTable)>
+where
+    DB: Blockstore + Sync + Send + 'static,
+{
+    let membership = gateway
+        .current_validator_set(state)
+        .context("failed to get current validator set")?;
+
+    let power_table = membership_to_power_table(&membership, state.power_scale());
+
+    Ok((membership.configuration_number, power_table))
 }
 
 /// Convert the collaterals and metadata in the membership to the public key and power expected by the system.
