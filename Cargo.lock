@@ -4642,7 +4642,7 @@ dependencies = [
 [[package]]
 name = "ipc-identity"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#99b4528319bbd357079ecfd787afd5ee5809d3ba"
+source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#e8020a3eb54677ae0d5b27587a21fb3b0a71815b"
 dependencies = [
  "ahash 0.8.6",
  "anyhow",
@@ -4669,7 +4669,7 @@ dependencies = [
 [[package]]
 name = "ipc-provider"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#99b4528319bbd357079ecfd787afd5ee5809d3ba"
+source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#e8020a3eb54677ae0d5b27587a21fb3b0a71815b"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -4709,7 +4709,7 @@ dependencies = [
 [[package]]
 name = "ipc-sdk"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#99b4528319bbd357079ecfd787afd5ee5809d3ba"
+source = "git+https://github.com/consensus-shipyard/ipc.git?branch=dev#e8020a3eb54677ae0d5b27587a21fb3b0a71815b"
 dependencies = [
  "anyhow",
  "cid",
