@@ -149,7 +149,17 @@ Before running our validators, at least one bootstrap needs to be deployed and a
 
 * We can deploy a new bootstrap node in the subnet by running: 
 ```bash
-cargo make --makefile bin/ipc-infra/Makefile.toml -e CMT_P2P_HOST_PORT=26650 bootstrap
+cargo make --makefile infra/Makefile.toml \
+    -e PRIVATE_KEY_PATH=<VALIDATOR_PRIV_KEY> \
+    -e SUBNET_ID=<SUBNET_ID> \
+    -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT> \
+    -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
+    -e ETHAPI_HOST_PORT=<ETH_RPC_PORT> \
+    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
+    -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
+    -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
+    -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
+    bootstrap
 ```
 
 At the end of the output, this command should return the ID of your new bootstrap node:
@@ -160,7 +170,7 @@ At the end of the output, this command should return the ID of your new bootstra
 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
 [cargo-make] INFO - Build Done in 13.38 seconds.
 ```
-Remember the address of your bootstrap for the next step. This address has the following format `id@ip:port`, and by default shows the public IP of your network interface. Feel free to adjust the `ip` to use a reachable IP for your deployment so other nodes can contact it (in our case our localhost IP, `127.0.0.1`).
+Remember the address of your bootstrap for the next step. This address has the following format `id@ip:port`. Feel free to adjust the `ip` to use a reachable IP for your deployment so other nodes can contact it (in our case our localhost IP, `127.0.0.1`) and to use as `CMT_EXTERNAL_ADDR` a reachable IP by other peers, and the port configured in `CMT_EXTERNAL_ADDR`.
 
 * We can get the address of the deployed bootstrap node by running:
 ```bash

@@ -72,17 +72,27 @@ If it is the first time that you use your `ipc-cli`, to initialize cli configura
 The suggested configuration for the `ipc-cli` is:
 
 ```
-# Default configuration for Filecoin Calibration
 keystore_path = "~/.ipc"
 
+# Filecoin Calibration
 [[subnets]]
 id = "/r314159"
 
 [subnets.config]
-gateway_addr = "0x0341fA160C66aBB112195192aE359a6D61df45cd"
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+gateway_addr = "0x0341fA160C66aBB112195192aE359a6D61df45cd"
 registry_addr = "0xc7068Cea947035560128a6a6F4c8913523A5A44C"
+
+# Mycelium Calibration
+[[subnets]]
+id = "/r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "https://api.mycelium.calibration.node.glif.io/"
+gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
 To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the `ipc-cli` to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).

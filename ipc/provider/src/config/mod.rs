@@ -31,6 +31,7 @@ pub const JSON_RPC_VERSION: &str = "2.0";
 pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
 keystore_path = "~/.ipc"
 
+# Filecoin Calibration
 [[subnets]]
 id = "/r314159"
 
@@ -40,13 +41,23 @@ provider_http = "https://api.calibration.node.glif.io/rpc/v1"
 gateway_addr = "0x0341fA160C66aBB112195192aE359a6D61df45cd"
 registry_addr = "0xc7068Cea947035560128a6a6F4c8913523A5A44C"
 
+# Mycelium Calibration
+[[subnets]]
+id = "/r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "https://api.mycelium.calibration.node.glif.io/"
+gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
+
 # Subnet template - uncomment and adjust before using
 # [[subnets]]
 # id = "/r314159/<SUBNET_ID>"
 
 # [subnets.config]
 # network_type = "fevm"
-# provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+# provider_http = "https://<RPC_ADDR>/"
 # gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
 # registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 "#;
