@@ -1,11 +1,13 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ethers::types::H256;
+use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
     lib_staking_change_log, subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
@@ -179,7 +181,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
 
         let mut changes = vec![];
         let mut hash = None;
-        for (event, meta) in ev.query_with_meta().await? {
+        for (event, meta) in query_with_meta(ev, contract.client()).await? {
             if let Some(h) = hash {
                 if h != meta.block_hash {
                     return Err(anyhow!("block hash not equal"));
@@ -1098,7 +1100,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .to_block(height as u64);
 
         let mut events = vec![];
-        for (event, _meta) in ev.query_with_meta().await? {
+        for (event, _meta) in query_with_meta(ev, contract.client()).await? {
             events.push(QuorumReachedEvent {
                 height: event.height as ChainEpoch,
                 checkpoint: event.checkpoint.to_vec(),
@@ -1267,6 +1269,37 @@ fn is_valid_bootstrap_addr(input: &str) -> Option<(String, IpAddr, u16)> {
     }
 
     None
+}
+
+/// This is a replacement for `Event::query_with_meta` in `ethers-contract`
+/// because in that one we don't get access to the `reverted` field, which
+/// we need to filteron in the currently deployed `1.25-rc4` version of Lotus.
+async fn query_with_meta<B, M, D>(
+    event: ethers::contract::Event<B, M, D>,
+    client: B,
+) -> Result<Vec<(D, LogMeta)>, ContractError<M>>
+where
+    B: Borrow<M>,
+    M: Middleware,
+    D: EthLogDecode,
+{
+    let logs = client
+        .borrow()
+        .get_logs(&event.filter)
+        .await
+        .map_err(ContractError::from_middleware_error)?;
+
+    let events = logs
+        .into_iter()
+        .filter(|l| !l.removed.unwrap_or_default())
+        .map(|log| {
+            let meta = LogMeta::from(&log);
+            let event = ethers::contract::parse_log::<D>(log)?;
+            Ok((event, meta))
+        })
+        .collect::<Result<_, ContractError<M>>>()?;
+
+    Ok(events)
 }
 
 fn into_genesis_balance_map(
