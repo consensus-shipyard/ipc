@@ -26,6 +26,8 @@ docker run \
   --volume ${CMT_DIR}:/cometbft \
   --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
   --env CMT_PEX=false \
+  --env CMT_MAX_SUBSCRIPTION_CLIENTS=10 \
+  --env CMT_MAX_SUBSCRIPTIONS_PER_CLIENT=1000 \
   ${CMT_DOCKER_IMAGE} \
   ${CMD}
 """
@@ -35,7 +37,7 @@ dependencies = ["cometbft-pull", "docker-network-create"]
 script_runner = "@rust"
 description = "This script resolve the external IP and sets NODE_EXTERNAL_IP variable using rust-env plugin"
 plugin = "rust-env"
-script="""
+script = """
 //! ```cargo
 //! [dependencies]
 //! reqwest = { version = "0.11", features = ["blocking"] }
@@ -174,12 +176,12 @@ extend = "docker-logs"
 env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
 
 [tasks.seed-enable]
-script="""
+script = """
 sed -i'' -e "s|seed_mode = false|seed_mode = true|" ${CMT_DIR}/config/config.toml
 """
 
 [tasks.addr-book-enable]
-script="""
+script = """
 sed -i'' -e "s|addr_book_strict = false|addr_book_strict = true|" ${CMT_DIR}/config/config.toml
 """
 

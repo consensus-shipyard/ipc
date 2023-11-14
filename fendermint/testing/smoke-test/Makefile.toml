@@ -133,6 +133,8 @@ docker run \
   --volume ${TEST_DATA_DIR}/cometbft:/cometbft \
   --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
   --env CMT_PEX=false \
+  --env CMT_MAX_SUBSCRIPTION_CLIENTS=10 \
+  --env CMT_MAX_SUBSCRIPTIONS_PER_CLIENT=1000 \
   ${CMT_DOCKER_IMAGE} \
   ${CMD}
 """
