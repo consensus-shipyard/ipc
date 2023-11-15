@@ -174,7 +174,7 @@ Remember the address of your bootstrap for the next step. This address has the f
 
 * We can get the address of the deployed bootstrap node by running:
 ```bash
-cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-id
+cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-node-id
 ```
 
 * To shut down the bootstrap node run:
