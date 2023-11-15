@@ -137,5 +137,9 @@ pub(crate) fn handle_null_round<T, F: FnOnce() -> T>(
 }
 
 pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
-    err.to_string().contains(NULL_ROUND_ERR_MSG)
+    is_null_round_str(&err.to_string())
+}
+
+pub(crate) fn is_null_round_str(s: &str) -> bool {
+    s.contains(NULL_ROUND_ERR_MSG)
 }
