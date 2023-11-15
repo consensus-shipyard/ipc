@@ -2,7 +2,7 @@
 
 Before delving into this tutorial, you should have a [basic understanding of IPC](../).&#x20;
 
-Please note that you do not need to deploy your own subnet, in order to build on one. For deploying smart contracts to an existing subnet, check out [the next quickstart](deploy-smart-contracts-to-mycelium.md).
+Please note that you do not need to deploy your own subnet, in order to build on one. For deploying smart contracts to an existing subnet, check out [the next quickstart](deploy-smart-contract-to-mycelium.md).
 
 In this tutorial, we will guide you through the process of spinning up your own IPC subnet validator node and anchoring it to the [Filecoin Calibration testnet](../reference/networks.md). We will use a repository with a pre-built docker image to simplify deployment of the IPC tooling. Steps include:
 

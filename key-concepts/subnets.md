@@ -25,5 +25,5 @@ To ensure security of a subnet, child subnets within a single hierarchy treee, p
 ## Subnet usage
 
 * **Deploying and operating a subnet.** This is for developers who want to operate their own private or public subnet, as they can be temporarily deployed and closed down, to increase network throughput as needed. See the quickstart tutorial [here](../quickstarts/deploy-a-subnet.md).
-* **Deploying smart contracts to an existing subnet.** This is for developers who want to build dApps on top of an existings subnets. See the quickstart tutorial [here](../quickstarts/deploy-smart-contracts-to-mycelium.md).
+* **Deploying smart contracts to an existing subnet.** This is for developers who want to build dApps on top of an existings subnets. See the quickstart tutorial [here](../quickstarts/deploy-smart-contract-to-mycelium.md).
 * For more on how fees work with IPC subnets, see [here](fees.md).
