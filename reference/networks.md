@@ -10,11 +10,11 @@ IPC Mycelium Calibration is a publicly available IPC subnet deployed on Filecoin
 
 The params to connect to IPC mycelium calibration testnet.
 
-* chainID : `3351407814553689`
-* subnet-id : `/r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi`
+* subnet-id : `/r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq`
 * provider\_http : `https://api.mycelium.calibration.node.glif.io/`
 * gateway\_addr : `0x77aa40b105843728088c0132e43fc44348881da8`
 * registry\_addr : `0x74539671a1d2f1c8f200826baba665179f53a1b7`
+* chainID : `1914449495539888`
 
 ### Filecoin Calibration Network
 
