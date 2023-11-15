@@ -76,6 +76,7 @@ impl Display for IPCParentFinality {
         )
     }
 }
+
 #[async_trait]
 pub trait ParentViewProvider {
     /// Obtain the genesis epoch of the current subnet in the parent

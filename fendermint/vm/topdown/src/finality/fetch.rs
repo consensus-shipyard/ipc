@@ -40,7 +40,10 @@ macro_rules! retry {
                 }
 
                 tracing::warn!(
-                    "cannot query ipc parent_client due to: {e}, retires: {retries}, wait: {wait:?}"
+                    error = e.to_string(),
+                    retries,
+                    wait = ?wait,
+                    "cannot query ipc parent_client"
                 );
 
                 if retries > 0 {
@@ -73,8 +76,9 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         for h in from..=to {
             let mut r = self.validator_changes(h).await?;
             tracing::debug!(
-                "obtained validator change set (len {}) at height {h}",
-                r.len()
+                number_of_messages = r.len(),
+                height = h,
+                "obtained validator change set",
             );
             v.append(&mut r);
         }
@@ -137,7 +141,11 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         let mut v = vec![];
         for h in from..=to {
             let mut r = self.top_down_msgs(h, block_hash).await?;
-            tracing::debug!("obtained topdown messages (len {}) at height {h}", r.len());
+            tracing::debug!(
+                number_of_top_down_messages = r.len(),
+                height = h,
+                "obtained topdown messages",
+            );
             v.append(&mut r);
         }
         Ok(v)

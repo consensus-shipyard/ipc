@@ -19,6 +19,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
+  --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
   --env FM_ETH__LISTEN__HOST=0.0.0.0 \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
@@ -46,6 +47,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
+  --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
   --env FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY=${TOPDOWN_CHAIN_HEAD_DELAY} \
@@ -86,6 +88,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
+  --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
   --env FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY=${TOPDOWN_CHAIN_HEAD_DELAY} \

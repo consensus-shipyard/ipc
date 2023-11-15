@@ -1940,16 +1940,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "deranged"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f32d04922c60427da6f9fef14d042d9edddef64cb9d4ce0d64d0685fbeb1fd3"
-dependencies = [
- "powerfmt",
- "serde",
-]
-
-[[package]]
 name = "derive_arbitrary"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2848,6 +2838,7 @@ dependencies = [
  "libipld",
  "libp2p",
  "libp2p-bitswap",
+ "literally",
  "multiaddr 0.16.0",
  "num-traits",
  "openssl",
@@ -2865,6 +2856,7 @@ dependencies = [
  "tendermint-rpc",
  "tokio",
  "tower-abci",
+ "trace4rs",
  "tracing",
  "tracing-subscriber",
 ]
@@ -5669,6 +5661,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "969488b55f8ac402214f3f5fd243ebb7206cf82de60d3172994707a4bcc2b829"
 
 [[package]]
+name = "literally"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0d2be3f5a0d4d5c983d1f8ecc2a87676a0875a14feb9eebf0675f7c3e2f3c35"
+
+[[package]]
 name = "lock_api"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6258,6 +6256,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_threads"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "object"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6547,6 +6554,24 @@ name = "paste"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
+
+[[package]]
+name = "path-absolutize"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4af381fe79fa195b4909485d99f73a80792331df0625188e707854f0b3383f5"
+dependencies = [
+ "path-dedot",
+]
+
+[[package]]
+name = "path-dedot"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07ba0ad7e047712414213ff67533e6dd477af0a4e1d14fb52343e53d30ea9397"
+dependencies = [
+ "once_cell",
+]
 
 [[package]]
 name = "path-slash"
@@ -6891,12 +6916,6 @@ dependencies = [
  "libc",
  "winapi",
 ]
-
-[[package]]
-name = "powerfmt"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "ppv-lite86"
@@ -8361,6 +8380,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "942b4a808e05215192e39f4ab80813e599068285906cc91aa64f923db842bd5a"
 
 [[package]]
+name = "smart-default"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "133659a15339456eeeb07572eb02a91c91e9815e9cbc89566944d2c8d3efdbf6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "smoke-test"
 version = "0.1.0"
 
@@ -9060,13 +9090,13 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.30"
+version = "0.3.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4a34ab300f2dee6e562c10a046fc05e358b29f9bf92277f30c3c8d82275f6f5"
+checksum = "cd0cbfecb4d19b5ea75bb31ad904eb5b9fa13f21079c3b92017ebdf4999a5890"
 dependencies = [
- "deranged",
  "itoa",
- "powerfmt",
+ "libc",
+ "num_threads",
  "serde",
  "time-core",
  "time-macros",
@@ -9074,15 +9104,15 @@ dependencies = [
 
 [[package]]
 name = "time-core"
-version = "0.1.2"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
+checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
 
 [[package]]
 name = "time-macros"
-version = "0.2.15"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ad70d68dba9e1f8aceda7aa6711965dfec1cac869f311a51bd08b3a2ccbce20"
+checksum = "fd80a657e71da814b8e5d60d3374fc6d35045062245d80224748ae522dd76f36"
 dependencies = [
  "time-core",
 ]
@@ -9369,6 +9399,52 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
+name = "trace4rs"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79478dd8f523a9acec48b5e71ad56dc0f3b0dcaf703da29961d31a6bdd713bf0"
+dependencies = [
+ "camino",
+ "literally",
+ "log",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "path-absolutize",
+ "regex",
+ "rustversion",
+ "thiserror",
+ "time",
+ "trace4rs-config",
+ "trace4rs-fmtorp",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
+ "utc-offset",
+]
+
+[[package]]
+name = "trace4rs-config"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54a8eca7b495cb7659cb081820b3f410b42b9edaecb28b0d7861cff6606fc882"
+dependencies = [
+ "literally",
+ "smart-default",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "trace4rs-fmtorp"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3bc666374e9f4d6962ba6bbf1f9d5f6a56d4a8c08c6d07985684b9078e8bf0e"
+dependencies = [
+ "thiserror",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9432,6 +9508,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "time",
  "tracing-core",
  "tracing-log",
 ]
@@ -9683,6 +9760,18 @@ dependencies = [
  "idna 0.4.0",
  "percent-encoding",
  "serde",
+]
+
+[[package]]
+name = "utc-offset"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7f5187fd6893d08fecb6cdcb09badfbd5a187bf947fc12abc36c7bcb88dcd51"
+dependencies = [
+ "once_cell",
+ "parking_lot 0.12.1",
+ "thiserror",
+ "time",
 ]
 
 [[package]]

@@ -209,6 +209,10 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         changes: Vec<StakingChangeRequest>,
     ) -> anyhow::Result<()> {
+        if changes.is_empty() {
+            return Ok(());
+        }
+
         let mut change_requests = vec![];
         for c in changes {
             change_requests.push(router::StakingChangeRequest::try_from(c)?);
