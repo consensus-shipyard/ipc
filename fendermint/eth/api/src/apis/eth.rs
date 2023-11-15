@@ -599,6 +599,7 @@ where
 
     let sighash = tx.sighash();
     let msghash = et::TxHash::from(ethers_core::utils::keccak256(rlp.as_raw()));
+    tracing::debug!(?sighash, eth_hash = ?msghash, ?tx, "received raw transaction");
 
     let msg = to_fvm_message(tx, false)?;
     let msg = SignedMessage {
@@ -607,10 +608,10 @@ where
     };
     let msg = ChainMessage::Signed(msg);
     let bz: Vec<u8> = MessageFactory::serialize(&msg)?;
+
     // Use the broadcast version which waits for basic checks to complete,
     // but not the execution results - those will have to be polled with get_transaction_receipt.
     let res: tx_sync::Response = data.tm().broadcast_tx_sync(bz).await?;
-    tracing::debug!(?sighash, eth_hash = ?msghash, tm_hash = ?res.hash, "received raw transaction");
     if res.code.is_ok() {
         // The following hash would be okay for ethers-rs,and we could use it to look up the TX with Tendermint,
         // but ethers.js would reject it because it doesn't match what Ethereum would use.

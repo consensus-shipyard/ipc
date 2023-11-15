@@ -41,12 +41,14 @@ where
         msg: Self::Message,
         _is_recheck: bool,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
-        let checked = |state, exit_code: ExitCode, info: Option<String>| {
+        let checked = |state, exit_code: ExitCode, gas_used: Option<u64>, info: Option<String>| {
             tracing::info!(
                 exit_code = exit_code.value(),
                 from = msg.from.to_string(),
                 to = msg.to.to_string(),
                 method_num = msg.method_num,
+                gas_limit = msg.gas_limit,
+                gas_used = gas_used.unwrap_or_default(),
                 info = info.clone().unwrap_or_default(),
                 "check transaction"
             );
@@ -63,6 +65,7 @@ where
             return checked(
                 state,
                 ExitCode::SYS_ASSERTION_FAILED,
+                None,
                 Some(format!("pre-check failure: {:#}", e)),
             );
         }
@@ -78,6 +81,7 @@ where
                     return checked(
                         state,
                         ExitCode::SYS_SENDER_STATE_INVALID,
+                        None,
                         Some(
                             format! {"actor balance {} less than needed {}", actor.balance, balance_needed},
                         ),
@@ -86,6 +90,7 @@ where
                     return checked(
                         state,
                         ExitCode::SYS_SENDER_STATE_INVALID,
+                        None,
                         Some(
                             format! {"expected sequence {}, got {}", actor.sequence, msg.sequence},
                         ),
@@ -99,6 +104,7 @@ where
                     return checked(
                         state,
                         apply_ret.msg_receipt.exit_code,
+                        Some(apply_ret.msg_receipt.gas_used),
                         apply_ret
                             .failure_info
                             .map(|i| i.to_string())
@@ -109,7 +115,7 @@ where
                     actor.balance -= balance_needed;
                     state_tree.set_actor(id, actor);
 
-                    return checked(state, ExitCode::OK, None);
+                    return checked(state, ExitCode::OK, None, None);
                 }
             }
         }
@@ -117,6 +123,7 @@ where
         checked(
             state,
             ExitCode::SYS_SENDER_INVALID,
+            None,
             Some(format! {"cannot find actor {}", msg.from}),
         )
     }

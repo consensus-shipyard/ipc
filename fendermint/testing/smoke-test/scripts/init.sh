@@ -43,6 +43,7 @@ fendermint \
 # Create some Ethereum accounts
 for NAME in emily eric; do
   fendermint key gen --out-dir $KEYS_DIR --name $NAME;
+  fendermint key into-eth --out-dir $KEYS_DIR --secret-key $KEYS_DIR/$NAME.sk --name $NAME-eth;
   fendermint \
     genesis --genesis-file $GENESIS_FILE \
     add-account --public-key $KEYS_DIR/$NAME.pk \

@@ -7,6 +7,7 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     bigint::BigInt, econ::TokenAmount, error::ExitCode, message::Message, ActorID, BLOCK_GAS_LIMIT,
 };
+use num_traits::Zero;
 
 use crate::QueryInterpreter;
 
@@ -163,9 +164,21 @@ where
         // Setting BlockGasLimit as initial limit for gas estimation
         msg.gas_limit = BLOCK_GAS_LIMIT;
 
+        // With unlimited gas we are probably better off setting the prices to zero.
+        let gas_premium = msg.gas_premium.clone();
+        let gas_fee_cap = msg.gas_fee_cap.clone();
+        msg.gas_premium = TokenAmount::zero();
+        msg.gas_fee_cap = TokenAmount::zero();
+
         // estimate the gas limit and assign it to the message
         // revert any changes because we'll repeat the estimation
         let (state, (ret, _)) = state.call(msg.clone()).await?;
+
+        tracing::debug!(
+            gas_used = ret.msg_receipt.gas_used,
+            exit_code = ret.msg_receipt.exit_code.value(),
+            "estimated gassed message"
+        );
 
         if !ret.msg_receipt.exit_code.is_success() {
             // if the message fail we can't estimate the gas.
@@ -182,16 +195,18 @@ where
 
         msg.gas_limit = (ret.msg_receipt.gas_used as f64 * self.gas_overestimation_rate) as u64;
 
-        if msg.gas_premium.is_zero() {
+        if gas_premium.is_zero() {
             // We need to set the gas_premium to some value other than zero for the
             // gas estimation to work accurately (I really don't know why this is
             // the case but after a lot of testing, setting this value to zero rejects the transaction)
             msg.gas_premium = TokenAmount::from_nano(BigInt::from(1));
+        } else {
+            msg.gas_premium = gas_premium;
         }
 
         // Same for the gas_fee_cap, not setting the fee cap leads to the message
         // being sent after the estimation to fail.
-        if msg.gas_fee_cap.is_zero() {
+        if gas_fee_cap.is_zero() {
             // TODO: In Lotus historical values of the base fee and a more accurate overestimation is performed
             // for the fee cap. If we issues with messages going through let's consider the historical analysis.
             // For now we are disregarding the base_fee so I don't think this is needed here.
@@ -199,6 +214,8 @@ where
             // specified premium. Returns 0 if GasFeeCap is less than BaseFee.
             // see https://spec.filecoin.io/#section-systems.filecoin_vm.message.message-semantic-validation
             msg.gas_fee_cap = msg.gas_premium.clone();
+        } else {
+            msg.gas_fee_cap = gas_fee_cap;
         }
 
         Ok((state, None))

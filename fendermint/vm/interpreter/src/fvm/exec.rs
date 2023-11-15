@@ -117,6 +117,7 @@ where
             to = to.to_string(),
             method_num = method_num,
             exit_code = apply_ret.msg_receipt.exit_code.value(),
+            gas_used = apply_ret.msg_receipt.gas_used,
             "tx delivered"
         );
 
