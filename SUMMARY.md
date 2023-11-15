@@ -7,7 +7,6 @@
 * [Key Concepts](key-concepts/README.md)
   * [Architecture](key-concepts/architecture.md)
   * [Subnets](key-concepts/subnets.md)
-  * [Checkpointing](key-concepts/checkpointing.md)
   * [Fees](key-concepts/fees.md)
 * [Reference](reference/README.md)
   * [Networks](reference/networks.md)

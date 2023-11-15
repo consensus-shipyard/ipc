@@ -20,7 +20,7 @@ Subnets within a single hierarchy tree have native communication protocols and a
 
 ## Checkpointing state
 
-To ensure security of a subnet, child subnets within a single hierarchy treee, periodically save snapshots of state to their parent subnet. This includes critical information (e.g. subnet state, membership information etc.). This is know as checkpointing and you can read more [here](checkpointing.md).&#x20;
+To ensure security of a subnet, child subnets within a single hierarchy treee, periodically save snapshots of state to their parent subnet. This includes critical information (e.g. subnet state, membership information etc.). This is know as checkpointing and you can read more [here](broken-reference).&#x20;
 
 ## Subnet usage
 

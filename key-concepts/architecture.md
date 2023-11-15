@@ -8,7 +8,7 @@ description: Architectural components in the IPC framework.
 
 ## Validator nodes
 
-Operators of a subnet run a full validator node for both the parent and the child subnet. Requiring the nodes of child subnets to run the nodes of parents is a security parameter to ensure [checkpointed](checkpointing.md) states of the subnet are appropriately stored, at the right time in the parent.&#x20;
+Operators of a subnet run a full validator node for both the parent and the child subnet. Requiring the nodes of child subnets to run the nodes of parents is a security parameter to ensure [checkpointed](broken-reference) states of the subnet are appropriately stored, at the right time in the parent.&#x20;
 
 The following components make up a node:
 
@@ -18,7 +18,7 @@ The following components make up a node:
 
 ### ABCI++
 
-The [ABCI++](https://members.delphidigital.io/learn/abci) interface is implemented in order to handle the IPC ledger logic and transaction handling, using the [Filecoin Virtual Machine](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) (or Ethereum-compatible FVM). The ABCI can pass [checkpointed](checkpointing.md) headers to the parent and use the ledger to gather relevant signatures.&#x20;
+The [ABCI++](https://members.delphidigital.io/learn/abci) interface is implemented in order to handle the IPC ledger logic and transaction handling, using the [Filecoin Virtual Machine](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) (or Ethereum-compatible FVM). The ABCI can pass [checkpointed](broken-reference) headers to the parent and use the ledger to gather relevant signatures.&#x20;
 
 An ABCI++ application can contact the [IPLD](https://docs.filecoin.io/basics/project-and-community/related-projects#ipld) [resolver & store](../reference/ipld-resolver.md) to read and write data so that it is IPLD addressable.&#x20;
 
