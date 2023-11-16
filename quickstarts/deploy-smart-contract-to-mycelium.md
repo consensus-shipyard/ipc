@@ -60,7 +60,7 @@ To connect to the Mycelium Calibration, we need to append the new subnet params 
 
 ```
 [[subnets]]
-id = "/r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi"
+id = "/r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq"
 
 [subnets.config]
 network_type = "fevm"
@@ -94,7 +94,7 @@ ipc-cli subnet rpc --subnet <subnet-id>
 ipc-cli subnet rpc --subnet /r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi
 
 rpc: "https://api.mycelium.calibration.node.glif.io/"
-chainID: "3351407814553689"
+chainID: "1914449495539888"
 ```
 
 With the gathered information, you now have all the necessary details to manually add your subnet network to MetaMask.
@@ -140,7 +140,7 @@ ipc-cli cross-msg fund --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>
 # --to is optional. If not specified, will use the same address in subnet
 
 # Command Example
-ipc-cli cross-msg fund --subnet /r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi --to 0xd388aB098ed3E84c0D808776440B48F685198498 10
+ipc-cli cross-msg fund --subnet /r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq --to 0xd388aB098ed3E84c0D808776440B48F685198498 10
 
 [2023-10-31T09:28:52Z INFO  ipc_provider::manager::evm::manager] fund with evm gateway contract: t410fk2ki2lh2ulxtkw4mbcwjeuqc3mqscrwrkmrzo4a with value: 1000000000000000000, original: TokenAmount(10.0)
 fund performed in epoch: 1085104
@@ -156,7 +156,7 @@ There are a couple of ways to check the token balance in the IPC subnet.
     Use the `subnet-id` for the Mycelium Calibration.
 
     ```sh
-    ipc-cli wallet balances --subnet /r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi -w evm
+    ipc-cli wallet balances --subnet /r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq -w evm
     ```
 *   **ETH API**
 
@@ -274,7 +274,7 @@ module.exports = {
   solidity: "0.8.20", //Update solidity version for Openzeppline contracts
   networks: {
     Mycelium: {
-        chainId: 3351407814553689,
+        chainId: 1914449495539888,
         url: "https://api.mycelium.calibration.node.glif.io/",
         accounts: [WalletPK]
     }
