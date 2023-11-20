@@ -127,7 +127,8 @@ library LibDiamond {
             revert CannotReplaceFunctionsFromFacetWithZeroAddress(_functionSelectors);
         }
         enforceHasContractCode(_facetAddress, "LibDiamondCut: Replace facet has no code");
-        for (uint256 selectorIndex; selectorIndex < _functionSelectors.length; selectorIndex++) {
+        uint256 fl = _functionSelectors.length;
+        for (uint256 selectorIndex; selectorIndex < fl; ) {
             bytes4 selector = _functionSelectors[selectorIndex];
             address oldFacetAddress = ds.facetAddressAndSelectorPosition[selector].facetAddress;
             // can't replace immutable functions -- functions defined directly in the diamond in this case
@@ -142,6 +143,9 @@ library LibDiamond {
             }
             // replace old facet address
             ds.facetAddressAndSelectorPosition[selector].facetAddress = _facetAddress;
+            unchecked {
+                ++selectorIndex;
+            }
         }
     }
 
@@ -151,7 +155,8 @@ library LibDiamond {
         if (_facetAddress != address(0)) {
             revert RemoveFacetAddressMustBeZeroAddress(_facetAddress);
         }
-        for (uint256 selectorIndex; selectorIndex < _functionSelectors.length; selectorIndex++) {
+        uint256 fl = _functionSelectors.length;
+        for (uint256 selectorIndex; selectorIndex < fl; ) {
             bytes4 selector = _functionSelectors[selectorIndex];
             FacetAddressAndSelectorPosition memory oldFacetAddressAndSelectorPosition = ds
                 .facetAddressAndSelectorPosition[selector];
@@ -164,7 +169,7 @@ library LibDiamond {
                 revert CannotRemoveImmutableFunction(selector);
             }
             // replace selector with last selector
-            selectorCount--;
+            --selectorCount;
             if (oldFacetAddressAndSelectorPosition.selectorPosition != selectorCount) {
                 bytes4 lastSelector = ds.selectors[selectorCount];
                 ds.selectors[oldFacetAddressAndSelectorPosition.selectorPosition] = lastSelector;
@@ -174,6 +179,9 @@ library LibDiamond {
             // delete last selector
             ds.selectors.pop();
             delete ds.facetAddressAndSelectorPosition[selector];
+            unchecked {
+                ++selectorIndex;
+            }
         }
     }
 
@@ -185,7 +193,8 @@ library LibDiamond {
         // slither-disable-next-line low-level-calls
         (bool success, bytes memory error) = _init.delegatecall(_calldata); // solhint-disable-line avoid-low-level-calls
         if (!success) {
-            if (error.length > 0) {
+            // gas-opt: original check: error.length > 0
+            if (error.length != 0) {
                 // bubble up error
                 /// @solidity memory-safe-assembly
                 assembly {

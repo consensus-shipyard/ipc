@@ -70,7 +70,8 @@ library SubnetIDHelper {
     }
 
     function isRoot(SubnetID calldata subnet) public pure returns (bool) {
-        return subnet.route.length == 0 && subnet.root > 0;
+        // gas-opt: original check: subnet.root > 0
+        return subnet.route.length == 0 && subnet.root != 0;
     }
 
     function equals(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (bool) {

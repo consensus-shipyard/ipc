@@ -116,7 +116,7 @@ library LibMaxPQ {
         uint256 parentCollateral;
 
         while (pos > 1) {
-            parentPos = pos / 2;
+            parentPos = pos >> 1; // parentPos = pos / 2
             parentCollateral = self.inner.getConfirmedCollateral(validators, parentPos);
 
             // parent collateral is not larger than that of the current child, heap condition met.
@@ -130,7 +130,7 @@ library LibMaxPQ {
     }
 
     function sink(MaxPQ storage self, ValidatorSet storage validators, uint16 pos, uint256 value) internal {
-        uint16 childPos = pos * 2;
+        uint16 childPos = pos << 1; // childPos = pos * 2
         uint256 childCollateral = 0;
 
         uint16 size = self.inner.size;

@@ -110,7 +110,9 @@ contract SubnetActorDiamond {
 
     /// @notice Same as fallback but called when calldata is empty
     /* solhint-disable no-empty-blocks */
-    receive() external payable onlyGateway {}
+    receive() external payable onlyGateway {
+        // The function body is empty since here we are implementing Diamond mechanism.
+    }
 
     /* solhint-enable no-empty-blocks */
 

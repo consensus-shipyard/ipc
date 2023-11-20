@@ -60,7 +60,8 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
 
         uint256 feeRemainder = msg.value - s.minCrossMsgFee;
 
-        if (feeRemainder > 0) {
+        // gas-opt: original check: feeRemainder > 0
+        if (feeRemainder != 0) {
             payable(msg.sender).sendValue(feeRemainder);
         }
     }
@@ -96,7 +97,8 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         if (shouldCommitBottomUp) {
             LibGateway.commitBottomUpMsg(crossMessage);
 
-            return (shouldBurn = crossMessage.message.value > 0);
+            // gas-opt: original check: value > 0
+            return (shouldBurn = crossMessage.message.value != 0);
         }
 
         if (applyType == IPCMsgType.TopDown) {

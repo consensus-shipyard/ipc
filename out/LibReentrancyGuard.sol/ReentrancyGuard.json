@@ -80,17 +80,17 @@
   },
   "ast": {
     "absolutePath": "src/lib/LibReentrancyGuard.sol",
-    "id": 42434,
+    "id": 42444,
     "exportedSymbols": {
       "ReentrancyGuard": [
-        42433
+        42443
       ]
     },
     "nodeType": "SourceUnit",
     "src": "46:966:63",
     "nodes": [
       {
-        "id": 42370,
+        "id": 42380,
         "nodeType": "PragmaDirective",
         "src": "46:23:63",
         "nodes": [],
@@ -101,12 +101,12 @@
         ]
       },
       {
-        "id": 42433,
+        "id": 42443,
         "nodeType": "ContractDefinition",
         "src": "170:841:63",
         "nodes": [
           {
-            "id": 42376,
+            "id": 42386,
             "nodeType": "VariableDeclaration",
             "src": "210:85:63",
             "nodes": [],
@@ -114,7 +114,7 @@
             "mutability": "constant",
             "name": "NAMESPACE",
             "nameLocation": "235:9:63",
-            "scope": 42433,
+            "scope": 42443,
             "stateVariable": true,
             "storageLocation": "default",
             "typeDescriptions": {
@@ -122,7 +122,7 @@
               "typeString": "bytes32"
             },
             "typeName": {
-              "id": 42372,
+              "id": 42382,
               "name": "bytes32",
               "nodeType": "ElementaryTypeName",
               "src": "210:7:63",
@@ -135,7 +135,7 @@
               "arguments": [
                 {
                   "hexValue": "7265656e7472616e637967756172642e6c69622e6469616d6f6e642e73746f72616765",
-                  "id": 42374,
+                  "id": 42384,
                   "isConstant": false,
                   "isLValue": false,
                   "isPure": true,
@@ -157,7 +157,7 @@
                     "typeString": "literal_string \"reentrancyguard.lib.diamond.storage\""
                   }
                 ],
-                "id": 42373,
+                "id": 42383,
                 "name": "keccak256",
                 "nodeType": "Identifier",
                 "overloadedDeclarations": [],
@@ -168,7 +168,7 @@
                   "typeString": "function (bytes memory) pure returns (bytes32)"
                 }
               },
-              "id": 42375,
+              "id": 42385,
               "isConstant": false,
               "isLValue": false,
               "isPure": true,
@@ -187,7 +187,7 @@
             "visibility": "private"
           },
           {
-            "id": 42379,
+            "id": 42389,
             "nodeType": "StructDefinition",
             "src": "302:56:63",
             "nodes": [],
@@ -195,12 +195,12 @@
             "members": [
               {
                 "constant": false,
-                "id": 42378,
+                "id": 42388,
                 "mutability": "mutable",
                 "name": "status",
                 "nameLocation": "345:6:63",
                 "nodeType": "VariableDeclaration",
-                "scope": 42379,
+                "scope": 42389,
                 "src": "337:14:63",
                 "stateVariable": false,
                 "storageLocation": "default",
@@ -209,7 +209,7 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 42377,
+                  "id": 42387,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
                   "src": "337:7:63",
@@ -223,11 +223,11 @@
             ],
             "name": "ReentrancyStorage",
             "nameLocation": "309:17:63",
-            "scope": 42433,
+            "scope": 42443,
             "visibility": "public"
           },
           {
-            "id": 42381,
+            "id": 42391,
             "nodeType": "ErrorDefinition",
             "src": "364:24:63",
             "nodes": [],
@@ -235,14 +235,14 @@
             "name": "ReentrancyError",
             "nameLocation": "370:15:63",
             "parameters": {
-              "id": 42380,
+              "id": 42390,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "385:2:63"
             }
           },
           {
-            "id": 42384,
+            "id": 42394,
             "nodeType": "VariableDeclaration",
             "src": "394:41:63",
             "nodes": [],
@@ -250,7 +250,7 @@
             "mutability": "constant",
             "name": "_NOT_ENTERED",
             "nameLocation": "419:12:63",
-            "scope": 42433,
+            "scope": 42443,
             "stateVariable": true,
             "storageLocation": "default",
             "typeDescriptions": {
@@ -258,7 +258,7 @@
               "typeString": "uint256"
             },
             "typeName": {
-              "id": 42382,
+              "id": 42392,
               "name": "uint256",
               "nodeType": "ElementaryTypeName",
               "src": "394:7:63",
@@ -269,7 +269,7 @@
             },
             "value": {
               "hexValue": "30",
-              "id": 42383,
+              "id": 42393,
               "isConstant": false,
               "isLValue": false,
               "isPure": true,
@@ -286,7 +286,7 @@
             "visibility": "private"
           },
           {
-            "id": 42387,
+            "id": 42397,
             "nodeType": "VariableDeclaration",
             "src": "441:37:63",
             "nodes": [],
@@ -294,7 +294,7 @@
             "mutability": "constant",
             "name": "_ENTERED",
             "nameLocation": "466:8:63",
-            "scope": 42433,
+            "scope": 42443,
             "stateVariable": true,
             "storageLocation": "default",
             "typeDescriptions": {
@@ -302,7 +302,7 @@
               "typeString": "uint256"
             },
             "typeName": {
-              "id": 42385,
+              "id": 42395,
               "name": "uint256",
               "nodeType": "ElementaryTypeName",
               "src": "441:7:63",
@@ -313,7 +313,7 @@
             },
             "value": {
               "hexValue": "31",
-              "id": 42386,
+              "id": 42396,
               "isConstant": false,
               "isLValue": false,
               "isPure": true,
@@ -330,76 +330,76 @@
             "visibility": "private"
           },
           {
-            "id": 42417,
+            "id": 42427,
             "nodeType": "ModifierDefinition",
             "src": "485:223:63",
             "nodes": [],
             "body": {
-              "id": 42416,
+              "id": 42426,
               "nodeType": "Block",
               "src": "509:199:63",
               "nodes": [],
               "statements": [
                 {
                   "assignments": [
-                    42391
+                    42401
                   ],
                   "declarations": [
                     {
                       "constant": false,
-                      "id": 42391,
+                      "id": 42401,
                       "mutability": "mutable",
                       "name": "s",
                       "nameLocation": "545:1:63",
                       "nodeType": "VariableDeclaration",
-                      "scope": 42416,
+                      "scope": 42426,
                       "src": "519:27:63",
                       "stateVariable": false,
                       "storageLocation": "storage",
                       "typeDescriptions": {
-                        "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                        "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                         "typeString": "struct ReentrancyGuard.ReentrancyStorage"
                       },
                       "typeName": {
-                        "id": 42390,
+                        "id": 42400,
                         "nodeType": "UserDefinedTypeName",
                         "pathNode": {
-                          "id": 42389,
+                          "id": 42399,
                           "name": "ReentrancyStorage",
                           "nameLocations": [
                             "519:17:63"
                           ],
                           "nodeType": "IdentifierPath",
-                          "referencedDeclaration": 42379,
+                          "referencedDeclaration": 42389,
                           "src": "519:17:63"
                         },
-                        "referencedDeclaration": 42379,
+                        "referencedDeclaration": 42389,
                         "src": "519:17:63",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                           "typeString": "struct ReentrancyGuard.ReentrancyStorage"
                         }
                       },
                       "visibility": "internal"
                     }
                   ],
-                  "id": 42394,
+                  "id": 42404,
                   "initialValue": {
                     "arguments": [],
                     "expression": {
                       "argumentTypes": [],
-                      "id": 42392,
+                      "id": 42402,
                       "name": "reentrancyStorage",
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
-                      "referencedDeclaration": 42432,
+                      "referencedDeclaration": 42442,
                       "src": "549:17:63",
                       "typeDescriptions": {
-                        "typeIdentifier": "t_function_internal_pure$__$returns$_t_struct$_ReentrancyStorage_$42379_storage_ptr_$",
+                        "typeIdentifier": "t_function_internal_pure$__$returns$_t_struct$_ReentrancyStorage_$42389_storage_ptr_$",
                         "typeString": "function () pure returns (struct ReentrancyGuard.ReentrancyStorage storage pointer)"
                       }
                     },
-                    "id": 42393,
+                    "id": 42403,
                     "isConstant": false,
                     "isLValue": false,
                     "isPure": false,
@@ -411,7 +411,7 @@
                     "src": "549:19:63",
                     "tryCall": false,
                     "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                      "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                       "typeString": "struct ReentrancyGuard.ReentrancyStorage storage pointer"
                     }
                   },
@@ -424,25 +424,25 @@
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
                     },
-                    "id": 42398,
+                    "id": 42408,
                     "isConstant": false,
                     "isLValue": false,
                     "isPure": false,
                     "lValueRequested": false,
                     "leftExpression": {
                       "expression": {
-                        "id": 42395,
+                        "id": 42405,
                         "name": "s",
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
-                        "referencedDeclaration": 42391,
+                        "referencedDeclaration": 42401,
                         "src": "582:1:63",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                           "typeString": "struct ReentrancyGuard.ReentrancyStorage storage pointer"
                         }
                       },
-                      "id": 42396,
+                      "id": 42406,
                       "isConstant": false,
                       "isLValue": true,
                       "isPure": false,
@@ -450,7 +450,7 @@
                       "memberLocation": "584:6:63",
                       "memberName": "status",
                       "nodeType": "MemberAccess",
-                      "referencedDeclaration": 42378,
+                      "referencedDeclaration": 42388,
                       "src": "582:8:63",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
@@ -460,11 +460,11 @@
                     "nodeType": "BinaryOperation",
                     "operator": "==",
                     "rightExpression": {
-                      "id": 42397,
+                      "id": 42407,
                       "name": "_ENTERED",
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
-                      "referencedDeclaration": 42387,
+                      "referencedDeclaration": 42397,
                       "src": "594:8:63",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
@@ -477,7 +477,7 @@
                       "typeString": "bool"
                     }
                   },
-                  "id": 42402,
+                  "id": 42412,
                   "nodeType": "IfStatement",
                   "src": "578:50:63",
                   "trueBody": {
@@ -485,18 +485,18 @@
                       "arguments": [],
                       "expression": {
                         "argumentTypes": [],
-                        "id": 42399,
+                        "id": 42409,
                         "name": "ReentrancyError",
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
-                        "referencedDeclaration": 42381,
+                        "referencedDeclaration": 42391,
                         "src": "611:15:63",
                         "typeDescriptions": {
                           "typeIdentifier": "t_function_error_pure$__$returns$__$",
                           "typeString": "function () pure"
                         }
                       },
-                      "id": 42400,
+                      "id": 42410,
                       "isConstant": false,
                       "isLValue": false,
                       "isPure": false,
@@ -512,32 +512,32 @@
                         "typeString": "tuple()"
                       }
                     },
-                    "id": 42401,
+                    "id": 42411,
                     "nodeType": "RevertStatement",
                     "src": "604:24:63"
                   }
                 },
                 {
                   "expression": {
-                    "id": 42407,
+                    "id": 42417,
                     "isConstant": false,
                     "isLValue": false,
                     "isPure": false,
                     "lValueRequested": false,
                     "leftHandSide": {
                       "expression": {
-                        "id": 42403,
+                        "id": 42413,
                         "name": "s",
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
-                        "referencedDeclaration": 42391,
+                        "referencedDeclaration": 42401,
                         "src": "638:1:63",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                           "typeString": "struct ReentrancyGuard.ReentrancyStorage storage pointer"
                         }
                       },
-                      "id": 42405,
+                      "id": 42415,
                       "isConstant": false,
                       "isLValue": true,
                       "isPure": false,
@@ -545,7 +545,7 @@
                       "memberLocation": "640:6:63",
                       "memberName": "status",
                       "nodeType": "MemberAccess",
-                      "referencedDeclaration": 42378,
+                      "referencedDeclaration": 42388,
                       "src": "638:8:63",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
@@ -555,11 +555,11 @@
                     "nodeType": "Assignment",
                     "operator": "=",
                     "rightHandSide": {
-                      "id": 42406,
+                      "id": 42416,
                       "name": "_ENTERED",
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
-                      "referencedDeclaration": 42387,
+                      "referencedDeclaration": 42397,
                       "src": "649:8:63",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
@@ -572,36 +572,36 @@
                       "typeString": "uint256"
                     }
                   },
-                  "id": 42408,
+                  "id": 42418,
                   "nodeType": "ExpressionStatement",
                   "src": "638:19:63"
                 },
                 {
-                  "id": 42409,
+                  "id": 42419,
                   "nodeType": "PlaceholderStatement",
                   "src": "667:1:63"
                 },
                 {
                   "expression": {
-                    "id": 42414,
+                    "id": 42424,
                     "isConstant": false,
                     "isLValue": false,
                     "isPure": false,
                     "lValueRequested": false,
                     "leftHandSide": {
                       "expression": {
-                        "id": 42410,
+                        "id": 42420,
                         "name": "s",
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
-                        "referencedDeclaration": 42391,
+                        "referencedDeclaration": 42401,
                         "src": "678:1:63",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                          "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                           "typeString": "struct ReentrancyGuard.ReentrancyStorage storage pointer"
                         }
                       },
-                      "id": 42412,
+                      "id": 42422,
                       "isConstant": false,
                       "isLValue": true,
                       "isPure": false,
@@ -609,7 +609,7 @@
                       "memberLocation": "680:6:63",
                       "memberName": "status",
                       "nodeType": "MemberAccess",
-                      "referencedDeclaration": 42378,
+                      "referencedDeclaration": 42388,
                       "src": "678:8:63",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
@@ -619,11 +619,11 @@
                     "nodeType": "Assignment",
                     "operator": "=",
                     "rightHandSide": {
-                      "id": 42413,
+                      "id": 42423,
                       "name": "_NOT_ENTERED",
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
-                      "referencedDeclaration": 42384,
+                      "referencedDeclaration": 42394,
                       "src": "689:12:63",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
@@ -636,7 +636,7 @@
                       "typeString": "uint256"
                     }
                   },
-                  "id": 42415,
+                  "id": 42425,
                   "nodeType": "ExpressionStatement",
                   "src": "678:23:63"
                 }
@@ -645,7 +645,7 @@
             "name": "nonReentrant",
             "nameLocation": "494:12:63",
             "parameters": {
-              "id": 42388,
+              "id": 42398,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "506:2:63"
@@ -654,29 +654,29 @@
             "visibility": "internal"
           },
           {
-            "id": 42432,
+            "id": 42442,
             "nodeType": "FunctionDefinition",
             "src": "747:262:63",
             "nodes": [],
             "body": {
-              "id": 42431,
+              "id": 42441,
               "nodeType": "Block",
               "src": "828:181:63",
               "nodes": [],
               "statements": [
                 {
                   "assignments": [
-                    42425
+                    42435
                   ],
                   "declarations": [
                     {
                       "constant": false,
-                      "id": 42425,
+                      "id": 42435,
                       "mutability": "mutable",
                       "name": "position",
                       "nameLocation": "846:8:63",
                       "nodeType": "VariableDeclaration",
-                      "scope": 42431,
+                      "scope": 42441,
                       "src": "838:16:63",
                       "stateVariable": false,
                       "storageLocation": "default",
@@ -685,7 +685,7 @@
                         "typeString": "bytes32"
                       },
                       "typeName": {
-                        "id": 42424,
+                        "id": 42434,
                         "name": "bytes32",
                         "nodeType": "ElementaryTypeName",
                         "src": "838:7:63",
@@ -697,13 +697,13 @@
                       "visibility": "internal"
                     }
                   ],
-                  "id": 42427,
+                  "id": 42437,
                   "initialValue": {
-                    "id": 42426,
+                    "id": 42436,
                     "name": "NAMESPACE",
                     "nodeType": "Identifier",
                     "overloadedDeclarations": [],
-                    "referencedDeclaration": 42376,
+                    "referencedDeclaration": 42386,
                     "src": "857:9:63",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
@@ -739,7 +739,7 @@
                   "evmVersion": "paris",
                   "externalReferences": [
                     {
-                      "declaration": 42422,
+                      "declaration": 42432,
                       "isOffset": false,
                       "isSlot": true,
                       "src": "955:7:63",
@@ -747,39 +747,39 @@
                       "valueSize": 1
                     },
                     {
-                      "declaration": 42425,
+                      "declaration": 42435,
                       "isOffset": false,
                       "isSlot": false,
                       "src": "966:8:63",
                       "valueSize": 1
                     }
                   ],
-                  "id": 42428,
+                  "id": 42438,
                   "nodeType": "InlineAssembly",
                   "src": "932:52:63"
                 },
                 {
                   "expression": {
-                    "id": 42429,
+                    "id": 42439,
                     "name": "ds",
                     "nodeType": "Identifier",
                     "overloadedDeclarations": [],
-                    "referencedDeclaration": 42422,
+                    "referencedDeclaration": 42432,
                     "src": "1000:2:63",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                      "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                       "typeString": "struct ReentrancyGuard.ReentrancyStorage storage pointer"
                     }
                   },
-                  "functionReturnParameters": 42423,
-                  "id": 42430,
+                  "functionReturnParameters": 42433,
+                  "id": 42440,
                   "nodeType": "Return",
                   "src": "993:9:63"
                 }
               ]
             },
             "documentation": {
-              "id": 42418,
+              "id": 42428,
               "nodeType": "StructuredDocumentation",
               "src": "714:28:63",
               "text": "@dev fetch local storage"
@@ -790,47 +790,47 @@
             "name": "reentrancyStorage",
             "nameLocation": "756:17:63",
             "parameters": {
-              "id": 42419,
+              "id": 42429,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "773:2:63"
             },
             "returnParameters": {
-              "id": 42423,
+              "id": 42433,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 42422,
+                  "id": 42432,
                   "mutability": "mutable",
                   "name": "ds",
                   "nameLocation": "824:2:63",
                   "nodeType": "VariableDeclaration",
-                  "scope": 42432,
+                  "scope": 42442,
                   "src": "798:28:63",
                   "stateVariable": false,
                   "storageLocation": "storage",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                    "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                     "typeString": "struct ReentrancyGuard.ReentrancyStorage"
                   },
                   "typeName": {
-                    "id": 42421,
+                    "id": 42431,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 42420,
+                      "id": 42430,
                       "name": "ReentrancyStorage",
                       "nameLocations": [
                         "798:17:63"
                       ],
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 42379,
+                      "referencedDeclaration": 42389,
                       "src": "798:17:63"
                     },
-                    "referencedDeclaration": 42379,
+                    "referencedDeclaration": 42389,
                     "src": "798:17:63",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_ReentrancyStorage_$42379_storage_ptr",
+                      "typeIdentifier": "t_struct$_ReentrancyStorage_$42389_storage_ptr",
                       "typeString": "struct ReentrancyGuard.ReentrancyStorage"
                     }
                   },
@@ -839,7 +839,7 @@
               ],
               "src": "797:30:63"
             },
-            "scope": 42433,
+            "scope": 42443,
             "stateMutability": "pure",
             "virtual": false,
             "visibility": "private"
@@ -851,20 +851,20 @@
         "contractDependencies": [],
         "contractKind": "contract",
         "documentation": {
-          "id": 42371,
+          "id": 42381,
           "nodeType": "StructuredDocumentation",
           "src": "71:99:63",
           "text": "@title Reentrancy Guard\n @notice Abstract contract to provide protection against reentrancy"
         },
         "fullyImplemented": true,
         "linearizedBaseContracts": [
-          42433
+          42443
         ],
         "name": "ReentrancyGuard",
         "nameLocation": "188:15:63",
-        "scope": 42434,
+        "scope": 42444,
         "usedErrors": [
-          42381
+          42391
         ]
       }
     ],

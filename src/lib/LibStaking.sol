@@ -61,6 +61,7 @@ library LibAddressStakingReleases {
 
 /// The util library for `StakingReleaseQueue`
 library LibStakingReleaseQueue {
+    using Address for address payable;
     using LibAddressStakingReleases for AddressStakingReleases;
 
     event NewCollateralRelease(address validator, uint256 amount, uint256 releaseBlock);
@@ -87,7 +88,7 @@ library LibStakingReleaseQueue {
             delete self.releases[validator];
         }
 
-        payable(validator).transfer(amount);
+        payable(validator).sendValue(amount);
 
         return amount;
     }
@@ -360,7 +361,9 @@ library LibStaking {
     /// @notice Checks if the validator has staked before
     function hasStaked(address validator) internal view returns (bool) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.validators[validator].totalCollateral > 0;
+
+        // gas-opt: original check: totalCollateral > 0
+        return s.validatorSet.validators[validator].totalCollateral != 0;
     }
 
     function totalActiveValidators() internal view returns (uint16) {
@@ -440,7 +443,7 @@ library LibStaking {
         s.validatorSet.confirmWithdraw(validator, amount);
 
         // release stake from gateway and transfer to user
-        payable(validator).transfer(amount);
+        payable(validator).sendValue(amount);
     }
 
     // ================= Operations that are queued ==============

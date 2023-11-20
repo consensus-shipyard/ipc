@@ -237,8 +237,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         delete s.bootstrapNodes[msg.sender];
 
         if (!s.bootstrapped) {
-            LibStaking.withdrawWithConfirm(msg.sender, amount);
-
             // check if the validator had some initial balance and return it if not bootstrapped
             uint256 genesisBalance = s.genesisBalance[msg.sender];
             if (genesisBalance != 0) {
@@ -247,6 +245,9 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
                 rmAddressFromBalanceKey(msg.sender);
                 payable(msg.sender).sendValue(genesisBalance);
             }
+
+            // interaction must be performed after checks and changes
+            LibStaking.withdrawWithConfirm(msg.sender, amount);
             return;
         }
         LibStaking.withdraw(msg.sender, amount);

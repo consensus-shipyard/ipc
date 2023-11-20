@@ -93,7 +93,8 @@ library CrossMsgHelper {
 
         bytes memory data = bytes.concat(crossMsg.message.method, params);
 
-        if (value > 0) {
+        // gas-opt: original check: value > 0
+        if (value != 0) {
             return Address.functionCallWithValue({target: recipient, data: data, value: value});
         }
 
@@ -108,7 +109,8 @@ library CrossMsgHelper {
             uint256 nonce = crossMsgs[i].message.nonce;
 
             if (prevNonce >= nonce) {
-                if (i > 0) {
+                // gas-opt: original check: i > 0
+                if (i != 0) {
                     return false;
                 }
             }

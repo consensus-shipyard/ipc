@@ -113,7 +113,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         if (!registered) {
             revert NotRegisteredSubnet();
         }
-        if (subnet.circSupply > 0) {
+        // gas-opt: original check: subnet.circSupply > 0
+        if (subnet.circSupply != 0) {
             revert NotEmptySubnetCircSupply();
         }
 
