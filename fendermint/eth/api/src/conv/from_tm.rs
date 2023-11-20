@@ -195,6 +195,9 @@ pub fn to_eth_block(
         size: Some(size),
         gas_limit,
         gas_used,
+        blob_gas_used: None,
+        excess_blob_gas: None,
+        parent_beacon_block_root: None,
     };
 
     Ok(block)
@@ -360,6 +363,9 @@ where
         withdrawals_root,
         withdrawals,
         other,
+        blob_gas_used,
+        excess_blob_gas,
+        parent_beacon_block_root,
     } = block;
 
     let transactions: Result<Vec<B>, E> = transactions.into_iter().map(f).collect();
@@ -391,6 +397,9 @@ where
         withdrawals,
         transactions,
         other,
+        blob_gas_used,
+        excess_blob_gas,
+        parent_beacon_block_root,
     };
 
     Ok(block)

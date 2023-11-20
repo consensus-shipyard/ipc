@@ -34,7 +34,7 @@ build: | protoc
 	cargo build --release
 
 install:
-	cargo install --path fendermint/app
+	cargo install --locked --path fendermint/app
 
 # Using --release for testing because wasm can otherwise be slow.
 test: $(IPC_ACTORS_ABI) $(BUILTIN_ACTORS_BUNDLE) $(BUILTIN_ACTORS_DIR)

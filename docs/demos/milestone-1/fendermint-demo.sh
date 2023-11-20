@@ -1,5 +1,5 @@
 #0
-cargo install --path fendermint/app
+cargo install --locked --path fendermint/app
 
 #1
 
