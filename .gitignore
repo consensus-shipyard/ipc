@@ -23,4 +23,7 @@ binding/target
 
 # Coverage tools assets
 coverage_report
-lcov.info
+lcov.info 
+
+#vim
+*.un~ 

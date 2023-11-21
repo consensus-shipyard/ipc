@@ -1,7 +1,7 @@
 import { ethers } from 'hardhat';
 import { deployContractWithDeployer, getTransactionFees } from './util';
 
-const { getSelectors } = require('./js/diamond.js')
+const { getSelectors, FacetCutAction } = require("./js/diamond.js");
 
 async function main() {
   try {
@@ -37,18 +37,69 @@ async function main() {
     const managerSelectors = getSelectors(managerFacet);
     // console.log("manager address:", managerFacet.address);
 
-    const registry = await ethers.getContractFactory('SubnetRegistry', { signer: deployer, libraries: {
-      "SubnetIDHelper": LIBMAP["SubnetIDHelper"]
-    }});
 
-    const contract = await registry.deploy(
-      gatewayAddress, 
-      getterFacet.address,
-      managerFacet.address,
-      getterSelectors,
-      managerSelectors, 
+
+
+    //deploy subnet registry diamond
+    const registry = await ethers.getContractFactory('SubnetRegistryDiamond', { signer: deployer });
+
+    const registryConstructorParams = {
+      gateway: gatewayAddress,
+      getterFacet: getterFacet.address,
+      managerFacet: managerFacet.address,
+      subnetGetterSelectors: getterSelectors,
+      subnetManagerSelectors: managerSelectors,
+    };
+
+ 
+
+const facetCuts = []
+
+
+const facets = [ 
+  { name: "RegisterSubnetFacet", libs:  {
+    "SubnetIDHelper": LIBMAP["SubnetIDHelper"]
+  }},
+  { name: "SubnetGetterFacet", libs: {} }, 
+  { name: "DiamondLoupeFacet", libs: {} },
+  { name: "DiamondCutFacet", libs: {} },
+
+];
+
+for (const facet of facets) {
+  const facetInstance = await deployContractWithDeployer(
+    deployer,
+    facet.name,
+    facet.libs,
+    txArgs
+  );
+  await facetInstance.deployed();
+
+  facet.address = facetInstance.address;
+
+  facetCuts.push({
+    facetAddress: facetInstance.address,
+    action: FacetCutAction.Add,
+    functionSelectors: getSelectors(facetInstance),
+  });
+}
+ 
+  
+    const diamondLibs  =  {
+      "SubnetIDHelper": LIBMAP["SubnetIDHelper"]
+    }
+    // deploy Diamond
+    const contract = await deployContractWithDeployer(
+      deployer,
+      "SubnetRegistryDiamond",
+      {},
+      facetCuts,
+      registryConstructorParams,
       txArgs
     );
+
+
+
 
     // FEVM: 
     console.log(`registry contract deployed to: ${contract.address}`);

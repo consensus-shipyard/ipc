@@ -158,7 +158,7 @@ task(
             './scripts/deploy-sa-diamond',
         )
         const subnetActorDiamond = await deployDiamond(
-            deployments.GatewayActorDiamond,
+            deployments.Gateway,
             deployments.libs,
         )
         console.log(subnetActorDiamond)

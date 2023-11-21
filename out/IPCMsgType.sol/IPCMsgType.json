@@ -10,19 +10,19 @@
   },
   "ast": {
     "absolutePath": "src/enums/IPCMsgType.sol",
-    "id": 36833,
+    "id": 36671,
     "exportedSymbols": {
       "IPCMsgType": [
-        36832
+        36670
       ]
     },
     "nodeType": "SourceUnit",
-    "src": "46:131:42",
+    "src": "46:131:41",
     "nodes": [
       {
-        "id": 36829,
+        "id": 36667,
         "nodeType": "PragmaDirective",
-        "src": "46:23:42",
+        "src": "46:23:41",
         "nodes": [],
         "literals": [
           "solidity",
@@ -31,32 +31,32 @@
         ]
       },
       {
-        "id": 36832,
+        "id": 36670,
         "nodeType": "EnumDefinition",
-        "src": "131:45:42",
+        "src": "131:45:41",
         "nodes": [],
         "canonicalName": "IPCMsgType",
         "members": [
           {
-            "id": 36830,
+            "id": 36668,
             "name": "TopDown",
-            "nameLocation": "153:7:42",
+            "nameLocation": "153:7:41",
             "nodeType": "EnumValue",
-            "src": "153:7:42"
+            "src": "153:7:41"
           },
           {
-            "id": 36831,
+            "id": 36669,
             "name": "BottomUp",
-            "nameLocation": "166:8:42",
+            "nameLocation": "166:8:41",
             "nodeType": "EnumValue",
-            "src": "166:8:42"
+            "src": "166:8:41"
           }
         ],
         "name": "IPCMsgType",
-        "nameLocation": "136:10:42"
+        "nameLocation": "136:10:41"
       }
     ],
     "license": "MIT OR Apache-2.0"
   },
-  "id": 42
+  "id": 41
 }

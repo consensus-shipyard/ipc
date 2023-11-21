@@ -10,19 +10,19 @@
   },
   "ast": {
     "absolutePath": "src/enums/ConsensusType.sol",
-    "id": 36828,
+    "id": 36666,
     "exportedSymbols": {
       "ConsensusType": [
-        36827
+        36665
       ]
     },
     "nodeType": "SourceUnit",
-    "src": "46:128:41",
+    "src": "46:128:40",
     "nodes": [
       {
-        "id": 36825,
+        "id": 36663,
         "nodeType": "PragmaDirective",
-        "src": "46:23:41",
+        "src": "46:23:40",
         "nodes": [],
         "literals": [
           "solidity",
@@ -31,25 +31,25 @@
         ]
       },
       {
-        "id": 36827,
+        "id": 36665,
         "nodeType": "EnumDefinition",
-        "src": "136:37:41",
+        "src": "136:37:40",
         "nodes": [],
         "canonicalName": "ConsensusType",
         "members": [
           {
-            "id": 36826,
+            "id": 36664,
             "name": "Fendermint",
-            "nameLocation": "161:10:41",
+            "nameLocation": "161:10:40",
             "nodeType": "EnumValue",
-            "src": "161:10:41"
+            "src": "161:10:40"
           }
         ],
         "name": "ConsensusType",
-        "nameLocation": "141:13:41"
+        "nameLocation": "141:13:40"
       }
     ],
     "license": "MIT OR Apache-2.0"
   },
-  "id": 41
+  "id": 40
 }
