@@ -208,13 +208,80 @@ function filterSelectors(input) {
     })
 }
 
+function compareArrays(onChain, newArr) {
+    const result = {
+        removedSelectors: [],
+        matchingSelectors: [],
+        addedSelectors: [],
+    }
+
+    // Create a Map for easier lookup
+    const onChainMap = new Map()
+    onChain.forEach((selector) => onChainMap.set(selector, true))
+
+    const newArrMap = new Map()
+    newArr.forEach((selector) => newArrMap.set(selector, true))
+
+    // Find matching and removed selectors
+    onChain.forEach((selector) => {
+        if (newArrMap.has(selector)) {
+            result.matchingSelectors.push(selector)
+        } else {
+            result.removedSelectors.push(selector)
+        }
+    })
+
+    // Find added selectors
+    newArr.forEach((selector) => {
+        if (!onChainMap.has(selector)) {
+            result.addedSelectors.push(selector)
+        }
+    })
+
+    return result
+}
+async function cutFacetOnChain(
+    diamondAddress: string,
+    replacementFacet: any,
+    action,
+    functionSelectors,
+) {
+    const [deployer] = await ethers.getSigners()
+    const txArgs = await getTransactionFees()
+
+    const facetCuts = [
+        {
+            facetAddress:
+                action === FacetCutAction.Remove
+                    ? ethers.constants.AddressZero
+                    : replacementFacet.address,
+            action: action,
+            functionSelectors: functionSelectors,
+        },
+    ]
+    const diamondCutter = await ethers.getContractAt(
+        'DiamondCutFacet',
+        diamondAddress,
+        deployer,
+    )
+    const tx = await diamondCutter.diamondCut(
+        facetCuts,
+        ethers.constants.AddressZero,
+        ethers.utils.formatBytes32String(''),
+        txArgs,
+    )
+    await tx.wait()
+}
+
 // given a facet address and a diamond address,
 // upgrade the diamond to use the new facet
-export async function upgradeFacet(
+export async function upgradeFacetOnChain(
     diamondAddress: string,
-    replacementFacetName: string,
-    facetLibs: { [key in string]: string },
+    facet,
+    onChainFunctionSelectors,
 ) {
+    const replacementFacetName = facet.name
+    const facetLibs = facet.libs
     console.info(`
 Diamond Facet Upgrade:
 -----------------------------------
@@ -234,25 +301,30 @@ Replacement Facet Name: ${replacementFacetName}
     )
     await replacementFacet.deployed()
 
-    const facetCuts = [
-        {
-            facetAddress: replacementFacet.address,
-            action: FacetCutAction.Replace,
-            functionSelectors: filterSelectors(getSelectors(replacementFacet)),
-        },
-    ]
-    const diamondCutter = await ethers.getContractAt(
-        'DiamondCutFacet',
-        diamondAddress,
-        deployer,
+    const result = compareArrays(
+        onChainFunctionSelectors,
+        filterSelectors(getSelectors(replacementFacet)),
     )
-    // 0x0 (contract address) and "" (call data) can be used to send call data to contract
-    const tx = await diamondCutter.diamondCut(
-        facetCuts,
-        ethers.constants.AddressZero,
-        ethers.utils.formatBytes32String(''),
-        txArgs,
+
+    async function cutSelectorsOnChain(action, selectors) {
+        if (selectors.length > 0) {
+            await cutFacetOnChain(
+                diamondAddress,
+                replacementFacet,
+                action,
+                selectors,
+            )
+        }
+    }
+
+    // cut changes for each facet cut action - remove replace and add
+    await cutSelectorsOnChain(FacetCutAction.Remove, result['removedSelectors'])
+    await cutSelectorsOnChain(
+        FacetCutAction.Replace,
+        result['matchingSelectors'],
     )
-    await tx.wait()
-    return { replacementFacetName: replacementFacet.address }
+    await cutSelectorsOnChain(FacetCutAction.Add, result['addedSelectors'])
+
+    //end move facet
+    return { [replacementFacetName]: replacementFacet.address }
 }
