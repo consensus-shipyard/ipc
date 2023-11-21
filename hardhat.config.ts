@@ -84,12 +84,48 @@ async function saveSubnetRegistry(
     fs.writeFileSync(subnetRegistryJsonPath, JSON.stringify(subnetRegistryJson))
 }
 
+async function saveSubnetActor(
+    env: string,
+    subnetRegistryData: { [key in string]: string },
+) {
+    const subnetRegistryJsonPath = `${process.cwd()}/subnet.actor.json`
+
+    let subnetRegistryJson = { [env]: {} }
+    if (fs.existsSync(subnetRegistryJsonPath)) {
+        subnetRegistryJson = JSON.parse(
+            fs.readFileSync(subnetRegistryJsonPath).toString(),
+        )
+    }
+ 
+    subnetRegistryJson[env] = { ...subnetRegistryJson[env], ...subnetRegistryData }
+    
+
+    fs.writeFileSync(subnetRegistryJsonPath, JSON.stringify(subnetRegistryJson))
+}
+
+
 
 
 async function getSubnetRegistry(
     env: string,
 ): Promise<{ [key in string]: string }> {
     const subnetRegistryJsonPath = `${process.cwd()}/subnet.registry.json`
+
+    let subnetRegistry = {}
+    if (fs.existsSync(subnetRegistryJsonPath)) {
+        subnetRegistry = JSON.parse(
+            fs.readFileSync(subnetRegistryJsonPath).toString(),
+        )[env]
+    }
+
+    return subnetRegistry
+}
+
+
+async function getSubnetActor(
+    env: string,
+): Promise<{ [key in string]: string }> {
+    const subnetRegistryJsonPath = `${process.cwd()}/subnet.actor.json`
 
     let subnetRegistry = {}
     if (fs.existsSync(subnetRegistryJsonPath)) {
@@ -195,6 +231,8 @@ task(
     'deploy-sa-diamond-and-facets',
     'Builds and deploys Subnet Actor diamond and its facets',
     async (args, hre: HardhatRuntimeEnvironment) => {
+        await hre.run('compile')
+
         const network = hre.network.name
         const deployments = await getDeployments(network)
         const { deployDiamond } = await lazyImport(
@@ -204,7 +242,7 @@ task(
             deployments.Gateway,
             deployments.libs,
         )
-        await saveDeployments(network, subnetActorDiamond)
+        await saveSubnetActor(network, subnetActorDiamond)
     },
 )
 
@@ -276,11 +314,12 @@ task(
     async (args, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
         const network = hre.network.name
-        const deployments = await getDeployments(network)
+        const deployments = await getSubnetActor(network)
         const { upgradeDiamond } = await lazyImport(
             './scripts/upgrade-sa-diamond',
         )
-        await upgradeDiamond(deployments)
+        const updatedFacets = await upgradeDiamond(deployments)
+        await saveDeploymentsFacets('subnet.actor.json', network, updatedFacets)
     },
 )
 
