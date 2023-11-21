@@ -7,6 +7,12 @@ OUTPUT ?= ./out
 deploy-ipc:
 	./ops/deploy.sh $(NETWORK)
 
+upgrade-gw-diamond:
+	./ops/upgrade-gw-diamond.sh $(NETWORK)
+
+upgrade-sa-diamond:
+	./ops/upgrade-sa-diamond.sh $(NETWORK)
+
 compile-abi: | forge
 	./ops/compile-abi.sh $(OUTPUT)
 

@@ -44,6 +44,7 @@
     "@openzeppelin/contracts": "^4.7.3",
     "@solidity-parser/parser": "^0.16.0",
     "diamond-util": "^1.1.1",
+    "ganache-core": "^2.13.2",
     "hardhat": "^2.15.0",
     "hardhat-storage-layout-changes": "^0.1.2",
     "yarn": "^1.22.19"
