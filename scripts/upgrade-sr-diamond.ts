@@ -9,14 +9,14 @@ import {
 } from './util'
 
 /**
- * Upgrade the Gateway Actor Diamond.
+ * Upgrade the Subnet Registry Diamond.
  * @param deployments - The deployment data.
  * @returns An object of updated facets.
  */
-async function upgradeGatewayActorDiamond(deployments) {
-    const gatewayDiamondAddress = deployments.Gateway
+async function upgradeSubnetRegistryDiamond(deployments) {
+    const subnetRegistryDiamondAddress = deployments.SubnetRegistry
 
-    const onChainFacets = await getFacets(gatewayDiamondAddress)
+    const onChainFacets = await getFacets(subnetRegistryDiamondAddress)
     const updatedFacets = {}
     const onChainFacetBytecodes = await getOnChainBytecodeFromFacets(
         onChainFacets,
@@ -26,7 +26,7 @@ async function upgradeGatewayActorDiamond(deployments) {
         await upgradeFacet(
             facet,
             onChainFacets,
-            gatewayDiamondAddress,
+            subnetRegistryDiamondAddress,
             updatedFacets,
             onChainFacetBytecodes,
             deployments,
@@ -36,4 +36,4 @@ async function upgradeGatewayActorDiamond(deployments) {
     return updatedFacets
 }
 
-export { upgradeGatewayActorDiamond as upgradeDiamond }
+export { upgradeSubnetRegistryDiamond as upgradeDiamond }

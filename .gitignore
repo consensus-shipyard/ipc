@@ -20,6 +20,7 @@ scripts/*.out
 scripts/deploy-registry.ts
 scripts/deploy-gateway.ts
 binding/target
+subnet.registry.json
 
 # Coverage tools assets
 coverage_report

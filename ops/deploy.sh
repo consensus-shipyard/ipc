@@ -34,5 +34,5 @@ echo "[*] Populating deploy-registry script"
 cat scripts/${LIB_OUTPUT} | sed '/StorableMsgHelper/d' | cat - scripts/deploy-registry.template.ts > temp && mv temp scripts/deploy-registry.ts
 cat scripts/${GATEWAY_OUTPUT} |  cat - scripts/deploy-registry.ts > temp && mv temp scripts/deploy-registry.ts
 echo "[*] Registry script in $PWD/scripts/deploy-registry.ts"
-npx hardhat run scripts/deploy-registry.ts --network ${NETWORK}
+npx hardhat deploy-subnet-registry --network ${NETWORK}
 echo "[*] IPC actors successfully deployed"

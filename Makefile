@@ -13,6 +13,9 @@ upgrade-gw-diamond:
 upgrade-sa-diamond:
 	./ops/upgrade-sa-diamond.sh $(NETWORK)
 
+upgrade-sr-diamond:
+	./ops/upgrade-sr-diamond.sh $(NETWORK)
+ 
 compile-abi: | forge
 	./ops/compile-abi.sh $(OUTPUT)
 

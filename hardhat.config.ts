@@ -44,19 +44,18 @@ async function saveDeployments(
 }
 
 async function saveDeploymentsFacets(
+    filename: string,
     env: string,
     updatedFacets: { [key: string]: string },
     branch?: string,
 ) {
-    const deploymentsJsonPath = `${process.cwd()}/deployments.json`
-
+    const deploymentsJsonPath = `${process.cwd()}/${filename}`
     let deploymentsJson = { [env]: {} }
     if (fs.existsSync(deploymentsJsonPath)) {
         deploymentsJson = JSON.parse(
             fs.readFileSync(deploymentsJsonPath).toString(),
         )
     }
-
     const facets = deploymentsJson[env]['Facets']
     for (const facetIndex in facets) {
         const facetName = facets[facetIndex].name
@@ -64,9 +63,44 @@ async function saveDeploymentsFacets(
             facets[facetIndex].address = updatedFacets[facetName]
         }
     }
-
     fs.writeFileSync(deploymentsJsonPath, JSON.stringify(deploymentsJson))
 }
+async function saveSubnetRegistry(
+    env: string,
+    subnetRegistryData: { [key in string]: string },
+) {
+    const subnetRegistryJsonPath = `${process.cwd()}/subnet.registry.json`
+
+    let subnetRegistryJson = { [env]: {} }
+    if (fs.existsSync(subnetRegistryJsonPath)) {
+        subnetRegistryJson = JSON.parse(
+            fs.readFileSync(subnetRegistryJsonPath).toString(),
+        )
+    }
+ 
+    subnetRegistryJson[env] = { ...subnetRegistryJson[env], ...subnetRegistryData }
+    
+
+    fs.writeFileSync(subnetRegistryJsonPath, JSON.stringify(subnetRegistryJson))
+}
+
+
+
+async function getSubnetRegistry(
+    env: string,
+): Promise<{ [key in string]: string }> {
+    const subnetRegistryJsonPath = `${process.cwd()}/subnet.registry.json`
+
+    let subnetRegistry = {}
+    if (fs.existsSync(subnetRegistryJsonPath)) {
+        subnetRegistry = JSON.parse(
+            fs.readFileSync(subnetRegistryJsonPath).toString(),
+        )[env]
+    }
+
+    return subnetRegistry
+}
+
 
 async function getDeployments(
     env: string,
@@ -111,6 +145,18 @@ task(
 )
 
 task(
+    'deploy-subnet-registry',
+    'Builds and deploys the Registry contract on the selected network',
+    async (args, hre: HardhatRuntimeEnvironment) => {
+        const network = hre.network.name
+         const { deploy } = await lazyImport('./scripts/deploy-registry')
+        const subnetRegistryDeployment = await deploy()
+        await saveSubnetRegistry(network, subnetRegistryDeployment)
+      },
+)
+
+
+task(
     'deploy-subnet',
     'Builds and deploys the SubnetActor contract on the selected network',
     async (args, hre: HardhatRuntimeEnvironment) => {
@@ -127,8 +173,6 @@ task(
             deployments.libs,
         )
 
-        console.log(subnetDeployment)
-
         await saveDeployments(network, subnetDeployment)
     },
 )
@@ -143,7 +187,6 @@ task(
             './scripts/deploy-gw-diamond',
         )
         const gatewayActorDiamond = await deployDiamond(deployments.libs)
-        console.log(gatewayActorDiamond)
         await saveDeployments(network, gatewayActorDiamond)
     },
 )
@@ -161,7 +204,6 @@ task(
             deployments.Gateway,
             deployments.libs,
         )
-        console.log(subnetActorDiamond)
         await saveDeployments(network, subnetActorDiamond)
     },
 )
@@ -207,9 +249,26 @@ task(
             './scripts/upgrade-gw-diamond',
         )
         const updatedFacets = await upgradeDiamond(deployments)
-        await saveDeploymentsFacets(network, updatedFacets)
+        await saveDeploymentsFacets('deployments.json', network, updatedFacets)
     },
 )
+
+task(
+    'upgrade-sr-diamond',
+    'Upgrades IPC Subnet Registry Diamond Facets on an EVM-compatible subnet using hardhat',
+    async (args, hre: HardhatRuntimeEnvironment) => {
+        await hre.run('compile')
+        const network = hre.network.name
+        const subnetRegistry = await getSubnetRegistry(network)
+        const { upgradeDiamond } = await lazyImport(
+            './scripts/upgrade-sr-diamond',
+        )
+        const updatedFacets = await upgradeDiamond(subnetRegistry)
+        await saveDeploymentsFacets('subnet.registry.json', network, updatedFacets)
+
+    },
+)
+
 
 task(
     'upgrade-sa-diamond',
