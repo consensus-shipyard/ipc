@@ -593,10 +593,10 @@
         36385
       ],
       "IDiamondCut": [
-        39468
+        39445
       ],
       "LibDiamond": [
-        41041
+        41018
       ]
     },
     "nodeType": "SourceUnit",
@@ -622,7 +622,7 @@
         "file": "../interfaces/IDiamondCut.sol",
         "nameLocation": "-1:-1:-1",
         "scope": 36386,
-        "sourceUnit": 39469,
+        "sourceUnit": 39446,
         "symbolAliases": [
           {
             "foreign": {
@@ -630,7 +630,7 @@
               "name": "IDiamondCut",
               "nodeType": "Identifier",
               "overloadedDeclarations": [],
-              "referencedDeclaration": 39468,
+              "referencedDeclaration": 39445,
               "src": "370:11:39",
               "typeDescriptions": {}
             },
@@ -648,7 +648,7 @@
         "file": "../lib/LibDiamond.sol",
         "nameLocation": "-1:-1:-1",
         "scope": 36386,
-        "sourceUnit": 41042,
+        "sourceUnit": 41019,
         "symbolAliases": [
           {
             "foreign": {
@@ -656,7 +656,7 @@
               "name": "LibDiamond",
               "nodeType": "Identifier",
               "overloadedDeclarations": [],
-              "referencedDeclaration": 41041,
+              "referencedDeclaration": 41018,
               "src": "429:10:39",
               "typeDescriptions": {}
             },
@@ -691,10 +691,10 @@
                         "name": "LibDiamond",
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
-                        "referencedDeclaration": 41041,
+                        "referencedDeclaration": 41018,
                         "src": "1083:10:39",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_type$_t_contract$_LibDiamond_$41041_$",
+                          "typeIdentifier": "t_type$_t_contract$_LibDiamond_$41018_$",
                           "typeString": "type(library LibDiamond)"
                         }
                       },
@@ -706,7 +706,7 @@
                       "memberLocation": "1094:22:39",
                       "memberName": "enforceIsContractOwner",
                       "nodeType": "MemberAccess",
-                      "referencedDeclaration": 40501,
+                      "referencedDeclaration": 40478,
                       "src": "1083:33:39",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_view$__$returns$__$",
@@ -744,7 +744,7 @@
                         "referencedDeclaration": 36362,
                         "src": "1164:11:39",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_array$_t_struct$_FacetCut_$39438_calldata_ptr_$dyn_calldata_ptr",
+                          "typeIdentifier": "t_array$_t_struct$_FacetCut_$39415_calldata_ptr_$dyn_calldata_ptr",
                           "typeString": "struct IDiamond.FacetCut calldata[] calldata"
                         }
                       },
@@ -776,7 +776,7 @@
                     "expression": {
                       "argumentTypes": [
                         {
-                          "typeIdentifier": "t_array$_t_struct$_FacetCut_$39438_calldata_ptr_$dyn_calldata_ptr",
+                          "typeIdentifier": "t_array$_t_struct$_FacetCut_$39415_calldata_ptr_$dyn_calldata_ptr",
                           "typeString": "struct IDiamond.FacetCut calldata[] calldata"
                         },
                         {
@@ -793,10 +793,10 @@
                         "name": "LibDiamond",
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
-                        "referencedDeclaration": 41041,
+                        "referencedDeclaration": 41018,
                         "src": "1128:10:39",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_type$_t_contract$_LibDiamond_$41041_$",
+                          "typeIdentifier": "t_type$_t_contract$_LibDiamond_$41018_$",
                           "typeString": "type(library LibDiamond)"
                         }
                       },
@@ -808,10 +808,10 @@
                       "memberLocation": "1139:10:39",
                       "memberName": "diamondCut",
                       "nodeType": "MemberAccess",
-                      "referencedDeclaration": 40620,
+                      "referencedDeclaration": 40597,
                       "src": "1128:21:39",
                       "typeDescriptions": {
-                        "typeIdentifier": "t_function_internal_nonpayable$_t_array$_t_struct$_FacetCut_$39438_memory_ptr_$dyn_memory_ptr_$_t_address_$_t_bytes_memory_ptr_$returns$__$",
+                        "typeIdentifier": "t_function_internal_nonpayable$_t_array$_t_struct$_FacetCut_$39415_memory_ptr_$dyn_memory_ptr_$_t_address_$_t_bytes_memory_ptr_$returns$__$",
                         "typeString": "function (struct IDiamond.FacetCut memory[] memory,address,bytes memory)"
                       }
                     },
@@ -846,7 +846,7 @@
               ]
             },
             "baseFunctions": [
-              39467
+              39444
             ],
             "documentation": {
               "id": 36358,
@@ -882,7 +882,7 @@
                   "stateVariable": false,
                   "storageLocation": "calldata",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_array$_t_struct$_FacetCut_$39438_calldata_ptr_$dyn_calldata_ptr",
+                    "typeIdentifier": "t_array$_t_struct$_FacetCut_$39415_calldata_ptr_$dyn_calldata_ptr",
                     "typeString": "struct IDiamond.FacetCut[]"
                   },
                   "typeName": {
@@ -896,13 +896,13 @@
                           "981:8:39"
                         ],
                         "nodeType": "IdentifierPath",
-                        "referencedDeclaration": 39438,
+                        "referencedDeclaration": 39415,
                         "src": "981:8:39"
                       },
-                      "referencedDeclaration": 39438,
+                      "referencedDeclaration": 39415,
                       "src": "981:8:39",
                       "typeDescriptions": {
-                        "typeIdentifier": "t_struct$_FacetCut_$39438_storage_ptr",
+                        "typeIdentifier": "t_struct$_FacetCut_$39415_storage_ptr",
                         "typeString": "struct IDiamond.FacetCut"
                       }
                     },
@@ -910,7 +910,7 @@
                     "nodeType": "ArrayTypeName",
                     "src": "981:10:39",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_array$_t_struct$_FacetCut_$39438_storage_$dyn_storage_ptr",
+                      "typeIdentifier": "t_array$_t_struct$_FacetCut_$39415_storage_$dyn_storage_ptr",
                       "typeString": "struct IDiamond.FacetCut[]"
                     }
                   },
@@ -996,7 +996,7 @@
                 "500:11:39"
               ],
               "nodeType": "IdentifierPath",
-              "referencedDeclaration": 39468,
+              "referencedDeclaration": 39445,
               "src": "500:11:39"
             },
             "id": 36357,
@@ -1010,27 +1010,27 @@
         "fullyImplemented": true,
         "linearizedBaseContracts": [
           36385,
-          39468,
-          39449
+          39445,
+          39426
         ],
         "name": "DiamondCutFacet",
         "nameLocation": "481:15:39",
         "scope": 36386,
         "usedErrors": [
-          40332,
-          40338,
-          40343,
-          40347,
-          40351,
+          40309,
+          40315,
+          40320,
+          40324,
+          40328,
+          40333,
+          40339,
+          40352,
           40356,
-          40362,
-          40375,
-          40379,
-          40383,
-          40387,
-          40391,
-          40395,
-          40399
+          40360,
+          40364,
+          40368,
+          40372,
+          40376
         ]
       }
     ],

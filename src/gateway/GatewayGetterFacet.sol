@@ -78,16 +78,6 @@ contract GatewayGetterFacet {
         return subnet.topDownNonce;
     }
 
-    /// @notice get the list of top down messages from block number, we may also consider introducing pagination.
-    /// @param subnetId - The subnet id to fetch messages from
-    /// @param blockNumber - The block to get top down messages
-    function getTopDownMsgs(
-        SubnetID calldata subnetId,
-        uint256 blockNumber
-    ) external view returns (CrossMsg[] memory msgs) {
-        msgs = LibGateway.getTopDownMsgs({subnetId: subnetId, fromBlock: blockNumber, toBlock: blockNumber});
-    }
-
     /// @notice Get the latest applied top down nonce
     /// @param subnetId - The subnet id to fetch messages from
     function getAppliedTopDownNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {

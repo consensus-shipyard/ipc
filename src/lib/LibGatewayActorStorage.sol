@@ -13,9 +13,6 @@ struct GatewayActorStorage {
     /// @notice List of subnets
     /// SubnetID => Subnet
     mapping(bytes32 => Subnet) subnets;
-    /// @notice a mapping of block number to top-down cross-messages
-    /// SubnetID => blockNumber => messages
-    mapping(bytes32 => mapping(uint256 => CrossMsg[])) topDownMsgs;
     /// @notice The parent finalities. Key is the block number, value is the finality struct.
     mapping(uint256 => ParentFinality) finalitiesMap;
     /// @notice The latest parent height committed.

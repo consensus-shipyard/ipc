@@ -98,20 +98,20 @@
   },
   "ast": {
     "absolutePath": "test/NumberContract.sol",
-    "id": 49101,
+    "id": 48962,
     "exportedSymbols": {
       "NumberContractFacetEight": [
-        49100
+        48961
       ],
       "NumberContractFacetSeven": [
-        49091
+        48952
       ]
     },
     "nodeType": "SourceUnit",
     "src": "46:258:79",
     "nodes": [
       {
-        "id": 49082,
+        "id": 48943,
         "nodeType": "PragmaDirective",
         "src": "46:23:79",
         "nodes": [],
@@ -122,17 +122,17 @@
         ]
       },
       {
-        "id": 49091,
+        "id": 48952,
         "nodeType": "ContractDefinition",
         "src": "71:115:79",
         "nodes": [
           {
-            "id": 49090,
+            "id": 48951,
             "nodeType": "FunctionDefinition",
             "src": "111:73:79",
             "nodes": [],
             "body": {
-              "id": 49089,
+              "id": 48950,
               "nodeType": "Block",
               "src": "159:25:79",
               "nodes": [],
@@ -140,7 +140,7 @@
                 {
                   "expression": {
                     "hexValue": "37",
-                    "id": 49087,
+                    "id": 48948,
                     "isConstant": false,
                     "isLValue": false,
                     "isPure": true,
@@ -154,8 +154,8 @@
                     },
                     "value": "7"
                   },
-                  "functionReturnParameters": 49086,
-                  "id": 49088,
+                  "functionReturnParameters": 48947,
+                  "id": 48949,
                   "nodeType": "Return",
                   "src": "169:8:79"
                 }
@@ -168,23 +168,23 @@
             "name": "getNum",
             "nameLocation": "120:6:79",
             "parameters": {
-              "id": 49083,
+              "id": 48944,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "126:2:79"
             },
             "returnParameters": {
-              "id": 49086,
+              "id": 48947,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 49085,
+                  "id": 48946,
                   "mutability": "mutable",
                   "name": "",
                   "nameLocation": "-1:-1:-1",
                   "nodeType": "VariableDeclaration",
-                  "scope": 49090,
+                  "scope": 48951,
                   "src": "152:5:79",
                   "stateVariable": false,
                   "storageLocation": "default",
@@ -193,7 +193,7 @@
                     "typeString": "uint8"
                   },
                   "typeName": {
-                    "id": 49084,
+                    "id": 48945,
                     "name": "uint8",
                     "nodeType": "ElementaryTypeName",
                     "src": "152:5:79",
@@ -207,7 +207,7 @@
               ],
               "src": "151:7:79"
             },
-            "scope": 49091,
+            "scope": 48952,
             "stateMutability": "pure",
             "virtual": false,
             "visibility": "external"
@@ -220,25 +220,25 @@
         "contractKind": "contract",
         "fullyImplemented": true,
         "linearizedBaseContracts": [
-          49091
+          48952
         ],
         "name": "NumberContractFacetSeven",
         "nameLocation": "80:24:79",
-        "scope": 49101,
+        "scope": 48962,
         "usedErrors": []
       },
       {
-        "id": 49100,
+        "id": 48961,
         "nodeType": "ContractDefinition",
         "src": "188:115:79",
         "nodes": [
           {
-            "id": 49099,
+            "id": 48960,
             "nodeType": "FunctionDefinition",
             "src": "228:73:79",
             "nodes": [],
             "body": {
-              "id": 49098,
+              "id": 48959,
               "nodeType": "Block",
               "src": "276:25:79",
               "nodes": [],
@@ -246,7 +246,7 @@
                 {
                   "expression": {
                     "hexValue": "38",
-                    "id": 49096,
+                    "id": 48957,
                     "isConstant": false,
                     "isLValue": false,
                     "isPure": true,
@@ -260,8 +260,8 @@
                     },
                     "value": "8"
                   },
-                  "functionReturnParameters": 49095,
-                  "id": 49097,
+                  "functionReturnParameters": 48956,
+                  "id": 48958,
                   "nodeType": "Return",
                   "src": "286:8:79"
                 }
@@ -274,23 +274,23 @@
             "name": "getNum",
             "nameLocation": "237:6:79",
             "parameters": {
-              "id": 49092,
+              "id": 48953,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "243:2:79"
             },
             "returnParameters": {
-              "id": 49095,
+              "id": 48956,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 49094,
+                  "id": 48955,
                   "mutability": "mutable",
                   "name": "",
                   "nameLocation": "-1:-1:-1",
                   "nodeType": "VariableDeclaration",
-                  "scope": 49099,
+                  "scope": 48960,
                   "src": "269:5:79",
                   "stateVariable": false,
                   "storageLocation": "default",
@@ -299,7 +299,7 @@
                     "typeString": "uint8"
                   },
                   "typeName": {
-                    "id": 49093,
+                    "id": 48954,
                     "name": "uint8",
                     "nodeType": "ElementaryTypeName",
                     "src": "269:5:79",
@@ -313,7 +313,7 @@
               ],
               "src": "268:7:79"
             },
-            "scope": 49100,
+            "scope": 48961,
             "stateMutability": "pure",
             "virtual": false,
             "visibility": "external"
@@ -326,11 +326,11 @@
         "contractKind": "contract",
         "fullyImplemented": true,
         "linearizedBaseContracts": [
-          49100
+          48961
         ],
         "name": "NumberContractFacetEight",
         "nameLocation": "197:24:79",
-        "scope": 49101,
+        "scope": 48962,
         "usedErrors": []
       }
     ],

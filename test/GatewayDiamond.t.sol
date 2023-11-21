@@ -2025,33 +2025,6 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
             require(nonce == expectedNonce, "unexpected nonce");
             require(circSupply == expectedCircSupply, "unexpected circSupply");
         }
-
-        CrossMsg[] memory topDownMsgs = gwGetter.getTopDownMsgs(subnetId, block.number);
-        for (uint256 msgIndex = 0; msgIndex < expectedTopDownMsgsLength; msgIndex++) {
-            CrossMsg memory topDownMsg = topDownMsgs[msgIndex];
-
-            require(topDownMsg.message.nonce == msgIndex, "unexpected nonce");
-            require(topDownMsg.message.value == fundAmountWithSubtractedFee, "unexpected value");
-            require(
-                keccak256(abi.encode(topDownMsg.message.to)) ==
-                    keccak256(
-                        abi.encode(IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(funderAddress)}))
-                    ),
-                "unexpected to"
-            );
-            require(
-                keccak256(abi.encode(topDownMsg.message.from)) ==
-                    keccak256(
-                        abi.encode(
-                            IPCAddress({
-                                subnetId: subnetId.getParentSubnet(),
-                                rawAddress: FvmAddressHelper.from(funderAddress)
-                            })
-                        )
-                    ),
-                "unexpected from"
-            );
-        }
     }
 
     // function _join(address validatorAddress) internal {

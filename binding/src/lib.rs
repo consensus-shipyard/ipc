@@ -14,6 +14,8 @@ pub mod gateway_router_facet;
 #[allow(clippy::all)]
 pub mod i_diamond;
 #[allow(clippy::all)]
+pub mod lib_gateway;
+#[allow(clippy::all)]
 pub mod lib_staking;
 #[allow(clippy::all)]
 pub mod lib_staking_change_log;
@@ -32,6 +34,7 @@ fvm_address_conversion!(gateway_getter_facet);
 fvm_address_conversion!(gateway_router_facet);
 fvm_address_conversion!(gateway_messenger_facet);
 fvm_address_conversion!(subnet_actor_manager_facet);
+fvm_address_conversion!(lib_gateway);
 
 // The list of contracts that need to convert common types between each other
 common_type_conversion!(gateway_getter_facet, subnet_actor_manager_facet);

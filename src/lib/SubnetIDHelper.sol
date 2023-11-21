@@ -10,7 +10,19 @@ library SubnetIDHelper {
     using Strings for address;
 
     error NoParentForSubnet();
+    error NoAddressForRoot();
     error EmptySubnet();
+    error DifferentRootNetwork();
+    error InvalidRoute();
+
+    function getAddress(SubnetID memory subnet) public pure returns (address) {
+        uint256 length = subnet.route.length;
+
+        if (length == 0) {
+            revert NoAddressForRoot();
+        }
+        return subnet.route[length - 1];
+    }
 
     function getParentSubnet(SubnetID memory subnet) public pure returns (SubnetID memory) {
         if (subnet.route.length == 0) {
@@ -116,13 +128,15 @@ library SubnetIDHelper {
 
     /// @notice In the path determined by the current subnet id, it moves
     /// down in the path from the subnet id given as argument.
-    /// the subnet2 needs to be a subset of the subnet1
+    /// subnet2 needs to be a prefix of the subnet1.
+    /// If subnet1 is /a/b/c/d and subnet2 is /a/b, then the returned ID should be /a/b/c.
+    /// @dev Revert will be triggered if subnet2 is an invalid input.
     function down(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (SubnetID memory) {
         if (subnet1.root != subnet2.root) {
-            return SubnetID({root: 0, route: new address[](0)});
+            revert DifferentRootNetwork();
         }
         if (subnet1.route.length <= subnet2.route.length) {
-            return SubnetID({root: 0, route: new address[](0)});
+            revert InvalidRoute();
         }
 
         uint256 i = 0;
