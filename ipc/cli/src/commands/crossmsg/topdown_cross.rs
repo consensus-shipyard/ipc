@@ -33,8 +33,7 @@ impl CommandLineHandler for ListTopdownMsgs {
             let parent = subnet
                 .parent()
                 .ok_or_else(|| anyhow!("subnet has not parent"))?;
-            let epoch = provider.get_chain_head_height(&parent).await?;
-            let hash = provider.get_block_hash(&parent, epoch).await?;
+            let hash = provider.get_block_hash(&parent, arguments.epoch).await?;
             hash.block_hash
         };
         let msgs = provider

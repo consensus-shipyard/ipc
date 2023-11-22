@@ -6,11 +6,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use ethers::types::H256;
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
-    lib_staking_change_log, subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_registry,
+    lib_gateway, lib_staking_change_log, subnet_actor_getter_facet, subnet_actor_manager_facet,
+    subnet_registry,
 };
 use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_sdk::validator::from_contract_validators;
@@ -33,7 +33,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{BlockId, Eip1559TransactionRequest, I256, U256};
+use ethers::types::{Eip1559TransactionRequest, I256, U256};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
@@ -116,31 +116,42 @@ impl TopDownFinalityQuery for EthSubnetManager {
             return Err(anyhow!("invalid block hash len"));
         }
 
-        let route = subnet_id_to_evm_addresses(subnet_id)?;
-        log::debug!("getting top down messages for route: {route:?}");
-
-        let subnet_id = gateway_getter_facet::SubnetID {
-            root: subnet_id.root_id(),
-            route,
-        };
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
+        let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
 
-        let call = gateway_contract
-            .get_top_down_msgs(subnet_id, U256::from(epoch))
-            .block(BlockId::from(H256::from_slice(block_hash)));
-        let raw_msgs = call
-            .call()
-            .await
-            .map_err(|e| anyhow!("cannot get evm top down messages: {e:}"))?;
+        let topic1 = contract_address_from_subnet(subnet_id)?;
+        log::debug!(
+            "getting top down messages for subnet: {:?} with topic 1: {}, block hash equals: {}",
+            subnet_id,
+            topic1,
+            hex::encode(block_hash),
+        );
 
-        let mut msgs = vec![];
-        for c in raw_msgs {
-            msgs.push(ipc_sdk::cross::CrossMsg::try_from(c)?);
+        let ev = gateway_contract
+            .event::<lib_gateway::NewTopDownMessageFilter>()
+            .from_block(epoch as u64)
+            .to_block(epoch as u64)
+            .topic1(topic1);
+
+        let mut messages = vec![];
+        for (event, meta) in query_with_meta(ev, gateway_contract.client()).await? {
+            let msg = CrossMsg::try_from(event.message)?;
+            log::debug!("received message: {:?} and meta: {:?}", msg, meta);
+
+            if meta.block_hash.0 != block_hash {
+                return Err(anyhow!(
+                    "block hash not equal, input: {}, received: {}",
+                    hex::encode(block_hash),
+                    hex::encode(meta.block_hash.0)
+                ));
+            }
+
+            messages.push(msg);
         }
-        Ok(msgs)
+
+        Ok(messages)
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult> {
