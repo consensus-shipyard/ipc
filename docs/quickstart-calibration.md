@@ -215,6 +215,7 @@ cargo make --makefile ./bin/ipc-infra/Makefile.toml \
     -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \
     -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
     -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
+    -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
     child-validator
 ```
 `PARENT_REGISTRY` and `PARENT_GATEWAY` are the contract addresses of the IPC contracts in Calibration. This command also uses the calibration endpoint as default. Finally, you'll need to choose a different `NODE_NAME`, `CMT_HOST_PORT`, `ETHAPI_HOST_PORT` for each of the validators.
