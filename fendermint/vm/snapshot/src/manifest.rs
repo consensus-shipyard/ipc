@@ -11,10 +11,7 @@ use fendermint_vm_interpreter::fvm::state::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::SnapshotItem;
-
-/// The file name in snapshot directories that contains the manifest.
-const MANIFEST_FILE_NAME: &str = "manifest.json";
+use crate::{SnapshotItem, MANIFEST_FILE_NAME};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct SnapshotManifest {
@@ -115,6 +112,19 @@ pub fn file_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash>
 pub fn parts_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash> {
     let mut hasher = Sha256::new();
 
+    let chunks = list_parts(path)?;
+
+    for path in chunks {
+        let mut file = std::fs::File::open(path).context("failed to open part")?;
+        let _ = std::io::copy(&mut file, &mut hasher)?;
+    }
+
+    let hash = hasher.finalize().into();
+    Ok(tendermint::Hash::Sha256(hash))
+}
+
+/// List all the `{idx}.part` files in a directory.
+pub fn list_parts(path: impl AsRef<Path>) -> anyhow::Result<Vec<PathBuf>> {
     let mut chunks = std::fs::read_dir(path.as_ref())
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
@@ -142,13 +152,7 @@ pub fn parts_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash
             .expect("file part names are prefixed by index")
     });
 
-    for entry in chunks {
-        let mut file = std::fs::File::open(&entry.path()).context("failed to open part")?;
-        let _ = std::io::copy(&mut file, &mut hasher)?;
-    }
-
-    let hash = hasher.finalize().into();
-    Ok(tendermint::Hash::Sha256(hash))
+    Ok(chunks.into_iter().map(|c| c.path()).collect())
 }
 
 #[cfg(feature = "arb")]

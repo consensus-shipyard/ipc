@@ -887,7 +887,14 @@ where
                     tracing::info!(?manifest, "received snapshot offer");
                     // We can look at the version but currently there's only one.
                     match atomically_or_err(|| client.offer_snapshot(manifest.clone())).await {
-                        Ok(()) => {
+                        Ok(path) => {
+                            tracing::info!(
+                                download_dir = path.to_string_lossy().to_string(),
+                                height = manifest.block_height,
+                                size = manifest.size,
+                                chunks = manifest.chunks,
+                                "downloading snapshot"
+                            );
                             return Ok(response::OfferSnapshot::Accept);
                         }
                         Err(SnapshotError::IncompatibleVersion(version)) => {
@@ -919,13 +926,47 @@ where
 
         if let Some(ref client) = self.snapshots {
             match atomically_or_err(|| {
-                client.apply_chunk(request.index, request.chunk.clone().into())
+                client.save_chunk(request.index, request.chunk.clone().into())
             })
             .await
             {
-                Ok(completed) => {
-                    if completed {
-                        tracing::info!("received all snapshot chunks");
+                Ok(snapshot) => {
+                    if let Some(snapshot) = snapshot {
+                        tracing::info!(
+                            download_dir = snapshot.snapshot_dir.to_string_lossy().to_string(),
+                            height = snapshot.manifest.block_height,
+                            "received all snapshot chunks",
+                        );
+
+                        // Ideally we would import into some isolated store then validate,
+                        // but for now let's trust that all is well.
+                        if let Err(e) = snapshot.import(self.state_store_clone(), true).await {
+                            tracing::error!(error =? e, "failed to import snapshot");
+                            return Ok(response::ApplySnapshotChunk {
+                                result: response::ApplySnapshotChunkResult::RejectSnapshot,
+                                ..default
+                            });
+                        }
+
+                        tracing::info!(
+                            height = snapshot.manifest.block_height,
+                            "imported snapshot"
+                        );
+
+                        // Now insert the new state into the history.
+                        let mut state = self.committed_state()?;
+                        state.block_height = snapshot.manifest.block_height;
+                        state.state_params = snapshot.manifest.state_params;
+                        self.set_committed_state(state)?;
+
+                        // TODO: We can remove the `current_download` from the STM
+                        // state here which would cause it to get dropped from /tmp,
+                        // but for now let's keep it just in case we need to investigate
+                        // some problem.
+
+                        // We could also move the files into our own snapshot directory
+                        // so that we can offer it to others, but again let's hold on
+                        // until we have done more robust validation.
                     }
                     return Ok(response::ApplySnapshotChunk {
                         result: response::ApplySnapshotChunkResult::Accept,

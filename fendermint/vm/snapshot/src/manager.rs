@@ -6,16 +6,13 @@ use std::time::Duration;
 
 use crate::manifest::{file_checksum, list_manifests, write_manifest, SnapshotManifest};
 use crate::state::SnapshotState;
-use crate::{car, SnapshotClient, SnapshotItem};
+use crate::{car, SnapshotClient, SnapshotItem, PARTS_DIR_NAME, SNAPSHOT_FILE_NAME};
 use anyhow::Context;
 use async_stm::{atomically, retry, TVar};
 use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, Snapshot};
 use fendermint_vm_interpreter::fvm::state::FvmStateParams;
 use fvm_ipld_blockstore::Blockstore;
 use tendermint_rpc::Client;
-
-/// The file name to export the CAR to.
-const SNAPSHOT_FILE_NAME: &str = "snapshot.car";
 
 /// Create snapshots at regular block intervals.
 pub struct SnapshotManager<BS> {
@@ -199,8 +196,8 @@ where
             .context("failed to create temp dir for snapshot")?;
 
         let snapshot_path = temp_dir.path().join(SNAPSHOT_FILE_NAME);
-        let checksum_path = temp_dir.path().join("parts.sha256");
-        let parts_path = temp_dir.path().join("parts");
+        let checksum_path = temp_dir.path().join(format!("{PARTS_DIR_NAME}.sha256"));
+        let parts_path = temp_dir.path().join(PARTS_DIR_NAME);
 
         // TODO: See if we can reuse the contents of an existing CAR file.
 
@@ -304,7 +301,7 @@ mod tests {
     use fvm::engine::MultiEngine;
     use quickcheck::Arbitrary;
 
-    use crate::manifest;
+    use crate::{manifest, PARTS_DIR_NAME};
 
     use super::SnapshotManager;
 
@@ -388,8 +385,9 @@ mod tests {
         assert_eq!(snapshots.len(), 1, "can list manifests");
         assert_eq!(snapshots[0], snapshot);
 
-        let checksum = manifest::parts_checksum(snapshot.snapshot_dir.as_path().join("parts"))
-            .expect("parts checksum can be calculated");
+        let checksum =
+            manifest::parts_checksum(snapshot.snapshot_dir.as_path().join(PARTS_DIR_NAME))
+                .expect("parts checksum can be calculated");
 
         assert_eq!(
             checksum, snapshot.manifest.checksum,
