@@ -39,7 +39,7 @@ type SnapshotStreamer = Box<dyn Send + Unpin + Stream<Item = (Cid, Vec<u8>)>>;
 
 impl<BS> Snapshot<BS>
 where
-    BS: Blockstore + Clone + 'static + Send,
+    BS: Blockstore + 'static + Send,
 {
     pub fn new(
         store: BS,
@@ -131,11 +131,11 @@ pub struct V1Snapshot<BS> {
     block_height: BlockHeight,
 }
 
-type BlockStateParams = (FvmStateParams, BlockHeight);
+pub type BlockStateParams = (FvmStateParams, BlockHeight);
 
 impl<BS> V1Snapshot<BS>
 where
-    BS: Blockstore + Clone + 'static + Send,
+    BS: Blockstore + 'static + Send,
 {
     /// Creates a new V2Snapshot struct. Caller ensure store
     pub fn new(
@@ -263,8 +263,8 @@ fn derive_cid<T: Serialize>(t: &T) -> anyhow::Result<(Cid, Vec<u8>)> {
 
 #[cfg(test)]
 mod tests {
-    use crate::fvm::state::snapshot::StateTreeStreamer;
-    use crate::fvm::state::{FvmStateParams, Snapshot};
+    use crate::fvm::state::snapshot::{Snapshot, StateTreeStreamer};
+    use crate::fvm::state::FvmStateParams;
     use crate::fvm::store::memory::MemoryBlockstore;
     use crate::fvm::store::ReadOnlyBlockstore;
     use cid::Cid;

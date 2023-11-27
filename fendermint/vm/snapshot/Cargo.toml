@@ -1,0 +1,23 @@
+[package]
+name = "fendermint_vm_snapshot"
+description = "Produce and consume ledger snapshots"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+async-stm = { workspace = true }
+tempfile = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+tendermint = { workspace = true }
+tendermint-rpc = { workspace = true }
+
+fvm_ipld_blockstore = { workspace = true }
+
+fendermint_vm_interpreter = { path = "../interpreter" }
