@@ -31,6 +31,7 @@ use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
+use fendermint_vm_snapshot::manager::SnapshotClient;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
@@ -169,6 +170,8 @@ where
     resolve_pool: CheckpointPool,
     /// The parent finality provider for top down checkpoint
     parent_finality_provider: TopDownFinalityProvider,
+    /// Interface to the snapshotter, if enabled.
+    snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
     exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<SS>>>>,
     /// Projected (partial) state accumulating during transaction checks.
@@ -196,6 +199,7 @@ where
         interpreter: I,
         resolve_pool: CheckpointPool,
         parent_finality_provider: TopDownFinalityProvider,
+        snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
@@ -208,6 +212,7 @@ where
             interpreter: Arc::new(interpreter),
             resolve_pool,
             parent_finality_provider,
+            snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
         };
@@ -803,6 +808,8 @@ where
         state.state_params.circ_supply = circ_supply;
 
         let app_hash = state.app_hash();
+        let block_height = state.block_height;
+        let state_params = state.state_params.clone();
 
         tracing::debug!(
             height = state.block_height,
@@ -834,7 +841,10 @@ where
         let mut guard = self.check_state.lock().await;
         *guard = None;
 
-        tracing::debug!("committed state");
+        // Notify the snapshotter.
+        if let Some(ref snapshots) = self.snapshots {
+            snapshots.on_commit(block_height, state_params).await;
+        }
 
         let response = response::Commit {
             data: app_hash.into(),

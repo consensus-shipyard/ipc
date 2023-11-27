@@ -190,6 +190,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         interpreter,
         resolve_pool,
         parent_finality_provider.clone(),
+        None,
     )?;
 
     if let Some((agent_proxy, config)) = ipc_tuple {
