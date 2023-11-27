@@ -59,6 +59,10 @@ pub struct SnapshotManager<BS> {
     snapshot_dir: PathBuf,
     /// Target size in bytes for snapshot chunks.
     snapshot_chunk_size: usize,
+    /// Number of snapshots to keep.
+    ///
+    /// 0 means unlimited.
+    snapshot_history_size: usize,
     /// Shared state of snapshots.
     snapshot_state: SnapshotState,
     /// How often to check CometBFT whether it has finished syncing.
@@ -78,6 +82,7 @@ where
         snapshot_interval: BlockHeight,
         snapshot_dir: PathBuf,
         snapshot_chunk_size: usize,
+        snapshot_history_size: usize,
         sync_poll_interval: Duration,
     ) -> anyhow::Result<(Self, SnapshotClient)> {
         let snapshot_items = list_manifests(&snapshot_dir).context("failed to list manifests")?;
@@ -93,6 +98,7 @@ where
             store,
             snapshot_dir,
             snapshot_chunk_size,
+            snapshot_history_size,
             snapshot_state: snapshot_state.clone(),
             sync_poll_interval,
             // Assume we are syncing until we can determine otherwise.
@@ -170,7 +176,38 @@ where
                 }
             }
 
+            // Delete old snapshots.
+            self.prune_history().await;
+
             last_params = Some((state_params, block_height));
+        }
+    }
+
+    /// Remove snapshot directories if we have more than the desired history size.
+    async fn prune_history(&self) {
+        if self.snapshot_history_size == 0 {
+            return;
+        }
+
+        let removables = atomically(|| {
+            self.snapshot_state.snapshots.modify_mut(|snapshots| {
+                let mut removables = Vec::new();
+                while snapshots.len() > self.snapshot_history_size {
+                    if let Some(snapshot) = snapshots.pop_front() {
+                        removables.push(snapshot);
+                    } else {
+                        break;
+                    }
+                }
+                removables
+            })
+        })
+        .await;
+
+        for r in removables {
+            if let Err(e) = std::fs::remove_dir_all(&r.snapshot_dir) {
+                tracing::error!(error =? e, snapshot_dir = r.snapshot_dir.to_string_lossy().to_string(), "failed to remove snapsot");
+            }
         }
     }
 
@@ -362,6 +399,7 @@ mod tests {
             1,
             temp_dir.path().into(),
             10000,
+            1,
             never_poll_sync,
         )
         .expect("failed to create snapshot manager");
@@ -412,7 +450,7 @@ mod tests {
 
         // Create a new manager instance
         let (_, new_client) =
-            SnapshotManager::new(store, 1, temp_dir.path().into(), 10000, never_poll_sync)
+            SnapshotManager::new(store, 1, temp_dir.path().into(), 10000, 1, never_poll_sync)
                 .expect("failed to create snapshot manager");
 
         let snapshots = atomically(|| new_client.list_snapshots()).await;
