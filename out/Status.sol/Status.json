@@ -10,64 +10,64 @@
     },
     "ast": {
         "absolutePath": "src/enums/Status.sol",
-        "id": 36680,
+        "id": 36824,
         "exportedSymbols": {
-            "Status": [36679]
+            "Status": [36823]
         },
         "nodeType": "SourceUnit",
         "src": "46:181:42",
         "nodes": [
             {
-                "id": 36672,
+                "id": 36816,
                 "nodeType": "PragmaDirective",
                 "src": "46:23:42",
                 "nodes": [],
                 "literals": ["solidity", "0.8", ".19"]
             },
             {
-                "id": 36679,
+                "id": 36823,
                 "nodeType": "EnumDefinition",
                 "src": "128:98:42",
                 "nodes": [],
                 "canonicalName": "Status",
                 "members": [
                     {
-                        "id": 36673,
+                        "id": 36817,
                         "name": "Unset",
                         "nameLocation": "146:5:42",
                         "nodeType": "EnumValue",
                         "src": "146:5:42"
                     },
                     {
-                        "id": 36674,
+                        "id": 36818,
                         "name": "Active",
                         "nameLocation": "157:6:42",
                         "nodeType": "EnumValue",
                         "src": "157:6:42"
                     },
                     {
-                        "id": 36675,
+                        "id": 36819,
                         "name": "Inactive",
                         "nameLocation": "169:8:42",
                         "nodeType": "EnumValue",
                         "src": "169:8:42"
                     },
                     {
-                        "id": 36676,
+                        "id": 36820,
                         "name": "Killed",
                         "nameLocation": "183:6:42",
                         "nodeType": "EnumValue",
                         "src": "183:6:42"
                     },
                     {
-                        "id": 36677,
+                        "id": 36821,
                         "name": "Terminating",
                         "nameLocation": "195:11:42",
                         "nodeType": "EnumValue",
                         "src": "195:11:42"
                     },
                     {
-                        "id": 36678,
+                        "id": 36822,
                         "name": "Instantiated",
                         "nameLocation": "212:12:42",
                         "nodeType": "EnumValue",

@@ -9,6 +9,7 @@ import {NumberContractFacetSeven, NumberContractFacetEight} from "./NumberContra
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {Status} from "../src/enums/Status.sol";
+import {IERC165} from "../src/interfaces/IERC165.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
@@ -66,14 +67,16 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
     bytes4[] gwMessengerSelectors;
-    bytes4[] dcFacetSelectors;
+    bytes4[] cutFacetSelectors;
+    bytes4[] louperSelectors;
 
     GatewayDiamond gatewayDiamond;
     GatewayManagerFacet gwManager;
     GatewayGetterFacet gwGetter;
     GatewayRouterFacet gwRouter;
     GatewayMessengerFacet gwMessenger;
-    DiamondCutFacet dcFacet;
+    DiamondCutFacet cutFacet;
+    DiamondLoupeFacet louper;
 
     GatewayDiamond gatewayDiamond2;
     GatewayManagerFacet gwManager2;
@@ -86,11 +89,6 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     SubnetActorDiamond saDiamond;
     SubnetManagerTestUtil saManager;
     SubnetActorGetterFacet saGetter;
-
-    bytes4[] louperSelectors;
-    DiamondLoupeFacet louper;
-
-    bytes4[] ncGetterSelectors;
 
     uint64 private constant ROOTNET_CHAINID = 123;
     address public constant ROOTNET_ADDRESS = address(1);
@@ -105,7 +103,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
         gwManagerSelectors = TestUtils.generateSelectors(vm, "GatewayManagerFacet");
         gwMessengerSelectors = TestUtils.generateSelectors(vm, "GatewayMessengerFacet");
-        dcFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
+        cutFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
 
         louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
     }
@@ -115,7 +113,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         gwManager = new GatewayManagerFacet();
         gwGetter = new GatewayGetterFacet();
         gwMessenger = new GatewayMessengerFacet();
-        dcFacet = new DiamondCutFacet();
+        cutFacet = new DiamondCutFacet();
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](5);
 
@@ -153,9 +151,9 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
         diamondCut[4] = (
             IDiamond.FacetCut({
-                facetAddress: address(dcFacet),
+                facetAddress: address(cutFacet),
                 action: IDiamond.FacetCutAction.Add,
-                functionSelectors: dcFacetSelectors
+                functionSelectors: cutFacetSelectors
             })
         );
 
@@ -189,7 +187,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         gwGetter = new GatewayGetterFacet();
         gwMessenger = new GatewayMessengerFacet();
         louper = new DiamondLoupeFacet();
-        dcFacet = new DiamondCutFacet();
+        cutFacet = new DiamondCutFacet();
 
         IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](6);
 
@@ -235,9 +233,9 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
         gwDiamondCut[5] = (
             IDiamond.FacetCut({
-                facetAddress: address(dcFacet),
+                facetAddress: address(cutFacet),
                 action: IDiamond.FacetCutAction.Add,
-                functionSelectors: dcFacetSelectors
+                functionSelectors: cutFacetSelectors
             })
         );
 
@@ -324,6 +322,9 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
     function testGatewayDiamond_LoupeFunction() public view {
         require(louper.facets().length == 6, "unexpected length");
+        require(louper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(louper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(louper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     function testGatewayDiamond_DiamondCut() public {
@@ -337,7 +338,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
         DiamondCutFacet gwDiamondCutter = DiamondCutFacet(address(gatewayDiamond));
         IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](1);
-        ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetSeven");
+        bytes4[] memory ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetSeven");
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -1418,18 +1419,14 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         uint256[] memory weights = new uint[](1);
         weights[0] = 100;
 
+        SubnetID memory id = gwGetter.getNetworkName();
+
         CrossMsg[] memory topDownMsgs = new CrossMsg[](n);
         for (uint64 i = 0; i < n; i++) {
             topDownMsgs[i] = CrossMsg({
                 message: StorableMsg({
-                    from: IPCAddress({
-                        subnetId: gwGetter.getNetworkName(),
-                        rawAddress: FvmAddressHelper.from(address(this))
-                    }),
-                    to: IPCAddress({
-                        subnetId: gwGetter.getNetworkName(),
-                        rawAddress: FvmAddressHelper.from(address(this))
-                    }),
+                    from: IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
+                    to: IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                     value: 0,
                     nonce: i,
                     method: this.callback.selector,
@@ -1443,6 +1440,10 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
         gwRouter.applyCrossMessages(topDownMsgs);
+        require(gwGetter.getSubnetTopDownMsgsLength(id) == 0, "unexpected top-down message");
+        (bool ok, uint64 tdn) = gwGetter.getAppliedTopDownNonce(id);
+        console.log(tdn);
+        require(!ok && tdn == 0, "unexpected nonce");
 
         vm.stopPrank();
     }
@@ -1491,10 +1492,12 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         require(recv.crossMessagesHash == keccak256("messages1"), "received cross messages incorrect");
         require(gwGetter.bottomUpMessages(gwGetter.bottomUpCheckPeriod()).length == 0, "there are messages");
 
+        uint64 d = gwGetter.bottomUpCheckPeriod();
+
         // failed to create a checkpoint with the same height
         checkpoint = BottomUpCheckpoint({
             subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            blockHeight: d,
             blockHash: keccak256("block"),
             nextConfigurationNumber: 2,
             crossMessagesHash: keccak256("newmessages")
@@ -1508,7 +1511,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         // failed to create a checkpoint with the height not multiple to checkpoint period
         checkpoint = BottomUpCheckpoint({
             subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod() + gwGetter.bottomUpCheckPeriod() / 2,
+            blockHeight: d + d / 2,
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 2,
             crossMessagesHash: keccak256("newmessages")
@@ -1518,6 +1521,10 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         vm.expectRevert(InvalidCheckpointEpoch.selector);
         gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
         vm.stopPrank();
+
+        (bool ok, uint64 e, ) = gwGetter.getCurrentBottomUpCheckpoint();
+        require(ok, "checkpoint not exist");
+        require(e == d, "out height incorrect");
     }
 
     function testGatewayDiamond_commitBottomUpCheckpoint_InvalidCheckpointSource() public {

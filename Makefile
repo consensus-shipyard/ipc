@@ -84,6 +84,11 @@ coverage: | forge
 	genhtml -o coverage_report lcov.info --branch-coverage
 	./tools/check_coverage.sh
 
+make coverage-for-mac: | forge
+	forge coverage --ffi --report lcov -C ./src
+	genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category
+	./tools/check_coverage.sh
+
 prepare: fmt lint test slither
 
 # Forge is used by the ipc-solidity-actors compilation steps.

@@ -2,13 +2,8 @@
 
 The IPC Solidity Actors are implemented using the Diamond pattern, but the current implementation
 is not compatible with [EIP-2535](https://eips.ethereum.org/EIPS/eip-2535) standard:
-At present, it is not possible to add new facets or update the existing ones.
 
-The current implementation can be classified as a `Single Cut Diamond`.
-A single-cut diamond adds all functions to itself in its constructor function,
-but it does not allow adding, replacing, or removing functions later.
-This means that all facets of the diamond will be added to it in the constructor of the diamond
-and upgrades will not be possible.
+All the diamonds are upgradable and implement `IDiamondCut` and `IDiamondLoupe` interfaces.
 
 ## Code Layout
 
@@ -25,13 +20,13 @@ The IPC diamond code is based on the [diamond-1-hardhat](https://github.com/mudg
 ## Storage
 
 The implementation uses the `AppStorage` pattern in facets and `Diamond Storage` in libraries.
-`GatewayActorStorage` and `SubnetActorStorage` are used within the `AppStorage` pattern.
-To be compatible with `ApStorage` and to be able to apply it, we are using the `LibReentrancyGuard` contract.
+`GatewayActorStorage` and `SubnetActorStorage` are used within the `AppStorage` pattern.
+To be compatible with `ApStorage` and to be able to apply it, we are using the `LibReentrancyGuard` contract.
 
 ## Getting Selectors
 
 Because diamonds contain mappings of function selectors to facet addresses, we have to know function selectors before deploying.
-To do that, we use the `get_selectors` function from a script in Python.
+To do that, we use the `get_selectors` function from a script in Python.
 
 ## References
 

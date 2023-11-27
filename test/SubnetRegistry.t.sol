@@ -7,7 +7,11 @@ import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {TestUtils} from "./TestUtils.sol";
+import {IERC165} from "../src/interfaces/IERC165.sol";
+import {IGateway} from "../src/interfaces/IGateway.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
+import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
@@ -39,15 +43,20 @@ contract SubnetRegistryTest is Test {
     SubnetRegistryDiamond registry;
     bytes4[] empty;
 
-    DiamondLoupeFacet louper;
-    DiamondCutFacet dcFacet;
-    RegisterSubnetFacet registerSubnetFacet;
-    SubnetGetterFacet private subnetGetterFacet;
-    bytes4[] private dcFacetSelectors;
-    bytes4[] private louperSelectors;
+    address louperFacetAddr;
+    address cutFacetAddr;
+    address registerSubnetFacetAddr;
+    address subnetGetterFacetAddr;
 
-    bytes4[] private registerSubnetFacetSelectors;
-    bytes4[] private subnetGetterFacetSelectors;
+    DiamondLoupeFacet louperFacet;
+    DiamondCutFacet cutFacet;
+    RegisterSubnetFacet registerSubnetFacet;
+    SubnetGetterFacet subnetGetterFacet;
+    bytes4[] cutFacetSelectors;
+    bytes4[] louperSelectors;
+
+    bytes4[] registerSubnetFacetSelectors;
+    bytes4[] subnetGetterFacetSelectors;
 
     error FacetCannotBeZero();
     error WrongGateway();
@@ -57,7 +66,7 @@ contract SubnetRegistryTest is Test {
 
     constructor() {
         louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
-        dcFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
+        cutFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
         registerSubnetFacetSelectors = TestUtils.generateSelectors(vm, "RegisterSubnetFacet");
         subnetGetterFacetSelectors = TestUtils.generateSelectors(vm, "SubnetGetterFacet");
     }
@@ -79,45 +88,52 @@ contract SubnetRegistryTest is Test {
         params.subnetGetterSelectors = mockedSelectors;
         params.subnetManagerSelectors = mockedSelectors2;
 
-        louper = new DiamondLoupeFacet();
-        dcFacet = new DiamondCutFacet();
+        louperFacet = new DiamondLoupeFacet();
+        louperFacetAddr = address(louperFacet);
+
+        cutFacet = new DiamondCutFacet();
+        cutFacetAddr = address(cutFacet);
+
         registerSubnetFacet = new RegisterSubnetFacet();
+        registerSubnetFacetAddr = address(registerSubnetFacet);
+
         subnetGetterFacet = new SubnetGetterFacet();
+        subnetGetterFacetAddr = address(subnetGetterFacet);
 
         IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](4);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
-                facetAddress: address(louper),
+                facetAddress: louperFacetAddr,
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: louperSelectors
             })
         );
         gwDiamondCut[1] = (
             IDiamond.FacetCut({
-                facetAddress: address(dcFacet),
+                facetAddress: cutFacetAddr,
                 action: IDiamond.FacetCutAction.Add,
-                functionSelectors: dcFacetSelectors
+                functionSelectors: cutFacetSelectors
             })
         );
         gwDiamondCut[2] = (
             IDiamond.FacetCut({
-                facetAddress: address(registerSubnetFacet),
+                facetAddress: registerSubnetFacetAddr,
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: registerSubnetFacetSelectors
             })
         );
         gwDiamondCut[3] = (
             IDiamond.FacetCut({
-                facetAddress: address(subnetGetterFacet),
+                facetAddress: subnetGetterFacetAddr,
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: subnetGetterFacetSelectors
             })
         );
 
         registry = new SubnetRegistryDiamond(gwDiamondCut, params);
-        louper = DiamondLoupeFacet(address(registry));
-        dcFacet = DiamondCutFacet(address(registry));
+        louperFacet = DiamondLoupeFacet(address(registry));
+        cutFacet = DiamondCutFacet(address(registry));
         registerSubnetFacet = RegisterSubnetFacet(address(registry));
         subnetGetterFacet = SubnetGetterFacet(address(registry));
     }
@@ -128,16 +144,16 @@ contract SubnetRegistryTest is Test {
 
         diamondCut[0] = (
             IDiamond.FacetCut({
-                facetAddress: address(louper),
+                facetAddress: address(louperFacet),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: louperSelectors
             })
         );
         diamondCut[1] = (
             IDiamond.FacetCut({
-                facetAddress: address(dcFacet),
+                facetAddress: address(cutFacet),
                 action: IDiamond.FacetCutAction.Add,
-                functionSelectors: dcFacetSelectors
+                functionSelectors: cutFacetSelectors
             })
         );
         diamondCut[2] = (
@@ -158,6 +174,50 @@ contract SubnetRegistryTest is Test {
         SubnetRegistryDiamond newSubnetRegistry = new SubnetRegistryDiamond(diamondCut, params);
         emit SubnetRegistryCreated(address(newSubnetRegistry));
         return address(newSubnetRegistry);
+    }
+
+    function test_Registry_Facet_Addresses() public view {
+        require(louperFacet.facetAddresses().length == 4, "unexpected number");
+        require(louperFacet.facetAddresses().length == louperFacet.facets().length, "inconsistent diamond size");
+    }
+
+    function test_Registry_FacetFunctionSelectors() public view {
+        require(
+            louperFacet.facetFunctionSelectors(louperFacetAddr).length == louperSelectors.length,
+            "unexpected louper selectors number"
+        );
+        require(
+            louperFacet.facetFunctionSelectors(subnetGetterFacetAddr).length == subnetGetterFacetSelectors.length,
+            "unexpected subnet selectors number"
+        );
+        require(
+            louperFacet.facetFunctionSelectors(registerSubnetFacetAddr).length == registerSubnetFacetSelectors.length,
+            "unexpected register selectors number"
+        );
+        require(
+            louperFacet.facetFunctionSelectors(cutFacetAddr).length == cutFacetSelectors.length,
+            "unexpected cut selectors number"
+        );
+    }
+
+    function test_Registry_Facet_Address() public view {
+        require(
+            louperFacet.facetAddress(subnetGetterFacetSelectors[0]) == subnetGetterFacetAddr,
+            "unexpected subnet addr"
+        );
+        require(louperFacet.facetAddress(louperSelectors[0]) == louperFacetAddr, "unexpected louper addr");
+        require(
+            louperFacet.facetAddress(registerSubnetFacetSelectors[0]) == registerSubnetFacetAddr,
+            "unexpected register addr"
+        );
+        require(louperFacet.facetAddress(cutFacetSelectors[0]) == cutFacetAddr, "unexpected cut addr");
+    }
+
+    function test_Registry_Deployment_IERC165() public view {
+        require(louperFacet.facets().length == 4, "unexpected length");
+        require(louperFacet.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(louperFacet.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(louperFacet.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     function test_Registry_Deployment_ZeroGetterFacet() public {

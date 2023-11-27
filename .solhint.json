@@ -29,6 +29,7 @@
         "visibility-modifier-order": "error",
         "avoid-tx-origin": "error",
         "reentrancy": "error",
-        "state-visibility": "error"
+        "state-visibility": "error",
+        "explicit-types": ["error", "explicit"]
     }
 }

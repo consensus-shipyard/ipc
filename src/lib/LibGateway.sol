@@ -34,7 +34,7 @@ library LibGateway {
     function getCurrentBottomUpCheckpoint()
         internal
         view
-        returns (bool exists, uint64 epoch, BottomUpCheckpoint storage checkpoint)
+        returns (bool exists, uint64 epoch, BottomUpCheckpoint memory checkpoint)
     {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         epoch = LibGateway.getNextEpoch(block.number, s.bottomUpCheckPeriod);

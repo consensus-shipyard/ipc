@@ -3,6 +3,9 @@ pragma solidity 0.8.19;
 
 import {GatewayActorStorage} from "./lib/LibGatewayActorStorage.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
+import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
+import {IERC165} from "./interfaces/IERC165.sol";
 import {FvmAddress} from "./structs/FvmAddress.sol";
 import {Validator, Membership} from "./structs/Subnet.sol";
 import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
@@ -41,6 +44,12 @@ contract GatewayDiamond {
 
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
+
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        // adding ERC165 data
+        ds.supportedInterfaces[type(IERC165).interfaceId] = true;
+        ds.supportedInterfaces[type(IDiamondCut).interfaceId] = true;
+        ds.supportedInterfaces[type(IDiamondLoupe).interfaceId] = true;
 
         s.networkName = params.networkName;
         s.minStake = params.minCollateral;

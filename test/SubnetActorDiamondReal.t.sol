@@ -13,9 +13,11 @@ import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../src/structs/Checkpoi
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, IPCAddress, Subnet, ValidatorInfo, Validator} from "../src/structs/Subnet.sol";
 import {StorableMsg} from "../src/structs/Checkpoint.sol";
+import {IERC165} from "../src/interfaces/IERC165.sol";
 import {IGateway} from "../src/interfaces/IGateway.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CheckpointHelper} from "../src/lib/CheckpointHelper.sol";
 import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
@@ -28,6 +30,8 @@ import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
 import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
+import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
+import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {LibStaking} from "../src/lib/LibStaking.sol";
 
@@ -50,20 +54,24 @@ contract SubnetActorDiamondRealTest is Test {
     uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
     uint64 private constant ROOTNET_CHAINID = 123;
 
-    address private gatewayAddress;
-    IGateway private gatewayContract;
+    address gatewayAddress;
+    IGateway gatewayContract;
 
-    bytes4[] private saGetterSelectors;
-    bytes4[] private saManagerSelectors;
+    bytes4[] saGetterSelectors;
+    bytes4[] saManagerSelectors;
+    bytes4[] cutFacetSelectors;
+    bytes4[] louperSelectors;
 
     bytes4[] gwRouterSelectors;
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
     bytes4[] gwMessengerSelectors;
 
-    SubnetActorDiamond private saDiamond;
-    SubnetManagerTestUtil private saManager;
-    SubnetActorGetterFacet private saGetter;
+    SubnetActorDiamond saDiamond;
+    SubnetManagerTestUtil saManager;
+    SubnetActorGetterFacet saGetter;
+    DiamondCutFacet cutFacet;
+    DiamondLoupeFacet louper;
 
     GatewayDiamond gatewayDiamond;
     GatewayManagerFacet gwManager;
@@ -74,6 +82,8 @@ contract SubnetActorDiamondRealTest is Test {
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
         saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetManagerTestUtil");
+        cutFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
+        louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
 
         gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
@@ -181,6 +191,13 @@ contract SubnetActorDiamondRealTest is Test {
             DEFAULT_CHECKPOINT_PERIOD,
             DEFAULT_MAJORITY_PERCENTAGE
         );
+    }
+
+    function testSubnetActorDiamondReal_LoupeFunction() public view {
+        require(louper.facets().length == 4, "unexpected length");
+        require(louper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(louper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(louper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     function testSubnetActorDiamondReal_BasicLifeCycle() public {
@@ -394,8 +411,10 @@ contract SubnetActorDiamondRealTest is Test {
 
         saManager = new SubnetManagerTestUtil();
         saGetter = new SubnetActorGetterFacet();
+        cutFacet = new DiamondCutFacet();
+        louper = new DiamondLoupeFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -410,6 +429,22 @@ contract SubnetActorDiamondRealTest is Test {
                 facetAddress: address(saGetter),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: saGetterSelectors
+            })
+        );
+
+        diamondCut[2] = (
+            IDiamond.FacetCut({
+                facetAddress: address(cutFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: cutFacetSelectors
+            })
+        );
+
+        diamondCut[3] = (
+            IDiamond.FacetCut({
+                facetAddress: address(louper),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: louperSelectors
             })
         );
 
@@ -431,6 +466,8 @@ contract SubnetActorDiamondRealTest is Test {
 
         saManager = SubnetManagerTestUtil(address(saDiamond));
         saGetter = SubnetActorGetterFacet(address(saDiamond));
+        cutFacet = DiamondCutFacet(address(saDiamond));
+        louper = DiamondLoupeFacet(address(saDiamond));
 
         require(saGetter.ipcGatewayAddr() == _ipcGatewayAddr, "saGetter.ipcGatewayAddr() == _ipcGatewayAddr");
         require(
