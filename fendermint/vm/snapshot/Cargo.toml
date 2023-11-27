@@ -11,13 +11,23 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-stm = { workspace = true }
+cid = { workspace = true }
+futures = { workspace = true }
+multihash = { workspace = true }
+sha2 = { workspace = true }
 tempfile = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
 
 fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_car = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
 
 fendermint_vm_interpreter = { path = "../interpreter" }
+
+[dev-dependencies]
+fendermint_vm_interpreter = { path = "../interpreter", features = ["bundle"] }

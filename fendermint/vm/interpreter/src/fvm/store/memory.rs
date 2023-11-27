@@ -10,6 +10,8 @@ use anyhow::Result;
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
 
+/// An in-memory blockstore that can be shared between threads,
+/// unlike [fvm_ipld_blockstore::memory::MemoryBlockstore].
 #[derive(Debug, Default, Clone)]
 pub struct MemoryBlockstore {
     blocks: Arc<RwLock<HashMap<Cid, Vec<u8>>>>,
