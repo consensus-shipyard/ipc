@@ -11,6 +11,7 @@ license.workspace = true
 [dependencies]
 fendermint_vm_actor_interface = { path = "../actor_interface" }
 fendermint_vm_core = { path = "../core" }
+fendermint_vm_encoding = { path = "../encoding" }
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_message = { path = "../message" }
 fendermint_vm_resolver = { path = "../resolver" }
@@ -29,6 +30,7 @@ ethers = { workspace = true }
 hex = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true }
+serde_with = { workspace = true }
 serde_json = { workspace = true }
 tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
@@ -53,7 +55,7 @@ tokio-util = { workspace = true }
 [dev-dependencies]
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
-tempfile = { workspace = true}
+tempfile = { workspace = true }
 
 fvm = { workspace = true, features = ["arb", "testing"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }

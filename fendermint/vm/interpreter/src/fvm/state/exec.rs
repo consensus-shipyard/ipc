@@ -20,9 +20,11 @@ use fvm_shared::{
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
 };
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 use crate::fvm::externs::FendermintExterns;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
+use fendermint_vm_encoding::IsHumanReadable;
 
 pub type BlockHash = [u8; 32];
 
@@ -32,12 +34,21 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct FvmStateParams {
+    /// Root CID of the actor state map.
+    #[serde_as(as = "IsHumanReadable")]
     pub state_root: Cid,
+    /// Last applied block time stamp.
     pub timestamp: Timestamp,
+    /// FVM network version.
     pub network_version: NetworkVersion,
+    /// Base fee for contract execution.
+    #[serde_as(as = "IsHumanReadable")]
     pub base_fee: TokenAmount,
+    /// Current circulating supply; changes in the context of IPC.
+    #[serde_as(as = "IsHumanReadable")]
     pub circ_supply: TokenAmount,
     /// The [`ChainID`] is stored here to hint at the possibility that
     /// a chain ID might change during the lifetime of a chain, in case
@@ -45,6 +56,7 @@ pub struct FvmStateParams {
     ///
     /// How exactly that would be communicated is uknown at this point.
     pub chain_id: u64,
+    /// Conversion from collateral to voting power.
     pub power_scale: PowerScale,
 }
 

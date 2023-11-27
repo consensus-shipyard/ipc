@@ -6,6 +6,7 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{state::BlockHash, FvmApplyRet, FvmCheckRet, FvmQueryRet};
 use fendermint_vm_message::signed::DomainHash;
+use fendermint_vm_snapshot::manifest::SnapshotItem;
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
 use prost::Message;
 use std::{collections::HashMap, num::NonZeroU32};
@@ -345,6 +346,31 @@ pub fn to_error_msg(exit_code: ExitCode) -> &'static str {
         ExitCode::USR_NOT_PAYABLE => "The method cannot handle a transfer of value.",
         _ => ""
     }
+}
+
+pub fn to_snapshots(
+    snapshots: impl IntoIterator<Item = SnapshotItem>,
+) -> anyhow::Result<response::ListSnapshots> {
+    let snapshots = snapshots
+        .into_iter()
+        .map(to_snapshot)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(response::ListSnapshots { snapshots })
+}
+
+pub fn to_snapshot(snapshot: SnapshotItem) -> anyhow::Result<tendermint::abci::types::Snapshot> {
+    Ok(tendermint::abci::types::Snapshot {
+        height: snapshot
+            .manifest
+            .block_height
+            .try_into()
+            .expect("height is valid"),
+        format: snapshot.manifest.version,
+        chunks: snapshot.manifest.chunks as u32,
+        hash: snapshot.manifest.checksum.into(),
+        metadata: fvm_ipld_encoding::to_vec(&snapshot.manifest.state_params)?.into(),
+    })
 }
 
 #[cfg(test)]

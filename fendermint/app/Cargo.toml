@@ -25,6 +25,7 @@ rand_chacha = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
+async-stm = { workspace = true }
 tendermint = { workspace = true }
 tendermint-config = { workspace = true }
 tendermint-rpc = { workspace = true }

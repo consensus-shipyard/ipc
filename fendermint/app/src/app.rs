@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
+use async_stm::atomically;
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
@@ -843,7 +844,7 @@ where
 
         // Notify the snapshotter.
         if let Some(ref snapshots) = self.snapshots {
-            snapshots.on_commit(block_height, state_params).await;
+            atomically(|| snapshots.on_commit(block_height, state_params.clone())).await;
         }
 
         let response = response::Commit {
@@ -852,5 +853,15 @@ where
             retain_height: Default::default(),
         };
         Ok(response)
+    }
+
+    /// Used during state sync to discover available snapshots on peers.
+    async fn list_snapshots(&self) -> AbciResult<response::ListSnapshots> {
+        if let Some(ref client) = self.snapshots {
+            let snapshots = atomically(|| client.list_snapshots()).await;
+            Ok(to_snapshots(snapshots)?)
+        } else {
+            Ok(Default::default())
+        }
     }
 }

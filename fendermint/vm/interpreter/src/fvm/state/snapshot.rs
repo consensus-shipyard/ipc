@@ -21,6 +21,7 @@ use tokio_stream::StreamExt;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 pub type BlockHeight = u64;
+pub type SnapshotVersion = u32;
 
 /// Taking snapshot of the current blockchain state
 pub enum Snapshot<BS> {
@@ -51,6 +52,12 @@ where
             state_params,
             block_height,
         )?))
+    }
+
+    pub fn version(&self) -> SnapshotVersion {
+        match self {
+            Snapshot::V1(_) => 1,
+        }
     }
 
     /// Read the snapshot from file and load all the data into the store
@@ -220,8 +227,15 @@ impl<BS: Blockstore> Stream for StateTreeStreamer<BS> {
 
             match this.bs.get(&cid) {
                 Ok(Some(bytes)) => {
-                    let ipld = from_slice::<Ipld>(&bytes).unwrap();
-                    walk_ipld_cids(ipld, &mut this.dfs);
+                    // Not all data in the blockstore is traversable, e.g.
+                    // Wasm bytecode is inserted as IPLD_RAW here: https://github.com/filecoin-project/builtin-actors-bundler/blob/bf6847b2276ee8e4e17f8336f2eb5ab2fce1d853/src/lib.rs#L54C71-L54C79
+                    if cid.codec() == DAG_CBOR {
+                        // XXX: Is it okay to panic?
+                        let ipld =
+                            from_slice::<Ipld>(&bytes).expect("blocktore stores IPLD encoded data");
+
+                        walk_ipld_cids(ipld, &mut this.dfs);
+                    }
                     return Poll::Ready(Some((cid, bytes)));
                 }
                 Ok(None) => {

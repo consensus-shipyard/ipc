@@ -11,7 +11,7 @@ use fvm_ipld_car::Error as CarError;
 
 type BlockStreamerItem = Result<(Cid, Vec<u8>), CarError>;
 type BlockStreamerRead<R> = (CarReader<R>, Option<BlockStreamerItem>);
-type BlockStreamerReadFuture<R> = Pin<Box<dyn Future<Output = BlockStreamerRead<R>>>>;
+type BlockStreamerReadFuture<R> = Pin<Box<dyn Future<Output = BlockStreamerRead<R>> + Send>>;
 
 enum BlockStreamerState<R> {
     Idle(CarReader<R>),
