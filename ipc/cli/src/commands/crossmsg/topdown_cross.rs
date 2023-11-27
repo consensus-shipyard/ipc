@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 //! List top down cross messages
 
-use anyhow::anyhow;
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -27,19 +26,9 @@ impl CommandLineHandler for ListTopdownMsgs {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        let hash = if let Some(hash) = &arguments.block_hash {
-            hex::decode(hash)?
-        } else {
-            let parent = subnet
-                .parent()
-                .ok_or_else(|| anyhow!("subnet has not parent"))?;
-            let hash = provider.get_block_hash(&parent, arguments.epoch).await?;
-            hash.block_hash
-        };
-        let msgs = provider
-            .get_top_down_msgs(&subnet, arguments.epoch, &hash)
-            .await?;
-        for msg in msgs {
+        let result = provider.get_top_down_msgs(&subnet, arguments.epoch).await?;
+        println!("block hash: {}", hex::encode(result.block_hash));
+        for msg in result.value {
             println!(
                 "from: {}, to: {}, value: {}, nonce: {}, fee: {} ",
                 msg.msg.from.to_string()?,
@@ -61,8 +50,6 @@ pub(crate) struct ListTopdownMsgsArgs {
     pub subnet: String,
     #[arg(long, short, help = "Include topdown messages of this epoch")]
     pub epoch: ChainEpoch,
-    #[arg(long, short, help = "The block hash to query until")]
-    pub block_hash: Option<String>,
 }
 
 pub(crate) struct LatestParentFinality;

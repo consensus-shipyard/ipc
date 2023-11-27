@@ -110,12 +110,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-        block_hash: &[u8],
-    ) -> Result<Vec<CrossMsg>> {
-        if block_hash.len() != 32 {
-            return Err(anyhow!("invalid block hash len"));
-        }
-
+    ) -> Result<TopDownQueryPayload<Vec<CrossMsg>>> {
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
@@ -123,10 +118,9 @@ impl TopDownFinalityQuery for EthSubnetManager {
 
         let topic1 = contract_address_from_subnet(subnet_id)?;
         log::debug!(
-            "getting top down messages for subnet: {:?} with topic 1: {}, block hash equals: {}",
+            "getting top down messages for subnet: {:?} with topic 1: {}",
             subnet_id,
             topic1,
-            hex::encode(block_hash),
         );
 
         let ev = gateway_contract
@@ -136,22 +130,28 @@ impl TopDownFinalityQuery for EthSubnetManager {
             .topic1(topic1);
 
         let mut messages = vec![];
+        let mut hash = None;
         for (event, meta) in query_with_meta(ev, gateway_contract.client()).await? {
-            let msg = CrossMsg::try_from(event.message)?;
-            log::debug!("received message: {:?} and meta: {:?}", msg, meta);
-
-            if meta.block_hash.0 != block_hash {
-                return Err(anyhow!(
-                    "block hash not equal, input: {}, received: {}",
-                    hex::encode(block_hash),
-                    hex::encode(meta.block_hash.0)
-                ));
+            if let Some(h) = hash {
+                if h != meta.block_hash {
+                    return Err(anyhow!("block hash not equal"));
+                }
+            } else {
+                hash = Some(meta.block_hash);
             }
 
-            messages.push(msg);
+            messages.push(CrossMsg::try_from(event.message)?);
         }
 
-        Ok(messages)
+        let block_hash = if let Some(h) = hash {
+            h.0.to_vec()
+        } else {
+            self.get_block_hash(epoch).await?.block_hash
+        };
+        Ok(TopDownQueryPayload {
+            value: messages,
+            block_hash,
+        })
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult> {
