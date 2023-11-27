@@ -563,9 +563,15 @@ where
 
     tracing::info!(sighash = ?deployer.tx.sighash(), "deployment tx");
 
-    // NOTE: This will call eth_estimateGas to figure out how much gas to use, because we don't set it,
-    // unlike in the case of the example transfer. What the [Provider::fill_transaction] will _also_ do
-    // is estimate the fees using eth_feeHistory, here:
+    // Try with a call just because Remix does.
+    request(
+        "eth_call w/ deploy",
+        provider.call(&deployer.tx, None).await,
+        |_| true,
+    )?;
+
+    // NOTE: This would call eth_estimateGas to figure out how much gas to use, if we didn't set it.
+    // What the [Provider::fill_transaction] will _also_ do is estimate the fees using eth_feeHistory, here:
     // https://github.com/gakonst/ethers-rs/blob/df165b84229cdc1c65e8522e0c1aeead3746d9a8/ethers-providers/src/rpc/provider.rs#LL300C30-L300C51
     // These were set to zero in the earlier example transfer, ie. it was basically paid for by the miner (which is not at the moment charged),
     // so the test passed. Here, however, there will be a non-zero cost to pay by the deployer, and therefore those balances

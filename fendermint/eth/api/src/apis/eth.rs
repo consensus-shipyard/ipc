@@ -15,7 +15,7 @@ use ethers_core::utils::rlp;
 use fendermint_rpc::message::MessageFactory;
 use fendermint_rpc::query::QueryClient;
 use fendermint_rpc::response::{decode_fevm_invoke, decode_fevm_return_data};
-use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::eam::{EthAddress, EAM_ACTOR_ADDR};
 use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::FvmQueryHeight;
@@ -634,6 +634,7 @@ where
     C: Client + Sync + Send,
 {
     let msg = to_fvm_message(tx.into(), true)?;
+    let is_create = msg.to == EAM_ACTOR_ADDR;
     let height = data.query_height(block_id).await?;
     let response = data.client.call(msg, height).await?;
     let deliver_tx = response.value;
@@ -649,11 +650,19 @@ where
             ),
         };
         error_with_data(ExitCode::new(deliver_tx.code.value()), msg, data)
+    } else if is_create {
+        // It's not clear why some tools like Remix call this with deployment transaction, but they do.
+        // We could parse the deployed contract address, but it would be of very limited use;
+        // the call effect isn't persisted, so one would have to send an actual transaction
+        // and then run a call on `pending` state with this address to have a chance to hit
+        // that contract before the transaction is included in a block, assuming address
+        // creation is deterministic.
+        // Lotus returns empty: https://github.com/filecoin-project/lotus/blob/v1.23.1-rc2/node/impl/full/eth.go#L1091-L1094
+        Ok(Default::default())
     } else {
         let return_data = decode_fevm_invoke(&deliver_tx)
             .context("error decoding data from deliver_tx in query")?;
-
-        Ok(et::Bytes::from(return_data))
+        Ok(return_data.into())
     }
 }
 
