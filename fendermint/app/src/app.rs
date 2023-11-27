@@ -864,4 +864,28 @@ where
             Ok(Default::default())
         }
     }
+
+    /// Used during state sync to retrieve chunks of snapshots from peers.
+    async fn load_snapshot_chunk(
+        &self,
+        request: request::LoadSnapshotChunk,
+    ) -> AbciResult<response::LoadSnapshotChunk> {
+        if let Some(ref client) = self.snapshots {
+            if let Some(snapshot) =
+                atomically(|| client.access_snapshot(request.height.value(), request.format)).await
+            {
+                match snapshot.load_chunk(request.chunk as usize) {
+                    Ok(chunk) => {
+                        return Ok(response::LoadSnapshotChunk {
+                            chunk: chunk.into(),
+                        });
+                    }
+                    Err(e) => {
+                        tracing::warn!("failed to load chunk: {e:#}");
+                    }
+                }
+            }
+        }
+        Ok(Default::default())
+    }
 }
