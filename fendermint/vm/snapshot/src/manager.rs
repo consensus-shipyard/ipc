@@ -38,11 +38,14 @@ pub struct SnapshotClient {
 
 impl SnapshotClient {
     /// Set the latest block state parameters and notify the manager.
-    pub fn on_commit(&self, block_height: BlockHeight, params: FvmStateParams) -> Stm<()> {
+    ///
+    /// Call this with the block height where the `app_hash` in the block reflects the
+    /// state in the parameters, that is, the in the *next* block.
+    pub fn notify(&self, block_height: BlockHeight, state_params: FvmStateParams) -> Stm<()> {
         if block_height % self.snapshot_interval == 0 {
             self.state
                 .latest_params
-                .write(Some((params, block_height)))?;
+                .write(Some((state_params, block_height)))?;
         }
         Ok(())
     }
@@ -307,8 +310,8 @@ where
         // Create and export a manifest that we can easily look up.
         let manifest = SnapshotManifest {
             block_height,
-            size: snapshot_size,
-            chunks: chunks_count,
+            size: snapshot_size as u64,
+            chunks: chunks_count as u32,
             checksum: checksum_bytes,
             state_params,
             version: snapshot_version,
@@ -445,7 +448,7 @@ mod tests {
         assert!(snapshots.is_empty());
 
         // Notify about snapshottable height.
-        atomically(|| snapshot_client.on_commit(0, state_params.clone())).await;
+        atomically(|| snapshot_client.notify(0, state_params.clone())).await;
 
         // Wait for the new snapshot to appear in memory.
         let snapshots = tokio::time::timeout(

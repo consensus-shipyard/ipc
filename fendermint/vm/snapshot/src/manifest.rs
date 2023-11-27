@@ -21,9 +21,9 @@ pub struct SnapshotManifest {
     /// Block height where the snapshot was taken.
     pub block_height: BlockHeight,
     /// Snapshot size in bytes.
-    pub size: usize,
+    pub size: u64,
     /// Number of chunks in the snapshot.
-    pub chunks: usize,
+    pub chunks: u32,
     /// SHA2 hash of the snapshot contents.
     ///
     /// Using a [tendermint::Hash] type because it has nice formatting in JSON.
@@ -58,7 +58,7 @@ impl SnapshotItem {
     /// Load the data from disk.
     ///
     /// Returns an error if the chunk isn't within range or if the file doesn't exist any more.
-    pub fn load_chunk(&self, chunk: usize) -> anyhow::Result<Vec<u8>> {
+    pub fn load_chunk(&self, chunk: u32) -> anyhow::Result<Vec<u8>> {
         if chunk >= self.manifest.chunks {
             bail!(
                 "cannot load chunk {chunk}; only have {} in the snapshot",
@@ -142,20 +142,22 @@ pub fn list_manifests(snapshot_dir: impl AsRef<Path>) -> anyhow::Result<Vec<Snap
 
 #[cfg(feature = "arb")]
 mod arb {
+    use std::{path::PathBuf, time::SystemTime};
+
     use fendermint_testing::arb::{ArbCid, ArbTokenAmount};
     use fendermint_vm_core::{chainid, Timestamp};
     use fendermint_vm_interpreter::fvm::state::FvmStateParams;
     use fvm_shared::version::NetworkVersion;
     use quickcheck::Arbitrary;
 
-    use super::SnapshotManifest;
+    use super::{SnapshotItem, SnapshotManifest};
 
     impl quickcheck::Arbitrary for SnapshotManifest {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             let checksum: [u8; 32] = std::array::from_fn(|_| u8::arbitrary(g));
 
             Self {
-                block_height: Arbitrary::arbitrary(g),
+                block_height: u32::arbitrary(g) as u64,
                 size: Arbitrary::arbitrary(g),
                 chunks: Arbitrary::arbitrary(g),
                 checksum: tendermint::Hash::from_bytes(
@@ -175,6 +177,16 @@ mod arb {
                     power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
                 },
                 version: Arbitrary::arbitrary(g),
+            }
+        }
+    }
+
+    impl quickcheck::Arbitrary for SnapshotItem {
+        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            Self {
+                manifest: SnapshotManifest::arbitrary(g),
+                snapshot_dir: PathBuf::arbitrary(g),
+                last_access: SystemTime::arbitrary(g),
             }
         }
     }

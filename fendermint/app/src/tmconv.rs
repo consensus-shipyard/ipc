@@ -1,18 +1,28 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Conversions to Tendermint data types.
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
-use fendermint_vm_interpreter::fvm::{state::BlockHash, FvmApplyRet, FvmCheckRet, FvmQueryRet};
+use fendermint_vm_interpreter::fvm::{
+    state::{BlockHash, FvmStateParams},
+    FvmApplyRet, FvmCheckRet, FvmQueryRet,
+};
 use fendermint_vm_message::signed::DomainHash;
-use fendermint_vm_snapshot::manifest::SnapshotItem;
+use fendermint_vm_snapshot::manifest::{SnapshotItem, SnapshotManifest};
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
 use prost::Message;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU32};
 use tendermint::abci::{response, Code, Event, EventAttribute};
 
 use crate::{app::AppError, BlockHeight};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct SnapshotMetadata {
+    size: u64,
+    state_params: FvmStateParams,
+}
 
 /// IPLD encoding of data types we know we must be able to encode.
 macro_rules! ipld_encode {
@@ -359,7 +369,14 @@ pub fn to_snapshots(
     Ok(response::ListSnapshots { snapshots })
 }
 
+/// Convert a snapshot manifest to the Tendermint ABCI type.
 pub fn to_snapshot(snapshot: SnapshotItem) -> anyhow::Result<tendermint::abci::types::Snapshot> {
+    // Put anything that doesn't fit into fields of the ABCI snapshot into the metadata.
+    let metadata = SnapshotMetadata {
+        size: snapshot.manifest.size,
+        state_params: snapshot.manifest.state_params,
+    };
+
     Ok(tendermint::abci::types::Snapshot {
         height: snapshot
             .manifest
@@ -367,17 +384,73 @@ pub fn to_snapshot(snapshot: SnapshotItem) -> anyhow::Result<tendermint::abci::t
             .try_into()
             .expect("height is valid"),
         format: snapshot.manifest.version,
-        chunks: snapshot.manifest.chunks as u32,
+        chunks: snapshot.manifest.chunks,
         hash: snapshot.manifest.checksum.into(),
-        metadata: fvm_ipld_encoding::to_vec(&snapshot.manifest.state_params)?.into(),
+        metadata: fvm_ipld_encoding::to_vec(&metadata)?.into(),
     })
+}
+
+/// Parse a Tendermint ABCI snapshot offer to a manifest.
+pub fn from_snapshot(
+    offer: tendermint::abci::request::OfferSnapshot,
+) -> anyhow::Result<SnapshotManifest> {
+    let metadata = fvm_ipld_encoding::from_slice::<SnapshotMetadata>(&offer.snapshot.metadata)
+        .context("failed to parse snapshot metadata")?;
+
+    let app_hash = to_app_hash(&metadata.state_params);
+
+    if app_hash != offer.app_hash {
+        bail!("the application hash does not match the metadata");
+    }
+
+    let checksum = tendermint::hash::Hash::try_from(offer.snapshot.hash)
+        .context("failed to parse checksum")?;
+
+    let manifest = SnapshotManifest {
+        block_height: offer.snapshot.height.value(),
+        size: metadata.size,
+        chunks: offer.snapshot.chunks,
+        checksum,
+        state_params: metadata.state_params,
+        version: offer.snapshot.format,
+    };
+
+    Ok(manifest)
+}
+
+/// Produce an appliction hash that is a commitment to all data replicated by consensus,
+/// that is, all nodes participating in the network must agree on this otherwise we have
+/// a consensus failure.
+///
+/// Notably it contains the actor state root _as well as_ some of the metadata maintained
+/// outside the FVM, such as the timestamp and the circulating supply.
+pub fn to_app_hash(state_params: &FvmStateParams) -> tendermint::hash::AppHash {
+    // Create an artifical CID from the FVM state params, which include everything that
+    // deterministically changes under consensus.
+    let state_params_cid =
+        fendermint_vm_message::cid(state_params).expect("state params have a CID");
+
+    // We could reduce it to a hash to ephasize that this is not something that we can return at the moment,
+    // but we could just as easily store the record in the Blockstore to make it retrievable.
+    // It is generally not a goal to serve the entire state over the IPLD Resolver or ABCI queries, though;
+    // for that we should rely on the CometBFT snapshot mechanism.
+    // But to keep our options open, we can return the hash as a CID that nobody can retrieve, and change our mind later.
+
+    // let state_params_hash = state_params_cid.hash();
+    let state_params_hash = state_params_cid.to_bytes();
+
+    tendermint::hash::AppHash::try_from(state_params_hash).expect("hash can be wrapped")
 }
 
 #[cfg(test)]
 mod tests {
+    use fendermint_vm_snapshot::manifest::SnapshotItem;
     use fvm_shared::error::ExitCode;
+    use tendermint::abci::request;
 
     use crate::tmconv::to_error_msg;
+
+    use super::{from_snapshot, to_app_hash, to_snapshot};
 
     #[test]
     fn code_error_message() {
@@ -386,5 +459,16 @@ mod tests {
             to_error_msg(ExitCode::SYS_SENDER_INVALID),
             "The message sender doesn't exist."
         );
+    }
+
+    #[quickcheck_macros::quickcheck]
+    fn abci_snapshot_metadata(snapshot: SnapshotItem) {
+        let abci_snapshot = to_snapshot(snapshot.clone()).unwrap();
+        let abci_offer = request::OfferSnapshot {
+            snapshot: abci_snapshot,
+            app_hash: to_app_hash(&snapshot.manifest.state_params),
+        };
+        let manifest = from_snapshot(abci_offer).unwrap();
+        assert_eq!(manifest, snapshot.manifest)
     }
 }
