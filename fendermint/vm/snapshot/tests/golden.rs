@@ -4,7 +4,7 @@
 /// JSON based test so we can parse data from the disk where it's nice to be human readable.
 mod json {
     use fendermint_testing::golden_json;
-    use fendermint_vm_snapshot::manifest::SnapshotManifest;
+    use fendermint_vm_snapshot::SnapshotManifest;
     use quickcheck::Arbitrary;
     golden_json! { "manifest/json", manifest, SnapshotManifest::arbitrary }
 }
@@ -12,7 +12,7 @@ mod json {
 /// CBOR based test to make sure we can parse data in network format and we also cover the state params.
 mod cbor {
     use fendermint_testing::golden_cbor;
-    use fendermint_vm_snapshot::manifest::SnapshotManifest;
+    use fendermint_vm_snapshot::SnapshotManifest;
     use quickcheck::Arbitrary;
     golden_cbor! { "manifest/cbor", manifest, SnapshotManifest::arbitrary }
 }

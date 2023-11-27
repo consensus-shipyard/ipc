@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
-use async_stm::atomically;
+use async_stm::{atomically, atomically_or_err};
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
@@ -32,7 +32,7 @@ use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
-use fendermint_vm_snapshot::manager::SnapshotClient;
+use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
@@ -874,16 +874,31 @@ where
     }
 
     /// Decide whether to start downloading a snapshot from peers.
+    ///
+    /// This method is also called when a download is aborted and a new snapshot is offered,
+    /// so potentially we have to clean up previous resources and start a new one.
     async fn offer_snapshot(
         &self,
         request: request::OfferSnapshot,
     ) -> AbciResult<response::OfferSnapshot> {
-        if self.snapshots.is_some() {
+        if let Some(ref client) = self.snapshots {
             match from_snapshot(request).context("failed to parse snapshot") {
                 Ok(manifest) => {
                     tracing::info!(?manifest, "received snapshot offer");
                     // We can look at the version but currently there's only one.
-                    return Ok(response::OfferSnapshot::Accept);
+                    match atomically_or_err(|| client.offer_snapshot(manifest.clone())).await {
+                        Ok(()) => {
+                            return Ok(response::OfferSnapshot::Accept);
+                        }
+                        Err(SnapshotError::IncompatibleVersion(version)) => {
+                            tracing::warn!(version, "rejecting offered snapshot version");
+                            return Ok(response::OfferSnapshot::RejectFormat);
+                        }
+                        Err(e) => {
+                            tracing::error!(error = ?e, "failed to start snapshot download");
+                            return Ok(response::OfferSnapshot::Abort);
+                        }
+                    };
                 }
                 Err(e) => {
                     tracing::warn!("failed to parse snapshot offer: {e:#}");
@@ -892,5 +907,59 @@ where
             }
         }
         Ok(Default::default())
+    }
+
+    /// Apply the given snapshot chunk to the application's state.
+    async fn apply_snapshot_chunk(
+        &self,
+        request: request::ApplySnapshotChunk,
+    ) -> AbciResult<response::ApplySnapshotChunk> {
+        tracing::debug!(chunk = request.index, "received snapshot chunk");
+        let default = response::ApplySnapshotChunk::default();
+
+        if let Some(ref client) = self.snapshots {
+            match atomically_or_err(|| {
+                client.apply_chunk(request.index, request.chunk.clone().into())
+            })
+            .await
+            {
+                Ok(completed) => {
+                    if completed {
+                        tracing::info!("received all snapshot chunks");
+                    }
+                    return Ok(response::ApplySnapshotChunk {
+                        result: response::ApplySnapshotChunkResult::Accept,
+                        ..default
+                    });
+                }
+                Err(SnapshotError::UnexpectedChunk(expected, got)) => {
+                    tracing::warn!(got, expected, "unexpected snapshot chunk index");
+                    return Ok(response::ApplySnapshotChunk {
+                        result: response::ApplySnapshotChunkResult::Retry,
+                        refetch_chunks: vec![expected],
+                        ..default
+                    });
+                }
+                Err(SnapshotError::WrongChecksum(expected, got)) => {
+                    tracing::warn!(?got, ?expected, "wrong snapshot checksum");
+                    // We could retry this snapshot, or try another one.
+                    // If we retry, we have to tell which chunks to refetch.
+                    return Ok(response::ApplySnapshotChunk {
+                        result: response::ApplySnapshotChunkResult::RejectSnapshot,
+                        ..default
+                    });
+                }
+                Err(e) => {
+                    tracing::error!(
+                        chunk = request.index,
+                        sender = request.sender,
+                        error = ?e,
+                        "failed to process snapshot chunk"
+                    );
+                }
+            }
+        }
+
+        Ok(default)
     }
 }

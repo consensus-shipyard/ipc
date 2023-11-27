@@ -1,83 +1,21 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
+use std::path::PathBuf;
+use std::time::Duration;
 
-use crate::car;
-use crate::manifest::{list_manifests, write_manifest, SnapshotItem, SnapshotManifest};
+use crate::manifest::{file_checksum, list_manifests, write_manifest, SnapshotManifest};
+use crate::state::SnapshotState;
+use crate::{car, SnapshotClient, SnapshotItem};
 use anyhow::Context;
-use async_stm::{atomically, retry, Stm, TVar};
-use fendermint_vm_interpreter::fvm::state::snapshot::{
-    BlockHeight, BlockStateParams, Snapshot, SnapshotVersion,
-};
+use async_stm::{atomically, retry, TVar};
+use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, Snapshot};
 use fendermint_vm_interpreter::fvm::state::FvmStateParams;
 use fvm_ipld_blockstore::Blockstore;
-use sha2::{Digest, Sha256};
 use tendermint_rpc::Client;
 
 /// The file name to export the CAR to.
 const SNAPSHOT_FILE_NAME: &str = "snapshot.car";
-
-/// State of snapshots, including the list of available completed ones
-/// and the next eligible height.
-#[derive(Clone)]
-struct SnapshotState {
-    /// The latest state parameters at a snapshottable height.
-    latest_params: TVar<Option<BlockStateParams>>,
-    snapshots: TVar<im::Vector<SnapshotItem>>,
-}
-
-/// Interface to snapshot state for the application.
-#[derive(Clone)]
-pub struct SnapshotClient {
-    /// The client will only notify the manager of snapshottable heights.
-    snapshot_interval: BlockHeight,
-    state: SnapshotState,
-}
-
-impl SnapshotClient {
-    /// Set the latest block state parameters and notify the manager.
-    ///
-    /// Call this with the block height where the `app_hash` in the block reflects the
-    /// state in the parameters, that is, the in the *next* block.
-    pub fn notify(&self, block_height: BlockHeight, state_params: FvmStateParams) -> Stm<()> {
-        if block_height % self.snapshot_interval == 0 {
-            self.state
-                .latest_params
-                .write(Some((state_params, block_height)))?;
-        }
-        Ok(())
-    }
-
-    /// List completed snapshots.
-    pub fn list_snapshots(&self) -> Stm<im::Vector<SnapshotItem>> {
-        self.state.snapshots.read_clone()
-    }
-
-    /// Try to find a snapshot, if it still exists.
-    ///
-    /// If found, mark it as accessed, so that it doesn't get purged while likely to be requested or read from disk.
-    pub fn access_snapshot(
-        &self,
-        block_height: BlockHeight,
-        version: SnapshotVersion,
-    ) -> Stm<Option<SnapshotItem>> {
-        let mut snapshots = self.state.snapshots.read_clone()?;
-        let mut snapshot = None;
-        for s in snapshots.iter_mut() {
-            if s.manifest.block_height == block_height && s.manifest.version == version {
-                s.last_access = SystemTime::now();
-                snapshot = Some(s.clone());
-                break;
-            }
-        }
-        if snapshot.is_some() {
-            self.state.snapshots.write(snapshots)?;
-        }
-        Ok(snapshot)
-    }
-}
 
 /// Create snapshots at regular block intervals.
 pub struct SnapshotManager<BS> {
@@ -119,12 +57,7 @@ where
     ) -> anyhow::Result<(Self, SnapshotClient)> {
         let snapshot_items = list_manifests(&snapshot_dir).context("failed to list manifests")?;
 
-        let state = SnapshotState {
-            // Start with nothing to snapshot until we are notified about a new height.
-            // We could also look back to find the latest height we should have snapshotted.
-            latest_params: TVar::new(None),
-            snapshots: TVar::new(snapshot_items.into()),
-        };
+        let state = SnapshotState::new(snapshot_items);
 
         let manager = Self {
             store,
@@ -138,10 +71,7 @@ where
             is_syncing: TVar::new(true),
         };
 
-        let client = SnapshotClient {
-            snapshot_interval,
-            state,
-        };
+        let client = SnapshotClient::new(snapshot_interval, state);
 
         Ok((manager, client))
     }
@@ -291,7 +221,7 @@ where
             .len() as usize;
 
         // Create a checksum over the CAR file.
-        let checksum_bytes = checksum(&snapshot_path).context("failed to compute checksum")?;
+        let checksum_bytes = file_checksum(&snapshot_path).context("failed to compute checksum")?;
         std::fs::write(&checksum_path, checksum_bytes).context("failed to write checksum file")?;
 
         // Create a directory for the parts.
@@ -330,15 +260,6 @@ where
     }
 }
 
-/// Create a Sha256 checksum of a file.
-fn checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash> {
-    let mut file = std::fs::File::open(&path)?;
-    let mut hasher = Sha256::new();
-    let _ = std::io::copy(&mut file, &mut hasher)?;
-    let hash = hasher.finalize().into();
-    Ok(tendermint::Hash::Sha256(hash))
-}
-
 /// Periodically ask CometBFT if it has caught up with the chain.
 async fn poll_sync_status<C>(client: C, is_syncing: TVar<bool>, poll_interval: Duration)
 where
@@ -367,10 +288,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, sync::Arc, time::Duration};
+    use std::{sync::Arc, time::Duration};
 
     use async_stm::{atomically, retry};
-    use cid::multihash::MultihashDigest;
     use fendermint_vm_genesis::Genesis;
     use fendermint_vm_interpreter::{
         fvm::{
@@ -383,26 +303,10 @@ mod tests {
     };
     use fvm::engine::MultiEngine;
     use quickcheck::Arbitrary;
-    use tempfile::NamedTempFile;
 
     use crate::manifest;
 
-    use super::{checksum, SnapshotManager};
-
-    #[test]
-    fn file_checksum() {
-        let content = b"Hello Checksum!";
-
-        let mut file = NamedTempFile::new().expect("new temp file");
-        file.write_all(content).expect("write contents");
-        let file_path = file.into_temp_path();
-        let file_digest = checksum(file_path).expect("checksum");
-
-        let content_digest = cid::multihash::Code::Sha2_256.digest(content);
-        let content_digest = content_digest.digest();
-
-        assert_eq!(file_digest.as_bytes(), content_digest)
-    }
+    use super::SnapshotManager;
 
     // Initialise genesis and export it directly to see if it works.
     #[tokio::test]
@@ -483,6 +387,14 @@ mod tests {
 
         assert_eq!(snapshots.len(), 1, "can list manifests");
         assert_eq!(snapshots[0], snapshot);
+
+        let checksum = manifest::parts_checksum(snapshot.snapshot_dir.as_path().join("parts"))
+            .expect("parts checksum can be calculated");
+
+        assert_eq!(
+            checksum, snapshot.manifest.checksum,
+            "checksum should match"
+        );
 
         // Create a new manager instance
         let (_, new_client) = SnapshotManager::new(

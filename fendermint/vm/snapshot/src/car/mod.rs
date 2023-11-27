@@ -96,6 +96,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
+        // There are few enough that we can get away without converting to an integer.
         chunks.sort_unstable_by_key(|c| c.path().to_string_lossy().to_string());
 
         let chunks = chunks

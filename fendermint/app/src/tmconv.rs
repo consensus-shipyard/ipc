@@ -9,7 +9,7 @@ use fendermint_vm_interpreter::fvm::{
     FvmApplyRet, FvmCheckRet, FvmQueryRet,
 };
 use fendermint_vm_message::signed::DomainHash;
-use fendermint_vm_snapshot::manifest::{SnapshotItem, SnapshotManifest};
+use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -444,7 +444,7 @@ pub fn to_app_hash(state_params: &FvmStateParams) -> tendermint::hash::AppHash {
 
 #[cfg(test)]
 mod tests {
-    use fendermint_vm_snapshot::manifest::SnapshotItem;
+    use fendermint_vm_snapshot::SnapshotItem;
     use fvm_shared::error::ExitCode;
     use tendermint::abci::request;
 

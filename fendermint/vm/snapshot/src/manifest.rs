@@ -1,17 +1,17 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{
-    path::{Path, PathBuf},
-    time::SystemTime,
-};
+use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use fendermint_vm_interpreter::fvm::state::{
     snapshot::{BlockHeight, SnapshotVersion},
     FvmStateParams,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use crate::SnapshotItem;
 
 /// The file name in snapshot directories that contains the manifest.
 const MANIFEST_FILE_NAME: &str = "manifest.json";
@@ -34,44 +34,6 @@ pub struct SnapshotManifest {
     pub state_params: FvmStateParams,
     /// Snapshot format version
     pub version: SnapshotVersion,
-}
-
-/// A snapshot directory and its manifest.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct SnapshotItem {
-    /// Directory containing this snapshot, ie. the manifest ane the parts.
-    pub snapshot_dir: PathBuf,
-    /// Parsed `manifest.json` contents.
-    pub manifest: SnapshotManifest,
-    /// Last time a peer asked for a chunk from this snapshot.
-    pub last_access: SystemTime,
-}
-
-impl SnapshotItem {
-    pub fn new(snapshot_dir: PathBuf, manifest: SnapshotManifest) -> Self {
-        Self {
-            snapshot_dir,
-            manifest,
-            last_access: SystemTime::UNIX_EPOCH,
-        }
-    }
-    /// Load the data from disk.
-    ///
-    /// Returns an error if the chunk isn't within range or if the file doesn't exist any more.
-    pub fn load_chunk(&self, chunk: u32) -> anyhow::Result<Vec<u8>> {
-        if chunk >= self.manifest.chunks {
-            bail!(
-                "cannot load chunk {chunk}; only have {} in the snapshot",
-                self.manifest.chunks
-            );
-        }
-        let chunk_file = self.snapshot_dir.join("{chunk}.part");
-
-        let content = std::fs::read(&chunk_file)
-            .with_context(|| format!("failed to read chunk {}", chunk_file.to_string_lossy()))?;
-
-        Ok(content)
-    }
 }
 
 /// Save a manifest along with the other snapshot files into a snapshot specific directory.
@@ -140,9 +102,57 @@ pub fn list_manifests(snapshot_dir: impl AsRef<Path>) -> anyhow::Result<Vec<Snap
     Ok(items)
 }
 
+/// Calculate the Sha256 checksum of a file.
+pub fn file_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash> {
+    let mut file = std::fs::File::open(&path)?;
+    let mut hasher = Sha256::new();
+    let _ = std::io::copy(&mut file, &mut hasher)?;
+    let hash = hasher.finalize().into();
+    Ok(tendermint::Hash::Sha256(hash))
+}
+
+/// Calculate the Sha256 checksum of all `{idx}.part` files in a directory.
+pub fn parts_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash> {
+    let mut hasher = Sha256::new();
+
+    let mut chunks = std::fs::read_dir(path.as_ref())
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .with_context(|| {
+            format!(
+                "failed to collect parts in directory: {}",
+                path.as_ref().to_string_lossy()
+            )
+        })?;
+
+    chunks.retain(|item| {
+        item.path()
+            .extension()
+            .map(|x| x.to_string_lossy().to_string())
+            .unwrap_or_default()
+            == "part"
+    });
+
+    chunks.sort_by_cached_key(|item| {
+        item.path()
+            .file_stem()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_default()
+            .parse::<u32>()
+            .expect("file part names are prefixed by index")
+    });
+
+    for entry in chunks {
+        let mut file = std::fs::File::open(&entry.path()).context("failed to open part")?;
+        let _ = std::io::copy(&mut file, &mut hasher)?;
+    }
+
+    let hash = hasher.finalize().into();
+    Ok(tendermint::Hash::Sha256(hash))
+}
+
 #[cfg(feature = "arb")]
 mod arb {
-    use std::{path::PathBuf, time::SystemTime};
 
     use fendermint_testing::arb::{ArbCid, ArbTokenAmount};
     use fendermint_vm_core::{chainid, Timestamp};
@@ -150,7 +160,7 @@ mod arb {
     use fvm_shared::version::NetworkVersion;
     use quickcheck::Arbitrary;
 
-    use super::{SnapshotItem, SnapshotManifest};
+    use super::SnapshotManifest;
 
     impl quickcheck::Arbitrary for SnapshotManifest {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
@@ -180,14 +190,29 @@ mod arb {
             }
         }
     }
+}
 
-    impl quickcheck::Arbitrary for SnapshotItem {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            Self {
-                manifest: SnapshotManifest::arbitrary(g),
-                snapshot_dir: PathBuf::arbitrary(g),
-                last_access: SystemTime::arbitrary(g),
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use cid::multihash::MultihashDigest;
+    use tempfile::NamedTempFile;
+
+    use crate::manifest::file_checksum;
+
+    #[test]
+    fn test_file_checksum() {
+        let content = b"Hello Checksum!";
+
+        let mut file = NamedTempFile::new().expect("new temp file");
+        file.write_all(content).expect("write contents");
+        let file_path = file.into_temp_path();
+        let file_digest = file_checksum(file_path).expect("checksum");
+
+        let content_digest = cid::multihash::Code::Sha2_256.digest(content);
+        let content_digest = content_digest.digest();
+
+        assert_eq!(file_digest.as_bytes(), content_digest)
     }
 }
