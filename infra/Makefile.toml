@@ -42,7 +42,7 @@ BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }
 PRIVATE_KEY_PATH = { value = "", condition = { env_not_set = ["PRIVATE_KEY_PATH"] } }
 
 # Deployment-related
-BASE_DIR="${HOME}/.ipc/${NETWORK_NAME}"
+BASE_DIR="${HOME}/.ipc/${NETWORK_NAME}/${NODE_NAME}"
 FM_DIR="${BASE_DIR}/${NODE_NAME}/fendermint"
 CMT_DIR="${BASE_DIR}/${NODE_NAME}/cometbft"
 

@@ -197,10 +197,18 @@ sed -i'' -e 's|^external_address = ""$|external_address = "{{PLACEHOLDER}}"|g' $
 sed -i'' -e "s/{{PLACEHOLDER}}/$CMT_EXTERNAL_ADDR/g" ${CMT_DIR}/config/config.toml
 """
 
+# This is required to run several validators locally. You may want to disable it when running
+# a real environment.
+[tasks.duplicate-ip-enable]
+script = """
+sed -i'' -e "s|allow_duplicate_ip = false|allow_duplicate_ip = true|" ${CMT_DIR}/config/config.toml
+"""
+
 [tasks.cometbft-config]
 dependencies = [
     "cometbft-init",
     "set-seeds",
     "addr-book-enable",
     "set-external-addr",
+    "duplicate-ip-enable",
 ]
