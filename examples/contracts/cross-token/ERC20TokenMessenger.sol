@@ -62,7 +62,7 @@ contract ERC20TokenMessenger is ReentrancyGuard {
         if (receiver == address(0)) {
             revert ZeroAddress();
         }
-        if (msg.value != DEFAULT_CROSS_MSG_FEE ) {
+        if (msg.value != DEFAULT_CROSS_MSG_FEE) {
             revert NotEnoughFunds();
         }
 
@@ -91,10 +91,7 @@ contract ERC20TokenMessenger is ReentrancyGuard {
 
         CrossMsg memory crossMsg = CrossMsg({
             message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: info.getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(sourceContract)
-                }),
+                from: IPCAddress({subnetId: info.getNetworkName(), rawAddress: FvmAddressHelper.from(sourceContract)}),
                 to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)}),
                 value: 0,
                 nonce: lastNonce,

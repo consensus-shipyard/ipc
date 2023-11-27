@@ -19,18 +19,22 @@ and upgrades will not be possible.
 5. A custom `lib/ReentrancyGuard.sol` is used because the original OpenZeppelin's `ReentrancyGuard` contract doesn't support the Diamond pattern.
 
 ## Implementation Base
+
 The IPC diamond code is based on the [diamond-1-hardhat](https://github.com/mudgen/diamond-1-hardhat/tree/main/contracts) reference implementation.
 
 ## Storage
+
 The implementation uses the `AppStorage` pattern in facets and `Diamond Storage` in libraries.
 `GatewayActorStorage` and `SubnetActorStorage` are used within the `AppStorage` pattern.
 To be compatible with `ApStorage` and to be able to apply it, we are using the `LibReentrancyGuard` contract.
 
 ## Getting Selectors
+
 Because diamonds contain mappings of function selectors to facet addresses, we have to know function selectors before deploying.
 To do that, we use the `get_selectors` function from a script in Python.
 
 ## References
-- [Introduction to EIP-2535 Diamonds](https://eip2535diamonds.substack.com/p/introduction-to-the-diamond-standard)
-- [ERC-2535: Diamonds, Multi-Facet Proxy](https://eips.ethereum.org/EIPS/eip-2535#facets-state-variables-and-diamond-storage)
-- [Understanding Diamonds on Ethereum](https://dev.to/mudgen/understanding-diamonds-on-ethereum-1fb)
+
+-   [Introduction to EIP-2535 Diamonds](https://eip2535diamonds.substack.com/p/introduction-to-the-diamond-standard)
+-   [ERC-2535: Diamonds, Multi-Facet Proxy](https://eips.ethereum.org/EIPS/eip-2535#facets-state-variables-and-diamond-storage)
+-   [Understanding Diamonds on Ethereum](https://dev.to/mudgen/understanding-diamonds-on-ethereum-1fb)

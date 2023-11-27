@@ -1,2044 +1,1985 @@
 {
-  "abi": [],
-  "bytecode": {
-    "object": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea26469706673582212201b9bb0f849d722375021b5665db91354a570e090f63334035227bd4a881ba26564736f6c63430008130033",
-    "sourceMap": "3493:194:65:-:0;;;;;;;;;;;;;;;;;;;;;",
-    "linkReferences": {}
-  },
-  "deployedBytecode": {
-    "object": "0x600080fdfea26469706673582212201b9bb0f849d722375021b5665db91354a570e090f63334035227bd4a881ba26564736f6c63430008130033",
-    "sourceMap": "3493:194:65:-:0;;",
-    "linkReferences": {}
-  },
-  "methodIdentifiers": {},
-  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/lib/LibSubnetActorStorage.sol\":\"LibSubnetActorStorage\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/fevmate/contracts/utils/FilAddress.sol\":{\"keccak256\":\"0x8707b4f152e92b852090c313419c0dc772eebf4428472a0659dd6b13dd6bee31\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://442fc3cb02e610424f0599f4cc519e4fbead47da09911697b62208a2ae51e4a7\",\"dweb:/ipfs/QmRpKJ9tWWTHgMpRB18DHJLbCT4YT9yp2G89H9mHGu5ss2\"]},\"lib/openzeppelin-contracts/contracts/utils/Address.sol\":{\"keccak256\":\"0x67ca7745e6032aeda339ba3f5813abf9eeb4ec683520944fa878c2867aea58f1\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://c13ff04f87357176e2b267730f288013269eefce0862ea8f4bf3f420948eb7d5\",\"dweb:/ipfs/QmQZRjF3CdCdoUvqhrT9KXYjrjmdmFQqENtuiHTMbyt6xo\"]},\"lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol\":{\"keccak256\":\"0xeefcbb8cb69f04a18f6dc61d4811133ce9aeff96ce60820f758abc52ef55b892\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://81c61c0dd40890f6a4b1fb792bc5b5b61e821fcafa2aae6c7eda6d4f1ece2593\",\"dweb:/ipfs/QmRLMrq6BiPS9wGu7ZC174SFYWCu6cxbU3agDw2XgJeDpT\"]},\"src/constants/Constants.sol\":{\"keccak256\":\"0xe09e20d591a8c9cabf6f2e44a90029fb3b2a8cdd6c09dc4105b81781ffb44546\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://b3c4df8d0fd2aa770abf8b43a134ce0fc0bc3091f97ec02415d09cca09f4f940\",\"dweb:/ipfs/QmSUpMfWLN8WWhvLmbZymCdR48ZmpsuyvBnSPeAtdorxDx\"]},\"src/enums/ConsensusType.sol\":{\"keccak256\":\"0xc5efd8c66b57dadaba4178c4b4d087b30cb84cbac38fb288a8c3b65075a9f59d\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://6fcffaa8e40322ae27958603884cc07d06e9efd59cf12764f28945b7a47e11d0\",\"dweb:/ipfs/Qmc3PBovpcvj7jgVq5GwR5SkiUXBymT1tw74mvu5ccNqoZ\"]},\"src/enums/Status.sol\":{\"keccak256\":\"0x8f5921e4df87420127988b54f67a3ccfb6fbfae767891e8ed4edbf371598e16c\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://7a81d9a00ea7a2a85cfe1b2662236412dddb55e09fa70c70a34dc4dfc5ffea33\",\"dweb:/ipfs/QmRh4uA4491B2DVjrUtdfCTTtjpoXpKEp3Zz9CBYueNW1R\"]},\"src/errors/IPCErrors.sol\":{\"keccak256\":\"0x89ee65643858f78c51c49457f6cd127c773f794bf1b70ea50bd5e59f1b48e467\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://a4e9c19f69ab5bcd7ec8ac2b058a84bff7125ebc42eb195c7d8c7094c2049dec\",\"dweb:/ipfs/QmeN67eDEQefw5PS8iXk9TDzULVqK1QNA9ajzD3Z2jqxwK\"]},\"src/interfaces/IGateway.sol\":{\"keccak256\":\"0xb4209b44c3965fd233387ece78149461bd64a47788c3af24edb7c99ea1ef8868\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://4db7a4573100063387e170c55a69772b20e403444e9d97b24cc220a71a52fbbb\",\"dweb:/ipfs/QmTYsSjmFsTwuNTXBByZKueJZLpe7RwNzLRWNPxXGA3YKB\"]},\"src/lib/AccountHelper.sol\":{\"keccak256\":\"0xd5f3c0079e3002218c63b70b43f6e018eb5d39f064b7d4321b6409c84f6a22b5\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://e5857fe645e020bc964cd53a33e1fbd4fd9d0de405170a8251cc0b040519cbdc\",\"dweb:/ipfs/QmaFUeVbA1mqn7dTJMqgX4DbKx6yzBrSkmeNTcaVjBJd9z\"]},\"src/lib/LibGatewayActorStorage.sol\":{\"keccak256\":\"0x4731b1de63c99bfccfa12c1c59481f27630994c8d04c0a555c6f6845f3873157\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://641337e8c2d3876ccefdb1f181c9cfeb9568f7c015f51da668d0c2dc582773d3\",\"dweb:/ipfs/QmNzgGXzXjULKJE6iYN6ioZLJvh3ykLdwt6gTjVp7gX9f6\"]},\"src/lib/LibStaking.sol\":{\"keccak256\":\"0x3ad98b426ca82cc98fd795a166c4a599c71e9f400e3b23bda58666e2febdf3b2\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://1e501014ed974118161282e81821aa05810da989a3b2091624e73327d45cab67\",\"dweb:/ipfs/QmSi2Ed42uhNoxuvdyigyhNpujEkrzc9Goe4gTbhgVuE3o\"]},\"src/lib/LibStakingChangeLog.sol\":{\"keccak256\":\"0x1ec44b7c417dae8bec87da6f1f48eb10a1eacdfb4935144dd9094dc1bbe9aa9b\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://d6fcbd14fe0743c0ea0a8a8d2ea851b4864559c3553773f07d6ae708bcc83318\",\"dweb:/ipfs/QmYb6v6U27FAY4ut6gCZy6oK1MjN165RTxUGhrY6zxtg93\"]},\"src/lib/LibSubnetActorStorage.sol\":{\"keccak256\":\"0xe11ae56d18ef43fd9ebdf9350977f9a26da4ee9a3288b46b04c5b973aa231f28\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://f616b61fde1528a8666d09c962d7f23a82b200229691794933f39c4d3781fc1c\",\"dweb:/ipfs/QmXQsNGv6R34wAx1fRoyMiwdtGgQVn1qDXGCr7cED92vvJ\"]},\"src/lib/priority/LibMaxPQ.sol\":{\"keccak256\":\"0xf98fae415e764e627134ae440dea84d6879eaaa6950868cb56382324f84ae8db\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://f290b5d20ac65c22eddbadeae1b49bbe78cb9e8e0cd187c2b93f98d13f9300a2\",\"dweb:/ipfs/QmXShiVpDzD8CLn8MeWSa4fQSeiTzyBHSA1VNZtLhJgTgW\"]},\"src/lib/priority/LibMinPQ.sol\":{\"keccak256\":\"0xc8c27239c0e82b489d9cb61f64be28d4fde6af8d6c8b2d27180ad9c42d602110\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://ed53f96d383f74c06a118ad3c8758df07b91f48dcd81769dac637d2289644796\",\"dweb:/ipfs/Qmaf4HdjTnuQZ44PRmqmWXCF3h616rhNA7uKEksPPtmxXK\"]},\"src/lib/priority/LibPQ.sol\":{\"keccak256\":\"0x4d4290087995d669e80f8fdd405bfaae545323393c0c54689b84965ffb87303e\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://c21b563f6bf23afacb38fc97ab94d1afe12e4ad3dfde96d4484068bf26b13a2c\",\"dweb:/ipfs/Qmd5d3EnZwaSRnjG4ZFH2X8HKgymzd6vQgus8A6oEoh5pJ\"]},\"src/structs/Checkpoint.sol\":{\"keccak256\":\"0x1982a747516dce183434bbf0e96b5b1fedbf3a90928beffcc046cadf47ee0746\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://253b9df56334aae80fe4a0da805e4fdc3d186fb2624edade864ae06bfd472f2a\",\"dweb:/ipfs/QmVAaz1ViF96LjM9Aknn3vtwQ5a5oDiJRZP47ddJ1V9Fww\"]},\"src/structs/FvmAddress.sol\":{\"keccak256\":\"0xfc8c16b96bd5b7d4a163f586bd36936f7170304de70aa487a0b11c60e5ac9069\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://6b6572d5f28a9fa12ff91d45601c063cdaf68a12b9f8e46131c6dc4cd28255ac\",\"dweb:/ipfs/QmSC8gRWVuPKjobgDDyHbm2cmcPN8pWzbEmXKmdMZR8YKu\"]},\"src/structs/Subnet.sol\":{\"keccak256\":\"0x1ddb626039baf4a4411f06b5340aaa80dcd65e9980da7673b73ab16633d871ce\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://af017eef4cb46262ac29b4cf47faa1fc5d2b61970ec7d6d021eae4cf45b5577b\",\"dweb:/ipfs/QmZJiA2t934fbe62513neQYzxSNswnCRTJybp7d6X2RyWR\"]}},\"version\":1}",
-  "metadata": {
-    "compiler": {
-      "version": "0.8.19+commit.7dd6d404"
+    "abi": [],
+    "bytecode": {
+        "object": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea26469706673582212201b9bb0f849d722375021b5665db91354a570e090f63334035227bd4a881ba26564736f6c63430008130033",
+        "sourceMap": "3493:194:65:-:0;;;;;;;;;;;;;;;;;;;;;",
+        "linkReferences": {}
     },
-    "language": "Solidity",
-    "output": {
-      "abi": [],
-      "devdoc": {
-        "kind": "dev",
-        "methods": {},
+    "deployedBytecode": {
+        "object": "0x600080fdfea26469706673582212201b9bb0f849d722375021b5665db91354a570e090f63334035227bd4a881ba26564736f6c63430008130033",
+        "sourceMap": "3493:194:65:-:0;;",
+        "linkReferences": {}
+    },
+    "methodIdentifiers": {},
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/lib/LibSubnetActorStorage.sol\":\"LibSubnetActorStorage\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/fevmate/contracts/utils/FilAddress.sol\":{\"keccak256\":\"0x8707b4f152e92b852090c313419c0dc772eebf4428472a0659dd6b13dd6bee31\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://442fc3cb02e610424f0599f4cc519e4fbead47da09911697b62208a2ae51e4a7\",\"dweb:/ipfs/QmRpKJ9tWWTHgMpRB18DHJLbCT4YT9yp2G89H9mHGu5ss2\"]},\"lib/openzeppelin-contracts/contracts/utils/Address.sol\":{\"keccak256\":\"0x67ca7745e6032aeda339ba3f5813abf9eeb4ec683520944fa878c2867aea58f1\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://c13ff04f87357176e2b267730f288013269eefce0862ea8f4bf3f420948eb7d5\",\"dweb:/ipfs/QmQZRjF3CdCdoUvqhrT9KXYjrjmdmFQqENtuiHTMbyt6xo\"]},\"lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol\":{\"keccak256\":\"0xeefcbb8cb69f04a18f6dc61d4811133ce9aeff96ce60820f758abc52ef55b892\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://81c61c0dd40890f6a4b1fb792bc5b5b61e821fcafa2aae6c7eda6d4f1ece2593\",\"dweb:/ipfs/QmRLMrq6BiPS9wGu7ZC174SFYWCu6cxbU3agDw2XgJeDpT\"]},\"src/constants/Constants.sol\":{\"keccak256\":\"0xe09e20d591a8c9cabf6f2e44a90029fb3b2a8cdd6c09dc4105b81781ffb44546\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://b3c4df8d0fd2aa770abf8b43a134ce0fc0bc3091f97ec02415d09cca09f4f940\",\"dweb:/ipfs/QmSUpMfWLN8WWhvLmbZymCdR48ZmpsuyvBnSPeAtdorxDx\"]},\"src/enums/ConsensusType.sol\":{\"keccak256\":\"0xc5efd8c66b57dadaba4178c4b4d087b30cb84cbac38fb288a8c3b65075a9f59d\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://6fcffaa8e40322ae27958603884cc07d06e9efd59cf12764f28945b7a47e11d0\",\"dweb:/ipfs/Qmc3PBovpcvj7jgVq5GwR5SkiUXBymT1tw74mvu5ccNqoZ\"]},\"src/enums/Status.sol\":{\"keccak256\":\"0x8f5921e4df87420127988b54f67a3ccfb6fbfae767891e8ed4edbf371598e16c\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://7a81d9a00ea7a2a85cfe1b2662236412dddb55e09fa70c70a34dc4dfc5ffea33\",\"dweb:/ipfs/QmRh4uA4491B2DVjrUtdfCTTtjpoXpKEp3Zz9CBYueNW1R\"]},\"src/errors/IPCErrors.sol\":{\"keccak256\":\"0x89ee65643858f78c51c49457f6cd127c773f794bf1b70ea50bd5e59f1b48e467\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://a4e9c19f69ab5bcd7ec8ac2b058a84bff7125ebc42eb195c7d8c7094c2049dec\",\"dweb:/ipfs/QmeN67eDEQefw5PS8iXk9TDzULVqK1QNA9ajzD3Z2jqxwK\"]},\"src/interfaces/IGateway.sol\":{\"keccak256\":\"0xb4209b44c3965fd233387ece78149461bd64a47788c3af24edb7c99ea1ef8868\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://4db7a4573100063387e170c55a69772b20e403444e9d97b24cc220a71a52fbbb\",\"dweb:/ipfs/QmTYsSjmFsTwuNTXBByZKueJZLpe7RwNzLRWNPxXGA3YKB\"]},\"src/lib/AccountHelper.sol\":{\"keccak256\":\"0xd5f3c0079e3002218c63b70b43f6e018eb5d39f064b7d4321b6409c84f6a22b5\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://e5857fe645e020bc964cd53a33e1fbd4fd9d0de405170a8251cc0b040519cbdc\",\"dweb:/ipfs/QmaFUeVbA1mqn7dTJMqgX4DbKx6yzBrSkmeNTcaVjBJd9z\"]},\"src/lib/LibGatewayActorStorage.sol\":{\"keccak256\":\"0x4731b1de63c99bfccfa12c1c59481f27630994c8d04c0a555c6f6845f3873157\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://641337e8c2d3876ccefdb1f181c9cfeb9568f7c015f51da668d0c2dc582773d3\",\"dweb:/ipfs/QmNzgGXzXjULKJE6iYN6ioZLJvh3ykLdwt6gTjVp7gX9f6\"]},\"src/lib/LibStaking.sol\":{\"keccak256\":\"0x3ad98b426ca82cc98fd795a166c4a599c71e9f400e3b23bda58666e2febdf3b2\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://1e501014ed974118161282e81821aa05810da989a3b2091624e73327d45cab67\",\"dweb:/ipfs/QmSi2Ed42uhNoxuvdyigyhNpujEkrzc9Goe4gTbhgVuE3o\"]},\"src/lib/LibStakingChangeLog.sol\":{\"keccak256\":\"0x1ec44b7c417dae8bec87da6f1f48eb10a1eacdfb4935144dd9094dc1bbe9aa9b\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://d6fcbd14fe0743c0ea0a8a8d2ea851b4864559c3553773f07d6ae708bcc83318\",\"dweb:/ipfs/QmYb6v6U27FAY4ut6gCZy6oK1MjN165RTxUGhrY6zxtg93\"]},\"src/lib/LibSubnetActorStorage.sol\":{\"keccak256\":\"0xe11ae56d18ef43fd9ebdf9350977f9a26da4ee9a3288b46b04c5b973aa231f28\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://f616b61fde1528a8666d09c962d7f23a82b200229691794933f39c4d3781fc1c\",\"dweb:/ipfs/QmXQsNGv6R34wAx1fRoyMiwdtGgQVn1qDXGCr7cED92vvJ\"]},\"src/lib/priority/LibMaxPQ.sol\":{\"keccak256\":\"0xf98fae415e764e627134ae440dea84d6879eaaa6950868cb56382324f84ae8db\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://f290b5d20ac65c22eddbadeae1b49bbe78cb9e8e0cd187c2b93f98d13f9300a2\",\"dweb:/ipfs/QmXShiVpDzD8CLn8MeWSa4fQSeiTzyBHSA1VNZtLhJgTgW\"]},\"src/lib/priority/LibMinPQ.sol\":{\"keccak256\":\"0xc8c27239c0e82b489d9cb61f64be28d4fde6af8d6c8b2d27180ad9c42d602110\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://ed53f96d383f74c06a118ad3c8758df07b91f48dcd81769dac637d2289644796\",\"dweb:/ipfs/Qmaf4HdjTnuQZ44PRmqmWXCF3h616rhNA7uKEksPPtmxXK\"]},\"src/lib/priority/LibPQ.sol\":{\"keccak256\":\"0x4d4290087995d669e80f8fdd405bfaae545323393c0c54689b84965ffb87303e\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://c21b563f6bf23afacb38fc97ab94d1afe12e4ad3dfde96d4484068bf26b13a2c\",\"dweb:/ipfs/Qmd5d3EnZwaSRnjG4ZFH2X8HKgymzd6vQgus8A6oEoh5pJ\"]},\"src/structs/Checkpoint.sol\":{\"keccak256\":\"0x1982a747516dce183434bbf0e96b5b1fedbf3a90928beffcc046cadf47ee0746\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://253b9df56334aae80fe4a0da805e4fdc3d186fb2624edade864ae06bfd472f2a\",\"dweb:/ipfs/QmVAaz1ViF96LjM9Aknn3vtwQ5a5oDiJRZP47ddJ1V9Fww\"]},\"src/structs/FvmAddress.sol\":{\"keccak256\":\"0xfc8c16b96bd5b7d4a163f586bd36936f7170304de70aa487a0b11c60e5ac9069\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://6b6572d5f28a9fa12ff91d45601c063cdaf68a12b9f8e46131c6dc4cd28255ac\",\"dweb:/ipfs/QmSC8gRWVuPKjobgDDyHbm2cmcPN8pWzbEmXKmdMZR8YKu\"]},\"src/structs/Subnet.sol\":{\"keccak256\":\"0x1ddb626039baf4a4411f06b5340aaa80dcd65e9980da7673b73ab16633d871ce\",\"license\":\"MIT OR Apache-2.0\",\"urls\":[\"bzz-raw://af017eef4cb46262ac29b4cf47faa1fc5d2b61970ec7d6d021eae4cf45b5577b\",\"dweb:/ipfs/QmZJiA2t934fbe62513neQYzxSNswnCRTJybp7d6X2RyWR\"]}},\"version\":1}",
+    "metadata": {
+        "compiler": {
+            "version": "0.8.19+commit.7dd6d404"
+        },
+        "language": "Solidity",
+        "output": {
+            "abi": [],
+            "devdoc": {
+                "kind": "dev",
+                "methods": {},
+                "version": 1
+            },
+            "userdoc": {
+                "kind": "user",
+                "methods": {},
+                "version": 1
+            }
+        },
+        "settings": {
+            "remappings": [
+                "ds-test/=lib/forge-std/lib/ds-test/src/",
+                "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
+                "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
+                "fevmate/=lib/fevmate/contracts/",
+                "forge-std/=lib/forge-std/src/",
+                "murky/=lib/murky/src/",
+                "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+                "openzeppelin/=lib/openzeppelin-contracts/contracts/"
+            ],
+            "optimizer": {
+                "enabled": true,
+                "runs": 200
+            },
+            "metadata": {
+                "bytecodeHash": "ipfs"
+            },
+            "compilationTarget": {
+                "src/lib/LibSubnetActorStorage.sol": "LibSubnetActorStorage"
+            },
+            "libraries": {},
+            "viaIR": true
+        },
+        "sources": {
+            "lib/fevmate/contracts/utils/FilAddress.sol": {
+                "keccak256": "0x8707b4f152e92b852090c313419c0dc772eebf4428472a0659dd6b13dd6bee31",
+                "urls": [
+                    "bzz-raw://442fc3cb02e610424f0599f4cc519e4fbead47da09911697b62208a2ae51e4a7",
+                    "dweb:/ipfs/QmRpKJ9tWWTHgMpRB18DHJLbCT4YT9yp2G89H9mHGu5ss2"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts/contracts/utils/Address.sol": {
+                "keccak256": "0x67ca7745e6032aeda339ba3f5813abf9eeb4ec683520944fa878c2867aea58f1",
+                "urls": [
+                    "bzz-raw://c13ff04f87357176e2b267730f288013269eefce0862ea8f4bf3f420948eb7d5",
+                    "dweb:/ipfs/QmQZRjF3CdCdoUvqhrT9KXYjrjmdmFQqENtuiHTMbyt6xo"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol": {
+                "keccak256": "0xeefcbb8cb69f04a18f6dc61d4811133ce9aeff96ce60820f758abc52ef55b892",
+                "urls": [
+                    "bzz-raw://81c61c0dd40890f6a4b1fb792bc5b5b61e821fcafa2aae6c7eda6d4f1ece2593",
+                    "dweb:/ipfs/QmRLMrq6BiPS9wGu7ZC174SFYWCu6cxbU3agDw2XgJeDpT"
+                ],
+                "license": "MIT"
+            },
+            "src/constants/Constants.sol": {
+                "keccak256": "0xe09e20d591a8c9cabf6f2e44a90029fb3b2a8cdd6c09dc4105b81781ffb44546",
+                "urls": [
+                    "bzz-raw://b3c4df8d0fd2aa770abf8b43a134ce0fc0bc3091f97ec02415d09cca09f4f940",
+                    "dweb:/ipfs/QmSUpMfWLN8WWhvLmbZymCdR48ZmpsuyvBnSPeAtdorxDx"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/enums/ConsensusType.sol": {
+                "keccak256": "0xc5efd8c66b57dadaba4178c4b4d087b30cb84cbac38fb288a8c3b65075a9f59d",
+                "urls": [
+                    "bzz-raw://6fcffaa8e40322ae27958603884cc07d06e9efd59cf12764f28945b7a47e11d0",
+                    "dweb:/ipfs/Qmc3PBovpcvj7jgVq5GwR5SkiUXBymT1tw74mvu5ccNqoZ"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/enums/Status.sol": {
+                "keccak256": "0x8f5921e4df87420127988b54f67a3ccfb6fbfae767891e8ed4edbf371598e16c",
+                "urls": [
+                    "bzz-raw://7a81d9a00ea7a2a85cfe1b2662236412dddb55e09fa70c70a34dc4dfc5ffea33",
+                    "dweb:/ipfs/QmRh4uA4491B2DVjrUtdfCTTtjpoXpKEp3Zz9CBYueNW1R"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/errors/IPCErrors.sol": {
+                "keccak256": "0x89ee65643858f78c51c49457f6cd127c773f794bf1b70ea50bd5e59f1b48e467",
+                "urls": [
+                    "bzz-raw://a4e9c19f69ab5bcd7ec8ac2b058a84bff7125ebc42eb195c7d8c7094c2049dec",
+                    "dweb:/ipfs/QmeN67eDEQefw5PS8iXk9TDzULVqK1QNA9ajzD3Z2jqxwK"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/interfaces/IGateway.sol": {
+                "keccak256": "0xb4209b44c3965fd233387ece78149461bd64a47788c3af24edb7c99ea1ef8868",
+                "urls": [
+                    "bzz-raw://4db7a4573100063387e170c55a69772b20e403444e9d97b24cc220a71a52fbbb",
+                    "dweb:/ipfs/QmTYsSjmFsTwuNTXBByZKueJZLpe7RwNzLRWNPxXGA3YKB"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/AccountHelper.sol": {
+                "keccak256": "0xd5f3c0079e3002218c63b70b43f6e018eb5d39f064b7d4321b6409c84f6a22b5",
+                "urls": [
+                    "bzz-raw://e5857fe645e020bc964cd53a33e1fbd4fd9d0de405170a8251cc0b040519cbdc",
+                    "dweb:/ipfs/QmaFUeVbA1mqn7dTJMqgX4DbKx6yzBrSkmeNTcaVjBJd9z"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/LibGatewayActorStorage.sol": {
+                "keccak256": "0x4731b1de63c99bfccfa12c1c59481f27630994c8d04c0a555c6f6845f3873157",
+                "urls": [
+                    "bzz-raw://641337e8c2d3876ccefdb1f181c9cfeb9568f7c015f51da668d0c2dc582773d3",
+                    "dweb:/ipfs/QmNzgGXzXjULKJE6iYN6ioZLJvh3ykLdwt6gTjVp7gX9f6"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/LibStaking.sol": {
+                "keccak256": "0x3ad98b426ca82cc98fd795a166c4a599c71e9f400e3b23bda58666e2febdf3b2",
+                "urls": [
+                    "bzz-raw://1e501014ed974118161282e81821aa05810da989a3b2091624e73327d45cab67",
+                    "dweb:/ipfs/QmSi2Ed42uhNoxuvdyigyhNpujEkrzc9Goe4gTbhgVuE3o"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/LibStakingChangeLog.sol": {
+                "keccak256": "0x1ec44b7c417dae8bec87da6f1f48eb10a1eacdfb4935144dd9094dc1bbe9aa9b",
+                "urls": [
+                    "bzz-raw://d6fcbd14fe0743c0ea0a8a8d2ea851b4864559c3553773f07d6ae708bcc83318",
+                    "dweb:/ipfs/QmYb6v6U27FAY4ut6gCZy6oK1MjN165RTxUGhrY6zxtg93"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/LibSubnetActorStorage.sol": {
+                "keccak256": "0xe11ae56d18ef43fd9ebdf9350977f9a26da4ee9a3288b46b04c5b973aa231f28",
+                "urls": [
+                    "bzz-raw://f616b61fde1528a8666d09c962d7f23a82b200229691794933f39c4d3781fc1c",
+                    "dweb:/ipfs/QmXQsNGv6R34wAx1fRoyMiwdtGgQVn1qDXGCr7cED92vvJ"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/priority/LibMaxPQ.sol": {
+                "keccak256": "0xf98fae415e764e627134ae440dea84d6879eaaa6950868cb56382324f84ae8db",
+                "urls": [
+                    "bzz-raw://f290b5d20ac65c22eddbadeae1b49bbe78cb9e8e0cd187c2b93f98d13f9300a2",
+                    "dweb:/ipfs/QmXShiVpDzD8CLn8MeWSa4fQSeiTzyBHSA1VNZtLhJgTgW"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/priority/LibMinPQ.sol": {
+                "keccak256": "0xc8c27239c0e82b489d9cb61f64be28d4fde6af8d6c8b2d27180ad9c42d602110",
+                "urls": [
+                    "bzz-raw://ed53f96d383f74c06a118ad3c8758df07b91f48dcd81769dac637d2289644796",
+                    "dweb:/ipfs/Qmaf4HdjTnuQZ44PRmqmWXCF3h616rhNA7uKEksPPtmxXK"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/lib/priority/LibPQ.sol": {
+                "keccak256": "0x4d4290087995d669e80f8fdd405bfaae545323393c0c54689b84965ffb87303e",
+                "urls": [
+                    "bzz-raw://c21b563f6bf23afacb38fc97ab94d1afe12e4ad3dfde96d4484068bf26b13a2c",
+                    "dweb:/ipfs/Qmd5d3EnZwaSRnjG4ZFH2X8HKgymzd6vQgus8A6oEoh5pJ"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/structs/Checkpoint.sol": {
+                "keccak256": "0x1982a747516dce183434bbf0e96b5b1fedbf3a90928beffcc046cadf47ee0746",
+                "urls": [
+                    "bzz-raw://253b9df56334aae80fe4a0da805e4fdc3d186fb2624edade864ae06bfd472f2a",
+                    "dweb:/ipfs/QmVAaz1ViF96LjM9Aknn3vtwQ5a5oDiJRZP47ddJ1V9Fww"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/structs/FvmAddress.sol": {
+                "keccak256": "0xfc8c16b96bd5b7d4a163f586bd36936f7170304de70aa487a0b11c60e5ac9069",
+                "urls": [
+                    "bzz-raw://6b6572d5f28a9fa12ff91d45601c063cdaf68a12b9f8e46131c6dc4cd28255ac",
+                    "dweb:/ipfs/QmSC8gRWVuPKjobgDDyHbm2cmcPN8pWzbEmXKmdMZR8YKu"
+                ],
+                "license": "MIT OR Apache-2.0"
+            },
+            "src/structs/Subnet.sol": {
+                "keccak256": "0x1ddb626039baf4a4411f06b5340aaa80dcd65e9980da7673b73ab16633d871ce",
+                "urls": [
+                    "bzz-raw://af017eef4cb46262ac29b4cf47faa1fc5d2b61970ec7d6d021eae4cf45b5577b",
+                    "dweb:/ipfs/QmZJiA2t934fbe62513neQYzxSNswnCRTJybp7d6X2RyWR"
+                ],
+                "license": "MIT OR Apache-2.0"
+            }
+        },
         "version": 1
-      },
-      "userdoc": {
-        "kind": "user",
-        "methods": {},
-        "version": 1
-      }
     },
-    "settings": {
-      "remappings": [
-        "ds-test/=lib/forge-std/lib/ds-test/src/",
-        "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
-        "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
-        "fevmate/=lib/fevmate/contracts/",
-        "forge-std/=lib/forge-std/src/",
-        "murky/=lib/murky/src/",
-        "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
-        "openzeppelin/=lib/openzeppelin-contracts/contracts/"
-      ],
-      "optimizer": {
-        "enabled": true,
-        "runs": 200
-      },
-      "metadata": {
-        "bytecodeHash": "ipfs"
-      },
-      "compilationTarget": {
-        "src/lib/LibSubnetActorStorage.sol": "LibSubnetActorStorage"
-      },
-      "libraries": {},
-      "viaIR": true
-    },
-    "sources": {
-      "lib/fevmate/contracts/utils/FilAddress.sol": {
-        "keccak256": "0x8707b4f152e92b852090c313419c0dc772eebf4428472a0659dd6b13dd6bee31",
-        "urls": [
-          "bzz-raw://442fc3cb02e610424f0599f4cc519e4fbead47da09911697b62208a2ae51e4a7",
-          "dweb:/ipfs/QmRpKJ9tWWTHgMpRB18DHJLbCT4YT9yp2G89H9mHGu5ss2"
-        ],
-        "license": "MIT"
-      },
-      "lib/openzeppelin-contracts/contracts/utils/Address.sol": {
-        "keccak256": "0x67ca7745e6032aeda339ba3f5813abf9eeb4ec683520944fa878c2867aea58f1",
-        "urls": [
-          "bzz-raw://c13ff04f87357176e2b267730f288013269eefce0862ea8f4bf3f420948eb7d5",
-          "dweb:/ipfs/QmQZRjF3CdCdoUvqhrT9KXYjrjmdmFQqENtuiHTMbyt6xo"
-        ],
-        "license": "MIT"
-      },
-      "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol": {
-        "keccak256": "0xeefcbb8cb69f04a18f6dc61d4811133ce9aeff96ce60820f758abc52ef55b892",
-        "urls": [
-          "bzz-raw://81c61c0dd40890f6a4b1fb792bc5b5b61e821fcafa2aae6c7eda6d4f1ece2593",
-          "dweb:/ipfs/QmRLMrq6BiPS9wGu7ZC174SFYWCu6cxbU3agDw2XgJeDpT"
-        ],
-        "license": "MIT"
-      },
-      "src/constants/Constants.sol": {
-        "keccak256": "0xe09e20d591a8c9cabf6f2e44a90029fb3b2a8cdd6c09dc4105b81781ffb44546",
-        "urls": [
-          "bzz-raw://b3c4df8d0fd2aa770abf8b43a134ce0fc0bc3091f97ec02415d09cca09f4f940",
-          "dweb:/ipfs/QmSUpMfWLN8WWhvLmbZymCdR48ZmpsuyvBnSPeAtdorxDx"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/enums/ConsensusType.sol": {
-        "keccak256": "0xc5efd8c66b57dadaba4178c4b4d087b30cb84cbac38fb288a8c3b65075a9f59d",
-        "urls": [
-          "bzz-raw://6fcffaa8e40322ae27958603884cc07d06e9efd59cf12764f28945b7a47e11d0",
-          "dweb:/ipfs/Qmc3PBovpcvj7jgVq5GwR5SkiUXBymT1tw74mvu5ccNqoZ"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/enums/Status.sol": {
-        "keccak256": "0x8f5921e4df87420127988b54f67a3ccfb6fbfae767891e8ed4edbf371598e16c",
-        "urls": [
-          "bzz-raw://7a81d9a00ea7a2a85cfe1b2662236412dddb55e09fa70c70a34dc4dfc5ffea33",
-          "dweb:/ipfs/QmRh4uA4491B2DVjrUtdfCTTtjpoXpKEp3Zz9CBYueNW1R"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/errors/IPCErrors.sol": {
-        "keccak256": "0x89ee65643858f78c51c49457f6cd127c773f794bf1b70ea50bd5e59f1b48e467",
-        "urls": [
-          "bzz-raw://a4e9c19f69ab5bcd7ec8ac2b058a84bff7125ebc42eb195c7d8c7094c2049dec",
-          "dweb:/ipfs/QmeN67eDEQefw5PS8iXk9TDzULVqK1QNA9ajzD3Z2jqxwK"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/interfaces/IGateway.sol": {
-        "keccak256": "0xb4209b44c3965fd233387ece78149461bd64a47788c3af24edb7c99ea1ef8868",
-        "urls": [
-          "bzz-raw://4db7a4573100063387e170c55a69772b20e403444e9d97b24cc220a71a52fbbb",
-          "dweb:/ipfs/QmTYsSjmFsTwuNTXBByZKueJZLpe7RwNzLRWNPxXGA3YKB"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/AccountHelper.sol": {
-        "keccak256": "0xd5f3c0079e3002218c63b70b43f6e018eb5d39f064b7d4321b6409c84f6a22b5",
-        "urls": [
-          "bzz-raw://e5857fe645e020bc964cd53a33e1fbd4fd9d0de405170a8251cc0b040519cbdc",
-          "dweb:/ipfs/QmaFUeVbA1mqn7dTJMqgX4DbKx6yzBrSkmeNTcaVjBJd9z"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/LibGatewayActorStorage.sol": {
-        "keccak256": "0x4731b1de63c99bfccfa12c1c59481f27630994c8d04c0a555c6f6845f3873157",
-        "urls": [
-          "bzz-raw://641337e8c2d3876ccefdb1f181c9cfeb9568f7c015f51da668d0c2dc582773d3",
-          "dweb:/ipfs/QmNzgGXzXjULKJE6iYN6ioZLJvh3ykLdwt6gTjVp7gX9f6"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/LibStaking.sol": {
-        "keccak256": "0x3ad98b426ca82cc98fd795a166c4a599c71e9f400e3b23bda58666e2febdf3b2",
-        "urls": [
-          "bzz-raw://1e501014ed974118161282e81821aa05810da989a3b2091624e73327d45cab67",
-          "dweb:/ipfs/QmSi2Ed42uhNoxuvdyigyhNpujEkrzc9Goe4gTbhgVuE3o"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/LibStakingChangeLog.sol": {
-        "keccak256": "0x1ec44b7c417dae8bec87da6f1f48eb10a1eacdfb4935144dd9094dc1bbe9aa9b",
-        "urls": [
-          "bzz-raw://d6fcbd14fe0743c0ea0a8a8d2ea851b4864559c3553773f07d6ae708bcc83318",
-          "dweb:/ipfs/QmYb6v6U27FAY4ut6gCZy6oK1MjN165RTxUGhrY6zxtg93"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/LibSubnetActorStorage.sol": {
-        "keccak256": "0xe11ae56d18ef43fd9ebdf9350977f9a26da4ee9a3288b46b04c5b973aa231f28",
-        "urls": [
-          "bzz-raw://f616b61fde1528a8666d09c962d7f23a82b200229691794933f39c4d3781fc1c",
-          "dweb:/ipfs/QmXQsNGv6R34wAx1fRoyMiwdtGgQVn1qDXGCr7cED92vvJ"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/priority/LibMaxPQ.sol": {
-        "keccak256": "0xf98fae415e764e627134ae440dea84d6879eaaa6950868cb56382324f84ae8db",
-        "urls": [
-          "bzz-raw://f290b5d20ac65c22eddbadeae1b49bbe78cb9e8e0cd187c2b93f98d13f9300a2",
-          "dweb:/ipfs/QmXShiVpDzD8CLn8MeWSa4fQSeiTzyBHSA1VNZtLhJgTgW"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/priority/LibMinPQ.sol": {
-        "keccak256": "0xc8c27239c0e82b489d9cb61f64be28d4fde6af8d6c8b2d27180ad9c42d602110",
-        "urls": [
-          "bzz-raw://ed53f96d383f74c06a118ad3c8758df07b91f48dcd81769dac637d2289644796",
-          "dweb:/ipfs/Qmaf4HdjTnuQZ44PRmqmWXCF3h616rhNA7uKEksPPtmxXK"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/lib/priority/LibPQ.sol": {
-        "keccak256": "0x4d4290087995d669e80f8fdd405bfaae545323393c0c54689b84965ffb87303e",
-        "urls": [
-          "bzz-raw://c21b563f6bf23afacb38fc97ab94d1afe12e4ad3dfde96d4484068bf26b13a2c",
-          "dweb:/ipfs/Qmd5d3EnZwaSRnjG4ZFH2X8HKgymzd6vQgus8A6oEoh5pJ"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/structs/Checkpoint.sol": {
-        "keccak256": "0x1982a747516dce183434bbf0e96b5b1fedbf3a90928beffcc046cadf47ee0746",
-        "urls": [
-          "bzz-raw://253b9df56334aae80fe4a0da805e4fdc3d186fb2624edade864ae06bfd472f2a",
-          "dweb:/ipfs/QmVAaz1ViF96LjM9Aknn3vtwQ5a5oDiJRZP47ddJ1V9Fww"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/structs/FvmAddress.sol": {
-        "keccak256": "0xfc8c16b96bd5b7d4a163f586bd36936f7170304de70aa487a0b11c60e5ac9069",
-        "urls": [
-          "bzz-raw://6b6572d5f28a9fa12ff91d45601c063cdaf68a12b9f8e46131c6dc4cd28255ac",
-          "dweb:/ipfs/QmSC8gRWVuPKjobgDDyHbm2cmcPN8pWzbEmXKmdMZR8YKu"
-        ],
-        "license": "MIT OR Apache-2.0"
-      },
-      "src/structs/Subnet.sol": {
-        "keccak256": "0x1ddb626039baf4a4411f06b5340aaa80dcd65e9980da7673b73ab16633d871ce",
-        "urls": [
-          "bzz-raw://af017eef4cb46262ac29b4cf47faa1fc5d2b61970ec7d6d021eae4cf45b5577b",
-          "dweb:/ipfs/QmZJiA2t934fbe62513neQYzxSNswnCRTJybp7d6X2RyWR"
-        ],
-        "license": "MIT OR Apache-2.0"
-      }
-    },
-    "version": 1
-  },
-  "ast": {
-    "absolutePath": "src/lib/LibSubnetActorStorage.sol",
-    "id": 44576,
-    "exportedSymbols": {
-      "Address": [
-        32409
-      ],
-      "BottomUpCheckpoint": [
-        46824
-      ],
-      "ConsensusType": [
-        36665
-      ],
-      "EnumerableSet": [
-        35386
-      ],
-      "FvmAddress": [
-        46870
-      ],
-      "LibSubnetActorStorage": [
-        44532
-      ],
-      "NotGateway": [
-        36783
-      ],
-      "StakingChangeLog": [
-        46948
-      ],
-      "StakingReleaseQueue": [
-        46975
-      ],
-      "SubnetActorModifiers": [
-        44575
-      ],
-      "SubnetActorStorage": [
-        44521
-      ],
-      "SubnetAlreadyKilled": [
-        36809
-      ],
-      "SubnetID": [
-        46900
-      ],
-      "Validator": [
-        47025
-      ],
-      "ValidatorSet": [
-        47004
-      ]
-    },
-    "nodeType": "SourceUnit",
-    "src": "46:4113:65",
-    "nodes": [
-      {
-        "id": 44406,
-        "nodeType": "PragmaDirective",
-        "src": "46:23:65",
-        "nodes": [],
-        "literals": [
-          "solidity",
-          "0.8",
-          ".19"
-        ]
-      },
-      {
-        "id": 44408,
-        "nodeType": "ImportDirective",
-        "src": "71:57:65",
-        "nodes": [],
-        "absolutePath": "src/enums/ConsensusType.sol",
-        "file": "../enums/ConsensusType.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 44576,
-        "sourceUnit": 36666,
-        "symbolAliases": [
-          {
-            "foreign": {
-              "id": 44407,
-              "name": "ConsensusType",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 36665,
-              "src": "79:13:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          }
-        ],
-        "unitAlias": ""
-      },
-      {
-        "id": 44411,
-        "nodeType": "ImportDirective",
-        "src": "129:72:65",
-        "nodes": [],
-        "absolutePath": "src/errors/IPCErrors.sol",
-        "file": "../errors/IPCErrors.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 44576,
-        "sourceUnit": 36828,
-        "symbolAliases": [
-          {
-            "foreign": {
-              "id": 44409,
-              "name": "NotGateway",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 36783,
-              "src": "137:10:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          },
-          {
-            "foreign": {
-              "id": 44410,
-              "name": "SubnetAlreadyKilled",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 36809,
-              "src": "149:19:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          }
-        ],
-        "unitAlias": ""
-      },
-      {
-        "id": 44413,
-        "nodeType": "ImportDirective",
-        "src": "202:53:65",
-        "nodes": [],
-        "absolutePath": "src/structs/FvmAddress.sol",
-        "file": "../structs/FvmAddress.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 44576,
-        "sourceUnit": 46878,
-        "symbolAliases": [
-          {
-            "foreign": {
-              "id": 44412,
-              "name": "FvmAddress",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 46870,
-              "src": "210:10:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          }
-        ],
-        "unitAlias": ""
-      },
-      {
-        "id": 44415,
-        "nodeType": "ImportDirective",
-        "src": "256:61:65",
-        "nodes": [],
-        "absolutePath": "src/structs/Checkpoint.sol",
-        "file": "../structs/Checkpoint.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 44576,
-        "sourceUnit": 46864,
-        "symbolAliases": [
-          {
-            "foreign": {
-              "id": 44414,
-              "name": "BottomUpCheckpoint",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 46824,
-              "src": "264:18:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          }
-        ],
-        "unitAlias": ""
-      },
-      {
-        "id": 44421,
-        "nodeType": "ImportDirective",
-        "src": "318:111:65",
-        "nodes": [],
-        "absolutePath": "src/structs/Subnet.sol",
-        "file": "../structs/Subnet.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 44576,
-        "sourceUnit": 47033,
-        "symbolAliases": [
-          {
-            "foreign": {
-              "id": 44416,
-              "name": "SubnetID",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 46900,
-              "src": "326:8:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          },
-          {
-            "foreign": {
-              "id": 44417,
-              "name": "ValidatorSet",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 47004,
-              "src": "336:12:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          },
-          {
-            "foreign": {
-              "id": 44418,
-              "name": "StakingChangeLog",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 46948,
-              "src": "350:16:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          },
-          {
-            "foreign": {
-              "id": 44419,
-              "name": "StakingReleaseQueue",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 46975,
-              "src": "368:19:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          },
-          {
-            "foreign": {
-              "id": 44420,
-              "name": "Validator",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 47025,
-              "src": "389:9:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          }
-        ],
-        "unitAlias": ""
-      },
-      {
-        "id": 44423,
-        "nodeType": "ImportDirective",
-        "src": "430:65:65",
-        "nodes": [],
-        "absolutePath": "lib/openzeppelin-contracts/contracts/utils/Address.sol",
-        "file": "openzeppelin-contracts/utils/Address.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 44576,
-        "sourceUnit": 32410,
-        "symbolAliases": [
-          {
-            "foreign": {
-              "id": 44422,
-              "name": "Address",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 32409,
-              "src": "438:7:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          }
-        ],
-        "unitAlias": ""
-      },
-      {
-        "id": 44425,
-        "nodeType": "ImportDirective",
-        "src": "496:85:65",
-        "nodes": [],
-        "absolutePath": "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol",
-        "file": "openzeppelin-contracts/utils/structs/EnumerableSet.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 44576,
-        "sourceUnit": 35387,
-        "symbolAliases": [
-          {
-            "foreign": {
-              "id": 44424,
-              "name": "EnumerableSet",
-              "nodeType": "Identifier",
-              "overloadedDeclarations": [],
-              "referencedDeclaration": 35386,
-              "src": "504:13:65",
-              "typeDescriptions": {}
-            },
-            "nameLocation": "-1:-1:-1"
-          }
-        ],
-        "unitAlias": ""
-      },
-      {
-        "id": 44521,
-        "nodeType": "StructDefinition",
-        "src": "583:2908:65",
-        "nodes": [],
-        "canonicalName": "SubnetActorStorage",
-        "members": [
-          {
-            "constant": false,
-            "id": 44431,
-            "mutability": "mutable",
-            "name": "committedCheckpoints",
-            "nameLocation": "731:20:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "693:58:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_BottomUpCheckpoint_$46824_storage_$",
-              "typeString": "mapping(uint64 => struct BottomUpCheckpoint)"
-            },
-            "typeName": {
-              "id": 44430,
-              "keyName": "",
-              "keyNameLocation": "-1:-1:-1",
-              "keyType": {
-                "id": 44427,
-                "name": "uint64",
-                "nodeType": "ElementaryTypeName",
-                "src": "701:6:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_uint64",
-                  "typeString": "uint64"
-                }
-              },
-              "nodeType": "Mapping",
-              "src": "693:37:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_BottomUpCheckpoint_$46824_storage_$",
-                "typeString": "mapping(uint64 => struct BottomUpCheckpoint)"
-              },
-              "valueName": "",
-              "valueNameLocation": "-1:-1:-1",
-              "valueType": {
-                "id": 44429,
-                "nodeType": "UserDefinedTypeName",
-                "pathNode": {
-                  "id": 44428,
-                  "name": "BottomUpCheckpoint",
-                  "nameLocations": [
-                    "711:18:65"
-                  ],
-                  "nodeType": "IdentifierPath",
-                  "referencedDeclaration": 46824,
-                  "src": "711:18:65"
-                },
-                "referencedDeclaration": 46824,
-                "src": "711:18:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_struct$_BottomUpCheckpoint_$46824_storage_ptr",
-                  "typeString": "struct BottomUpCheckpoint"
-                }
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44436,
-            "mutability": "mutable",
-            "name": "genesisValidators",
-            "nameLocation": "830:17:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "818:29:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_array$_t_struct$_Validator_$47025_storage_$dyn_storage_ptr",
-              "typeString": "struct Validator[]"
-            },
-            "typeName": {
-              "baseType": {
-                "id": 44434,
-                "nodeType": "UserDefinedTypeName",
-                "pathNode": {
-                  "id": 44433,
-                  "name": "Validator",
-                  "nameLocations": [
-                    "818:9:65"
-                  ],
-                  "nodeType": "IdentifierPath",
-                  "referencedDeclaration": 47025,
-                  "src": "818:9:65"
-                },
-                "referencedDeclaration": 47025,
-                "src": "818:9:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_struct$_Validator_$47025_storage_ptr",
-                  "typeString": "struct Validator"
-                }
-              },
-              "id": 44435,
-              "nodeType": "ArrayTypeName",
-              "src": "818:11:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_array$_t_struct$_Validator_$47025_storage_$dyn_storage_ptr",
-                "typeString": "struct Validator[]"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44439,
-            "mutability": "mutable",
-            "name": "genesisCircSupply",
-            "nameLocation": "982:17:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "974:25:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_uint256",
-              "typeString": "uint256"
-            },
-            "typeName": {
-              "id": 44438,
-              "name": "uint256",
-              "nodeType": "ElementaryTypeName",
-              "src": "974:7:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_uint256",
-                "typeString": "uint256"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44444,
-            "mutability": "mutable",
-            "name": "genesisBalance",
-            "nameLocation": "1107:14:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1079:42:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
-              "typeString": "mapping(address => uint256)"
-            },
-            "typeName": {
-              "id": 44443,
-              "keyName": "",
-              "keyNameLocation": "-1:-1:-1",
-              "keyType": {
-                "id": 44441,
-                "name": "address",
-                "nodeType": "ElementaryTypeName",
-                "src": "1087:7:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_address",
-                  "typeString": "address"
-                }
-              },
-              "nodeType": "Mapping",
-              "src": "1079:27:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
-                "typeString": "mapping(address => uint256)"
-              },
-              "valueName": "",
-              "valueNameLocation": "-1:-1:-1",
-              "valueType": {
-                "id": 44442,
-                "name": "uint256",
-                "nodeType": "ElementaryTypeName",
-                "src": "1098:7:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_uint256",
-                  "typeString": "uint256"
-                }
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44448,
-            "mutability": "mutable",
-            "name": "genesisBalanceKeys",
-            "nameLocation": "1179:18:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1169:28:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
-              "typeString": "address[]"
-            },
-            "typeName": {
-              "baseType": {
-                "id": 44446,
-                "name": "address",
-                "nodeType": "ElementaryTypeName",
-                "src": "1169:7:65",
-                "stateMutability": "nonpayable",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_address",
-                  "typeString": "address"
-                }
-              },
-              "id": 44447,
-              "nodeType": "ArrayTypeName",
-              "src": "1169:9:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
-                "typeString": "address[]"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44451,
-            "mutability": "mutable",
-            "name": "lastBottomUpCheckpointHeight",
-            "nameLocation": "1281:28:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1274:35:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_uint64",
-              "typeString": "uint64"
-            },
-            "typeName": {
-              "id": 44450,
-              "name": "uint64",
-              "nodeType": "ElementaryTypeName",
-              "src": "1274:6:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_uint64",
-                "typeString": "uint64"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44454,
-            "mutability": "mutable",
-            "name": "minActivationCollateral",
-            "nameLocation": "1369:23:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1361:31:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_uint256",
-              "typeString": "uint256"
-            },
-            "typeName": {
-              "id": 44453,
-              "name": "uint256",
-              "nodeType": "ElementaryTypeName",
-              "src": "1361:7:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_uint256",
-                "typeString": "uint256"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44457,
-            "mutability": "mutable",
-            "name": "bottomUpCheckPeriod",
-            "nameLocation": "1459:19:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1452:26:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_uint64",
-              "typeString": "uint64"
-            },
-            "typeName": {
-              "id": 44456,
-              "name": "uint64",
-              "nodeType": "ElementaryTypeName",
-              "src": "1452:6:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_uint64",
-                "typeString": "uint64"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44460,
-            "mutability": "mutable",
-            "name": "minValidators",
-            "nameLocation": "1595:13:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1588:20:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_uint64",
-              "typeString": "uint64"
-            },
-            "typeName": {
-              "id": 44459,
-              "name": "uint64",
-              "nodeType": "ElementaryTypeName",
-              "src": "1588:6:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_uint64",
-                "typeString": "uint64"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44462,
-            "mutability": "mutable",
-            "name": "currentSubnetHash",
-            "nameLocation": "1667:17:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1659:25:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_bytes32",
-              "typeString": "bytes32"
-            },
-            "typeName": {
-              "id": 44461,
-              "name": "bytes32",
-              "nodeType": "ElementaryTypeName",
-              "src": "1659:7:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_bytes32",
-                "typeString": "bytes32"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44465,
-            "mutability": "mutable",
-            "name": "ipcGatewayAddr",
-            "nameLocation": "1756:14:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1748:22:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_address",
-              "typeString": "address"
-            },
-            "typeName": {
-              "id": 44464,
-              "name": "address",
-              "nodeType": "ElementaryTypeName",
-              "src": "1748:7:65",
-              "stateMutability": "nonpayable",
-              "typeDescriptions": {
-                "typeIdentifier": "t_address",
-                "typeString": "address"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44468,
-            "mutability": "mutable",
-            "name": "majorityPercentage",
-            "nameLocation": "1862:18:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1856:24:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_uint8",
-              "typeString": "uint8"
-            },
-            "typeName": {
-              "id": 44467,
-              "name": "uint8",
-              "nodeType": "ElementaryTypeName",
-              "src": "1856:5:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_uint8",
-                "typeString": "uint8"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44471,
-            "mutability": "mutable",
-            "name": "minCrossMsgFee",
-            "nameLocation": "1969:14:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "1961:22:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_uint256",
-              "typeString": "uint256"
-            },
-            "typeName": {
-              "id": 44470,
-              "name": "uint256",
-              "nodeType": "ElementaryTypeName",
-              "src": "1961:7:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_uint256",
-                "typeString": "uint256"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44475,
-            "mutability": "mutable",
-            "name": "parentId",
-            "nameLocation": "2038:8:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2029:17:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_struct$_SubnetID_$46900_storage_ptr",
-              "typeString": "struct SubnetID"
-            },
-            "typeName": {
-              "id": 44474,
-              "nodeType": "UserDefinedTypeName",
-              "pathNode": {
-                "id": 44473,
-                "name": "SubnetID",
-                "nameLocations": [
-                  "2029:8:65"
-                ],
-                "nodeType": "IdentifierPath",
-                "referencedDeclaration": 46900,
-                "src": "2029:8:65"
-              },
-              "referencedDeclaration": 46900,
-              "src": "2029:8:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_struct$_SubnetID_$46900_storage_ptr",
-                "typeString": "struct SubnetID"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44479,
-            "mutability": "mutable",
-            "name": "consensus",
-            "nameLocation": "2091:9:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2077:23:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_enum$_ConsensusType_$36665",
-              "typeString": "enum ConsensusType"
-            },
-            "typeName": {
-              "id": 44478,
-              "nodeType": "UserDefinedTypeName",
-              "pathNode": {
-                "id": 44477,
-                "name": "ConsensusType",
-                "nameLocations": [
-                  "2077:13:65"
-                ],
-                "nodeType": "IdentifierPath",
-                "referencedDeclaration": 36665,
-                "src": "2077:13:65"
-              },
-              "referencedDeclaration": 36665,
-              "src": "2077:13:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_enum$_ConsensusType_$36665",
-                "typeString": "enum ConsensusType"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44482,
-            "mutability": "mutable",
-            "name": "bootstrapped",
-            "nameLocation": "2203:12:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2198:17:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_bool",
-              "typeString": "bool"
-            },
-            "typeName": {
-              "id": 44481,
-              "name": "bool",
-              "nodeType": "ElementaryTypeName",
-              "src": "2198:4:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_bool",
-                "typeString": "bool"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44485,
-            "mutability": "mutable",
-            "name": "killed",
-            "nameLocation": "2296:6:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2291:11:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_bool",
-              "typeString": "bool"
-            },
-            "typeName": {
-              "id": 44484,
-              "name": "bool",
-              "nodeType": "ElementaryTypeName",
-              "src": "2291:4:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_bool",
-                "typeString": "bool"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44489,
-            "mutability": "mutable",
-            "name": "validatorSet",
-            "nameLocation": "2407:12:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2394:25:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_struct$_ValidatorSet_$47004_storage_ptr",
-              "typeString": "struct ValidatorSet"
-            },
-            "typeName": {
-              "id": 44488,
-              "nodeType": "UserDefinedTypeName",
-              "pathNode": {
-                "id": 44487,
-                "name": "ValidatorSet",
-                "nameLocations": [
-                  "2394:12:65"
-                ],
-                "nodeType": "IdentifierPath",
-                "referencedDeclaration": 47004,
-                "src": "2394:12:65"
-              },
-              "referencedDeclaration": 47004,
-              "src": "2394:12:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_struct$_ValidatorSet_$47004_storage_ptr",
-                "typeString": "struct ValidatorSet"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44493,
-            "mutability": "mutable",
-            "name": "changeSet",
-            "nameLocation": "2556:9:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2539:26:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_struct$_StakingChangeLog_$46948_storage_ptr",
-              "typeString": "struct StakingChangeLog"
-            },
-            "typeName": {
-              "id": 44492,
-              "nodeType": "UserDefinedTypeName",
-              "pathNode": {
-                "id": 44491,
-                "name": "StakingChangeLog",
-                "nameLocations": [
-                  "2539:16:65"
-                ],
-                "nodeType": "IdentifierPath",
-                "referencedDeclaration": 46948,
-                "src": "2539:16:65"
-              },
-              "referencedDeclaration": 46948,
-              "src": "2539:16:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_struct$_StakingChangeLog_$46948_storage_ptr",
-                "typeString": "struct StakingChangeLog"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44497,
-            "mutability": "mutable",
-            "name": "releaseQueue",
-            "nameLocation": "2702:12:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2682:32:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_struct$_StakingReleaseQueue_$46975_storage_ptr",
-              "typeString": "struct StakingReleaseQueue"
-            },
-            "typeName": {
-              "id": 44496,
-              "nodeType": "UserDefinedTypeName",
-              "pathNode": {
-                "id": 44495,
-                "name": "StakingReleaseQueue",
-                "nameLocations": [
-                  "2682:19:65"
-                ],
-                "nodeType": "IdentifierPath",
-                "referencedDeclaration": 46975,
-                "src": "2682:19:65"
-              },
-              "referencedDeclaration": 46975,
-              "src": "2682:19:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_struct$_StakingReleaseQueue_$46975_storage_ptr",
-                "typeString": "struct StakingReleaseQueue"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44500,
-            "mutability": "mutable",
-            "name": "powerScale",
-            "nameLocation": "3000:10:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "2995:15:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_int8",
-              "typeString": "int8"
-            },
-            "typeName": {
-              "id": 44499,
-              "name": "int8",
-              "nodeType": "ElementaryTypeName",
-              "src": "2995:4:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_int8",
-                "typeString": "int8"
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44505,
-            "mutability": "mutable",
-            "name": "relayerRewards",
-            "nameLocation": "3077:14:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "3049:42:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
-              "typeString": "mapping(address => uint256)"
-            },
-            "typeName": {
-              "id": 44504,
-              "keyName": "",
-              "keyNameLocation": "-1:-1:-1",
-              "keyType": {
-                "id": 44502,
-                "name": "address",
-                "nodeType": "ElementaryTypeName",
-                "src": "3057:7:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_address",
-                  "typeString": "address"
-                }
-              },
-              "nodeType": "Mapping",
-              "src": "3049:27:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
-                "typeString": "mapping(address => uint256)"
-              },
-              "valueName": "",
-              "valueNameLocation": "-1:-1:-1",
-              "valueType": {
-                "id": 44503,
-                "name": "uint256",
-                "nodeType": "ElementaryTypeName",
-                "src": "3068:7:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_uint256",
-                  "typeString": "uint256"
-                }
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44511,
-            "mutability": "mutable",
-            "name": "rewardedRelayers",
-            "nameLocation": "3222:16:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "3178:60:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_AddressSet_$35099_storage_$",
-              "typeString": "mapping(uint64 => struct EnumerableSet.AddressSet)"
-            },
-            "typeName": {
-              "id": 44510,
-              "keyName": "",
-              "keyNameLocation": "-1:-1:-1",
-              "keyType": {
-                "id": 44507,
-                "name": "uint64",
-                "nodeType": "ElementaryTypeName",
-                "src": "3186:6:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_uint64",
-                  "typeString": "uint64"
-                }
-              },
-              "nodeType": "Mapping",
-              "src": "3178:43:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_AddressSet_$35099_storage_$",
-                "typeString": "mapping(uint64 => struct EnumerableSet.AddressSet)"
-              },
-              "valueName": "",
-              "valueNameLocation": "-1:-1:-1",
-              "valueType": {
-                "id": 44509,
-                "nodeType": "UserDefinedTypeName",
-                "pathNode": {
-                  "id": 44508,
-                  "name": "EnumerableSet.AddressSet",
-                  "nameLocations": [
-                    "3196:13:65",
-                    "3210:10:65"
-                  ],
-                  "nodeType": "IdentifierPath",
-                  "referencedDeclaration": 35099,
-                  "src": "3196:24:65"
-                },
-                "referencedDeclaration": 35099,
-                "src": "3196:24:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_struct$_AddressSet_$35099_storage_ptr",
-                  "typeString": "struct EnumerableSet.AddressSet"
-                }
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44516,
-            "mutability": "mutable",
-            "name": "bootstrapNodes",
-            "nameLocation": "3358:14:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "3331:41:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_mapping$_t_address_$_t_string_storage_$",
-              "typeString": "mapping(address => string)"
-            },
-            "typeName": {
-              "id": 44515,
-              "keyName": "",
-              "keyNameLocation": "-1:-1:-1",
-              "keyType": {
-                "id": 44513,
-                "name": "address",
-                "nodeType": "ElementaryTypeName",
-                "src": "3339:7:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_address",
-                  "typeString": "address"
-                }
-              },
-              "nodeType": "Mapping",
-              "src": "3331:26:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_mapping$_t_address_$_t_string_storage_$",
-                "typeString": "mapping(address => string)"
-              },
-              "valueName": "",
-              "valueNameLocation": "-1:-1:-1",
-              "valueType": {
-                "id": 44514,
-                "name": "string",
-                "nodeType": "ElementaryTypeName",
-                "src": "3350:6:65",
-                "typeDescriptions": {
-                  "typeIdentifier": "t_string_storage_ptr",
-                  "typeString": "string"
-                }
-              }
-            },
-            "visibility": "internal"
-          },
-          {
-            "constant": false,
-            "id": 44520,
-            "mutability": "mutable",
-            "name": "bootstrapOwners",
-            "nameLocation": "3473:15:65",
-            "nodeType": "VariableDeclaration",
-            "scope": 44521,
-            "src": "3448:40:65",
-            "stateVariable": false,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_struct$_AddressSet_$35099_storage_ptr",
-              "typeString": "struct EnumerableSet.AddressSet"
-            },
-            "typeName": {
-              "id": 44519,
-              "nodeType": "UserDefinedTypeName",
-              "pathNode": {
-                "id": 44518,
-                "name": "EnumerableSet.AddressSet",
-                "nameLocations": [
-                  "3448:13:65",
-                  "3462:10:65"
-                ],
-                "nodeType": "IdentifierPath",
-                "referencedDeclaration": 35099,
-                "src": "3448:24:65"
-              },
-              "referencedDeclaration": 35099,
-              "src": "3448:24:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_struct$_AddressSet_$35099_storage_ptr",
-                "typeString": "struct EnumerableSet.AddressSet"
-              }
-            },
-            "visibility": "internal"
-          }
-        ],
-        "name": "SubnetActorStorage",
-        "nameLocation": "590:18:65",
-        "scope": 44576,
-        "visibility": "public"
-      },
-      {
-        "id": 44532,
-        "nodeType": "ContractDefinition",
-        "src": "3493:194:65",
+    "ast": {
+        "absolutePath": "src/lib/LibSubnetActorStorage.sol",
+        "id": 44576,
+        "exportedSymbols": {
+            "Address": [32409],
+            "BottomUpCheckpoint": [46824],
+            "ConsensusType": [36665],
+            "EnumerableSet": [35386],
+            "FvmAddress": [46870],
+            "LibSubnetActorStorage": [44532],
+            "NotGateway": [36783],
+            "StakingChangeLog": [46948],
+            "StakingReleaseQueue": [46975],
+            "SubnetActorModifiers": [44575],
+            "SubnetActorStorage": [44521],
+            "SubnetAlreadyKilled": [36809],
+            "SubnetID": [46900],
+            "Validator": [47025],
+            "ValidatorSet": [47004]
+        },
+        "nodeType": "SourceUnit",
+        "src": "46:4113:65",
         "nodes": [
-          {
-            "id": 44531,
-            "nodeType": "FunctionDefinition",
-            "src": "3529:156:65",
-            "nodes": [],
-            "body": {
-              "id": 44530,
-              "nodeType": "Block",
-              "src": "3605:80:65",
-              "nodes": [],
-              "statements": [
-                {
-                  "AST": {
-                    "nodeType": "YulBlock",
-                    "src": "3624:36:65",
-                    "statements": [
-                      {
-                        "nodeType": "YulAssignment",
-                        "src": "3638:12:65",
-                        "value": {
-                          "kind": "number",
-                          "nodeType": "YulLiteral",
-                          "src": "3649:1:65",
-                          "type": "",
-                          "value": "0"
-                        },
-                        "variableNames": [
-                          {
-                            "name": "ds.slot",
-                            "nodeType": "YulIdentifier",
-                            "src": "3638:7:65"
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  "evmVersion": "paris",
-                  "externalReferences": [
+            {
+                "id": 44406,
+                "nodeType": "PragmaDirective",
+                "src": "46:23:65",
+                "nodes": [],
+                "literals": ["solidity", "0.8", ".19"]
+            },
+            {
+                "id": 44408,
+                "nodeType": "ImportDirective",
+                "src": "71:57:65",
+                "nodes": [],
+                "absolutePath": "src/enums/ConsensusType.sol",
+                "file": "../enums/ConsensusType.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 44576,
+                "sourceUnit": 36666,
+                "symbolAliases": [
                     {
-                      "declaration": 44525,
-                      "isOffset": false,
-                      "isSlot": true,
-                      "src": "3638:7:65",
-                      "suffix": "slot",
-                      "valueSize": 1
+                        "foreign": {
+                            "id": 44407,
+                            "name": "ConsensusType",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 36665,
+                            "src": "79:13:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
                     }
-                  ],
-                  "id": 44527,
-                  "nodeType": "InlineAssembly",
-                  "src": "3615:45:65"
-                },
-                {
-                  "expression": {
-                    "id": 44528,
-                    "name": "ds",
-                    "nodeType": "Identifier",
-                    "overloadedDeclarations": [],
-                    "referencedDeclaration": 44525,
-                    "src": "3676:2:65",
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
-                      "typeString": "struct SubnetActorStorage storage pointer"
-                    }
-                  },
-                  "functionReturnParameters": 44526,
-                  "id": 44529,
-                  "nodeType": "Return",
-                  "src": "3669:9:65"
-                }
-              ]
-            },
-            "implemented": true,
-            "kind": "function",
-            "modifiers": [],
-            "name": "appStorage",
-            "nameLocation": "3538:10:65",
-            "parameters": {
-              "id": 44522,
-              "nodeType": "ParameterList",
-              "parameters": [],
-              "src": "3548:2:65"
-            },
-            "returnParameters": {
-              "id": 44526,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 44525,
-                  "mutability": "mutable",
-                  "name": "ds",
-                  "nameLocation": "3601:2:65",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 44531,
-                  "src": "3574:29:65",
-                  "stateVariable": false,
-                  "storageLocation": "storage",
-                  "typeDescriptions": {
-                    "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
-                    "typeString": "struct SubnetActorStorage"
-                  },
-                  "typeName": {
-                    "id": 44524,
-                    "nodeType": "UserDefinedTypeName",
-                    "pathNode": {
-                      "id": 44523,
-                      "name": "SubnetActorStorage",
-                      "nameLocations": [
-                        "3574:18:65"
-                      ],
-                      "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 44521,
-                      "src": "3574:18:65"
-                    },
-                    "referencedDeclaration": 44521,
-                    "src": "3574:18:65",
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
-                      "typeString": "struct SubnetActorStorage"
-                    }
-                  },
-                  "visibility": "internal"
-                }
-              ],
-              "src": "3573:31:65"
-            },
-            "scope": 44532,
-            "stateMutability": "pure",
-            "virtual": false,
-            "visibility": "internal"
-          }
-        ],
-        "abstract": false,
-        "baseContracts": [],
-        "canonicalName": "LibSubnetActorStorage",
-        "contractDependencies": [],
-        "contractKind": "library",
-        "fullyImplemented": true,
-        "linearizedBaseContracts": [
-          44532
-        ],
-        "name": "LibSubnetActorStorage",
-        "nameLocation": "3501:21:65",
-        "scope": 44576,
-        "usedErrors": []
-      },
-      {
-        "id": 44575,
-        "nodeType": "ContractDefinition",
-        "src": "3689:469:65",
-        "nodes": [
-          {
-            "id": 44535,
-            "nodeType": "VariableDeclaration",
-            "src": "3725:29:65",
-            "nodes": [],
-            "constant": false,
-            "mutability": "mutable",
-            "name": "s",
-            "nameLocation": "3753:1:65",
-            "scope": 44575,
-            "stateVariable": true,
-            "storageLocation": "default",
-            "typeDescriptions": {
-              "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage",
-              "typeString": "struct SubnetActorStorage"
-            },
-            "typeName": {
-              "id": 44534,
-              "nodeType": "UserDefinedTypeName",
-              "pathNode": {
-                "id": 44533,
-                "name": "SubnetActorStorage",
-                "nameLocations": [
-                  "3725:18:65"
                 ],
-                "nodeType": "IdentifierPath",
-                "referencedDeclaration": 44521,
-                "src": "3725:18:65"
-              },
-              "referencedDeclaration": 44521,
-              "src": "3725:18:65",
-              "typeDescriptions": {
-                "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
-                "typeString": "struct SubnetActorStorage"
-              }
+                "unitAlias": ""
             },
-            "visibility": "internal"
-          },
-          {
-            "id": 44549,
-            "nodeType": "FunctionDefinition",
-            "src": "3761:133:65",
-            "nodes": [],
-            "body": {
-              "id": 44548,
-              "nodeType": "Block",
-              "src": "3798:96:65",
-              "nodes": [],
-              "statements": [
-                {
-                  "condition": {
-                    "commonType": {
-                      "typeIdentifier": "t_address",
-                      "typeString": "address"
-                    },
-                    "id": 44542,
-                    "isConstant": false,
-                    "isLValue": false,
-                    "isPure": false,
-                    "lValueRequested": false,
-                    "leftExpression": {
-                      "expression": {
-                        "id": 44538,
-                        "name": "msg",
-                        "nodeType": "Identifier",
-                        "overloadedDeclarations": [],
-                        "referencedDeclaration": -15,
-                        "src": "3812:3:65",
-                        "typeDescriptions": {
-                          "typeIdentifier": "t_magic_message",
-                          "typeString": "msg"
-                        }
-                      },
-                      "id": 44539,
-                      "isConstant": false,
-                      "isLValue": false,
-                      "isPure": false,
-                      "lValueRequested": false,
-                      "memberLocation": "3816:6:65",
-                      "memberName": "sender",
-                      "nodeType": "MemberAccess",
-                      "src": "3812:10:65",
-                      "typeDescriptions": {
-                        "typeIdentifier": "t_address",
-                        "typeString": "address"
-                      }
-                    },
-                    "nodeType": "BinaryOperation",
-                    "operator": "!=",
-                    "rightExpression": {
-                      "expression": {
-                        "id": 44540,
-                        "name": "s",
-                        "nodeType": "Identifier",
-                        "overloadedDeclarations": [],
-                        "referencedDeclaration": 44535,
-                        "src": "3826:1:65",
-                        "typeDescriptions": {
-                          "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage",
-                          "typeString": "struct SubnetActorStorage storage ref"
-                        }
-                      },
-                      "id": 44541,
-                      "isConstant": false,
-                      "isLValue": true,
-                      "isPure": false,
-                      "lValueRequested": false,
-                      "memberLocation": "3828:14:65",
-                      "memberName": "ipcGatewayAddr",
-                      "nodeType": "MemberAccess",
-                      "referencedDeclaration": 44465,
-                      "src": "3826:16:65",
-                      "typeDescriptions": {
-                        "typeIdentifier": "t_address",
-                        "typeString": "address"
-                      }
-                    },
-                    "src": "3812:30:65",
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_bool",
-                      "typeString": "bool"
-                    }
-                  },
-                  "id": 44547,
-                  "nodeType": "IfStatement",
-                  "src": "3808:80:65",
-                  "trueBody": {
-                    "id": 44546,
-                    "nodeType": "Block",
-                    "src": "3844:44:65",
-                    "statements": [
-                      {
-                        "errorCall": {
-                          "arguments": [],
-                          "expression": {
-                            "argumentTypes": [],
-                            "id": 44543,
+            {
+                "id": 44411,
+                "nodeType": "ImportDirective",
+                "src": "129:72:65",
+                "nodes": [],
+                "absolutePath": "src/errors/IPCErrors.sol",
+                "file": "../errors/IPCErrors.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 44576,
+                "sourceUnit": 36828,
+                "symbolAliases": [
+                    {
+                        "foreign": {
+                            "id": 44409,
                             "name": "NotGateway",
                             "nodeType": "Identifier",
                             "overloadedDeclarations": [],
                             "referencedDeclaration": 36783,
-                            "src": "3865:10:65",
-                            "typeDescriptions": {
-                              "typeIdentifier": "t_function_error_pure$__$returns$__$",
-                              "typeString": "function () pure"
-                            }
-                          },
-                          "id": 44544,
-                          "isConstant": false,
-                          "isLValue": false,
-                          "isPure": false,
-                          "kind": "functionCall",
-                          "lValueRequested": false,
-                          "nameLocations": [],
-                          "names": [],
-                          "nodeType": "FunctionCall",
-                          "src": "3865:12:65",
-                          "tryCall": false,
-                          "typeDescriptions": {
-                            "typeIdentifier": "t_tuple$__$",
-                            "typeString": "tuple()"
-                          }
+                            "src": "137:10:65",
+                            "typeDescriptions": {}
                         },
-                        "id": 44545,
-                        "nodeType": "RevertStatement",
-                        "src": "3858:19:65"
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            "implemented": true,
-            "kind": "function",
-            "modifiers": [],
-            "name": "_onlyGateway",
-            "nameLocation": "3770:12:65",
-            "parameters": {
-              "id": 44536,
-              "nodeType": "ParameterList",
-              "parameters": [],
-              "src": "3782:2:65"
-            },
-            "returnParameters": {
-              "id": 44537,
-              "nodeType": "ParameterList",
-              "parameters": [],
-              "src": "3798:0:65"
-            },
-            "scope": 44575,
-            "stateMutability": "view",
-            "virtual": false,
-            "visibility": "private"
-          },
-          {
-            "id": 44560,
-            "nodeType": "FunctionDefinition",
-            "src": "3900:118:65",
-            "nodes": [],
-            "body": {
-              "id": 44559,
-              "nodeType": "Block",
-              "src": "3935:83:65",
-              "nodes": [],
-              "statements": [
-                {
-                  "condition": {
-                    "expression": {
-                      "id": 44552,
-                      "name": "s",
-                      "nodeType": "Identifier",
-                      "overloadedDeclarations": [],
-                      "referencedDeclaration": 44535,
-                      "src": "3949:1:65",
-                      "typeDescriptions": {
-                        "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage",
-                        "typeString": "struct SubnetActorStorage storage ref"
-                      }
+                        "nameLocation": "-1:-1:-1"
                     },
-                    "id": 44553,
-                    "isConstant": false,
-                    "isLValue": true,
-                    "isPure": false,
-                    "lValueRequested": false,
-                    "memberLocation": "3951:6:65",
-                    "memberName": "killed",
-                    "nodeType": "MemberAccess",
-                    "referencedDeclaration": 44485,
-                    "src": "3949:8:65",
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_bool",
-                      "typeString": "bool"
-                    }
-                  },
-                  "id": 44558,
-                  "nodeType": "IfStatement",
-                  "src": "3945:67:65",
-                  "trueBody": {
-                    "id": 44557,
-                    "nodeType": "Block",
-                    "src": "3959:53:65",
-                    "statements": [
-                      {
-                        "errorCall": {
-                          "arguments": [],
-                          "expression": {
-                            "argumentTypes": [],
-                            "id": 44554,
+                    {
+                        "foreign": {
+                            "id": 44410,
                             "name": "SubnetAlreadyKilled",
                             "nodeType": "Identifier",
                             "overloadedDeclarations": [],
                             "referencedDeclaration": 36809,
-                            "src": "3980:19:65",
-                            "typeDescriptions": {
-                              "typeIdentifier": "t_function_error_pure$__$returns$__$",
-                              "typeString": "function () pure"
-                            }
-                          },
-                          "id": 44555,
-                          "isConstant": false,
-                          "isLValue": false,
-                          "isPure": false,
-                          "kind": "functionCall",
-                          "lValueRequested": false,
-                          "nameLocations": [],
-                          "names": [],
-                          "nodeType": "FunctionCall",
-                          "src": "3980:21:65",
-                          "tryCall": false,
-                          "typeDescriptions": {
-                            "typeIdentifier": "t_tuple$__$",
-                            "typeString": "tuple()"
-                          }
+                            "src": "149:19:65",
+                            "typeDescriptions": {}
                         },
-                        "id": 44556,
-                        "nodeType": "RevertStatement",
-                        "src": "3973:28:65"
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            "implemented": true,
-            "kind": "function",
-            "modifiers": [],
-            "name": "_notKilled",
-            "nameLocation": "3909:10:65",
-            "parameters": {
-              "id": 44550,
-              "nodeType": "ParameterList",
-              "parameters": [],
-              "src": "3919:2:65"
-            },
-            "returnParameters": {
-              "id": 44551,
-              "nodeType": "ParameterList",
-              "parameters": [],
-              "src": "3935:0:65"
-            },
-            "scope": 44575,
-            "stateMutability": "view",
-            "virtual": false,
-            "visibility": "private"
-          },
-          {
-            "id": 44567,
-            "nodeType": "ModifierDefinition",
-            "src": "4024:65:65",
-            "nodes": [],
-            "body": {
-              "id": 44566,
-              "nodeType": "Block",
-              "src": "4047:42:65",
-              "nodes": [],
-              "statements": [
-                {
-                  "expression": {
-                    "arguments": [],
-                    "expression": {
-                      "argumentTypes": [],
-                      "id": 44562,
-                      "name": "_onlyGateway",
-                      "nodeType": "Identifier",
-                      "overloadedDeclarations": [],
-                      "referencedDeclaration": 44549,
-                      "src": "4057:12:65",
-                      "typeDescriptions": {
-                        "typeIdentifier": "t_function_internal_view$__$returns$__$",
-                        "typeString": "function () view"
-                      }
-                    },
-                    "id": 44563,
-                    "isConstant": false,
-                    "isLValue": false,
-                    "isPure": false,
-                    "kind": "functionCall",
-                    "lValueRequested": false,
-                    "nameLocations": [],
-                    "names": [],
-                    "nodeType": "FunctionCall",
-                    "src": "4057:14:65",
-                    "tryCall": false,
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_tuple$__$",
-                      "typeString": "tuple()"
+                        "nameLocation": "-1:-1:-1"
                     }
-                  },
-                  "id": 44564,
-                  "nodeType": "ExpressionStatement",
-                  "src": "4057:14:65"
-                },
-                {
-                  "id": 44565,
-                  "nodeType": "PlaceholderStatement",
-                  "src": "4081:1:65"
-                }
-              ]
+                ],
+                "unitAlias": ""
             },
-            "name": "onlyGateway",
-            "nameLocation": "4033:11:65",
-            "parameters": {
-              "id": 44561,
-              "nodeType": "ParameterList",
-              "parameters": [],
-              "src": "4044:2:65"
-            },
-            "virtual": false,
-            "visibility": "internal"
-          },
-          {
-            "id": 44574,
-            "nodeType": "ModifierDefinition",
-            "src": "4095:61:65",
-            "nodes": [],
-            "body": {
-              "id": 44573,
-              "nodeType": "Block",
-              "src": "4116:40:65",
-              "nodes": [],
-              "statements": [
-                {
-                  "expression": {
-                    "arguments": [],
-                    "expression": {
-                      "argumentTypes": [],
-                      "id": 44569,
-                      "name": "_notKilled",
-                      "nodeType": "Identifier",
-                      "overloadedDeclarations": [],
-                      "referencedDeclaration": 44560,
-                      "src": "4126:10:65",
-                      "typeDescriptions": {
-                        "typeIdentifier": "t_function_internal_view$__$returns$__$",
-                        "typeString": "function () view"
-                      }
-                    },
-                    "id": 44570,
-                    "isConstant": false,
-                    "isLValue": false,
-                    "isPure": false,
-                    "kind": "functionCall",
-                    "lValueRequested": false,
-                    "nameLocations": [],
-                    "names": [],
-                    "nodeType": "FunctionCall",
-                    "src": "4126:12:65",
-                    "tryCall": false,
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_tuple$__$",
-                      "typeString": "tuple()"
+            {
+                "id": 44413,
+                "nodeType": "ImportDirective",
+                "src": "202:53:65",
+                "nodes": [],
+                "absolutePath": "src/structs/FvmAddress.sol",
+                "file": "../structs/FvmAddress.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 44576,
+                "sourceUnit": 46878,
+                "symbolAliases": [
+                    {
+                        "foreign": {
+                            "id": 44412,
+                            "name": "FvmAddress",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 46870,
+                            "src": "210:10:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
                     }
-                  },
-                  "id": 44571,
-                  "nodeType": "ExpressionStatement",
-                  "src": "4126:12:65"
-                },
-                {
-                  "id": 44572,
-                  "nodeType": "PlaceholderStatement",
-                  "src": "4148:1:65"
-                }
-              ]
+                ],
+                "unitAlias": ""
             },
-            "name": "notKilled",
-            "nameLocation": "4104:9:65",
-            "parameters": {
-              "id": 44568,
-              "nodeType": "ParameterList",
-              "parameters": [],
-              "src": "4113:2:65"
+            {
+                "id": 44415,
+                "nodeType": "ImportDirective",
+                "src": "256:61:65",
+                "nodes": [],
+                "absolutePath": "src/structs/Checkpoint.sol",
+                "file": "../structs/Checkpoint.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 44576,
+                "sourceUnit": 46864,
+                "symbolAliases": [
+                    {
+                        "foreign": {
+                            "id": 44414,
+                            "name": "BottomUpCheckpoint",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 46824,
+                            "src": "264:18:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    }
+                ],
+                "unitAlias": ""
             },
-            "virtual": false,
-            "visibility": "internal"
-          }
+            {
+                "id": 44421,
+                "nodeType": "ImportDirective",
+                "src": "318:111:65",
+                "nodes": [],
+                "absolutePath": "src/structs/Subnet.sol",
+                "file": "../structs/Subnet.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 44576,
+                "sourceUnit": 47033,
+                "symbolAliases": [
+                    {
+                        "foreign": {
+                            "id": 44416,
+                            "name": "SubnetID",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 46900,
+                            "src": "326:8:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    },
+                    {
+                        "foreign": {
+                            "id": 44417,
+                            "name": "ValidatorSet",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 47004,
+                            "src": "336:12:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    },
+                    {
+                        "foreign": {
+                            "id": 44418,
+                            "name": "StakingChangeLog",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 46948,
+                            "src": "350:16:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    },
+                    {
+                        "foreign": {
+                            "id": 44419,
+                            "name": "StakingReleaseQueue",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 46975,
+                            "src": "368:19:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    },
+                    {
+                        "foreign": {
+                            "id": 44420,
+                            "name": "Validator",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 47025,
+                            "src": "389:9:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    }
+                ],
+                "unitAlias": ""
+            },
+            {
+                "id": 44423,
+                "nodeType": "ImportDirective",
+                "src": "430:65:65",
+                "nodes": [],
+                "absolutePath": "lib/openzeppelin-contracts/contracts/utils/Address.sol",
+                "file": "openzeppelin-contracts/utils/Address.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 44576,
+                "sourceUnit": 32410,
+                "symbolAliases": [
+                    {
+                        "foreign": {
+                            "id": 44422,
+                            "name": "Address",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 32409,
+                            "src": "438:7:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    }
+                ],
+                "unitAlias": ""
+            },
+            {
+                "id": 44425,
+                "nodeType": "ImportDirective",
+                "src": "496:85:65",
+                "nodes": [],
+                "absolutePath": "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol",
+                "file": "openzeppelin-contracts/utils/structs/EnumerableSet.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 44576,
+                "sourceUnit": 35387,
+                "symbolAliases": [
+                    {
+                        "foreign": {
+                            "id": 44424,
+                            "name": "EnumerableSet",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 35386,
+                            "src": "504:13:65",
+                            "typeDescriptions": {}
+                        },
+                        "nameLocation": "-1:-1:-1"
+                    }
+                ],
+                "unitAlias": ""
+            },
+            {
+                "id": 44521,
+                "nodeType": "StructDefinition",
+                "src": "583:2908:65",
+                "nodes": [],
+                "canonicalName": "SubnetActorStorage",
+                "members": [
+                    {
+                        "constant": false,
+                        "id": 44431,
+                        "mutability": "mutable",
+                        "name": "committedCheckpoints",
+                        "nameLocation": "731:20:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "693:58:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_BottomUpCheckpoint_$46824_storage_$",
+                            "typeString": "mapping(uint64 => struct BottomUpCheckpoint)"
+                        },
+                        "typeName": {
+                            "id": 44430,
+                            "keyName": "",
+                            "keyNameLocation": "-1:-1:-1",
+                            "keyType": {
+                                "id": 44427,
+                                "name": "uint64",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "701:6:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_uint64",
+                                    "typeString": "uint64"
+                                }
+                            },
+                            "nodeType": "Mapping",
+                            "src": "693:37:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_BottomUpCheckpoint_$46824_storage_$",
+                                "typeString": "mapping(uint64 => struct BottomUpCheckpoint)"
+                            },
+                            "valueName": "",
+                            "valueNameLocation": "-1:-1:-1",
+                            "valueType": {
+                                "id": 44429,
+                                "nodeType": "UserDefinedTypeName",
+                                "pathNode": {
+                                    "id": 44428,
+                                    "name": "BottomUpCheckpoint",
+                                    "nameLocations": ["711:18:65"],
+                                    "nodeType": "IdentifierPath",
+                                    "referencedDeclaration": 46824,
+                                    "src": "711:18:65"
+                                },
+                                "referencedDeclaration": 46824,
+                                "src": "711:18:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_struct$_BottomUpCheckpoint_$46824_storage_ptr",
+                                    "typeString": "struct BottomUpCheckpoint"
+                                }
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44436,
+                        "mutability": "mutable",
+                        "name": "genesisValidators",
+                        "nameLocation": "830:17:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "818:29:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_array$_t_struct$_Validator_$47025_storage_$dyn_storage_ptr",
+                            "typeString": "struct Validator[]"
+                        },
+                        "typeName": {
+                            "baseType": {
+                                "id": 44434,
+                                "nodeType": "UserDefinedTypeName",
+                                "pathNode": {
+                                    "id": 44433,
+                                    "name": "Validator",
+                                    "nameLocations": ["818:9:65"],
+                                    "nodeType": "IdentifierPath",
+                                    "referencedDeclaration": 47025,
+                                    "src": "818:9:65"
+                                },
+                                "referencedDeclaration": 47025,
+                                "src": "818:9:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_struct$_Validator_$47025_storage_ptr",
+                                    "typeString": "struct Validator"
+                                }
+                            },
+                            "id": 44435,
+                            "nodeType": "ArrayTypeName",
+                            "src": "818:11:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_array$_t_struct$_Validator_$47025_storage_$dyn_storage_ptr",
+                                "typeString": "struct Validator[]"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44439,
+                        "mutability": "mutable",
+                        "name": "genesisCircSupply",
+                        "nameLocation": "982:17:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "974:25:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                        },
+                        "typeName": {
+                            "id": 44438,
+                            "name": "uint256",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "974:7:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint256",
+                                "typeString": "uint256"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44444,
+                        "mutability": "mutable",
+                        "name": "genesisBalance",
+                        "nameLocation": "1107:14:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1079:42:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
+                            "typeString": "mapping(address => uint256)"
+                        },
+                        "typeName": {
+                            "id": 44443,
+                            "keyName": "",
+                            "keyNameLocation": "-1:-1:-1",
+                            "keyType": {
+                                "id": 44441,
+                                "name": "address",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "1087:7:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_address",
+                                    "typeString": "address"
+                                }
+                            },
+                            "nodeType": "Mapping",
+                            "src": "1079:27:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
+                                "typeString": "mapping(address => uint256)"
+                            },
+                            "valueName": "",
+                            "valueNameLocation": "-1:-1:-1",
+                            "valueType": {
+                                "id": 44442,
+                                "name": "uint256",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "1098:7:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_uint256",
+                                    "typeString": "uint256"
+                                }
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44448,
+                        "mutability": "mutable",
+                        "name": "genesisBalanceKeys",
+                        "nameLocation": "1179:18:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1169:28:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
+                            "typeString": "address[]"
+                        },
+                        "typeName": {
+                            "baseType": {
+                                "id": 44446,
+                                "name": "address",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "1169:7:65",
+                                "stateMutability": "nonpayable",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_address",
+                                    "typeString": "address"
+                                }
+                            },
+                            "id": 44447,
+                            "nodeType": "ArrayTypeName",
+                            "src": "1169:9:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
+                                "typeString": "address[]"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44451,
+                        "mutability": "mutable",
+                        "name": "lastBottomUpCheckpointHeight",
+                        "nameLocation": "1281:28:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1274:35:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint64",
+                            "typeString": "uint64"
+                        },
+                        "typeName": {
+                            "id": 44450,
+                            "name": "uint64",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1274:6:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint64",
+                                "typeString": "uint64"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44454,
+                        "mutability": "mutable",
+                        "name": "minActivationCollateral",
+                        "nameLocation": "1369:23:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1361:31:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                        },
+                        "typeName": {
+                            "id": 44453,
+                            "name": "uint256",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1361:7:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint256",
+                                "typeString": "uint256"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44457,
+                        "mutability": "mutable",
+                        "name": "bottomUpCheckPeriod",
+                        "nameLocation": "1459:19:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1452:26:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint64",
+                            "typeString": "uint64"
+                        },
+                        "typeName": {
+                            "id": 44456,
+                            "name": "uint64",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1452:6:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint64",
+                                "typeString": "uint64"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44460,
+                        "mutability": "mutable",
+                        "name": "minValidators",
+                        "nameLocation": "1595:13:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1588:20:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint64",
+                            "typeString": "uint64"
+                        },
+                        "typeName": {
+                            "id": 44459,
+                            "name": "uint64",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1588:6:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint64",
+                                "typeString": "uint64"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44462,
+                        "mutability": "mutable",
+                        "name": "currentSubnetHash",
+                        "nameLocation": "1667:17:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1659:25:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_bytes32",
+                            "typeString": "bytes32"
+                        },
+                        "typeName": {
+                            "id": 44461,
+                            "name": "bytes32",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1659:7:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_bytes32",
+                                "typeString": "bytes32"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44465,
+                        "mutability": "mutable",
+                        "name": "ipcGatewayAddr",
+                        "nameLocation": "1756:14:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1748:22:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_address",
+                            "typeString": "address"
+                        },
+                        "typeName": {
+                            "id": 44464,
+                            "name": "address",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1748:7:65",
+                            "stateMutability": "nonpayable",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_address",
+                                "typeString": "address"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44468,
+                        "mutability": "mutable",
+                        "name": "majorityPercentage",
+                        "nameLocation": "1862:18:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1856:24:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                        },
+                        "typeName": {
+                            "id": 44467,
+                            "name": "uint8",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1856:5:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint8",
+                                "typeString": "uint8"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44471,
+                        "mutability": "mutable",
+                        "name": "minCrossMsgFee",
+                        "nameLocation": "1969:14:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "1961:22:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                        },
+                        "typeName": {
+                            "id": 44470,
+                            "name": "uint256",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "1961:7:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint256",
+                                "typeString": "uint256"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44475,
+                        "mutability": "mutable",
+                        "name": "parentId",
+                        "nameLocation": "2038:8:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2029:17:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_SubnetID_$46900_storage_ptr",
+                            "typeString": "struct SubnetID"
+                        },
+                        "typeName": {
+                            "id": 44474,
+                            "nodeType": "UserDefinedTypeName",
+                            "pathNode": {
+                                "id": 44473,
+                                "name": "SubnetID",
+                                "nameLocations": ["2029:8:65"],
+                                "nodeType": "IdentifierPath",
+                                "referencedDeclaration": 46900,
+                                "src": "2029:8:65"
+                            },
+                            "referencedDeclaration": 46900,
+                            "src": "2029:8:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_SubnetID_$46900_storage_ptr",
+                                "typeString": "struct SubnetID"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44479,
+                        "mutability": "mutable",
+                        "name": "consensus",
+                        "nameLocation": "2091:9:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2077:23:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_enum$_ConsensusType_$36665",
+                            "typeString": "enum ConsensusType"
+                        },
+                        "typeName": {
+                            "id": 44478,
+                            "nodeType": "UserDefinedTypeName",
+                            "pathNode": {
+                                "id": 44477,
+                                "name": "ConsensusType",
+                                "nameLocations": ["2077:13:65"],
+                                "nodeType": "IdentifierPath",
+                                "referencedDeclaration": 36665,
+                                "src": "2077:13:65"
+                            },
+                            "referencedDeclaration": 36665,
+                            "src": "2077:13:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_enum$_ConsensusType_$36665",
+                                "typeString": "enum ConsensusType"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44482,
+                        "mutability": "mutable",
+                        "name": "bootstrapped",
+                        "nameLocation": "2203:12:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2198:17:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_bool",
+                            "typeString": "bool"
+                        },
+                        "typeName": {
+                            "id": 44481,
+                            "name": "bool",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "2198:4:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_bool",
+                                "typeString": "bool"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44485,
+                        "mutability": "mutable",
+                        "name": "killed",
+                        "nameLocation": "2296:6:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2291:11:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_bool",
+                            "typeString": "bool"
+                        },
+                        "typeName": {
+                            "id": 44484,
+                            "name": "bool",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "2291:4:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_bool",
+                                "typeString": "bool"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44489,
+                        "mutability": "mutable",
+                        "name": "validatorSet",
+                        "nameLocation": "2407:12:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2394:25:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_ValidatorSet_$47004_storage_ptr",
+                            "typeString": "struct ValidatorSet"
+                        },
+                        "typeName": {
+                            "id": 44488,
+                            "nodeType": "UserDefinedTypeName",
+                            "pathNode": {
+                                "id": 44487,
+                                "name": "ValidatorSet",
+                                "nameLocations": ["2394:12:65"],
+                                "nodeType": "IdentifierPath",
+                                "referencedDeclaration": 47004,
+                                "src": "2394:12:65"
+                            },
+                            "referencedDeclaration": 47004,
+                            "src": "2394:12:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_ValidatorSet_$47004_storage_ptr",
+                                "typeString": "struct ValidatorSet"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44493,
+                        "mutability": "mutable",
+                        "name": "changeSet",
+                        "nameLocation": "2556:9:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2539:26:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_StakingChangeLog_$46948_storage_ptr",
+                            "typeString": "struct StakingChangeLog"
+                        },
+                        "typeName": {
+                            "id": 44492,
+                            "nodeType": "UserDefinedTypeName",
+                            "pathNode": {
+                                "id": 44491,
+                                "name": "StakingChangeLog",
+                                "nameLocations": ["2539:16:65"],
+                                "nodeType": "IdentifierPath",
+                                "referencedDeclaration": 46948,
+                                "src": "2539:16:65"
+                            },
+                            "referencedDeclaration": 46948,
+                            "src": "2539:16:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_StakingChangeLog_$46948_storage_ptr",
+                                "typeString": "struct StakingChangeLog"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44497,
+                        "mutability": "mutable",
+                        "name": "releaseQueue",
+                        "nameLocation": "2702:12:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2682:32:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_StakingReleaseQueue_$46975_storage_ptr",
+                            "typeString": "struct StakingReleaseQueue"
+                        },
+                        "typeName": {
+                            "id": 44496,
+                            "nodeType": "UserDefinedTypeName",
+                            "pathNode": {
+                                "id": 44495,
+                                "name": "StakingReleaseQueue",
+                                "nameLocations": ["2682:19:65"],
+                                "nodeType": "IdentifierPath",
+                                "referencedDeclaration": 46975,
+                                "src": "2682:19:65"
+                            },
+                            "referencedDeclaration": 46975,
+                            "src": "2682:19:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_StakingReleaseQueue_$46975_storage_ptr",
+                                "typeString": "struct StakingReleaseQueue"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44500,
+                        "mutability": "mutable",
+                        "name": "powerScale",
+                        "nameLocation": "3000:10:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "2995:15:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_int8",
+                            "typeString": "int8"
+                        },
+                        "typeName": {
+                            "id": 44499,
+                            "name": "int8",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "2995:4:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_int8",
+                                "typeString": "int8"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44505,
+                        "mutability": "mutable",
+                        "name": "relayerRewards",
+                        "nameLocation": "3077:14:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "3049:42:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
+                            "typeString": "mapping(address => uint256)"
+                        },
+                        "typeName": {
+                            "id": 44504,
+                            "keyName": "",
+                            "keyNameLocation": "-1:-1:-1",
+                            "keyType": {
+                                "id": 44502,
+                                "name": "address",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "3057:7:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_address",
+                                    "typeString": "address"
+                                }
+                            },
+                            "nodeType": "Mapping",
+                            "src": "3049:27:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_mapping$_t_address_$_t_uint256_$",
+                                "typeString": "mapping(address => uint256)"
+                            },
+                            "valueName": "",
+                            "valueNameLocation": "-1:-1:-1",
+                            "valueType": {
+                                "id": 44503,
+                                "name": "uint256",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "3068:7:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_uint256",
+                                    "typeString": "uint256"
+                                }
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44511,
+                        "mutability": "mutable",
+                        "name": "rewardedRelayers",
+                        "nameLocation": "3222:16:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "3178:60:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_AddressSet_$35099_storage_$",
+                            "typeString": "mapping(uint64 => struct EnumerableSet.AddressSet)"
+                        },
+                        "typeName": {
+                            "id": 44510,
+                            "keyName": "",
+                            "keyNameLocation": "-1:-1:-1",
+                            "keyType": {
+                                "id": 44507,
+                                "name": "uint64",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "3186:6:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_uint64",
+                                    "typeString": "uint64"
+                                }
+                            },
+                            "nodeType": "Mapping",
+                            "src": "3178:43:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_mapping$_t_uint64_$_t_struct$_AddressSet_$35099_storage_$",
+                                "typeString": "mapping(uint64 => struct EnumerableSet.AddressSet)"
+                            },
+                            "valueName": "",
+                            "valueNameLocation": "-1:-1:-1",
+                            "valueType": {
+                                "id": 44509,
+                                "nodeType": "UserDefinedTypeName",
+                                "pathNode": {
+                                    "id": 44508,
+                                    "name": "EnumerableSet.AddressSet",
+                                    "nameLocations": [
+                                        "3196:13:65",
+                                        "3210:10:65"
+                                    ],
+                                    "nodeType": "IdentifierPath",
+                                    "referencedDeclaration": 35099,
+                                    "src": "3196:24:65"
+                                },
+                                "referencedDeclaration": 35099,
+                                "src": "3196:24:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_struct$_AddressSet_$35099_storage_ptr",
+                                    "typeString": "struct EnumerableSet.AddressSet"
+                                }
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44516,
+                        "mutability": "mutable",
+                        "name": "bootstrapNodes",
+                        "nameLocation": "3358:14:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "3331:41:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_mapping$_t_address_$_t_string_storage_$",
+                            "typeString": "mapping(address => string)"
+                        },
+                        "typeName": {
+                            "id": 44515,
+                            "keyName": "",
+                            "keyNameLocation": "-1:-1:-1",
+                            "keyType": {
+                                "id": 44513,
+                                "name": "address",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "3339:7:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_address",
+                                    "typeString": "address"
+                                }
+                            },
+                            "nodeType": "Mapping",
+                            "src": "3331:26:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_mapping$_t_address_$_t_string_storage_$",
+                                "typeString": "mapping(address => string)"
+                            },
+                            "valueName": "",
+                            "valueNameLocation": "-1:-1:-1",
+                            "valueType": {
+                                "id": 44514,
+                                "name": "string",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "3350:6:65",
+                                "typeDescriptions": {
+                                    "typeIdentifier": "t_string_storage_ptr",
+                                    "typeString": "string"
+                                }
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "constant": false,
+                        "id": 44520,
+                        "mutability": "mutable",
+                        "name": "bootstrapOwners",
+                        "nameLocation": "3473:15:65",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44521,
+                        "src": "3448:40:65",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_AddressSet_$35099_storage_ptr",
+                            "typeString": "struct EnumerableSet.AddressSet"
+                        },
+                        "typeName": {
+                            "id": 44519,
+                            "nodeType": "UserDefinedTypeName",
+                            "pathNode": {
+                                "id": 44518,
+                                "name": "EnumerableSet.AddressSet",
+                                "nameLocations": ["3448:13:65", "3462:10:65"],
+                                "nodeType": "IdentifierPath",
+                                "referencedDeclaration": 35099,
+                                "src": "3448:24:65"
+                            },
+                            "referencedDeclaration": 35099,
+                            "src": "3448:24:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_AddressSet_$35099_storage_ptr",
+                                "typeString": "struct EnumerableSet.AddressSet"
+                            }
+                        },
+                        "visibility": "internal"
+                    }
+                ],
+                "name": "SubnetActorStorage",
+                "nameLocation": "590:18:65",
+                "scope": 44576,
+                "visibility": "public"
+            },
+            {
+                "id": 44532,
+                "nodeType": "ContractDefinition",
+                "src": "3493:194:65",
+                "nodes": [
+                    {
+                        "id": 44531,
+                        "nodeType": "FunctionDefinition",
+                        "src": "3529:156:65",
+                        "nodes": [],
+                        "body": {
+                            "id": 44530,
+                            "nodeType": "Block",
+                            "src": "3605:80:65",
+                            "nodes": [],
+                            "statements": [
+                                {
+                                    "AST": {
+                                        "nodeType": "YulBlock",
+                                        "src": "3624:36:65",
+                                        "statements": [
+                                            {
+                                                "nodeType": "YulAssignment",
+                                                "src": "3638:12:65",
+                                                "value": {
+                                                    "kind": "number",
+                                                    "nodeType": "YulLiteral",
+                                                    "src": "3649:1:65",
+                                                    "type": "",
+                                                    "value": "0"
+                                                },
+                                                "variableNames": [
+                                                    {
+                                                        "name": "ds.slot",
+                                                        "nodeType": "YulIdentifier",
+                                                        "src": "3638:7:65"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "evmVersion": "paris",
+                                    "externalReferences": [
+                                        {
+                                            "declaration": 44525,
+                                            "isOffset": false,
+                                            "isSlot": true,
+                                            "src": "3638:7:65",
+                                            "suffix": "slot",
+                                            "valueSize": 1
+                                        }
+                                    ],
+                                    "id": 44527,
+                                    "nodeType": "InlineAssembly",
+                                    "src": "3615:45:65"
+                                },
+                                {
+                                    "expression": {
+                                        "id": 44528,
+                                        "name": "ds",
+                                        "nodeType": "Identifier",
+                                        "overloadedDeclarations": [],
+                                        "referencedDeclaration": 44525,
+                                        "src": "3676:2:65",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
+                                            "typeString": "struct SubnetActorStorage storage pointer"
+                                        }
+                                    },
+                                    "functionReturnParameters": 44526,
+                                    "id": 44529,
+                                    "nodeType": "Return",
+                                    "src": "3669:9:65"
+                                }
+                            ]
+                        },
+                        "implemented": true,
+                        "kind": "function",
+                        "modifiers": [],
+                        "name": "appStorage",
+                        "nameLocation": "3538:10:65",
+                        "parameters": {
+                            "id": 44522,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "3548:2:65"
+                        },
+                        "returnParameters": {
+                            "id": 44526,
+                            "nodeType": "ParameterList",
+                            "parameters": [
+                                {
+                                    "constant": false,
+                                    "id": 44525,
+                                    "mutability": "mutable",
+                                    "name": "ds",
+                                    "nameLocation": "3601:2:65",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 44531,
+                                    "src": "3574:29:65",
+                                    "stateVariable": false,
+                                    "storageLocation": "storage",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
+                                        "typeString": "struct SubnetActorStorage"
+                                    },
+                                    "typeName": {
+                                        "id": 44524,
+                                        "nodeType": "UserDefinedTypeName",
+                                        "pathNode": {
+                                            "id": 44523,
+                                            "name": "SubnetActorStorage",
+                                            "nameLocations": ["3574:18:65"],
+                                            "nodeType": "IdentifierPath",
+                                            "referencedDeclaration": 44521,
+                                            "src": "3574:18:65"
+                                        },
+                                        "referencedDeclaration": 44521,
+                                        "src": "3574:18:65",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
+                                            "typeString": "struct SubnetActorStorage"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                }
+                            ],
+                            "src": "3573:31:65"
+                        },
+                        "scope": 44532,
+                        "stateMutability": "pure",
+                        "virtual": false,
+                        "visibility": "internal"
+                    }
+                ],
+                "abstract": false,
+                "baseContracts": [],
+                "canonicalName": "LibSubnetActorStorage",
+                "contractDependencies": [],
+                "contractKind": "library",
+                "fullyImplemented": true,
+                "linearizedBaseContracts": [44532],
+                "name": "LibSubnetActorStorage",
+                "nameLocation": "3501:21:65",
+                "scope": 44576,
+                "usedErrors": []
+            },
+            {
+                "id": 44575,
+                "nodeType": "ContractDefinition",
+                "src": "3689:469:65",
+                "nodes": [
+                    {
+                        "id": 44535,
+                        "nodeType": "VariableDeclaration",
+                        "src": "3725:29:65",
+                        "nodes": [],
+                        "constant": false,
+                        "mutability": "mutable",
+                        "name": "s",
+                        "nameLocation": "3753:1:65",
+                        "scope": 44575,
+                        "stateVariable": true,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage",
+                            "typeString": "struct SubnetActorStorage"
+                        },
+                        "typeName": {
+                            "id": 44534,
+                            "nodeType": "UserDefinedTypeName",
+                            "pathNode": {
+                                "id": 44533,
+                                "name": "SubnetActorStorage",
+                                "nameLocations": ["3725:18:65"],
+                                "nodeType": "IdentifierPath",
+                                "referencedDeclaration": 44521,
+                                "src": "3725:18:65"
+                            },
+                            "referencedDeclaration": 44521,
+                            "src": "3725:18:65",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage_ptr",
+                                "typeString": "struct SubnetActorStorage"
+                            }
+                        },
+                        "visibility": "internal"
+                    },
+                    {
+                        "id": 44549,
+                        "nodeType": "FunctionDefinition",
+                        "src": "3761:133:65",
+                        "nodes": [],
+                        "body": {
+                            "id": 44548,
+                            "nodeType": "Block",
+                            "src": "3798:96:65",
+                            "nodes": [],
+                            "statements": [
+                                {
+                                    "condition": {
+                                        "commonType": {
+                                            "typeIdentifier": "t_address",
+                                            "typeString": "address"
+                                        },
+                                        "id": 44542,
+                                        "isConstant": false,
+                                        "isLValue": false,
+                                        "isPure": false,
+                                        "lValueRequested": false,
+                                        "leftExpression": {
+                                            "expression": {
+                                                "id": 44538,
+                                                "name": "msg",
+                                                "nodeType": "Identifier",
+                                                "overloadedDeclarations": [],
+                                                "referencedDeclaration": -15,
+                                                "src": "3812:3:65",
+                                                "typeDescriptions": {
+                                                    "typeIdentifier": "t_magic_message",
+                                                    "typeString": "msg"
+                                                }
+                                            },
+                                            "id": 44539,
+                                            "isConstant": false,
+                                            "isLValue": false,
+                                            "isPure": false,
+                                            "lValueRequested": false,
+                                            "memberLocation": "3816:6:65",
+                                            "memberName": "sender",
+                                            "nodeType": "MemberAccess",
+                                            "src": "3812:10:65",
+                                            "typeDescriptions": {
+                                                "typeIdentifier": "t_address",
+                                                "typeString": "address"
+                                            }
+                                        },
+                                        "nodeType": "BinaryOperation",
+                                        "operator": "!=",
+                                        "rightExpression": {
+                                            "expression": {
+                                                "id": 44540,
+                                                "name": "s",
+                                                "nodeType": "Identifier",
+                                                "overloadedDeclarations": [],
+                                                "referencedDeclaration": 44535,
+                                                "src": "3826:1:65",
+                                                "typeDescriptions": {
+                                                    "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage",
+                                                    "typeString": "struct SubnetActorStorage storage ref"
+                                                }
+                                            },
+                                            "id": 44541,
+                                            "isConstant": false,
+                                            "isLValue": true,
+                                            "isPure": false,
+                                            "lValueRequested": false,
+                                            "memberLocation": "3828:14:65",
+                                            "memberName": "ipcGatewayAddr",
+                                            "nodeType": "MemberAccess",
+                                            "referencedDeclaration": 44465,
+                                            "src": "3826:16:65",
+                                            "typeDescriptions": {
+                                                "typeIdentifier": "t_address",
+                                                "typeString": "address"
+                                            }
+                                        },
+                                        "src": "3812:30:65",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_bool",
+                                            "typeString": "bool"
+                                        }
+                                    },
+                                    "id": 44547,
+                                    "nodeType": "IfStatement",
+                                    "src": "3808:80:65",
+                                    "trueBody": {
+                                        "id": 44546,
+                                        "nodeType": "Block",
+                                        "src": "3844:44:65",
+                                        "statements": [
+                                            {
+                                                "errorCall": {
+                                                    "arguments": [],
+                                                    "expression": {
+                                                        "argumentTypes": [],
+                                                        "id": 44543,
+                                                        "name": "NotGateway",
+                                                        "nodeType": "Identifier",
+                                                        "overloadedDeclarations": [],
+                                                        "referencedDeclaration": 36783,
+                                                        "src": "3865:10:65",
+                                                        "typeDescriptions": {
+                                                            "typeIdentifier": "t_function_error_pure$__$returns$__$",
+                                                            "typeString": "function () pure"
+                                                        }
+                                                    },
+                                                    "id": 44544,
+                                                    "isConstant": false,
+                                                    "isLValue": false,
+                                                    "isPure": false,
+                                                    "kind": "functionCall",
+                                                    "lValueRequested": false,
+                                                    "nameLocations": [],
+                                                    "names": [],
+                                                    "nodeType": "FunctionCall",
+                                                    "src": "3865:12:65",
+                                                    "tryCall": false,
+                                                    "typeDescriptions": {
+                                                        "typeIdentifier": "t_tuple$__$",
+                                                        "typeString": "tuple()"
+                                                    }
+                                                },
+                                                "id": 44545,
+                                                "nodeType": "RevertStatement",
+                                                "src": "3858:19:65"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        "implemented": true,
+                        "kind": "function",
+                        "modifiers": [],
+                        "name": "_onlyGateway",
+                        "nameLocation": "3770:12:65",
+                        "parameters": {
+                            "id": 44536,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "3782:2:65"
+                        },
+                        "returnParameters": {
+                            "id": 44537,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "3798:0:65"
+                        },
+                        "scope": 44575,
+                        "stateMutability": "view",
+                        "virtual": false,
+                        "visibility": "private"
+                    },
+                    {
+                        "id": 44560,
+                        "nodeType": "FunctionDefinition",
+                        "src": "3900:118:65",
+                        "nodes": [],
+                        "body": {
+                            "id": 44559,
+                            "nodeType": "Block",
+                            "src": "3935:83:65",
+                            "nodes": [],
+                            "statements": [
+                                {
+                                    "condition": {
+                                        "expression": {
+                                            "id": 44552,
+                                            "name": "s",
+                                            "nodeType": "Identifier",
+                                            "overloadedDeclarations": [],
+                                            "referencedDeclaration": 44535,
+                                            "src": "3949:1:65",
+                                            "typeDescriptions": {
+                                                "typeIdentifier": "t_struct$_SubnetActorStorage_$44521_storage",
+                                                "typeString": "struct SubnetActorStorage storage ref"
+                                            }
+                                        },
+                                        "id": 44553,
+                                        "isConstant": false,
+                                        "isLValue": true,
+                                        "isPure": false,
+                                        "lValueRequested": false,
+                                        "memberLocation": "3951:6:65",
+                                        "memberName": "killed",
+                                        "nodeType": "MemberAccess",
+                                        "referencedDeclaration": 44485,
+                                        "src": "3949:8:65",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_bool",
+                                            "typeString": "bool"
+                                        }
+                                    },
+                                    "id": 44558,
+                                    "nodeType": "IfStatement",
+                                    "src": "3945:67:65",
+                                    "trueBody": {
+                                        "id": 44557,
+                                        "nodeType": "Block",
+                                        "src": "3959:53:65",
+                                        "statements": [
+                                            {
+                                                "errorCall": {
+                                                    "arguments": [],
+                                                    "expression": {
+                                                        "argumentTypes": [],
+                                                        "id": 44554,
+                                                        "name": "SubnetAlreadyKilled",
+                                                        "nodeType": "Identifier",
+                                                        "overloadedDeclarations": [],
+                                                        "referencedDeclaration": 36809,
+                                                        "src": "3980:19:65",
+                                                        "typeDescriptions": {
+                                                            "typeIdentifier": "t_function_error_pure$__$returns$__$",
+                                                            "typeString": "function () pure"
+                                                        }
+                                                    },
+                                                    "id": 44555,
+                                                    "isConstant": false,
+                                                    "isLValue": false,
+                                                    "isPure": false,
+                                                    "kind": "functionCall",
+                                                    "lValueRequested": false,
+                                                    "nameLocations": [],
+                                                    "names": [],
+                                                    "nodeType": "FunctionCall",
+                                                    "src": "3980:21:65",
+                                                    "tryCall": false,
+                                                    "typeDescriptions": {
+                                                        "typeIdentifier": "t_tuple$__$",
+                                                        "typeString": "tuple()"
+                                                    }
+                                                },
+                                                "id": 44556,
+                                                "nodeType": "RevertStatement",
+                                                "src": "3973:28:65"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        "implemented": true,
+                        "kind": "function",
+                        "modifiers": [],
+                        "name": "_notKilled",
+                        "nameLocation": "3909:10:65",
+                        "parameters": {
+                            "id": 44550,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "3919:2:65"
+                        },
+                        "returnParameters": {
+                            "id": 44551,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "3935:0:65"
+                        },
+                        "scope": 44575,
+                        "stateMutability": "view",
+                        "virtual": false,
+                        "visibility": "private"
+                    },
+                    {
+                        "id": 44567,
+                        "nodeType": "ModifierDefinition",
+                        "src": "4024:65:65",
+                        "nodes": [],
+                        "body": {
+                            "id": 44566,
+                            "nodeType": "Block",
+                            "src": "4047:42:65",
+                            "nodes": [],
+                            "statements": [
+                                {
+                                    "expression": {
+                                        "arguments": [],
+                                        "expression": {
+                                            "argumentTypes": [],
+                                            "id": 44562,
+                                            "name": "_onlyGateway",
+                                            "nodeType": "Identifier",
+                                            "overloadedDeclarations": [],
+                                            "referencedDeclaration": 44549,
+                                            "src": "4057:12:65",
+                                            "typeDescriptions": {
+                                                "typeIdentifier": "t_function_internal_view$__$returns$__$",
+                                                "typeString": "function () view"
+                                            }
+                                        },
+                                        "id": 44563,
+                                        "isConstant": false,
+                                        "isLValue": false,
+                                        "isPure": false,
+                                        "kind": "functionCall",
+                                        "lValueRequested": false,
+                                        "nameLocations": [],
+                                        "names": [],
+                                        "nodeType": "FunctionCall",
+                                        "src": "4057:14:65",
+                                        "tryCall": false,
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_tuple$__$",
+                                            "typeString": "tuple()"
+                                        }
+                                    },
+                                    "id": 44564,
+                                    "nodeType": "ExpressionStatement",
+                                    "src": "4057:14:65"
+                                },
+                                {
+                                    "id": 44565,
+                                    "nodeType": "PlaceholderStatement",
+                                    "src": "4081:1:65"
+                                }
+                            ]
+                        },
+                        "name": "onlyGateway",
+                        "nameLocation": "4033:11:65",
+                        "parameters": {
+                            "id": 44561,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "4044:2:65"
+                        },
+                        "virtual": false,
+                        "visibility": "internal"
+                    },
+                    {
+                        "id": 44574,
+                        "nodeType": "ModifierDefinition",
+                        "src": "4095:61:65",
+                        "nodes": [],
+                        "body": {
+                            "id": 44573,
+                            "nodeType": "Block",
+                            "src": "4116:40:65",
+                            "nodes": [],
+                            "statements": [
+                                {
+                                    "expression": {
+                                        "arguments": [],
+                                        "expression": {
+                                            "argumentTypes": [],
+                                            "id": 44569,
+                                            "name": "_notKilled",
+                                            "nodeType": "Identifier",
+                                            "overloadedDeclarations": [],
+                                            "referencedDeclaration": 44560,
+                                            "src": "4126:10:65",
+                                            "typeDescriptions": {
+                                                "typeIdentifier": "t_function_internal_view$__$returns$__$",
+                                                "typeString": "function () view"
+                                            }
+                                        },
+                                        "id": 44570,
+                                        "isConstant": false,
+                                        "isLValue": false,
+                                        "isPure": false,
+                                        "kind": "functionCall",
+                                        "lValueRequested": false,
+                                        "nameLocations": [],
+                                        "names": [],
+                                        "nodeType": "FunctionCall",
+                                        "src": "4126:12:65",
+                                        "tryCall": false,
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_tuple$__$",
+                                            "typeString": "tuple()"
+                                        }
+                                    },
+                                    "id": 44571,
+                                    "nodeType": "ExpressionStatement",
+                                    "src": "4126:12:65"
+                                },
+                                {
+                                    "id": 44572,
+                                    "nodeType": "PlaceholderStatement",
+                                    "src": "4148:1:65"
+                                }
+                            ]
+                        },
+                        "name": "notKilled",
+                        "nameLocation": "4104:9:65",
+                        "parameters": {
+                            "id": 44568,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "4113:2:65"
+                        },
+                        "virtual": false,
+                        "visibility": "internal"
+                    }
+                ],
+                "abstract": false,
+                "baseContracts": [],
+                "canonicalName": "SubnetActorModifiers",
+                "contractDependencies": [],
+                "contractKind": "contract",
+                "fullyImplemented": true,
+                "linearizedBaseContracts": [44575],
+                "name": "SubnetActorModifiers",
+                "nameLocation": "3698:20:65",
+                "scope": 44576,
+                "usedErrors": []
+            }
         ],
-        "abstract": false,
-        "baseContracts": [],
-        "canonicalName": "SubnetActorModifiers",
-        "contractDependencies": [],
-        "contractKind": "contract",
-        "fullyImplemented": true,
-        "linearizedBaseContracts": [
-          44575
-        ],
-        "name": "SubnetActorModifiers",
-        "nameLocation": "3698:20:65",
-        "scope": 44576,
-        "usedErrors": []
-      }
-    ],
-    "license": "MIT OR Apache-2.0"
-  },
-  "id": 65
+        "license": "MIT OR Apache-2.0"
+    },
+    "id": 65
 }

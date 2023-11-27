@@ -5,7 +5,7 @@ import {
     getOnChainBytecodeFromFacets,
     upgradeFacetOnChain,
     upgradeFacet,
-    logMissingFacetInfo
+    logMissingFacetInfo,
 } from './util'
 
 /**

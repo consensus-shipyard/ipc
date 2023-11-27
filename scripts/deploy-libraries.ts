@@ -1,41 +1,74 @@
 /* global ethers */
 /* eslint prefer-const: "off" */
 
-import hre, { ethers } from "hardhat";
-import { deployContractWithDeployer, getTransactionFees } from './util';
+import hre, { ethers } from 'hardhat'
+import { deployContractWithDeployer, getTransactionFees } from './util'
 
 export async function deploy() {
-    await hre.run('compile');
+    await hre.run('compile')
 
-    const [deployer] = await ethers.getSigners();
-    const balance = await ethers.provider.getBalance(deployer.address);
-    console.log("Deploying libraries with the account:", deployer.address, ' balance:', ethers.utils.formatEther(balance));
+    const [deployer] = await ethers.getSigners()
+    const balance = await ethers.provider.getBalance(deployer.address)
+    console.log(
+        'Deploying libraries with the account:',
+        deployer.address,
+        ' balance:',
+        ethers.utils.formatEther(balance),
+    )
 
-    const txArgs = await getTransactionFees();
+    const txArgs = await getTransactionFees()
 
-    const { address: accountHelperAddress } = await deployContractWithDeployer(deployer, "AccountHelper", {}, txArgs);
-    const { address: libStakingAddress } = await deployContractWithDeployer(deployer, "LibStaking", {}, txArgs);
-    
-    const { address: subnetIDHelperAddress } = await deployContractWithDeployer(deployer, "SubnetIDHelper", {}, txArgs);
+    const { address: accountHelperAddress } = await deployContractWithDeployer(
+        deployer,
+        'AccountHelper',
+        {},
+        txArgs,
+    )
+    const { address: libStakingAddress } = await deployContractWithDeployer(
+        deployer,
+        'LibStaking',
+        {},
+        txArgs,
+    )
+
+    const { address: subnetIDHelperAddress } = await deployContractWithDeployer(
+        deployer,
+        'SubnetIDHelper',
+        {},
+        txArgs,
+    )
     // nested libs
-    const { address: crossMsgHelperAddress } = await deployContractWithDeployer(deployer, "CrossMsgHelper",
-        { "SubnetIDHelper": subnetIDHelperAddress
-        },
-        txArgs);
-    const { address: storableMsgHelperAddress } = await deployContractWithDeployer(deployer, "StorableMsgHelper", {
-        "SubnetIDHelper": subnetIDHelperAddress
-        },
-        txArgs);
-    const { address: checkpointHelperAddress } = await deployContractWithDeployer(deployer, "CheckpointHelper", {}, txArgs);
+    const { address: crossMsgHelperAddress } = await deployContractWithDeployer(
+        deployer,
+        'CrossMsgHelper',
+        { SubnetIDHelper: subnetIDHelperAddress },
+        txArgs,
+    )
+    const { address: storableMsgHelperAddress } =
+        await deployContractWithDeployer(
+            deployer,
+            'StorableMsgHelper',
+            {
+                SubnetIDHelper: subnetIDHelperAddress,
+            },
+            txArgs,
+        )
+    const { address: checkpointHelperAddress } =
+        await deployContractWithDeployer(
+            deployer,
+            'CheckpointHelper',
+            {},
+            txArgs,
+        )
 
     return {
-        "AccountHelper": accountHelperAddress,
-        "CheckpointHelper": checkpointHelperAddress,
-        "SubnetIDHelper": subnetIDHelperAddress,
-        "CrossMsgHelper": crossMsgHelperAddress,
-        "StorableMsgHelper": storableMsgHelperAddress,
-        "LibStaking": libStakingAddress,
-    };
+        AccountHelper: accountHelperAddress,
+        CheckpointHelper: checkpointHelperAddress,
+        SubnetIDHelper: subnetIDHelperAddress,
+        CrossMsgHelper: crossMsgHelperAddress,
+        StorableMsgHelper: storableMsgHelperAddress,
+        LibStaking: libStakingAddress,
+    }
 }
 
 // deploy();

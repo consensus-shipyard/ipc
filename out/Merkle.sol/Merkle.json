@@ -1,850 +1,834 @@
 {
-  "abi": [
-    {
-      "inputs": [
+    "abi": [
         {
-          "internalType": "bytes32[]",
-          "name": "data",
-          "type": "bytes32[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "node",
-          "type": "uint256"
-        }
-      ],
-      "name": "getProof",
-      "outputs": [
-        {
-          "internalType": "bytes32[]",
-          "name": "",
-          "type": "bytes32[]"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32[]",
-          "name": "data",
-          "type": "bytes32[]"
-        }
-      ],
-      "name": "getRoot",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "left",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "right",
-          "type": "bytes32"
-        }
-      ],
-      "name": "hashLeafPairs",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_hash",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "x",
-          "type": "uint256"
-        }
-      ],
-      "name": "log2ceil",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "x",
-          "type": "uint256"
-        }
-      ],
-      "name": "log2ceilBitMagic",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "root",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "bytes32[]",
-          "name": "proof",
-          "type": "bytes32[]"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "valueToProve",
-          "type": "bytes32"
-        }
-      ],
-      "name": "verifyProof",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    }
-  ],
-  "bytecode": {
-    "object": "0x6080806040523461001657610799908161001c8239f35b600080fdfe6080604052600436101561001257600080fd5b6000803560e01c9081632e08d6021461007a5750806358161a4214610075578063b861619514610070578063cf06c7b71461006b578063dd1d2599146100665763e27d51531461006157600080fd5b6103f7565b6103d6565b6103b0565b6102bb565b61020d565b346101515760203660031901126101515760043567ffffffffffffffff811161014d576100ab9036906004016101ad565b600180825111156100fc57805b6100de575b6100da6100c98361045a565b516040519081529081906020820190565b0390f35b80825111156100f7576100f18192610511565b916100b8565b6100bd565b60405162461bcd60e51b815260206004820152602360248201527f776f6e27742067656e657261746520726f6f7420666f722073696e676c65206c60448201526232b0b360e91b6064820152608490fd5b5080fd5b80fd5b634e487b7160e01b600052604160045260246000fd5b6040519190601f01601f1916820167ffffffffffffffff81118382101761019057604052565b610154565b67ffffffffffffffff81116101905760051b60200190565b9080601f83011215610208578135906101cd6101c883610195565b61016a565b9182938184526020808095019260051b820101928311610208578301905b8282106101f9575050505090565b813581529083019083016101eb565b600080fd5b346102085760603660031901126102085760243567ffffffffffffffff81116102085761023e9036906004016101ad565b60443581516000925b81841061025d5760405160043584148152602090f35b909161027660019161026f868561047d565b5190610437565b9301929190610247565b6020908160408183019282815285518094520193019160005b8281106102a7575050505090565b835185529381019392810192600101610299565b346102085760403660031901126102085760043567ffffffffffffffff8111610208576102ec9036906004016101ad565b602435906001906102ff82825111610491565b61031161030c8251610632565b6104e9565b92600080845b61032a575b604051806100da8882610280565b8351858111156103aa578584939261036f92828080981614600014610379575061035860001986018861047d565b51610363828b61047d565b525b0192841c94610511565b9392919091610317565b85830190810361039557508361038f828b61047d565b52610365565b61039f908861047d565b5161038f828b61047d565b5061031c565b346102085760203660031901126102085760206103ce600435610632565b604051908152f35b346102085760403660031901126102085760206103ce602435600435610437565b3461020857602036600319011261020857600435806000815b61042a576020925060405191806001811901161490038152f35b600192831c920182610410565b8181101561044e576000526020525b604060002090565b90600052602052610446565b8051156104675760200190565b634e487b7160e01b600052603260045260246000fd5b80518210156104675760209160051b010190565b1561049857565b60405162461bcd60e51b8152602060048201526024808201527f776f6e27742067656e65726174652070726f6f6620666f722073696e676c65206044820152633632b0b360e11b6064820152608490fd5b906104f66101c883610195565b8281528092610507601f1991610195565b0190602036910137565b90815160019081808216146000146105a9576105308282811c016104e9565b916000196105408382018761047d565b516000805260205261055a6040600020918551018561047d565b525b600019909101906000805b8382106105775750929450505050565b82600291610595610588858b61047d565b5161026f8487018c61047d565b61059f828961047d565b5201910190610567565b6105b481831c6104e9565b9161055c565b90604082018092116105c857565b634e487b7160e01b600052601160045260246000fd5b90602082018092116105c857565b90601082018092116105c857565b90600882018092116105c857565b90600482018092116105c857565b90600282018092116105c857565b90600182018092116105c857565b600181111561075d5760009080600160801b811015610752575b8068010000000000000000600292101561073f575b64010000000081101561072c575b62010000811015610719575b610100811015610706575b60108110156106f3575b60048110156106e1575b10156106d1575b806106ac8119610624565b1614806106c8575b156106bc5790565b6106c590610624565b90565b508015156106b4565b906106db90610624565b906106a1565b6106ed90821c93610616565b9261069a565b6107009060041c93610608565b92610690565b6107139060081c936105fa565b92610686565b6107269060101c936105ec565b9261067b565b6107399060201c936105de565b9261066f565b61074c9060401c936105ba565b92610661565b60809250821c61064c565b5060009056fea264697066735822122055fcbfe112c97d90fead77f8fd51145df97402c6afa286c5b97c82dcfc9b948064736f6c63430008130033",
-    "sourceMap": "242:576:19:-:0;;;;;;;;;;;;;;;;;",
-    "linkReferences": {}
-  },
-  "deployedBytecode": {
-    "object": "0x6080604052600436101561001257600080fd5b6000803560e01c9081632e08d6021461007a5750806358161a4214610075578063b861619514610070578063cf06c7b71461006b578063dd1d2599146100665763e27d51531461006157600080fd5b6103f7565b6103d6565b6103b0565b6102bb565b61020d565b346101515760203660031901126101515760043567ffffffffffffffff811161014d576100ab9036906004016101ad565b600180825111156100fc57805b6100de575b6100da6100c98361045a565b516040519081529081906020820190565b0390f35b80825111156100f7576100f18192610511565b916100b8565b6100bd565b60405162461bcd60e51b815260206004820152602360248201527f776f6e27742067656e657261746520726f6f7420666f722073696e676c65206c60448201526232b0b360e91b6064820152608490fd5b5080fd5b80fd5b634e487b7160e01b600052604160045260246000fd5b6040519190601f01601f1916820167ffffffffffffffff81118382101761019057604052565b610154565b67ffffffffffffffff81116101905760051b60200190565b9080601f83011215610208578135906101cd6101c883610195565b61016a565b9182938184526020808095019260051b820101928311610208578301905b8282106101f9575050505090565b813581529083019083016101eb565b600080fd5b346102085760603660031901126102085760243567ffffffffffffffff81116102085761023e9036906004016101ad565b60443581516000925b81841061025d5760405160043584148152602090f35b909161027660019161026f868561047d565b5190610437565b9301929190610247565b6020908160408183019282815285518094520193019160005b8281106102a7575050505090565b835185529381019392810192600101610299565b346102085760403660031901126102085760043567ffffffffffffffff8111610208576102ec9036906004016101ad565b602435906001906102ff82825111610491565b61031161030c8251610632565b6104e9565b92600080845b61032a575b604051806100da8882610280565b8351858111156103aa578584939261036f92828080981614600014610379575061035860001986018861047d565b51610363828b61047d565b525b0192841c94610511565b9392919091610317565b85830190810361039557508361038f828b61047d565b52610365565b61039f908861047d565b5161038f828b61047d565b5061031c565b346102085760203660031901126102085760206103ce600435610632565b604051908152f35b346102085760403660031901126102085760206103ce602435600435610437565b3461020857602036600319011261020857600435806000815b61042a576020925060405191806001811901161490038152f35b600192831c920182610410565b8181101561044e576000526020525b604060002090565b90600052602052610446565b8051156104675760200190565b634e487b7160e01b600052603260045260246000fd5b80518210156104675760209160051b010190565b1561049857565b60405162461bcd60e51b8152602060048201526024808201527f776f6e27742067656e65726174652070726f6f6620666f722073696e676c65206044820152633632b0b360e11b6064820152608490fd5b906104f66101c883610195565b8281528092610507601f1991610195565b0190602036910137565b90815160019081808216146000146105a9576105308282811c016104e9565b916000196105408382018761047d565b516000805260205261055a6040600020918551018561047d565b525b600019909101906000805b8382106105775750929450505050565b82600291610595610588858b61047d565b5161026f8487018c61047d565b61059f828961047d565b5201910190610567565b6105b481831c6104e9565b9161055c565b90604082018092116105c857565b634e487b7160e01b600052601160045260246000fd5b90602082018092116105c857565b90601082018092116105c857565b90600882018092116105c857565b90600482018092116105c857565b90600282018092116105c857565b90600182018092116105c857565b600181111561075d5760009080600160801b811015610752575b8068010000000000000000600292101561073f575b64010000000081101561072c575b62010000811015610719575b610100811015610706575b60108110156106f3575b60048110156106e1575b10156106d1575b806106ac8119610624565b1614806106c8575b156106bc5790565b6106c590610624565b90565b508015156106b4565b906106db90610624565b906106a1565b6106ed90821c93610616565b9261069a565b6107009060041c93610608565b92610690565b6107139060081c936105fa565b92610686565b6107269060101c936105ec565b9261067b565b6107399060201c936105de565b9261066f565b61074c9060401c936105ba565b92610661565b60809250821c61064c565b5060009056fea264697066735822122055fcbfe112c97d90fead77f8fd51145df97402c6afa286c5b97c82dcfc9b948064736f6c63430008130033",
-    "sourceMap": "242:576:19:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;:::i;:::-;;:::i;:::-;;:::i;:::-;;:::i;:::-;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;;;;;:::i;:::-;1089:1:20;242:576:19;;;1075:15:20;242:576:19;;;1140:70:20;1089:1;;;1140:70;242:576:19;1226:7:20;;;:::i;:::-;242:576:19;;;;;;;;;;;;;;;;;;1140:70:20;242:576:19;;;1146:15:20;;;;1184;;;;:::i;:::-;1140:70;;;1146:15;;;242:576:19;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;;;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;:::o;:::-;;:::i;:::-;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;:::i;:::-;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;-1:-1:-1;242:576:19;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;-1:-1:-1;736:115:20;752:10;;;;;;242:576:19;;;;877:19:20;;242:576:19;;;;;764:3:20;827:8;;800:36;242:576:19;827:8:20;;;;;:::i;:::-;242:576:19;800:36:20;;:::i;:::-;764:3;242:576:19;740:10:20;;;;;242:576:19;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;;;;;:::i;:::-;;;1372:1:20;;242:576:19;1350:64:20;242:576:19;;;1358:15:20;1350:64;:::i;:::-;1527:44;1541:29;242:576:19;;1541:29:20;:::i;:::-;1527:44;:::i;:::-;1581:15;-1:-1:-1;;1581:15:20;1372:1;;;1910:475;242:576:19;;;;;;;:::i;1910:475:20:-;242:576:19;;1916:15:20;;;;;;1978:10;;;;2359:15;1978:10;;;;;;:15;1975:300;1372:1;;;-1:-1:-1;2031:14:20;-1:-1:-1;;242:576:19;;2031:14:20;;:::i;:::-;242:576:19;2017:28:20;;;;:::i;:::-;242:576:19;1975:300:20;242:576:19;;;;2359:15:20;;:::i;:::-;1910:475;;;;;;;1975:300;242:576:19;;;;2091:23:20;;;;2138:24;;;;;;:::i;:::-;242:576:19;1975:300:20;;2087:188;2242:14;;;;:::i;:::-;242:576:19;2228:28:20;;;;:::i;1916:15::-;;;;242:576:19;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;:::i;:::-;;;;;;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;:::i;:::-;;;;;;-1:-1:-1;;242:576:19;;;;;;;-1:-1:-1;242:576:19;4880:5:20;;;242:576:19;;;;;3936:769:20;;;;;;;;242:576:19;;;;;4873:78:20;3936:769;242:576:19;;;;;;4873:78:20;;407:409:19;513:297;;;;;;;;;;;;;;407:409;:::o;513:297::-;;;;;;;;242:576;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;:::o;:::-;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;;;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;:::i;:::-;;;;;;;;:::o;2493:990:20:-;;242:576:19;;2933:3:20;2924:12;;;;;:17;2920:251;2933:3;;;2969:29;242:576:19;;;;;2969:29:20;:::i;:::-;242:576:19;-1:-1:-1;;3058:16:20;242:576:19;;;3058:16:20;;:::i;:::-;242:576:19;-1:-1:-1;513:297:19;;;;3016:71:20;513:297:19;-1:-1:-1;513:297:19;242:576;;;;3016:71:20;;:::i;:::-;242:576:19;2920:251:20;-1:-1:-1;;242:576:19;;;;-1:-1:-1;;3322:12:20;;;;;;-1:-1:-1;3463:13:20;;-1:-1:-1;;;;2493:990:20:o;3336:4::-;3387:7;3339:1;3387:7;3373:33;3387:7;;;;:::i;:::-;242:576:19;3396:9:20;242:576:19;;;3396:9:20;;:::i;3373:33::-;3359:47;;;;:::i;:::-;242:576:19;;3336:4:20;242:576:19;3307:13:20;;;2920:251;3135:25;242:576:19;;;3135:25:20;:::i;:::-;2920:251;;;242:576:19;;5478:2:20;242:576:19;;;;;;;:::o;:::-;;;;;;;;;;;;;;5559:2:20;242:576:19;;;;;;;:::o;:::-;;5640:2:20;242:576:19;;;;;;;:::o;:::-;;5720:1:20;242:576:19;;;;;;;:::o;:::-;;5798:1:20;242:576:19;;;;;;;:::o;:::-;;5876:1:20;242:576:19;;;;;;;:::o;:::-;;5264:1:20;242:576:19;;;;;;;:::o;5179:952:20:-;5264:1;5259:6;;;5255:45;;5323:1;;5334:14;-1:-1:-1;;;5362:11:20;;;5358:75;;5179:952;5446:10;5451:5;5928:4;5446:10;;;5442:72;;5179:952;5532:5;5527:10;;;5523:72;;5179:952;5613:5;5608:10;;;5604:72;;5179:952;5694:4;5689:9;;;5685:69;;5179:952;5772:4;5767:9;;;5763:69;;5179:952;5850:4;5845:9;;;5841:69;;5179:952;5923:9;;5919:48;;5179:952;5992:3;:7;:3;;:7;:::i;:::-;5991:14;6020:9;6019:24;;;5179:952;6015:110;;;6059:10;:::o;6015:110::-;6107:7;;;:::i;:::-;6100:14;:::o;6019:24::-;6035:7;;;;6019:24;;5919:48;5948:8;;;;:::i;:::-;5919:48;;;5841:69;5891:8;242:576:19;;;5891:8:20;;:::i;:::-;5841:69;;;5763;5813:8;242:576:19;;;5813:8:20;;:::i;:::-;5763:69;;;5685;5735:8;242:576:19;;;5735:8:20;;:::i;:::-;5685:69;;;5604:72;5656:9;242:576:19;;;5656:9:20;;:::i;:::-;5604:72;;;5523;5575:9;242:576:19;;;5575:9:20;;:::i;:::-;5523:72;;;5442;5494:9;242:576:19;;;5494:9:20;;:::i;:::-;5442:72;;;5358:75;5367:6;;-1:-1:-1;242:576:19;;5358:75:20;;5255:45;5281:8;5288:1;5281:8;:::o",
-    "linkReferences": {}
-  },
-  "methodIdentifiers": {
-    "getProof(bytes32[],uint256)": "b8616195",
-    "getRoot(bytes32[])": "2e08d602",
-    "hashLeafPairs(bytes32,bytes32)": "dd1d2599",
-    "log2ceil(uint256)": "e27d5153",
-    "log2ceilBitMagic(uint256)": "cf06c7b7",
-    "verifyProof(bytes32,bytes32[],bytes32)": "58161a42"
-  },
-  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint256\",\"name\":\"node\",\"type\":\"uint256\"}],\"name\":\"getProof\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"}],\"name\":\"getRoot\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"left\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"right\",\"type\":\"bytes32\"}],\"name\":\"hashLeafPairs\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"_hash\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceil\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceilBitMagic\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32[]\",\"name\":\"proof\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes32\",\"name\":\"valueToProve\",\"type\":\"bytes32\"}],\"name\":\"verifyProof\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"author\":\"dmfxyz\",\"details\":\"Note Generic Merkle Tree\",\"kind\":\"dev\",\"methods\":{\"log2ceil(uint256)\":{\"details\":\"Note that x is assumed > 0\"},\"log2ceilBitMagic(uint256)\":{\"details\":\"Note that x assumed > 1\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"hashLeafPairs(bytes32,bytes32)\":{\"notice\":\"ascending sort and concat prior to hashing\"},\"log2ceilBitMagic(uint256)\":{\"notice\":\"Original bitmagic adapted from https://github.com/paulrberg/prb-math/blob/main/contracts/PRBMath.sol\"}},\"notice\":\"Nascent, simple, kinda efficient (and improving!) Merkle proof generator and verifier\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/murky/src/Merkle.sol\":\"Merkle\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/murky/src/Merkle.sol\":{\"keccak256\":\"0x70e50a6d61ea806b5ba0c8ff76fadfa3e90e6dfecb6900b1c0492eac0309660f\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b6cc1b02a6d11e029fe24d5d638ad891a3a2552aaef9d3a0918274b1496fcd74\",\"dweb:/ipfs/QmWsU7yXsyKATkfYb8g1jbPTbgGsCg9rk7bJ3ypCYxQixB\"]},\"lib/murky/src/common/MurkyBase.sol\":{\"keccak256\":\"0x5287741b2b215c9a11cc8482b419abde0625dfc3949d539c72ee498108842894\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://259e803b0811e404bba09237bce4ef42f2ff27dacaca770d1eb7c1afddbf762b\",\"dweb:/ipfs/QmWfbsHa1siBxDEqFmbnzUuZqyitFZHmDXo2vc4cVn4uJe\"]}},\"version\":1}",
-  "metadata": {
-    "compiler": {
-      "version": "0.8.19+commit.7dd6d404"
-    },
-    "language": "Solidity",
-    "output": {
-      "abi": [
-        {
-          "inputs": [
-            {
-              "internalType": "bytes32[]",
-              "name": "data",
-              "type": "bytes32[]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "node",
-              "type": "uint256"
-            }
-          ],
-          "stateMutability": "pure",
-          "type": "function",
-          "name": "getProof",
-          "outputs": [
-            {
-              "internalType": "bytes32[]",
-              "name": "",
-              "type": "bytes32[]"
-            }
-          ]
-        },
-        {
-          "inputs": [
-            {
-              "internalType": "bytes32[]",
-              "name": "data",
-              "type": "bytes32[]"
-            }
-          ],
-          "stateMutability": "pure",
-          "type": "function",
-          "name": "getRoot",
-          "outputs": [
-            {
-              "internalType": "bytes32",
-              "name": "",
-              "type": "bytes32"
-            }
-          ]
-        },
-        {
-          "inputs": [
-            {
-              "internalType": "bytes32",
-              "name": "left",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "right",
-              "type": "bytes32"
-            }
-          ],
-          "stateMutability": "pure",
-          "type": "function",
-          "name": "hashLeafPairs",
-          "outputs": [
-            {
-              "internalType": "bytes32",
-              "name": "_hash",
-              "type": "bytes32"
-            }
-          ]
-        },
-        {
-          "inputs": [
-            {
-              "internalType": "uint256",
-              "name": "x",
-              "type": "uint256"
-            }
-          ],
-          "stateMutability": "pure",
-          "type": "function",
-          "name": "log2ceil",
-          "outputs": [
-            {
-              "internalType": "uint256",
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "inputs": [
-            {
-              "internalType": "uint256",
-              "name": "x",
-              "type": "uint256"
-            }
-          ],
-          "stateMutability": "pure",
-          "type": "function",
-          "name": "log2ceilBitMagic",
-          "outputs": [
-            {
-              "internalType": "uint256",
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "inputs": [
-            {
-              "internalType": "bytes32",
-              "name": "root",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32[]",
-              "name": "proof",
-              "type": "bytes32[]"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "valueToProve",
-              "type": "bytes32"
-            }
-          ],
-          "stateMutability": "pure",
-          "type": "function",
-          "name": "verifyProof",
-          "outputs": [
-            {
-              "internalType": "bool",
-              "name": "",
-              "type": "bool"
-            }
-          ]
-        }
-      ],
-      "devdoc": {
-        "kind": "dev",
-        "methods": {
-          "log2ceil(uint256)": {
-            "details": "Note that x is assumed > 0"
-          },
-          "log2ceilBitMagic(uint256)": {
-            "details": "Note that x assumed > 1"
-          }
-        },
-        "version": 1
-      },
-      "userdoc": {
-        "kind": "user",
-        "methods": {
-          "hashLeafPairs(bytes32,bytes32)": {
-            "notice": "ascending sort and concat prior to hashing"
-          },
-          "log2ceilBitMagic(uint256)": {
-            "notice": "Original bitmagic adapted from https://github.com/paulrberg/prb-math/blob/main/contracts/PRBMath.sol"
-          }
-        },
-        "version": 1
-      }
-    },
-    "settings": {
-      "remappings": [
-        "ds-test/=lib/forge-std/lib/ds-test/src/",
-        "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
-        "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
-        "fevmate/=lib/fevmate/contracts/",
-        "forge-std/=lib/forge-std/src/",
-        "murky/=lib/murky/src/",
-        "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
-        "openzeppelin/=lib/openzeppelin-contracts/contracts/"
-      ],
-      "optimizer": {
-        "enabled": true,
-        "runs": 200
-      },
-      "metadata": {
-        "bytecodeHash": "ipfs"
-      },
-      "compilationTarget": {
-        "lib/murky/src/Merkle.sol": "Merkle"
-      },
-      "libraries": {},
-      "viaIR": true
-    },
-    "sources": {
-      "lib/murky/src/Merkle.sol": {
-        "keccak256": "0x70e50a6d61ea806b5ba0c8ff76fadfa3e90e6dfecb6900b1c0492eac0309660f",
-        "urls": [
-          "bzz-raw://b6cc1b02a6d11e029fe24d5d638ad891a3a2552aaef9d3a0918274b1496fcd74",
-          "dweb:/ipfs/QmWsU7yXsyKATkfYb8g1jbPTbgGsCg9rk7bJ3ypCYxQixB"
-        ],
-        "license": "MIT"
-      },
-      "lib/murky/src/common/MurkyBase.sol": {
-        "keccak256": "0x5287741b2b215c9a11cc8482b419abde0625dfc3949d539c72ee498108842894",
-        "urls": [
-          "bzz-raw://259e803b0811e404bba09237bce4ef42f2ff27dacaca770d1eb7c1afddbf762b",
-          "dweb:/ipfs/QmWfbsHa1siBxDEqFmbnzUuZqyitFZHmDXo2vc4cVn4uJe"
-        ],
-        "license": "MIT"
-      }
-    },
-    "version": 1
-  },
-  "ast": {
-    "absolutePath": "lib/murky/src/Merkle.sol",
-    "id": 30566,
-    "exportedSymbols": {
-      "Merkle": [
-        30565
-      ],
-      "MurkyBase": [
-        31082
-      ]
-    },
-    "nodeType": "SourceUnit",
-    "src": "32:786:19",
-    "nodes": [
-      {
-        "id": 30547,
-        "nodeType": "PragmaDirective",
-        "src": "32:23:19",
-        "nodes": [],
-        "literals": [
-          "solidity",
-          "^",
-          "0.8",
-          ".4"
-        ]
-      },
-      {
-        "id": 30548,
-        "nodeType": "ImportDirective",
-        "src": "57:32:19",
-        "nodes": [],
-        "absolutePath": "lib/murky/src/common/MurkyBase.sol",
-        "file": "./common/MurkyBase.sol",
-        "nameLocation": "-1:-1:-1",
-        "scope": 30566,
-        "sourceUnit": 31083,
-        "symbolAliases": [],
-        "unitAlias": ""
-      },
-      {
-        "id": 30565,
-        "nodeType": "ContractDefinition",
-        "src": "242:576:19",
-        "nodes": [
-          {
-            "id": 30564,
-            "nodeType": "FunctionDefinition",
-            "src": "407:409:19",
-            "nodes": [],
-            "body": {
-              "id": 30563,
-              "nodeType": "Block",
-              "src": "504:312:19",
-              "nodes": [],
-              "statements": [
+            "inputs": [
                 {
-                  "AST": {
-                    "nodeType": "YulBlock",
-                    "src": "522:288:19",
-                    "statements": [
-                      {
-                        "cases": [
-                          {
-                            "body": {
-                              "nodeType": "YulBlock",
-                              "src": "576:82:19",
-                              "statements": [
-                                {
-                                  "expression": {
-                                    "arguments": [
-                                      {
-                                        "kind": "number",
-                                        "nodeType": "YulLiteral",
-                                        "src": "600:3:19",
-                                        "type": "",
-                                        "value": "0x0"
-                                      },
-                                      {
-                                        "name": "right",
-                                        "nodeType": "YulIdentifier",
-                                        "src": "605:5:19"
-                                      }
-                                    ],
-                                    "functionName": {
-                                      "name": "mstore",
-                                      "nodeType": "YulIdentifier",
-                                      "src": "593:6:19"
-                                    },
-                                    "nodeType": "YulFunctionCall",
-                                    "src": "593:18:19"
-                                  },
-                                  "nodeType": "YulExpressionStatement",
-                                  "src": "593:18:19"
-                                },
-                                {
-                                  "expression": {
-                                    "arguments": [
-                                      {
-                                        "kind": "number",
-                                        "nodeType": "YulLiteral",
-                                        "src": "634:4:19",
-                                        "type": "",
-                                        "value": "0x20"
-                                      },
-                                      {
-                                        "name": "left",
-                                        "nodeType": "YulIdentifier",
-                                        "src": "640:4:19"
-                                      }
-                                    ],
-                                    "functionName": {
-                                      "name": "mstore",
-                                      "nodeType": "YulIdentifier",
-                                      "src": "627:6:19"
-                                    },
-                                    "nodeType": "YulFunctionCall",
-                                    "src": "627:18:19"
-                                  },
-                                  "nodeType": "YulExpressionStatement",
-                                  "src": "627:18:19"
-                                }
-                              ]
-                            },
-                            "nodeType": "YulCase",
-                            "src": "569:89:19",
-                            "value": {
-                              "kind": "number",
-                              "nodeType": "YulLiteral",
-                              "src": "574:1:19",
-                              "type": "",
-                              "value": "0"
-                            }
-                          },
-                          {
-                            "body": {
-                              "nodeType": "YulBlock",
-                              "src": "678:82:19",
-                              "statements": [
-                                {
-                                  "expression": {
-                                    "arguments": [
-                                      {
-                                        "kind": "number",
-                                        "nodeType": "YulLiteral",
-                                        "src": "702:3:19",
-                                        "type": "",
-                                        "value": "0x0"
-                                      },
-                                      {
-                                        "name": "left",
-                                        "nodeType": "YulIdentifier",
-                                        "src": "707:4:19"
-                                      }
-                                    ],
-                                    "functionName": {
-                                      "name": "mstore",
-                                      "nodeType": "YulIdentifier",
-                                      "src": "695:6:19"
-                                    },
-                                    "nodeType": "YulFunctionCall",
-                                    "src": "695:17:19"
-                                  },
-                                  "nodeType": "YulExpressionStatement",
-                                  "src": "695:17:19"
-                                },
-                                {
-                                  "expression": {
-                                    "arguments": [
-                                      {
-                                        "kind": "number",
-                                        "nodeType": "YulLiteral",
-                                        "src": "735:4:19",
-                                        "type": "",
-                                        "value": "0x20"
-                                      },
-                                      {
-                                        "name": "right",
-                                        "nodeType": "YulIdentifier",
-                                        "src": "741:5:19"
-                                      }
-                                    ],
-                                    "functionName": {
-                                      "name": "mstore",
-                                      "nodeType": "YulIdentifier",
-                                      "src": "728:6:19"
-                                    },
-                                    "nodeType": "YulFunctionCall",
-                                    "src": "728:19:19"
-                                  },
-                                  "nodeType": "YulExpressionStatement",
-                                  "src": "728:19:19"
-                                }
-                              ]
-                            },
-                            "nodeType": "YulCase",
-                            "src": "670:90:19",
-                            "value": "default"
-                          }
-                        ],
-                        "expression": {
-                          "arguments": [
-                            {
-                              "name": "left",
-                              "nodeType": "YulIdentifier",
-                              "src": "545:4:19"
-                            },
-                            {
-                              "name": "right",
-                              "nodeType": "YulIdentifier",
-                              "src": "551:5:19"
-                            }
-                          ],
-                          "functionName": {
-                            "name": "lt",
-                            "nodeType": "YulIdentifier",
-                            "src": "542:2:19"
-                          },
-                          "nodeType": "YulFunctionCall",
-                          "src": "542:15:19"
-                        },
-                        "nodeType": "YulSwitch",
-                        "src": "535:225:19"
-                      },
-                      {
-                        "nodeType": "YulAssignment",
-                        "src": "772:29:19",
-                        "value": {
-                          "arguments": [
-                            {
-                              "kind": "number",
-                              "nodeType": "YulLiteral",
-                              "src": "791:3:19",
-                              "type": "",
-                              "value": "0x0"
-                            },
-                            {
-                              "kind": "number",
-                              "nodeType": "YulLiteral",
-                              "src": "796:4:19",
-                              "type": "",
-                              "value": "0x40"
-                            }
-                          ],
-                          "functionName": {
-                            "name": "keccak256",
-                            "nodeType": "YulIdentifier",
-                            "src": "781:9:19"
-                          },
-                          "nodeType": "YulFunctionCall",
-                          "src": "781:20:19"
-                        },
-                        "variableNames": [
-                          {
-                            "name": "_hash",
-                            "nodeType": "YulIdentifier",
-                            "src": "772:5:19"
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  "evmVersion": "paris",
-                  "externalReferences": [
-                    {
-                      "declaration": 30560,
-                      "isOffset": false,
-                      "isSlot": false,
-                      "src": "772:5:19",
-                      "valueSize": 1
-                    },
-                    {
-                      "declaration": 30554,
-                      "isOffset": false,
-                      "isSlot": false,
-                      "src": "545:4:19",
-                      "valueSize": 1
-                    },
-                    {
-                      "declaration": 30554,
-                      "isOffset": false,
-                      "isSlot": false,
-                      "src": "640:4:19",
-                      "valueSize": 1
-                    },
-                    {
-                      "declaration": 30554,
-                      "isOffset": false,
-                      "isSlot": false,
-                      "src": "707:4:19",
-                      "valueSize": 1
-                    },
-                    {
-                      "declaration": 30556,
-                      "isOffset": false,
-                      "isSlot": false,
-                      "src": "551:5:19",
-                      "valueSize": 1
-                    },
-                    {
-                      "declaration": 30556,
-                      "isOffset": false,
-                      "isSlot": false,
-                      "src": "605:5:19",
-                      "valueSize": 1
-                    },
-                    {
-                      "declaration": 30556,
-                      "isOffset": false,
-                      "isSlot": false,
-                      "src": "741:5:19",
-                      "valueSize": 1
-                    }
-                  ],
-                  "id": 30562,
-                  "nodeType": "InlineAssembly",
-                  "src": "513:297:19"
-                }
-              ]
-            },
-            "baseFunctions": [
-              30580
-            ],
-            "documentation": {
-              "id": 30552,
-              "nodeType": "StructuredDocumentation",
-              "src": "356:46:19",
-              "text": "ascending sort and concat prior to hashing"
-            },
-            "functionSelector": "dd1d2599",
-            "implemented": true,
-            "kind": "function",
-            "modifiers": [],
-            "name": "hashLeafPairs",
-            "nameLocation": "416:13:19",
-            "overrides": {
-              "id": 30558,
-              "nodeType": "OverrideSpecifier",
-              "overrides": [],
-              "src": "471:8:19"
-            },
-            "parameters": {
-              "id": 30557,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 30554,
-                  "mutability": "mutable",
-                  "name": "left",
-                  "nameLocation": "438:4:19",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 30564,
-                  "src": "430:12:19",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": {
-                    "typeIdentifier": "t_bytes32",
-                    "typeString": "bytes32"
-                  },
-                  "typeName": {
-                    "id": 30553,
-                    "name": "bytes32",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "430:7:19",
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_bytes32",
-                      "typeString": "bytes32"
-                    }
-                  },
-                  "visibility": "internal"
+                    "internalType": "bytes32[]",
+                    "name": "data",
+                    "type": "bytes32[]"
                 },
                 {
-                  "constant": false,
-                  "id": 30556,
-                  "mutability": "mutable",
-                  "name": "right",
-                  "nameLocation": "452:5:19",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 30564,
-                  "src": "444:13:19",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": {
-                    "typeIdentifier": "t_bytes32",
-                    "typeString": "bytes32"
-                  },
-                  "typeName": {
-                    "id": 30555,
-                    "name": "bytes32",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "444:7:19",
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_bytes32",
-                      "typeString": "bytes32"
-                    }
-                  },
-                  "visibility": "internal"
+                    "internalType": "uint256",
+                    "name": "node",
+                    "type": "uint256"
                 }
-              ],
-              "src": "429:29:19"
-            },
-            "returnParameters": {
-              "id": 30561,
-              "nodeType": "ParameterList",
-              "parameters": [
+            ],
+            "name": "getProof",
+            "outputs": [
                 {
-                  "constant": false,
-                  "id": 30560,
-                  "mutability": "mutable",
-                  "name": "_hash",
-                  "nameLocation": "497:5:19",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 30564,
-                  "src": "489:13:19",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": {
-                    "typeIdentifier": "t_bytes32",
-                    "typeString": "bytes32"
-                  },
-                  "typeName": {
-                    "id": 30559,
-                    "name": "bytes32",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "489:7:19",
-                    "typeDescriptions": {
-                      "typeIdentifier": "t_bytes32",
-                      "typeString": "bytes32"
-                    }
-                  },
-                  "visibility": "internal"
+                    "internalType": "bytes32[]",
+                    "name": "",
+                    "type": "bytes32[]"
                 }
-              ],
-              "src": "488:15:19"
-            },
-            "scope": 30565,
+            ],
             "stateMutability": "pure",
-            "virtual": false,
-            "visibility": "public"
-          }
-        ],
-        "abstract": false,
-        "baseContracts": [
-          {
-            "baseName": {
-              "id": 30550,
-              "name": "MurkyBase",
-              "nameLocations": [
-                "261:9:19"
-              ],
-              "nodeType": "IdentifierPath",
-              "referencedDeclaration": 31082,
-              "src": "261:9:19"
-            },
-            "id": 30551,
-            "nodeType": "InheritanceSpecifier",
-            "src": "261:9:19"
-          }
-        ],
-        "canonicalName": "Merkle",
-        "contractDependencies": [],
-        "contractKind": "contract",
-        "documentation": {
-          "id": 30549,
-          "nodeType": "StructuredDocumentation",
-          "src": "91:151:19",
-          "text": "@notice Nascent, simple, kinda efficient (and improving!) Merkle proof generator and verifier\n @author dmfxyz\n @dev Note Generic Merkle Tree"
+            "type": "function"
         },
-        "fullyImplemented": true,
-        "linearizedBaseContracts": [
-          30565,
-          31082
-        ],
-        "name": "Merkle",
-        "nameLocation": "251:6:19",
-        "scope": 30566,
-        "usedErrors": []
-      }
+        {
+            "inputs": [
+                {
+                    "internalType": "bytes32[]",
+                    "name": "data",
+                    "type": "bytes32[]"
+                }
+            ],
+            "name": "getRoot",
+            "outputs": [
+                {
+                    "internalType": "bytes32",
+                    "name": "",
+                    "type": "bytes32"
+                }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "bytes32",
+                    "name": "left",
+                    "type": "bytes32"
+                },
+                {
+                    "internalType": "bytes32",
+                    "name": "right",
+                    "type": "bytes32"
+                }
+            ],
+            "name": "hashLeafPairs",
+            "outputs": [
+                {
+                    "internalType": "bytes32",
+                    "name": "_hash",
+                    "type": "bytes32"
+                }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "x",
+                    "type": "uint256"
+                }
+            ],
+            "name": "log2ceil",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "x",
+                    "type": "uint256"
+                }
+            ],
+            "name": "log2ceilBitMagic",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "bytes32",
+                    "name": "root",
+                    "type": "bytes32"
+                },
+                {
+                    "internalType": "bytes32[]",
+                    "name": "proof",
+                    "type": "bytes32[]"
+                },
+                {
+                    "internalType": "bytes32",
+                    "name": "valueToProve",
+                    "type": "bytes32"
+                }
+            ],
+            "name": "verifyProof",
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+        }
     ],
-    "license": "MIT"
-  },
-  "id": 19
+    "bytecode": {
+        "object": "0x6080806040523461001657610799908161001c8239f35b600080fdfe6080604052600436101561001257600080fd5b6000803560e01c9081632e08d6021461007a5750806358161a4214610075578063b861619514610070578063cf06c7b71461006b578063dd1d2599146100665763e27d51531461006157600080fd5b6103f7565b6103d6565b6103b0565b6102bb565b61020d565b346101515760203660031901126101515760043567ffffffffffffffff811161014d576100ab9036906004016101ad565b600180825111156100fc57805b6100de575b6100da6100c98361045a565b516040519081529081906020820190565b0390f35b80825111156100f7576100f18192610511565b916100b8565b6100bd565b60405162461bcd60e51b815260206004820152602360248201527f776f6e27742067656e657261746520726f6f7420666f722073696e676c65206c60448201526232b0b360e91b6064820152608490fd5b5080fd5b80fd5b634e487b7160e01b600052604160045260246000fd5b6040519190601f01601f1916820167ffffffffffffffff81118382101761019057604052565b610154565b67ffffffffffffffff81116101905760051b60200190565b9080601f83011215610208578135906101cd6101c883610195565b61016a565b9182938184526020808095019260051b820101928311610208578301905b8282106101f9575050505090565b813581529083019083016101eb565b600080fd5b346102085760603660031901126102085760243567ffffffffffffffff81116102085761023e9036906004016101ad565b60443581516000925b81841061025d5760405160043584148152602090f35b909161027660019161026f868561047d565b5190610437565b9301929190610247565b6020908160408183019282815285518094520193019160005b8281106102a7575050505090565b835185529381019392810192600101610299565b346102085760403660031901126102085760043567ffffffffffffffff8111610208576102ec9036906004016101ad565b602435906001906102ff82825111610491565b61031161030c8251610632565b6104e9565b92600080845b61032a575b604051806100da8882610280565b8351858111156103aa578584939261036f92828080981614600014610379575061035860001986018861047d565b51610363828b61047d565b525b0192841c94610511565b9392919091610317565b85830190810361039557508361038f828b61047d565b52610365565b61039f908861047d565b5161038f828b61047d565b5061031c565b346102085760203660031901126102085760206103ce600435610632565b604051908152f35b346102085760403660031901126102085760206103ce602435600435610437565b3461020857602036600319011261020857600435806000815b61042a576020925060405191806001811901161490038152f35b600192831c920182610410565b8181101561044e576000526020525b604060002090565b90600052602052610446565b8051156104675760200190565b634e487b7160e01b600052603260045260246000fd5b80518210156104675760209160051b010190565b1561049857565b60405162461bcd60e51b8152602060048201526024808201527f776f6e27742067656e65726174652070726f6f6620666f722073696e676c65206044820152633632b0b360e11b6064820152608490fd5b906104f66101c883610195565b8281528092610507601f1991610195565b0190602036910137565b90815160019081808216146000146105a9576105308282811c016104e9565b916000196105408382018761047d565b516000805260205261055a6040600020918551018561047d565b525b600019909101906000805b8382106105775750929450505050565b82600291610595610588858b61047d565b5161026f8487018c61047d565b61059f828961047d565b5201910190610567565b6105b481831c6104e9565b9161055c565b90604082018092116105c857565b634e487b7160e01b600052601160045260246000fd5b90602082018092116105c857565b90601082018092116105c857565b90600882018092116105c857565b90600482018092116105c857565b90600282018092116105c857565b90600182018092116105c857565b600181111561075d5760009080600160801b811015610752575b8068010000000000000000600292101561073f575b64010000000081101561072c575b62010000811015610719575b610100811015610706575b60108110156106f3575b60048110156106e1575b10156106d1575b806106ac8119610624565b1614806106c8575b156106bc5790565b6106c590610624565b90565b508015156106b4565b906106db90610624565b906106a1565b6106ed90821c93610616565b9261069a565b6107009060041c93610608565b92610690565b6107139060081c936105fa565b92610686565b6107269060101c936105ec565b9261067b565b6107399060201c936105de565b9261066f565b61074c9060401c936105ba565b92610661565b60809250821c61064c565b5060009056fea264697066735822122055fcbfe112c97d90fead77f8fd51145df97402c6afa286c5b97c82dcfc9b948064736f6c63430008130033",
+        "sourceMap": "242:576:19:-:0;;;;;;;;;;;;;;;;;",
+        "linkReferences": {}
+    },
+    "deployedBytecode": {
+        "object": "0x6080604052600436101561001257600080fd5b6000803560e01c9081632e08d6021461007a5750806358161a4214610075578063b861619514610070578063cf06c7b71461006b578063dd1d2599146100665763e27d51531461006157600080fd5b6103f7565b6103d6565b6103b0565b6102bb565b61020d565b346101515760203660031901126101515760043567ffffffffffffffff811161014d576100ab9036906004016101ad565b600180825111156100fc57805b6100de575b6100da6100c98361045a565b516040519081529081906020820190565b0390f35b80825111156100f7576100f18192610511565b916100b8565b6100bd565b60405162461bcd60e51b815260206004820152602360248201527f776f6e27742067656e657261746520726f6f7420666f722073696e676c65206c60448201526232b0b360e91b6064820152608490fd5b5080fd5b80fd5b634e487b7160e01b600052604160045260246000fd5b6040519190601f01601f1916820167ffffffffffffffff81118382101761019057604052565b610154565b67ffffffffffffffff81116101905760051b60200190565b9080601f83011215610208578135906101cd6101c883610195565b61016a565b9182938184526020808095019260051b820101928311610208578301905b8282106101f9575050505090565b813581529083019083016101eb565b600080fd5b346102085760603660031901126102085760243567ffffffffffffffff81116102085761023e9036906004016101ad565b60443581516000925b81841061025d5760405160043584148152602090f35b909161027660019161026f868561047d565b5190610437565b9301929190610247565b6020908160408183019282815285518094520193019160005b8281106102a7575050505090565b835185529381019392810192600101610299565b346102085760403660031901126102085760043567ffffffffffffffff8111610208576102ec9036906004016101ad565b602435906001906102ff82825111610491565b61031161030c8251610632565b6104e9565b92600080845b61032a575b604051806100da8882610280565b8351858111156103aa578584939261036f92828080981614600014610379575061035860001986018861047d565b51610363828b61047d565b525b0192841c94610511565b9392919091610317565b85830190810361039557508361038f828b61047d565b52610365565b61039f908861047d565b5161038f828b61047d565b5061031c565b346102085760203660031901126102085760206103ce600435610632565b604051908152f35b346102085760403660031901126102085760206103ce602435600435610437565b3461020857602036600319011261020857600435806000815b61042a576020925060405191806001811901161490038152f35b600192831c920182610410565b8181101561044e576000526020525b604060002090565b90600052602052610446565b8051156104675760200190565b634e487b7160e01b600052603260045260246000fd5b80518210156104675760209160051b010190565b1561049857565b60405162461bcd60e51b8152602060048201526024808201527f776f6e27742067656e65726174652070726f6f6620666f722073696e676c65206044820152633632b0b360e11b6064820152608490fd5b906104f66101c883610195565b8281528092610507601f1991610195565b0190602036910137565b90815160019081808216146000146105a9576105308282811c016104e9565b916000196105408382018761047d565b516000805260205261055a6040600020918551018561047d565b525b600019909101906000805b8382106105775750929450505050565b82600291610595610588858b61047d565b5161026f8487018c61047d565b61059f828961047d565b5201910190610567565b6105b481831c6104e9565b9161055c565b90604082018092116105c857565b634e487b7160e01b600052601160045260246000fd5b90602082018092116105c857565b90601082018092116105c857565b90600882018092116105c857565b90600482018092116105c857565b90600282018092116105c857565b90600182018092116105c857565b600181111561075d5760009080600160801b811015610752575b8068010000000000000000600292101561073f575b64010000000081101561072c575b62010000811015610719575b610100811015610706575b60108110156106f3575b60048110156106e1575b10156106d1575b806106ac8119610624565b1614806106c8575b156106bc5790565b6106c590610624565b90565b508015156106b4565b906106db90610624565b906106a1565b6106ed90821c93610616565b9261069a565b6107009060041c93610608565b92610690565b6107139060081c936105fa565b92610686565b6107269060101c936105ec565b9261067b565b6107399060201c936105de565b9261066f565b61074c9060401c936105ba565b92610661565b60809250821c61064c565b5060009056fea264697066735822122055fcbfe112c97d90fead77f8fd51145df97402c6afa286c5b97c82dcfc9b948064736f6c63430008130033",
+        "sourceMap": "242:576:19:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;:::i;:::-;;:::i;:::-;;:::i;:::-;;:::i;:::-;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;;;;;:::i;:::-;1089:1:20;242:576:19;;;1075:15:20;242:576:19;;;1140:70:20;1089:1;;;1140:70;242:576:19;1226:7:20;;;:::i;:::-;242:576:19;;;;;;;;;;;;;;;;;;1140:70:20;242:576:19;;;1146:15:20;;;;1184;;;;:::i;:::-;1140:70;;;1146:15;;;242:576:19;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;;;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;:::o;:::-;;:::i;:::-;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;:::i;:::-;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;-1:-1:-1;242:576:19;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;-1:-1:-1;736:115:20;752:10;;;;;;242:576:19;;;;877:19:20;;242:576:19;;;;;764:3:20;827:8;;800:36;242:576:19;827:8:20;;;;;:::i;:::-;242:576:19;800:36:20;;:::i;:::-;764:3;242:576:19;740:10:20;;;;;242:576:19;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;;;;;;;;:::i;:::-;;;1372:1:20;;242:576:19;1350:64:20;242:576:19;;;1358:15:20;1350:64;:::i;:::-;1527:44;1541:29;242:576:19;;1541:29:20;:::i;:::-;1527:44;:::i;:::-;1581:15;-1:-1:-1;;1581:15:20;1372:1;;;1910:475;242:576:19;;;;;;;:::i;1910:475:20:-;242:576:19;;1916:15:20;;;;;;1978:10;;;;2359:15;1978:10;;;;;;:15;1975:300;1372:1;;;-1:-1:-1;2031:14:20;-1:-1:-1;;242:576:19;;2031:14:20;;:::i;:::-;242:576:19;2017:28:20;;;;:::i;:::-;242:576:19;1975:300:20;242:576:19;;;;2359:15:20;;:::i;:::-;1910:475;;;;;;;1975:300;242:576:19;;;;2091:23:20;;;;2138:24;;;;;;:::i;:::-;242:576:19;1975:300:20;;2087:188;2242:14;;;;:::i;:::-;242:576:19;2228:28:20;;;;:::i;1916:15::-;;;;242:576:19;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;:::i;:::-;;;;;;;;;;;;;-1:-1:-1;;242:576:19;;;;;;;;;;;:::i;:::-;;;;;;-1:-1:-1;;242:576:19;;;;;;;-1:-1:-1;242:576:19;4880:5:20;;;242:576:19;;;;;3936:769:20;;;;;;;;242:576:19;;;;;4873:78:20;3936:769;242:576:19;;;;;;4873:78:20;;407:409:19;513:297;;;;;;;;;;;;;;407:409;:::o;513:297::-;;;;;;;;242:576;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;:::o;:::-;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;;;;;-1:-1:-1;;;242:576:19;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;:::i;:::-;;;;;;;;:::o;2493:990:20:-;;242:576:19;;2933:3:20;2924:12;;;;;:17;2920:251;2933:3;;;2969:29;242:576:19;;;;;2969:29:20;:::i;:::-;242:576:19;-1:-1:-1;;3058:16:20;242:576:19;;;3058:16:20;;:::i;:::-;242:576:19;-1:-1:-1;513:297:19;;;;3016:71:20;513:297:19;-1:-1:-1;513:297:19;242:576;;;;3016:71:20;;:::i;:::-;242:576:19;2920:251:20;-1:-1:-1;;242:576:19;;;;-1:-1:-1;;3322:12:20;;;;;;-1:-1:-1;3463:13:20;;-1:-1:-1;;;;2493:990:20:o;3336:4::-;3387:7;3339:1;3387:7;3373:33;3387:7;;;;:::i;:::-;242:576:19;3396:9:20;242:576:19;;;3396:9:20;;:::i;3373:33::-;3359:47;;;;:::i;:::-;242:576:19;;3336:4:20;242:576:19;3307:13:20;;;2920:251;3135:25;242:576:19;;;3135:25:20;:::i;:::-;2920:251;;;242:576:19;;5478:2:20;242:576:19;;;;;;;:::o;:::-;;;;;;;;;;;;;;5559:2:20;242:576:19;;;;;;;:::o;:::-;;5640:2:20;242:576:19;;;;;;;:::o;:::-;;5720:1:20;242:576:19;;;;;;;:::o;:::-;;5798:1:20;242:576:19;;;;;;;:::o;:::-;;5876:1:20;242:576:19;;;;;;;:::o;:::-;;5264:1:20;242:576:19;;;;;;;:::o;5179:952:20:-;5264:1;5259:6;;;5255:45;;5323:1;;5334:14;-1:-1:-1;;;5362:11:20;;;5358:75;;5179:952;5446:10;5451:5;5928:4;5446:10;;;5442:72;;5179:952;5532:5;5527:10;;;5523:72;;5179:952;5613:5;5608:10;;;5604:72;;5179:952;5694:4;5689:9;;;5685:69;;5179:952;5772:4;5767:9;;;5763:69;;5179:952;5850:4;5845:9;;;5841:69;;5179:952;5923:9;;5919:48;;5179:952;5992:3;:7;:3;;:7;:::i;:::-;5991:14;6020:9;6019:24;;;5179:952;6015:110;;;6059:10;:::o;6015:110::-;6107:7;;;:::i;:::-;6100:14;:::o;6019:24::-;6035:7;;;;6019:24;;5919:48;5948:8;;;;:::i;:::-;5919:48;;;5841:69;5891:8;242:576:19;;;5891:8:20;;:::i;:::-;5841:69;;;5763;5813:8;242:576:19;;;5813:8:20;;:::i;:::-;5763:69;;;5685;5735:8;242:576:19;;;5735:8:20;;:::i;:::-;5685:69;;;5604:72;5656:9;242:576:19;;;5656:9:20;;:::i;:::-;5604:72;;;5523;5575:9;242:576:19;;;5575:9:20;;:::i;:::-;5523:72;;;5442;5494:9;242:576:19;;;5494:9:20;;:::i;:::-;5442:72;;;5358:75;5367:6;;-1:-1:-1;242:576:19;;5358:75:20;;5255:45;5281:8;5288:1;5281:8;:::o",
+        "linkReferences": {}
+    },
+    "methodIdentifiers": {
+        "getProof(bytes32[],uint256)": "b8616195",
+        "getRoot(bytes32[])": "2e08d602",
+        "hashLeafPairs(bytes32,bytes32)": "dd1d2599",
+        "log2ceil(uint256)": "e27d5153",
+        "log2ceilBitMagic(uint256)": "cf06c7b7",
+        "verifyProof(bytes32,bytes32[],bytes32)": "58161a42"
+    },
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint256\",\"name\":\"node\",\"type\":\"uint256\"}],\"name\":\"getProof\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"}],\"name\":\"getRoot\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"left\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"right\",\"type\":\"bytes32\"}],\"name\":\"hashLeafPairs\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"_hash\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceil\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceilBitMagic\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32[]\",\"name\":\"proof\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes32\",\"name\":\"valueToProve\",\"type\":\"bytes32\"}],\"name\":\"verifyProof\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"author\":\"dmfxyz\",\"details\":\"Note Generic Merkle Tree\",\"kind\":\"dev\",\"methods\":{\"log2ceil(uint256)\":{\"details\":\"Note that x is assumed > 0\"},\"log2ceilBitMagic(uint256)\":{\"details\":\"Note that x assumed > 1\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"hashLeafPairs(bytes32,bytes32)\":{\"notice\":\"ascending sort and concat prior to hashing\"},\"log2ceilBitMagic(uint256)\":{\"notice\":\"Original bitmagic adapted from https://github.com/paulrberg/prb-math/blob/main/contracts/PRBMath.sol\"}},\"notice\":\"Nascent, simple, kinda efficient (and improving!) Merkle proof generator and verifier\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/murky/src/Merkle.sol\":\"Merkle\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/murky/src/Merkle.sol\":{\"keccak256\":\"0x70e50a6d61ea806b5ba0c8ff76fadfa3e90e6dfecb6900b1c0492eac0309660f\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b6cc1b02a6d11e029fe24d5d638ad891a3a2552aaef9d3a0918274b1496fcd74\",\"dweb:/ipfs/QmWsU7yXsyKATkfYb8g1jbPTbgGsCg9rk7bJ3ypCYxQixB\"]},\"lib/murky/src/common/MurkyBase.sol\":{\"keccak256\":\"0x5287741b2b215c9a11cc8482b419abde0625dfc3949d539c72ee498108842894\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://259e803b0811e404bba09237bce4ef42f2ff27dacaca770d1eb7c1afddbf762b\",\"dweb:/ipfs/QmWfbsHa1siBxDEqFmbnzUuZqyitFZHmDXo2vc4cVn4uJe\"]}},\"version\":1}",
+    "metadata": {
+        "compiler": {
+            "version": "0.8.19+commit.7dd6d404"
+        },
+        "language": "Solidity",
+        "output": {
+            "abi": [
+                {
+                    "inputs": [
+                        {
+                            "internalType": "bytes32[]",
+                            "name": "data",
+                            "type": "bytes32[]"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "node",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "pure",
+                    "type": "function",
+                    "name": "getProof",
+                    "outputs": [
+                        {
+                            "internalType": "bytes32[]",
+                            "name": "",
+                            "type": "bytes32[]"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "bytes32[]",
+                            "name": "data",
+                            "type": "bytes32[]"
+                        }
+                    ],
+                    "stateMutability": "pure",
+                    "type": "function",
+                    "name": "getRoot",
+                    "outputs": [
+                        {
+                            "internalType": "bytes32",
+                            "name": "",
+                            "type": "bytes32"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "bytes32",
+                            "name": "left",
+                            "type": "bytes32"
+                        },
+                        {
+                            "internalType": "bytes32",
+                            "name": "right",
+                            "type": "bytes32"
+                        }
+                    ],
+                    "stateMutability": "pure",
+                    "type": "function",
+                    "name": "hashLeafPairs",
+                    "outputs": [
+                        {
+                            "internalType": "bytes32",
+                            "name": "_hash",
+                            "type": "bytes32"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "x",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "pure",
+                    "type": "function",
+                    "name": "log2ceil",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "x",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "pure",
+                    "type": "function",
+                    "name": "log2ceilBitMagic",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "bytes32",
+                            "name": "root",
+                            "type": "bytes32"
+                        },
+                        {
+                            "internalType": "bytes32[]",
+                            "name": "proof",
+                            "type": "bytes32[]"
+                        },
+                        {
+                            "internalType": "bytes32",
+                            "name": "valueToProve",
+                            "type": "bytes32"
+                        }
+                    ],
+                    "stateMutability": "pure",
+                    "type": "function",
+                    "name": "verifyProof",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ]
+                }
+            ],
+            "devdoc": {
+                "kind": "dev",
+                "methods": {
+                    "log2ceil(uint256)": {
+                        "details": "Note that x is assumed > 0"
+                    },
+                    "log2ceilBitMagic(uint256)": {
+                        "details": "Note that x assumed > 1"
+                    }
+                },
+                "version": 1
+            },
+            "userdoc": {
+                "kind": "user",
+                "methods": {
+                    "hashLeafPairs(bytes32,bytes32)": {
+                        "notice": "ascending sort and concat prior to hashing"
+                    },
+                    "log2ceilBitMagic(uint256)": {
+                        "notice": "Original bitmagic adapted from https://github.com/paulrberg/prb-math/blob/main/contracts/PRBMath.sol"
+                    }
+                },
+                "version": 1
+            }
+        },
+        "settings": {
+            "remappings": [
+                "ds-test/=lib/forge-std/lib/ds-test/src/",
+                "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
+                "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
+                "fevmate/=lib/fevmate/contracts/",
+                "forge-std/=lib/forge-std/src/",
+                "murky/=lib/murky/src/",
+                "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+                "openzeppelin/=lib/openzeppelin-contracts/contracts/"
+            ],
+            "optimizer": {
+                "enabled": true,
+                "runs": 200
+            },
+            "metadata": {
+                "bytecodeHash": "ipfs"
+            },
+            "compilationTarget": {
+                "lib/murky/src/Merkle.sol": "Merkle"
+            },
+            "libraries": {},
+            "viaIR": true
+        },
+        "sources": {
+            "lib/murky/src/Merkle.sol": {
+                "keccak256": "0x70e50a6d61ea806b5ba0c8ff76fadfa3e90e6dfecb6900b1c0492eac0309660f",
+                "urls": [
+                    "bzz-raw://b6cc1b02a6d11e029fe24d5d638ad891a3a2552aaef9d3a0918274b1496fcd74",
+                    "dweb:/ipfs/QmWsU7yXsyKATkfYb8g1jbPTbgGsCg9rk7bJ3ypCYxQixB"
+                ],
+                "license": "MIT"
+            },
+            "lib/murky/src/common/MurkyBase.sol": {
+                "keccak256": "0x5287741b2b215c9a11cc8482b419abde0625dfc3949d539c72ee498108842894",
+                "urls": [
+                    "bzz-raw://259e803b0811e404bba09237bce4ef42f2ff27dacaca770d1eb7c1afddbf762b",
+                    "dweb:/ipfs/QmWfbsHa1siBxDEqFmbnzUuZqyitFZHmDXo2vc4cVn4uJe"
+                ],
+                "license": "MIT"
+            }
+        },
+        "version": 1
+    },
+    "ast": {
+        "absolutePath": "lib/murky/src/Merkle.sol",
+        "id": 30566,
+        "exportedSymbols": {
+            "Merkle": [30565],
+            "MurkyBase": [31082]
+        },
+        "nodeType": "SourceUnit",
+        "src": "32:786:19",
+        "nodes": [
+            {
+                "id": 30547,
+                "nodeType": "PragmaDirective",
+                "src": "32:23:19",
+                "nodes": [],
+                "literals": ["solidity", "^", "0.8", ".4"]
+            },
+            {
+                "id": 30548,
+                "nodeType": "ImportDirective",
+                "src": "57:32:19",
+                "nodes": [],
+                "absolutePath": "lib/murky/src/common/MurkyBase.sol",
+                "file": "./common/MurkyBase.sol",
+                "nameLocation": "-1:-1:-1",
+                "scope": 30566,
+                "sourceUnit": 31083,
+                "symbolAliases": [],
+                "unitAlias": ""
+            },
+            {
+                "id": 30565,
+                "nodeType": "ContractDefinition",
+                "src": "242:576:19",
+                "nodes": [
+                    {
+                        "id": 30564,
+                        "nodeType": "FunctionDefinition",
+                        "src": "407:409:19",
+                        "nodes": [],
+                        "body": {
+                            "id": 30563,
+                            "nodeType": "Block",
+                            "src": "504:312:19",
+                            "nodes": [],
+                            "statements": [
+                                {
+                                    "AST": {
+                                        "nodeType": "YulBlock",
+                                        "src": "522:288:19",
+                                        "statements": [
+                                            {
+                                                "cases": [
+                                                    {
+                                                        "body": {
+                                                            "nodeType": "YulBlock",
+                                                            "src": "576:82:19",
+                                                            "statements": [
+                                                                {
+                                                                    "expression": {
+                                                                        "arguments": [
+                                                                            {
+                                                                                "kind": "number",
+                                                                                "nodeType": "YulLiteral",
+                                                                                "src": "600:3:19",
+                                                                                "type": "",
+                                                                                "value": "0x0"
+                                                                            },
+                                                                            {
+                                                                                "name": "right",
+                                                                                "nodeType": "YulIdentifier",
+                                                                                "src": "605:5:19"
+                                                                            }
+                                                                        ],
+                                                                        "functionName": {
+                                                                            "name": "mstore",
+                                                                            "nodeType": "YulIdentifier",
+                                                                            "src": "593:6:19"
+                                                                        },
+                                                                        "nodeType": "YulFunctionCall",
+                                                                        "src": "593:18:19"
+                                                                    },
+                                                                    "nodeType": "YulExpressionStatement",
+                                                                    "src": "593:18:19"
+                                                                },
+                                                                {
+                                                                    "expression": {
+                                                                        "arguments": [
+                                                                            {
+                                                                                "kind": "number",
+                                                                                "nodeType": "YulLiteral",
+                                                                                "src": "634:4:19",
+                                                                                "type": "",
+                                                                                "value": "0x20"
+                                                                            },
+                                                                            {
+                                                                                "name": "left",
+                                                                                "nodeType": "YulIdentifier",
+                                                                                "src": "640:4:19"
+                                                                            }
+                                                                        ],
+                                                                        "functionName": {
+                                                                            "name": "mstore",
+                                                                            "nodeType": "YulIdentifier",
+                                                                            "src": "627:6:19"
+                                                                        },
+                                                                        "nodeType": "YulFunctionCall",
+                                                                        "src": "627:18:19"
+                                                                    },
+                                                                    "nodeType": "YulExpressionStatement",
+                                                                    "src": "627:18:19"
+                                                                }
+                                                            ]
+                                                        },
+                                                        "nodeType": "YulCase",
+                                                        "src": "569:89:19",
+                                                        "value": {
+                                                            "kind": "number",
+                                                            "nodeType": "YulLiteral",
+                                                            "src": "574:1:19",
+                                                            "type": "",
+                                                            "value": "0"
+                                                        }
+                                                    },
+                                                    {
+                                                        "body": {
+                                                            "nodeType": "YulBlock",
+                                                            "src": "678:82:19",
+                                                            "statements": [
+                                                                {
+                                                                    "expression": {
+                                                                        "arguments": [
+                                                                            {
+                                                                                "kind": "number",
+                                                                                "nodeType": "YulLiteral",
+                                                                                "src": "702:3:19",
+                                                                                "type": "",
+                                                                                "value": "0x0"
+                                                                            },
+                                                                            {
+                                                                                "name": "left",
+                                                                                "nodeType": "YulIdentifier",
+                                                                                "src": "707:4:19"
+                                                                            }
+                                                                        ],
+                                                                        "functionName": {
+                                                                            "name": "mstore",
+                                                                            "nodeType": "YulIdentifier",
+                                                                            "src": "695:6:19"
+                                                                        },
+                                                                        "nodeType": "YulFunctionCall",
+                                                                        "src": "695:17:19"
+                                                                    },
+                                                                    "nodeType": "YulExpressionStatement",
+                                                                    "src": "695:17:19"
+                                                                },
+                                                                {
+                                                                    "expression": {
+                                                                        "arguments": [
+                                                                            {
+                                                                                "kind": "number",
+                                                                                "nodeType": "YulLiteral",
+                                                                                "src": "735:4:19",
+                                                                                "type": "",
+                                                                                "value": "0x20"
+                                                                            },
+                                                                            {
+                                                                                "name": "right",
+                                                                                "nodeType": "YulIdentifier",
+                                                                                "src": "741:5:19"
+                                                                            }
+                                                                        ],
+                                                                        "functionName": {
+                                                                            "name": "mstore",
+                                                                            "nodeType": "YulIdentifier",
+                                                                            "src": "728:6:19"
+                                                                        },
+                                                                        "nodeType": "YulFunctionCall",
+                                                                        "src": "728:19:19"
+                                                                    },
+                                                                    "nodeType": "YulExpressionStatement",
+                                                                    "src": "728:19:19"
+                                                                }
+                                                            ]
+                                                        },
+                                                        "nodeType": "YulCase",
+                                                        "src": "670:90:19",
+                                                        "value": "default"
+                                                    }
+                                                ],
+                                                "expression": {
+                                                    "arguments": [
+                                                        {
+                                                            "name": "left",
+                                                            "nodeType": "YulIdentifier",
+                                                            "src": "545:4:19"
+                                                        },
+                                                        {
+                                                            "name": "right",
+                                                            "nodeType": "YulIdentifier",
+                                                            "src": "551:5:19"
+                                                        }
+                                                    ],
+                                                    "functionName": {
+                                                        "name": "lt",
+                                                        "nodeType": "YulIdentifier",
+                                                        "src": "542:2:19"
+                                                    },
+                                                    "nodeType": "YulFunctionCall",
+                                                    "src": "542:15:19"
+                                                },
+                                                "nodeType": "YulSwitch",
+                                                "src": "535:225:19"
+                                            },
+                                            {
+                                                "nodeType": "YulAssignment",
+                                                "src": "772:29:19",
+                                                "value": {
+                                                    "arguments": [
+                                                        {
+                                                            "kind": "number",
+                                                            "nodeType": "YulLiteral",
+                                                            "src": "791:3:19",
+                                                            "type": "",
+                                                            "value": "0x0"
+                                                        },
+                                                        {
+                                                            "kind": "number",
+                                                            "nodeType": "YulLiteral",
+                                                            "src": "796:4:19",
+                                                            "type": "",
+                                                            "value": "0x40"
+                                                        }
+                                                    ],
+                                                    "functionName": {
+                                                        "name": "keccak256",
+                                                        "nodeType": "YulIdentifier",
+                                                        "src": "781:9:19"
+                                                    },
+                                                    "nodeType": "YulFunctionCall",
+                                                    "src": "781:20:19"
+                                                },
+                                                "variableNames": [
+                                                    {
+                                                        "name": "_hash",
+                                                        "nodeType": "YulIdentifier",
+                                                        "src": "772:5:19"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "evmVersion": "paris",
+                                    "externalReferences": [
+                                        {
+                                            "declaration": 30560,
+                                            "isOffset": false,
+                                            "isSlot": false,
+                                            "src": "772:5:19",
+                                            "valueSize": 1
+                                        },
+                                        {
+                                            "declaration": 30554,
+                                            "isOffset": false,
+                                            "isSlot": false,
+                                            "src": "545:4:19",
+                                            "valueSize": 1
+                                        },
+                                        {
+                                            "declaration": 30554,
+                                            "isOffset": false,
+                                            "isSlot": false,
+                                            "src": "640:4:19",
+                                            "valueSize": 1
+                                        },
+                                        {
+                                            "declaration": 30554,
+                                            "isOffset": false,
+                                            "isSlot": false,
+                                            "src": "707:4:19",
+                                            "valueSize": 1
+                                        },
+                                        {
+                                            "declaration": 30556,
+                                            "isOffset": false,
+                                            "isSlot": false,
+                                            "src": "551:5:19",
+                                            "valueSize": 1
+                                        },
+                                        {
+                                            "declaration": 30556,
+                                            "isOffset": false,
+                                            "isSlot": false,
+                                            "src": "605:5:19",
+                                            "valueSize": 1
+                                        },
+                                        {
+                                            "declaration": 30556,
+                                            "isOffset": false,
+                                            "isSlot": false,
+                                            "src": "741:5:19",
+                                            "valueSize": 1
+                                        }
+                                    ],
+                                    "id": 30562,
+                                    "nodeType": "InlineAssembly",
+                                    "src": "513:297:19"
+                                }
+                            ]
+                        },
+                        "baseFunctions": [30580],
+                        "documentation": {
+                            "id": 30552,
+                            "nodeType": "StructuredDocumentation",
+                            "src": "356:46:19",
+                            "text": "ascending sort and concat prior to hashing"
+                        },
+                        "functionSelector": "dd1d2599",
+                        "implemented": true,
+                        "kind": "function",
+                        "modifiers": [],
+                        "name": "hashLeafPairs",
+                        "nameLocation": "416:13:19",
+                        "overrides": {
+                            "id": 30558,
+                            "nodeType": "OverrideSpecifier",
+                            "overrides": [],
+                            "src": "471:8:19"
+                        },
+                        "parameters": {
+                            "id": 30557,
+                            "nodeType": "ParameterList",
+                            "parameters": [
+                                {
+                                    "constant": false,
+                                    "id": 30554,
+                                    "mutability": "mutable",
+                                    "name": "left",
+                                    "nameLocation": "438:4:19",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 30564,
+                                    "src": "430:12:19",
+                                    "stateVariable": false,
+                                    "storageLocation": "default",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_bytes32",
+                                        "typeString": "bytes32"
+                                    },
+                                    "typeName": {
+                                        "id": 30553,
+                                        "name": "bytes32",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "430:7:19",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_bytes32",
+                                            "typeString": "bytes32"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                },
+                                {
+                                    "constant": false,
+                                    "id": 30556,
+                                    "mutability": "mutable",
+                                    "name": "right",
+                                    "nameLocation": "452:5:19",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 30564,
+                                    "src": "444:13:19",
+                                    "stateVariable": false,
+                                    "storageLocation": "default",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_bytes32",
+                                        "typeString": "bytes32"
+                                    },
+                                    "typeName": {
+                                        "id": 30555,
+                                        "name": "bytes32",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "444:7:19",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_bytes32",
+                                            "typeString": "bytes32"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                }
+                            ],
+                            "src": "429:29:19"
+                        },
+                        "returnParameters": {
+                            "id": 30561,
+                            "nodeType": "ParameterList",
+                            "parameters": [
+                                {
+                                    "constant": false,
+                                    "id": 30560,
+                                    "mutability": "mutable",
+                                    "name": "_hash",
+                                    "nameLocation": "497:5:19",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 30564,
+                                    "src": "489:13:19",
+                                    "stateVariable": false,
+                                    "storageLocation": "default",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_bytes32",
+                                        "typeString": "bytes32"
+                                    },
+                                    "typeName": {
+                                        "id": 30559,
+                                        "name": "bytes32",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "489:7:19",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_bytes32",
+                                            "typeString": "bytes32"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                }
+                            ],
+                            "src": "488:15:19"
+                        },
+                        "scope": 30565,
+                        "stateMutability": "pure",
+                        "virtual": false,
+                        "visibility": "public"
+                    }
+                ],
+                "abstract": false,
+                "baseContracts": [
+                    {
+                        "baseName": {
+                            "id": 30550,
+                            "name": "MurkyBase",
+                            "nameLocations": ["261:9:19"],
+                            "nodeType": "IdentifierPath",
+                            "referencedDeclaration": 31082,
+                            "src": "261:9:19"
+                        },
+                        "id": 30551,
+                        "nodeType": "InheritanceSpecifier",
+                        "src": "261:9:19"
+                    }
+                ],
+                "canonicalName": "Merkle",
+                "contractDependencies": [],
+                "contractKind": "contract",
+                "documentation": {
+                    "id": 30549,
+                    "nodeType": "StructuredDocumentation",
+                    "src": "91:151:19",
+                    "text": "@notice Nascent, simple, kinda efficient (and improving!) Merkle proof generator and verifier\n @author dmfxyz\n @dev Note Generic Merkle Tree"
+                },
+                "fullyImplemented": true,
+                "linearizedBaseContracts": [30565, 31082],
+                "name": "Merkle",
+                "nameLocation": "251:6:19",
+                "scope": 30566,
+                "usedErrors": []
+            }
+        ],
+        "license": "MIT"
+    },
+    "id": 19
 }

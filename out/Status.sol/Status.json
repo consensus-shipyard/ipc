@@ -1,90 +1,84 @@
 {
-  "abi": [],
-  "bytecode": {
-    "object": "0x",
-    "linkReferences": {}
-  },
-  "deployedBytecode": {
-    "object": "0x",
-    "linkReferences": {}
-  },
-  "ast": {
-    "absolutePath": "src/enums/Status.sol",
-    "id": 36680,
-    "exportedSymbols": {
-      "Status": [
-        36679
-      ]
+    "abi": [],
+    "bytecode": {
+        "object": "0x",
+        "linkReferences": {}
     },
-    "nodeType": "SourceUnit",
-    "src": "46:181:42",
-    "nodes": [
-      {
-        "id": 36672,
-        "nodeType": "PragmaDirective",
-        "src": "46:23:42",
-        "nodes": [],
-        "literals": [
-          "solidity",
-          "0.8",
-          ".19"
-        ]
-      },
-      {
-        "id": 36679,
-        "nodeType": "EnumDefinition",
-        "src": "128:98:42",
-        "nodes": [],
-        "canonicalName": "Status",
-        "members": [
-          {
-            "id": 36673,
-            "name": "Unset",
-            "nameLocation": "146:5:42",
-            "nodeType": "EnumValue",
-            "src": "146:5:42"
-          },
-          {
-            "id": 36674,
-            "name": "Active",
-            "nameLocation": "157:6:42",
-            "nodeType": "EnumValue",
-            "src": "157:6:42"
-          },
-          {
-            "id": 36675,
-            "name": "Inactive",
-            "nameLocation": "169:8:42",
-            "nodeType": "EnumValue",
-            "src": "169:8:42"
-          },
-          {
-            "id": 36676,
-            "name": "Killed",
-            "nameLocation": "183:6:42",
-            "nodeType": "EnumValue",
-            "src": "183:6:42"
-          },
-          {
-            "id": 36677,
-            "name": "Terminating",
-            "nameLocation": "195:11:42",
-            "nodeType": "EnumValue",
-            "src": "195:11:42"
-          },
-          {
-            "id": 36678,
-            "name": "Instantiated",
-            "nameLocation": "212:12:42",
-            "nodeType": "EnumValue",
-            "src": "212:12:42"
-          }
+    "deployedBytecode": {
+        "object": "0x",
+        "linkReferences": {}
+    },
+    "ast": {
+        "absolutePath": "src/enums/Status.sol",
+        "id": 36680,
+        "exportedSymbols": {
+            "Status": [36679]
+        },
+        "nodeType": "SourceUnit",
+        "src": "46:181:42",
+        "nodes": [
+            {
+                "id": 36672,
+                "nodeType": "PragmaDirective",
+                "src": "46:23:42",
+                "nodes": [],
+                "literals": ["solidity", "0.8", ".19"]
+            },
+            {
+                "id": 36679,
+                "nodeType": "EnumDefinition",
+                "src": "128:98:42",
+                "nodes": [],
+                "canonicalName": "Status",
+                "members": [
+                    {
+                        "id": 36673,
+                        "name": "Unset",
+                        "nameLocation": "146:5:42",
+                        "nodeType": "EnumValue",
+                        "src": "146:5:42"
+                    },
+                    {
+                        "id": 36674,
+                        "name": "Active",
+                        "nameLocation": "157:6:42",
+                        "nodeType": "EnumValue",
+                        "src": "157:6:42"
+                    },
+                    {
+                        "id": 36675,
+                        "name": "Inactive",
+                        "nameLocation": "169:8:42",
+                        "nodeType": "EnumValue",
+                        "src": "169:8:42"
+                    },
+                    {
+                        "id": 36676,
+                        "name": "Killed",
+                        "nameLocation": "183:6:42",
+                        "nodeType": "EnumValue",
+                        "src": "183:6:42"
+                    },
+                    {
+                        "id": 36677,
+                        "name": "Terminating",
+                        "nameLocation": "195:11:42",
+                        "nodeType": "EnumValue",
+                        "src": "195:11:42"
+                    },
+                    {
+                        "id": 36678,
+                        "name": "Instantiated",
+                        "nameLocation": "212:12:42",
+                        "nodeType": "EnumValue",
+                        "src": "212:12:42"
+                    }
+                ],
+                "name": "Status",
+                "nameLocation": "133:6:42"
+            }
         ],
-        "name": "Status",
-        "nameLocation": "133:6:42"
-      }
-    ],
-    "license": "MIT OR Apache-2.0"
-  },
-  "id": 42
+        "license": "MIT OR Apache-2.0"
+    },
+    "id": 42
 }

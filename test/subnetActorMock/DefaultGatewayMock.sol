@@ -58,7 +58,10 @@ contract DefaultGatewayMock is IGateway {
 
     /// CommitChildCheck propagates the commitment of a checkpoint from a child subnet,
     /// process the cross-messages directed to the subnet.
-    function commitBottomUpCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint, CrossMsg[] calldata messages) external {
+    function commitBottomUpCheckpoint(
+        BottomUpCheckpoint calldata bottomUpCheckpoint,
+        CrossMsg[] calldata messages
+    ) external {
         // silent warning
         bottomUpCheckpoint;
         messages;
@@ -95,9 +98,7 @@ contract DefaultGatewayMock is IGateway {
         dummy = 1;
     }
 
-    function commitParentFinality(
-        ParentFinality calldata finality
-    ) external {
+    function commitParentFinality(ParentFinality calldata finality) external {
         // silent warning
         finality;
         // make method perform txn
