@@ -20,7 +20,6 @@ import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
-import {CheckpointHelper} from "../src/lib/CheckpointHelper.sol";
 import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../src/SubnetActorDiamond.sol";
@@ -37,7 +36,6 @@ import {SubnetManagerTestUtil} from "./subnetActorMock/SubnetManagerTestUtil.sol
 
 contract SubnetActorDiamondTest is Test {
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpoint;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
 

@@ -14,7 +14,6 @@ import {NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, Not
 import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointInfoAlreadyExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory} from "../errors/IPCErrors.sol";
 import {NotEnoughBalance, NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
@@ -31,7 +30,6 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 contract GatewayRouterFacet is GatewayActorModifiers {
     using FilAddress for address;
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpoint;
     using CrossMsgHelper for CrossMsg;
     using StorableMsgHelper for StorableMsg;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -61,10 +59,10 @@ contract GatewayRouterFacet is GatewayActorModifiers {
             revert SubnetNotActive();
         }
 
-        uint256 totalValue = 0;
-        uint256 totalFee = 0;
+        uint256 totalValue;
+        uint256 totalFee;
         uint256 crossMsgLength = messages.length;
-        for (uint256 i = 0; i < crossMsgLength; ) {
+        for (uint256 i; i < crossMsgLength; ) {
             totalValue += messages[i].message.value;
             totalFee += messages[i].message.fee;
             unchecked {
@@ -128,7 +126,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         address[] memory validators = s.validatorsTracker.validators.listActiveValidators();
         uint256 vLength = validators.length;
         Validator[] memory vs = new Validator[](vLength);
-        for (uint256 i = 0; i < vLength; ) {
+        for (uint256 i; i < vLength; ) {
             address addr = validators[i];
             ValidatorInfo storage info = s.validatorsTracker.validators.validators[addr];
             vs[i] = Validator({weight: info.confirmedCollateral, addr: addr, metadata: info.metadata});
@@ -202,7 +200,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     /// @param crossMsgs - the cross-net messages to apply
     function _applyMessages(SubnetID memory forwarder, CrossMsg[] memory crossMsgs) internal {
         uint256 crossMsgsLength = crossMsgs.length;
-        for (uint256 i = 0; i < crossMsgsLength; ) {
+        for (uint256 i; i < crossMsgsLength; ) {
             _applyMsg(forwarder, crossMsgs[i]);
             unchecked {
                 ++i;
@@ -316,7 +314,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         }
 
         CheckpointInfo memory info = CheckpointInfo({
-            hash: checkpoint.toHash(),
+            hash: keccak256(abi.encode(checkpoint)),
             rootHash: membershipRootHash,
             threshold: threshold,
             currentWeight: 0,
@@ -345,7 +343,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
             address[] memory validators = s.bottomUpSignatureSenders[h].values();
             uint256 n = validators.length;
 
-            for (uint256 i = 0; i < n; ) {
+            for (uint256 i; i < n; ) {
                 delete s.bottomUpSignatures[h][validators[i]];
                 unchecked {
                     ++i;

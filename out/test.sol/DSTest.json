@@ -1,319 +1,302 @@
 {
     "abi": [
         {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "",
-                    "type": "string"
-                }
-            ],
-            "name": "log",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "address",
-                    "name": "",
-                    "type": "address"
-                }
-            ],
-            "name": "log_address",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "bytes",
-                    "name": "",
-                    "type": "bytes"
-                }
-            ],
-            "name": "log_bytes",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "bytes32",
-                    "name": "",
-                    "type": "bytes32"
-                }
-            ],
-            "name": "log_bytes32",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "int256",
-                    "name": "",
-                    "type": "int256"
-                }
-            ],
-            "name": "log_int",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "address",
-                    "name": "val",
-                    "type": "address"
-                }
-            ],
-            "name": "log_named_address",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "bytes",
-                    "name": "val",
-                    "type": "bytes"
-                }
-            ],
-            "name": "log_named_bytes",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "bytes32",
-                    "name": "val",
-                    "type": "bytes32"
-                }
-            ],
-            "name": "log_named_bytes32",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "int256",
-                    "name": "val",
-                    "type": "int256"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "uint256",
-                    "name": "decimals",
-                    "type": "uint256"
-                }
-            ],
-            "name": "log_named_decimal_int",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "uint256",
-                    "name": "val",
-                    "type": "uint256"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "uint256",
-                    "name": "decimals",
-                    "type": "uint256"
-                }
-            ],
-            "name": "log_named_decimal_uint",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "int256",
-                    "name": "val",
-                    "type": "int256"
-                }
-            ],
-            "name": "log_named_int",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "val",
-                    "type": "string"
-                }
-            ],
-            "name": "log_named_string",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "key",
-                    "type": "string"
-                },
-                {
-                    "indexed": false,
-                    "internalType": "uint256",
-                    "name": "val",
-                    "type": "uint256"
-                }
-            ],
-            "name": "log_named_uint",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "string",
-                    "name": "",
-                    "type": "string"
-                }
-            ],
-            "name": "log_string",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "uint256",
-                    "name": "",
-                    "type": "uint256"
-                }
-            ],
-            "name": "log_uint",
-            "type": "event"
-        },
-        {
-            "anonymous": false,
-            "inputs": [
-                {
-                    "indexed": false,
-                    "internalType": "bytes",
-                    "name": "",
-                    "type": "bytes"
-                }
-            ],
-            "name": "logs",
-            "type": "event"
-        },
-        {
-            "inputs": [],
+            "type": "function",
             "name": "IS_TEST",
-            "outputs": [
-                {
-                    "internalType": "bool",
-                    "name": "",
-                    "type": "bool"
-                }
-            ],
-            "stateMutability": "view",
-            "type": "function"
+            "inputs": [],
+            "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+            "stateMutability": "view"
         },
         {
-            "inputs": [],
+            "type": "function",
             "name": "failed",
-            "outputs": [
+            "inputs": [],
+            "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "event",
+            "name": "log",
+            "inputs": [
                 {
-                    "internalType": "bool",
                     "name": "",
-                    "type": "bool"
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
                 }
             ],
-            "stateMutability": "nonpayable",
-            "type": "function"
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_address",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_bytes",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "bytes",
+                    "indexed": false,
+                    "internalType": "bytes"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_bytes32",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "bytes32",
+                    "indexed": false,
+                    "internalType": "bytes32"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_int",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "int256",
+                    "indexed": false,
+                    "internalType": "int256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_address",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_bytes",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "bytes",
+                    "indexed": false,
+                    "internalType": "bytes"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_bytes32",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "bytes32",
+                    "indexed": false,
+                    "internalType": "bytes32"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_decimal_int",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "int256",
+                    "indexed": false,
+                    "internalType": "int256"
+                },
+                {
+                    "name": "decimals",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_decimal_uint",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "decimals",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_int",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "int256",
+                    "indexed": false,
+                    "internalType": "int256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_string",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_named_uint",
+            "inputs": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
+                    "name": "val",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_string",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "log_uint",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "logs",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "bytes",
+                    "indexed": false,
+                    "internalType": "bytes"
+                }
+            ],
+            "anonymous": false
         }
     ],
     "bytecode": {
-        "object": "0x6080806040523461002357600160ff19600054161760005561024090816100298239f35b600080fdfe6080604052600436101561001257600080fd5b6000803560e01c8063ba414fa6146100575763fa7626d41461003357600080fd5b3461005457806003193601126100545760ff60209154166040519015158152f35b80fd5b503461005457806003193601126100545760206100726100b4565b6040519015158152f35b90601f8019910116810190811067ffffffffffffffff82111761009e57604052565b634e487b7160e01b600052604160045260246000fd5b6000805460081c60ff16156100cd575460081c60ff1690565b80737109709ecfa91a80626ff3989d68f67f5b1dd12d803b6100ee57505090565b90915060405160209180838301526519985a5b195960d21b604083015260408252606082019167ffffffffffffffff92818110848211176101f65791828692936040526080840190630667f9d760e41b8252845187855b8281106101de5750509061016f60248787989488950185608482015203600481018452018261007c565b51925af1503d156101d6573d9081116101c25760405190610199601f8201601f191684018361007c565b81523d838383013e5b81818051810103126101be570151908115158203610054575090565b8280fd5b634e487b7160e01b83526041600452602483fd5b5060606101a2565b808801808301516084909101528a9650899101610145565b634e487b7160e01b86526041600452602486fdfea2646970667358221220e8d07bd9cf94eaa91e17663709d890c81aecd7ccfaa5e06e569f996cae93bd4464736f6c63430008130033",
+        "object": "0x6080806040523461002357600160ff19600054161760005561024090816100298239f35b600080fdfe6080604052600436101561001257600080fd5b6000803560e01c8063ba414fa6146100575763fa7626d41461003357600080fd5b3461005457806003193601126100545760ff60209154166040519015158152f35b80fd5b503461005457806003193601126100545760206100726100b4565b6040519015158152f35b90601f8019910116810190811067ffffffffffffffff82111761009e57604052565b634e487b7160e01b600052604160045260246000fd5b6000805460081c60ff16156100cd575460081c60ff1690565b80737109709ecfa91a80626ff3989d68f67f5b1dd12d803b6100ee57505090565b90915060405160209180838301526519985a5b195960d21b604083015260408252606082019167ffffffffffffffff92818110848211176101f65791828692936040526080840190630667f9d760e41b8252845187855b8281106101de5750509061016f60248787989488950185608482015203600481018452018261007c565b51925af1503d156101d6573d9081116101c25760405190610199601f8201601f191684018361007c565b81523d838383013e5b81818051810103126101be570151908115158203610054575090565b8280fd5b634e487b7160e01b83526041600452602483fd5b5060606101a2565b808801808301516084909101528a9650899101610145565b634e487b7160e01b86526041600452602486fdfea26469706673582212209ebcf48954348038469d3c6d68e52cfab207c0e974803e4d1c8fadb8da4bd12164736f6c63430008130033",
         "sourceMap": "715:19781:2:-:0;;;;;;;1594:4;715:19781;;1594:4;715:19781;;;1594:4;715:19781;;;;;;;;;;;",
         "linkReferences": {}
     },
     "deployedBytecode": {
-        "object": "0x6080604052600436101561001257600080fd5b6000803560e01c8063ba414fa6146100575763fa7626d41461003357600080fd5b3461005457806003193601126100545760ff60209154166040519015158152f35b80fd5b503461005457806003193601126100545760206100726100b4565b6040519015158152f35b90601f8019910116810190811067ffffffffffffffff82111761009e57604052565b634e487b7160e01b600052604160045260246000fd5b6000805460081c60ff16156100cd575460081c60ff1690565b80737109709ecfa91a80626ff3989d68f67f5b1dd12d803b6100ee57505090565b90915060405160209180838301526519985a5b195960d21b604083015260408252606082019167ffffffffffffffff92818110848211176101f65791828692936040526080840190630667f9d760e41b8252845187855b8281106101de5750509061016f60248787989488950185608482015203600481018452018261007c565b51925af1503d156101d6573d9081116101c25760405190610199601f8201601f191684018361007c565b81523d838383013e5b81818051810103126101be570151908115158203610054575090565b8280fd5b634e487b7160e01b83526041600452602483fd5b5060606101a2565b808801808301516084909101528a9650899101610145565b634e487b7160e01b86526041600452602486fdfea2646970667358221220e8d07bd9cf94eaa91e17663709d890c81aecd7ccfaa5e06e569f996cae93bd4464736f6c63430008130033",
+        "object": "0x6080604052600436101561001257600080fd5b6000803560e01c8063ba414fa6146100575763fa7626d41461003357600080fd5b3461005457806003193601126100545760ff60209154166040519015158152f35b80fd5b503461005457806003193601126100545760206100726100b4565b6040519015158152f35b90601f8019910116810190811067ffffffffffffffff82111761009e57604052565b634e487b7160e01b600052604160045260246000fd5b6000805460081c60ff16156100cd575460081c60ff1690565b80737109709ecfa91a80626ff3989d68f67f5b1dd12d803b6100ee57505090565b90915060405160209180838301526519985a5b195960d21b604083015260408252606082019167ffffffffffffffff92818110848211176101f65791828692936040526080840190630667f9d760e41b8252845187855b8281106101de5750509061016f60248787989488950185608482015203600481018452018261007c565b51925af1503d156101d6573d9081116101c25760405190610199601f8201601f191684018361007c565b81523d838383013e5b81818051810103126101be570151908115158203610054575090565b8280fd5b634e487b7160e01b83526041600452602483fd5b5060606101a2565b808801808301516084909101528a9650899101610145565b634e487b7160e01b86526041600452602486fdfea26469706673582212209ebcf48954348038469d3c6d68e52cfab207c0e974803e4d1c8fadb8da4bd12164736f6c63430008130033",
         "sourceMap": "715:19781:2:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;1671:64;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;1819:584;1873:7;715:19781;;;;;;;;;;;;;;;1896:14::o;1869:528::-;1941:25;2946:104;;;1980:374;;2367:19;;;:::o;1980:374::-;715:19781;;;;;2196:43;;;;;;1671:64;;;;715:19781;1671:64;;;715:19781;2196:43;;715:19781;1671:64;;;;;;;;;;;;;;;;;;;715:19781;1671:64;2086:175;;;1671:64;;;;;;;;;;;;;;;;;;;2086:175;1671:64;;;;;;;;;;;;;2086:175;;;;;;;;;:::i;:::-;2047:232;;;;-1:-1:-1;1671:64:2;;;;;;;;;;715:19781;;;1671:64;;;;-1:-1:-1;;1671:64:2;;;715:19781;1671:64;:::i;:::-;;;;;;;;;;;;;;2312:27;;1671:64;;;;2312:27;1671:64;715:19781;;;;1671:64;;;;2297:42;2367:19;:::o;1671:64::-;715:19781;;;1671:64;-1:-1:-1;;;1671:64:2;;;2086:175;1671:64;;;;;;715:19781;1671:64;;;;;;;;;;;;;;;;;-1:-1:-1;1671:64:2;;;;;;-1:-1:-1;;;1671:64:2;;;;;;;",
         "linkReferences": {}
     },
-    "methodIdentifiers": {
-        "IS_TEST()": "fa7626d4",
-        "failed()": "ba414fa6"
-    },
-    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"name\":\"log\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"log_address\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"log_bytes\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"log_bytes32\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"int256\",\"name\":\"\",\"type\":\"int256\"}],\"name\":\"log_int\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"val\",\"type\":\"address\"}],\"name\":\"log_named_address\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"val\",\"type\":\"bytes\"}],\"name\":\"log_named_bytes\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"val\",\"type\":\"bytes32\"}],\"name\":\"log_named_bytes32\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\"}],\"name\":\"log_named_decimal_int\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\"}],\"name\":\"log_named_decimal_uint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\"}],\"name\":\"log_named_int\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"val\",\"type\":\"string\"}],\"name\":\"log_named_string\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\"}],\"name\":\"log_named_uint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"name\":\"log_string\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"log_uint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"logs\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"IS_TEST\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"failed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/forge-std/lib/ds-test/src/test.sol\":\"DSTest\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":@openzeppelin/=node_modules/@openzeppelin/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":hardhat-deploy/=node_modules/hardhat-deploy/\",\":hardhat/=node_modules/hardhat/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\",\":sol-explore/=node_modules/sol-explore/\"],\"viaIR\":true},\"sources\":{\"lib/forge-std/lib/ds-test/src/test.sol\":{\"keccak256\":\"0x8758531bbac3972efcf1fa46383dbe1d276406fe527bc7abb2f236486278e83b\",\"license\":\"GPL-3.0-or-later\",\"urls\":[\"bzz-raw://1f64264d61506847acf8761e84aff690cebe830958eac00bac7924d8be569240\",\"dweb:/ipfs/QmSekDJvJ82MZAmr63n7YvfLzQ7gS4NLSHPmHL3GN3rw8k\"]}},\"version\":1}",
+    "methodIdentifiers": { "IS_TEST()": "fa7626d4", "failed()": "ba414fa6" },
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"name\":\"log\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"log_address\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"log_bytes\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"log_bytes32\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"int256\",\"name\":\"\",\"type\":\"int256\"}],\"name\":\"log_int\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"val\",\"type\":\"address\"}],\"name\":\"log_named_address\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"val\",\"type\":\"bytes\"}],\"name\":\"log_named_bytes\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"val\",\"type\":\"bytes32\"}],\"name\":\"log_named_bytes32\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\"}],\"name\":\"log_named_decimal_int\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\"}],\"name\":\"log_named_decimal_uint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\"}],\"name\":\"log_named_int\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"val\",\"type\":\"string\"}],\"name\":\"log_named_string\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\"}],\"name\":\"log_named_uint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"name\":\"log_string\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"log_uint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"logs\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"IS_TEST\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"failed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/forge-std/lib/ds-test/src/test.sol\":\"DSTest\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/forge-std/lib/ds-test/src/test.sol\":{\"keccak256\":\"0x8758531bbac3972efcf1fa46383dbe1d276406fe527bc7abb2f236486278e83b\",\"license\":\"GPL-3.0-or-later\",\"urls\":[\"bzz-raw://1f64264d61506847acf8761e84aff690cebe830958eac00bac7924d8be569240\",\"dweb:/ipfs/QmSekDJvJ82MZAmr63n7YvfLzQ7gS4NLSHPmHL3GN3rw8k\"]}},\"version\":1}",
     "metadata": {
-        "compiler": {
-            "version": "0.8.19+commit.7dd6d404"
-        },
+        "compiler": { "version": "0.8.19+commit.7dd6d404" },
         "language": "Solidity",
         "output": {
             "abi": [
@@ -591,11 +574,7 @@
                     "type": "function",
                     "name": "IS_TEST",
                     "outputs": [
-                        {
-                            "internalType": "bool",
-                            "name": "",
-                            "type": "bool"
-                        }
+                        { "internalType": "bool", "name": "", "type": "bool" }
                     ]
                 },
                 {
@@ -604,47 +583,26 @@
                     "type": "function",
                     "name": "failed",
                     "outputs": [
-                        {
-                            "internalType": "bool",
-                            "name": "",
-                            "type": "bool"
-                        }
+                        { "internalType": "bool", "name": "", "type": "bool" }
                     ]
                 }
             ],
-            "devdoc": {
-                "kind": "dev",
-                "methods": {},
-                "version": 1
-            },
-            "userdoc": {
-                "kind": "user",
-                "methods": {},
-                "version": 1
-            }
+            "devdoc": { "kind": "dev", "methods": {}, "version": 1 },
+            "userdoc": { "kind": "user", "methods": {}, "version": 1 }
         },
         "settings": {
             "remappings": [
-                "@openzeppelin/=node_modules/@openzeppelin/",
                 "ds-test/=lib/forge-std/lib/ds-test/src/",
                 "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
                 "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
                 "fevmate/=lib/fevmate/contracts/",
                 "forge-std/=lib/forge-std/src/",
-                "hardhat-deploy/=node_modules/hardhat-deploy/",
-                "hardhat/=node_modules/hardhat/",
                 "murky/=lib/murky/src/",
                 "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
-                "openzeppelin/=lib/openzeppelin-contracts/contracts/",
-                "sol-explore/=node_modules/sol-explore/"
+                "openzeppelin/=lib/openzeppelin-contracts/contracts/"
             ],
-            "optimizer": {
-                "enabled": true,
-                "runs": 200
-            },
-            "metadata": {
-                "bytecodeHash": "ipfs"
-            },
+            "optimizer": { "enabled": true, "runs": 200 },
+            "metadata": { "bytecodeHash": "ipfs" },
             "compilationTarget": {
                 "lib/forge-std/lib/ds-test/src/test.sol": "DSTest"
             },
@@ -666,9 +624,7 @@
     "ast": {
         "absolutePath": "lib/forge-std/lib/ds-test/src/test.sol",
         "id": 3721,
-        "exportedSymbols": {
-            "DSTest": [3720]
-        },
+        "exportedSymbols": { "DSTest": [3720] },
         "nodeType": "SourceUnit",
         "src": "689:19808:2",
         "nodes": [

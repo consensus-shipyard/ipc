@@ -31,7 +31,7 @@ library SubnetIDHelper {
 
         address[] memory route = new address[](subnet.route.length - 1);
         uint256 routeLength = route.length;
-        for (uint256 i = 0; i < routeLength; ) {
+        for (uint256 i; i < routeLength; ) {
             route[i] = subnet.route[i];
             unchecked {
                 ++i;
@@ -44,7 +44,7 @@ library SubnetIDHelper {
     function toString(SubnetID calldata subnet) public pure returns (string memory) {
         string memory route = string(abi.encodePacked("/r", Strings.toString(subnet.root)));
         uint256 subnetLength = subnet.route.length;
-        for (uint256 i = 0; i < subnetLength; ) {
+        for (uint256 i; i < subnetLength; ) {
             route = string.concat(route, "/");
             route = string.concat(route, subnet.route[i].toHexString());
             unchecked {
@@ -63,7 +63,7 @@ library SubnetIDHelper {
         newSubnet.root = subnet.root;
         newSubnet.route = new address[](subnet.route.length + 1);
         uint256 routeLength = subnet.route.length;
-        for (uint256 i = 0; i < routeLength; ) {
+        for (uint256 i; i < routeLength; ) {
             newSubnet.route[i] = subnet.route[i];
             unchecked {
                 ++i;
@@ -103,7 +103,7 @@ library SubnetIDHelper {
             return SubnetID({root: 0, route: new address[](0)});
         }
 
-        uint256 i = 0;
+        uint256 i;
         uint256 subnet1routeLength = subnet1.route.length;
         uint256 subnet2routeLength = subnet2.route.length;
         while (i < subnet1routeLength && i < subnet2routeLength && subnet1.route[i] == subnet2.route[i]) {
@@ -116,7 +116,7 @@ library SubnetIDHelper {
         }
 
         address[] memory route = new address[](i);
-        for (uint256 j = 0; j < i; ) {
+        for (uint256 j; j < i; ) {
             route[j] = subnet1.route[j];
             unchecked {
                 ++j;
@@ -139,7 +139,7 @@ library SubnetIDHelper {
             revert InvalidRoute();
         }
 
-        uint256 i = 0;
+        uint256 i;
         uint256 subnet2routeLength = subnet2.route.length;
         while (i < subnet2routeLength && subnet1.route[i] == subnet2.route[i]) {
             unchecked {
@@ -151,7 +151,7 @@ library SubnetIDHelper {
 
         address[] memory route = new address[](i);
 
-        for (uint256 j = 0; j < i; ) {
+        for (uint256 j; j < i; ) {
             route[j] = subnet1.route[j];
             unchecked {
                 ++j;

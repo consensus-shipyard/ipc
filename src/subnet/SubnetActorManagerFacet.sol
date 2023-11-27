@@ -6,7 +6,6 @@ import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID, Validator, ValidatorSet} from "../structs/Subnet.sol";
-import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
@@ -19,7 +18,6 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpoint;
     using LibValidatorSet for ValidatorSet;
     using Address for address payable;
 
@@ -308,7 +306,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         }
         uint256 relayerReward = reward / relayersLength;
 
-        for (uint256 i = 0; i < relayersLength; ) {
+        for (uint256 i; i < relayersLength; ) {
             s.relayerRewards[relayers[i]] += relayerReward;
             unchecked {
                 ++i;
@@ -361,7 +359,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice Removes an address from the initial balance keys
     function rmAddressFromBalanceKey(address addr) internal {
         uint256 length = s.genesisBalanceKeys.length;
-        for (uint256 i = 0; i < length; ) {
+        for (uint256 i; i < length; ) {
             if (s.genesisBalanceKeys[i] == addr) {
                 s.genesisBalanceKeys[i] = s.genesisBalanceKeys[length - 1];
                 s.genesisBalanceKeys.pop();

@@ -1,46 +1,40 @@
 {
     "abi": [],
-    "bytecode": {
-        "object": "0x",
-        "linkReferences": {}
-    },
-    "deployedBytecode": {
-        "object": "0x",
-        "linkReferences": {}
-    },
+    "bytecode": { "object": "0x", "linkReferences": {} },
+    "deployedBytecode": { "object": "0x", "linkReferences": {} },
     "ast": {
         "absolutePath": "src/structs/FvmAddress.sol",
-        "id": 47048,
+        "id": 46945,
         "exportedSymbols": {
-            "DelegatedAddress": [47047],
-            "FvmAddress": [47040]
+            "DelegatedAddress": [46944],
+            "FvmAddress": [46937]
         },
         "nodeType": "SourceUnit",
-        "src": "46:489:73",
+        "src": "46:489:72",
         "nodes": [
             {
-                "id": 47035,
+                "id": 46932,
                 "nodeType": "PragmaDirective",
-                "src": "46:23:73",
+                "src": "46:23:72",
                 "nodes": [],
                 "literals": ["solidity", "0.8", ".19"]
             },
             {
-                "id": 47040,
+                "id": 46937,
                 "nodeType": "StructDefinition",
-                "src": "320:60:73",
+                "src": "320:60:72",
                 "nodes": [],
                 "canonicalName": "FvmAddress",
                 "members": [
                     {
                         "constant": false,
-                        "id": 47037,
+                        "id": 46934,
                         "mutability": "mutable",
                         "name": "addrType",
-                        "nameLocation": "350:8:73",
+                        "nameLocation": "350:8:72",
                         "nodeType": "VariableDeclaration",
-                        "scope": 47040,
-                        "src": "344:14:73",
+                        "scope": 46937,
+                        "src": "344:14:72",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -48,10 +42,10 @@
                             "typeString": "uint8"
                         },
                         "typeName": {
-                            "id": 47036,
+                            "id": 46933,
                             "name": "uint8",
                             "nodeType": "ElementaryTypeName",
-                            "src": "344:5:73",
+                            "src": "344:5:72",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_uint8",
                                 "typeString": "uint8"
@@ -61,13 +55,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 47039,
+                        "id": 46936,
                         "mutability": "mutable",
                         "name": "payload",
-                        "nameLocation": "370:7:73",
+                        "nameLocation": "370:7:72",
                         "nodeType": "VariableDeclaration",
-                        "scope": 47040,
-                        "src": "364:13:73",
+                        "scope": 46937,
+                        "src": "364:13:72",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -75,10 +69,10 @@
                             "typeString": "bytes"
                         },
                         "typeName": {
-                            "id": 47038,
+                            "id": 46935,
                             "name": "bytes",
                             "nodeType": "ElementaryTypeName",
-                            "src": "364:5:73",
+                            "src": "364:5:72",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_bytes_storage_ptr",
                                 "typeString": "bytes"
@@ -88,26 +82,26 @@
                     }
                 ],
                 "name": "FvmAddress",
-                "nameLocation": "327:10:73",
-                "scope": 47048,
+                "nameLocation": "327:10:72",
+                "scope": 46945,
                 "visibility": "public"
             },
             {
-                "id": 47047,
+                "id": 46944,
                 "nodeType": "StructDefinition",
-                "src": "447:87:73",
+                "src": "447:87:72",
                 "nodes": [],
                 "canonicalName": "DelegatedAddress",
                 "members": [
                     {
                         "constant": false,
-                        "id": 47042,
+                        "id": 46939,
                         "mutability": "mutable",
                         "name": "namespace",
-                        "nameLocation": "484:9:73",
+                        "nameLocation": "484:9:72",
                         "nodeType": "VariableDeclaration",
-                        "scope": 47047,
-                        "src": "477:16:73",
+                        "scope": 46944,
+                        "src": "477:16:72",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -115,10 +109,10 @@
                             "typeString": "uint64"
                         },
                         "typeName": {
-                            "id": 47041,
+                            "id": 46938,
                             "name": "uint64",
                             "nodeType": "ElementaryTypeName",
-                            "src": "477:6:73",
+                            "src": "477:6:72",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_uint64",
                                 "typeString": "uint64"
@@ -128,13 +122,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 47044,
+                        "id": 46941,
                         "mutability": "mutable",
                         "name": "length",
-                        "nameLocation": "507:6:73",
+                        "nameLocation": "507:6:72",
                         "nodeType": "VariableDeclaration",
-                        "scope": 47047,
-                        "src": "499:14:73",
+                        "scope": 46944,
+                        "src": "499:14:72",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -142,10 +136,10 @@
                             "typeString": "uint128"
                         },
                         "typeName": {
-                            "id": 47043,
+                            "id": 46940,
                             "name": "uint128",
                             "nodeType": "ElementaryTypeName",
-                            "src": "499:7:73",
+                            "src": "499:7:72",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_uint128",
                                 "typeString": "uint128"
@@ -155,13 +149,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 47046,
+                        "id": 46943,
                         "mutability": "mutable",
                         "name": "buffer",
-                        "nameLocation": "525:6:73",
+                        "nameLocation": "525:6:72",
                         "nodeType": "VariableDeclaration",
-                        "scope": 47047,
-                        "src": "519:12:73",
+                        "scope": 46944,
+                        "src": "519:12:72",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -169,10 +163,10 @@
                             "typeString": "bytes"
                         },
                         "typeName": {
-                            "id": 47045,
+                            "id": 46942,
                             "name": "bytes",
                             "nodeType": "ElementaryTypeName",
-                            "src": "519:5:73",
+                            "src": "519:5:72",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_bytes_storage_ptr",
                                 "typeString": "bytes"
@@ -182,12 +176,12 @@
                     }
                 ],
                 "name": "DelegatedAddress",
-                "nameLocation": "454:16:73",
-                "scope": 47048,
+                "nameLocation": "454:16:72",
+                "scope": 46945,
                 "visibility": "public"
             }
         ],
         "license": "MIT OR Apache-2.0"
     },
-    "id": 73
+    "id": 72
 }

@@ -5,7 +5,6 @@ import {ConsensusType} from "../enums/ConsensusType.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator} from "../structs/Subnet.sol";
-import {CheckpointHelper} from "../lib/CheckpointHelper.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
@@ -15,7 +14,6 @@ import {LibStaking} from "../lib/LibStaking.sol";
 contract SubnetActorGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
-    using CheckpointHelper for BottomUpCheckpoint;
     using Address for address payable;
 
     // slither-disable-next-line uninitialized-state
@@ -59,7 +57,7 @@ contract SubnetActorGetterFacet {
         address[] memory addresses = new address[](numAddresses);
         uint256[] memory balances = new uint256[](numAddresses);
 
-        for (uint256 i = 0; i < numAddresses; ) {
+        for (uint256 i; i < numAddresses; ) {
             address addr = s.genesisBalanceKeys[i];
             addresses[i] = addr;
             balances[i] = s.genesisBalance[addr];
@@ -137,7 +135,7 @@ contract SubnetActorGetterFacet {
     /// @return hash - the hash of the checkpoint
     function bottomUpCheckpointHashAtEpoch(uint64 epoch) external view returns (bool, bytes32) {
         (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
-        return (exists, checkpoint.toHash());
+        return (exists, keccak256(abi.encode(checkpoint)));
     }
 
     /// @notice returns the power scale in number of decimals from whole FIL
@@ -153,7 +151,7 @@ contract SubnetActorGetterFacet {
             return nodes;
         }
         address[] memory owners = s.bootstrapOwners.values();
-        for (uint256 i = 0; i < n; ) {
+        for (uint256 i; i < n; ) {
             nodes[i] = s.bootstrapNodes[owners[i]];
             unchecked {
                 ++i;

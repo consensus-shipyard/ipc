@@ -33,7 +33,7 @@ library LibAddressStakingReleases {
 
         uint16 i = self.startIdx;
         uint16 newLength = length;
-        uint256 amount = 0;
+        uint256 amount;
         while (i < length) {
             StakingRelease memory release = self.releases[i];
 
@@ -158,7 +158,7 @@ library LibValidatorSet {
         uint256 size = addresses.length;
         uint256[] memory activeCollaterals = new uint256[](size);
 
-        for (uint256 i = 0; i < size; ) {
+        for (uint256 i; i < size; ) {
             if (!isActiveValidator(validators, addresses[i])) {
                 revert NotValidator(addresses[i]);
             }
@@ -339,7 +339,7 @@ library LibStaking {
     using LibMinPQ for MinPQ;
     using Address for address payable;
 
-    uint64 public constant INITIAL_CONFIGURATION_NUMBER = 1;
+    uint64 internal constant INITIAL_CONFIGURATION_NUMBER = 1;
 
     event ConfigurationNumberConfirmed(uint64 number);
     event CollateralClaimed(address validator, uint256 amount);
@@ -408,9 +408,9 @@ library LibStaking {
         if (!s.bootstrapped) {
             // add to initial validators avoiding duplicates if it
             // is a genesis validator.
-            bool alreadyValidator = false;
+            bool alreadyValidator;
             uint256 length = s.genesisValidators.length;
-            for (uint256 i = 0; i < length; ) {
+            for (uint256 i; i < length; ) {
                 if (s.genesisValidators[i].addr == validator) {
                     alreadyValidator = true;
                     break;
@@ -564,7 +564,7 @@ library LibValidatorTracking {
             return;
         }
 
-        for (uint256 i = 0; i < length; ) {
+        for (uint256 i; i < length; ) {
             storeChange(self, changeRequests[i]);
             unchecked {
                 ++i;

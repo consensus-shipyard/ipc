@@ -1,100 +1,94 @@
 {
     "abi": [],
-    "bytecode": {
-        "object": "0x",
-        "linkReferences": {}
-    },
-    "deployedBytecode": {
-        "object": "0x",
-        "linkReferences": {}
-    },
+    "bytecode": { "object": "0x", "linkReferences": {} },
+    "deployedBytecode": { "object": "0x", "linkReferences": {} },
     "ast": {
         "absolutePath": "src/errors/IPCErrors.sol",
-        "id": 36972,
+        "id": 36971,
         "exportedSymbols": {
-            "AddressShouldBeValidator": [36827],
-            "AlreadyRegisteredSubnet": [36829],
-            "CannotConfirmFutureChanges": [36831],
-            "CannotFindSubnet": [36969],
-            "CannotReleaseZero": [36833],
-            "CannotSendCrossMsgToItself": [36835],
-            "CheckpointAlreadyExists": [36837],
-            "CheckpointAlreadyProcessed": [36839],
-            "CheckpointInfoAlreadyExists": [36841],
-            "CheckpointNotCreated": [36843],
-            "CollateralIsZero": [36845],
-            "EmptyAddress": [36847],
-            "FacetCannotBeZero": [36965],
-            "FailedAddIncompleteCheckpoint": [36849],
-            "FailedAddSignatory": [36851],
-            "FailedRemoveIncompleteCheckpoint": [36853],
-            "GatewayCannotBeZero": [36855],
-            "InvalidActorAddress": [36857],
-            "InvalidCheckpointEpoch": [36859],
-            "InvalidCheckpointMessagesHash": [36861],
-            "InvalidCheckpointSource": [36863],
-            "InvalidCollateral": [36865],
-            "InvalidConfigurationNumber": [36867],
-            "InvalidCrossMsgDstSubnet": [36869],
-            "InvalidCrossMsgFromSubnet": [36871],
-            "InvalidCrossMsgNonce": [36873],
-            "InvalidCrossMsgValue": [36875],
-            "InvalidMajorityPercentage": [36877],
-            "InvalidPowerScale": [36879],
-            "InvalidPublicKeyLength": [36891],
-            "InvalidRetentionHeight": [36881],
-            "InvalidSignature": [36883],
-            "InvalidSignatureErr": [36887],
-            "InvalidSignatureLength": [36889],
-            "InvalidSubmissionPeriod": [36893],
-            "InvalidSubnet": [36895],
-            "NoCollateralToWithdraw": [36897],
-            "NoRewardToWithdraw": [36899],
-            "NoValidatorsInSubnet": [36901],
-            "NotAllValidatorsHaveLeft": [36903],
-            "NotAuthorized": [36907],
-            "NotEmptySubnetCircSupply": [36909],
-            "NotEnoughBalance": [36911],
-            "NotEnoughBalanceForRewards": [36913],
-            "NotEnoughCollateral": [36915],
-            "NotEnoughFee": [36917],
-            "NotEnoughFunds": [36919],
-            "NotEnoughFundsToRelease": [36921],
-            "NotEnoughSubnetCircSupply": [36923],
-            "NotEnoughValidatorsInSubnet": [36925],
-            "NotGateway": [36927],
-            "NotOwnerOfPublicKey": [36929],
-            "NotRegisteredSubnet": [36931],
-            "NotStakedBefore": [36933],
-            "NotSystemActor": [36935],
-            "NotValidator": [36939],
-            "OldConfigurationNumber": [36941],
-            "PQDoesNotContainAddress": [36943],
-            "PQEmpty": [36945],
-            "ParentFinalityAlreadyCommitted": [36947],
-            "PostboxNotExist": [36949],
-            "SignatureReplay": [36951],
-            "SubnetAlreadyBootstrapped": [36963],
-            "SubnetAlreadyKilled": [36953],
-            "SubnetNotActive": [36955],
-            "SubnetNotFound": [36957],
-            "UnknownSubnet": [36971],
-            "WithdrawExceedingCollateral": [36959],
-            "WrongGateway": [36967],
-            "ZeroMembershipWeight": [36961]
+            "AddressShouldBeValidator": [36826],
+            "AlreadyRegisteredSubnet": [36828],
+            "CannotConfirmFutureChanges": [36830],
+            "CannotFindSubnet": [36968],
+            "CannotReleaseZero": [36832],
+            "CannotSendCrossMsgToItself": [36834],
+            "CheckpointAlreadyExists": [36836],
+            "CheckpointAlreadyProcessed": [36838],
+            "CheckpointInfoAlreadyExists": [36840],
+            "CheckpointNotCreated": [36842],
+            "CollateralIsZero": [36844],
+            "EmptyAddress": [36846],
+            "FacetCannotBeZero": [36964],
+            "FailedAddIncompleteCheckpoint": [36848],
+            "FailedAddSignatory": [36850],
+            "FailedRemoveIncompleteCheckpoint": [36852],
+            "GatewayCannotBeZero": [36854],
+            "InvalidActorAddress": [36856],
+            "InvalidCheckpointEpoch": [36858],
+            "InvalidCheckpointMessagesHash": [36860],
+            "InvalidCheckpointSource": [36862],
+            "InvalidCollateral": [36864],
+            "InvalidConfigurationNumber": [36866],
+            "InvalidCrossMsgDstSubnet": [36868],
+            "InvalidCrossMsgFromSubnet": [36870],
+            "InvalidCrossMsgNonce": [36872],
+            "InvalidCrossMsgValue": [36874],
+            "InvalidMajorityPercentage": [36876],
+            "InvalidPowerScale": [36878],
+            "InvalidPublicKeyLength": [36890],
+            "InvalidRetentionHeight": [36880],
+            "InvalidSignature": [36882],
+            "InvalidSignatureErr": [36886],
+            "InvalidSignatureLength": [36888],
+            "InvalidSubmissionPeriod": [36892],
+            "InvalidSubnet": [36894],
+            "NoCollateralToWithdraw": [36896],
+            "NoRewardToWithdraw": [36898],
+            "NoValidatorsInSubnet": [36900],
+            "NotAllValidatorsHaveLeft": [36902],
+            "NotAuthorized": [36906],
+            "NotEmptySubnetCircSupply": [36908],
+            "NotEnoughBalance": [36910],
+            "NotEnoughBalanceForRewards": [36912],
+            "NotEnoughCollateral": [36914],
+            "NotEnoughFee": [36916],
+            "NotEnoughFunds": [36918],
+            "NotEnoughFundsToRelease": [36920],
+            "NotEnoughSubnetCircSupply": [36922],
+            "NotEnoughValidatorsInSubnet": [36924],
+            "NotGateway": [36926],
+            "NotOwnerOfPublicKey": [36928],
+            "NotRegisteredSubnet": [36930],
+            "NotStakedBefore": [36932],
+            "NotSystemActor": [36934],
+            "NotValidator": [36938],
+            "OldConfigurationNumber": [36940],
+            "PQDoesNotContainAddress": [36942],
+            "PQEmpty": [36944],
+            "ParentFinalityAlreadyCommitted": [36946],
+            "PostboxNotExist": [36948],
+            "SignatureReplay": [36950],
+            "SubnetAlreadyBootstrapped": [36962],
+            "SubnetAlreadyKilled": [36952],
+            "SubnetNotActive": [36954],
+            "SubnetNotFound": [36956],
+            "UnknownSubnet": [36970],
+            "WithdrawExceedingCollateral": [36958],
+            "WrongGateway": [36966],
+            "ZeroMembershipWeight": [36960]
         },
         "nodeType": "SourceUnit",
         "src": "46:2148:43",
         "nodes": [
             {
-                "id": 36825,
+                "id": 36824,
                 "nodeType": "PragmaDirective",
                 "src": "46:23:43",
                 "nodes": [],
                 "literals": ["solidity", "0.8", ".19"]
             },
             {
-                "id": 36827,
+                "id": 36826,
                 "nodeType": "ErrorDefinition",
                 "src": "71:33:43",
                 "nodes": [],
@@ -102,14 +96,14 @@
                 "name": "AddressShouldBeValidator",
                 "nameLocation": "77:24:43",
                 "parameters": {
-                    "id": 36826,
+                    "id": 36825,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "101:2:43"
                 }
             },
             {
-                "id": 36829,
+                "id": 36828,
                 "nodeType": "ErrorDefinition",
                 "src": "105:32:43",
                 "nodes": [],
@@ -117,14 +111,14 @@
                 "name": "AlreadyRegisteredSubnet",
                 "nameLocation": "111:23:43",
                 "parameters": {
-                    "id": 36828,
+                    "id": 36827,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "134:2:43"
                 }
             },
             {
-                "id": 36831,
+                "id": 36830,
                 "nodeType": "ErrorDefinition",
                 "src": "138:35:43",
                 "nodes": [],
@@ -132,14 +126,14 @@
                 "name": "CannotConfirmFutureChanges",
                 "nameLocation": "144:26:43",
                 "parameters": {
-                    "id": 36830,
+                    "id": 36829,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "170:2:43"
                 }
             },
             {
-                "id": 36833,
+                "id": 36832,
                 "nodeType": "ErrorDefinition",
                 "src": "174:26:43",
                 "nodes": [],
@@ -147,14 +141,14 @@
                 "name": "CannotReleaseZero",
                 "nameLocation": "180:17:43",
                 "parameters": {
-                    "id": 36832,
+                    "id": 36831,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "197:2:43"
                 }
             },
             {
-                "id": 36835,
+                "id": 36834,
                 "nodeType": "ErrorDefinition",
                 "src": "201:35:43",
                 "nodes": [],
@@ -162,14 +156,14 @@
                 "name": "CannotSendCrossMsgToItself",
                 "nameLocation": "207:26:43",
                 "parameters": {
-                    "id": 36834,
+                    "id": 36833,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "233:2:43"
                 }
             },
             {
-                "id": 36837,
+                "id": 36836,
                 "nodeType": "ErrorDefinition",
                 "src": "237:32:43",
                 "nodes": [],
@@ -177,14 +171,14 @@
                 "name": "CheckpointAlreadyExists",
                 "nameLocation": "243:23:43",
                 "parameters": {
-                    "id": 36836,
+                    "id": 36835,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "266:2:43"
                 }
             },
             {
-                "id": 36839,
+                "id": 36838,
                 "nodeType": "ErrorDefinition",
                 "src": "270:35:43",
                 "nodes": [],
@@ -192,14 +186,14 @@
                 "name": "CheckpointAlreadyProcessed",
                 "nameLocation": "276:26:43",
                 "parameters": {
-                    "id": 36838,
+                    "id": 36837,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "302:2:43"
                 }
             },
             {
-                "id": 36841,
+                "id": 36840,
                 "nodeType": "ErrorDefinition",
                 "src": "306:36:43",
                 "nodes": [],
@@ -207,14 +201,14 @@
                 "name": "CheckpointInfoAlreadyExists",
                 "nameLocation": "312:27:43",
                 "parameters": {
-                    "id": 36840,
+                    "id": 36839,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "339:2:43"
                 }
             },
             {
-                "id": 36843,
+                "id": 36842,
                 "nodeType": "ErrorDefinition",
                 "src": "343:29:43",
                 "nodes": [],
@@ -222,14 +216,14 @@
                 "name": "CheckpointNotCreated",
                 "nameLocation": "349:20:43",
                 "parameters": {
-                    "id": 36842,
+                    "id": 36841,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "369:2:43"
                 }
             },
             {
-                "id": 36845,
+                "id": 36844,
                 "nodeType": "ErrorDefinition",
                 "src": "373:25:43",
                 "nodes": [],
@@ -237,14 +231,14 @@
                 "name": "CollateralIsZero",
                 "nameLocation": "379:16:43",
                 "parameters": {
-                    "id": 36844,
+                    "id": 36843,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "395:2:43"
                 }
             },
             {
-                "id": 36847,
+                "id": 36846,
                 "nodeType": "ErrorDefinition",
                 "src": "399:21:43",
                 "nodes": [],
@@ -252,14 +246,14 @@
                 "name": "EmptyAddress",
                 "nameLocation": "405:12:43",
                 "parameters": {
-                    "id": 36846,
+                    "id": 36845,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "417:2:43"
                 }
             },
             {
-                "id": 36849,
+                "id": 36848,
                 "nodeType": "ErrorDefinition",
                 "src": "421:38:43",
                 "nodes": [],
@@ -267,14 +261,14 @@
                 "name": "FailedAddIncompleteCheckpoint",
                 "nameLocation": "427:29:43",
                 "parameters": {
-                    "id": 36848,
+                    "id": 36847,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "456:2:43"
                 }
             },
             {
-                "id": 36851,
+                "id": 36850,
                 "nodeType": "ErrorDefinition",
                 "src": "460:27:43",
                 "nodes": [],
@@ -282,14 +276,14 @@
                 "name": "FailedAddSignatory",
                 "nameLocation": "466:18:43",
                 "parameters": {
-                    "id": 36850,
+                    "id": 36849,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "484:2:43"
                 }
             },
             {
-                "id": 36853,
+                "id": 36852,
                 "nodeType": "ErrorDefinition",
                 "src": "488:41:43",
                 "nodes": [],
@@ -297,14 +291,14 @@
                 "name": "FailedRemoveIncompleteCheckpoint",
                 "nameLocation": "494:32:43",
                 "parameters": {
-                    "id": 36852,
+                    "id": 36851,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "526:2:43"
                 }
             },
             {
-                "id": 36855,
+                "id": 36854,
                 "nodeType": "ErrorDefinition",
                 "src": "530:28:43",
                 "nodes": [],
@@ -312,14 +306,14 @@
                 "name": "GatewayCannotBeZero",
                 "nameLocation": "536:19:43",
                 "parameters": {
-                    "id": 36854,
+                    "id": 36853,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "555:2:43"
                 }
             },
             {
-                "id": 36857,
+                "id": 36856,
                 "nodeType": "ErrorDefinition",
                 "src": "559:28:43",
                 "nodes": [],
@@ -327,14 +321,14 @@
                 "name": "InvalidActorAddress",
                 "nameLocation": "565:19:43",
                 "parameters": {
-                    "id": 36856,
+                    "id": 36855,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "584:2:43"
                 }
             },
             {
-                "id": 36859,
+                "id": 36858,
                 "nodeType": "ErrorDefinition",
                 "src": "588:31:43",
                 "nodes": [],
@@ -342,14 +336,14 @@
                 "name": "InvalidCheckpointEpoch",
                 "nameLocation": "594:22:43",
                 "parameters": {
-                    "id": 36858,
+                    "id": 36857,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "616:2:43"
                 }
             },
             {
-                "id": 36861,
+                "id": 36860,
                 "nodeType": "ErrorDefinition",
                 "src": "620:38:43",
                 "nodes": [],
@@ -357,14 +351,14 @@
                 "name": "InvalidCheckpointMessagesHash",
                 "nameLocation": "626:29:43",
                 "parameters": {
-                    "id": 36860,
+                    "id": 36859,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "655:2:43"
                 }
             },
             {
-                "id": 36863,
+                "id": 36862,
                 "nodeType": "ErrorDefinition",
                 "src": "659:32:43",
                 "nodes": [],
@@ -372,14 +366,14 @@
                 "name": "InvalidCheckpointSource",
                 "nameLocation": "665:23:43",
                 "parameters": {
-                    "id": 36862,
+                    "id": 36861,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "688:2:43"
                 }
             },
             {
-                "id": 36865,
+                "id": 36864,
                 "nodeType": "ErrorDefinition",
                 "src": "692:26:43",
                 "nodes": [],
@@ -387,14 +381,14 @@
                 "name": "InvalidCollateral",
                 "nameLocation": "698:17:43",
                 "parameters": {
-                    "id": 36864,
+                    "id": 36863,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "715:2:43"
                 }
             },
             {
-                "id": 36867,
+                "id": 36866,
                 "nodeType": "ErrorDefinition",
                 "src": "719:35:43",
                 "nodes": [],
@@ -402,14 +396,14 @@
                 "name": "InvalidConfigurationNumber",
                 "nameLocation": "725:26:43",
                 "parameters": {
-                    "id": 36866,
+                    "id": 36865,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "751:2:43"
                 }
             },
             {
-                "id": 36869,
+                "id": 36868,
                 "nodeType": "ErrorDefinition",
                 "src": "755:33:43",
                 "nodes": [],
@@ -417,14 +411,14 @@
                 "name": "InvalidCrossMsgDstSubnet",
                 "nameLocation": "761:24:43",
                 "parameters": {
-                    "id": 36868,
+                    "id": 36867,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "785:2:43"
                 }
             },
             {
-                "id": 36871,
+                "id": 36870,
                 "nodeType": "ErrorDefinition",
                 "src": "789:34:43",
                 "nodes": [],
@@ -432,14 +426,14 @@
                 "name": "InvalidCrossMsgFromSubnet",
                 "nameLocation": "795:25:43",
                 "parameters": {
-                    "id": 36870,
+                    "id": 36869,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "820:2:43"
                 }
             },
             {
-                "id": 36873,
+                "id": 36872,
                 "nodeType": "ErrorDefinition",
                 "src": "824:29:43",
                 "nodes": [],
@@ -447,14 +441,14 @@
                 "name": "InvalidCrossMsgNonce",
                 "nameLocation": "830:20:43",
                 "parameters": {
-                    "id": 36872,
+                    "id": 36871,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "850:2:43"
                 }
             },
             {
-                "id": 36875,
+                "id": 36874,
                 "nodeType": "ErrorDefinition",
                 "src": "854:29:43",
                 "nodes": [],
@@ -462,14 +456,14 @@
                 "name": "InvalidCrossMsgValue",
                 "nameLocation": "860:20:43",
                 "parameters": {
-                    "id": 36874,
+                    "id": 36873,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "880:2:43"
                 }
             },
             {
-                "id": 36877,
+                "id": 36876,
                 "nodeType": "ErrorDefinition",
                 "src": "884:34:43",
                 "nodes": [],
@@ -477,14 +471,14 @@
                 "name": "InvalidMajorityPercentage",
                 "nameLocation": "890:25:43",
                 "parameters": {
-                    "id": 36876,
+                    "id": 36875,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "915:2:43"
                 }
             },
             {
-                "id": 36879,
+                "id": 36878,
                 "nodeType": "ErrorDefinition",
                 "src": "919:26:43",
                 "nodes": [],
@@ -492,14 +486,14 @@
                 "name": "InvalidPowerScale",
                 "nameLocation": "925:17:43",
                 "parameters": {
-                    "id": 36878,
+                    "id": 36877,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "942:2:43"
                 }
             },
             {
-                "id": 36881,
+                "id": 36880,
                 "nodeType": "ErrorDefinition",
                 "src": "946:31:43",
                 "nodes": [],
@@ -507,14 +501,14 @@
                 "name": "InvalidRetentionHeight",
                 "nameLocation": "952:22:43",
                 "parameters": {
-                    "id": 36880,
+                    "id": 36879,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "974:2:43"
                 }
             },
             {
-                "id": 36883,
+                "id": 36882,
                 "nodeType": "ErrorDefinition",
                 "src": "978:25:43",
                 "nodes": [],
@@ -522,14 +516,14 @@
                 "name": "InvalidSignature",
                 "nameLocation": "984:16:43",
                 "parameters": {
-                    "id": 36882,
+                    "id": 36881,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1000:2:43"
                 }
             },
             {
-                "id": 36887,
+                "id": 36886,
                 "nodeType": "ErrorDefinition",
                 "src": "1004:33:43",
                 "nodes": [],
@@ -537,17 +531,17 @@
                 "name": "InvalidSignatureErr",
                 "nameLocation": "1010:19:43",
                 "parameters": {
-                    "id": 36886,
+                    "id": 36885,
                     "nodeType": "ParameterList",
                     "parameters": [
                         {
                             "constant": false,
-                            "id": 36885,
+                            "id": 36884,
                             "mutability": "mutable",
                             "name": "",
                             "nameLocation": "-1:-1:-1",
                             "nodeType": "VariableDeclaration",
-                            "scope": 36887,
+                            "scope": 36886,
                             "src": "1030:5:43",
                             "stateVariable": false,
                             "storageLocation": "default",
@@ -556,7 +550,7 @@
                                 "typeString": "uint8"
                             },
                             "typeName": {
-                                "id": 36884,
+                                "id": 36883,
                                 "name": "uint8",
                                 "nodeType": "ElementaryTypeName",
                                 "src": "1030:5:43",
@@ -572,7 +566,7 @@
                 }
             },
             {
-                "id": 36889,
+                "id": 36888,
                 "nodeType": "ErrorDefinition",
                 "src": "1038:31:43",
                 "nodes": [],
@@ -580,14 +574,14 @@
                 "name": "InvalidSignatureLength",
                 "nameLocation": "1044:22:43",
                 "parameters": {
-                    "id": 36888,
+                    "id": 36887,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1066:2:43"
                 }
             },
             {
-                "id": 36891,
+                "id": 36890,
                 "nodeType": "ErrorDefinition",
                 "src": "1070:31:43",
                 "nodes": [],
@@ -595,14 +589,14 @@
                 "name": "InvalidPublicKeyLength",
                 "nameLocation": "1076:22:43",
                 "parameters": {
-                    "id": 36890,
+                    "id": 36889,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1098:2:43"
                 }
             },
             {
-                "id": 36893,
+                "id": 36892,
                 "nodeType": "ErrorDefinition",
                 "src": "1102:32:43",
                 "nodes": [],
@@ -610,14 +604,14 @@
                 "name": "InvalidSubmissionPeriod",
                 "nameLocation": "1108:23:43",
                 "parameters": {
-                    "id": 36892,
+                    "id": 36891,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1131:2:43"
                 }
             },
             {
-                "id": 36895,
+                "id": 36894,
                 "nodeType": "ErrorDefinition",
                 "src": "1135:22:43",
                 "nodes": [],
@@ -625,14 +619,14 @@
                 "name": "InvalidSubnet",
                 "nameLocation": "1141:13:43",
                 "parameters": {
-                    "id": 36894,
+                    "id": 36893,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1154:2:43"
                 }
             },
             {
-                "id": 36897,
+                "id": 36896,
                 "nodeType": "ErrorDefinition",
                 "src": "1158:31:43",
                 "nodes": [],
@@ -640,14 +634,14 @@
                 "name": "NoCollateralToWithdraw",
                 "nameLocation": "1164:22:43",
                 "parameters": {
-                    "id": 36896,
+                    "id": 36895,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1186:2:43"
                 }
             },
             {
-                "id": 36899,
+                "id": 36898,
                 "nodeType": "ErrorDefinition",
                 "src": "1190:27:43",
                 "nodes": [],
@@ -655,14 +649,14 @@
                 "name": "NoRewardToWithdraw",
                 "nameLocation": "1196:18:43",
                 "parameters": {
-                    "id": 36898,
+                    "id": 36897,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1214:2:43"
                 }
             },
             {
-                "id": 36901,
+                "id": 36900,
                 "nodeType": "ErrorDefinition",
                 "src": "1218:29:43",
                 "nodes": [],
@@ -670,14 +664,14 @@
                 "name": "NoValidatorsInSubnet",
                 "nameLocation": "1224:20:43",
                 "parameters": {
-                    "id": 36900,
+                    "id": 36899,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1244:2:43"
                 }
             },
             {
-                "id": 36903,
+                "id": 36902,
                 "nodeType": "ErrorDefinition",
                 "src": "1248:33:43",
                 "nodes": [],
@@ -685,14 +679,14 @@
                 "name": "NotAllValidatorsHaveLeft",
                 "nameLocation": "1254:24:43",
                 "parameters": {
-                    "id": 36902,
+                    "id": 36901,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1278:2:43"
                 }
             },
             {
-                "id": 36907,
+                "id": 36906,
                 "nodeType": "ErrorDefinition",
                 "src": "1282:29:43",
                 "nodes": [],
@@ -700,17 +694,17 @@
                 "name": "NotAuthorized",
                 "nameLocation": "1288:13:43",
                 "parameters": {
-                    "id": 36906,
+                    "id": 36905,
                     "nodeType": "ParameterList",
                     "parameters": [
                         {
                             "constant": false,
-                            "id": 36905,
+                            "id": 36904,
                             "mutability": "mutable",
                             "name": "",
                             "nameLocation": "-1:-1:-1",
                             "nodeType": "VariableDeclaration",
-                            "scope": 36907,
+                            "scope": 36906,
                             "src": "1302:7:43",
                             "stateVariable": false,
                             "storageLocation": "default",
@@ -719,7 +713,7 @@
                                 "typeString": "address"
                             },
                             "typeName": {
-                                "id": 36904,
+                                "id": 36903,
                                 "name": "address",
                                 "nodeType": "ElementaryTypeName",
                                 "src": "1302:7:43",
@@ -736,7 +730,7 @@
                 }
             },
             {
-                "id": 36909,
+                "id": 36908,
                 "nodeType": "ErrorDefinition",
                 "src": "1312:33:43",
                 "nodes": [],
@@ -744,14 +738,14 @@
                 "name": "NotEmptySubnetCircSupply",
                 "nameLocation": "1318:24:43",
                 "parameters": {
-                    "id": 36908,
+                    "id": 36907,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1342:2:43"
                 }
             },
             {
-                "id": 36911,
+                "id": 36910,
                 "nodeType": "ErrorDefinition",
                 "src": "1346:25:43",
                 "nodes": [],
@@ -759,14 +753,14 @@
                 "name": "NotEnoughBalance",
                 "nameLocation": "1352:16:43",
                 "parameters": {
-                    "id": 36910,
+                    "id": 36909,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1368:2:43"
                 }
             },
             {
-                "id": 36913,
+                "id": 36912,
                 "nodeType": "ErrorDefinition",
                 "src": "1372:35:43",
                 "nodes": [],
@@ -774,14 +768,14 @@
                 "name": "NotEnoughBalanceForRewards",
                 "nameLocation": "1378:26:43",
                 "parameters": {
-                    "id": 36912,
+                    "id": 36911,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1404:2:43"
                 }
             },
             {
-                "id": 36915,
+                "id": 36914,
                 "nodeType": "ErrorDefinition",
                 "src": "1408:28:43",
                 "nodes": [],
@@ -789,14 +783,14 @@
                 "name": "NotEnoughCollateral",
                 "nameLocation": "1414:19:43",
                 "parameters": {
-                    "id": 36914,
+                    "id": 36913,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1433:2:43"
                 }
             },
             {
-                "id": 36917,
+                "id": 36916,
                 "nodeType": "ErrorDefinition",
                 "src": "1437:21:43",
                 "nodes": [],
@@ -804,14 +798,14 @@
                 "name": "NotEnoughFee",
                 "nameLocation": "1443:12:43",
                 "parameters": {
-                    "id": 36916,
+                    "id": 36915,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1455:2:43"
                 }
             },
             {
-                "id": 36919,
+                "id": 36918,
                 "nodeType": "ErrorDefinition",
                 "src": "1459:23:43",
                 "nodes": [],
@@ -819,14 +813,14 @@
                 "name": "NotEnoughFunds",
                 "nameLocation": "1465:14:43",
                 "parameters": {
-                    "id": 36918,
+                    "id": 36917,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1479:2:43"
                 }
             },
             {
-                "id": 36921,
+                "id": 36920,
                 "nodeType": "ErrorDefinition",
                 "src": "1483:32:43",
                 "nodes": [],
@@ -834,14 +828,14 @@
                 "name": "NotEnoughFundsToRelease",
                 "nameLocation": "1489:23:43",
                 "parameters": {
-                    "id": 36920,
+                    "id": 36919,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1512:2:43"
                 }
             },
             {
-                "id": 36923,
+                "id": 36922,
                 "nodeType": "ErrorDefinition",
                 "src": "1516:34:43",
                 "nodes": [],
@@ -849,14 +843,14 @@
                 "name": "NotEnoughSubnetCircSupply",
                 "nameLocation": "1522:25:43",
                 "parameters": {
-                    "id": 36922,
+                    "id": 36921,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1547:2:43"
                 }
             },
             {
-                "id": 36925,
+                "id": 36924,
                 "nodeType": "ErrorDefinition",
                 "src": "1551:36:43",
                 "nodes": [],
@@ -864,14 +858,14 @@
                 "name": "NotEnoughValidatorsInSubnet",
                 "nameLocation": "1557:27:43",
                 "parameters": {
-                    "id": 36924,
+                    "id": 36923,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1584:2:43"
                 }
             },
             {
-                "id": 36927,
+                "id": 36926,
                 "nodeType": "ErrorDefinition",
                 "src": "1588:19:43",
                 "nodes": [],
@@ -879,14 +873,14 @@
                 "name": "NotGateway",
                 "nameLocation": "1594:10:43",
                 "parameters": {
-                    "id": 36926,
+                    "id": 36925,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1604:2:43"
                 }
             },
             {
-                "id": 36929,
+                "id": 36928,
                 "nodeType": "ErrorDefinition",
                 "src": "1608:28:43",
                 "nodes": [],
@@ -894,14 +888,14 @@
                 "name": "NotOwnerOfPublicKey",
                 "nameLocation": "1614:19:43",
                 "parameters": {
-                    "id": 36928,
+                    "id": 36927,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1633:2:43"
                 }
             },
             {
-                "id": 36931,
+                "id": 36930,
                 "nodeType": "ErrorDefinition",
                 "src": "1637:28:43",
                 "nodes": [],
@@ -909,14 +903,14 @@
                 "name": "NotRegisteredSubnet",
                 "nameLocation": "1643:19:43",
                 "parameters": {
-                    "id": 36930,
+                    "id": 36929,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1662:2:43"
                 }
             },
             {
-                "id": 36933,
+                "id": 36932,
                 "nodeType": "ErrorDefinition",
                 "src": "1666:24:43",
                 "nodes": [],
@@ -924,14 +918,14 @@
                 "name": "NotStakedBefore",
                 "nameLocation": "1672:15:43",
                 "parameters": {
-                    "id": 36932,
+                    "id": 36931,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1687:2:43"
                 }
             },
             {
-                "id": 36935,
+                "id": 36934,
                 "nodeType": "ErrorDefinition",
                 "src": "1691:23:43",
                 "nodes": [],
@@ -939,14 +933,14 @@
                 "name": "NotSystemActor",
                 "nameLocation": "1697:14:43",
                 "parameters": {
-                    "id": 36934,
+                    "id": 36933,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1711:2:43"
                 }
             },
             {
-                "id": 36939,
+                "id": 36938,
                 "nodeType": "ErrorDefinition",
                 "src": "1715:28:43",
                 "nodes": [],
@@ -954,17 +948,17 @@
                 "name": "NotValidator",
                 "nameLocation": "1721:12:43",
                 "parameters": {
-                    "id": 36938,
+                    "id": 36937,
                     "nodeType": "ParameterList",
                     "parameters": [
                         {
                             "constant": false,
-                            "id": 36937,
+                            "id": 36936,
                             "mutability": "mutable",
                             "name": "",
                             "nameLocation": "-1:-1:-1",
                             "nodeType": "VariableDeclaration",
-                            "scope": 36939,
+                            "scope": 36938,
                             "src": "1734:7:43",
                             "stateVariable": false,
                             "storageLocation": "default",
@@ -973,7 +967,7 @@
                                 "typeString": "address"
                             },
                             "typeName": {
-                                "id": 36936,
+                                "id": 36935,
                                 "name": "address",
                                 "nodeType": "ElementaryTypeName",
                                 "src": "1734:7:43",
@@ -990,7 +984,7 @@
                 }
             },
             {
-                "id": 36941,
+                "id": 36940,
                 "nodeType": "ErrorDefinition",
                 "src": "1744:31:43",
                 "nodes": [],
@@ -998,14 +992,14 @@
                 "name": "OldConfigurationNumber",
                 "nameLocation": "1750:22:43",
                 "parameters": {
-                    "id": 36940,
+                    "id": 36939,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1772:2:43"
                 }
             },
             {
-                "id": 36943,
+                "id": 36942,
                 "nodeType": "ErrorDefinition",
                 "src": "1776:32:43",
                 "nodes": [],
@@ -1013,14 +1007,14 @@
                 "name": "PQDoesNotContainAddress",
                 "nameLocation": "1782:23:43",
                 "parameters": {
-                    "id": 36942,
+                    "id": 36941,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1805:2:43"
                 }
             },
             {
-                "id": 36945,
+                "id": 36944,
                 "nodeType": "ErrorDefinition",
                 "src": "1809:16:43",
                 "nodes": [],
@@ -1028,14 +1022,14 @@
                 "name": "PQEmpty",
                 "nameLocation": "1815:7:43",
                 "parameters": {
-                    "id": 36944,
+                    "id": 36943,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1822:2:43"
                 }
             },
             {
-                "id": 36947,
+                "id": 36946,
                 "nodeType": "ErrorDefinition",
                 "src": "1826:39:43",
                 "nodes": [],
@@ -1043,14 +1037,14 @@
                 "name": "ParentFinalityAlreadyCommitted",
                 "nameLocation": "1832:30:43",
                 "parameters": {
-                    "id": 36946,
+                    "id": 36945,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1862:2:43"
                 }
             },
             {
-                "id": 36949,
+                "id": 36948,
                 "nodeType": "ErrorDefinition",
                 "src": "1866:24:43",
                 "nodes": [],
@@ -1058,14 +1052,14 @@
                 "name": "PostboxNotExist",
                 "nameLocation": "1872:15:43",
                 "parameters": {
-                    "id": 36948,
+                    "id": 36947,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1887:2:43"
                 }
             },
             {
-                "id": 36951,
+                "id": 36950,
                 "nodeType": "ErrorDefinition",
                 "src": "1891:24:43",
                 "nodes": [],
@@ -1073,14 +1067,14 @@
                 "name": "SignatureReplay",
                 "nameLocation": "1897:15:43",
                 "parameters": {
-                    "id": 36950,
+                    "id": 36949,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1912:2:43"
                 }
             },
             {
-                "id": 36953,
+                "id": 36952,
                 "nodeType": "ErrorDefinition",
                 "src": "1916:28:43",
                 "nodes": [],
@@ -1088,14 +1082,14 @@
                 "name": "SubnetAlreadyKilled",
                 "nameLocation": "1922:19:43",
                 "parameters": {
-                    "id": 36952,
+                    "id": 36951,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1941:2:43"
                 }
             },
             {
-                "id": 36955,
+                "id": 36954,
                 "nodeType": "ErrorDefinition",
                 "src": "1945:24:43",
                 "nodes": [],
@@ -1103,14 +1097,14 @@
                 "name": "SubnetNotActive",
                 "nameLocation": "1951:15:43",
                 "parameters": {
-                    "id": 36954,
+                    "id": 36953,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1966:2:43"
                 }
             },
             {
-                "id": 36957,
+                "id": 36956,
                 "nodeType": "ErrorDefinition",
                 "src": "1970:23:43",
                 "nodes": [],
@@ -1118,14 +1112,14 @@
                 "name": "SubnetNotFound",
                 "nameLocation": "1976:14:43",
                 "parameters": {
-                    "id": 36956,
+                    "id": 36955,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "1990:2:43"
                 }
             },
             {
-                "id": 36959,
+                "id": 36958,
                 "nodeType": "ErrorDefinition",
                 "src": "1994:36:43",
                 "nodes": [],
@@ -1133,14 +1127,14 @@
                 "name": "WithdrawExceedingCollateral",
                 "nameLocation": "2000:27:43",
                 "parameters": {
-                    "id": 36958,
+                    "id": 36957,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "2027:2:43"
                 }
             },
             {
-                "id": 36961,
+                "id": 36960,
                 "nodeType": "ErrorDefinition",
                 "src": "2031:29:43",
                 "nodes": [],
@@ -1148,14 +1142,14 @@
                 "name": "ZeroMembershipWeight",
                 "nameLocation": "2037:20:43",
                 "parameters": {
-                    "id": 36960,
+                    "id": 36959,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "2057:2:43"
                 }
             },
             {
-                "id": 36963,
+                "id": 36962,
                 "nodeType": "ErrorDefinition",
                 "src": "2061:34:43",
                 "nodes": [],
@@ -1163,14 +1157,14 @@
                 "name": "SubnetAlreadyBootstrapped",
                 "nameLocation": "2067:25:43",
                 "parameters": {
-                    "id": 36962,
+                    "id": 36961,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "2092:2:43"
                 }
             },
             {
-                "id": 36965,
+                "id": 36964,
                 "nodeType": "ErrorDefinition",
                 "src": "2096:26:43",
                 "nodes": [],
@@ -1178,14 +1172,14 @@
                 "name": "FacetCannotBeZero",
                 "nameLocation": "2102:17:43",
                 "parameters": {
-                    "id": 36964,
+                    "id": 36963,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "2119:2:43"
                 }
             },
             {
-                "id": 36967,
+                "id": 36966,
                 "nodeType": "ErrorDefinition",
                 "src": "2123:21:43",
                 "nodes": [],
@@ -1193,14 +1187,14 @@
                 "name": "WrongGateway",
                 "nameLocation": "2129:12:43",
                 "parameters": {
-                    "id": 36966,
+                    "id": 36965,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "2141:2:43"
                 }
             },
             {
-                "id": 36969,
+                "id": 36968,
                 "nodeType": "ErrorDefinition",
                 "src": "2145:25:43",
                 "nodes": [],
@@ -1208,14 +1202,14 @@
                 "name": "CannotFindSubnet",
                 "nameLocation": "2151:16:43",
                 "parameters": {
-                    "id": 36968,
+                    "id": 36967,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "2167:2:43"
                 }
             },
             {
-                "id": 36971,
+                "id": 36970,
                 "nodeType": "ErrorDefinition",
                 "src": "2171:22:43",
                 "nodes": [],
@@ -1223,7 +1217,7 @@
                 "name": "UnknownSubnet",
                 "nameLocation": "2177:13:43",
                 "parameters": {
-                    "id": 36970,
+                    "id": 36969,
                     "nodeType": "ParameterList",
                     "parameters": [],
                     "src": "2190:2:43"

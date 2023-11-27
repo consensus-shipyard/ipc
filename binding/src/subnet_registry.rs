@@ -7,7 +7,7 @@ pub use subnet_registry::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod subnet_registry {
     #[allow(deprecated)]
@@ -22,9 +22,8 @@ pub mod subnet_registry {
         }
     }
     ///The parsed human-readable ABI of the contract.
-    pub static SUBNETREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(
-        __abi,
-    );
+    pub static SUBNETREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(__abi);
     pub struct SubnetRegistry<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for SubnetRegistry<M> {
         fn clone(&self) -> Self {
@@ -56,17 +55,16 @@ pub mod subnet_registry {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    SUBNETREGISTRY_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                SUBNETREGISTRY_ABI.clone(),
+                client,
+            ))
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for SubnetRegistry<M> {
+        for SubnetRegistry<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }

@@ -127,7 +127,7 @@ library LibMinPQ {
 
     function sink(MinPQ storage self, ValidatorSet storage validators, uint16 pos, uint256 value) internal {
         uint16 childPos = pos * 2;
-        uint256 childCollateral = 0;
+        uint256 childCollateral;
 
         uint16 size = self.inner.size;
 

@@ -1,27 +1,25 @@
 {
     "abi": [
         {
-            "inputs": [],
+            "type": "error",
             "name": "MerkleProofInvalidMultiproof",
-            "type": "error"
+            "inputs": []
         }
     ],
     "bytecode": {
-        "object": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea26469706673582212205d323858d4ee384cd1b789dc45004b93d32f30de110118a6fd1d18fe331e50c064736f6c63430008130033",
+        "object": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea264697066735822122058e0b6c23aa8c664e42da430a70ed6865c5735d976da9aeef2aea044a6dfed5c64736f6c63430008130033",
         "sourceMap": "803:9035:30:-:0;;;;;;;;;;;;;;;;;;;;;",
         "linkReferences": {}
     },
     "deployedBytecode": {
-        "object": "0x600080fdfea26469706673582212205d323858d4ee384cd1b789dc45004b93d32f30de110118a6fd1d18fe331e50c064736f6c63430008130033",
+        "object": "0x600080fdfea264697066735822122058e0b6c23aa8c664e42da430a70ed6865c5735d976da9aeef2aea044a6dfed5c64736f6c63430008130033",
         "sourceMap": "803:9035:30:-:0;;",
         "linkReferences": {}
     },
     "methodIdentifiers": {},
-    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"MerkleProofInvalidMultiproof\",\"type\":\"error\"}],\"devdoc\":{\"details\":\"These functions deal with verification of Merkle Tree proofs. The tree and the proofs can be generated using our https://github.com/OpenZeppelin/merkle-tree[JavaScript library]. You will find a quickstart guide in the readme. WARNING: You should avoid using leaf values that are 64 bytes long prior to hashing, or use a hash function other than keccak256 for hashing leaves. This is because the concatenation of a sorted pair of internal nodes in the merkle tree could be reinterpreted as a leaf value. OpenZeppelin's JavaScript library generates merkle trees that are safe against this attack out of the box.\",\"errors\":{\"MerkleProofInvalidMultiproof()\":[{\"details\":\"The multiproof provided is not valid.\"}]},\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol\":\"MerkleProof\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":@openzeppelin/=node_modules/@openzeppelin/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":hardhat-deploy/=node_modules/hardhat-deploy/\",\":hardhat/=node_modules/hardhat/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\",\":sol-explore/=node_modules/sol-explore/\"],\"viaIR\":true},\"sources\":{\"lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol\":{\"keccak256\":\"0xeef0055c9d8aba5fd076b940267fdaad89cf5a1c341f81973553a802390985df\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://7ef9483358a9db47fda4e196be3247d985729246412c1752c50531400a4863de\",\"dweb:/ipfs/QmYxMMfqh9BbJgDimU6t7YBmPFLcmXerWaSVAg3DoiGZuQ\"]}},\"version\":1}",
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"MerkleProofInvalidMultiproof\",\"type\":\"error\"}],\"devdoc\":{\"details\":\"These functions deal with verification of Merkle Tree proofs. The tree and the proofs can be generated using our https://github.com/OpenZeppelin/merkle-tree[JavaScript library]. You will find a quickstart guide in the readme. WARNING: You should avoid using leaf values that are 64 bytes long prior to hashing, or use a hash function other than keccak256 for hashing leaves. This is because the concatenation of a sorted pair of internal nodes in the merkle tree could be reinterpreted as a leaf value. OpenZeppelin's JavaScript library generates merkle trees that are safe against this attack out of the box.\",\"errors\":{\"MerkleProofInvalidMultiproof()\":[{\"details\":\"The multiproof provided is not valid.\"}]},\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol\":\"MerkleProof\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol\":{\"keccak256\":\"0xeef0055c9d8aba5fd076b940267fdaad89cf5a1c341f81973553a802390985df\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://7ef9483358a9db47fda4e196be3247d985729246412c1752c50531400a4863de\",\"dweb:/ipfs/QmYxMMfqh9BbJgDimU6t7YBmPFLcmXerWaSVAg3DoiGZuQ\"]}},\"version\":1}",
     "metadata": {
-        "compiler": {
-            "version": "0.8.19+commit.7dd6d404"
-        },
+        "compiler": { "version": "0.8.19+commit.7dd6d404" },
         "language": "Solidity",
         "output": {
             "abi": [
@@ -31,39 +29,22 @@
                     "name": "MerkleProofInvalidMultiproof"
                 }
             ],
-            "devdoc": {
-                "kind": "dev",
-                "methods": {},
-                "version": 1
-            },
-            "userdoc": {
-                "kind": "user",
-                "methods": {},
-                "version": 1
-            }
+            "devdoc": { "kind": "dev", "methods": {}, "version": 1 },
+            "userdoc": { "kind": "user", "methods": {}, "version": 1 }
         },
         "settings": {
             "remappings": [
-                "@openzeppelin/=node_modules/@openzeppelin/",
                 "ds-test/=lib/forge-std/lib/ds-test/src/",
                 "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
                 "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
                 "fevmate/=lib/fevmate/contracts/",
                 "forge-std/=lib/forge-std/src/",
-                "hardhat-deploy/=node_modules/hardhat-deploy/",
-                "hardhat/=node_modules/hardhat/",
                 "murky/=lib/murky/src/",
                 "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
-                "openzeppelin/=lib/openzeppelin-contracts/contracts/",
-                "sol-explore/=node_modules/sol-explore/"
+                "openzeppelin/=lib/openzeppelin-contracts/contracts/"
             ],
-            "optimizer": {
-                "enabled": true,
-                "runs": 200
-            },
-            "metadata": {
-                "bytecodeHash": "ipfs"
-            },
+            "optimizer": { "enabled": true, "runs": 200 },
+            "metadata": { "bytecodeHash": "ipfs" },
             "compilationTarget": {
                 "lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol": "MerkleProof"
             },
@@ -85,9 +66,7 @@
     "ast": {
         "absolutePath": "lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol",
         "id": 33632,
-        "exportedSymbols": {
-            "MerkleProof": [33631]
-        },
+        "exportedSymbols": { "MerkleProof": [33631] },
         "nodeType": "SourceUnit",
         "src": "118:9721:30",
         "nodes": [
