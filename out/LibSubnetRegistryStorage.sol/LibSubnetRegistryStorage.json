@@ -1,37 +1,45 @@
 {
     "abi": [],
-    "bytecode": { "object": "0x", "linkReferences": {} },
-    "deployedBytecode": { "object": "0x", "linkReferences": {} },
+    "bytecode": {
+        "object": "0x",
+        "linkReferences": {}
+    },
+    "deployedBytecode": {
+        "object": "0x",
+        "linkReferences": {}
+    },
     "ast": {
         "absolutePath": "src/lib/LibSubnetRegistryStorage.sol",
-        "id": 44682,
-        "exportedSymbols": { "SubnetRegistryActorStorage": [44681] },
+        "id": 13898,
+        "exportedSymbols": {
+            "SubnetRegistryActorStorage": [13897]
+        },
         "nodeType": "SourceUnit",
-        "src": "46:939:65",
+        "src": "46:939:45",
         "nodes": [
             {
-                "id": 44653,
+                "id": 13869,
                 "nodeType": "PragmaDirective",
-                "src": "46:23:65",
+                "src": "46:23:45",
                 "nodes": [],
                 "literals": ["solidity", "0.8", ".19"]
             },
             {
-                "id": 44681,
+                "id": 13897,
                 "nodeType": "StructDefinition",
-                "src": "71:913:65",
+                "src": "71:913:45",
                 "nodes": [],
                 "canonicalName": "SubnetRegistryActorStorage",
                 "members": [
                     {
                         "constant": false,
-                        "id": 44655,
+                        "id": 13871,
                         "mutability": "mutable",
                         "name": "GATEWAY",
-                        "nameLocation": "171:7:65",
+                        "nameLocation": "171:7:45",
                         "nodeType": "VariableDeclaration",
-                        "scope": 44681,
-                        "src": "163:15:65",
+                        "scope": 13897,
+                        "src": "163:15:45",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -39,10 +47,10 @@
                             "typeString": "address"
                         },
                         "typeName": {
-                            "id": 44654,
+                            "id": 13870,
                             "name": "address",
                             "nodeType": "ElementaryTypeName",
-                            "src": "163:7:65",
+                            "src": "163:7:45",
                             "stateMutability": "nonpayable",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_address",
@@ -53,13 +61,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 44658,
+                        "id": 13874,
                         "mutability": "mutable",
                         "name": "SUBNET_GETTER_FACET",
-                        "nameLocation": "299:19:65",
+                        "nameLocation": "299:19:45",
                         "nodeType": "VariableDeclaration",
-                        "scope": 44681,
-                        "src": "291:27:65",
+                        "scope": 13897,
+                        "src": "291:27:45",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -67,10 +75,10 @@
                             "typeString": "address"
                         },
                         "typeName": {
-                            "id": 44657,
+                            "id": 13873,
                             "name": "address",
                             "nodeType": "ElementaryTypeName",
-                            "src": "291:7:65",
+                            "src": "291:7:45",
                             "stateMutability": "nonpayable",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_address",
@@ -81,13 +89,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 44660,
+                        "id": 13876,
                         "mutability": "mutable",
                         "name": "SUBNET_MANAGER_FACET",
-                        "nameLocation": "384:20:65",
+                        "nameLocation": "384:20:45",
                         "nodeType": "VariableDeclaration",
-                        "scope": 44681,
-                        "src": "376:28:65",
+                        "scope": 13897,
+                        "src": "376:28:45",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -95,10 +103,10 @@
                             "typeString": "address"
                         },
                         "typeName": {
-                            "id": 44659,
+                            "id": 13875,
                             "name": "address",
                             "nodeType": "ElementaryTypeName",
-                            "src": "376:7:65",
+                            "src": "376:7:45",
                             "stateMutability": "nonpayable",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_address",
@@ -109,13 +117,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 44664,
+                        "id": 13880,
                         "mutability": "mutable",
                         "name": "subnetGetterSelectors",
-                        "nameLocation": "471:21:65",
+                        "nameLocation": "471:21:45",
                         "nodeType": "VariableDeclaration",
-                        "scope": 44681,
-                        "src": "462:30:65",
+                        "scope": 13897,
+                        "src": "462:30:45",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -124,18 +132,18 @@
                         },
                         "typeName": {
                             "baseType": {
-                                "id": 44662,
+                                "id": 13878,
                                 "name": "bytes4",
                                 "nodeType": "ElementaryTypeName",
-                                "src": "462:6:65",
+                                "src": "462:6:45",
                                 "typeDescriptions": {
                                     "typeIdentifier": "t_bytes4",
                                     "typeString": "bytes4"
                                 }
                             },
-                            "id": 44663,
+                            "id": 13879,
                             "nodeType": "ArrayTypeName",
-                            "src": "462:8:65",
+                            "src": "462:8:45",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_array$_t_bytes4_$dyn_storage_ptr",
                                 "typeString": "bytes4[]"
@@ -145,13 +153,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 44668,
+                        "id": 13884,
                         "mutability": "mutable",
                         "name": "subnetManagerSelectors",
-                        "nameLocation": "560:22:65",
+                        "nameLocation": "560:22:45",
                         "nodeType": "VariableDeclaration",
-                        "scope": 44681,
-                        "src": "551:31:65",
+                        "scope": 13897,
+                        "src": "551:31:45",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -160,18 +168,18 @@
                         },
                         "typeName": {
                             "baseType": {
-                                "id": 44666,
+                                "id": 13882,
                                 "name": "bytes4",
                                 "nodeType": "ElementaryTypeName",
-                                "src": "551:6:65",
+                                "src": "551:6:45",
                                 "typeDescriptions": {
                                     "typeIdentifier": "t_bytes4",
                                     "typeString": "bytes4"
                                 }
                             },
-                            "id": 44667,
+                            "id": 13883,
                             "nodeType": "ArrayTypeName",
-                            "src": "551:8:65",
+                            "src": "551:8:45",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_array$_t_bytes4_$dyn_storage_ptr",
                                 "typeString": "bytes4[]"
@@ -181,13 +189,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 44675,
+                        "id": 13891,
                         "mutability": "mutable",
                         "name": "subnets",
-                        "nameLocation": "809:7:65",
+                        "nameLocation": "809:7:45",
                         "nodeType": "VariableDeclaration",
-                        "scope": 44681,
-                        "src": "762:54:65",
+                        "scope": 13897,
+                        "src": "762:54:45",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -195,21 +203,21 @@
                             "typeString": "mapping(address => mapping(uint64 => address))"
                         },
                         "typeName": {
-                            "id": 44674,
+                            "id": 13890,
                             "keyName": "",
                             "keyNameLocation": "-1:-1:-1",
                             "keyType": {
-                                "id": 44670,
+                                "id": 13886,
                                 "name": "address",
                                 "nodeType": "ElementaryTypeName",
-                                "src": "770:7:65",
+                                "src": "770:7:45",
                                 "typeDescriptions": {
                                     "typeIdentifier": "t_address",
                                     "typeString": "address"
                                 }
                             },
                             "nodeType": "Mapping",
-                            "src": "762:46:65",
+                            "src": "762:46:45",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_mapping$_t_address_$_t_mapping$_t_uint64_$_t_address_$_$",
                                 "typeString": "mapping(address => mapping(uint64 => address))"
@@ -217,21 +225,21 @@
                             "valueName": "",
                             "valueNameLocation": "-1:-1:-1",
                             "valueType": {
-                                "id": 44673,
+                                "id": 13889,
                                 "keyName": "",
                                 "keyNameLocation": "-1:-1:-1",
                                 "keyType": {
-                                    "id": 44671,
+                                    "id": 13887,
                                     "name": "uint64",
                                     "nodeType": "ElementaryTypeName",
-                                    "src": "789:6:65",
+                                    "src": "789:6:45",
                                     "typeDescriptions": {
                                         "typeIdentifier": "t_uint64",
                                         "typeString": "uint64"
                                     }
                                 },
                                 "nodeType": "Mapping",
-                                "src": "781:26:65",
+                                "src": "781:26:45",
                                 "typeDescriptions": {
                                     "typeIdentifier": "t_mapping$_t_uint64_$_t_address_$",
                                     "typeString": "mapping(uint64 => address)"
@@ -239,10 +247,10 @@
                                 "valueName": "",
                                 "valueNameLocation": "-1:-1:-1",
                                 "valueType": {
-                                    "id": 44672,
+                                    "id": 13888,
                                     "name": "address",
                                     "nodeType": "ElementaryTypeName",
-                                    "src": "799:7:65",
+                                    "src": "799:7:45",
                                     "stateMutability": "nonpayable",
                                     "typeDescriptions": {
                                         "typeIdentifier": "t_address",
@@ -255,13 +263,13 @@
                     },
                     {
                         "constant": false,
-                        "id": 44680,
+                        "id": 13896,
                         "mutability": "mutable",
                         "name": "userNonces",
-                        "nameLocation": "971:10:65",
+                        "nameLocation": "971:10:45",
                         "nodeType": "VariableDeclaration",
-                        "scope": 44681,
-                        "src": "944:37:65",
+                        "scope": 13897,
+                        "src": "944:37:45",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -269,21 +277,21 @@
                             "typeString": "mapping(address => uint64)"
                         },
                         "typeName": {
-                            "id": 44679,
+                            "id": 13895,
                             "keyName": "",
                             "keyNameLocation": "-1:-1:-1",
                             "keyType": {
-                                "id": 44677,
+                                "id": 13893,
                                 "name": "address",
                                 "nodeType": "ElementaryTypeName",
-                                "src": "952:7:65",
+                                "src": "952:7:45",
                                 "typeDescriptions": {
                                     "typeIdentifier": "t_address",
                                     "typeString": "address"
                                 }
                             },
                             "nodeType": "Mapping",
-                            "src": "944:26:65",
+                            "src": "944:26:45",
                             "typeDescriptions": {
                                 "typeIdentifier": "t_mapping$_t_address_$_t_uint64_$",
                                 "typeString": "mapping(address => uint64)"
@@ -291,10 +299,10 @@
                             "valueName": "",
                             "valueNameLocation": "-1:-1:-1",
                             "valueType": {
-                                "id": 44678,
+                                "id": 13894,
                                 "name": "uint64",
                                 "nodeType": "ElementaryTypeName",
-                                "src": "963:6:65",
+                                "src": "963:6:45",
                                 "typeDescriptions": {
                                     "typeIdentifier": "t_uint64",
                                     "typeString": "uint64"
@@ -305,12 +313,12 @@
                     }
                 ],
                 "name": "SubnetRegistryActorStorage",
-                "nameLocation": "78:26:65",
-                "scope": 44682,
+                "nameLocation": "78:26:45",
+                "scope": 13898,
                 "visibility": "public"
             }
         ],
         "license": "MIT OR Apache-2.0"
     },
-    "id": 65
+    "id": 45
 }

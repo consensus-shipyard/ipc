@@ -1,76 +1,84 @@
 {
     "abi": [],
-    "bytecode": { "object": "0x", "linkReferences": {} },
-    "deployedBytecode": { "object": "0x", "linkReferences": {} },
+    "bytecode": {
+        "object": "0x",
+        "linkReferences": {}
+    },
+    "deployedBytecode": {
+        "object": "0x",
+        "linkReferences": {}
+    },
     "ast": {
         "absolutePath": "src/enums/Status.sol",
-        "id": 36823,
-        "exportedSymbols": { "Status": [36822] },
+        "id": 6039,
+        "exportedSymbols": {
+            "Status": [6038]
+        },
         "nodeType": "SourceUnit",
-        "src": "46:181:42",
+        "src": "46:181:22",
         "nodes": [
             {
-                "id": 36815,
+                "id": 6031,
                 "nodeType": "PragmaDirective",
-                "src": "46:23:42",
+                "src": "46:23:22",
                 "nodes": [],
                 "literals": ["solidity", "0.8", ".19"]
             },
             {
-                "id": 36822,
+                "id": 6038,
                 "nodeType": "EnumDefinition",
-                "src": "128:98:42",
+                "src": "128:98:22",
                 "nodes": [],
                 "canonicalName": "Status",
                 "members": [
                     {
-                        "id": 36816,
+                        "id": 6032,
                         "name": "Unset",
-                        "nameLocation": "146:5:42",
+                        "nameLocation": "146:5:22",
                         "nodeType": "EnumValue",
-                        "src": "146:5:42"
+                        "src": "146:5:22"
                     },
                     {
-                        "id": 36817,
+                        "id": 6033,
                         "name": "Active",
-                        "nameLocation": "157:6:42",
+                        "nameLocation": "157:6:22",
                         "nodeType": "EnumValue",
-                        "src": "157:6:42"
+                        "src": "157:6:22"
                     },
                     {
-                        "id": 36818,
+                        "id": 6034,
                         "name": "Inactive",
-                        "nameLocation": "169:8:42",
+                        "nameLocation": "169:8:22",
                         "nodeType": "EnumValue",
-                        "src": "169:8:42"
+                        "src": "169:8:22"
                     },
                     {
-                        "id": 36819,
+                        "id": 6035,
                         "name": "Killed",
-                        "nameLocation": "183:6:42",
+                        "nameLocation": "183:6:22",
                         "nodeType": "EnumValue",
-                        "src": "183:6:42"
+                        "src": "183:6:22"
                     },
                     {
-                        "id": 36820,
+                        "id": 6036,
                         "name": "Terminating",
-                        "nameLocation": "195:11:42",
+                        "nameLocation": "195:11:22",
                         "nodeType": "EnumValue",
-                        "src": "195:11:42"
+                        "src": "195:11:22"
                     },
                     {
-                        "id": 36821,
+                        "id": 6037,
                         "name": "Instantiated",
-                        "nameLocation": "212:12:42",
+                        "nameLocation": "212:12:22",
                         "nodeType": "EnumValue",
-                        "src": "212:12:42"
+                        "src": "212:12:22"
                     }
                 ],
                 "name": "Status",
-                "nameLocation": "133:6:42"
+                "nameLocation": "133:6:22"
             }
         ],
         "license": "MIT OR Apache-2.0"
     },
-    "id": 42
+    "id": 22
 }

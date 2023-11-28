@@ -1,107 +1,145 @@
 {
     "abi": [
         {
-            "type": "function",
+            "inputs": [
+                {
+                    "internalType": "bytes32[]",
+                    "name": "data",
+                    "type": "bytes32[]"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "node",
+                    "type": "uint256"
+                }
+            ],
             "name": "getProof",
-            "inputs": [
-                {
-                    "name": "data",
-                    "type": "bytes32[]",
-                    "internalType": "bytes32[]"
-                },
-                { "name": "node", "type": "uint256", "internalType": "uint256" }
-            ],
             "outputs": [
-                { "name": "", "type": "bytes32[]", "internalType": "bytes32[]" }
+                {
+                    "internalType": "bytes32[]",
+                    "name": "",
+                    "type": "bytes32[]"
+                }
             ],
-            "stateMutability": "pure"
+            "stateMutability": "pure",
+            "type": "function"
         },
         {
-            "type": "function",
+            "inputs": [
+                {
+                    "internalType": "bytes32[]",
+                    "name": "data",
+                    "type": "bytes32[]"
+                }
+            ],
             "name": "getRoot",
-            "inputs": [
+            "outputs": [
                 {
-                    "name": "data",
-                    "type": "bytes32[]",
-                    "internalType": "bytes32[]"
+                    "internalType": "bytes32",
+                    "name": "",
+                    "type": "bytes32"
                 }
             ],
-            "outputs": [
-                { "name": "", "type": "bytes32", "internalType": "bytes32" }
-            ],
-            "stateMutability": "pure"
+            "stateMutability": "pure",
+            "type": "function"
         },
         {
-            "type": "function",
-            "name": "hashLeafPairs",
             "inputs": [
                 {
+                    "internalType": "bytes32",
                     "name": "left",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
+                    "type": "bytes32"
                 },
                 {
+                    "internalType": "bytes32",
                     "name": "right",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
+                    "type": "bytes32"
                 }
             ],
+            "name": "hashLeafPairs",
             "outputs": [
                 {
+                    "internalType": "bytes32",
                     "name": "_hash",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
+                    "type": "bytes32"
                 }
             ],
-            "stateMutability": "pure"
+            "stateMutability": "pure",
+            "type": "function"
         },
         {
-            "type": "function",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "x",
+                    "type": "uint256"
+                }
+            ],
             "name": "log2ceil",
-            "inputs": [
-                { "name": "x", "type": "uint256", "internalType": "uint256" }
-            ],
             "outputs": [
-                { "name": "", "type": "uint256", "internalType": "uint256" }
-            ],
-            "stateMutability": "pure"
-        },
-        {
-            "type": "function",
-            "name": "log2ceilBitMagic",
-            "inputs": [
-                { "name": "x", "type": "uint256", "internalType": "uint256" }
-            ],
-            "outputs": [
-                { "name": "", "type": "uint256", "internalType": "uint256" }
-            ],
-            "stateMutability": "pure"
-        },
-        {
-            "type": "function",
-            "name": "verifyProof",
-            "inputs": [
                 {
-                    "name": "root",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
-                },
-                {
-                    "name": "proof",
-                    "type": "bytes32[]",
-                    "internalType": "bytes32[]"
-                },
-                {
-                    "name": "valueToProve",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
                 }
             ],
-            "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
-            "stateMutability": "pure"
+            "stateMutability": "pure",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "x",
+                    "type": "uint256"
+                }
+            ],
+            "name": "log2ceilBitMagic",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "bytes32",
+                    "name": "root",
+                    "type": "bytes32"
+                },
+                {
+                    "internalType": "bytes32[]",
+                    "name": "proof",
+                    "type": "bytes32[]"
+                },
+                {
+                    "internalType": "bytes32",
+                    "name": "valueToProve",
+                    "type": "bytes32"
+                }
+            ],
+            "name": "verifyProof",
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
         }
     ],
-    "bytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
+    "bytecode": {
+        "object": "0x",
+        "sourceMap": "",
+        "linkReferences": {}
+    },
     "deployedBytecode": {
         "object": "0x",
         "sourceMap": "",
@@ -115,9 +153,11 @@
         "log2ceilBitMagic(uint256)": "cf06c7b7",
         "verifyProof(bytes32,bytes32[],bytes32)": "58161a42"
     },
-    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint256\",\"name\":\"node\",\"type\":\"uint256\"}],\"name\":\"getProof\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"}],\"name\":\"getRoot\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"left\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"right\",\"type\":\"bytes32\"}],\"name\":\"hashLeafPairs\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"_hash\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceil\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceilBitMagic\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32[]\",\"name\":\"proof\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes32\",\"name\":\"valueToProve\",\"type\":\"bytes32\"}],\"name\":\"verifyProof\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"log2ceil(uint256)\":{\"details\":\"Note that x is assumed > 0\"},\"log2ceilBitMagic(uint256)\":{\"details\":\"Note that x assumed > 1\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"log2ceilBitMagic(uint256)\":{\"notice\":\"Original bitmagic adapted from https://github.com/paulrberg/prb-math/blob/main/contracts/PRBMath.sol\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/murky/src/common/MurkyBase.sol\":\"MurkyBase\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"viaIR\":true},\"sources\":{\"lib/murky/src/common/MurkyBase.sol\":{\"keccak256\":\"0x5287741b2b215c9a11cc8482b419abde0625dfc3949d539c72ee498108842894\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://259e803b0811e404bba09237bce4ef42f2ff27dacaca770d1eb7c1afddbf762b\",\"dweb:/ipfs/QmWfbsHa1siBxDEqFmbnzUuZqyitFZHmDXo2vc4cVn4uJe\"]}},\"version\":1}",
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint256\",\"name\":\"node\",\"type\":\"uint256\"}],\"name\":\"getProof\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"data\",\"type\":\"bytes32[]\"}],\"name\":\"getRoot\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"left\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"right\",\"type\":\"bytes32\"}],\"name\":\"hashLeafPairs\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"_hash\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceil\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"x\",\"type\":\"uint256\"}],\"name\":\"log2ceilBitMagic\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32[]\",\"name\":\"proof\",\"type\":\"bytes32[]\"},{\"internalType\":\"bytes32\",\"name\":\"valueToProve\",\"type\":\"bytes32\"}],\"name\":\"verifyProof\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"log2ceil(uint256)\":{\"details\":\"Note that x is assumed > 0\"},\"log2ceilBitMagic(uint256)\":{\"details\":\"Note that x assumed > 1\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"log2ceilBitMagic(uint256)\":{\"notice\":\"Original bitmagic adapted from https://github.com/paulrberg/prb-math/blob/main/contracts/PRBMath.sol\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"lib/murky/src/common/MurkyBase.sol\":\"MurkyBase\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":@openzeppelin/=node_modules/@openzeppelin/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":elliptic-curve-solidity/=lib/elliptic-curve-solidity/\",\":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\":fevmate/=lib/fevmate/contracts/\",\":forge-std/=lib/forge-std/src/\",\":hardhat-deploy/=node_modules/hardhat-deploy/\",\":hardhat/=node_modules/hardhat/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\":openzeppelin/=lib/openzeppelin-contracts/contracts/\"]},\"sources\":{\"lib/murky/src/common/MurkyBase.sol\":{\"keccak256\":\"0x5287741b2b215c9a11cc8482b419abde0625dfc3949d539c72ee498108842894\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://259e803b0811e404bba09237bce4ef42f2ff27dacaca770d1eb7c1afddbf762b\",\"dweb:/ipfs/QmWfbsHa1siBxDEqFmbnzUuZqyitFZHmDXo2vc4cVn4uJe\"]}},\"version\":1}",
     "metadata": {
-        "compiler": { "version": "0.8.19+commit.7dd6d404" },
+        "compiler": {
+            "version": "0.8.19+commit.7dd6d404"
+        },
         "language": "Solidity",
         "output": {
             "abi": [
@@ -248,7 +288,11 @@
                     "type": "function",
                     "name": "verifyProof",
                     "outputs": [
-                        { "internalType": "bool", "name": "", "type": "bool" }
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
                     ]
                 }
             ],
@@ -276,22 +320,29 @@
         },
         "settings": {
             "remappings": [
+                "@openzeppelin/=node_modules/@openzeppelin/",
                 "ds-test/=lib/forge-std/lib/ds-test/src/",
                 "elliptic-curve-solidity/=lib/elliptic-curve-solidity/",
                 "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
                 "fevmate/=lib/fevmate/contracts/",
                 "forge-std/=lib/forge-std/src/",
+                "hardhat-deploy/=node_modules/hardhat-deploy/",
+                "hardhat/=node_modules/hardhat/",
                 "murky/=lib/murky/src/",
                 "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
                 "openzeppelin/=lib/openzeppelin-contracts/contracts/"
             ],
-            "optimizer": { "enabled": true, "runs": 200 },
-            "metadata": { "bytecodeHash": "ipfs" },
+            "optimizer": {
+                "enabled": true,
+                "runs": 200
+            },
+            "metadata": {
+                "bytecodeHash": "ipfs"
+            },
             "compilationTarget": {
                 "lib/murky/src/common/MurkyBase.sol": "MurkyBase"
             },
-            "libraries": {},
-            "viaIR": true
+            "libraries": {}
         },
         "sources": {
             "lib/murky/src/common/MurkyBase.sol": {
@@ -308,7 +359,9 @@
     "ast": {
         "absolutePath": "lib/murky/src/common/MurkyBase.sol",
         "id": 31083,
-        "exportedSymbols": { "MurkyBase": [31082] },
+        "exportedSymbols": {
+            "MurkyBase": [31082]
+        },
         "nodeType": "SourceUnit",
         "src": "32:6101:20",
         "nodes": [

@@ -1,48 +1,56 @@
 {
     "abi": [],
-    "bytecode": { "object": "0x", "linkReferences": {} },
-    "deployedBytecode": { "object": "0x", "linkReferences": {} },
+    "bytecode": {
+        "object": "0x",
+        "linkReferences": {}
+    },
+    "deployedBytecode": {
+        "object": "0x",
+        "linkReferences": {}
+    },
     "ast": {
         "absolutePath": "src/enums/IPCMsgType.sol",
-        "id": 36814,
-        "exportedSymbols": { "IPCMsgType": [36813] },
+        "id": 6030,
+        "exportedSymbols": {
+            "IPCMsgType": [6029]
+        },
         "nodeType": "SourceUnit",
-        "src": "46:131:41",
+        "src": "46:131:21",
         "nodes": [
             {
-                "id": 36810,
+                "id": 6026,
                 "nodeType": "PragmaDirective",
-                "src": "46:23:41",
+                "src": "46:23:21",
                 "nodes": [],
                 "literals": ["solidity", "0.8", ".19"]
             },
             {
-                "id": 36813,
+                "id": 6029,
                 "nodeType": "EnumDefinition",
-                "src": "131:45:41",
+                "src": "131:45:21",
                 "nodes": [],
                 "canonicalName": "IPCMsgType",
                 "members": [
                     {
-                        "id": 36811,
+                        "id": 6027,
                         "name": "TopDown",
-                        "nameLocation": "153:7:41",
+                        "nameLocation": "153:7:21",
                         "nodeType": "EnumValue",
-                        "src": "153:7:41"
+                        "src": "153:7:21"
                     },
                     {
-                        "id": 36812,
+                        "id": 6028,
                         "name": "BottomUp",
-                        "nameLocation": "166:8:41",
+                        "nameLocation": "166:8:21",
                         "nodeType": "EnumValue",
-                        "src": "166:8:41"
+                        "src": "166:8:21"
                     }
                 ],
                 "name": "IPCMsgType",
-                "nameLocation": "136:10:41"
+                "nameLocation": "136:10:21"
             }
         ],
         "license": "MIT OR Apache-2.0"
     },
-    "id": 41
+    "id": 21
 }
