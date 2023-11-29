@@ -62,5 +62,5 @@ primitives = { git = "https://github.com/consensus-shipyard/fvm-utils" }
 # primitives = { path = "../fvm-utils/primitives" }
 # fil_actors_runtime = { path = "../fvm-utils/runtime" }
 
-[patch."https://github.com/consensus-shipyard/ipc-solidity-actors.git"]
-ipc_actors_abis = { path = "../ipc-solidity-actors/binding" }
+# [patch."https://github.com/consensus-shipyard/ipc-solidity-actors.git"]
+# ipc_actors_abis = { path = "../ipc-solidity-actors/binding" }
