@@ -5,25 +5,20 @@ use anyhow::Context;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::init::builtin_actor_eth_addr;
 use fendermint_vm_actor_interface::ipc::SUBNETREGISTRY_ACTOR_ID;
-use fendermint_vm_interpreter::fvm::state::fevm::{ContractCaller, MockProvider, NoRevert};
+use fendermint_vm_interpreter::fvm::state::fevm::{ContractCaller, MockProvider};
 use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::ActorID;
-use ipc_actors_abis::subnet_actor_getter_facet::SubnetActorGetterFacet;
-use ipc_actors_abis::subnet_actor_manager_facet::{
-    SubnetActorManagerFacet, SubnetActorManagerFacetErrors,
-};
-use ipc_actors_abis::subnet_registry::{SubnetRegistry, SubnetRegistryErrors};
+use ipc_actors_abis::subnet_registry_diamond::SubnetRegistryDiamondErrors;
 
-pub use ipc_actors_abis::subnet_registry::ConstructorParams as SubnetConstructorParams;
+pub use ipc_actors_abis::register_subnet_facet::{
+    ConstructorParams as SubnetConstructorParams, RegisterSubnetFacet,
+};
 
 #[derive(Clone)]
 pub struct RegistryCaller<DB> {
     addr: EthAddress,
-    registry: ContractCaller<DB, SubnetRegistry<MockProvider>, SubnetRegistryErrors>,
-    _getter: ContractCaller<DB, SubnetActorGetterFacet<MockProvider>, NoRevert>,
-    _manager:
-        ContractCaller<DB, SubnetActorManagerFacet<MockProvider>, SubnetActorManagerFacetErrors>,
+    register: ContractCaller<DB, RegisterSubnetFacet<MockProvider>, SubnetRegistryDiamondErrors>,
 }
 
 impl<DB> Default for RegistryCaller<DB> {
@@ -37,9 +32,7 @@ impl<DB> RegistryCaller<DB> {
         let addr = builtin_actor_eth_addr(actor_id);
         Self {
             addr,
-            registry: ContractCaller::new(addr, SubnetRegistry::new),
-            _getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
-            _manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),
+            register: ContractCaller::new(addr, RegisterSubnetFacet::new),
         }
     }
 
@@ -58,7 +51,7 @@ impl<DB: Blockstore> RegistryCaller<DB> {
         params: SubnetConstructorParams,
     ) -> anyhow::Result<EthAddress> {
         let addr = self
-            .registry
+            .register
             .call(state, |c| c.new_subnet_actor(params))
             .context("failed to create new subnet")?;
         Ok(EthAddress(addr.0))

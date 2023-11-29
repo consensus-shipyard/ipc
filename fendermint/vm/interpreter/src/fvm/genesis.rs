@@ -280,33 +280,41 @@ where
                     .context("failed to create gateway constructor")?;
 
                 let facets = deployer
-                    .facets("GatewayDiamond")
+                    .facets(ipc::gateway::CONTRACT_NAME)
                     .context("failed to collect gateway facets")?;
 
-                deployer.deploy_contract(&mut state, "GatewayDiamond", (facets, params))?
+                deployer.deploy_contract(
+                    &mut state,
+                    ipc::gateway::CONTRACT_NAME,
+                    (facets, params),
+                )?
             };
 
             // IPC SubnetRegistry actory.
             {
+                use ipc::registry::ConstructorParameters;
+
                 let mut facets = deployer
-                    .facets("SubnetRegistry")
+                    .facets(ipc::registry::CONTRACT_NAME)
                     .context("failed to collect registry facets")?;
 
-                let manager_facet = facets.remove(1);
                 let getter_facet = facets.remove(0);
+                let manager_facet = facets.remove(0);
 
-                debug_assert!(facets.is_empty(), "SubnetRegistry has 2 facets");
+                debug_assert_eq!(facets.len(), 4, "SubnetRegistry has 4 facets of its own");
+
+                let params = ConstructorParameters {
+                    gateway: gateway_addr,
+                    getter_facet: getter_facet.facet_address,
+                    manager_facet: manager_facet.facet_address,
+                    subnet_getter_selectors: getter_facet.function_selectors,
+                    subnet_manager_selectors: manager_facet.function_selectors,
+                };
 
                 deployer.deploy_contract(
                     &mut state,
-                    "SubnetRegistry",
-                    (
-                        gateway_addr,
-                        getter_facet.facet_address,
-                        manager_facet.facet_address,
-                        getter_facet.function_selectors,
-                        manager_facet.function_selectors,
-                    ),
+                    ipc::registry::CONTRACT_NAME,
+                    (facets, params),
                 )?;
             };
         }
@@ -454,7 +462,7 @@ where
     fn top_contract(&self, contract_name: &str) -> anyhow::Result<&EthContract> {
         self.top_contracts
             .get(contract_name)
-            .ok_or(anyhow!("unknown top contract name"))
+            .ok_or_else(|| anyhow!("unknown top contract name: {contract_name}"))
     }
 }
 

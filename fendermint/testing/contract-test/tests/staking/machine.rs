@@ -103,7 +103,7 @@ impl StateMachine for StakingMachine {
 
         // TODO: Need to add field to specify release queue lock time.
         let params = SubnetConstructorParams {
-            parent_id: ipc_actors_abis::subnet_registry::SubnetID { root, route },
+            parent_id: ipc_actors_abis::register_subnet_facet::SubnetID { root, route },
             ipc_gateway_addr: gateway.addr().into(),
             consensus: 0, // TODO: What are the options?
             bottom_up_check_period: child_ipc.gateway.bottom_up_check_period,

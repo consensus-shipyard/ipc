@@ -120,7 +120,7 @@ impl Hardhat {
 
             let artifact = self
                 .artifact(&sc.0, &sc.1)
-                .context("failed to load dependency artifact")?;
+                .with_context(|| format!("failed to load dependency artifact: {}", sc.1))?;
 
             let cds = deps.entry(sc).or_default();
 
@@ -289,10 +289,10 @@ mod tests {
     // These are all the libraries based on the `scripts/deploy-libraries.ts` in `ipc-solidity-actors`.
     const IPC_DEPS: [&str; 5] = [
         "AccountHelper",
-        "CheckpointHelper",
         "SubnetIDHelper",
         "CrossMsgHelper",
         "StorableMsgHelper",
+        "LibStaking",
     ];
 
     #[test]
@@ -336,9 +336,12 @@ mod tests {
         let root_contracts: Vec<(String, &str)> = vec![
             "GatewayDiamond",
             "GatewayManagerFacet",
-            "GatewayGetterFacet",
             "GatewayRouterFacet",
-            "SubnetRegistry",
+            "GatewayGetterFacet",
+            "GatewayMessengerFacet",
+            "GatewayRouterFacet",
+            "SubnetActorGetterFacet",
+            "SubnetActorManagerFacet",
         ]
         .into_iter()
         .map(|c| (format!("{c}.sol"), c))

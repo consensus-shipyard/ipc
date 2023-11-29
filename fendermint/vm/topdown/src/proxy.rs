@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::{BlockHash, BlockHeight};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
@@ -88,9 +88,16 @@ impl ParentQueryProxy for IPCProviderProxy {
         height: BlockHeight,
         block_hash: &BlockHash,
     ) -> anyhow::Result<Vec<CrossMsg>> {
-        self.ipc_provider
-            .get_top_down_msgs(&self.child_subnet, height as ChainEpoch, block_hash)
-            .await
+        let res = self
+            .ipc_provider
+            .get_top_down_msgs(&self.child_subnet, height as ChainEpoch)
+            .await?;
+
+        if res.block_hash != *block_hash {
+            bail!("unexpected blockhash at height {height}");
+        }
+
+        Ok(res.value)
     }
 
     /// Get the validator set at the specified height.

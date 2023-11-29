@@ -15,7 +15,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::subnet_actor_getter_facet::{self as getter, SubnetActorGetterFacet};
 use ipc_actors_abis::subnet_actor_manager_facet::{self as manager, SubnetActorManagerFacet};
 
-pub use ipc_actors_abis::subnet_registry::ConstructorParams as SubnetConstructorParams;
+pub use ipc_actors_abis::register_subnet_facet::ConstructorParams as SubnetConstructorParams;
 
 #[derive(Clone)]
 pub struct SubnetCaller<DB> {
