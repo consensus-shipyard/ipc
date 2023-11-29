@@ -15,8 +15,4 @@ pub enum Error {
     ParentChainReorgDetected,
     #[error("Cannot query parent at height {1}: {0}")]
     CannotQueryParent(String, BlockHeight),
-    /// This error happens when querying top down messages, the block ahead are all null rounds.
-    /// See `parent_views_at_height` for detailed explanation
-    #[error("Look ahead limit reached from {0}: {1}")]
-    LookAheadLimitReached(BlockHeight, BlockHeight),
 }

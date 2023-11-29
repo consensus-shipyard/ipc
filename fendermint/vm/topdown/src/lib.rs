@@ -31,6 +31,10 @@ pub type BlockHash = Bytes;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
+/// Default topdown proposal height range
+pub(crate) const DEFAULT_MAX_PROPOSAL_RANGE: BlockHeight = 100;
+pub(crate) const DEFAULT_MAX_CACHE_BLOCK: BlockHeight = 500;
+pub(crate) const DEFAULT_PROPOSAL_DELAY: BlockHeight = 2;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -45,6 +49,53 @@ pub struct Config {
     pub exponential_back_off: Duration,
     /// The max number of retries for exponential backoff before giving up
     pub exponential_retry_limit: usize,
+    /// The max number of blocks one should make the topdown proposal
+    pub max_proposal_range: Option<BlockHeight>,
+    /// Max number of blocks that should be stored in cache
+    pub max_cache_blocks: Option<BlockHeight>,
+    pub proposal_delay: Option<BlockHeight>,
+}
+
+impl Config {
+    pub fn new(
+        chain_head_delay: BlockHeight,
+        polling_interval: Duration,
+        exponential_back_off: Duration,
+        exponential_retry_limit: usize,
+    ) -> Self {
+        Self {
+            chain_head_delay,
+            polling_interval,
+            exponential_back_off,
+            exponential_retry_limit,
+            max_proposal_range: None,
+            max_cache_blocks: None,
+            proposal_delay: None,
+        }
+    }
+
+    pub fn with_max_proposal_range(mut self, max_proposal_range: BlockHeight) -> Self {
+        self.max_proposal_range = Some(max_proposal_range);
+        self
+    }
+
+    pub fn with_proposal_delay(mut self, proposal_delay: BlockHeight) -> Self {
+        self.proposal_delay = Some(proposal_delay);
+        self
+    }
+
+    pub fn max_proposal_range(&self) -> BlockHeight {
+        self.max_proposal_range
+            .unwrap_or(DEFAULT_MAX_PROPOSAL_RANGE)
+    }
+
+    pub fn proposal_delay(&self) -> BlockHeight {
+        self.proposal_delay.unwrap_or(DEFAULT_PROPOSAL_DELAY)
+    }
+
+    pub fn max_cache_blocks(&self) -> BlockHeight {
+        self.max_cache_blocks.unwrap_or(DEFAULT_MAX_CACHE_BLOCK)
+    }
 }
 
 /// The finality view for IPC parent at certain height.
@@ -87,23 +138,11 @@ pub trait ParentViewProvider {
         from: BlockHeight,
         to: BlockHeight,
     ) -> anyhow::Result<Vec<StakingChangeRequest>>;
-    /// Get the validator changes at height.
-    async fn validator_changes(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>>;
-    /// Get the top down messages at height.
-    async fn top_down_msgs(
-        &self,
-        height: BlockHeight,
-        block_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<CrossMsg>>;
     /// Get the top down messages from and to height.
     async fn top_down_msgs_from(
         &self,
         from: BlockHeight,
         to: BlockHeight,
-        block_hash: &BlockHash,
     ) -> anyhow::Result<Vec<CrossMsg>>;
 }
 

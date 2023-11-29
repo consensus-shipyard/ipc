@@ -50,6 +50,10 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
         self.increment
     }
 
+    pub fn size(&self) -> usize {
+        self.data.len()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }

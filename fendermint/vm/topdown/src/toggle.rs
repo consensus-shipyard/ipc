@@ -61,35 +61,13 @@ impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggl
         }
     }
 
-    async fn validator_changes(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
-        match self.inner.as_ref() {
-            Some(p) => p.validator_changes(height).await,
-            None => Err(anyhow!("provider is toggled off")),
-        }
-    }
-
-    async fn top_down_msgs(
-        &self,
-        height: BlockHeight,
-        block_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<CrossMsg>> {
-        match self.inner.as_ref() {
-            Some(p) => p.top_down_msgs(height, block_hash).await,
-            None => Err(anyhow!("provider is toggled off")),
-        }
-    }
-
     async fn top_down_msgs_from(
         &self,
         from: BlockHeight,
         to: BlockHeight,
-        block_hash: &BlockHash,
     ) -> anyhow::Result<Vec<CrossMsg>> {
         match self.inner.as_ref() {
-            Some(p) => p.top_down_msgs_from(from, to, block_hash).await,
+            Some(p) => p.top_down_msgs_from(from, to).await,
             None => Err(anyhow!("provider is toggled off")),
         }
     }
@@ -118,12 +96,12 @@ impl<P> Toggle<CachedFinalityProvider<P>> {
         self.perform_or_else(|p| p.block_hash(height), None)
     }
 
-    pub fn latest_height(&self) -> Stm<Option<BlockHeight>> {
-        self.perform_or_else(|p| p.latest_height(), None)
+    pub fn latest_height_in_cache(&self) -> Stm<Option<BlockHeight>> {
+        self.perform_or_else(|p| p.latest_height_in_cache(), None)
     }
 
-    pub fn first_non_null_parent_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
-        self.perform_or_else(|p| p.first_non_null_parent_hash(height), None)
+    pub fn latest_height(&self) -> Stm<Option<BlockHeight>> {
+        self.perform_or_else(|p| p.latest_height(), None)
     }
 
     pub fn last_committed_finality(&self) -> Stm<Option<IPCParentFinality>> {
@@ -140,5 +118,9 @@ impl<P> Toggle<CachedFinalityProvider<P>> {
 
     pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
         self.perform_or_else(|p| p.reset(finality), ())
+    }
+
+    pub fn cached_blocks(&self) -> Stm<BlockHeight> {
+        self.perform_or_else(|p| p.cached_blocks(), BlockHeight::MAX)
     }
 }

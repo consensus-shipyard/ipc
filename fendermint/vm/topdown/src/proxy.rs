@@ -1,8 +1,8 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::{BlockHash, BlockHeight};
-use anyhow::{anyhow, bail};
+use crate::BlockHeight;
+use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
@@ -25,11 +25,10 @@ pub trait ParentQueryProxy {
     async fn get_block_hash(&self, height: BlockHeight) -> anyhow::Result<GetBlockHashResult>;
 
     /// Get the top down messages at epoch with the block hash at that height
-    async fn get_top_down_msgs_with_hash(
+    async fn get_top_down_msgs(
         &self,
         height: BlockHeight,
-        block_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<CrossMsg>>;
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>>;
 
     /// Get the validator set at the specified height
     async fn get_validator_changes(
@@ -83,21 +82,18 @@ impl ParentQueryProxy for IPCProviderProxy {
     }
 
     /// Get the top down messages from the starting to the ending height.
-    async fn get_top_down_msgs_with_hash(
+    async fn get_top_down_msgs(
         &self,
         height: BlockHeight,
-        block_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<CrossMsg>> {
-        let res = self
-            .ipc_provider
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+        self.ipc_provider
             .get_top_down_msgs(&self.child_subnet, height as ChainEpoch)
-            .await?;
-
-        if res.block_hash != *block_hash {
-            bail!("unexpected blockhash at height {height}");
-        }
-
-        Ok(res.value)
+            .await
+            .map(|mut v| {
+                // sort ascending, we dont assume the changes are ordered
+                v.value.sort_by(|a, b| a.msg.nonce.cmp(&b.msg.nonce));
+                v
+            })
     }
 
     /// Get the validator set at the specified height.

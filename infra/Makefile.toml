@@ -37,6 +37,8 @@ PARENT_GATEWAY = { value = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1", conditi
 PARENT_REGISTRY = { value = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e", condition = { env_not_set = ["PARENT_REGISTRY"] } }
 FM_NETWORK = { value = "test", condition = { env_not_set = ["FM_NETWORK"] } }
 TOPDOWN_CHAIN_HEAD_DELAY = { value = "10", condition = { env_not_set = ["TOPDOWN_CHAIN_HEAD_DELAY"] } }
+TOPDOWN_PROPOSAL_DELAY = { value = "2", condition = { env_not_set = ["TOPDOWN_PROPOSAL_DELAY"] } }
+TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = ["TOPDOWN_MAX_PROPOSAL_RANGE"] } }
 # Comma-separated list of bootstrap nodes to be used by the CometBFT node.
 BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }
 PRIVATE_KEY_PATH = { value = "", condition = { env_not_set = ["PRIVATE_KEY_PATH"] } }

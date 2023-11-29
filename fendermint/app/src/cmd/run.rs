@@ -162,12 +162,14 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let (parent_finality_provider, ipc_tuple) = if settings.ipc.is_topdown_enabled() {
         info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
-        let config = fendermint_vm_topdown::Config {
-            chain_head_delay: topdown_config.chain_head_delay,
-            polling_interval: topdown_config.polling_interval,
-            exponential_back_off: topdown_config.exponential_back_off,
-            exponential_retry_limit: topdown_config.exponential_retry_limit,
-        };
+        let config = fendermint_vm_topdown::Config::new(
+            topdown_config.chain_head_delay,
+            topdown_config.polling_interval,
+            topdown_config.exponential_back_off,
+            topdown_config.exponential_retry_limit,
+        )
+        .with_proposal_delay(topdown_config.proposal_delay)
+        .with_max_proposal_range(topdown_config.max_proposal_range);
         let ipc_provider = Arc::new(create_ipc_provider_proxy(&settings)?);
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
