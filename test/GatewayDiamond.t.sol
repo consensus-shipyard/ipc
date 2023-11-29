@@ -784,142 +784,222 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         gwManager.kill();
     }
 
-    // function testGatewayDiamond_Kill_Fail_CircSupplyMoreThanZero() public {
-    //     address validatorAddress = address(100);
-    //     _join(validatorAddress);
+    function testGatewayDiamond_SendCrossMessage_Fails_NoFunds() public {
+        address caller = vm.addr(100);
+        vm.startPrank(caller);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
-    //     address funderAddress = address(101);
-    //     uint256 fundAmount = 1 ether;
+        vm.expectRevert(NotEnoughFunds.selector);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE - 1}(
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                        rawAddress: FvmAddressHelper.from(caller)
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({root: 0, route: new address[](0)}),
+                        rawAddress: FvmAddressHelper.from(caller)
+                    }),
+                    value: 1,
+                    nonce: 0,
+                    method: METHOD_SEND,
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
+                }),
+                wrapped: false
+            })
+        );
 
-    //     vm.startPrank(funderAddress);
-    //     vm.deal(funderAddress, fundAmount + 1);
+        vm.expectRevert(NotEnoughFee.selector);
+        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                        rawAddress: FvmAddressHelper.from(caller)
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({root: 0, route: new address[](0)}),
+                        rawAddress: FvmAddressHelper.from(caller)
+                    }),
+                    value: 1,
+                    nonce: 0,
+                    method: METHOD_SEND,
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE - 1
+                }),
+                wrapped: false
+            })
+        );
+    }
 
-    //     fund(funderAddress, fundAmount);
+    function testGatewayDiamond_SendCrossMessage_Fails_Fuzz(uint256 fee) public {
+        vm.assume(fee < CROSS_MSG_FEE);
 
-    //     vm.stopPrank();
-    //     vm.startPrank(address(saManager));
-    //     vm.expectRevert(NotEmptySubnetCircSupply.selector);
+        address caller = vm.addr(100);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.prank(caller);
+        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
-    //     gwManager.kill();
-    // }
+        vm.expectRevert();
+        gwMessenger.sendCrossMessage{value: fee - 1}(
+            CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                        rawAddress: FvmAddressHelper.from(caller)
+                    }),
+                    to: IPCAddress({
+                        subnetId: SubnetID({root: 0, route: new address[](0)}),
+                        rawAddress: FvmAddressHelper.from(caller)
+                    }),
+                    value: 1,
+                    nonce: 0,
+                    method: METHOD_SEND,
+                    params: new bytes(0),
+                    fee: CROSS_MSG_FEE
+                }),
+                wrapped: false
+            })
+        );
+    }
 
-    // function testGatewayDiamond_Fund_Works_ReactivatedSubnet() public {
-    //     address validatorAddress = address(100);
+    function testGatewayDiamond_Single_Funding() public {
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
-    //     _join(validatorAddress);
+        _join(validatorAddress, publicKey);
 
-    //     vm.prank(validatorAddress);
-    //     saManager.leave();
+        address funderAddress = address(101);
+        uint256 fundAmount = 1 ether;
 
-    //     _join(validatorAddress);
+        vm.deal(funderAddress, fundAmount + 1);
 
-    //     require(saGetter.status() == Status.Active);
+        vm.prank(funderAddress);
+        fund(funderAddress, fundAmount);
+    }
 
-    //     address funderAddress = address(101);
-    //     uint256 fundAmount = 1 ether;
+    function testGatewayDiamond_Fund_Kill_Fail_CircSupplyMoreThanZero() public {
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
-    //     vm.startPrank(funderAddress);
-    //     vm.deal(funderAddress, fundAmount + 1);
+        _join(validatorAddress, publicKey);
 
-    //     fund(funderAddress, fundAmount);
-    // }
+        address funderAddress = address(101);
+        uint256 fundAmount = 1 ether;
 
-    // function testGatewayDiamond_Fund_Works_EthAccountSingleFunding() public {
-    //     address validatorAddress = address(100);
+        vm.deal(funderAddress, fundAmount + 1);
 
-    //     _join(validatorAddress);
+        vm.startPrank(funderAddress);
+        fund(funderAddress, fundAmount);
+        vm.stopPrank();
 
-    //     address funderAddress = address(101);
-    //     uint256 fundAmount = 1 ether;
+        vm.startPrank(address(saManager));
+        vm.expectRevert(NotEmptySubnetCircSupply.selector);
+        gwManager.kill();
+    }
 
-    //     vm.startPrank(funderAddress);
-    //     vm.deal(funderAddress, fundAmount + 1);
+    function testGatewayDiamond_Fund_Revert_OnZeroValue() public {
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        _join(validatorAddress, publicKey);
 
-    //     fund(funderAddress, fundAmount);
-    // }
+        address funderAddress = address(101);
 
-    // function testGatewayDiamond_Fund_Works_BLSAccountSingleFunding() public {
-    //     address validatorAddress = address(100);
-    //     _join(validatorAddress);
+        (SubnetID memory subnetId, , , , , ) = getSubnet(address(saManager));
 
-    //     uint256 fundAmount = 1 ether;
-    //     vm.startPrank(BLS_ACCOUNT_ADDREESS);
-    //     vm.deal(BLS_ACCOUNT_ADDREESS, fundAmount + 1);
+        vm.expectRevert(InvalidCrossMsgValue.selector);
+        gwManager.fund{value: 0}(subnetId, FvmAddressHelper.from(funderAddress));
+    }
 
-    //     fund(BLS_ACCOUNT_ADDREESS, fundAmount);
-    // }
+    function testGatewayDiamond_Fund_Works_MultipleFundings(uint8 numberOfFunds) public {
+        vm.assume(numberOfFunds > 10);
+        vm.assume(numberOfFunds < 50);
 
-    // function testGatewayDiamond_Fund_Works_MultipleFundings() public {
-    //     uint8 numberOfFunds = 5;
-    //     uint256 fundAmount = 1 ether;
+        uint256 fundAmount = 1 ether;
 
-    //     address validatorAddress = address(100);
-    //     address funderAddress = address(101);
+        address funderAddress = address(101);
 
-    //     _join(validatorAddress);
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        _join(validatorAddress, publicKey);
 
-    //     vm.startPrank(funderAddress);
+        vm.startPrank(funderAddress);
+        for (uint256 i = 0; i < numberOfFunds; i++) {
+            vm.deal(funderAddress, fundAmount + 1);
+            fund(funderAddress, fundAmount);
+        }
+    }
 
-    //     for (uint256 i = 0; i < numberOfFunds; i++) {
-    //         vm.deal(funderAddress, fundAmount + 1);
+    function testGatewayDiamond_Fund_Fuzz_InsufficientAmount(uint256 amount) public {
+        vm.assume(amount > 0);
+        vm.assume(amount < DEFAULT_COLLATERAL_AMOUNT);
 
-    //         fund(funderAddress, fundAmount);
-    //     }
-    // }
+        address funderAddress = address(101);
 
-    // function testGatewayDiamond_Fund_Fails_WrongSubnet() public {
-    //     address validatorAddress = address(100);
-    //     address funderAddress = address(101);
-    //     uint256 fundAmount = 1 ether;
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        _join(validatorAddress, publicKey);
 
-    //     _join(validatorAddress);
+        vm.deal(funderAddress, amount);
 
-    //     vm.startPrank(funderAddress);
-    //     vm.deal(funderAddress, fundAmount + 1);
+        (SubnetID memory subnetId, , , , , ) = getSubnet(address(saManager));
+        vm.prank(funderAddress);
+        gwManager.fund{value: amount}(subnetId, FvmAddressHelper.from(msg.sender));
+    }
 
-    //     address[] memory wrongPath = new address[](3);
-    //     wrongPath[0] = address(1);
-    //     wrongPath[1] = address(2);
+    function testGatewayDiamond_Fund_Fails_NotRegistered() public {
+        address funderAddress = address(101);
+        uint256 fundAmount = 1 ether;
 
-    //     vm.expectRevert(NotRegisteredSubnet.selector);
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        _join(validatorAddress, publicKey);
 
-    //     gwManager.fund{value: fundAmount}(SubnetID(ROOTNET_CHAINID, wrongPath), FvmAddressHelper.from(msg.sender));
-    // }
+        address[] memory wrongSubnetPath = new address[](2);
+        wrongSubnetPath[0] = vm.addr(102);
+        wrongSubnetPath[0] = vm.addr(103);
 
-    // function testGatewayDiamond_Fund_Fails_NotRegistered() public {
-    //     address validatorAddress = address(100);
-    //     address funderAddress = address(101);
-    //     uint256 fundAmount = 1 ether;
+        address[] memory wrongPath = new address[](3);
+        wrongPath[0] = address(1);
+        wrongPath[1] = address(2);
 
-    //     _join(validatorAddress);
+        vm.deal(funderAddress, fundAmount + 1);
 
-    //     vm.startPrank(funderAddress);
-    //     vm.deal(funderAddress, fundAmount + 1);
+        vm.startPrank(funderAddress);
 
-    //     address[] memory wrongSubnetPath = new address[](2);
-    //     wrongSubnetPath[0] = vm.addr(102);
-    //     wrongSubnetPath[0] = vm.addr(103);
-    //     SubnetID memory wrongSubnetId = SubnetID({root: ROOTNET_CHAINID, route: wrongSubnetPath});
+        SubnetID memory wrongSubnetId = SubnetID({root: ROOTNET_CHAINID, route: wrongSubnetPath});
 
-    //     vm.expectRevert(NotRegisteredSubnet.selector);
-    //     gwManager.fund{value: fundAmount}(wrongSubnetId, FvmAddressHelper.from(msg.sender));
-    // }
+        vm.expectRevert(NotRegisteredSubnet.selector);
+        gwManager.fund{value: fundAmount}(wrongSubnetId, FvmAddressHelper.from(msg.sender));
 
-    // function testGatewayDiamond_Fund_Fails_InsufficientAmount() public {
-    //     address validatorAddress = address(100);
-    //     address funderAddress = address(101);
+        vm.expectRevert(NotRegisteredSubnet.selector);
+        gwManager.fund{value: fundAmount}(SubnetID(ROOTNET_CHAINID, wrongPath), FvmAddressHelper.from(msg.sender));
+    }
 
-    //     _join(validatorAddress);
+    function testGatewayDiamond_Fund_Works_BLSAccountSingleFunding() public {
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        _join(validatorAddress, publicKey);
 
-    //     vm.startPrank(funderAddress);
-    //     vm.deal(funderAddress, 1 ether);
+        uint256 fundAmount = 1 ether;
+        vm.deal(BLS_ACCOUNT_ADDREESS, fundAmount + 1);
+        vm.startPrank(BLS_ACCOUNT_ADDREESS);
 
-    //     (SubnetID memory subnetId, , , , , ) = getSubnet(address(saManager));
+        fund(BLS_ACCOUNT_ADDREESS, fundAmount);
+    }
 
-    //     vm.expectRevert(NotEnoughFee.selector);
+    function testGatewayDiamond_Fund_Works_ReactivatedSubnet() public {
+        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        _join(validatorAddress, publicKey);
 
-    //     gwManager.fund{value: 0}(subnetId, FvmAddressHelper.from(msg.sender));
-    // }
+        vm.prank(validatorAddress);
+        saManager.leave();
+
+        _join(validatorAddress, publicKey);
+
+        address funderAddress = address(101);
+        uint256 fundAmount = 1 ether;
+
+        vm.deal(funderAddress, fundAmount + 1);
+        vm.prank(funderAddress);
+        fund(funderAddress, fundAmount);
+    }
 
     function testGatewayDiamond_Release_Fails_InsufficientAmount() public {
         address[] memory path = new address[](2);
@@ -2009,38 +2089,33 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     }
 
     function fund(address funderAddress, uint256 fundAmount) internal {
-        uint256 fundAmountWithSubtractedFee = fundAmount - gwGetter.crossMsgFee();
-
+        // funding subnets is free, we do not need cross msg fee
         (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore, ) = getSubnet(address(saManager));
+        console.log(circSupplyBefore);
 
-        uint256 expectedTopDownMsgsLength = 0;
-        {
-            expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
-            uint256 expectedNonce = nonceBefore + 1;
-            uint256 expectedCircSupply = circSupplyBefore + fundAmountWithSubtractedFee;
+        uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
+        uint256 expectedNonce = nonceBefore + 1;
+        uint256 expectedCircSupply = circSupplyBefore + fundAmount;
 
-            require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
+        require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
 
-            gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
+        gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
 
-            (, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(saManager));
+        (, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(saManager));
 
-            require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength, "unexpected lengths");
+        require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength, "unexpected lengths");
 
-            require(nonce == expectedNonce, "unexpected nonce");
-            require(circSupply == expectedCircSupply, "unexpected circSupply");
-        }
+        require(nonce == expectedNonce, "unexpected nonce");
+        require(circSupply == expectedCircSupply, "unexpected circSupply");
     }
 
-    // function _join(address validatorAddress) internal {
-    //     vm.prank(validatorAddress);
-    //     vm.deal(validatorAddress, DEFAULT_COLLATERAL_AMOUNT + 1);
-
-    //     saManager.join{value: DEFAULT_COLLATERAL_AMOUNT}(new bytes(20));
-
-    //     (uint64 nextConfigNum, ) = saGetter.getConfigurationNumbers();
-    //     saManager.confirmChange(nextConfigNum - 1);
-    // }
+    function _join(address validatorAddress, bytes memory pubkey) internal {
+        vm.prank(validatorAddress);
+        vm.deal(validatorAddress, DEFAULT_COLLATERAL_AMOUNT + 1);
+        saManager.join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey);
+        (uint64 nextConfigNum, ) = saGetter.getConfigurationNumbers();
+        saManager.confirmChange(nextConfigNum - 1);
+    }
 
     function release(uint256 releaseAmount, uint256 fee) internal {
         uint256 expectedNonce = gwGetter.bottomUpNonce() + 1;

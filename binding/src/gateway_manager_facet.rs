@@ -235,6 +235,17 @@ pub mod gateway_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("InvalidCrossMsgValue"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidCrossMsgValue",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NotEmptySubnetCircSupply"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -473,6 +484,19 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "InvalidActorAddress", abi = "InvalidActorAddress()")]
     pub struct InvalidActorAddress;
+    ///Custom Error type `InvalidCrossMsgValue` with signature `InvalidCrossMsgValue()` and selector `0xc1d89cd6`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "InvalidCrossMsgValue", abi = "InvalidCrossMsgValue()")]
+    pub struct InvalidCrossMsgValue;
     ///Custom Error type `NotEmptySubnetCircSupply` with signature `NotEmptySubnetCircSupply()` and selector `0xf8cf8e02`
     #[derive(
         Clone,
@@ -559,6 +583,7 @@ pub mod gateway_manager_facet {
         CannotReleaseZero(CannotReleaseZero),
         InsufficientFunds(InsufficientFunds),
         InvalidActorAddress(InvalidActorAddress),
+        InvalidCrossMsgValue(InvalidCrossMsgValue),
         NotEmptySubnetCircSupply(NotEmptySubnetCircSupply),
         NotEnoughFee(NotEnoughFee),
         NotEnoughFunds(NotEnoughFunds),
@@ -603,6 +628,11 @@ pub mod gateway_manager_facet {
                 data,
             ) {
                 return Ok(Self::InvalidActorAddress(decoded));
+            }
+            if let Ok(decoded) = <InvalidCrossMsgValue as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::InvalidCrossMsgValue(decoded));
             }
             if let Ok(decoded) = <NotEmptySubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -655,6 +685,9 @@ pub mod gateway_manager_facet {
                 Self::InvalidActorAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::InvalidCrossMsgValue(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotEmptySubnetCircSupply(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -700,6 +733,10 @@ pub mod gateway_manager_facet {
                     true
                 }
                 _ if selector
+                    == <InvalidCrossMsgValue as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <NotEmptySubnetCircSupply as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -735,6 +772,9 @@ pub mod gateway_manager_facet {
                 Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InsufficientFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidActorAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidCrossMsgValue(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NotEmptySubnetCircSupply(element) => {
@@ -781,6 +821,11 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<InvalidActorAddress> for GatewayManagerFacetErrors {
         fn from(value: InvalidActorAddress) -> Self {
             Self::InvalidActorAddress(value)
+        }
+    }
+    impl ::core::convert::From<InvalidCrossMsgValue> for GatewayManagerFacetErrors {
+        fn from(value: InvalidCrossMsgValue) -> Self {
+            Self::InvalidCrossMsgValue(value)
         }
     }
     impl ::core::convert::From<NotEmptySubnetCircSupply> for GatewayManagerFacetErrors {

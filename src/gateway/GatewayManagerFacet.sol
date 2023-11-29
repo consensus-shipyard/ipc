@@ -8,7 +8,7 @@ import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -127,10 +127,18 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         payable(msg.sender).sendValue(stake);
     }
 
-    /// @notice fund - commit a top-down message releasing funds in a child subnet. There is an associated fee that gets distributed to validators in the subnet as well
-    /// @param subnetId - subnet to fund
-    /// @param to - the address to send funds to
+    /// @notice fund() credits the received value to the specified address in the specified child subnet.
+    ///
+    /// There may be an associated fee that gets distributed to validators in the subnet. Currently this fee is zero,
+    /// i.e. funding a subnet is free.
+    ///
+    /// @param subnetId: the destination subnet for the funds.
+    /// @param to: the address to which to credit funds in the destination subnet.
     function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable {
+        if (msg.value == 0) {
+            // prevent spamming if there's no value to fund.
+            revert InvalidCrossMsgValue();
+        }
         CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
             signer: msg.sender,
@@ -143,8 +151,15 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         LibGateway.commitTopDownMsg(crossMsg);
     }
 
-    /// @notice release method locks funds in the current subnet and sends a cross message up the hierarchy to the parent gateway to release the funds
+    /// @notice release() burns the received value and releases them from this subnet onto the parent by committing a bottom-up message.
+    ///
+    /// @param to: the address to which to credit funds in the parent subnet.
+    /// @param fee: the fee that validators on the parent subnet get to keep for including this message.
     function release(FvmAddress calldata to, uint256 fee) external payable validFee(fee) {
+        if (msg.value == 0) {
+            // prevent spamming if there's no value to release.
+            revert InvalidCrossMsgValue();
+        }
         CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg({
             subnet: s.networkName,
             signer: msg.sender,
