@@ -9,8 +9,8 @@ use std::time::Duration;
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, gateway_router_facet,
-    lib_gateway, lib_staking_change_log, subnet_actor_getter_facet, subnet_actor_manager_facet,
-    subnet_registry,
+    lib_gateway, lib_staking_change_log, register_subnet_facet, subnet_actor_getter_facet,
+    subnet_actor_manager_facet,
 };
 use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_sdk::validator::from_contract_validators;
@@ -248,8 +248,8 @@ impl SubnetManager for EthSubnetManager {
         let route = subnet_id_to_evm_addresses(&params.parent)?;
         log::debug!("root SubnetID as Ethereum type: {route:?}");
 
-        let params = subnet_registry::ConstructorParams {
-            parent_id: subnet_registry::SubnetID {
+        let params = register_subnet_facet::ConstructorParams {
+            parent_id: register_subnet_facet::SubnetID {
                 root: params.parent.root_id(),
                 route,
             },
@@ -268,7 +268,7 @@ impl SubnetManager for EthSubnetManager {
 
         let signer = self.get_signer(&from)?;
         let signer = Arc::new(signer);
-        let registry_contract = subnet_registry::SubnetRegistry::new(
+        let registry_contract = register_subnet_facet::RegisterSubnetFacet::new(
             self.ipc_contract_info.registry_addr,
             signer.clone(),
         );
@@ -286,9 +286,11 @@ impl SubnetManager for EthSubnetManager {
                 for log in r.logs {
                     log::debug!("log: {log:?}");
 
-                    match ethers_contract::parse_log::<subnet_registry::SubnetDeployedFilter>(log) {
+                    match ethers_contract::parse_log::<register_subnet_facet::SubnetDeployedFilter>(
+                        log,
+                    ) {
                         Ok(subnet_deploy) => {
-                            let subnet_registry::SubnetDeployedFilter { subnet_addr } =
+                            let register_subnet_facet::SubnetDeployedFilter { subnet_addr } =
                                 subnet_deploy;
 
                             log::debug!("subnet deployed at {subnet_addr:?}");
