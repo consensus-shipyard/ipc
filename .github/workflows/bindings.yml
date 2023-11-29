@@ -27,7 +27,7 @@ jobs:
           components: rustfmt
 
       - name: Create binding
-        run: make compile-abi && make rust-binding && cargo fmt --manifest-path ./binding/Cargo.toml
+        run: make compile-abi && make rust-binding
 
       - name: Git Config
         run: |

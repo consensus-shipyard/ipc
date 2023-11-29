@@ -7,7 +7,7 @@ pub use gateway_messenger_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod gateway_messenger_facet {
     #[allow(deprecated)]
@@ -17,138 +17,192 @@ pub mod gateway_messenger_facet {
             functions: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("propagate"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("propagate"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("msgCid"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("bytes32"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("propagate"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("msgCid"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes32"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("sendCrossMessage"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("sendCrossMessage"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("crossMsg"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("sendCrossMessage"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("crossMsg"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                        ::std::boxed::Box::new(
+                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                        ),
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                ],
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                        ::std::boxed::Box::new(
+                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                        ),
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                ],
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                ],
                                             ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
-                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                ],),
-                                ::ethers::core::abi::ethabi::ParamType::Bool,
-                            ],),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("struct CrossMsg"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
-                    },],
+                                            ::ethers::core::abi::ethabi::ParamType::Bool,
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct CrossMsg"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
+                        },
+                    ],
                 ),
             ]),
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("CallFailed"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("CallFailed"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("CallFailed"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("CannotSendCrossMsgToItself"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("CannotSendCrossMsgToItself",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "CannotSendCrossMsgToItself",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InsufficientFunds"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("InsufficientFunds"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("InsufficientFunds"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidCrossMsgDstSubnet"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("InvalidCrossMsgDstSubnet",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidCrossMsgDstSubnet",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidCrossMsgFromSubnet"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("InvalidCrossMsgFromSubnet",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidCrossMsgFromSubnet",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidCrossMsgValue"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("InvalidCrossMsgValue",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidCrossMsgValue",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NotRegisteredSubnet",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
             ]),
             receive: false,
@@ -156,8 +210,9 @@ pub mod gateway_messenger_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static GATEWAYMESSENGERFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static GATEWAYMESSENGERFACET_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     pub struct GatewayMessengerFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for GatewayMessengerFacet<M> {
         fn clone(&self) -> Self {
@@ -189,11 +244,13 @@ pub mod gateway_messenger_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                GATEWAYMESSENGERFACET_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    GATEWAYMESSENGERFACET_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Calls the contract's `propagate` (0x25bf0db6) function
         pub fn propagate(
@@ -215,8 +272,7 @@ pub mod gateway_messenger_facet {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for GatewayMessengerFacet<M>
-    {
+    for GatewayMessengerFacet<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -230,7 +286,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "CallFailed", abi = "CallFailed()")]
     pub struct CallFailed;
@@ -243,7 +299,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotSendCrossMsgToItself",
@@ -259,7 +315,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InsufficientFunds", abi = "InsufficientFunds()")]
     pub struct InsufficientFunds;
@@ -272,7 +328,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidCrossMsgDstSubnet", abi = "InvalidCrossMsgDstSubnet()")]
     pub struct InvalidCrossMsgDstSubnet;
@@ -285,12 +341,9 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[etherror(
-        name = "InvalidCrossMsgFromSubnet",
-        abi = "InvalidCrossMsgFromSubnet()"
-    )]
+    #[etherror(name = "InvalidCrossMsgFromSubnet", abi = "InvalidCrossMsgFromSubnet()")]
     pub struct InvalidCrossMsgFromSubnet;
     ///Custom Error type `InvalidCrossMsgValue` with signature `InvalidCrossMsgValue()` and selector `0xc1d89cd6`
     #[derive(
@@ -301,7 +354,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidCrossMsgValue", abi = "InvalidCrossMsgValue()")]
     pub struct InvalidCrossMsgValue;
@@ -314,7 +367,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotEnoughFee", abi = "NotEnoughFee()")]
     pub struct NotEnoughFee;
@@ -327,7 +380,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotEnoughFunds", abi = "NotEnoughFunds()")]
     pub struct NotEnoughFunds;
@@ -340,7 +393,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotRegisteredSubnet", abi = "NotRegisteredSubnet()")]
     pub struct NotRegisteredSubnet;
@@ -365,47 +418,54 @@ pub mod gateway_messenger_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <CallFailed as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CallFailed as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CallFailed(decoded));
             }
-            if let Ok(decoded) =
-                <CannotSendCrossMsgToItself as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CannotSendCrossMsgToItself as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotSendCrossMsgToItself(decoded));
             }
-            if let Ok(decoded) = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InsufficientFunds(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCrossMsgDstSubnet(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidCrossMsgFromSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidCrossMsgFromSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCrossMsgFromSubnet(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidCrossMsgValue as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidCrossMsgValue as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCrossMsgValue(decoded));
             }
-            if let Ok(decoded) = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughFee(decoded));
             }
-            if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughFunds(decoded));
             }
-            if let Ok(decoded) =
-                <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotRegisteredSubnet(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -414,11 +474,15 @@ pub mod gateway_messenger_facet {
     impl ::ethers::core::abi::AbiEncode for GatewayMessengerFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::CallFailed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CallFailed(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::CannotSendCrossMsgToItself(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::InsufficientFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::InsufficientFunds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidCrossMsgDstSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -428,8 +492,12 @@ pub mod gateway_messenger_facet {
                 Self::InvalidCrossMsgValue(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEnoughFee(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NotEnoughFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotEnoughFee(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotEnoughFunds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -441,39 +509,36 @@ pub mod gateway_messenger_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <CallFailed as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
-                    == <CannotSendCrossMsgToItself as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <CallFailed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <CannotSendCrossMsgToItself as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InsufficientFunds as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InsufficientFunds as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidCrossMsgDstSubnet as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidCrossMsgDstSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidCrossMsgFromSubnet as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidCrossMsgFromSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidCrossMsgValue as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidCrossMsgValue as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ => false,
@@ -484,14 +549,24 @@ pub mod gateway_messenger_facet {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::CallFailed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CannotSendCrossMsgToItself(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CannotSendCrossMsgToItself(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::InsufficientFunds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidCrossMsgDstSubnet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidCrossMsgFromSubnet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidCrossMsgValue(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidCrossMsgDstSubnet(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidCrossMsgFromSubnet(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidCrossMsgValue(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotEnoughFee(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotRegisteredSubnet(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -506,7 +581,8 @@ pub mod gateway_messenger_facet {
             Self::CallFailed(value)
         }
     }
-    impl ::core::convert::From<CannotSendCrossMsgToItself> for GatewayMessengerFacetErrors {
+    impl ::core::convert::From<CannotSendCrossMsgToItself>
+    for GatewayMessengerFacetErrors {
         fn from(value: CannotSendCrossMsgToItself) -> Self {
             Self::CannotSendCrossMsgToItself(value)
         }
@@ -516,12 +592,14 @@ pub mod gateway_messenger_facet {
             Self::InsufficientFunds(value)
         }
     }
-    impl ::core::convert::From<InvalidCrossMsgDstSubnet> for GatewayMessengerFacetErrors {
+    impl ::core::convert::From<InvalidCrossMsgDstSubnet>
+    for GatewayMessengerFacetErrors {
         fn from(value: InvalidCrossMsgDstSubnet) -> Self {
             Self::InvalidCrossMsgDstSubnet(value)
         }
     }
-    impl ::core::convert::From<InvalidCrossMsgFromSubnet> for GatewayMessengerFacetErrors {
+    impl ::core::convert::From<InvalidCrossMsgFromSubnet>
+    for GatewayMessengerFacetErrors {
         fn from(value: InvalidCrossMsgFromSubnet) -> Self {
             Self::InvalidCrossMsgFromSubnet(value)
         }
@@ -555,7 +633,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "propagate", abi = "propagate(bytes32)")]
     pub struct PropagateCall {
@@ -570,7 +648,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "sendCrossMessage",
@@ -590,12 +668,14 @@ pub mod gateway_messenger_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <PropagateCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PropagateCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Propagate(decoded));
             }
-            if let Ok(decoded) =
-                <SendCrossMessageCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <SendCrossMessageCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SendCrossMessage(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -604,8 +684,12 @@ pub mod gateway_messenger_facet {
     impl ::ethers::core::abi::AbiEncode for GatewayMessengerFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::Propagate(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SendCrossMessage(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Propagate(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SendCrossMessage(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -636,7 +720,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct CrossMsg {
         pub message: StorableMsg,
@@ -651,7 +735,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct FvmAddress {
         pub addr_type: u8,
@@ -666,7 +750,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct Ipcaddress {
         pub subnet_id: SubnetID,
@@ -681,7 +765,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct StorableMsg {
         pub from: Ipcaddress,
@@ -701,7 +785,7 @@ pub mod gateway_messenger_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct SubnetID {
         pub root: u64,

@@ -32,6 +32,8 @@ fn main() {
     // so we need bindings for the facets, but well (I think) use the same address with all of them.
     for contract_name in [
         "IDiamond",
+        "DiamondLoupeFacet",
+        "DiamondCutFacet",
         "GatewayDiamond",
         "GatewayManagerFacet",
         "GatewayGetterFacet",
@@ -41,6 +43,8 @@ fn main() {
         "SubnetActorGetterFacet",
         "SubnetActorManagerFacet",
         "SubnetRegistryDiamond",
+        "RegisterSubnetFacet",
+        "SubnetGetterFacet",
         "LibStaking",
         "LibStakingChangeLog",
         "LibGateway",
