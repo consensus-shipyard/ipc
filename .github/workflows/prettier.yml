@@ -30,7 +30,7 @@ jobs:
       - name: Run Prettier on Solidity Files
         run: npx prettier --write '**/*.sol'
       - name: Debugging - Show changed files
-        run: git status && git diff --name-only
+        run: git restore package-lock.json && git status && git diff --name-only
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:

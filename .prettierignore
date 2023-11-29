@@ -1,2 +1,6 @@
 # Ignore everything in the lib folder
 lib/
+test/
+tools/
+package.json
+package-lock.json
