@@ -26,17 +26,24 @@ impl CommandLineHandler for ListTopdownMsgs {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        let result = provider.get_top_down_msgs(&subnet, arguments.epoch).await?;
-        println!("block hash: {}", hex::encode(result.block_hash));
-        for msg in result.value {
+        for h in arguments.from..=arguments.to {
+            let result = provider.get_top_down_msgs(&subnet, h).await?;
             println!(
-                "from: {}, to: {}, value: {}, nonce: {}, fee: {} ",
-                msg.msg.from.to_string()?,
-                msg.msg.to.to_string()?,
-                msg.msg.value,
-                msg.msg.nonce,
-                msg.msg.fee
+                "block height: {}, block hash: {}, number of messages: {}",
+                h,
+                hex::encode(result.block_hash),
+                result.value.len()
             );
+            for msg in result.value {
+                println!(
+                    "from: {}, to: {}, value: {}, nonce: {}, fee: {} ",
+                    msg.msg.from.to_string()?,
+                    msg.msg.to.to_string()?,
+                    msg.msg.value,
+                    msg.msg.nonce,
+                    msg.msg.fee
+                );
+            }
         }
 
         Ok(())
@@ -48,8 +55,14 @@ impl CommandLineHandler for ListTopdownMsgs {
 pub(crate) struct ListTopdownMsgsArgs {
     #[arg(long, short, help = "The subnet id of the topdown subnet")]
     pub subnet: String,
-    #[arg(long, short, help = "Include topdown messages of this epoch")]
-    pub epoch: ChainEpoch,
+    #[arg(
+        long,
+        short,
+        help = "Include topdown messages starting from this epoch"
+    )]
+    pub from: ChainEpoch,
+    #[arg(long, short, help = "Include topdown messages to this epoch")]
+    pub to: ChainEpoch,
 }
 
 pub(crate) struct LatestParentFinality;
