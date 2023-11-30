@@ -1,4 +1,4 @@
-# Deploy smart contract to Mycelium
+# Deploy smart contract to Mycelium testnet
 
 Before delving into this tutorial, you should have a [basic understanding of IPC](../) and [subnets](../key-concepts/subnets.md). You may want to familiarize yourself with the fundamentals of setting up an IPC subnet, in the [previous quickstart](deploy-a-subnet.md).&#x20;
 
@@ -260,7 +260,7 @@ Considering the security of your project, we will use the `.evn` file to store s
 PRIVATE_KEY="<your-wallet-private-key>"
 ```
 
-Open `hardhat.config.js` with VsCode, we will add IPC network configuration in this file. Make sure you have installed the `dotenv` package in your project by running `npm install dotenv`. Next, let's retrieve the ChainId and URL for the Mycelium Calibration from the [previous step](deploy-smart-contract-to-mycelium.md#1.-getting-rpc-url-and-chain-id). We will use them to configure the IPC network.
+Open `hardhat.config.js` with VsCode, we will add IPC network configuration in this file. Make sure you have installed the `dotenv` package in your project by running `npm install dotenv`. Next, let's retrieve the ChainId and URL for the Mycelium Calibration from the [previous step](deploy-smart-contract-to-mycelium-testnet.md#1.-getting-rpc-url-and-chain-id). We will use them to configure the IPC network.
 
 In the `hardhat.config.js` file, add the following code.
 
@@ -428,6 +428,6 @@ My new balance is  100.0
 {% endtab %}
 {% endtabs %}
 
-Congratulations! You have successfully deployed your first ERC20 contract on the Mycelium Calibration and even interacted with it. \
+Congratulations! You have successfully deployed your first ERC20 contract on the Mycelium Calibration and even interacted with it. You can view your contract on the [explorer](https://explorer.mycelium.calibration.node.glif.io/).\
 \
 Now, it's time to dive deeper and explore the exciting array of features available on the IPC subnet.
