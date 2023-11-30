@@ -60,7 +60,7 @@ To connect to the Mycelium Calibration, we need to append the new subnet params 
 
 ```
 [[subnets]]
-id = "/r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq"
+id = "/r314159/t410f2kwh2xm2zxaeb7kiznrappz3be7ivdc36dnzr2q"
 
 [subnets.config]
 network_type = "fevm"
@@ -91,7 +91,7 @@ With the `subnet-id`, we can use the following command to query the RPC URL and 
 ipc-cli subnet rpc --subnet <subnet-id>
 
 # Command Example
-ipc-cli subnet rpc --subnet /r314159/t410fug7q7fgzeehfgr6qlubzs45z2sjzcbw3nbhpiyi
+ipc-cli subnet rpc --subnet /r314159/t410f2kwh2xm2zxaeb7kiznrappz3be7ivdc36dnzr2q
 
 rpc: "https://api.mycelium.calibration.node.glif.io/"
 chainID: "1914449495539888"
@@ -140,7 +140,7 @@ ipc-cli cross-msg fund --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>
 # --to is optional. If not specified, will use the same address in subnet
 
 # Command Example
-ipc-cli cross-msg fund --subnet /r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq --to 0xd388aB098ed3E84c0D808776440B48F685198498 10
+ipc-cli cross-msg fund --subnet /r314159/t410f2kwh2xm2zxaeb7kiznrappz3be7ivdc36dnzr2q --to 0xd388aB098ed3E84c0D808776440B48F685198498 10
 
 [2023-10-31T09:28:52Z INFO  ipc_provider::manager::evm::manager] fund with evm gateway contract: t410fk2ki2lh2ulxtkw4mbcwjeuqc3mqscrwrkmrzo4a with value: 1000000000000000000, original: TokenAmount(10.0)
 fund performed in epoch: 1085104
@@ -156,7 +156,7 @@ There are a couple of ways to check the token balance in the IPC subnet.
     Use the `subnet-id` for the Mycelium Calibration.
 
     ```sh
-    ipc-cli wallet balances --subnet /r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq -w evm
+    ipc-cli wallet balances --subnet /r314159/t410f2kwh2xm2zxaeb7kiznrappz3be7ivdc36dnzr2q -w evm
     ```
 *   **ETH API**
 
