@@ -7,10 +7,7 @@ use anyhow::anyhow;
 use base64::Engine;
 use config::Config;
 use fvm_shared::{
-    address::{set_current_network, Address, Network},
-    clock::ChainEpoch,
-    crypto::signature::SignatureType,
-    econ::TokenAmount,
+    address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
 use ipc_identity::{
     EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
@@ -24,7 +21,6 @@ use ipc_sdk::{
 };
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
-use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
@@ -43,16 +39,6 @@ pub mod manager;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
-
-pub fn set_fil_network_from_env() {
-    let network_raw: u8 = std::env::var("LOTUS_NETWORK")
-        // default to testnet
-        .unwrap_or_else(|_| String::from("1"))
-        .parse()
-        .unwrap();
-    let network = Network::from_u8(network_raw).unwrap();
-    set_current_network(network);
-}
 
 /// The subnet manager connection that holds the subnet config and the manager instance.
 pub struct Connection {
