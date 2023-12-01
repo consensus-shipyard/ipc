@@ -21,7 +21,6 @@ export async function deploy() {
         deployer,
         'SubnetActorGetterFacet',
         {
-            CheckpointHelper: LIBMAP['CheckpointHelper'],
             SubnetIDHelper: LIBMAP['SubnetIDHelper'],
         },
         txArgs,

@@ -57,7 +57,6 @@ export async function deploy(libs: { [key in string]: string }) {
         CrossMsgHelper: libs['CrossMsgHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
         AccountHelper: libs['AccountHelper'],
-        CheckpointHelper: libs['CheckpointHelper'],
         StorableMsgHelper: libs['StorableMsgHelper'],
     }
 

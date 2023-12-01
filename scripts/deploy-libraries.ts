@@ -53,17 +53,9 @@ export async function deploy() {
             },
             txArgs,
         )
-    const { address: checkpointHelperAddress } =
-        await deployContractWithDeployer(
-            deployer,
-            'CheckpointHelper',
-            {},
-            txArgs,
-        )
 
     return {
         AccountHelper: accountHelperAddress,
-        CheckpointHelper: checkpointHelperAddress,
         SubnetIDHelper: subnetIDHelperAddress,
         CrossMsgHelper: crossMsgHelperAddress,
         StorableMsgHelper: storableMsgHelperAddress,

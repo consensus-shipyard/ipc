@@ -23,7 +23,6 @@ async function deploySubnetActorDiamond(
     }
 
     const getterFacetLibs: Libraries = {
-        CheckpointHelper: libs['CheckpointHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
     }
 
