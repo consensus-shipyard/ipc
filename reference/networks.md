@@ -10,12 +10,12 @@ Mycelium Calibration is a publicly available IPC subnet deployed on Filecoin Cal
 
 The params to connect to Mycelium Calibration are:
 
-* subnet\_id : `/r314159/t410fnotsxwgnxcjp5phjmgp6n3lnhxvrf3pncnm3oxq`
+* subnet\_id : `/r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y`
 * provider\_http : `https://api.mycelium.calibration.node.glif.io/`
 * gateway\_addr : `0x77aa40b105843728088c0132e43fc44348881da8`
 * registry\_addr : `0x74539671a1d2f1c8f200826baba665179f53a1b7`
 
-The Chain ID for Mycelium Calibration is `1914449495539888`. A [faucet](https://faucet.mycelium.calibration.node.glif.io/) and [explorer](https://explorer.mycelium.calibration.node.glif.io/) are available.
+The Chain ID for Mycelium Calibration is `3875628474663538`. A [faucet](https://faucet.mycelium.calibration.node.glif.io/) and [explorer](https://explorer.mycelium.calibration.node.glif.io/) are available.
 
 ### Filecoin Calibration Network
 
@@ -25,7 +25,7 @@ The params to connect to Filecoin Calibration are:
 
 * subnet\_id : `/r314159`
 * provider\_http : `https://api.calibration.node.glif.io/rpc/v1`
-* gateway\_addr : `0x0341fA160C66aBB112195192aE359a6D61df45cd`
-* registry\_addr : `0xc7068Cea947035560128a6a6F4c8913523A5A44C`
+* gateway\_addr : `0x2e994B75095a39EB7C6dDA0516731B02AbcDbdb4`
+* registry\_addr : `0x5FE1a06cA4534cB878260522a572e2254214261D`
 
 The Chain ID for Filecoin Calibration is `314159`. A [faucet](https://faucet.calibration.fildev.network/) and [explorer](https://calibration.filfox.info/en) are available.
