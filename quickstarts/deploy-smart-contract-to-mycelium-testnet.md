@@ -32,15 +32,11 @@ In this step, we will guide you through the process of manually configuring Meta
 
 #### **1. Getting RPC URL & Chain ID**
 
-With the `subnet-id`, we can use the following command to query the RPC URL and `chainID` for our subnet.
+To connect MetaMak to Mycelium Calibration, we need to have its  RPC URL and `chainID` which you can find on [Reference/Networks](../reference/networks.md#mycelium-calibration-network) page.
 
 ```bash
-ipc-cli subnet rpc --subnet <subnet-id>
-
-# Command Example
-ipc-cli subnet rpc --subnet /r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y
-
-rpc: "https://api.mycelium.calibration.node.glif.io/"
+# Mycelium Calibration Info
+rpc url: "https://api.mycelium.calibration.node.glif.io/"
 chainID: "3875628474663538"
 ```
 
