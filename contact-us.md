@@ -4,4 +4,4 @@
 
 :woman\_technologist: Check out the [repository](https://github.com/consensus-shipyard/ipc)
 
-:wave: Connect with the community on [Discord](https://discord.gg/QtNbXf75)
+:wave: Connect with the community on [Discord](https://ipc.space/discord)
