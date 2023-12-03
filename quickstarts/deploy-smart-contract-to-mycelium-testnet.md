@@ -22,66 +22,13 @@ The Filecoin Calibration testnet will be the IPC rootnet to host multiple IPC su
 
 In this quickstart guide, we will utilize the **public subnet** - **the Mycelium Calibration**, connected to Filecoin Calibration testnet, to deploy and interact with smart contracts.
 
-To begin, the first step is to establish a connection to the Mycelium Calibration, enabling you to seamlessly interact with it. As IPC is still undergoing active development, the recommended approach for querying subnet information or engaging with a subnet is to utilize `ipc-cli`. This command-line tool is the primary entry point for interacting with IPC subnets.
-
-### Install & config `ipc-cli`
-
-To interact with any IPC subnet, we will use `ipc-cli` as a user and execute various processes specific to the subnet. Before proceeding, ensure that we have `Rust stable` installed on the machine, as it is required to build `ipc-cli`. Additionally, depending on the environment, there may be additional dependencies that need to be installed.
-
-**Ensure basic dependencies are installed.**&#x20;
-
-By verifying the presence of Rust on the system and addressing any additional dependencies specific to the environment, we can ensure a smooth experience while utilizing `ipc-cli` to interact with the subnet.
-
-#### **1. Clone and build ipc**
-
-To obtain the latest updates for IPC, we will build the binary for `ipc-cli` from the source code available in the `dev` branch.
-
-```
-git clone https://github.com/consensus-shipyard/ipc.git
-cd ipc & git checkout dev
-make build
-```
-
-Upon building `ipc-cli`, the resulting binary will be located in the `./bin` folder. To conveniently access `ipc-cli` from anywhere on your machine, you can add the `ipc-cli` binary to the `PATH` environment variable.
-
-#### **2. Initialize `ipc-cli`**
-
-Executing the following command will create a default folder`~/.ipc` for all IPC-related configurations and data.&#x20;
-
-```
-ipc-cli config init
-```
-
-The configuration file `~/.ipc/config.toml` already includes all the necessary parameters to establish a connection with the calibration network. Additional subnet parameters can be added to this configuration file, enabling `ipc-cli` to connect to specific IPC subnets.
-
-#### **3. Configure `ipc-cli` to connect to** the Mycelium Calibration
-
-To connect to the Mycelium Calibration, we need to append the new subnet params to the IPC configuration file `~/.ipc/config.toml`.&#x20;
-
-```
-[[subnets]]
-id = "/r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y"
-
-[subnets.config]
-network_type = "fevm"
-provider_http = "https://api.mycelium.calibration.node.glif.io/"
-gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
-registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
-```
-
-* **id**: This subnet-id represents the Mycelium Calibration.
-* **network\_type**: IPC subnet supports `fevm` and will support more network environments in the future.
-* **provider\_http**: the URL to send the RPC API requests.
-* **gateway\_addr**: the gateway smart contract address deployed on your subnet.
-* **registry\_add**: the registry smart contract address deployed on your subnet.
-
-With this configuration, we should be able to start interacting with the Mycelium directly through `ipc-cli`.&#x20;
+To begin, the first step is to establish a connection to the Mycelium Calibration, enabling you to seamlessly request tFIL and interact with it.
 
 ### Add the subnet to your MetaMask wallet (manually)
 
 Since IPC subnets are EVM-compatible, you can leverage various tools from the Ethereum ecosystem to build and interact with your decentralized applications (dApps).&#x20;
 
-In this step, we will guide you through the process of manually configuring MetaMask to connect to our subnet. By doing so, we will be able to manage tokens and interact with dApps deployed on this specific subnet using MetaMask.
+In this step, we will guide you through the process of manually configuring MetaMask to connect to our subnet. By doing so, we can manage tokens and interact with dApps deployed on this specific subnet using MetaMask.
 
 #### **1. Getting RPC URL & Chain ID**
 
@@ -99,65 +46,21 @@ chainID: "3875628474663538"
 
 With the gathered information, you now have all the necessary details to manually add your subnet network to MetaMask.
 
-<figure><img src="../.gitbook/assets/metamask.png" alt=""><figcaption><p>Add Canopy network to the MetaMask.</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/metamask (2).png" alt=""><figcaption><p>Add Canopy network to the MetaMask.</p></figcaption></figure>
 
 ## Fund your address on the Mycelium Calibration
 
-Since any IPC subnet operates as a layer 2 network on top of Filecoin, it is necessary to transfer some tFIL tokens from the Filecoin Calibration testnet (rootnet) to our wallet within the Mycelium Calibration. This ensures that we have an adequate token balance for performing actions on the subnet.&#x20;
+Since any IPC subnet operates as a layer2 network on top of Filecoin, it is necessary to transfer some tFIL tokens from the Filecoin Calibration testnet (rootnet) to our wallet within the Mycelium Calibration. This ensures that we have an adequate token balance for performing actions on the subnet.&#x20;
 
-To facilitate this transfer, we will utilize `ipc-cli`. This tool will handle the process of locking tFIL in the smart contract on the Calibration network and subsequently releasing the funds to your wallet address within the subnet.
+To facilitate this transfer, we will directly request some tFIL on [public faucet](https://faucet.mycelium.calibration.node.glif.io/) for Mycelium Calibration.  Use your wallet address on MetaMask to request tFIL on the faucet, it will send you 30 tFIL which was funded from Calibration.&#x20;
 
-#### **1. Create a wallet using ipc-cli**
-
-First, we need to create a new wallet in `ipc-cli` and specify the wallet type & subnet we want to create for.
-
-```sh
-ipc-cli wallet new --wallet-type evm 
-
-0xfbe53abc6f371b65b26f2cf36dd155f80e6f3b85
-```
-
-#### **2. Request tFIL**&#x20;
-
-After creating a wallet in `ipc-cli`, we can request tFIL on the Calibration either through the[ calibration faucet](https://faucet.calibration.fildev.network/funds.html) or [Beryx-Faucet](https://beryx.zondax.ch/faucet).&#x20;
-
-Please note that it may take a minute for the network to finalize the token transfer transaction. You can use `ipc-cli` to check your wallet balance on the Calibration network.
-
-```bash
-ipc-cli wallet balances --subnet /r314159 --wallet-type evm
-
-0xfbe53abc6f371b65b26f2cf36dd155f80e6f3b85 Balance: 100
-```
-
-#### **3. Send tFIL to the subnet**
-
-After receiving tFIL in our wallet on the Filecoin Calibration testnet, we can send tFIL tokens down to our wallet address on the Mycelium Calibration using the following command. We will use the wallet address from MetaMask as to address to receive tFIL on the subnet.
-
-{% code overflow="wrap" %}
-```bash
-ipc-cli cross-msg fund --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
-# --from is optional. If not specified, will use the default address in your ipc
-# --to is optional. If not specified, will use the same address in subnet
-
-# Command Example
-ipc-cli cross-msg fund --subnet /r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y --to 0xd388aB098ed3E84c0D808776440B48F685198498 10
-
-[2023-10-31T09:28:52Z INFO  ipc_provider::manager::evm::manager] fund with evm gateway contract: t410fk2ki2lh2ulxtkw4mbcwjeuqc3mqscrwrkmrzo4a with value: 1000000000000000000, original: TokenAmount(10.0)
-fund performed in epoch: 1085104
-```
-{% endcode %}
-
-It will take some time for the tokens to arrive in the Mycelium Calibration wallet from its rootnet - Calibration. This process is set to take 10 epochs for the confirmation, considering the finality of the Filecoin Calibration rootnet. But once the tFIL is confirmed and transferred to the wallet address on Mycelium, we can transfer tokens within that Mycelium very quickly.
+Once the tFIL is confirmed and transferred to the wallet address on Mycelium, we can transfer tokens within that Mycelium very quickly.
 
 There are a couple of ways to check the token balance in the IPC subnet.
 
-*   **`ipc-cli` command**
+*   **On MetaMask**
 
-    Use the `subnet-id` for the Mycelium Calibration.
-
-    ```sh
-    ipc-cli wallet balances --subnet /r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y -w evm
-    ```
+    ![](../.gitbook/assets/tokenBalances.png)
 *   **ETH API**
 
     We can also send RPC API request to the Mycelium Calibration node to query the wallet balance of a certain wallet address.
@@ -168,9 +71,13 @@ There are a couple of ways to check the token balance in the IPC subnet.
     curl -X POST -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xd388aB098ed3E84c0D808776440B48F685198498", "latest"],"id":1}' <http://127.0.0.1:8545>
     ```
     {% endcode %}
-*   **On MetaMask**
+*   **`ipc-cli` command**
 
-    ![](../.gitbook/assets/tokenBalances.png)
+    Use the `subnet-id` for the Mycelium Calibration.
+
+    ```sh
+    ipc-cli wallet balances --subnet /r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y -w evm
+    ```
 
 After acquiring some test tokens in the MetaMask wallet, we can begin working on the smart contract for the IPC subnet.
 
