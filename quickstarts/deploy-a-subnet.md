@@ -114,7 +114,7 @@ Before running our validators, at least one bootstrap needs to be deployed and a
 * We can deploy a new bootstrap node in the subnet by running:
 
 ```
-docker compose run ipc -e CMT_P2P_HOST_PORT=26650 bootstrap
+docker compose run -e CMT_P2P_HOST_PORT=26650 bootstrap
 ```
 
 At the end of the output, this command should return the ID of your new bootstrap node:
