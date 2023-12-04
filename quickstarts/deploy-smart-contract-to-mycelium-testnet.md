@@ -10,10 +10,7 @@ In this tutorial, we will guide you through the simple process of connecting to 
 
 ## Prerequisites
 
-* [Node](https://nodejs.org/en)
-* [Rust](https://www.rust-lang.org/tools/install)
 * [VS Code](https://code.visualstudio.com/download)
-* [Docker](https://www.docker.com/products/docker-desktop/)
 * [MetaMask](https://metamask.io/download/)
 
 ## Connect to the Mycelium Calibration
