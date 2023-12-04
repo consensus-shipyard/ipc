@@ -34,17 +34,11 @@ You may want to build an dApp on FVM that requires a transaction throughput high
 
 Communication between subnets on IPC is done by two [actors](https://docs.filecoin.io/basics/the-blockchain/actors) instantiated in each subnet--the _IPC Subnet Actor (ISA)_ and the _IPC Gateway Actor (IGA)_.
 
-The IGA is an actor that contains all IPC-related information and logic associated with a subnet that needs to be replicated within the subnet. The ISA is the IGA’s parent-side counterpart; that is, it is deployed to a subnet’s parent and contains all data and logic associated with the particular child subnet.
+The IGA is an actor that contains all IPC-related information and logic associated with a subnet that needs to be replicated within the subnet. The IGA implements the hierarchical consensus logic and enforces some level of security for account balances, e.g. by ensuring that it is not possible to withdraw more native tokens from the subnet than were used to fund the subnet.
 
-Primitives enabling cross-subnet communication include those for transferring funds between accounts in different subnets, saving checkpoints of a child's state in a parent chain, and submitting transactions on one subnet on inputs from smart contracts on another subnet.
+The ISA is the IGA’s parent-side counterpart; that is, it is deployed to a subnet’s parent and contains all data and logic associated with the particular child subnet. For a subnet to be able to interact with its parent, it needs to have a registered subnet actor on the parent network.
 
-### Gateway actors
-
-A gateway is an actor in each subnet that implements the hierarchical consensus logic for that subnet and spawns new child subnets by implementing a new subnet actor interface.&#x20;
-
-A subnet is able to interact with its parent when it is registered in the subnet actor interface of the parent.
-
-Gateway actors enforce some level of security for account balances as well. As an example, gateway actors ensure it is not possible to withdraw more native tokens from subnet accounts to parent accounts than were used to fund the subnet to begin with.
+Primitives enabling cross-subnet communication include those for transferring funds between accounts in different subnets, saving checkpoints of a child's state in a parent chain, and submitting transactions on one subnet based on inputs from actors on another subnet.
 
 ### Relayer
 
