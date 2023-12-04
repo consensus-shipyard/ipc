@@ -21,6 +21,7 @@ use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
 use ipc_sdk::ethers_address_to_fil_address;
 
+use fvm_shared::address::set_current_network;
 use ipc_provider::config::{Config, Subnet};
 use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
@@ -65,6 +66,23 @@ struct IPCAgentCliCommands {
     command: Option<Commands>,
 }
 
+/// A version of options that does partial matching on the arguments, with its only interest
+/// being the capture of global parameters that need to take effect first, before we parse [Options],
+/// because their value affects how others arse parsed.
+///
+/// This one doesn't handle `--help` or `help` so that it is passed on to the next parser,
+/// where the full set of commands and arguments can be printed properly.
+#[derive(Parser, Debug)]
+#[command(version, disable_help_flag = true)]
+struct GlobalOptions {
+    #[command(flatten)]
+    global_params: GlobalArguments,
+
+    /// Capture all the normal commands, basically to ingore them.
+    #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
+    pub cmd: Vec<String>,
+}
+
 /// The `cli` method exposed to handle all the cli commands, ideally from main.
 ///
 /// # Examples
@@ -94,6 +112,9 @@ struct IPCAgentCliCommands {
 /// }
 /// ```
 pub async fn cli() -> anyhow::Result<()> {
+    let global = GlobalOptions::parse();
+    set_current_network(global.global_params.network);
+
     // parse the arguments
     let args = IPCAgentCliCommands::parse();
 
