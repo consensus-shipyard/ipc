@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::address::Address;
 use ipc_sdk::subnet_id::SubnetID;
 use std::{fmt::Debug, str::FromStr};
 
@@ -34,7 +33,7 @@ impl CommandLineHandler for Fund {
             None => None,
         };
         let gateway_addr = match &arguments.gateway_address {
-            Some(address) => Some(Address::from_str(address)?),
+            Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
 
