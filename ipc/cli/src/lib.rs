@@ -40,7 +40,7 @@ pub struct GlobalArguments {
     config_path: Option<String>,
 
     /// Set the FVM Address Network. It's value affects whether `f` (main) or `t` (test) prefixed addresses are accepted.
-    #[arg(short, long, default_value = "mainnet", env = "NETWORK", value_parser = parse_network)]
+    #[arg(short, long, default_value = "testnet", env = "NETWORK", value_parser = parse_network)]
     pub network: Network,
 }
 

@@ -239,6 +239,7 @@ impl IpcProvider {
         bottomup_check_period: ChainEpoch,
         active_validators_limit: u16,
         min_cross_msg_fee: TokenAmount,
+        permissioned: bool,
     ) -> anyhow::Result<Address> {
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -251,12 +252,13 @@ impl IpcProvider {
         let constructor_params = ConstructParams {
             parent,
             ipc_gateway_addr: subnet_config.gateway_addr(),
-            consensus: ConsensusType::Mir,
+            consensus: ConsensusType::Fendermint,
             min_validators,
             min_validator_stake,
             bottomup_check_period,
             active_validators_limit,
             min_cross_msg_fee,
+            permissioned,
         };
 
         conn.manager()
