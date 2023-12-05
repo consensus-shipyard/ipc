@@ -61,7 +61,7 @@ There are a couple of ways to check the token balance in the IPC subnet.
     {% code overflow="wrap" %}
     ```sh
     // Request wallet balance
-    curl -X POST -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xd388aB098ed3E84c0D808776440B48F685198498", "latest"],"id":1}' <http://127.0.0.1:8545>
+    curl -X POST -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["<WALLET ADDRESS", "latest"],"id":1}' <https://api.mycelium.calibration.node.glif.io/>
     ```
     {% endcode %}
 *   **`ipc-cli` command**
