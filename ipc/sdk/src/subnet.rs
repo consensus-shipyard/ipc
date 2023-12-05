@@ -24,16 +24,12 @@ pub struct ConstructParams {
     pub bottomup_check_period: ChainEpoch,
     pub active_validators_limit: u16,
     pub min_cross_msg_fee: TokenAmount,
+    pub permissioned: bool,
 }
 
 /// Consensus types supported by hierarchical consensus
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Deserialize_repr, Serialize_repr)]
 #[repr(u64)]
 pub enum ConsensusType {
-    Mir,
-}
-
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple, PartialEq, Eq)]
-pub struct JoinParams {
-    pub validator_net_addr: String,
+    Fendermint,
 }

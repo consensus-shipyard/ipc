@@ -41,6 +41,7 @@ impl CreateSubnet {
                     .active_validators_limit
                     .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
                 f64_to_token_amount(arguments.min_cross_msg_fee)?,
+                arguments.permissioned,
             )
             .await?;
 
@@ -96,4 +97,9 @@ pub struct CreateSubnetArgs {
         help = "Minimum fee for cross-net messages in subnet (in whole FIL)"
     )]
     pub min_cross_msg_fee: f64,
+    #[arg(
+        long,
+        help = "Deploy static network where validators can't join in a permissionless manner"
+    )]
+    pub permissioned: bool,
 }

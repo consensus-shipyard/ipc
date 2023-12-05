@@ -262,6 +262,7 @@ impl SubnetManager for EthSubnetManager {
             active_validators_limit: params.active_validators_limit,
             power_scale: 3,
             min_cross_msg_fee: ethers::types::U256::from(min_cross_msg_fee),
+            permissioned: params.permissioned,
         };
 
         log::info!("creating subnet on evm with params: {params:?}");
