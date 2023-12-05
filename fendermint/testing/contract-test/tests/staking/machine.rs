@@ -116,6 +116,7 @@ impl StateMachine for StakingMachine {
                 .unwrap(),
             min_validators: 1,
             min_cross_msg_fee: et::U256::zero(),
+            permissioned: false,
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
