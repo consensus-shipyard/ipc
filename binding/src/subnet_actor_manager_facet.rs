@@ -621,6 +621,15 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NoCollateralToWithdraw"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -1148,6 +1157,19 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "InvalidSignatureErr", abi = "InvalidSignatureErr(uint8)")]
     pub struct InvalidSignatureErr(pub u8);
+    ///Custom Error type `MethodNotAllowed` with signature `MethodNotAllowed()` and selector `0x83f171d6`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "MethodNotAllowed", abi = "MethodNotAllowed()")]
+    pub struct MethodNotAllowed;
     ///Custom Error type `NoCollateralToWithdraw` with signature `NoCollateralToWithdraw()` and selector `0x64b0557f`
     #[derive(
         Clone,
@@ -1360,6 +1382,7 @@ pub mod subnet_actor_manager_facet {
         InvalidCheckpointMessagesHash(InvalidCheckpointMessagesHash),
         InvalidPublicKeyLength(InvalidPublicKeyLength),
         InvalidSignatureErr(InvalidSignatureErr),
+        MethodNotAllowed(MethodNotAllowed),
         NoCollateralToWithdraw(NoCollateralToWithdraw),
         NotAllValidatorsHaveLeft(NotAllValidatorsHaveLeft),
         NotEnoughBalance(NotEnoughBalance),
@@ -1443,6 +1466,11 @@ pub mod subnet_actor_manager_facet {
                 data,
             ) {
                 return Ok(Self::InvalidSignatureErr(decoded));
+            }
+            if let Ok(decoded) = <MethodNotAllowed as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::MethodNotAllowed(decoded));
             }
             if let Ok(decoded) = <NoCollateralToWithdraw as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1558,6 +1586,9 @@ pub mod subnet_actor_manager_facet {
                 Self::InvalidSignatureErr(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::MethodNotAllowed(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NoCollateralToWithdraw(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1652,6 +1683,10 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
+                    == <MethodNotAllowed as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <NoCollateralToWithdraw as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1737,6 +1772,7 @@ pub mod subnet_actor_manager_facet {
                 Self::InvalidSignatureErr(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::MethodNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoCollateralToWithdraw(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1836,6 +1872,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<InvalidSignatureErr> for SubnetActorManagerFacetErrors {
         fn from(value: InvalidSignatureErr) -> Self {
             Self::InvalidSignatureErr(value)
+        }
+    }
+    impl ::core::convert::From<MethodNotAllowed> for SubnetActorManagerFacetErrors {
+        fn from(value: MethodNotAllowed) -> Self {
+            Self::MethodNotAllowed(value)
         }
     }
     impl ::core::convert::From<NoCollateralToWithdraw>

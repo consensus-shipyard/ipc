@@ -449,6 +449,7 @@ contract SubnetActorDiamondTest is Test {
                 majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
                 activeValidatorsLimit: 100,
                 powerScale: 12,
+                permissioned: false,
                 minCrossMsgFee: CROSS_MSG_FEE
             }),
             address(saDupGetterFaucet),
@@ -1332,6 +1333,7 @@ contract SubnetActorDiamondTest is Test {
                 majorityPercentage: _majorityPercentage,
                 activeValidatorsLimit: 100,
                 powerScale: 12,
+                permissioned: false,
                 minCrossMsgFee: CROSS_MSG_FEE
             })
         );

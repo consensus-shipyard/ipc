@@ -45,6 +45,7 @@ export async function deploy(
         topDownCheckPeriod: 10,
         majorityPercentage: 66,
         genesis: 0,
+        permissioned: false,
     }
 
     const { address: subnetAddress } = await deployContractWithDeployer(

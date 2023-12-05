@@ -264,7 +264,8 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
             powerScale: 12,
-            minCrossMsgFee: CROSS_MSG_FEE
+            minCrossMsgFee: CROSS_MSG_FEE,
+            permissioned: false
         });
 
         saManager = new SubnetManagerTestUtil();

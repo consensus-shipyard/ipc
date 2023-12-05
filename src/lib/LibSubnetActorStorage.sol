@@ -43,6 +43,8 @@ struct SubnetActorStorage {
     ConsensusType consensus;
     /// @notice Determines if the subnet has been bootstrapped (i.e. it has been activated)
     bool bootstrapped;
+    /// @notice Determines if the subnet is permissionless or not
+    bool permissioned;
     /// @notice Determines if the subnet has been successfully killed
     bool killed;
     // =========== Staking ===========

@@ -46,7 +46,8 @@ contract Deployer is Script {
             minValidators: DEFAULT_MIN_VALIDATORS,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesis: GENESIS
+            genesis: GENESIS,
+            permissioned: false
         });
 
         new SubnetActor(subnetConstructorParams);

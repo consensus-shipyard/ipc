@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength} from "../errors/IPCErrors.sol";
+import {SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
@@ -136,6 +136,12 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice method that allows a validator to join the subnet
     /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant notKilled {
+        // adding this check to prevent new validators from joining
+        // after the subnet has been bootstrapped. We will increase the
+        // functionality in the future to support explicit permissioning.
+        if (s.bootstrapped && s.permissioned) {
+            revert MethodNotAllowed();
+        }
         if (msg.value == 0) {
             revert CollateralIsZero();
         }
@@ -180,6 +186,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice method that allows a validator to increase its stake
     function stake() external payable notKilled {
+        // disbling validator changes for permissioned subnets (at least for now
+        // until a more complex mechanism is implemented).
+        if (s.permissioned) {
+            revert MethodNotAllowed();
+        }
         if (msg.value == 0) {
             revert CollateralIsZero();
         }
@@ -199,6 +210,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice method that allows a validator to unstake a part of its collateral from a subnet
     /// @dev `leave` must be used to unstake the entire stake.
     function unstake(uint256 amount) external notKilled {
+        // disbling validator changes for permissioned subnets (at least for now
+        // until a more complex mechanism is implemented).
+        if (s.permissioned) {
+            revert MethodNotAllowed();
+        }
         if (amount == 0) {
             revert CannotReleaseZero();
         }
@@ -223,8 +239,16 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @dev it also return the validators initial balance if the
     /// subnet was not yet bootstrapped.
     function leave() external notKilled nonReentrant {
-        // remove bootstrap nodes added by this validator
+        // disbling validator changes for permissioned subnets (at least for now
+        // until a more complex mechanism is implemented).
+        // This means that initial validators won't be able to recover
+        // their collateral ever (worth noting in the docs if this ends
+        // up sticking around for a while).
+        if (s.bootstrapped && s.permissioned) {
+            revert MethodNotAllowed();
+        }
 
+        // remove bootstrap nodes added by this validator
         uint256 amount = LibStaking.totalValidatorCollateral(msg.sender);
         if (amount == 0) {
             revert NotValidator(msg.sender);
