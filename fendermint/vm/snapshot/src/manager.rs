@@ -19,13 +19,13 @@ pub struct SnapshotManager<BS> {
     /// Blockstore
     store: BS,
     /// Location to store completed snapshots.
-    snapshot_dir: PathBuf,
+    snapshots_dir: PathBuf,
     /// Target size in bytes for snapshot chunks.
     chunk_size: usize,
     /// Number of snapshots to keep.
     ///
     /// 0 means unlimited.
-    history_size: usize,
+    hist_size: usize,
     /// Time to hold on from purging a snapshot after a remote client
     /// asked for a chunk from it.
     last_access_hold: Duration,
@@ -45,22 +45,22 @@ where
     /// Create a new manager.
     pub fn new(
         store: BS,
-        snapshot_interval: BlockHeight,
-        snapshot_dir: PathBuf,
+        snapshots_dir: PathBuf,
+        block_interval: BlockHeight,
         chunk_size: usize,
-        history_size: usize,
+        hist_size: usize,
         last_access_hold: Duration,
         sync_poll_interval: Duration,
     ) -> anyhow::Result<(Self, SnapshotClient)> {
-        let snapshot_items = list_manifests(&snapshot_dir).context("failed to list manifests")?;
+        let snapshot_items = list_manifests(&snapshots_dir).context("failed to list manifests")?;
 
         let state = SnapshotState::new(snapshot_items);
 
         let manager = Self {
             store,
-            snapshot_dir,
+            snapshots_dir,
             chunk_size,
-            history_size,
+            hist_size,
             last_access_hold,
             sync_poll_interval,
             state: state.clone(),
@@ -68,7 +68,7 @@ where
             is_syncing: TVar::new(true),
         };
 
-        let client = SnapshotClient::new(snapshot_interval, state);
+        let client = SnapshotClient::new(block_interval, state);
 
         Ok((manager, client))
     }
@@ -145,14 +145,14 @@ where
 
     /// Remove snapshot directories if we have more than the desired history size.
     async fn prune_history(&self) {
-        if self.history_size == 0 {
+        if self.hist_size == 0 {
             return;
         }
 
         let removables = atomically(|| {
             self.state.snapshots.modify_mut(|snapshots| {
                 let mut removables = Vec::new();
-                while snapshots.len() > self.history_size {
+                while snapshots.len() > self.hist_size {
                     // Stop at the first snapshot that was accessed recently.
                     if let Some(last_access) =
                         snapshots.head().and_then(|s| s.last_access.elapsed().ok())
@@ -174,7 +174,7 @@ where
 
         for r in removables {
             if let Err(e) = std::fs::remove_dir_all(&r.snapshot_dir) {
-                tracing::error!(error =? e, snapshot_dir = r.snapshot_dir.to_string_lossy().to_string(), "failed to remove snapsot");
+                tracing::error!(error =? e, snapshots_dir = r.snapshot_dir.to_string_lossy().to_string(), "failed to remove snapsot");
             }
         }
     }
@@ -246,14 +246,14 @@ where
         let _ = write_manifest(temp_dir.path(), &manifest).context("failed to export manifest")?;
 
         // Move snapshot to final location - doing it in one step so there's less room for error.
-        let snapshot_dir = self.snapshot_dir.join(&snapshot_name);
-        std::fs::rename(temp_dir.path(), &snapshot_dir).context("failed to move snapshot")?;
+        let snapshots_dir = self.snapshots_dir.join(&snapshot_name);
+        std::fs::rename(temp_dir.path(), &snapshots_dir).context("failed to move snapshot")?;
 
         // Delete the big CAR file - keep the parts only.
-        std::fs::remove_file(snapshot_dir.join(SNAPSHOT_FILE_NAME))
+        std::fs::remove_file(snapshots_dir.join(SNAPSHOT_FILE_NAME))
             .context("failed to remove CAR file")?;
 
-        Ok(SnapshotItem::new(snapshot_dir, manifest))
+        Ok(SnapshotItem::new(snapshots_dir, manifest))
     }
 }
 
@@ -307,7 +307,7 @@ mod tests {
 
     // Initialise genesis and export it directly to see if it works.
     #[tokio::test]
-    async fn create_snapshot_directly() {
+    async fn create_snapshots_directly() {
         let (state_params, store) = init_genesis().await;
         let snapshot = Snapshot::new(store, state_params, 0).expect("failed to create snapshot");
         let tmp_path = tempfile::NamedTempFile::new().unwrap().into_temp_path();
@@ -332,8 +332,8 @@ mod tests {
 
         let (snapshot_manager, snapshot_client) = SnapshotManager::new(
             store.clone(),
-            1,
             temp_dir.path().into(),
+            1,
             10000,
             1,
             Duration::ZERO,
@@ -397,8 +397,8 @@ mod tests {
         // Create a new manager instance
         let (_, new_client) = SnapshotManager::new(
             store,
-            1,
             temp_dir.path().into(),
+            1,
             10000,
             1,
             Duration::ZERO,

@@ -106,7 +106,7 @@ pub struct BroadcastSettings {
 
 #[serde_as]
 #[derive(Debug, Deserialize, Clone)]
-pub struct TopDownConfig {
+pub struct TopDownSettings {
     /// The number of blocks to delay before reporting a height as final on the parent chain.
     /// To propose a certain number of epochs delayed from the latest height, we see to be
     /// conservative and avoid other from rejecting the proposal because they don't see the
@@ -143,7 +143,7 @@ pub struct IpcSettings {
     pub subnet_id: SubnetID,
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
-    pub topdown: Option<TopDownConfig>,
+    pub topdown: Option<TopDownSettings>,
 }
 
 impl IpcSettings {
@@ -151,11 +151,30 @@ impl IpcSettings {
         !self.subnet_id.is_root() && self.topdown.is_some()
     }
 
-    pub fn topdown_config(&self) -> anyhow::Result<&TopDownConfig> {
+    pub fn topdown_config(&self) -> anyhow::Result<&TopDownSettings> {
         self.topdown
             .as_ref()
             .ok_or_else(|| anyhow!("top down config missing"))
     }
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize, Clone)]
+pub struct SnapshotSettings {
+    /// Enable the export and import of snapshots.
+    pub enabled: bool,
+    /// How often to attempt to export snapshots in terms of block height.
+    pub block_interval: BlockHeight,
+    /// Number of snapshots to keep before purging old ones.
+    pub hist_size: usize,
+    /// Target chunk size, in bytes.
+    pub chunk_size_bytes: usize,
+    /// How long to keep a snapshot from being purged after it has been requested by a peer.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub last_access_hold: Duration,
+    /// How often to poll CometBFT to see whether it has caught up with the chain.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub sync_poll_interval: Duration,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -164,10 +183,13 @@ pub struct Settings {
     home_dir: PathBuf,
     /// Database files.
     data_dir: PathBuf,
+    /// State snapshots.
+    snapshots_dir: PathBuf,
     /// Solidity contracts.
     contracts_dir: PathBuf,
     /// Builtin-actors CAR file.
     builtin_actors_bundle: PathBuf,
+
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
 
@@ -176,6 +198,7 @@ pub struct Settings {
 
     pub abci: AbciSettings,
     pub db: DbSettings,
+    pub snapshots: SnapshotSettings,
     pub eth: EthSettings,
     pub fvm: FvmSettings,
     pub resolver: ResolverSettings,
@@ -207,7 +230,12 @@ macro_rules! home_relative {
 }
 
 impl Settings {
-    home_relative!(data_dir, contracts_dir, builtin_actors_bundle);
+    home_relative!(
+        data_dir,
+        snapshots_dir,
+        contracts_dir,
+        builtin_actors_bundle
+    );
 
     /// Load the default configuration from a directory,
     /// then potential overrides specific to the run mode,

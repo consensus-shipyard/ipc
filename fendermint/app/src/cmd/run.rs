@@ -15,6 +15,7 @@ use fendermint_vm_interpreter::{
     signed::SignedMessageInterpreter,
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
+use fendermint_vm_snapshot::SnapshotManager;
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
@@ -67,8 +68,9 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
-    let client: tendermint_rpc::HttpClient = tendermint_rpc::HttpClient::new(tendermint_rpc_url)
-        .context("failed to create Tendermint client")?;
+    let tendermint_client: tendermint_rpc::HttpClient =
+        tendermint_rpc::HttpClient::new(tendermint_rpc_url)
+            .context("failed to create Tendermint client")?;
 
     let validator = match settings.validator_key {
         Some(ref key) => {
@@ -92,7 +94,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         // For now we are using the validator key for submitting transactions.
         // This allows us to identify transactions coming from bonded validators, to give priority to protocol related transactions.
         let broadcaster = Broadcaster::new(
-            client.clone(),
+            tendermint_client.clone(),
             addr,
             sk.clone(),
             settings.fvm.gas_fee_cap.clone(),
@@ -106,7 +108,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     });
 
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
-        client.clone(),
+        tendermint_client.clone(),
         validator_ctx,
         settings.contracts_dir(),
         settings.fvm.gas_overestimation_rate,
@@ -127,6 +129,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     let resolve_pool = CheckpointPool::new();
 
+    // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver.enabled() {
         let service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
@@ -180,6 +183,29 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         (Arc::new(Toggle::disabled()), None)
     };
 
+    // Start a snapshot manager in the background.
+    let snapshots = if settings.snapshots.enabled {
+        let (manager, client) = SnapshotManager::new(
+            state_store.clone(),
+            settings.snapshots_dir(),
+            settings.snapshots.block_interval,
+            settings.snapshots.chunk_size_bytes,
+            settings.snapshots.hist_size,
+            settings.snapshots.last_access_hold,
+            settings.snapshots.sync_poll_interval,
+        )
+        .context("failed to create snapshot manager")?;
+
+        tracing::info!("starting the SnapshotManager...");
+        let tendermint_client = tendermint_client.clone();
+        tokio::spawn(async move { manager.run(tendermint_client).await });
+
+        Some(client)
+    } else {
+        info!("snapshots disabled");
+        None
+    };
+
     let app: App<_, _, AppStore, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
@@ -192,7 +218,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         interpreter,
         resolve_pool,
         parent_finality_provider.clone(),
-        None,
+        snapshots,
     )?;
 
     if let Some((agent_proxy, config)) = ipc_tuple {
@@ -203,7 +229,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 config,
                 parent_finality_provider,
                 agent_proxy,
-                client,
+                tendermint_client,
             )
             .await
             {

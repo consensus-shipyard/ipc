@@ -5,6 +5,8 @@
 
 # Database files.
 data_dir = "data"
+# State snapshots.
+snapshots_dir = "snapshots"
 # Solidity contracts.
 contracts_dir = "contracts"
 # Builtin actor bundle CAR file.
@@ -36,6 +38,24 @@ port = 26658
 [db]
 # Keep unlimited history by default.
 state_hist_size = 0
+
+[snapshots]
+# Enable the export and import of snapshots.
+enabled = false
+# How often to attempt to export snapshots in terms of block height.
+# With 1-2s block time, we can aim for 8h snapshots and cover the last 24h keeping the last 3.
+# The Filecoin Calibration net does not allow longer lookups than 16h, so we should have a snapshot within that time.
+block_interval = 30000
+# Number of snapshots to keep before purging old ones.
+# Keep the last 2-3 snapshots around as recommended by CometBFT docs.
+hist_size = 3
+# Target chunk size, in bytes.
+# It has to be less than 16MB and the FVM has max 1MB blocks, so 10MB as recommended by CometBFT docs is a good start.
+chunk_size_bytes = 10485760
+# How long to keep a snapshot from being purged after it has been requested by a peer.
+last_access_hold = 300
+# Ask CometBFT every now and then whether it's syncing; snapshot production is skipped
+sync_poll_interval = 60
 
 [broadcast]
 # Maximum number of times to retry broadcasting a transaction after failure.
