@@ -186,6 +186,9 @@ task(
         const network = hre.network.name
         const { deploy } = await lazyImport('./scripts/deploy-registry')
         const subnetRegistryDeployment = await deploy()
+
+        console.log(JSON.stringify(subnetRegistryDeployment, null, 2))
+
         await saveSubnetRegistry(network, subnetRegistryDeployment)
     },
 )
