@@ -16,7 +16,6 @@ pub mod store;
 pub mod bundle;
 pub(crate) mod topdown;
 
-use anyhow::Context;
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
 pub use exec::FvmApplyRet;
@@ -101,13 +100,15 @@ where
     C: Client + Sync,
 {
     /// Indicate that the node is syncing with the rest of the network and hasn't caught up with the tip yet.
-    async fn syncing(&self) -> anyhow::Result<bool> {
-        let status: tendermint_rpc::endpoint::status::Response = self
-            .client
-            .status()
-            .await
-            .context("failed to get Tendermint status")?;
-
-        Ok(status.sync_info.catching_up)
+    async fn syncing(&self) -> bool {
+        match self.client.status().await {
+            Ok(status) => status.sync_info.catching_up,
+            Err(e) => {
+                // CometBFT often takes a long time to boot, e.g. while it's replaying blocks it won't
+                // respond to JSON-RPC calls. Let's treat this as an indication that we are syncing.
+                tracing::warn!(error =? e, "failed to get CometBFT sync status");
+                true
+            }
+        }
     }
 }

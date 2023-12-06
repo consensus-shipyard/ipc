@@ -141,7 +141,7 @@ where
             // Asynchronously broadcast signature, if validating.
             if let Some(ref ctx) = self.validator_ctx {
                 // Do not resend past signatures.
-                if !self.syncing().await? {
+                if !self.syncing().await {
                     // Fetch any incomplete checkpoints synchronously because the state can't be shared across threads.
                     let incomplete_checkpoints =
                         checkpoint::unsigned_checkpoints(&self.gateway, &mut state, ctx.public_key)
