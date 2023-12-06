@@ -21,9 +21,6 @@ struct GatewayActorStorage {
     /// an actor that need to be propagated further through the hierarchy.
     /// cross-net message id => CrossMsg
     mapping(bytes32 => CrossMsg) postbox;
-    /// @notice List of validators and how many votes of the total each validator has for top-down messages
-    // configurationNumber => validator fvm address => weight
-    mapping(uint64 => mapping(bytes32 => uint256)) validatorSetWeights;
     /// @notice The current membership of the child subnet
     Membership currentMembership;
     /// @notice The last membership received from the parent and adopted
