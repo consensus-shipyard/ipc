@@ -1,0 +1,8 @@
+target
+builtin-actors
+docker/.artifacts
+docker/Dockerfile
+cometbft
+test-network
+.idea
+.make
