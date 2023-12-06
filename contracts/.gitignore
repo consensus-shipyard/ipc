@@ -1,0 +1,31 @@
+cache/
+cache_hardhat/
+crytic-export/
+.vscode
+.idea
+.env
+broadcast/
+
+node_modules
+
+artifacts
+
+solidity-files-cache.json
+
+typechain
+
+# Deploment assets
+deployments.json
+scripts/*.out
+scripts/deploy-registry.ts
+scripts/deploy-gateway.ts
+binding/target
+subnet.registry.json
+subnet.actor.json
+
+# Coverage tools assets
+coverage_report
+lcov.info
+
+#vim
+*.un~

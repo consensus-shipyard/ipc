@@ -1,0 +1,6 @@
+# Ignore everything in the lib folder
+lib/
+tools/
+package.json
+package-lock.json
+out/
