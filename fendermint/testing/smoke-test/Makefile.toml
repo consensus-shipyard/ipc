@@ -1,27 +1,3 @@
-[env]
-NETWORK_NAME = "smoke"
-CMT_CONTAINER_NAME = "smoke-cometbft"
-FM_CONTAINER_NAME = "smoke-fendermint"
-ETHAPI_CONTAINER_NAME = "smoke-ethapi"
-CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
-FM_DOCKER_IMAGE = "fendermint:latest"
-TEST_DATA_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/test-data"
-TEST_SCRIPTS_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/smoke-test/scripts"
-ACTORS_BUNDLE = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/../builtin-actors/output/bundle.car"
-CMT_HOST_PORT = 26657
-ETHAPI_HOST_PORT = 8545
-# If this wasn't present, any wait task is skipped.
-CARGO_MAKE_WAIT_MILLISECONDS = 5000
-# This wait time seems to work locally.
-CMT_WAIT_MILLIS = 10000
-# Keep example logs to a minimum.
-VERBOSITY = ""
-
-[env.ci]
-CMT_WAIT_MILLIS = 20000
-# Help debug any issues with simplecoin by logging requests and responses.
-VERBOSITY = "--verbose"
-
 # smoke-test infrastructure:
 # cargo install cargo-make
 #
@@ -34,45 +10,19 @@ VERBOSITY = "--verbose"
 # docker logs smoke-ethapi
 # cargo make teardown
 
-[tasks.default]
-clear = true
-run_task = { name = [
-  "setup",
-  "test",
-], fork = true, cleanup_task = "teardown" }
+extend = [
+  { path = "../Makefile/common.toml" },
+]
 
-# Waiting before starting the Eth API for the CometBFT websocket to start listening.
-[tasks.setup]
-dependencies = [
-  "test-data-dir",
-  "network-create",
-  "cometbft-init",
-  "fendermint-init",
-  "fendermint-start",
-  "cometbft-start",
-  "ethapi-start",
-  "cometbft-wait",
-  "fendermint-logs",
-  "cometbft-logs",
-  "ethapi-logs",
+env_files = [
+  { path = "./smoke.env" },
+  { path = "../Makefile/common.env" },
+  { path = "../Makefile/ci.env", profile = "ci" },
 ]
 
 [tasks.test]
 clear = true
 dependencies = ["simplecoin-example", "ethapi-example"]
-
-[tasks.teardown]
-# `dependencies` doesn't seem to work with `cleanup_task`.
-run_task = { name = [
-  "cometbft-stop",
-  "cometbft-rm",
-  "fendermint-stop",
-  "fendermint-rm",
-  "ethapi-stop",
-  "ethapi-rm",
-  "network-rm",
-  "test-data-dir-rm",
-] }
 
 
 [tasks.simplecoin-example]
@@ -80,7 +30,7 @@ run_task = { name = [
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
 cargo run -p fendermint_rpc --release --example simplecoin -- \
-  --secret-key fendermint/testing/smoke-test/test-data/fendermint/keys/alice.sk \
+  --secret-key fendermint/testing/smoke-test/test-data/keys/alice.sk \
   ${VERBOSITY}
 """
 
@@ -89,166 +39,6 @@ cargo run -p fendermint_rpc --release --example simplecoin -- \
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}
 cargo run -p fendermint_eth_api --release --example ethers -- \
-  --secret-key-from fendermint/testing/smoke-test/test-data/fendermint/keys/emily.sk \
-  --secret-key-to   fendermint/testing/smoke-test/test-data/fendermint/keys/eric.sk
+  --secret-key-from fendermint/testing/smoke-test/test-data/keys/emily.sk \
+  --secret-key-to   fendermint/testing/smoke-test/test-data/keys/eric.sk
 """
-
-
-[tasks.test-data-dir]
-script = """
-mkdir -p ${TEST_DATA_DIR}/fendermint;
-mkdir -p ${TEST_DATA_DIR}/cometbft;
-"""
-
-[tasks.test-data-dir-rm]
-script = """
-rm -rf ${TEST_DATA_DIR}
-"""
-
-
-[tasks.cometbft-pull]
-command = "docker"
-args = ["pull", "${CMT_DOCKER_IMAGE}"]
-
-[tasks.cometbft-init]
-extend = "cometbft-run"
-env = { "CMD" = "init", "FLAGS" = "-a STDOUT -a STDERR --rm" }
-
-[tasks.cometbft-start]
-extend = "cometbft-run"
-env = { "CMD" = "start", "FLAGS" = "-d" }
-
-[tasks.cometbft-wait]
-extend = "wait"
-env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "${CMT_WAIT_MILLIS}" }
-
-[tasks.cometbft-run]
-script = """
-docker run \
-  ${FLAGS} \
-  --name ${CMT_CONTAINER_NAME} \
-  --user $(id -u) \
-  --network ${NETWORK_NAME} \
-  --publish ${CMT_HOST_PORT}:26657 \
-  --volume ${TEST_DATA_DIR}/cometbft:/cometbft \
-  --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
-  --env CMT_PEX=false \
-  --env CMT_MAX_SUBSCRIPTION_CLIENTS=10 \
-  --env CMT_MAX_SUBSCRIPTIONS_PER_CLIENT=1000 \
-  ${CMT_DOCKER_IMAGE} \
-  ${CMD}
-"""
-dependencies = ["cometbft-pull", "test-data-dir", "network-create"]
-
-
-[tasks.fendermint-init]
-extend = "fendermint-run"
-env = { "ENTRY" = "/scripts/init.sh", "FLAGS" = "-a STDOUT -a STDERR --rm" }
-
-[tasks.fendermint-start]
-extend = "fendermint-run"
-env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
-
-[tasks.fendermint-run]
-script = """
-docker run \
-  ${FLAGS} \
-  --name ${FM_CONTAINER_NAME} \
-  --init \
-  --user $(id -u) \
-  --network ${NETWORK_NAME} \
-  --volume ${TEST_DATA_DIR}:/data \
-  --volume ${TEST_SCRIPTS_DIR}:/scripts \
-  --env RUST_BACKTRACE=1 \
-  --env FM_DATA_DIR=/data/fendermint/data \
-  --env FM_CHAIN_NAME=${NETWORK_NAME} \
-  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env LOG_LEVEL=info \
-  --entrypoint ${ENTRY} \
-  ${FM_DOCKER_IMAGE} \
-  ${CMD}
-"""
-dependencies = ["test-data-dir", "network-create"]
-
-[tasks.ethapi-start]
-extend = "ethapi-run"
-env = { "CMD" = "eth run", "FLAGS" = "-d" }
-
-
-[tasks.ethapi-run]
-script = """
-docker run \
-  ${FLAGS} \
-  --name ${ETHAPI_CONTAINER_NAME} \
-  --init \
-  --user $(id -u) \
-  --network ${NETWORK_NAME} \
-  --publish ${ETHAPI_HOST_PORT}:8545 \
-  --env TENDERMINT_WS_URL=ws://${CMT_CONTAINER_NAME}:26657/websocket \
-  --env LOG_LEVEL=debug \
-  --env RUST_BACKTRACE=1 \
-  ${FM_DOCKER_IMAGE} \
-  ${CMD}
-"""
-dependencies = ["network-create"]
-
-[tasks.network-create]
-command = "docker"
-args = ["network", "create", "${NETWORK_NAME}"]
-ignore_errors = true
-
-[tasks.network-rm]
-command = "docker"
-args = ["network", "rm", "${NETWORK_NAME}"]
-ignore_errors = true
-
-[tasks.cometbft-rm]
-extend = "docker-rm"
-env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
-
-[tasks.cometbft-stop]
-extend = "docker-stop"
-env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
-
-[tasks.fendermint-rm]
-extend = "docker-rm"
-env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
-
-[tasks.fendermint-stop]
-extend = "docker-stop"
-env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
-
-[tasks.ethapi-rm]
-extend = "docker-rm"
-env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
-
-[tasks.ethapi-stop]
-extend = "docker-stop"
-env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
-
-[tasks.ethapi-logs]
-extend = "docker-logs"
-env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
-
-[tasks.fendermint-logs]
-extend = "docker-logs"
-env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
-
-[tasks.cometbft-logs]
-extend = "docker-logs"
-env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
-
-[tasks.docker-stop]
-command = "docker"
-args = ["stop", "${CONTAINER_NAME}"]
-ignore_errors = true
-
-[tasks.docker-rm]
-command = "docker"
-args = ["rm", "--force", "${CONTAINER_NAME}"]
-ignore_errors = true
-
-[tasks.docker-logs]
-command = "docker"
-args = ["logs", "${CONTAINER_NAME}"]
-ignore_errors = true

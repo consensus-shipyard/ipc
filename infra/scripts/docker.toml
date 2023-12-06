@@ -22,8 +22,3 @@ ignore_errors = true
 command = "docker"
 args = ["logs", "${CONTAINER_NAME}"]
 ignore_errors = true
-
-[tasks.docker-id]
-command = "docker"
-args = ["exec", "${CONTAINER_NAME}", "cometbft show-node-id"]
-ignore_errors = true

@@ -8,7 +8,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --publish ${ETHAPI_HOST_PORT}:8545 \
   --env TENDERMINT_WS_URL=ws://${CMT_CONTAINER_NAME}:26657/websocket \
-  --env LOG_LEVEL=${LOG_LEVEL} \
+  --env LOG_LEVEL=${ETHAPI_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   ${CMD}

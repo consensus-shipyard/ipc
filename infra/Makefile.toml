@@ -3,7 +3,7 @@ extend = [
   { path = "scripts/cometbft.toml" },
   { path = "scripts/fendermint.toml" },
   { path = "scripts/ethapi.toml" },
-  { path = "scripts/genesis.toml"},
+  { path = "scripts/genesis.toml" },
   { path = "scripts/node.toml" },
   { path = "scripts/testnet.toml" },
   { path = "scripts/testnode.toml" },
@@ -19,40 +19,50 @@ SUBNET_ID = { value = "/r0", condition = { env_not_set = ["SUBNET_ID"] } }
 # The network name is derived from the SUBNET_ID, replacing slashes with dashes, and dropping the first dash if any.
 NETWORK_NAME = { script = ["echo $SUBNET_ID | sed -e 's|/|-|g' -e 's|^-||1'"] }
 # External P2P address advertised by CometBFT to other peers.
-CMT_EXTERNAL_ADDR = { value = "", condition = { env_not_set = ["CMT_EXTERNAL_ADDR"] }}
+CMT_EXTERNAL_ADDR = { value = "", condition = { env_not_set = ["CMT_EXTERNAL_ADDR"] } }
 
-BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] }}
-BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] }}
-TIMESTAMP = { value = "1680101412", condition = { env_not_set = ["TIMESTAMP"] }}
-POWER_SCALE = { value = "3", condition = { env_not_set = ["POWER_SCALE"] }}
-CMT_P2P_HOST_PORT = { value = "26656", condition = { env_not_set = ["CMT_P2P_HOST_PORT"] }}
-CMT_RPC_HOST_PORT = { value = "26657", condition = { env_not_set = ["CMT_RPC_HOST_PORT"] }}
-ETHAPI_HOST_PORT = { value = "8545", condition = { env_not_set = ["ETHAPI_HOST_PORT"] }}
+BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
+BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] } }
+TIMESTAMP = { value = "1680101412", condition = { env_not_set = ["TIMESTAMP"] } }
+POWER_SCALE = { value = "3", condition = { env_not_set = ["POWER_SCALE"] } }
+CMT_P2P_HOST_PORT = { value = "26656", condition = { env_not_set = ["CMT_P2P_HOST_PORT"] } }
+CMT_RPC_HOST_PORT = { value = "26657", condition = { env_not_set = ["CMT_RPC_HOST_PORT"] } }
+ETHAPI_HOST_PORT = { value = "8545", condition = { env_not_set = ["ETHAPI_HOST_PORT"] } }
 
 # IPC subnet related parameters
 # Use calibration as default value
 NODE_NAME = { value = "ipc-node", condition = { env_not_set = ["NODE_NAME"] } }
-PARENT_ENDPOINT = { value = "https://api.calibration.node.glif.io/rpc/v1", condition = { env_not_set = ["PARENT_ENDPOINT"] } }
-PARENT_GATEWAY = { value = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1", condition = { env_not_set = ["PARENT_GATEWAY"] } }
-PARENT_REGISTRY = { value = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e", condition = { env_not_set = ["PARENT_REGISTRY"] } }
+PARENT_ENDPOINT = { value = "https://api.calibration.node.glif.io/rpc/v1", condition = { env_not_set = [
+  "PARENT_ENDPOINT",
+] } }
+PARENT_GATEWAY = { value = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1", condition = { env_not_set = [
+  "PARENT_GATEWAY",
+] } }
+PARENT_REGISTRY = { value = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e", condition = { env_not_set = [
+  "PARENT_REGISTRY",
+] } }
 FM_NETWORK = { value = "test", condition = { env_not_set = ["FM_NETWORK"] } }
-TOPDOWN_CHAIN_HEAD_DELAY = { value = "10", condition = { env_not_set = ["TOPDOWN_CHAIN_HEAD_DELAY"] } }
+TOPDOWN_CHAIN_HEAD_DELAY = { value = "10", condition = { env_not_set = [
+  "TOPDOWN_CHAIN_HEAD_DELAY",
+] } }
 TOPDOWN_PROPOSAL_DELAY = { value = "2", condition = { env_not_set = ["TOPDOWN_PROPOSAL_DELAY"] } }
-TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = ["TOPDOWN_MAX_PROPOSAL_RANGE"] } }
+TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = [
+  "TOPDOWN_MAX_PROPOSAL_RANGE",
+] } }
 # Comma-separated list of bootstrap nodes to be used by the CometBFT node.
 BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }
 PRIVATE_KEY_PATH = { value = "", condition = { env_not_set = ["PRIVATE_KEY_PATH"] } }
 
 # Deployment-related
-BASE_DIR="${HOME}/.ipc/${NETWORK_NAME}/${NODE_NAME}"
-FM_DIR="${BASE_DIR}/${NODE_NAME}/fendermint"
-CMT_DIR="${BASE_DIR}/${NODE_NAME}/cometbft"
+BASE_DIR = "${HOME}/.ipc/${NETWORK_NAME}/${NODE_NAME}"
+FM_DIR = "${BASE_DIR}/${NODE_NAME}/fendermint"
+CMT_DIR = "${BASE_DIR}/${NODE_NAME}/cometbft"
 
-GENESIS_FILE="${BASE_DIR}/genesis.json"
-KEYS_SUBDIR="keys"
-KEY_NAME="validator_key"
-PUB_KEY_PATH="${KEYS_SUBDIR}/${KEY_NAME}.pk"
-PRIV_KEY_PATH="${KEYS_SUBDIR}/${KEY_NAME}.sk"
+GENESIS_FILE = "${BASE_DIR}/genesis.json"
+KEYS_SUBDIR = "keys"
+KEY_NAME = "validator_key"
+PUB_KEY_PATH = "${KEYS_SUBDIR}/${KEY_NAME}.pk"
+PRIV_KEY_PATH = "${KEYS_SUBDIR}/${KEY_NAME}.sk"
 
 COMETBFT_SUBDIR = "cometbft"
 
@@ -74,10 +84,12 @@ CMT_WAIT_MILLIS = 20000
 # Keep example logs to a minimum.
 VERBOSITY = ""
 # supports info, error, debug, etc.
-LOG_LEVEL= "info"
+LOG_LEVEL = "info"
+ETHAPI_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["ETHAPI_LOG_LEVEL"] } }
+FM_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["FM_LOG_LEVEL"] } }
 
 [tasks.info]
-script="""
+script = """
 echo
 echo Chain info:
 echo - Chain: ${SUBNET_ID}
@@ -107,7 +119,8 @@ echo
 [tasks.default]
 clear = true
 script_runner = "@duckscript"
-script = ['''
+script = [
+  '''
     echo
     echo Main tasks:
     echo - testnet: run 4-nodes testnet
@@ -124,4 +137,5 @@ script = ['''
     echo
     echo Run 'cargo make --list-all-steps' for a complete list of available tasks.
     echo
-''']
+''',
+]

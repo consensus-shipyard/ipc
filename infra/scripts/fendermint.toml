@@ -3,7 +3,9 @@ extend = "fendermint-run"
 env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-pull]
-condition = { env_not_set = ["FM_PULL_SKIP"], fail_message = "Skipped pulling fendermint Docker image." }
+condition = { env_not_set = [
+  "FM_PULL_SKIP",
+], fail_message = "Skipped pulling fendermint Docker image." }
 script = """
   docker pull ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}
   docker tag ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG} fendermint:${FM_DOCKER_TAG}
@@ -18,13 +20,12 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
+  --env NODE_NAME=${NODE_NAME} \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
-  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
-  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env LOG_LEVEL=${LOG_LEVEL} \
+  --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \

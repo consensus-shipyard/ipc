@@ -4,11 +4,9 @@ set -e
 
 # Create test artifacts, which is basically the Tendermint genesis file.
 
-CMT_DIR=/data/cometbft
-FM_DIR=/data/fendermint
-
-KEYS_DIR=$FM_DIR/keys
-GENESIS_FILE=$FM_DIR/genesis.json
+KEYS_DIR=/data/keys
+CMT_DIR=/data/${NODE_NAME}/cometbft
+GENESIS_FILE=/data/genesis.json
 
 # Create a genesis file
 fendermint \

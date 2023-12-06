@@ -212,3 +212,9 @@ dependencies = [
     "set-external-addr",
     "duplicate-ip-enable",
 ]
+
+
+[tasks.node-id]
+command = "docker"
+args = ["exec", "${CONTAINER_NAME}", "cometbft show-node-id"]
+ignore_errors = true
