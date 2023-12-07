@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crate::manifest::{file_checksum, list_manifests, write_manifest, SnapshotManifest};
@@ -52,6 +52,9 @@ where
         last_access_hold: Duration,
         sync_poll_interval: Duration,
     ) -> anyhow::Result<(Self, SnapshotClient)> {
+        // Make sure the target directory exists.
+        std::fs::create_dir_all(&snapshots_dir).context("failed to create snapshots directory")?;
+
         let snapshot_items = list_manifests(&snapshots_dir).context("failed to list manifests")?;
 
         let state = SnapshotState::new(snapshot_items);
@@ -173,8 +176,11 @@ where
         .await;
 
         for r in removables {
+            let snapshot_dir = r.snapshot_dir.to_string_lossy().to_string();
             if let Err(e) = std::fs::remove_dir_all(&r.snapshot_dir) {
-                tracing::error!(error =? e, snapshots_dir = r.snapshot_dir.to_string_lossy().to_string(), "failed to remove snapsot");
+                tracing::error!(error =? e, snapshot_dir, "failed to remove snapshot");
+            } else {
+                tracing::info!(snapshot_dir, "removed snapshot");
             }
         }
     }
@@ -245,13 +251,8 @@ where
         };
         let _ = write_manifest(temp_dir.path(), &manifest).context("failed to export manifest")?;
 
-        // Move snapshot to final location - doing it in one step so there's less room for error.
         let snapshots_dir = self.snapshots_dir.join(&snapshot_name);
-        std::fs::rename(temp_dir.path(), &snapshots_dir).context("failed to move snapshot")?;
-
-        // Delete the big CAR file - keep the parts only.
-        std::fs::remove_file(snapshots_dir.join(SNAPSHOT_FILE_NAME))
-            .context("failed to remove CAR file")?;
+        move_or_copy(temp_dir.path(), &snapshots_dir).context("failed to move snapshot")?;
 
         Ok(SnapshotItem::new(snapshots_dir, manifest))
     }
@@ -281,6 +282,24 @@ where
         }
         tokio::time::sleep(poll_interval).await;
     }
+}
+
+/// Try to move the entire snapshot directory to its final place,
+/// then remove the snapshot file, keeping only the parts.
+///
+/// If that fails, for example because it would be moving between a
+/// Docker container's temporary directory to the host mounted volume,
+/// then fall back to copying.
+fn move_or_copy(from: &Path, to: &Path) -> anyhow::Result<()> {
+    if std::fs::rename(from, to).is_ok() {
+        // Delete the big CAR file - keep the only the parts.
+        std::fs::remove_file(to.join(SNAPSHOT_FILE_NAME)).context("failed to remove CAR file")?;
+    } else {
+        dircpy::CopyBuilder::new(from, to)
+            .with_exclude_filter(SNAPSHOT_FILE_NAME)
+            .run()?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

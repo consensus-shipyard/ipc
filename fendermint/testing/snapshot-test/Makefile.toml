@@ -1,0 +1,50 @@
+# cd fendermint/testing/snapshot-test
+# - then -
+# cargo make
+# - or -
+# cargo make setup
+# cargo make test
+# docker logs snapshot-fendermint
+# cargo make teardown
+
+extend = [
+  { path = "../Makefile/common.toml" },
+]
+
+env_files = [
+  { path = "./snapshot.env" },
+  { path = "../Makefile/common.env" },
+  { path = "../Makefile/ci.env", profile = "ci" },
+]
+
+# Overriding th env file to enable snapshotting.
+[tasks.test-data-env]
+script = """
+cat << EOF > ${TEST_DATA_DIR}/.env
+FM_DB__HIST_SIZE=100
+FM_SNAPSHOTS__ENABLED=true
+FM_SNAPSHOTS__BLOCK_INTERVAL=10
+FM_SNAPSHOTS__HIST_SIZE=10
+FM_SNAPSHOTS__CHUNK_SIZE_BYTES=1048576
+FM_SNAPSHOTS__SYNC_POLL_INTERVAL=10
+EOF
+"""
+
+[tasks.test]
+clear = true
+dependencies = ["snapshot-wait", "snapshot-created"]
+
+# Wait enought time that some snapshots should be exported.
+[tasks.snapshot-wait]
+extend = "wait"
+env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "15000" }
+
+# Check that some snapshots are being produced.
+[tasks.snapshot-created]
+script = """
+FM_SNAPSHOTS_DIR=${TEST_DATA_DIR}/${NODE_NAME}/fendermint/snapshots
+if [ -z "$(ls -A $FM_SNAPSOTS_DIR)" ]; then
+   echo "ERROR: No snapshots created at $FM_SNAPSHOTS_DIR"
+   exit 1
+fi
+"""

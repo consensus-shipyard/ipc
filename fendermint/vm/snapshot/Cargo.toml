@@ -12,6 +12,7 @@ license.workspace = true
 anyhow = { workspace = true }
 async-stm = { workspace = true }
 cid = { workspace = true }
+dircpy = { workspace = true }
 futures = { workspace = true }
 im = { workspace = true }
 multihash = { workspace = true }

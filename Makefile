@@ -44,6 +44,7 @@ test: $(IPC_ACTORS_ABI) $(BUILTIN_ACTORS_BUNDLE) $(BUILTIN_ACTORS_DIR)
 
 e2e: docker-build $(BUILTIN_ACTORS_DIR)
 	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
+	cd fendermint/testing/snapshot-test && cargo make --profile $(PROFILE)
 
 clean:
 	cargo clean
