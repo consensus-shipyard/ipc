@@ -79,7 +79,7 @@ registry_addr = "0xc7068Cea947035560128a6a6F4c8913523A5A44C"
 
 # [subnets.config]
 # network_type = "fevm"
-# provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+# provider_http = "<RPC_ADDR>"
 # gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
 # registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
@@ -246,7 +246,7 @@ With this you should be able to start interacting with your local subnet directl
 ./bin/ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
 ```
 
-> The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7, respectively.
+> The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively.
 
 ## Step 8: Interact with your the ETH RPC
 

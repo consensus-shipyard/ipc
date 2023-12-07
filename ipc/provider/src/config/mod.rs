@@ -43,7 +43,7 @@ registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
 
 # Mycelium Calibration
 [[subnets]]
-id = "/r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y"
+id = "/r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q"
 
 [subnets.config]
 network_type = "fevm"
