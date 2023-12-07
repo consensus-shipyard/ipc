@@ -41,8 +41,8 @@ id = "/r314159"
 [subnets.config]
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "0x2e994B75095a39EB7C6dDA0516731B02AbcDbdb4"
-registry_addr = "0x5FE1a06cA4534cB878260522a572e2254214261D"
+gateway_addr = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3"
+registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
 
 # Subnet template - uncomment and adjust before using
 # [[subnets]]
@@ -50,7 +50,7 @@ registry_addr = "0x5FE1a06cA4534cB878260522a572e2254214261D"
 
 # [subnets.config]
 # network_type = "fevm"
-# provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+# provider_http = "<RPC_ADDR>"
 # gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
 # registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
