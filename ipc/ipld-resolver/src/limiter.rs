@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use gcra::GcraState;
 pub use gcra::RateLimit;
-use libp2p::gossipsub::time_cache::TimeCache;
+use libp2p::gossipsub::TimeCache;
 
 /// Track the rate limit of resources (e.g. bytes) consumed per key.
 ///
