@@ -5,7 +5,7 @@ name = "primitives"
 version = "0.1.0"
 
 [dependencies]
-fil_actors_runtime = { workspace = true, features = ["fil-actor"] }
+fil_actors_runtime = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
