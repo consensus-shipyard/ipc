@@ -6,7 +6,7 @@ description: Test networks are available for deployment of IPC subnets.
 
 ### Mycelium Calibration Network
 
-Mycelium Calibration is a publicly available IPC subnet deployed on Filecoin Calibration as the rootnet. It's a test network that offers **short block time and fast finality** for builders to deploy smart contracts and build dApps.
+Mycelium Calibration is a publicly available IPC subnet deployed on Filecoin Calibration as the rootnet.It offers **short block time and fast finality** for builders to deploy smart contracts and build dApps. However, it is also an unstable test network, and users should expect the network to be reset (with full loss of state) weekly.
 
 The params to connect to Mycelium Calibration are:
 
