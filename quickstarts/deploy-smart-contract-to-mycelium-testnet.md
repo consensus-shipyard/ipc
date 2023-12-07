@@ -34,7 +34,7 @@ To connect MetaMak to Mycelium Calibration, we need to have its  RPC URL and `ch
 ```bash
 # Mycelium Calibration Info
 rpc url: "https://api.mycelium.calibration.node.glif.io/"
-chainID: "3875628474663538"
+chainID: "2120099022966061"
 ```
 
 With the gathered information, you now have all the necessary details to manually add your subnet network to MetaMask.
