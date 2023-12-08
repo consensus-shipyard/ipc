@@ -1,166 +1,101 @@
 # Deploy a subnet
 
-Before delving into this tutorial, you should have a [basic understanding of IPC](../).&#x20;
+Before delving into this tutorial, you should have a [basic understanding of IPC](../).
 
 Please note that you do not need to deploy your own subnet, in order to build on one. For deploying smart contracts to an existing subnet, check out [the next quickstart](deploy-smart-contract-to-mycelium-testnet.md).
 
-In this tutorial, we will guide you through the process of spinning up your own IPC subnet validator node and anchoring it to the [Filecoin Calibration testnet](../reference/networks.md). We will use a repository with a pre-built docker image to simplify deployment of the IPC tooling. Steps include:
-
-* Initialize and setup our config
-* Fund our wallets needed to run our subnet
-* Create a [child](../key-concepts/subnets.md#hierarchy-trees) subnet
-* Join the subnet
+In this tutorial, we will guide you through the process of spinning up your own IPC subnet validator node locally. We will use a repository with a pre-built docker image to simplify deployment of the IPC tooling.&#x20;
 
 ### Prerequisites
 
-This tutorial uses a repository containing a docker compose configuration and docker images pre-built of the main components needed. You will need to [have docker installed](https://docs.docker.com/engine/install/).
+* [Docker](https://docs.docker.com/engine/install/)
 
-### Setting up our Environment
+### Deploying the subnet
 
-Clone the repository:
+**Please note**, that running the commands below will result in docker downloading a 3GB image on first run. So if you are going to be running this at somewhere with poor or metered internet connectivity, please be aware.
 
-```
-git clone https://github.com/consensus-shipyard/ipc-dx-docker.git
-cd ipc-dx-docker
-```
+1.  Clone this repository:
 
-### Intialize your config
+    ```
+    git clone https://github.com/consensus-shipyard/ipc-dx-docker.git
+    ```
+2.  Navigate to the repository:
 
-```
-docker compose run ipc-cli config init
-```
+    ```
+    cd ipc-dx-docker
+    ```
+3.  OPTIONAL: By default the subnet started will be `r0`. If you want a different subnet ID (also affects the chain ID), then you can either set the env variable `SUBNET_ID`, or edit it in the `.env` file.
 
-You can run `nano ~/.ipc/config.toml` to double-check that the config file has been populated with the following content:
+    ```
+    export SUBNET_ID=r42
+    ```
+4.  To run a single standalone IPC node testnode::
 
-```
-keystore_path = "~/.ipc"
+    ```
+    docker compose run fendermint testnode
+    ```
+5.  To stop the network run::
 
-[[subnets]]
-id = "/r314159"
+    ```
+    docker compose run fendermint testnode-down
+    ```
 
-[subnets.config]
-network_type = "fevm"
-provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3"
-registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
+### Metamask and Funding a Wallet
 
-# Subnet template - uncomment and adjust before using
-# [[subnets]]
-# id = "/r314159/<SUBNET_ID>"
+#### Setting up Metamask
 
-# [subnets.config]
-# network_type = "fevm"
-# provider_http = "<RPC_ADDR>"
-# gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
-# registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
-```
-
-### Set up your wallets
-
-You'll need to create a set of wallets to spawn and interact with the subnet. Please make a note of the addresses as you go along, for easy reference.
-
-* Create the three different wallets
+A default metamask wallet will be funded and the details show to you on startup:
 
 ```
-docker compose run ipc-cli wallet new -w evm
-docker compose run ipc-cli wallet new -w evm
-docker compose run ipc-cli wallet new -w evm
+############################
+#                          #
+# Testnode ready! 🚀       #
+#                          #
+############################
+
+Eth API:
+	http://0.0.0.0:8545
+
+Accounts:
+	t1vwjol3lvimayhxxvcr2fmbtr4dm2krsta4vxmvq: 1000000000000000000000 coin units
+	t410f5joupqsfnfz2g2b5cakucfkigur2synrvem5d5q: 1000000000000000000000 coin units
+
+Private key (hex ready to import in MetaMask):
+	d870269696821eca9c628fe3780e8b54a5f471d29cc3cd444c9261d4d16e7730
+
+Note: both accounts use the same private key @ /tmp/data/.ipc/r0/keys/validator_key.sk
+
+Chain ID:
+	3522868364964899
+
+Fendermint API:
+	http://localhost:26658
+
+CometBFT API:
+	http://0.0.0.0:26657
 ```
 
-* You can optionally set one of the wallets as your default so you don't have to use the `--from` flag explicitly in some of the commands:
+You can configure metamask to connect to this local network by adding a new custom network, with the following steps:
 
-```
-docker compose run ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
-```
+1. Click the network at the top of Metamask
+2. Click `Add a network manually` at the bottom
+3.  Enter the network information below
 
-* Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses
+    ```
+    Network name: IPC localnode
+    New RPC URL: http://127.0.0.1:8545
+    Chain ID: 3522868364964899
+    Currency symbol: tFIL
+    ```
 
-This tutorial uses a pre-built docker image to simplify the process of deploying your own subnet using IPC.&#x20;
+#### Funding a wallet
 
-### Create a child subnet <a href="#user-content-step-4-create-a-child-subnet" id="user-content-step-4-create-a-child-subnet"></a>
+Your wallet will already be funded with 1000 tFIL, ready to use and deploy your first contract. To import the key into your Metamask wallet you will need to:
 
-* The next step is to create a subnet under `/r314159` in calibration. Remember to set a default wallet or explicitly specifying the wallet from which you want to perform the action with the `--from` flag.
+1. Click on the Metamask icon at the top of your browser
+2. Click the accounts drop down at the top
+3. Click `Add account or new hardware wallet`
+4. Click `Import account`
+5. Paste in the private key as shown in the output from starting the network
 
-```
-docker compose run ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
-```
-
-* Make a note of the address of the subnet you created.
-
-### Join the subnet <a href="#user-content-step-5-join-the-subnet" id="user-content-step-5-join-the-subnet"></a>
-
-Before we deploy the infrastructure for the subnet, we will have to bootstrap the subnet and join from our validators. We will put some initial collateral into the subnet and give our validator address some initial balance in the subnet. For this, we need to send a `join` command from each of our validators, from their validator owner addresses, providing their corresponding public key.
-
-* Get the public key for all your wallets and note it down. This is the public key that each of your validators will use to sign blocks in the subnet.
-
-```
-docker compose run ipc-cli wallet pub-key -w evm --address <WALLET_ADDR1>
-docker compose run ipc-cli wallet pub-key -w evm --address <WALLET_ADDR2>
-docker compose run ipc-cli wallet pub-key -w evm --address <WALLET_ADDR3>
-```
-
-* Join the subnet with each validator
-
-```
-docker compose run ipc-cli subnet join --from=<WALLET_ADDR1> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET1> --initial-balance 1
-docker compose run ipc-cli subnet join --from=<WALLET_ADDR2> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET2> --initial-balance 1
-docker compose run ipc-cli subnet join --from=<WALLET_ADDR3> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET3> --initial-balance 1
-```
-
-### Deploying a bootstrap validator node
-
-Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
-
-* We can deploy a new bootstrap node in the subnet by running:
-
-```
-docker compose run -e CMT_P2P_HOST_PORT=26650 bootstrap
-```
-
-At the end of the output, this command should return the ID of your new bootstrap node:
-
-```
-[cargo-make] INFO - Running Task: cometbft-wait
-[cargo-make] INFO - Running Task: cometbft-node-id
-2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
-[cargo-make] INFO - Build Done in 13.38 seconds.
-```
-
-Remember the address of your bootstrap for the next step. This address has the following format `id@ip:port`, and by default shows the public IP of your network interface. Feel free to adjust the `ip` to use a reachable IP for your deployment so other nodes can contact it (in our case our localhost IP, `127.0.0.1`).
-
-* To advertise the endpoint to the rest of nodes in the network we need to run:
-
-<pre><code><strong># Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
-</strong>docker compose run ipc-cli subnet add-bootstrap --subnet=&#x3C;SUBNET_ID> --endpoint="&#x3C;BOOTSRAP_ENDPOINT>"
-</code></pre>
-
-### Deploying the validator infrastructure <a href="#user-content-deploying-the-validator-infrastructure" id="user-content-deploying-the-validator-infrastructure"></a>
-
-With the bootstrap node deployed and advertised to the network, we are now ready to deploy the validators that will run the subnet.
-
-* First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
-
-```
-docker compose run ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-docker compose run ipc-cli wallet export -w evm -a <WALLET_ADDR2> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_2>
-docker compose run ipc-cli wallet export -w evm -a <WALLET_ADDR3> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_3>
-```
-
-* Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
-
-```
-docker compose run ipc cargo make --makefile ./bin/ipc-infra/Makefile.toml \
-    -e NODE_NAME=validator-<n> \
-    -e PRIVATE_KEY_PATH=<PATH_PRIV_KEY_VALIDATOR_n> \
-    -e SUBNET_ID=<SUBNET_ID> \
-    -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT_n> -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT_n> \
-    -e ETHAPI_HOST_PORT=<ETH_RPC_PORT_n> \
-    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \
-    -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
-    -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
-    child-validator
-```
-
-`PARENT_REGISTRY` and `PARENT_GATEWAY` are the contract addresses of the IPC contracts in Calibration. This command also uses the calibration endpoint as default. Finally, you'll need to choose a different `NODE_NAME`, `CMT_HOST_PORT`, `ETHAPI_HOST_PORT` for each of the validators.
-
-With this, we have everything in place, and our subnet should start automatically validating new blocks.
+With this, we have everything in place, and our subnet should start automatically validating new blocks. While this is a locally deployed subnet, there will soon be resources to deploy a subnet, anchored to a live testnet. Stay tuned!
