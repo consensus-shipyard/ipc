@@ -84,7 +84,7 @@ pub struct Behaviour<P: StoreParams> {
     /// on the address, and not on the peer ID which they can change easily.
     peer_addresses: HashMap<PeerId, Multiaddr>,
     /// Limit the amount of data served by remote address.
-    rate_limiter: RateLimiter<Multiaddr>,
+    rate_limiter: RateLimiter, /* T: <Multiaddr>*/
     rate_limit_period: Duration,
     rate_limit: Option<RateLimit>,
     outbox: VecDeque<Event>,
@@ -182,6 +182,32 @@ impl<P: StoreParams> Behaviour<P> {
 impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
     type ConnectionHandler = <Bitswap<P> as NetworkBehaviour>::ConnectionHandler;
     type ToSwarm = Event;
+
+    fn handle_established_inbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        peer: PeerId,
+        local_addr: &Multiaddr,
+        remote_addr: &Multiaddr,
+    ) -> Result<THandler<Self>, ConnectionDenied> {
+        self.inner.handle_established_inbound_connection(
+            connection_id,
+            peer,
+            local_addr,
+            remote_addr,
+        )
+    }
+
+    fn handle_established_outbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        peer: PeerId,
+        addr: &Multiaddr,
+        role_override: Endpoint,
+    ) -> Result<THandler<Self>, ConnectionDenied> {
+        self.inner
+            .handle_established_outbound_connection(connection_id, peer, addr, role_override)
+    }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
         // Store the remote address.
@@ -281,21 +307,6 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         }
 
         Poll::Pending
-    }
-
-    fn handle_established_inbound_connection(
-        &mut self,
-        connection_id: ConnectionId,
-        peer: PeerId,
-        local_addr: &Multiaddr,
-        remote_addr: &Multiaddr,
-    ) -> Result<THandler<Self>, ConnectionDenied> {
-        self.inner.handle_established_inbound_connection(
-            connection_id,
-            peer,
-            local_addr,
-            remote_addr,
-        )
     }
 
     fn handle_pending_outbound_connection(

@@ -57,11 +57,18 @@ pub struct Behaviour<P: StoreParams> {
     content: content::Behaviour<P>,
 }
 
+// impl<P> StoreParams for StoreWrapper<P> {
+//     const MAX_BLOCK_SIZE: usize = 1_048_576;
+//     type Codecs = libipld::IpldCodec;
+//     type Hashes = libipld::multihash::Code;
+// }
+
 // Unfortunately by using `#[derive(NetworkBehaviour)]` we cannot easily inspects events
 // from the inner behaviours, e.g. we cannot poll a behaviour and if it returns something
 // of interest then call a method on another behaviour. We can do this in yet another wrapper
 // where we manually implement `NetworkBehaviour`, or the outer service where we drive the
 // Swarm; there we are free to call any of the behaviours as well as the Swarm.
+// impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {}
 
 impl<P: StoreParams> Behaviour<P> {
     pub fn new<S>(

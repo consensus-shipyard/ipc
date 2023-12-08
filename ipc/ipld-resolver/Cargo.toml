@@ -31,7 +31,7 @@ libp2p = { workspace = true, default-features = false, features = [
   "secp256k1",
   "plaintext",
 ] }
-libp2p-bitswap = "0.25.1"
+libp2p-bitswap = { workspace = true }
 log = { workspace = true }
 prometheus = { workspace = true }
 quickcheck = { workspace = true, optional = true }
