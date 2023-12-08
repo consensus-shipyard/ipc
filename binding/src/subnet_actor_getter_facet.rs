@@ -369,6 +369,28 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getActiveValidatorsNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getActiveValidatorsNumber",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint16"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getBootstrapNodes"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -472,6 +494,84 @@ pub mod subnet_actor_getter_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getTotalConfirmedCollateral"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getTotalConfirmedCollateral",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getTotalValidatorCollateral"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getTotalValidatorCollateral",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getTotalValidatorsNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getTotalValidatorsNumber",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint16"),
                                     ),
                                 },
                             ],
@@ -907,6 +1007,14 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([217, 46, 143, 18], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getActiveValidatorsNumber` (0xc7cda762) function
+        pub fn get_active_validators_number(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u16> {
+            self.0
+                .method_hash([199, 205, 167, 98], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getBootstrapNodes` (0x9754b29e) function
         pub fn get_bootstrap_nodes(
             &self,
@@ -941,6 +1049,31 @@ pub mod subnet_actor_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([178, 189, 41, 94], relayer)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getTotalConfirmedCollateral` (0x332a5ac9) function
+        pub fn get_total_confirmed_collateral(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([51, 42, 90, 201], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getTotalValidatorCollateral` (0x1597bf7e) function
+        pub fn get_total_validator_collateral(
+            &self,
+            validator: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([21, 151, 191, 126], validator)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getTotalValidatorsNumber` (0x52d182d1) function
+        pub fn get_total_validators_number(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u16> {
+            self.0
+                .method_hash([82, 209, 130, 209], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getValidator` (0x1904bb2e) function
@@ -1194,6 +1327,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "genesisValidators", abi = "genesisValidators()")]
     pub struct GenesisValidatorsCall;
+    ///Container type for all input parameters for the `getActiveValidatorsNumber` function with signature `getActiveValidatorsNumber()` and selector `0xc7cda762`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getActiveValidatorsNumber", abi = "getActiveValidatorsNumber()")]
+    pub struct GetActiveValidatorsNumberCall;
     ///Container type for all input parameters for the `getBootstrapNodes` function with signature `getBootstrapNodes()` and selector `0x9754b29e`
     #[derive(
         Clone,
@@ -1248,6 +1394,53 @@ pub mod subnet_actor_getter_facet {
     pub struct GetRelayerRewardCall {
         pub relayer: ::ethers::core::types::Address,
     }
+    ///Container type for all input parameters for the `getTotalConfirmedCollateral` function with signature `getTotalConfirmedCollateral()` and selector `0x332a5ac9`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "getTotalConfirmedCollateral",
+        abi = "getTotalConfirmedCollateral()"
+    )]
+    pub struct GetTotalConfirmedCollateralCall;
+    ///Container type for all input parameters for the `getTotalValidatorCollateral` function with signature `getTotalValidatorCollateral(address)` and selector `0x1597bf7e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "getTotalValidatorCollateral",
+        abi = "getTotalValidatorCollateral(address)"
+    )]
+    pub struct GetTotalValidatorCollateralCall {
+        pub validator: ::ethers::core::types::Address,
+    }
+    ///Container type for all input parameters for the `getTotalValidatorsNumber` function with signature `getTotalValidatorsNumber()` and selector `0x52d182d1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getTotalValidatorsNumber", abi = "getTotalValidatorsNumber()")]
+    pub struct GetTotalValidatorsNumberCall;
     ///Container type for all input parameters for the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,
@@ -1431,10 +1624,14 @@ pub mod subnet_actor_getter_facet {
         GenesisBalances(GenesisBalancesCall),
         GenesisCircSupply(GenesisCircSupplyCall),
         GenesisValidators(GenesisValidatorsCall),
+        GetActiveValidatorsNumber(GetActiveValidatorsNumberCall),
         GetBootstrapNodes(GetBootstrapNodesCall),
         GetConfigurationNumbers(GetConfigurationNumbersCall),
         GetParent(GetParentCall),
         GetRelayerReward(GetRelayerRewardCall),
+        GetTotalConfirmedCollateral(GetTotalConfirmedCollateralCall),
+        GetTotalValidatorCollateral(GetTotalValidatorCollateralCall),
+        GetTotalValidatorsNumber(GetTotalValidatorsNumberCall),
         GetValidator(GetValidatorCall),
         HasSubmittedInLastBottomUpCheckpointHeight(
             HasSubmittedInLastBottomUpCheckpointHeightCall,
@@ -1505,6 +1702,11 @@ pub mod subnet_actor_getter_facet {
             ) {
                 return Ok(Self::GenesisValidators(decoded));
             }
+            if let Ok(decoded) = <GetActiveValidatorsNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetActiveValidatorsNumber(decoded));
+            }
             if let Ok(decoded) = <GetBootstrapNodesCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -1524,6 +1726,21 @@ pub mod subnet_actor_getter_facet {
                 data,
             ) {
                 return Ok(Self::GetRelayerReward(decoded));
+            }
+            if let Ok(decoded) = <GetTotalConfirmedCollateralCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetTotalConfirmedCollateral(decoded));
+            }
+            if let Ok(decoded) = <GetTotalValidatorCollateralCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetTotalValidatorCollateral(decoded));
+            }
+            if let Ok(decoded) = <GetTotalValidatorsNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetTotalValidatorsNumber(decoded));
             }
             if let Ok(decoded) = <GetValidatorCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1621,6 +1838,9 @@ pub mod subnet_actor_getter_facet {
                 Self::GenesisValidators(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::GetActiveValidatorsNumber(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetBootstrapNodes(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1631,6 +1851,15 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetRelayerReward(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTotalConfirmedCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTotalValidatorCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTotalValidatorsNumber(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetValidator(element) => {
@@ -1691,12 +1920,24 @@ pub mod subnet_actor_getter_facet {
                 Self::GenesisBalances(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisCircSupply(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisValidators(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetActiveValidatorsNumber(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GetBootstrapNodes(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetConfigurationNumbers(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::GetParent(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRelayerReward(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetTotalConfirmedCollateral(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetTotalValidatorCollateral(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetTotalValidatorsNumber(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::HasSubmittedInLastBottomUpCheckpointHeight(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -1775,6 +2016,12 @@ pub mod subnet_actor_getter_facet {
             Self::GenesisValidators(value)
         }
     }
+    impl ::core::convert::From<GetActiveValidatorsNumberCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetActiveValidatorsNumberCall) -> Self {
+            Self::GetActiveValidatorsNumber(value)
+        }
+    }
     impl ::core::convert::From<GetBootstrapNodesCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetBootstrapNodesCall) -> Self {
             Self::GetBootstrapNodes(value)
@@ -1794,6 +2041,24 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<GetRelayerRewardCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetRelayerRewardCall) -> Self {
             Self::GetRelayerReward(value)
+        }
+    }
+    impl ::core::convert::From<GetTotalConfirmedCollateralCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetTotalConfirmedCollateralCall) -> Self {
+            Self::GetTotalConfirmedCollateral(value)
+        }
+    }
+    impl ::core::convert::From<GetTotalValidatorCollateralCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetTotalValidatorCollateralCall) -> Self {
+            Self::GetTotalValidatorCollateral(value)
+        }
+    }
+    impl ::core::convert::From<GetTotalValidatorsNumberCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetTotalValidatorsNumberCall) -> Self {
+            Self::GetTotalValidatorsNumber(value)
         }
     }
     impl ::core::convert::From<GetValidatorCall> for SubnetActorGetterFacetCalls {
@@ -1985,6 +2250,18 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct GenesisValidatorsReturn(pub ::std::vec::Vec<Validator>);
+    ///Container type for all return fields from the `getActiveValidatorsNumber` function with signature `getActiveValidatorsNumber()` and selector `0xc7cda762`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetActiveValidatorsNumberReturn(pub u16);
     ///Container type for all return fields from the `getBootstrapNodes` function with signature `getBootstrapNodes()` and selector `0x9754b29e`
     #[derive(
         Clone,
@@ -2033,6 +2310,42 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct GetRelayerRewardReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getTotalConfirmedCollateral` function with signature `getTotalConfirmedCollateral()` and selector `0x332a5ac9`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetTotalConfirmedCollateralReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getTotalValidatorCollateral` function with signature `getTotalValidatorCollateral(address)` and selector `0x1597bf7e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetTotalValidatorCollateralReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getTotalValidatorsNumber` function with signature `getTotalValidatorsNumber()` and selector `0x52d182d1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetTotalValidatorsNumberReturn(pub u16);
     ///Container type for all return fields from the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,

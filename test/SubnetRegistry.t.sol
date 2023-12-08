@@ -8,7 +8,6 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {TestUtils} from "./TestUtils.sol";
 import {IERC165} from "../src/interfaces/IERC165.sol";
-import {IGateway} from "../src/interfaces/IGateway.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
@@ -324,6 +323,44 @@ contract SubnetRegistryTest is Test {
             DEFAULT_MAJORITY_PERCENTAGE,
             DEFAULT_POWER_SCALE
         );
+    }
+
+    function test_deploySubnetActor_fuzz(
+        uint256 _minCollateral,
+        uint64 _minValidators,
+        uint64 _bottomUpCheckPeriod,
+        uint16 _activeValidatorsLimit,
+        uint8 _majorityPercentage,
+        uint256 _minCrossMsgFee,
+        uint8 _pathSize,
+        int8 _powerScale
+    ) public {
+        vm.assume(_minCollateral > 0);
+        vm.assume(_bottomUpCheckPeriod > 0);
+        vm.assume(_majorityPercentage >= 51 && _majorityPercentage <= 100);
+        vm.assume(_powerScale <= 18);
+        vm.assume(_pathSize >= 0 && _pathSize <= 5);
+
+        address[] memory path = new address[](_pathSize);
+        for (uint8 i; i < _pathSize; ++i) {
+            path[i] = vm.addr(300 + i);
+        }
+
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: SubnetID({root: ROOTNET_CHAINID, route: path}),
+            ipcGatewayAddr: DEFAULT_IPC_GATEWAY_ADDR,
+            consensus: ConsensusType.Fendermint,
+            minActivationCollateral: _minCollateral,
+            minValidators: _minValidators,
+            bottomUpCheckPeriod: _bottomUpCheckPeriod,
+            majorityPercentage: _majorityPercentage,
+            activeValidatorsLimit: _activeValidatorsLimit,
+            powerScale: _powerScale,
+            permissioned: false,
+            minCrossMsgFee: _minCrossMsgFee
+        });
+
+        registerSubnetFacet.newSubnetActor(params);
     }
 
     function _assertDeploySubnetActor(

@@ -28,4 +28,14 @@ contract SubnetGetterFacet {
             revert CannotFindSubnet();
         }
     }
+
+    /// @notice Returns the last nonce used by the owner
+    function getUserLastNonce(address user) external view returns (uint64 nonce) {
+        nonce = s.userNonces[user];
+    }
+
+    /// @notice Returns the gateway
+    function getGateway() external view returns (address) {
+        return s.GATEWAY;
+    }
 }

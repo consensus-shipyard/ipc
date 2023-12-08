@@ -257,6 +257,17 @@ pub mod gateway_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("NotEnoughCollateral"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NotEnoughCollateral",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -510,6 +521,19 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "NotEmptySubnetCircSupply", abi = "NotEmptySubnetCircSupply()")]
     pub struct NotEmptySubnetCircSupply;
+    ///Custom Error type `NotEnoughCollateral` with signature `NotEnoughCollateral()` and selector `0x34477cc0`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "NotEnoughCollateral", abi = "NotEnoughCollateral()")]
+    pub struct NotEnoughCollateral;
     ///Custom Error type `NotEnoughFee` with signature `NotEnoughFee()` and selector `0x688e55ae`
     #[derive(
         Clone,
@@ -585,6 +609,7 @@ pub mod gateway_manager_facet {
         InvalidActorAddress(InvalidActorAddress),
         InvalidCrossMsgValue(InvalidCrossMsgValue),
         NotEmptySubnetCircSupply(NotEmptySubnetCircSupply),
+        NotEnoughCollateral(NotEnoughCollateral),
         NotEnoughFee(NotEnoughFee),
         NotEnoughFunds(NotEnoughFunds),
         NotEnoughFundsToRelease(NotEnoughFundsToRelease),
@@ -639,6 +664,11 @@ pub mod gateway_manager_facet {
             ) {
                 return Ok(Self::NotEmptySubnetCircSupply(decoded));
             }
+            if let Ok(decoded) = <NotEnoughCollateral as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::NotEnoughCollateral(decoded));
+            }
             if let Ok(decoded) = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -691,6 +721,9 @@ pub mod gateway_manager_facet {
                 Self::NotEmptySubnetCircSupply(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::NotEnoughCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotEnoughFee(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -741,6 +774,10 @@ pub mod gateway_manager_facet {
                     true
                 }
                 _ if selector
+                    == <NotEnoughCollateral as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
@@ -778,6 +815,9 @@ pub mod gateway_manager_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NotEmptySubnetCircSupply(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NotEnoughCollateral(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NotEnoughFee(element) => ::core::fmt::Display::fmt(element, f),
@@ -831,6 +871,11 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<NotEmptySubnetCircSupply> for GatewayManagerFacetErrors {
         fn from(value: NotEmptySubnetCircSupply) -> Self {
             Self::NotEmptySubnetCircSupply(value)
+        }
+    }
+    impl ::core::convert::From<NotEnoughCollateral> for GatewayManagerFacetErrors {
+        fn from(value: NotEnoughCollateral) -> Self {
+            Self::NotEnoughCollateral(value)
         }
     }
     impl ::core::convert::From<NotEnoughFee> for GatewayManagerFacetErrors {

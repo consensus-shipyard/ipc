@@ -34,7 +34,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {LibStaking} from "../src/lib/LibStaking.sol";
 import {LibDiamond} from "../src/lib/LibDiamond.sol";
 
-import {SubnetManagerTestUtil} from "./subnetActorMock/SubnetManagerTestUtil.sol";
+import {SubnetActorManagerFacetMock} from "./mocks/SubnetActor.sol";
 
 import {console} from "forge-std/console.sol";
 
@@ -67,7 +67,7 @@ contract SubnetActorDiamondTest is Test {
     bytes4[] gwMessengerSelectors;
 
     SubnetActorDiamond saDiamond;
-    SubnetManagerTestUtil saManager;
+    SubnetActorManagerFacetMock saManager;
     SubnetActorGetterFacet saGetter;
     DiamondCutFacet cutFacet;
     DiamondLoupeFacet louper;
@@ -80,7 +80,7 @@ contract SubnetActorDiamondTest is Test {
 
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
-        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetManagerTestUtil");
+        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacetMock");
         cutFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
         louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
 
@@ -192,401 +192,11 @@ contract SubnetActorDiamondTest is Test {
         );
     }
 
-    function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(louper.facets().length == 4, "unexpected length");
-        require(louper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(louper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(louper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
-    }
-
-    function testSubnetActorDiamondReal_BasicLifeCycle() public {
-        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
-        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
-
-        // total collateral in the gateway
-        uint256 collateral = 0;
-        uint256 stake = 10;
-
-        require(!saGetter.isActiveValidator(validator1), "active validator1");
-        require(!saGetter.isWaitingValidator(validator1), "waiting validator1");
-
-        require(!saGetter.isActiveValidator(validator2), "active validator2");
-        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
-
-        // ======== Step. Join ======
-        // initial validator joins
-        vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
-
-        vm.startPrank(validator1);
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
-        collateral = DEFAULT_MIN_VALIDATOR_STAKE;
-
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator1 joining");
-
-        // collateral confirmed immediately and network boostrapped
-        ValidatorInfo memory v = saGetter.getValidator(validator1);
-        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected");
-        require(v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "confirmed collateral not equal to collateral");
-        require(saGetter.isActiveValidator(validator1), "not active validator 1");
-        require(!saGetter.isWaitingValidator(validator1), "waiting validator 1");
-        require(!saGetter.isActiveValidator(validator2), "active validator2");
-        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
-        TestUtils.ensureBytesEqual(v.metadata, publicKey1);
-        require(saGetter.bootstrapped(), "subnet not bootstrapped");
-        require(!saGetter.killed(), "subnet killed");
-        require(saGetter.genesisValidators().length == 1, "not one validator in genesis");
-
-        (uint64 nextConfigNum, uint64 startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "next config num not 1");
-        require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
-
-        vm.stopPrank();
-
-        // second validator joins
-        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
-
-        vm.startPrank(validator2);
-        // subnet bootstrapped and should go through queue
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2);
-
-        // collateral not confirmed yet
-        v = saGetter.getValidator(validator2);
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator2 joining");
-        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected");
-        require(v.confirmedCollateral == 0, "confirmed collateral not equal to collateral");
-        require(saGetter.isActiveValidator(validator1), "not active validator 1");
-        require(!saGetter.isWaitingValidator(validator1), "waiting validator 1");
-        require(!saGetter.isActiveValidator(validator2), "active validator2");
-        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
-        TestUtils.ensureBytesEqual(v.metadata, new bytes(0));
-
-        (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        // join will update the metadata, incr by 1
-        // join will call deposit, incr by 1
-        require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2, "next config num not 3");
-        require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
-        vm.stopPrank();
-
-        // ======== Step. Confirm join operation ======
-        collateral += DEFAULT_MIN_VALIDATOR_STAKE;
-        saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 1);
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator2 joining");
-
-        v = saGetter.getValidator(validator2);
-        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected after confirm join");
-        require(
-            v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE,
-            "confirmed collateral not expected after confirm join"
-        );
-        require(saGetter.isActiveValidator(validator1), "not active validator1");
-        require(!saGetter.isWaitingValidator(validator1), "waiting validator1");
-        require(saGetter.isActiveValidator(validator2), "not active validator2");
-        require(!saGetter.isWaitingValidator(validator2), "waiting validator2");
-
-        (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(
-            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2,
-            "next config num not 3 after confirm join"
-        );
-        require(
-            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2,
-            "start config num not 3 after confirm join"
-        );
-
-        // ======== Step. Stake more ======
-        vm.startPrank(validator1);
-        vm.deal(validator1, stake);
-
-        saManager.stake{value: stake}();
-
-        v = saGetter.getValidator(validator1);
-        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake, "total collateral not expected after stake");
-        require(v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "confirmed collateral not 0 after stake");
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator1 stakes more");
-
-        (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3, "next config num not 4 after stake");
-        require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 2, "start config num not 3 after stake");
-
-        vm.stopPrank();
-
-        // ======== Step. Confirm stake operation ======
-        collateral += stake;
-        saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 2);
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after confirm stake");
-
-        v = saGetter.getValidator(validator1);
-        require(
-            v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake,
-            "total collateral not expected after confirm stake"
-        );
-        require(
-            v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake,
-            "confirmed collateral not expected after confirm stake"
-        );
-
-        v = saGetter.getValidator(validator2);
-        require(v.totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE, "total collateral not expected after confirm stake");
-        require(
-            v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE,
-            "confirmed collateral not expected after confirm stake"
-        );
-
-        (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(
-            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3,
-            "next config num not 4 after confirm stake"
-        );
-        require(
-            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3,
-            "start config num not 4 after confirm stake"
-        );
-        require(saGetter.genesisValidators().length == 1, "genesis validators still 1");
-
-        // ======== Step. Leave ======
-        vm.startPrank(validator1);
-        saManager.leave();
-
-        v = saGetter.getValidator(validator1);
-        require(v.totalCollateral == 0, "total collateral not 0 after confirm leave");
-        require(
-            v.confirmedCollateral == DEFAULT_MIN_VALIDATOR_STAKE + stake,
-            "confirmed collateral incorrect after confirm leave"
-        );
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator 1 leaving");
-
-        (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(
-            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
-            "next config num not 5 after confirm leave"
-        );
-        require(
-            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 3,
-            "start config num not 4 after confirm leave"
-        );
-        require(saGetter.isActiveValidator(validator1), "not active validator 1");
-        require(saGetter.isActiveValidator(validator2), "not active validator 2");
-
-        vm.stopPrank();
-
-        // ======== Step. Confirm leave ======
-        saManager.confirmChange(LibStaking.INITIAL_CONFIGURATION_NUMBER + 3);
-        collateral -= (DEFAULT_MIN_VALIDATOR_STAKE + stake);
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after confirming validator 1 leaving");
-
-        v = saGetter.getValidator(validator1);
-        require(v.totalCollateral == 0, "total collateral not 0 after confirm leave");
-        require(v.confirmedCollateral == 0, "confirmed collateral not 0 after confirm leave");
-
-        (nextConfigNum, startConfigNum) = saGetter.getConfigurationNumbers();
-        require(
-            nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
-            "next config num not 5 after confirm leave"
-        );
-        require(
-            startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER + 4,
-            "start config num not 5 after confirm leave"
-        );
-        require(!saGetter.isActiveValidator(validator1), "active validator 1");
-        require(saGetter.isActiveValidator(validator2), "not active validator 2");
-
-        // ======== Step. Claim collateral ======
-        uint256 b1 = validator1.balance;
-        vm.startPrank(validator1);
-        saManager.claim();
-        uint256 b2 = validator1.balance;
-        require(b2 - b1 == DEFAULT_MIN_VALIDATOR_STAKE + stake, "collateral not received");
-    }
-
     function testSubnetActorDiamond_LoupeFunction() public view {
         require(louper.facets().length == 4, "unexpected length");
         require(louper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
         require(louper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
         require(louper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
-    }
-
-    function testSubnetActorDiamond_Deployment_Works(
-        address _ipcGatewayAddr,
-        uint256 _minActivationCollateral,
-        uint64 _minValidators,
-        uint64 _checkPeriod,
-        uint8 _majorityPercentage
-    ) public {
-        vm.assume(_minActivationCollateral > DEFAULT_MIN_VALIDATOR_STAKE);
-        vm.assume(_checkPeriod > DEFAULT_CHECKPOINT_PERIOD);
-        vm.assume(_majorityPercentage > 51);
-        vm.assume(_majorityPercentage <= 100);
-        vm.assume(_ipcGatewayAddr != address(0));
-
-        _assertDeploySubnetActor(
-            _ipcGatewayAddr,
-            ConsensusType.Fendermint,
-            _minActivationCollateral,
-            _minValidators,
-            _checkPeriod,
-            _majorityPercentage
-        );
-
-        SubnetID memory parent = saGetter.getParent();
-        require(parent.isRoot(), "parent.isRoot()");
-
-        require(saGetter.bottomUpCheckPeriod() == _checkPeriod, "bottomUpCheckPeriod");
-    }
-
-    function testSubnetActorDiamond_Deployments_Fail_GatewayCannotBeZero() public {
-        SubnetManagerTestUtil saDupMangerFaucet = new SubnetManagerTestUtil();
-        SubnetActorGetterFacet saDupGetterFaucet = new SubnetActorGetterFacet();
-
-        vm.expectRevert(GatewayCannotBeZero.selector);
-        createSubnetActorDiamondWithFaucets(
-            SubnetActorDiamond.ConstructorParams({
-                parentId: SubnetID(ROOTNET_CHAINID, new address[](0)),
-                ipcGatewayAddr: address(0),
-                consensus: ConsensusType.Fendermint,
-                minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
-                minValidators: DEFAULT_MIN_VALIDATORS,
-                bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-                majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-                activeValidatorsLimit: 100,
-                powerScale: 12,
-                permissioned: false,
-                minCrossMsgFee: CROSS_MSG_FEE
-            }),
-            address(saDupGetterFaucet),
-            address(saDupMangerFaucet)
-        );
-    }
-
-    function testSubnetActorDiamond_Join_Fail_NotOwnerOfPublicKey() public {
-        address validator = vm.addr(100);
-
-        vm.deal(validator, 1 gwei);
-        vm.prank(validator);
-        vm.expectRevert(NotOwnerOfPublicKey.selector);
-
-        saManager.join{value: 10}(new bytes(65));
-    }
-
-    function testSubnetActorDiamond_Join_Fail_InvalidPublicKeyLength() public {
-        address validator = vm.addr(100);
-
-        vm.deal(validator, 1 gwei);
-        vm.prank(validator);
-        vm.expectRevert(InvalidPublicKeyLength.selector);
-
-        saManager.join{value: 10}(new bytes(64));
-    }
-
-    function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {
-        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-
-        vm.deal(validator, 1 gwei);
-        vm.prank(validator);
-        vm.expectRevert(CollateralIsZero.selector);
-
-        saManager.join(publicKey);
-    }
-
-    function testSubnetActorDiamond_Bootstrap_Node() public {
-        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-
-        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
-        vm.prank(validator);
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
-
-        // validator adds empty node
-        vm.prank(validator);
-        vm.expectRevert(EmptyAddress.selector);
-        saManager.addBootstrapNode("");
-
-        // validator adds a node
-        vm.prank(validator);
-        saManager.addBootstrapNode("1.2.3.4");
-
-        // not-validator adds a node
-        vm.prank(vm.addr(200));
-        vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, vm.addr(200)));
-        saManager.addBootstrapNode("3.4.5.6");
-
-        string[] memory nodes = saGetter.getBootstrapNodes();
-        require(nodes.length == 1, "it returns one node");
-        require(
-            keccak256(abi.encodePacked((nodes[0]))) == keccak256(abi.encodePacked(("1.2.3.4"))),
-            "it returns correct address"
-        );
-
-        vm.prank(validator);
-        saManager.leave();
-        saManager.confirmChange(1);
-
-        nodes = saGetter.getBootstrapNodes();
-        require(nodes.length == 0, "no nodes");
-    }
-
-    function testSubnetActorDiamond_Leave_NotValidator() public {
-        (address validator, ) = TestUtils.deriveValidatorAddress(100);
-
-        // non-empty subnet can't be killed
-        vm.startPrank(validator);
-        vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, validator));
-        saManager.leave();
-    }
-
-    function testSubnetActorDiamond_Kill() public {
-        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-
-        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
-        vm.prank(validator);
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
-
-        // non-empty subnet can't be killed
-        vm.expectRevert(NotAllValidatorsHaveLeft.selector);
-        saManager.kill();
-
-        // leave the subnet and kill it
-        vm.startPrank(validator);
-        saManager.leave();
-        saManager.confirmChange(1);
-
-        // anyone can kill a subnet
-        vm.startPrank(vm.addr(101));
-        saManager.kill();
-    }
-
-    function testSubnetActorDiamond_Stake() public {
-        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-        vm.deal(validator, 10 gwei);
-
-        vm.prank(validator);
-        vm.expectRevert(CollateralIsZero.selector);
-        saManager.stake();
-
-        vm.prank(validator);
-        vm.expectRevert(NotStakedBefore.selector);
-        saManager.stake{value: 10}();
-
-        vm.prank(validator);
-        saManager.join{value: 3}(publicKey);
-
-        ValidatorInfo memory info = saGetter.getValidator(validator);
-        require(info.totalCollateral == 3);
-    }
-
-    function testSubnetActorDiamond_crossMsgGetter() public view {
-        CrossMsg[] memory msgs = new CrossMsg[](1);
-        msgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
-                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0),
-                fee: CROSS_MSG_FEE
-            }),
-            wrapped: false
-        });
-        require(saGetter.crossMsgsHash(msgs) == keccak256(abi.encode(msgs)));
     }
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
@@ -787,6 +397,190 @@ contract SubnetActorDiamondTest is Test {
         saManager.claim();
         uint256 b2 = validator1.balance;
         require(b2 - b1 == DEFAULT_MIN_VALIDATOR_STAKE + stake, "collateral not received");
+    }
+
+    function testSubnetActorDiamond_Deployment_Works(
+        address _ipcGatewayAddr,
+        uint256 _minActivationCollateral,
+        uint64 _minValidators,
+        uint64 _checkPeriod,
+        uint8 _majorityPercentage
+    ) public {
+        vm.assume(_minActivationCollateral > DEFAULT_MIN_VALIDATOR_STAKE);
+        vm.assume(_checkPeriod > DEFAULT_CHECKPOINT_PERIOD);
+        vm.assume(_majorityPercentage > 51);
+        vm.assume(_majorityPercentage <= 100);
+        vm.assume(_ipcGatewayAddr != address(0));
+
+        _assertDeploySubnetActor(
+            _ipcGatewayAddr,
+            ConsensusType.Fendermint,
+            _minActivationCollateral,
+            _minValidators,
+            _checkPeriod,
+            _majorityPercentage
+        );
+
+        SubnetID memory parent = saGetter.getParent();
+        require(parent.isRoot(), "parent.isRoot()");
+
+        require(saGetter.bottomUpCheckPeriod() == _checkPeriod, "bottomUpCheckPeriod");
+    }
+
+    function testSubnetActorDiamond_Deployments_Fail_GatewayCannotBeZero() public {
+        SubnetActorManagerFacetMock saDupMangerFaucet = new SubnetActorManagerFacetMock();
+        SubnetActorGetterFacet saDupGetterFaucet = new SubnetActorGetterFacet();
+
+        vm.expectRevert(GatewayCannotBeZero.selector);
+        createSubnetActorDiamondWithFaucets(
+            SubnetActorDiamond.ConstructorParams({
+                parentId: SubnetID(ROOTNET_CHAINID, new address[](0)),
+                ipcGatewayAddr: address(0),
+                consensus: ConsensusType.Fendermint,
+                minActivationCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
+                minValidators: DEFAULT_MIN_VALIDATORS,
+                bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+                majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+                activeValidatorsLimit: 100,
+                powerScale: 12,
+                permissioned: false,
+                minCrossMsgFee: CROSS_MSG_FEE
+            }),
+            address(saDupGetterFaucet),
+            address(saDupMangerFaucet)
+        );
+    }
+
+    function testSubnetActorDiamond_Join_Fail_NotOwnerOfPublicKey() public {
+        address validator = vm.addr(100);
+
+        vm.deal(validator, 1 gwei);
+        vm.prank(validator);
+        vm.expectRevert(NotOwnerOfPublicKey.selector);
+
+        saManager.join{value: 10}(new bytes(65));
+    }
+
+    function testSubnetActorDiamond_Join_Fail_InvalidPublicKeyLength() public {
+        address validator = vm.addr(100);
+
+        vm.deal(validator, 1 gwei);
+        vm.prank(validator);
+        vm.expectRevert(InvalidPublicKeyLength.selector);
+
+        saManager.join{value: 10}(new bytes(64));
+    }
+
+    function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+
+        vm.deal(validator, 1 gwei);
+        vm.prank(validator);
+        vm.expectRevert(CollateralIsZero.selector);
+
+        saManager.join(publicKey);
+    }
+
+    function testSubnetActorDiamond_Bootstrap_Node() public {
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        vm.prank(validator);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+
+        // validator adds empty node
+        vm.prank(validator);
+        vm.expectRevert(EmptyAddress.selector);
+        saManager.addBootstrapNode("");
+
+        // validator adds a node
+        vm.prank(validator);
+        saManager.addBootstrapNode("1.2.3.4");
+
+        // not-validator adds a node
+        vm.prank(vm.addr(200));
+        vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, vm.addr(200)));
+        saManager.addBootstrapNode("3.4.5.6");
+
+        string[] memory nodes = saGetter.getBootstrapNodes();
+        require(nodes.length == 1, "it returns one node");
+        require(
+            keccak256(abi.encodePacked((nodes[0]))) == keccak256(abi.encodePacked(("1.2.3.4"))),
+            "it returns correct address"
+        );
+
+        vm.prank(validator);
+        saManager.leave();
+        saManager.confirmChange(1);
+
+        nodes = saGetter.getBootstrapNodes();
+        require(nodes.length == 0, "no nodes");
+    }
+
+    function testSubnetActorDiamond_Leave_NotValidator() public {
+        (address validator, ) = TestUtils.deriveValidatorAddress(100);
+
+        // non-empty subnet can't be killed
+        vm.startPrank(validator);
+        vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, validator));
+        saManager.leave();
+    }
+
+    function testSubnetActorDiamond_Kill() public {
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
+        vm.prank(validator);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+
+        // non-empty subnet can't be killed
+        vm.expectRevert(NotAllValidatorsHaveLeft.selector);
+        saManager.kill();
+
+        // leave the subnet and kill it
+        vm.startPrank(validator);
+        saManager.leave();
+        saManager.confirmChange(1);
+
+        // anyone can kill a subnet
+        vm.startPrank(vm.addr(101));
+        saManager.kill();
+    }
+
+    function testSubnetActorDiamond_Stake() public {
+        (address validator, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator, 10 gwei);
+
+        vm.prank(validator);
+        vm.expectRevert(CollateralIsZero.selector);
+        saManager.stake();
+
+        vm.prank(validator);
+        vm.expectRevert(NotStakedBefore.selector);
+        saManager.stake{value: 10}();
+
+        vm.prank(validator);
+        saManager.join{value: 3}(publicKey);
+
+        ValidatorInfo memory info = saGetter.getValidator(validator);
+        require(info.totalCollateral == 3);
+    }
+
+    function testSubnetActorDiamond_crossMsgGetter() public view {
+        CrossMsg[] memory msgs = new CrossMsg[](1);
+        msgs[0] = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+                value: CROSS_MSG_FEE + 1,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: new bytes(0),
+                fee: CROSS_MSG_FEE
+            }),
+            wrapped: false
+        });
+        require(saGetter.crossMsgsHash(msgs) == keccak256(abi.encode(msgs)));
     }
 
     function testSubnetActorDiamond_validateActiveQuorumSignatures() public {
@@ -1147,7 +941,7 @@ contract SubnetActorDiamondTest is Test {
         );
     }
 
-    function testSubnetActorDiamondReal_PreFundRelease_works() public {
+    function testSubnetActorDiamond_PreFundRelease_works() public {
         (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
         address preFunder = address(102);
         address preReleaser = address(103);
@@ -1227,7 +1021,7 @@ contract SubnetActorDiamondTest is Test {
         vm.stopPrank();
     }
 
-    function testSubnetActorDiamondReal_PreFundAndLeave_works() public {
+    function testSubnetActorDiamond_PreFundAndLeave_works() public {
         (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
 
         // total collateral in the gateway
@@ -1282,7 +1076,7 @@ contract SubnetActorDiamondTest is Test {
     ) public {
         SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
-        saManager = new SubnetManagerTestUtil();
+        saManager = new SubnetActorManagerFacetMock();
         saGetter = new SubnetActorGetterFacet();
         cutFacet = new DiamondCutFacet();
         louper = new DiamondLoupeFacet();
@@ -1338,7 +1132,7 @@ contract SubnetActorDiamondTest is Test {
             })
         );
 
-        saManager = SubnetManagerTestUtil(address(saDiamond));
+        saManager = SubnetActorManagerFacetMock(address(saDiamond));
         saGetter = SubnetActorGetterFacet(address(saDiamond));
         cutFacet = DiamondCutFacet(address(saDiamond));
         louper = DiamondLoupeFacet(address(saDiamond));

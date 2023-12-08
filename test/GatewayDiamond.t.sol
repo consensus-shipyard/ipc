@@ -38,7 +38,7 @@ import {LibDiamond} from "../src/lib/LibDiamond.sol";
 
 import {MerkleTreeHelper} from "./MerkleTreeHelper.sol";
 
-import {SubnetManagerTestUtil} from "./subnetActorMock/SubnetManagerTestUtil.sol";
+import {SubnetActorManagerFacetMock} from "./mocks/SubnetActor.sol";
 
 contract GatewayActorDiamondTest is StdInvariant, Test {
     using SubnetIDHelper for SubnetID;
@@ -85,7 +85,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     bytes4[] saGetterSelectors;
     bytes4[] saManagerSelectors;
     SubnetActorDiamond saDiamond;
-    SubnetManagerTestUtil saManager;
+    SubnetActorManagerFacetMock saManager;
     SubnetActorGetterFacet saGetter;
 
     uint64 private constant ROOTNET_CHAINID = 123;
@@ -95,7 +95,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
-        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetManagerTestUtil");
+        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacetMock");
 
         gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
@@ -268,7 +268,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
             permissioned: false
         });
 
-        saManager = new SubnetManagerTestUtil();
+        saManager = new SubnetActorManagerFacetMock();
         saGetter = new SubnetActorGetterFacet();
 
         IDiamond.FacetCut[] memory saDiamondCut = new IDiamond.FacetCut[](2);
@@ -290,7 +290,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         );
 
         saDiamond = new SubnetActorDiamond(saDiamondCut, saConstructorParams);
-        saManager = SubnetManagerTestUtil(address(saDiamond));
+        saManager = SubnetActorManagerFacetMock(address(saDiamond));
         saGetter = SubnetActorGetterFacet(address(saDiamond));
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
@@ -535,7 +535,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
     function testGatewayDiamond_Register_Fail_InsufficientCollateral(uint256 collateral) public {
         vm.assume(collateral < DEFAULT_COLLATERAL_AMOUNT);
-        vm.expectRevert(NotEnoughFunds.selector);
+        vm.expectRevert(NotEnoughCollateral.selector);
 
         gwManager.register{value: collateral}(0);
     }

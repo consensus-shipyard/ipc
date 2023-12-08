@@ -8,7 +8,7 @@ import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -23,9 +23,12 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
     /// subnet from genesis (without having to wait for the subnet to be spawned to propagate the funds).
     function register(uint256 genesisCircSupply) external payable {
+        if (msg.value < genesisCircSupply) {
+            revert NotEnoughFunds();
+        }
         uint256 collateral = msg.value - genesisCircSupply;
         if (collateral < s.minStake) {
-            revert NotEnoughFunds();
+            revert NotEnoughCollateral();
         }
 
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
@@ -49,7 +52,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
     /// @notice addStake - add collateral for an existing subnet
     function addStake() external payable {
-        if (msg.value <= 0) {
+        if (msg.value == 0) {
             revert NotEnoughFunds();
         }
 

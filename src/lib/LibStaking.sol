@@ -494,6 +494,11 @@ library LibStaking {
         payable(relayer).sendValue(amount);
     }
 
+    function getConfigurationNumbers() internal view returns(uint64, uint64) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
+    }
+
     /// @notice Confirm the changes in bottom up checkpoint submission, only call this in bottom up checkpoint execution.
     function confirmChange(uint64 configurationNumber) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
