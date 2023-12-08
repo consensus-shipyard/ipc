@@ -10,7 +10,7 @@ With IPC, dApps can reach planetary scale through recursively scalable subnets, 
 
 ## What is IPC?
 
-Interplanetary Consensus (IPC) is a framework that enables on-demand horizontal scalability of networks, by deploying "subnets" running different consensus algorithms depending on the application's requirements.
+[Interplanetary Consensus (IPC)](https://www.ipc.space/) is a framework that enables on-demand horizontal scalability of networks, by deploying "subnets" running different consensus algorithms depending on the application's requirements.
 
 Let's break that down.
 
