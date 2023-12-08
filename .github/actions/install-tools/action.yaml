@@ -29,8 +29,11 @@ runs:
         repo-token: ${{ inputs.repo-token }}
 
     # For compiling Solidity contracts
-    - name: Install Foundry
-      uses: foundry-rs/foundry-toolchain@v1
+    # - name: Install Foundry
+    #   uses: foundry-rs/foundry-toolchain@v1
+
+    - name: 'Install jq'
+      uses: dcarbone/install-jq-action@v2.1.0
 
     # See https://github.com/docker/setup-buildx-action
     - name: Set up Docker Buildx

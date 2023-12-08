@@ -15,7 +15,7 @@ extend = [
 ]
 
 env_files = [
-  { path = "./smoke.env" },
+  { path = "./scripts/smoke.env" },
   { path = "../Makefile/common.env" },
   { path = "../Makefile/ci.env", profile = "ci" },
 ]

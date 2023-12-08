@@ -19,13 +19,9 @@ dependencies = ["docker-network-create"]
 extend = "ethapi-run"
 env = { "CMD" = "eth run", "FLAGS" = "-d" }
 
-[tasks.ethapi-rm]
-extend = "docker-rm"
+[tasks.ethapi-destroy]
 env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
-
-[tasks.ethapi-stop]
-extend = "docker-stop"
-env = { "CONTAINER_NAME" = "${ETHAPI_CONTAINER_NAME}" }
+run_task = "docker-destroy"
 
 [tasks.ethapi-logs]
 extend = "docker-logs"

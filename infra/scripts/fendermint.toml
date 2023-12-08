@@ -149,13 +149,9 @@ else
 fi
 """
 
-[tasks.fendermint-rm]
-extend = "docker-rm"
+[tasks.fendermint-destroy]
 env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
-
-[tasks.fendermint-stop]
-extend = "docker-stop"
-env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+run_task = "docker-destroy"
 
 [tasks.fendermint-logs]
 extend = "docker-logs"

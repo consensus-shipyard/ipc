@@ -24,6 +24,7 @@ docker run \
   --publish ${CMT_RPC_HOST_PORT}:26657 \
   --publish ${CMT_P2P_HOST_PORT}:26656 \
   --volume ${CMT_DIR}:/cometbft \
+  --env-file ${ENV_FILE} \
   --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
   --env CMT_PEX=false \
   --env CMT_MAX_SUBSCRIPTION_CLIENTS=10 \
@@ -156,6 +157,12 @@ id=`docker exec ${CMT_CONTAINER_NAME} cometbft show-node-id`
 echo $id
 """
 
+[tasks.cometbft-export-node-id]
+script = """
+id=`docker exec ${CMT_CONTAINER_NAME} cometbft show-node-id`
+echo $id > ${TEST_DATA_DIR}/${NODE_NAME}/node-id
+"""
+
 [tasks.cometbft-seed]
 dependencies = ["get-external-ip"]
 script = """
@@ -163,13 +170,9 @@ id=`docker exec ${CMT_CONTAINER_NAME} cometbft show-node-id`
 echo $id@${NODE_EXTERNAL_IP}:${CMT_P2P_HOST_PORT}
 """
 
-[tasks.cometbft-rm]
-extend = "docker-rm"
+[tasks.cometbft-destroy]
 env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
-
-[tasks.cometbft-stop]
-extend = "docker-stop"
-env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
+run_task = "docker-destroy"
 
 [tasks.cometbft-logs]
 extend = "docker-logs"
@@ -205,16 +208,10 @@ sed -i'' -e "s|allow_duplicate_ip = false|allow_duplicate_ip = true|" ${CMT_DIR}
 """
 
 [tasks.cometbft-config]
-dependencies = [
+run_task = { name = [
     "cometbft-init",
     "set-seeds",
     "addr-book-enable",
     "set-external-addr",
     "duplicate-ip-enable",
-]
-
-
-[tasks.node-id]
-command = "docker"
-args = ["exec", "${CONTAINER_NAME}", "cometbft show-node-id"]
-ignore_errors = true
+] }

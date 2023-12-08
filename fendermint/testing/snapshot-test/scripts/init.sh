@@ -28,6 +28,11 @@ for NAME in victoria veronica vivienne; do
     add-account --public-key $KEYS_DIR/$NAME.pk \
                 --balance 1000 \
                 --kind ethereum
+
+  # Convert FM validator key to CMT
+  fendermint \
+    key into-tendermint --secret-key $KEYS_DIR/$NAME.sk \
+      --out $KEYS_DIR/$NAME.priv_validator_key.json
 done
 
 # Add a validator
@@ -42,7 +47,6 @@ fendermint \
   genesis --genesis-file $GENESIS_FILE \
   into-tendermint --out $CMT_DIR/config/genesis.json
 
-# Convert FM validator key to CMT
-fendermint \
-  key into-tendermint --secret-key $KEYS_DIR/$VALIDATOR_NAME.sk \
-    --out $CMT_DIR/config/priv_validator_key.json
+# Copy the default validator key
+cp $KEYS_DIR/$VALIDATOR_NAME.priv_validator_key.json \
+   $CMT_DIR/config/priv_validator_key.json
