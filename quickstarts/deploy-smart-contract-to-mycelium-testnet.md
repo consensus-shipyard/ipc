@@ -40,7 +40,7 @@ chainID: "2120099022966061"
 
 With the gathered information, you now have all the necessary details to manually add your subnet network to MetaMask.
 
-<figure><img src="../.gitbook/assets/metamask (2).png" alt=""><figcaption><p>Add Canopy network to the MetaMask.</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/MM-network.png" alt=""><figcaption><p>Add Canopy network to the MetaMask.</p></figcaption></figure>
 
 ## Fund your address on the Mycelium Calibration
 
