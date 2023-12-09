@@ -272,7 +272,7 @@ impl<P: StoreParams> Service<P> {
     }
 
     /// Handle events that the [`NetworkBehaviour`] for our [`Behaviour`] macro generated, one for each field.
-    fn handle_behaviour_event(&mut self, event: BehaviourEvent<P>) {
+    fn handle_behaviour_event(&mut self, event: BehaviourEvent) {
         match event {
             BehaviourEvent::Ping(e) => self.handle_ping_event(e),
             BehaviourEvent::Identify(e) => self.handle_identify_event(e),
@@ -286,7 +286,7 @@ impl<P: StoreParams> Service<P> {
     fn handle_ping_event(&mut self, event: ping::Event) {
         let peer_id = event.peer.to_base58();
         match event.result {
-            Ok(ping::Event::Success::Ping { rtt }) => {
+            Ok(rtt) => {
                 stats::PING_SUCCESS.inc();
                 stats::PING_RTT.observe(rtt.as_millis() as f64);
                 trace!(
@@ -295,9 +295,6 @@ impl<P: StoreParams> Service<P> {
                     self.peer_id,
                     rtt.as_millis()
                 );
-            }
-            Ok(ping::Event::Success::Pong) => {
-                trace!("PingSuccess::Pong from {peer_id} to {}", self.peer_id);
             }
             Err(ping::Failure::Timeout) => {
                 stats::PING_TIMEOUT.inc();

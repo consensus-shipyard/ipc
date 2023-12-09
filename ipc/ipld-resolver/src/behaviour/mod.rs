@@ -43,12 +43,39 @@ pub enum ConfigError {
     Membership(#[from] membership::ConfigError),
 }
 
+// This would normally be created by the `NetworkBehaviour` macro,
+// however it currently has a bug where it leaves out the `StoreParams` constraint.
+macro_rules! behaviour_event {
+    ($($item:ident ( $event:ty )),+) => {
+        pub enum BehaviourEvent {
+            $($item($event)),+
+        }
+
+        $(
+        impl From<$event> for BehaviourEvent {
+            fn from(value: $event) -> Self {
+                Self::$item(value)
+            }
+        }
+        )+
+    };
+}
+
+behaviour_event! {
+    Ping(ping::Event),
+    Identify(identify::Event),
+    Discovery(discovery::Event),
+    Membership(membership::Event),
+    Content(content::Event)
+}
+
 /// Libp2p behaviour bundle to manage content resolution from other subnets, using:
 ///
 /// * Kademlia for peer discovery
 /// * Gossipsub to advertise subnet membership
 /// * Bitswap to resolve CIDs
 #[derive(NetworkBehaviour)]
+#[behaviour(to_swarm = "BehaviourEvent")]
 pub struct Behaviour<P: StoreParams> {
     ping: ping::Behaviour,
     identify: identify::Behaviour,
