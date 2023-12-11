@@ -272,7 +272,7 @@ impl<P: StoreParams> Service<P> {
     }
 
     /// Handle events that the [`NetworkBehaviour`] for our [`Behaviour`] macro generated, one for each field.
-    fn handle_behaviour_event(&mut self, event: BehaviourEvent) {
+    fn handle_behaviour_event(&mut self, event: BehaviourEvent<P>) {
         match event {
             BehaviourEvent::Ping(e) => self.handle_ping_event(e),
             BehaviourEvent::Identify(e) => self.handle_identify_event(e),
