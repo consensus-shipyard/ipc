@@ -15,12 +15,12 @@ library TestUtils {
         return EllipticCurve.ecMul(privKey, GX, GY, AA, PP);
     }
 
-    function derivePubKeyBytes(uint256 privKey) external pure returns (bytes memory) {
+    function derivePubKeyBytes(uint256 privKey) public pure returns (bytes memory) {
         (uint256 pubKeyX, uint256 pubKeyY) = EllipticCurve.ecMul(privKey, GX, GY, AA, PP);
         return abi.encode(pubKeyX, pubKeyY);
     }
 
-    function deriveValidatorPubKeyBytes(uint256 privKey) external pure returns (bytes memory) {
+    function deriveValidatorPubKeyBytes(uint256 privKey) public pure returns (bytes memory) {
         (uint256 pubKeyX, uint256 pubKeyY) = EllipticCurve.ecMul(privKey, GX, GY, AA, PP);
 
         // https://github.com/ethereum/eth-keys/blob/master/README.md#keyapipublickeypublic_key_bytes
@@ -101,6 +101,32 @@ library TestUtils {
         }
 
         addr = address(uint160(uint256(keccak256(dataSubset))));
+    }
+
+    function newValidator(
+        uint256 key
+    ) internal pure returns (address addr, uint256 privKey, bytes memory validatorKey) {
+        privKey = key;
+        bytes memory pubkey = derivePubKeyBytes(key);
+        validatorKey = deriveValidatorPubKeyBytes(key);
+        addr = address(uint160(uint256(keccak256(pubkey))));
+    }
+
+    function newValidators(
+        uint256 n
+    ) internal pure returns (address[] memory validators, uint256[] memory privKeys, bytes[] memory validatorKeys) {
+        validatorKeys = new bytes[](n);
+        validators = new address[](n);
+        privKeys = new uint256[](n);
+
+        for (uint i = 0; i < n; i++) {
+            (address addr, uint256 key, bytes memory validatorKey) = newValidator(100 + i);
+            validators[i] = addr;
+            validatorKeys[i] = validatorKey;
+            privKeys[i] = key;
+        }
+
+        return (validators, privKeys, validatorKeys);
     }
 
     function derivePubKey(uint8 seq) internal pure returns (address addr, bytes memory data) {

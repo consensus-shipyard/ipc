@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
+
 import "../src/errors/IPCErrors.sol";
-import {TestUtils} from "./TestUtils.sol";
 import {NumberContractFacetSeven, NumberContractFacetEight} from "./NumberContract.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
@@ -13,7 +13,6 @@ import {IERC165} from "../src/interfaces/IERC165.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
-import {IPCMsgType} from "../src/enums/IPCMsgType.sol";
 import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
 import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
 import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/Checkpoint.sol";
@@ -35,10 +34,9 @@ import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
 import {LibDiamond} from "../src/lib/LibDiamond.sol";
-
 import {MerkleTreeHelper} from "./MerkleTreeHelper.sol";
 
-import {SubnetActorManagerFacetMock} from "./mocks/SubnetActor.sol";
+import {TestUtils} from "./TestUtils.sol";
 
 contract GatewayActorDiamondTest is StdInvariant, Test {
     using SubnetIDHelper for SubnetID;
@@ -85,7 +83,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     bytes4[] saGetterSelectors;
     bytes4[] saManagerSelectors;
     SubnetActorDiamond saDiamond;
-    SubnetActorManagerFacetMock saManager;
+    SubnetActorManagerFacet saManager;
     SubnetActorGetterFacet saGetter;
 
     uint64 private constant ROOTNET_CHAINID = 123;
@@ -95,7 +93,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
-        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacetMock");
+        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacet");
 
         gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
@@ -268,7 +266,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
             permissioned: false
         });
 
-        saManager = new SubnetActorManagerFacetMock();
+        saManager = new SubnetActorManagerFacet();
         saGetter = new SubnetActorGetterFacet();
 
         IDiamond.FacetCut[] memory saDiamondCut = new IDiamond.FacetCut[](2);
@@ -290,14 +288,10 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         );
 
         saDiamond = new SubnetActorDiamond(saDiamondCut, saConstructorParams);
-        saManager = SubnetActorManagerFacetMock(address(saDiamond));
+        saManager = SubnetActorManagerFacet(address(saDiamond));
         saGetter = SubnetActorGetterFacet(address(saDiamond));
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
-    }
-
-    function invariant_CrossMsgFee() public view {
-        require(gwGetter.crossMsgFee() == CROSS_MSG_FEE, "gw.crossMsgFee == CROSS_MSG_FEE");
     }
 
     function testGatewayDiamond_Constructor() public view {
@@ -868,7 +862,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_Single_Funding() public {
-        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        (address validatorAddress, , bytes memory publicKey) = TestUtils.newValidator(100);
 
         _join(validatorAddress, publicKey);
 
@@ -986,7 +980,9 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_Fund_Works_ReactivatedSubnet() public {
-        (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+        (address validatorAddress, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        assert(validatorAddress == vm.addr(privKey));
+
         _join(validatorAddress, publicKey);
 
         vm.prank(validatorAddress);
@@ -998,7 +994,6 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         uint256 fundAmount = 1 ether;
 
         vm.deal(funderAddress, fundAmount + 1);
-        vm.prank(funderAddress);
         fund(funderAddress, fundAmount);
     }
 
@@ -2110,12 +2105,68 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         require(circSupply == expectedCircSupply, "unexpected circSupply");
     }
 
+    function test_second_validator_can_join() public {
+        (address validatorAddress1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(101);
+        (address validatorAddress2, , bytes memory publicKey2) = TestUtils.newValidator(102);
+
+        _join(validatorAddress1, publicKey1);
+
+        require(saGetter.bootstrapped(), "subnet not bootstrapped");
+        require(saGetter.isActiveValidator(validatorAddress1), "validator 1 is not active");
+        require(!saGetter.isActiveValidator(validatorAddress2), "validator 2 is active");
+
+        _join(validatorAddress2, publicKey2);
+        _confirmChange(validatorAddress1, privKey1);
+        require(saGetter.isActiveValidator(validatorAddress2), "validator 2 is not active");
+    }
+
     function _join(address validatorAddress, bytes memory pubkey) internal {
         vm.prank(validatorAddress);
         vm.deal(validatorAddress, DEFAULT_COLLATERAL_AMOUNT + 1);
         saManager.join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey);
+    }
+
+    function _confirmChange(address validator, uint256 privKey) internal {
+        address[] memory validators = new address[](1);
+        validators[0] = validator;
+
+        uint256[] memory privKeys = new uint256[](1);
+        privKeys[0] = privKey;
+
+        _confirmChange(validators, privKeys);
+    }
+
+    function _confirmChange(address[] memory validators, uint256[] memory privKey) internal {
+        uint256 n = validators.length;
+
+        bytes[] memory signatures = new bytes[](n);
+
+        CrossMsg[] memory msgs = new CrossMsg[](0);
+
         (uint64 nextConfigNum, ) = saGetter.getConfigurationNumbers();
-        saManager.confirmChange(nextConfigNum - 1);
+        uint64 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
+
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            blockHeight: h,
+            blockHash: keccak256(abi.encode(h)),
+            nextConfigurationNumber: nextConfigNum - 1,
+            crossMessagesHash: keccak256(abi.encode(msgs))
+        });
+
+        vm.deal(address(saDiamond), 100 ether);
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < n; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        for (uint256 i = 0; i < n; i++) {
+            vm.prank(validators[i]);
+            saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        }
     }
 
     function release(uint256 releaseAmount, uint256 fee) internal {
