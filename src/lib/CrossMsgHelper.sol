@@ -23,7 +23,7 @@ library CrossMsgHelper {
         FvmAddress calldata to,
         uint256 value,
         uint256 fee
-    ) public pure returns (CrossMsg memory) {
+    ) external pure returns (CrossMsg memory) {
         return
             CrossMsg({
                 message: StorableMsg({
@@ -45,7 +45,7 @@ library CrossMsgHelper {
         FvmAddress calldata to,
         uint256 value,
         uint256 fee
-    ) public pure returns (CrossMsg memory) {
+    ) external pure returns (CrossMsg memory) {
         return
             CrossMsg({
                 message: StorableMsg({
@@ -61,22 +61,22 @@ library CrossMsgHelper {
             });
     }
 
-    function toHash(CrossMsg memory crossMsg) internal pure returns (bytes32) {
+    function toHash(CrossMsg memory crossMsg) external pure returns (bytes32) {
         return keccak256(abi.encode(crossMsg));
     }
 
-    function toHash(CrossMsg[] memory crossMsgs) public pure returns (bytes32) {
+    function toHash(CrossMsg[] memory crossMsgs) external pure returns (bytes32) {
         return keccak256(abi.encode(crossMsgs));
     }
 
-    function isEmpty(CrossMsg memory crossMsg) internal pure returns (bool) {
+    function isEmpty(CrossMsg memory crossMsg) external pure returns (bool) {
         return
             crossMsg.message.nonce == 0 &&
             crossMsg.message.to.subnetId.root == 0 &&
             crossMsg.message.from.subnetId.root == 0;
     }
 
-    function execute(CrossMsg calldata crossMsg) public returns (bytes memory) {
+    function execute(CrossMsg calldata crossMsg) external returns (bytes memory) {
         uint256 value = crossMsg.message.value;
         address recipient = crossMsg.message.to.rawAddress.extractEvmAddress().normalize();
 

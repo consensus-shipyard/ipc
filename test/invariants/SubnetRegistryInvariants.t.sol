@@ -145,8 +145,8 @@ contract SubnetRegistryInvariants is StdInvariant, Test {
     /// TODO: this test has the same issue as https://github.com/foundry-rs/foundry/issues/6074
     /// We may need to update the test setup when the issue is fixed.
     ///
-    /// forge-config: default.invariant.runs = 5
-    /// forge-config: default.invariant.depth = 20
+    /// forge-config: default.invariant.runs = 50
+    /// forge-config: default.invariant.depth = 5
     /// forge-config: default.invariant.fail-on-revert = false
     /// forge-config: default.invariant.call-override = true
     function invariant_SR_02_subnet_address_can_be_retrieved() public {

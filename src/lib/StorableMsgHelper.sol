@@ -11,7 +11,7 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 library StorableMsgHelper {
     using SubnetIDHelper for SubnetID;
 
-    function applyType(StorableMsg calldata message, SubnetID calldata currentSubnet) public pure returns (IPCMsgType) {
+    function applyType(StorableMsg calldata message, SubnetID calldata currentSubnet) external pure returns (IPCMsgType) {
         SubnetID memory toSubnet = message.to.subnetId;
         SubnetID memory fromSubnet = message.from.subnetId;
         SubnetID memory currentParentSubnet = currentSubnet.commonParent(toSubnet);
@@ -26,7 +26,7 @@ library StorableMsgHelper {
         return IPCMsgType.TopDown;
     }
 
-    function toHash(StorableMsg calldata storableMsg) public pure returns (bytes32) {
+    function toHash(StorableMsg calldata storableMsg) external pure returns (bytes32) {
         return keccak256(abi.encode(storableMsg));
     }
 }

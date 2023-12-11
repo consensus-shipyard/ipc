@@ -15,7 +15,7 @@ library SubnetIDHelper {
     error DifferentRootNetwork();
     error InvalidRoute();
 
-    function getAddress(SubnetID memory subnet) public pure returns (address) {
+    function getAddress(SubnetID memory subnet) external pure returns (address) {
         uint256 length = subnet.route.length;
 
         if (length == 0) {
@@ -24,7 +24,7 @@ library SubnetIDHelper {
         return subnet.route[length - 1];
     }
 
-    function getParentSubnet(SubnetID memory subnet) public pure returns (SubnetID memory) {
+    function getParentSubnet(SubnetID memory subnet) external pure returns (SubnetID memory) {
         if (subnet.route.length == 0) {
             revert NoParentForSubnet();
         }
@@ -41,8 +41,8 @@ library SubnetIDHelper {
         return SubnetID({root: subnet.root, route: route});
     }
 
-    function toString(SubnetID calldata subnet) public pure returns (string memory) {
-        string memory route = string(abi.encodePacked("/r", Strings.toString(subnet.root)));
+    function toString(SubnetID calldata subnet) external pure returns (string memory) {
+        string memory route = string.concat("/r", Strings.toString(subnet.root));
         uint256 subnetLength = subnet.route.length;
         for (uint256 i; i < subnetLength; ) {
             route = string.concat(route, "/");
@@ -59,7 +59,7 @@ library SubnetIDHelper {
         return keccak256(abi.encode(subnet));
     }
 
-    function createSubnetId(SubnetID calldata subnet, address actor) public pure returns (SubnetID memory newSubnet) {
+    function createSubnetId(SubnetID calldata subnet, address actor) external pure returns (SubnetID memory newSubnet) {
         newSubnet.root = subnet.root;
         newSubnet.route = new address[](subnet.route.length + 1);
         uint256 routeLength = subnet.route.length;
@@ -71,9 +71,10 @@ library SubnetIDHelper {
         }
 
         newSubnet.route[newSubnet.route.length - 1] = actor;
+        return newSubnet;
     }
 
-    function getActor(SubnetID calldata subnet) public pure returns (address) {
+    function getActor(SubnetID calldata subnet) external pure returns (address) {
         if (subnet.route.length == 0) {
             return address(0);
         }
@@ -81,12 +82,12 @@ library SubnetIDHelper {
         return subnet.route[subnet.route.length - 1];
     }
 
-    function isRoot(SubnetID calldata subnet) public pure returns (bool) {
+    function isRoot(SubnetID calldata subnet) external pure returns (bool) {
         // gas-opt: original check: subnet.root > 0
         return subnet.route.length == 0 && subnet.root != 0;
     }
 
-    function equals(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (bool) {
+    function equals(SubnetID calldata subnet1, SubnetID calldata subnet2) external pure returns (bool) {
         if (subnet1.root != subnet2.root) {
             return false;
         }
@@ -98,7 +99,7 @@ library SubnetIDHelper {
     }
 
     /// @notice Computes the common parent of the current subnet and the one given as argument
-    function commonParent(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (SubnetID memory) {
+    function commonParent(SubnetID calldata subnet1, SubnetID calldata subnet2) external pure returns (SubnetID memory) {
         if (subnet1.root != subnet2.root) {
             return SubnetID({root: 0, route: new address[](0)});
         }
@@ -131,7 +132,7 @@ library SubnetIDHelper {
     /// subnet2 needs to be a prefix of the subnet1.
     /// If subnet1 is /a/b/c/d and subnet2 is /a/b, then the returned ID should be /a/b/c.
     /// @dev Revert will be triggered if subnet2 is an invalid input.
-    function down(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (SubnetID memory) {
+    function down(SubnetID calldata subnet1, SubnetID calldata subnet2) external pure returns (SubnetID memory) {
         if (subnet1.root != subnet2.root) {
             revert DifferentRootNetwork();
         }
@@ -161,7 +162,7 @@ library SubnetIDHelper {
         return SubnetID({root: subnet1.root, route: route});
     }
 
-    function isEmpty(SubnetID calldata subnetId) public pure returns (bool) {
+    function isEmpty(SubnetID calldata subnetId) external pure returns (bool) {
         return subnetId.route.length == 0 && subnetId.root == 0;
     }
 }

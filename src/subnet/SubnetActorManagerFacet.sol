@@ -238,7 +238,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice method that allows a validator to leave the subnet
     /// @dev it also return the validators initial balance if the
     /// subnet was not yet bootstrapped.
-    function leave() external notKilled nonReentrant {
+    function leave() external nonReentrant notKilled {
         // disbling validator changes for permissioned subnets (at least for now
         // until a more complex mechanism is implemented).
         // This means that initial validators won't be able to recover
