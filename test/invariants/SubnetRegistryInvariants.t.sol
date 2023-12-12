@@ -136,7 +136,6 @@ contract SubnetRegistryInvariants is StdInvariant, Test {
     /// forge-config: default.invariant.runs = 5
     /// forge-config: default.invariant.depth = 10
     /// forge-config: default.invariant.fail-on-revert = false
-    /// forge-config: default.invariant.call-override = true
     function invariant_SR_01_gateway_address_is_persistent() public {
         assertEq(registryHandler.getGateway(), DEFAULT_IPC_GATEWAY_ADDR);
     }
@@ -146,9 +145,8 @@ contract SubnetRegistryInvariants is StdInvariant, Test {
     /// We may need to update the test setup when the issue is fixed.
     ///
     /// forge-config: default.invariant.runs = 50
-    /// forge-config: default.invariant.depth = 5
+    /// forge-config: default.invariant.depth = 10
     /// forge-config: default.invariant.fail-on-revert = false
-    /// forge-config: default.invariant.call-override = true
     function invariant_SR_02_subnet_address_can_be_retrieved() public {
         address[] memory owners = registryHandler.getOwners();
         uint256 length = owners.length;
