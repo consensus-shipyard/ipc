@@ -247,7 +247,7 @@ contract SubnetActorDiamondTest is Test {
 
         // subnet bootstrapped and should go through queue
         // second and third validators join
-        vm.prank(validator2);
+        vm.startPrank(validator2);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2);
 
         // collateral not confirmed yet
@@ -387,7 +387,7 @@ contract SubnetActorDiamondTest is Test {
 
         // ======== Step. Claim collateral ======
         uint256 b1 = validator1.balance;
-        vm.startPrank(validator1);
+        vm.prank(validator1);
         saManager.claim();
         uint256 b2 = validator1.balance;
         require(b2 - b1 == validator1Stake + stake, "collateral not received");
