@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {StdInvariant, Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {TestUtils} from "../TestUtils.sol";
+import {TestUtils} from "../helpers/TestUtils.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";

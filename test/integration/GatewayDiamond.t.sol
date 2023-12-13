@@ -2,296 +2,44 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import "forge-std/StdInvariant.sol";
 
-import "../src/errors/IPCErrors.sol";
-import {NumberContractFacetSeven, NumberContractFacetEight} from "./NumberContract.sol";
-import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
-import {ConsensusType} from "../src/enums/ConsensusType.sol";
-import {Status} from "../src/enums/Status.sol";
-import {IERC165} from "../src/interfaces/IERC165.sol";
-import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
-import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
-import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
-import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/Checkpoint.sol";
-import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
-import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
-import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
+import "../../src/errors/IPCErrors.sol";
+import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
+import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
+import {Status} from "../../src/enums/Status.sol";
+import {IERC165} from "../../src/interfaces/IERC165.sol";
+import {IDiamond} from "../../src/interfaces/IDiamond.sol";
+import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
+import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
+import {CheckpointInfo} from "../../src/structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../../src/structs/Checkpoint.sol";
+import {FvmAddress} from "../../src/structs/FvmAddress.sol";
+import {SubnetID, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
+import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {GatewayDiamond, FunctionNotFound} from "../src/GatewayDiamond.sol";
-import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
-import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
-import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
-import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
-import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
-import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
-import {LibDiamond} from "../src/lib/LibDiamond.sol";
-import {MerkleTreeHelper} from "./MerkleTreeHelper.sol";
+import {GatewayDiamond, FunctionNotFound} from "../../src/GatewayDiamond.sol";
+import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
+import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
+import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
+import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
+import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {LibDiamond} from "../../src/lib/LibDiamond.sol";
+import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
-import {TestUtils} from "./TestUtils.sol";
+import {TestUtils} from "../helpers/TestUtils.sol";
+import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 
-contract GatewayActorDiamondTest is StdInvariant, Test {
+contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
     using StorableMsgHelper for StorableMsg;
     using FvmAddressHelper for FvmAddress;
 
-    uint64 constant MAX_NONCE = type(uint64).max;
-    address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
-    uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
-    uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 70;
-    uint64 constant DEFAULT_COLLATERAL_AMOUNT = 1 ether;
-    uint64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
-    string private constant DEFAULT_NET_ADDR = "netAddr";
-    bytes private constant GENESIS = EMPTY_BYTES;
-    uint256 constant CROSS_MSG_FEE = 10 gwei;
-    uint256 constant DEFAULT_RELAYER_REWARD = 10 gwei;
-    address constant CHILD_NETWORK_ADDRESS = address(10);
-    address constant CHILD_NETWORK_ADDRESS_2 = address(11);
-    uint64 constant EPOCH_ONE = 1 * DEFAULT_CHECKPOINT_PERIOD;
-    uint256 constant INITIAL_VALIDATOR_FUNDS = 1 ether;
-
-    bytes4[] gwRouterSelectors;
-    bytes4[] gwManagerSelectors;
-    bytes4[] gwGetterSelectors;
-    bytes4[] gwMessengerSelectors;
-    bytes4[] cutFacetSelectors;
-    bytes4[] louperSelectors;
-
-    GatewayDiamond gatewayDiamond;
-    GatewayManagerFacet gwManager;
-    GatewayGetterFacet gwGetter;
-    GatewayRouterFacet gwRouter;
-    GatewayMessengerFacet gwMessenger;
-    DiamondCutFacet cutFacet;
-    DiamondLoupeFacet louper;
-
-    GatewayDiamond gatewayDiamond2;
-    GatewayManagerFacet gwManager2;
-    GatewayGetterFacet gwGetter2;
-    GatewayRouterFacet gwRouter2;
-    GatewayMessengerFacet gwMessenger2;
-
-    bytes4[] saGetterSelectors;
-    bytes4[] saManagerSelectors;
-    SubnetActorDiamond saDiamond;
-    SubnetActorManagerFacet saManager;
-    SubnetActorGetterFacet saGetter;
-
-    uint64 private constant ROOTNET_CHAINID = 123;
-    address public constant ROOTNET_ADDRESS = address(1);
-
-    address private constant TOPDOWN_VALIDATOR_1 = address(12);
-
-    constructor() {
-        saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
-        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacet");
-
-        gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
-        gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
-        gwManagerSelectors = TestUtils.generateSelectors(vm, "GatewayManagerFacet");
-        gwMessengerSelectors = TestUtils.generateSelectors(vm, "GatewayMessengerFacet");
-        cutFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
-
-        louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
-    }
-
-    function createDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
-        gwRouter = new GatewayRouterFacet();
-        gwManager = new GatewayManagerFacet();
-        gwGetter = new GatewayGetterFacet();
-        gwMessenger = new GatewayMessengerFacet();
-        cutFacet = new DiamondCutFacet();
-
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](5);
-
-        diamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwRouter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwRouterSelectors
-            })
-        );
-
-        diamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwManager),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwManagerSelectors
-            })
-        );
-
-        diamondCut[2] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwGetter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwGetterSelectors
-            })
-        );
-
-        diamondCut[3] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwMessenger),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwMessengerSelectors
-            })
-        );
-
-        diamondCut[4] = (
-            IDiamond.FacetCut({
-                facetAddress: address(cutFacet),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: cutFacetSelectors
-            })
-        );
-
-        gatewayDiamond = new GatewayDiamond(diamondCut, params);
-
-        return gatewayDiamond;
-    }
-
-    function setUp() public {
-        address[] memory path = new address[](1);
-        path[0] = ROOTNET_ADDRESS;
-
-        address[] memory path2 = new address[](2);
-        path2[0] = CHILD_NETWORK_ADDRESS;
-        path2[1] = CHILD_NETWORK_ADDRESS_2;
-
-        // create a gateway actor.
-
-        GatewayDiamond.ConstructorParams memory gwConstructorParams = GatewayDiamond.ConstructorParams({
-            networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
-        });
-
-        gwRouter = new GatewayRouterFacet();
-        gwManager = new GatewayManagerFacet();
-        gwGetter = new GatewayGetterFacet();
-        gwMessenger = new GatewayMessengerFacet();
-        louper = new DiamondLoupeFacet();
-        cutFacet = new DiamondCutFacet();
-
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](6);
-
-        gwDiamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwRouter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwRouterSelectors
-            })
-        );
-
-        gwDiamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwManager),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwManagerSelectors
-            })
-        );
-
-        gwDiamondCut[2] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwGetter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwGetterSelectors
-            })
-        );
-
-        gwDiamondCut[3] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwMessenger),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwMessengerSelectors
-            })
-        );
-
-        gwDiamondCut[4] = (
-            IDiamond.FacetCut({
-                facetAddress: address(louper),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: louperSelectors
-            })
-        );
-
-        gwDiamondCut[5] = (
-            IDiamond.FacetCut({
-                facetAddress: address(cutFacet),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: cutFacetSelectors
-            })
-        );
-
-        gatewayDiamond = new GatewayDiamond(gwDiamondCut, gwConstructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwRouter = GatewayRouterFacet(address(gatewayDiamond));
-        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
-        louper = DiamondLoupeFacet(address(gatewayDiamond));
-
-        gwConstructorParams.networkName = SubnetID({root: ROOTNET_CHAINID, route: path2});
-
-        gatewayDiamond2 = new GatewayDiamond(gwDiamondCut, gwConstructorParams);
-        gwGetter2 = GatewayGetterFacet(address(gatewayDiamond2));
-        gwManager2 = GatewayManagerFacet(address(gatewayDiamond2));
-        gwRouter2 = GatewayRouterFacet(address(gatewayDiamond2));
-        gwMessenger2 = GatewayMessengerFacet(address(gatewayDiamond2));
-
-        // create a subnet actor.
-
-        SubnetActorDiamond.ConstructorParams memory saConstructorParams = SubnetActorDiamond.ConstructorParams({
-            parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            ipcGatewayAddr: address(gatewayDiamond),
-            consensus: ConsensusType.Fendermint,
-            minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
-            minValidators: DEFAULT_MIN_VALIDATORS,
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            activeValidatorsLimit: 100,
-            powerScale: 12,
-            minCrossMsgFee: CROSS_MSG_FEE,
-            permissioned: false
-        });
-
-        saManager = new SubnetActorManagerFacet();
-        saGetter = new SubnetActorGetterFacet();
-
-        IDiamond.FacetCut[] memory saDiamondCut = new IDiamond.FacetCut[](2);
-
-        saDiamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saGetter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saGetterSelectors
-            })
-        );
-
-        saDiamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saManager),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saManagerSelectors
-            })
-        );
-
-        saDiamond = new SubnetActorDiamond(saDiamondCut, saConstructorParams);
-        saManager = SubnetActorManagerFacet(address(saDiamond));
-        saGetter = SubnetActorGetterFacet(address(saDiamond));
-
-        addValidator(TOPDOWN_VALIDATOR_1, 100);
+    function setUp() public override {
+        super.setUp();
     }
 
     function testGatewayDiamond_Constructor() public view {
@@ -299,7 +47,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         require(gwGetter.bottomUpNonce() == 0, "unexpected bottomUpNonce");
         require(gwGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "unexpected minStake");
 
-        require(gwGetter.crossMsgFee() == CROSS_MSG_FEE, "unexpected crossMsgFee");
+        require(gwGetter.crossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected crossMsgFee");
         require(gwGetter.bottomUpCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD, "unexpected bottomUpCheckPeriod");
         require(
             gwGetter.getNetworkName().equals(SubnetID({root: ROOTNET_CHAINID, route: new address[](0)})),
@@ -313,11 +61,19 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         require(!wrapped, "unexpected wrapped message");
     }
 
+    function testGatewayDiamond_NewGatewayWithDefaultParams() public view {
+        GatewayDiamond.ConstructorParams memory params = defaultGatewayParams();
+
+        require(gwGetter.crossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected cross-msg fee");
+        require(gwGetter.bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
+        require(gwGetter.majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
+    }
+
     function testGatewayDiamond_LoupeFunction() public view {
-        require(louper.facets().length == 6, "unexpected length");
-        require(louper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(louper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(louper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
+        require(gwLouper.facets().length == 6, "unexpected length");
+        require(gwLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(gwLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(gwLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     function testGatewayDiamond_DiamondCut() public {
@@ -400,14 +156,14 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
-            msgFee: CROSS_MSG_FEE,
+            msgFee: DEFAULT_CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
 
-        dep = createDiamond(constructorParams);
+        dep = createGatewayDiamond(constructorParams);
         depGetter = GatewayGetterFacet(address(dep));
         depManager = GatewayManagerFacet(address(dep));
         depRouter = GatewayRouterFacet(address(dep));
@@ -438,7 +194,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
-            msgFee: CROSS_MSG_FEE,
+            msgFee: DEFAULT_CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: 100,
             genesisValidators: new Validator[](0),
@@ -782,11 +538,11 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_NoFunds() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         vm.expectRevert(NotEnoughFunds.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE - 1}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE - 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -801,14 +557,14 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: false
             })
         );
 
         vm.expectRevert(NotEnoughFee.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -823,7 +579,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE - 1
+                    fee: DEFAULT_CROSS_MSG_FEE - 1
                 }),
                 wrapped: false
             })
@@ -831,10 +587,10 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_Fuzz(uint256 fee) public {
-        vm.assume(fee < CROSS_MSG_FEE);
+        vm.assume(fee < DEFAULT_CROSS_MSG_FEE);
 
         address caller = vm.addr(100);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         vm.prank(caller);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
@@ -854,7 +610,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: false
             })
@@ -864,7 +620,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_Single_Funding() public {
         (address validatorAddress, , bytes memory publicKey) = TestUtils.newValidator(100);
 
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         address funderAddress = address(101);
         uint256 fundAmount = 1 ether;
@@ -878,7 +634,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_Fund_Kill_Fail_CircSupplyMoreThanZero() public {
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
 
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         address funderAddress = address(101);
         uint256 fundAmount = 1 ether;
@@ -896,7 +652,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
     function testGatewayDiamond_Fund_Revert_OnZeroValue() public {
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         address funderAddress = address(101);
 
@@ -915,7 +671,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         address funderAddress = address(101);
 
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         vm.startPrank(funderAddress);
         for (uint256 i = 0; i < numberOfFunds; i++) {
@@ -931,7 +687,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         address funderAddress = address(101);
 
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         vm.deal(funderAddress, amount);
 
@@ -945,7 +701,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         uint256 fundAmount = 1 ether;
 
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         address[] memory wrongSubnetPath = new address[](2);
         wrongSubnetPath[0] = vm.addr(102);
@@ -970,7 +726,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
     function testGatewayDiamond_Fund_Works_BLSAccountSingleFunding() public {
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         uint256 fundAmount = 1 ether;
         vm.deal(BLS_ACCOUNT_ADDREESS, fundAmount + 1);
@@ -983,12 +739,12 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         (address validatorAddress, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
         assert(validatorAddress == vm.addr(privKey));
 
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         vm.prank(validatorAddress);
         saManager.leave();
 
-        _join(validatorAddress, publicKey);
+        join(validatorAddress, publicKey);
 
         address funderAddress = address(101);
         uint256 fundAmount = 1 ether;
@@ -1005,13 +761,13 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: CROSS_MSG_FEE,
+            msgFee: DEFAULT_CROSS_MSG_FEE,
             minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
-        gatewayDiamond = createDiamond(constructorParams);
+        gatewayDiamond = createGatewayDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
         gwRouter = GatewayRouterFacet(address(gatewayDiamond));
@@ -1026,7 +782,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_Release_Works_BLSAccount(uint256 releaseAmount, uint256 crossMsgFee) public {
-        vm.assume(crossMsgFee >= CROSS_MSG_FEE);
+        vm.assume(crossMsgFee >= DEFAULT_CROSS_MSG_FEE);
         vm.assume(releaseAmount < type(uint256).max);
         vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
 
@@ -1043,7 +799,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
-        gatewayDiamond = createDiamond(constructorParams);
+        gatewayDiamond = createGatewayDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
         gwRouter = GatewayRouterFacet(address(gatewayDiamond));
@@ -1057,7 +813,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_Release_Works_EmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
-        vm.assume(crossMsgFee >= CROSS_MSG_FEE);
+        vm.assume(crossMsgFee >= DEFAULT_CROSS_MSG_FEE);
         vm.assume(releaseAmount < type(uint256).max);
         vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
 
@@ -1074,7 +830,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
-        gatewayDiamond = createDiamond(constructorParams);
+        gatewayDiamond = createGatewayDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
         gwRouter = GatewayRouterFacet(address(gatewayDiamond));
@@ -1089,7 +845,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     }
 
     function testGatewayDiamond_Release_Works_NonEmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
-        vm.assume(crossMsgFee >= CROSS_MSG_FEE);
+        vm.assume(crossMsgFee >= DEFAULT_CROSS_MSG_FEE);
         vm.assume(releaseAmount < type(uint256).max / 2);
         vm.assume(crossMsgFee > 0 && crossMsgFee < releaseAmount);
 
@@ -1106,7 +862,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
-        gatewayDiamond = createDiamond(constructorParams);
+        gatewayDiamond = createGatewayDiamond(constructorParams);
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
         gwRouter = GatewayRouterFacet(address(gatewayDiamond));
@@ -1125,11 +881,11 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_NoDestination() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1144,7 +900,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: false
             })
@@ -1154,11 +910,11 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_NoCurrentNetwork() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName();
         vm.expectRevert(CannotSendCrossMsgToItself.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1170,7 +926,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
@@ -1180,11 +936,11 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_Failes_InvalidCrossMsgValue() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
         vm.expectRevert(InvalidCrossMsgValue.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1196,7 +952,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
@@ -1206,14 +962,14 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_EmptyNetwork() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
 
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
         vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
 
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1225,7 +981,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
@@ -1235,11 +991,11 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_InvalidCrossMsgFromSubnet() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE + 2);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
         vm.expectRevert(InvalidCrossMsgFromSubnet.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE + 1}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1251,7 +1007,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
@@ -1261,12 +1017,12 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughFee() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
         vm.expectRevert(NotEnoughFee.selector);
-        gwMessenger.sendCrossMessage{value: CROSS_MSG_FEE}(
+        gwMessenger.sendCrossMessage{value: DEFAULT_CROSS_MSG_FEE}(
             CrossMsg({
                 message: StorableMsg({
                     from: IPCAddress({
@@ -1288,7 +1044,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughFunds() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
@@ -1305,15 +1061,11 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: 0,
                     method: METHOD_SEND,
                     params: new bytes(0),
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: true
             })
         );
-    }
-
-    function reward(uint256 amount) external view {
-        console.log("reward method called with %d", amount);
     }
 
     function testGatewayDiamond_Propagate_Works_WithFeeRemainder() external {
@@ -1369,11 +1121,11 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     subnetId: gwGetter.getNetworkName().createSubnetId(address(this)),
                     rawAddress: FvmAddressHelper.from(address(this))
                 }),
-                value: CROSS_MSG_FEE + 1,
+                value: DEFAULT_CROSS_MSG_FEE + 1,
                 nonce: 0,
                 method: METHOD_SEND,
                 params: new bytes(0),
-                fee: CROSS_MSG_FEE
+                fee: DEFAULT_CROSS_MSG_FEE
             }),
             wrapped: false
         });
@@ -1505,7 +1257,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: i,
                     method: this.callback.selector,
                     params: EMPTY_BYTES,
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: false
             });
@@ -1619,7 +1371,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_commitBottomUpCheckpoint_Works_NoMessages() public {
         address caller = address(saDiamond);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         vm.stopPrank();
 
@@ -1642,7 +1394,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
     function testGatewayDiamond_commitBottomUpCheckpoint_Works_WithMessages() public {
         address caller = address(saDiamond);
         vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + CROSS_MSG_FEE);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         vm.stopPrank();
 
@@ -1671,7 +1423,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
                     nonce: i,
                     method: this.callback.selector,
                     params: EMPTY_BYTES,
-                    fee: CROSS_MSG_FEE
+                    fee: DEFAULT_CROSS_MSG_FEE
                 }),
                 wrapped: false
             });
@@ -1690,7 +1442,7 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
 
         (, subnetInfo) = gwGetter.getSubnet(subnetId);
         require(
-            subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * CROSS_MSG_FEE,
+            subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * DEFAULT_CROSS_MSG_FEE,
             "unexpected circulation supply"
         );
     }
@@ -2026,221 +1778,5 @@ contract GatewayActorDiamondTest is StdInvariant, Test {
         require(heights.length == n, "index is not the same");
     }
 
-    function totalWeight(uint256[] memory weights) internal pure returns (uint256 sum) {
-        for (uint64 i = 0; i < 3; i++) {
-            sum += weights[i];
-        }
-        return sum;
-    }
-
-    function setupValidators() internal returns (FvmAddress[] memory validators, address[] memory addresses) {
-        validators = new FvmAddress[](3);
-        validators[0] = FvmAddressHelper.from(vm.addr(100));
-        validators[1] = FvmAddressHelper.from(vm.addr(200));
-        validators[2] = FvmAddressHelper.from(vm.addr(300));
-
-        addresses = new address[](3);
-        addresses[0] = vm.addr(100);
-        addresses[1] = vm.addr(200);
-        addresses[2] = vm.addr(300);
-
-        uint256[] memory weights = new uint256[](3);
-
-        vm.deal(vm.addr(100), 1);
-        vm.deal(vm.addr(200), 1);
-        vm.deal(vm.addr(300), 1);
-
-        weights[0] = 100;
-        weights[1] = 100;
-        weights[2] = 100;
-
-        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwRouter.commitParentFinality(finality);
-    }
-
-    function addValidator(address validator) internal {
-        addValidator(validator, 100);
-    }
-
-    function addValidator(address validator, uint256 weight) internal {
-        FvmAddress[] memory validators = new FvmAddress[](1);
-        validators[0] = FvmAddressHelper.from(validator);
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = weight;
-
-        vm.deal(validator, 1);
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwRouter.commitParentFinality(finality);
-        vm.stopPrank();
-    }
-
-    function callback() public view {
-        // console.log("callback called");
-    }
-
-    function fund(address funderAddress, uint256 fundAmount) internal {
-        // funding subnets is free, we do not need cross msg fee
-        (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore, ) = getSubnet(address(saManager));
-        console.log(circSupplyBefore);
-
-        uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
-        uint256 expectedNonce = nonceBefore + 1;
-        uint256 expectedCircSupply = circSupplyBefore + fundAmount;
-
-        require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
-
-        gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
-
-        (, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(saManager));
-
-        require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength, "unexpected lengths");
-
-        require(nonce == expectedNonce, "unexpected nonce");
-        require(circSupply == expectedCircSupply, "unexpected circSupply");
-    }
-
-    function test_second_validator_can_join() public {
-        (address validatorAddress1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(101);
-        (address validatorAddress2, , bytes memory publicKey2) = TestUtils.newValidator(102);
-
-        _join(validatorAddress1, publicKey1);
-
-        require(saGetter.bootstrapped(), "subnet not bootstrapped");
-        require(saGetter.isActiveValidator(validatorAddress1), "validator 1 is not active");
-        require(!saGetter.isActiveValidator(validatorAddress2), "validator 2 is active");
-
-        _join(validatorAddress2, publicKey2);
-        _confirmChange(validatorAddress1, privKey1);
-        require(saGetter.isActiveValidator(validatorAddress2), "validator 2 is not active");
-    }
-
-    function _join(address validatorAddress, bytes memory pubkey) internal {
-        vm.prank(validatorAddress);
-        vm.deal(validatorAddress, DEFAULT_COLLATERAL_AMOUNT + 1);
-        saManager.join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey);
-    }
-
-    function _confirmChange(address validator, uint256 privKey) internal {
-        address[] memory validators = new address[](1);
-        validators[0] = validator;
-
-        uint256[] memory privKeys = new uint256[](1);
-        privKeys[0] = privKey;
-
-        _confirmChange(validators, privKeys);
-    }
-
-    function _confirmChange(address[] memory validators, uint256[] memory privKey) internal {
-        uint256 n = validators.length;
-
-        bytes[] memory signatures = new bytes[](n);
-
-        CrossMsg[] memory msgs = new CrossMsg[](0);
-
-        (uint64 nextConfigNum, ) = saGetter.getConfigurationNumbers();
-        uint64 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
-
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
-            blockHeight: h,
-            blockHash: keccak256(abi.encode(h)),
-            nextConfigurationNumber: nextConfigNum - 1,
-            crossMessagesHash: keccak256(abi.encode(msgs))
-        });
-
-        vm.deal(address(saDiamond), 100 ether);
-
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-
-        for (uint256 i = 0; i < n; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-        }
-
-        for (uint256 i = 0; i < n; i++) {
-            vm.prank(validators[i]);
-            saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
-        }
-    }
-
-    function release(uint256 releaseAmount, uint256 fee) internal {
-        uint256 expectedNonce = gwGetter.bottomUpNonce() + 1;
-        gwManager.release{value: releaseAmount}(FvmAddressHelper.from(msg.sender), fee);
-        require(gwGetter.bottomUpNonce() == expectedNonce, "gwGetter.bottomUpNonce() == expectedNonce");
-    }
-
-    function addStake(uint256 stakeAmount, address subnetAddress) internal {
-        uint256 balanceBefore = subnetAddress.balance;
-        (, uint256 stakedBefore, , , , ) = getSubnet(subnetAddress);
-
-        gwManager.addStake{value: stakeAmount}();
-
-        uint256 balanceAfter = subnetAddress.balance;
-        (, uint256 stakedAfter, , , , ) = getSubnet(subnetAddress);
-
-        require(balanceAfter == balanceBefore - stakeAmount, "unexpected balance");
-        require(stakedAfter == stakedBefore + stakeAmount, "unexpected stake");
-    }
-
-    function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) internal {
-        gwRouter = GatewayRouterFacet(address(gw));
-        gwManager = GatewayManagerFacet(address(gw));
-        gwGetter = GatewayGetterFacet(address(gw));
-
-        gwManager.register{value: collateral}(0);
-
-        (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply, Status status) = getSubnetGW(
-            subnetAddress,
-            gw
-        );
-
-        SubnetID memory parentNetwork = gwGetter.getNetworkName();
-
-        require(
-            id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
-            "id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash()"
-        );
-        require(stake == collateral, "unexpected stake");
-        require(topDownNonce == 0, "unexpected nonce");
-        require(circSupply == 0, "unexpected circSupply");
-        require(status == Status.Active, "unexpected status");
-    }
-
-    function registerSubnet(uint256 collateral, address subnetAddress) internal {
-        registerSubnetGW(collateral, subnetAddress, gatewayDiamond);
-    }
-
-    function getSubnetGW(
-        address subnetAddress,
-        GatewayDiamond gw
-    ) internal returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
-        gwRouter = GatewayRouterFacet(address(gw));
-        gwManager = GatewayManagerFacet(address(gw));
-        gwGetter = GatewayGetterFacet(address(gw));
-
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
-
-        Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
-
-        return (
-            subnet.id,
-            subnet.stake,
-            subnet.topDownNonce,
-            subnet.appliedBottomUpNonce,
-            subnet.circSupply,
-            subnet.status
-        );
-    }
-
-    function getSubnet(
-        address subnetAddress
-    ) internal returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
-        return getSubnetGW(subnetAddress, gatewayDiamond);
-    }
+    function callback() public view {}
 }

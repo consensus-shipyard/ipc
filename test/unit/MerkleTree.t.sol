@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import {MerkleTreeHelper} from "./MerkleTreeHelper.sol";
+import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {Merkle} from "murky/Merkle.sol";
 

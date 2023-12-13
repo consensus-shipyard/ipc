@@ -61,9 +61,9 @@ library TestUtils {
 
         weights = new uint256[](4);
         weights[0] = 100;
-        weights[1] = 101;
-        weights[2] = 102;
-        weights[3] = 103;
+        weights[1] = 100;
+        weights[2] = 100;
+        weights[3] = 100;
     }
 
     function getThreeValidators(

@@ -1,202 +1,76 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import "../src/errors/IPCErrors.sol";
+import "../../src/errors/IPCErrors.sol";
 import {Test} from "forge-std/Test.sol";
-import {TestUtils} from "./TestUtils.sol";
-import {NumberContractFacetSeven, NumberContractFacetEight} from "./NumberContract.sol";
-import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
-import {ConsensusType} from "../src/enums/ConsensusType.sol";
-import {Status} from "../src/enums/Status.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../src/structs/Checkpoint.sol";
-import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, IPCAddress, Subnet, ValidatorInfo, Validator} from "../src/structs/Subnet.sol";
-import {StorableMsg} from "../src/structs/Checkpoint.sol";
-import {IERC165} from "../src/interfaces/IERC165.sol";
-import {IGateway} from "../src/interfaces/IGateway.sol";
-import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
-import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
-import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
-import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
-import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
-import {SubnetActorDiamond, FunctionNotFound} from "../src/SubnetActorDiamond.sol";
-import {GatewayDiamond} from "../src/GatewayDiamond.sol";
-import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
-import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
-import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
-import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
-import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
-import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
+import {TestUtils} from "../helpers/TestUtils.sol";
+import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
+import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
+import {ConsensusType} from "../../src/enums/ConsensusType.sol";
+import {Status} from "../../src/enums/Status.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/Checkpoint.sol";
+import {FvmAddress} from "../../src/structs/FvmAddress.sol";
+import {SubnetID, IPCAddress, Subnet, ValidatorInfo, Validator} from "../../src/structs/Subnet.sol";
+import {StorableMsg} from "../../src/structs/Checkpoint.sol";
+import {IERC165} from "../../src/interfaces/IERC165.sol";
+import {IGateway} from "../../src/interfaces/IGateway.sol";
+import {IDiamond} from "../../src/interfaces/IDiamond.sol";
+import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
+import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
+import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
+import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
+import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
+import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
+import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
+import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
+import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
+import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {LibStaking} from "../src/lib/LibStaking.sol";
-import {LibDiamond} from "../src/lib/LibDiamond.sol";
+import {LibStaking} from "../../src/lib/LibStaking.sol";
+import {LibDiamond} from "../../src/lib/LibDiamond.sol";
 
-import {console} from "forge-std/console.sol";
+import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 
-contract SubnetActorDiamondTest is Test {
+contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
 
-    address private constant DEFAULT_IPC_GATEWAY_ADDR = address(1024);
-    uint64 private constant DEFAULT_CHECKPOINT_PERIOD = 10;
-    uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 1 ether;
-    uint64 private constant DEFAULT_MIN_VALIDATORS = 1;
-    string private constant DEFAULT_NET_ADDR = "netAddr";
-    uint256 private constant CROSS_MSG_FEE = 10 gwei;
-    uint256 private constant DEFAULT_RELAYER_REWARD = 10 gwei;
-    uint8 private constant DEFAULT_MAJORITY_PERCENTAGE = 60;
-    uint64 private constant ROOTNET_CHAINID = 123;
-
     address gatewayAddress;
-    IGateway gatewayContract;
 
-    bytes4[] saGetterSelectors;
-    bytes4[] saManagerSelectors;
-    bytes4[] cutFacetSelectors;
-    bytes4[] louperSelectors;
-
-    bytes4[] gwRouterSelectors;
-    bytes4[] gwManagerSelectors;
-    bytes4[] gwGetterSelectors;
-    bytes4[] gwMessengerSelectors;
-
-    SubnetActorDiamond saDiamond;
-    SubnetActorManagerFacet saManager;
-
-    SubnetActorGetterFacet saGetter;
-    DiamondCutFacet cutFacet;
-    DiamondLoupeFacet louper;
-
-    GatewayDiamond gatewayDiamond;
-    GatewayManagerFacet gwManager;
-    GatewayGetterFacet gwGetter;
-    GatewayRouterFacet gwRouter;
-    GatewayMessengerFacet gwMessenger;
-
-    constructor() {
-        saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
-        saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacet");
-
-        cutFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
-        louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
-
-        gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
-        gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
-        gwManagerSelectors = TestUtils.generateSelectors(vm, "GatewayManagerFacet");
-        gwMessengerSelectors = TestUtils.generateSelectors(vm, "GatewayMessengerFacet");
-    }
-
-    function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
-        gwRouter = new GatewayRouterFacet();
-        gwManager = new GatewayManagerFacet();
-        gwGetter = new GatewayGetterFacet();
-        gwMessenger = new GatewayMessengerFacet();
-
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
-
-        diamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwRouter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwRouterSelectors
-            })
-        );
-
-        diamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwManager),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwManagerSelectors
-            })
-        );
-
-        diamondCut[2] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwGetter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwGetterSelectors
-            })
-        );
-
-        diamondCut[3] = (
-            IDiamond.FacetCut({
-                facetAddress: address(gwMessenger),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwMessengerSelectors
-            })
-        );
-
-        gatewayDiamond = new GatewayDiamond(diamondCut, params);
-
-        return gatewayDiamond;
-    }
-
-    function createSubnetActorDiamondWithFaucets(
-        SubnetActorDiamond.ConstructorParams memory params,
-        address getterFaucet,
-        address managerFaucet
-    ) public returns (SubnetActorDiamond) {
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
-
-        diamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: getterFaucet,
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saGetterSelectors
-            })
-        );
-
-        diamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: managerFaucet,
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saManagerSelectors
-            })
-        );
-
-        saDiamond = new SubnetActorDiamond(diamondCut, params);
-        return saDiamond;
-    }
-
-    function setUp() public {
-        GatewayDiamond.ConstructorParams memory gwConstructorParams = GatewayDiamond.ConstructorParams({
-            networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: CROSS_MSG_FEE,
-            minCollateral: DEFAULT_MIN_VALIDATOR_STAKE,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            activeValidatorsLimit: 4,
-            genesisValidators: new Validator[](0)
-        });
-
-        gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwRouter = GatewayRouterFacet(address(gatewayDiamond));
-        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
+    function setUp() public override {
+        super.setUp();
 
         gatewayAddress = address(gatewayDiamond);
+    }
 
-        _assertDeploySubnetActor(
-            gatewayAddress,
-            ConsensusType.Fendermint,
-            DEFAULT_MIN_VALIDATOR_STAKE,
-            DEFAULT_MIN_VALIDATORS,
-            DEFAULT_CHECKPOINT_PERIOD,
-            DEFAULT_MAJORITY_PERCENTAGE
-        );
+    function testSubnetActorDiamond_NewSubnetActorWithDefaultParams() public view {
+        SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithRootGateway();
+
+        require(saGetter.ipcGatewayAddr() == params.ipcGatewayAddr, "unexpected gateway");
+        require(saGetter.minActivationCollateral() == params.minActivationCollateral, "unexpected collateral");
+        require(saGetter.minValidators() == params.minValidators, "unexpected minValidators");
+        require(saGetter.consensus() == params.consensus, "unexpected consensus");
+        require(saGetter.getParent().equals(_parentId), "unexpected parent");
+        require(saGetter.activeValidatorsLimit() == 100, "unexpected activeValidatorsLimit");
+        require(saGetter.powerScale() == params.powerScale, "unexpected powerscale");
+        require(saGetter.minCrossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected cross-msg fee");
+        require(saGetter.bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
+        require(saGetter.majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
+        require(saGetter.getParent().toHash() == _parentId.toHash(), "unexpected parent subnetID hash");
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(louper.facets().length == 4, "unexpected length");
-        require(louper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(louper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(louper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
+        require(saLouper.facets().length == 4, "unexpected length");
+        require(saLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(saLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(saLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
@@ -270,7 +144,7 @@ contract SubnetActorDiamondTest is Test {
 
         // ======== Step. Confirm join operation ======
         collateral += DEFAULT_MIN_VALIDATOR_STAKE;
-        _confirmChange(validator1, privKey1);
+        confirmChange(validator1, privKey1);
         require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator2 joining");
 
         v = saGetter.getValidator(validator2);
@@ -313,7 +187,7 @@ contract SubnetActorDiamondTest is Test {
 
         // ======== Step. Confirm stake operation ======
         collateral += stake;
-        _confirmChange(validator1, privKey1, validator2, privKey2);
+        confirmChange(validator1, privKey1, validator2, privKey2);
         require(gatewayAddress.balance == collateral, "gw balance is incorrect after confirm stake");
 
         v = saGetter.getValidator(validator1);
@@ -365,7 +239,7 @@ contract SubnetActorDiamondTest is Test {
         vm.stopPrank();
 
         // ======== Step. Confirm leave ======
-        _confirmChange(validator1, privKey1);
+        confirmChange(validator1, privKey1);
         collateral -= (validator1Stake + stake);
         require(gatewayAddress.balance == collateral, "gw balance is incorrect after confirming validator 1 leaving");
 
@@ -393,13 +267,6 @@ contract SubnetActorDiamondTest is Test {
         require(b2 - b1 == validator1Stake + stake, "collateral not received");
     }
 
-    function testSubnetActorDiamond_LoupeFunction() public view {
-        require(louper.facets().length == 4, "unexpected length");
-        require(louper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(louper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(louper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
-    }
-
     function testSubnetActorDiamond_Deployment_Works(
         address _ipcGatewayAddr,
         uint256 _minActivationCollateral,
@@ -413,7 +280,7 @@ contract SubnetActorDiamondTest is Test {
         vm.assume(_majorityPercentage <= 100);
         vm.assume(_ipcGatewayAddr != address(0));
 
-        _assertDeploySubnetActor(
+        createSubnetActor(
             _ipcGatewayAddr,
             ConsensusType.Fendermint,
             _minActivationCollateral,
@@ -446,7 +313,7 @@ contract SubnetActorDiamondTest is Test {
                 activeValidatorsLimit: 100,
                 powerScale: 12,
                 permissioned: false,
-                minCrossMsgFee: CROSS_MSG_FEE
+                minCrossMsgFee: DEFAULT_CROSS_MSG_FEE
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet)
@@ -513,7 +380,7 @@ contract SubnetActorDiamondTest is Test {
 
         vm.prank(validator);
         saManager.leave();
-        _confirmChange(validator, privKey);
+        confirmChange(validator, privKey);
 
         nodes = saGetter.getBootstrapNodes();
         require(nodes.length == 0, "no nodes");
@@ -523,7 +390,7 @@ contract SubnetActorDiamondTest is Test {
         (address validator, , ) = TestUtils.newValidator(100);
 
         // non-empty subnet can't be killed
-        vm.startPrank(validator);
+        vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(NotValidator.selector, validator));
         saManager.leave();
     }
@@ -534,19 +401,19 @@ contract SubnetActorDiamondTest is Test {
         (address validator3, uint256 privKey3, bytes memory publicKey3) = TestUtils.newValidator(102);
 
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
-        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
+        vm.deal(validator2, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
         vm.deal(validator3, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.prank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
 
         vm.prank(validator2);
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2);
+        saManager.join{value: 3 * DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2);
 
         vm.prank(validator3);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey3);
 
-        _confirmChange(validator1, privKey1);
+        confirmChange(validator1, privKey1);
 
         require(saGetter.isActiveValidator(validator1), "validator 1 is not active");
         require(saGetter.isActiveValidator(validator2), "validator 2 is not active");
@@ -562,7 +429,7 @@ contract SubnetActorDiamondTest is Test {
         saManager.leave();
         vm.stopPrank();
 
-        _confirmChange(validator2, privKey2, validator3, privKey3);
+        confirmChange(validator2, privKey2, validator3, privKey3);
 
         require(!saGetter.isActiveValidator(validator1), "validator 1 is active");
         require(saGetter.isActiveValidator(validator2), "validator 2 is not active");
@@ -594,11 +461,11 @@ contract SubnetActorDiamondTest is Test {
             message: StorableMsg({
                 from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
                 to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: CROSS_MSG_FEE + 1,
+                value: DEFAULT_CROSS_MSG_FEE + 1,
                 nonce: 0,
                 method: METHOD_SEND,
                 params: new bytes(0),
-                fee: CROSS_MSG_FEE
+                fee: DEFAULT_CROSS_MSG_FEE
             }),
             wrapped: false
         });
@@ -665,11 +532,11 @@ contract SubnetActorDiamondTest is Test {
                     rawAddress: FvmAddressHelper.from(address(saDiamond))
                 }),
                 to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-                value: CROSS_MSG_FEE + 1,
+                value: DEFAULT_CROSS_MSG_FEE + 1,
                 nonce: 0,
                 method: METHOD_SEND,
                 params: new bytes(0),
-                fee: CROSS_MSG_FEE
+                fee: DEFAULT_CROSS_MSG_FEE
             }),
             wrapped: false
         });
@@ -702,7 +569,7 @@ contract SubnetActorDiamondTest is Test {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * CROSS_MSG_FEE}(3 * CROSS_MSG_FEE);
+        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(3 * DEFAULT_CROSS_MSG_FEE);
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
 
@@ -769,11 +636,11 @@ contract SubnetActorDiamondTest is Test {
                     rawAddress: FvmAddressHelper.from(address(saDiamond))
                 }),
                 to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-                value: CROSS_MSG_FEE + 1,
+                value: DEFAULT_CROSS_MSG_FEE + 1,
                 nonce: 0,
                 method: METHOD_SEND,
                 params: new bytes(0),
-                fee: CROSS_MSG_FEE
+                fee: DEFAULT_CROSS_MSG_FEE
             }),
             wrapped: false
         });
@@ -790,7 +657,7 @@ contract SubnetActorDiamondTest is Test {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * CROSS_MSG_FEE}(6 * CROSS_MSG_FEE);
+        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * DEFAULT_CROSS_MSG_FEE}(6 * DEFAULT_CROSS_MSG_FEE);
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
 
@@ -819,11 +686,11 @@ contract SubnetActorDiamondTest is Test {
                     rawAddress: FvmAddressHelper.from(address(saDiamond))
                 }),
                 to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-                value: CROSS_MSG_FEE + 1,
+                value: DEFAULT_CROSS_MSG_FEE + 1,
                 nonce: 1,
                 method: METHOD_SEND,
                 params: new bytes(0),
-                fee: CROSS_MSG_FEE
+                fee: DEFAULT_CROSS_MSG_FEE
             }),
             wrapped: false
         });
@@ -850,10 +717,10 @@ contract SubnetActorDiamondTest is Test {
         require(saGetter.getRelayerReward(validators[1]) == 0, "unexpected reward");
         require(saGetter.getRelayerReward(validators[2]) == 0, "unexpected reward");
         uint256 validator0Reward = saGetter.getRelayerReward(validators[0]);
-        require(validator0Reward == CROSS_MSG_FEE, "there is no reward for validator");
+        require(validator0Reward == DEFAULT_CROSS_MSG_FEE, "there is no reward for validator");
 
         uint256 b1 = validators[0].balance;
-        vm.startPrank(validators[0]);
+        vm.prank(validators[0]);
         saManager.claimRewardForRelayer();
         uint256 b2 = validators[0].balance;
         require(b2 - b1 == validator0Reward, "reward received");
@@ -994,20 +861,25 @@ contract SubnetActorDiamondTest is Test {
         (genesisAddrs, ) = saGetter.genesisBalances();
         require(saGetter.genesisCircSupply() == 0, "genesis circ supply not correct");
         require(genesisAddrs.length == 0, "not zero genesis addresses");
+        vm.stopPrank();
 
         // pre-fund from validator and from pre-funder
         vm.startPrank(validator1);
         vm.deal(validator1, fundAmount);
         saManager.preFund{value: fundAmount}();
+        vm.stopPrank();
+
         vm.startPrank(preFunder);
         vm.deal(preFunder, fundAmount);
         saManager.preFund{value: fundAmount}();
+        vm.stopPrank();
 
         // initial validator joins
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.startPrank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        vm.stopPrank();
         collateral = DEFAULT_MIN_VALIDATOR_STAKE;
 
         require(
@@ -1039,7 +911,6 @@ contract SubnetActorDiamondTest is Test {
         vm.expectRevert(SubnetAlreadyBootstrapped.selector);
         vm.deal(preFunder, fundAmount);
         saManager.preFund{value: fundAmount}();
-
         vm.stopPrank();
     }
 
@@ -1054,6 +925,7 @@ contract SubnetActorDiamondTest is Test {
         vm.startPrank(validator1);
         vm.deal(validator1, fundAmount);
         saManager.preFund{value: fundAmount}();
+        vm.stopPrank();
 
         // initial validator joins but doesn't bootstrap the subnet
         vm.deal(validator1, collateral);
@@ -1073,186 +945,20 @@ contract SubnetActorDiamondTest is Test {
         require(saGetter.genesisCircSupply() == 0, "genesis circ supply not zero");
         (genesisAddrs, ) = saGetter.genesisBalances();
         require(genesisAddrs.length == 0, "not zero genesis addresses");
+        vm.stopPrank();
 
         // initial validator joins to bootstrap the subnet
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.startPrank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        vm.stopPrank();
 
         // pre-release not allowed with bootstrapped subnet
         vm.startPrank(validator1);
         vm.expectRevert(SubnetAlreadyBootstrapped.selector);
         saManager.preRelease(fundAmount);
-
         vm.stopPrank();
-    }
-
-    function _assertDeploySubnetActor(
-        address _ipcGatewayAddr,
-        ConsensusType _consensus,
-        uint256 _minActivationCollateral,
-        uint64 _minValidators,
-        uint64 _checkPeriod,
-        uint8 _majorityPercentage
-    ) public {
-        SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
-
-        saManager = new SubnetActorManagerFacet();
-        saGetter = new SubnetActorGetterFacet();
-        cutFacet = new DiamondCutFacet();
-        louper = new DiamondLoupeFacet();
-
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
-
-        diamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saManager),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saManagerSelectors
-            })
-        );
-
-        diamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saGetter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saGetterSelectors
-            })
-        );
-
-        diamondCut[2] = (
-            IDiamond.FacetCut({
-                facetAddress: address(cutFacet),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: cutFacetSelectors
-            })
-        );
-
-        diamondCut[3] = (
-            IDiamond.FacetCut({
-                facetAddress: address(louper),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: louperSelectors
-            })
-        );
-
-        saDiamond = new SubnetActorDiamond(
-            diamondCut,
-            SubnetActorDiamond.ConstructorParams({
-                parentId: _parentId,
-                ipcGatewayAddr: _ipcGatewayAddr,
-                consensus: _consensus,
-                minActivationCollateral: _minActivationCollateral,
-                minValidators: _minValidators,
-                bottomUpCheckPeriod: _checkPeriod,
-                majorityPercentage: _majorityPercentage,
-                activeValidatorsLimit: 100,
-                powerScale: 12,
-                permissioned: false,
-                minCrossMsgFee: CROSS_MSG_FEE
-            })
-        );
-
-        saManager = SubnetActorManagerFacet(address(saDiamond));
-        saGetter = SubnetActorGetterFacet(address(saDiamond));
-        cutFacet = DiamondCutFacet(address(saDiamond));
-        louper = DiamondLoupeFacet(address(saDiamond));
-
-        require(saGetter.ipcGatewayAddr() == _ipcGatewayAddr, "saGetter.ipcGatewayAddr() == _ipcGatewayAddr");
-        require(
-            saGetter.minActivationCollateral() == _minActivationCollateral,
-            "saGetter.minActivationCollateral() == _minActivationCollateral"
-        );
-        require(saGetter.minValidators() == _minValidators, "saGetter.minValidators() == _minValidators");
-        require(saGetter.consensus() == _consensus, "consensus");
-        require(saGetter.getParent().equals(_parentId), "parent");
-        require(saGetter.activeValidatorsLimit() == 100, "activeValidatorsLimit");
-        require(saGetter.powerScale() == 12, "powerscale");
-        require(saGetter.minCrossMsgFee() == CROSS_MSG_FEE, "cross-msg fee");
-        require(saGetter.bottomUpCheckPeriod() == _checkPeriod, "bottom-up period");
-        require(saGetter.majorityPercentage() == _majorityPercentage, "majority percentage");
-        require(
-            saGetter.getParent().toHash() == _parentId.toHash(),
-            "parent.toHash() == SubnetID({root: ROOTNET_CHAINID, route: path}).toHash()"
-        );
-    }
-
-    function _confirmChange(address validator, uint256 privKey) internal {
-        address[] memory validators = new address[](1);
-        validators[0] = validator;
-
-        uint256[] memory privKeys = new uint256[](1);
-        privKeys[0] = privKey;
-
-        _confirmChange(validators, privKeys);
-    }
-
-    function _confirmChange(address validator1, uint256 privKey1, address validator2, uint256 privKey2) internal {
-        address[] memory validators = new address[](2);
-        validators[0] = validator1;
-        validators[1] = validator2;
-
-        uint256[] memory privKeys = new uint256[](2);
-        privKeys[0] = privKey1;
-        privKeys[1] = privKey2;
-
-        _confirmChange(validators, privKeys);
-    }
-
-    function _confirmChange(
-        address validator1,
-        uint256 privKey1,
-        address validator2,
-        uint256 privKey2,
-        address validator3,
-        uint256 privKey3
-    ) internal {
-        address[] memory validators = new address[](3);
-        validators[0] = validator1;
-        validators[1] = validator2;
-        validators[2] = validator3;
-
-        uint256[] memory privKeys = new uint256[](3);
-        privKeys[0] = privKey1;
-        privKeys[1] = privKey2;
-        privKeys[2] = privKey3;
-
-        _confirmChange(validators, privKeys);
-    }
-
-    function _confirmChange(address[] memory validators, uint256[] memory privKeys) internal {
-        uint256 n = validators.length;
-
-        bytes[] memory signatures = new bytes[](n);
-
-        CrossMsg[] memory msgs = new CrossMsg[](0);
-
-        (uint64 nextConfigNum, ) = saGetter.getConfigurationNumbers();
-
-        uint64 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
-
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
-            blockHeight: h,
-            blockHash: keccak256(abi.encode(h)),
-            nextConfigurationNumber: nextConfigNum - 1,
-            crossMessagesHash: keccak256(abi.encode(msgs))
-        });
-
-        vm.deal(address(saDiamond), 100 ether);
-
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-
-        for (uint256 i = 0; i < n; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKeys[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-        }
-
-        for (uint256 i = 0; i < n; i++) {
-            vm.prank(validators[i]);
-            saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
-        }
     }
 
     function testSubnetActorDiamond_MultipleJoins_Works_GetValidators() public {
@@ -1274,7 +980,7 @@ contract SubnetActorDiamondTest is Test {
             saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[i]);
         }
 
-        _confirmChange(validators[0], privKeys[0]);
+        confirmChange(validators[0], privKeys[0]);
 
         for (uint i = 0; i < n; i++) {
             require(saGetter.isActiveValidator(validators[i]), "not active validator");
@@ -1300,7 +1006,7 @@ contract SubnetActorDiamondTest is Test {
             saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE - 1}(publicKeys[i]);
         }
 
-        _confirmChange(validators[0], privKeys[0]);
+        confirmChange(validators[0], privKeys[0]);
 
         for (uint i = 0; i < n; i++) {
             require(saGetter.isActiveValidator(validators[i]), "not active validator");
@@ -1327,7 +1033,7 @@ contract SubnetActorDiamondTest is Test {
             saManager.join{value: 1}(publicKeys[i]);
         }
 
-        _confirmChange(validators[0], privKeys[0]);
+        confirmChange(validators[0], privKeys[0]);
 
         for (uint i = 0; i < n; i++) {
             require(saGetter.isActiveValidator(validators[i]), "not active validator");
@@ -1346,6 +1052,21 @@ contract SubnetActorDiamondTest is Test {
         }
 
         require(!saGetter.bootstrapped());
+    }
+
+    function test_second_validator_can_join() public {
+        (address validatorAddress1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(101);
+        (address validatorAddress2, , bytes memory publicKey2) = TestUtils.newValidator(102);
+
+        join(validatorAddress1, publicKey1);
+
+        require(saGetter.bootstrapped(), "subnet not bootstrapped");
+        require(saGetter.isActiveValidator(validatorAddress1), "validator 1 is not active");
+        require(!saGetter.isActiveValidator(validatorAddress2), "validator 2 is active");
+
+        join(validatorAddress2, publicKey2);
+        confirmChange(validatorAddress1, privKey1);
+        require(saGetter.isActiveValidator(validatorAddress2), "validator 2 is not active");
     }
 
     function callback() public view {

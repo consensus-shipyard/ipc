@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 
 import "fevmate/utils/FilAddress.sol";
-import "../src/lib/AccountHelper.sol";
+import "../../src/lib/AccountHelper.sol";
 
 contract DummyContract {
     using AccountHelper for address;

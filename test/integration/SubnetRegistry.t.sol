@@ -1,29 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {EMPTY_BYTES} from "../src/constants/Constants.sol";
-import {ConsensusType} from "../src/enums/ConsensusType.sol";
+import {EMPTY_BYTES} from "../../src/constants/Constants.sol";
+import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import {TestUtils} from "./TestUtils.sol";
-import {IERC165} from "../src/interfaces/IERC165.sol";
-import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
-import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
+import {TestUtils} from "../helpers/TestUtils.sol";
+import {IERC165} from "../../src/interfaces/IERC165.sol";
+import {IDiamond} from "../../src/interfaces/IDiamond.sol";
+import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 
-import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
-import {SubnetID} from "../src/structs/Subnet.sol";
-import {SubnetRegistryDiamond} from "../src/SubnetRegistryDiamond.sol";
-import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
+import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
+import {SubnetID} from "../../src/structs/Subnet.sol";
+import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
+import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 
 //facets
-import {RegisterSubnetFacet} from "../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../src/subnetregistry/SubnetGetterFacet.sol";
-import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
+import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
+import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 contract SubnetRegistryTest is Test {
     using SubnetIDHelper for SubnetID;

@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import "../../src/errors/IPCErrors.sol";
 import {StdInvariant, Test} from "forge-std/Test.sol";
-import {TestUtils} from "../TestUtils.sol";
-import {NumberContractFacetSeven, NumberContractFacetEight} from "../NumberContract.sol";
+import {TestUtils} from "../helpers/TestUtils.sol";
+import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 import {Status} from "../../src/enums/Status.sol";

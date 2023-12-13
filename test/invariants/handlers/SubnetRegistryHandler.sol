@@ -15,7 +15,7 @@ import {ConsensusType} from "../../../src/enums/ConsensusType.sol";
 import {SubnetID} from "../../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../../src/lib/SubnetIDHelper.sol";
 
-import {TestUtils} from "../../TestUtils.sol";
+import {TestUtils} from "../../helpers/TestUtils.sol";
 
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 

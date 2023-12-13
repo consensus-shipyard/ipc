@@ -41,7 +41,7 @@ lint:
 	solhint 'src/**/*.sol'
 
 fmt:
-	npx prettier --check -w 'src/**/**/*.sol' 'test/**/**/*.sol'
+	npx prettier --check -w 'src/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol'
 
 build: | forge
 	forge build

@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "openzeppelin-contracts/utils/Strings.sol";
 
-import "../src/lib/SubnetIDHelper.sol";
+import "../../src/lib/SubnetIDHelper.sol";
 
 contract SubnetIDHelperTest is Test {
     using Strings for *;
