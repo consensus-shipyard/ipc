@@ -4,3 +4,5 @@ tools/
 package.json
 package-lock.json
 out/
+scripts/deploy-registry.ts
+scripts/deploy-gateway.ts

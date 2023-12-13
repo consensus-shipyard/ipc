@@ -26,18 +26,39 @@ jobs:
           toolchain: nightly
           components: rustfmt
 
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/binding/Cargo.lock') }}
+
+        # for prettier (compile-abi calls the formatter first)
+      - name: Set up node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+
       - name: Create binding
         run: make compile-abi && make rust-binding
 
-      - name: Git Config
+      - name: Check diff clean
         run: |
-          git config --global user.name 'auto-commit'
-          git config --global user.email 'auto-commit@users.noreply.github.com'
+          git --no-pager diff
+          git --no-pager diff --quiet
 
-      - name: Commit bindings
-        run: |
-          make commit-rust-binding
-
-      - name: Commit ABI
-        run: |
-          make commit-abi
+#      - name: Git Config
+#        run: |
+#          git config --global user.name 'auto-commit'
+#          git config --global user.email 'auto-commit@users.noreply.github.com'
+#
+#      - name: Commit bindings
+#        run: |
+#          make commit-rust-binding
+#
+#      - name: Commit ABI
+#        run: |
+#          make commit-abi

@@ -11,4 +11,4 @@ fi
 OUTPUT=$1
 
 echo "[*] Compiling contracts and output core contracts ABI in $OUTPUT" 
-forge build -C ./src/ --via-ir --sizes --skip test --out=$OUTPUT
+forge build -C ./src/ -R $(jq '.remappings | join(",")' remappings.json) --lib-paths lib/ --via-ir --sizes --skip test --out=$OUTPUT
