@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event.pull_request.merged == true ||
-      github.ref == 'refs/heads/main' ||
-      github.ref == 'refs/heads/dev'
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
+      !contains(github.event.head_commit.message, 'GEN:')
     permissions:
       # Give the default GITHUB_TOKEN write permission to commit and push the
       # added or changed files to the repository.

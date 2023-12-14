@@ -14,6 +14,6 @@ OUTPUT=$1
 if [[ `git status $OUTPUT --porcelain` ]]; then
     echo "********** NOT ALL ABI ARTIFACTS ARE COMMITTED, AUTO PUSH **********\n";
     git add $OUTPUT
-    git commit -m "commit ABI artifacts"
+    git commit -m "GEN: commit ABI artifacts"
     git push
 fi;
