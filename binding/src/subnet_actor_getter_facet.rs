@@ -601,6 +601,7 @@ pub mod subnet_actor_getter_facet {
                                         ::std::vec![
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                         ],
                                     ),
@@ -2606,7 +2607,7 @@ pub mod subnet_actor_getter_facet {
         pub addr: ::ethers::core::types::Address,
         pub metadata: ::ethers::core::types::Bytes,
     }
-    ///`ValidatorInfo(uint256,uint256,bytes)`
+    ///`ValidatorInfo(uint256,uint256,uint256,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2618,6 +2619,7 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct ValidatorInfo {
+        pub federated_power: ::ethers::core::types::U256,
         pub confirmed_collateral: ::ethers::core::types::U256,
         pub total_collateral: ::ethers::core::types::U256,
         pub metadata: ::ethers::core::types::Bytes,

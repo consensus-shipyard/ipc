@@ -72,3 +72,4 @@ error WrongGateway();
 error CannotFindSubnet();
 error UnknownSubnet();
 error MethodNotAllowed();
+error InvalidFederationPayload();

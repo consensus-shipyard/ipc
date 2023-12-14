@@ -17,7 +17,7 @@ import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
 import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
 import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, PermissionMode, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
@@ -145,7 +145,7 @@ contract IntegrationTestBase is Test {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
-            permissioned: false
+            permissionMode: PermissionMode.Collateral
         });
 
         return params;
@@ -320,6 +320,28 @@ contract IntegrationTestBase is Test {
         uint64 _checkPeriod,
         uint8 _majorityPercentage
     ) public {
+        createSubnetActor(
+            _ipcGatewayAddr,
+            _consensus,
+            _minActivationCollateral,
+            _minValidators,
+            _checkPeriod,
+            _majorityPercentage,
+            PermissionMode.Collateral,
+            100
+        );
+    }
+
+    function createSubnetActor(
+        address _ipcGatewayAddr,
+        ConsensusType _consensus,
+        uint256 _minActivationCollateral,
+        uint64 _minValidators,
+        uint64 _checkPeriod,
+        uint8 _majorityPercentage,
+        PermissionMode _permissionMode,
+        uint16 _activeValidatorsLimit
+    ) public {
         SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
         saManager = new SubnetActorManagerFacet();
@@ -371,9 +393,9 @@ contract IntegrationTestBase is Test {
                 minValidators: _minValidators,
                 bottomUpCheckPeriod: _checkPeriod,
                 majorityPercentage: _majorityPercentage,
-                activeValidatorsLimit: 100,
+                activeValidatorsLimit: _activeValidatorsLimit,
                 powerScale: 12,
-                permissioned: false,
+                permissionMode: _permissionMode,
                 minCrossMsgFee: DEFAULT_CROSS_MSG_FEE
             })
         );

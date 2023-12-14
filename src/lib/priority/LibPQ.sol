@@ -51,6 +51,15 @@ library LibPQ {
         delete self.addressToPos[addr];
     }
 
+    function getPower(
+        PQ storage self,
+        ValidatorSet storage validators,
+        uint16 pos
+    ) internal view returns (uint256) {
+        address addr = self.posToAddress[pos];
+        return validators.getPower(addr);
+    }
+
     function getConfirmedCollateral(
         PQ storage self,
         ValidatorSet storage validators,

@@ -15,7 +15,7 @@ import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetID} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode} from "../../src/structs/Subnet.sol";
 import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 
@@ -266,7 +266,7 @@ contract SubnetRegistryTest is Test {
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
             powerScale: DEFAULT_POWER_SCALE,
-            permissioned: false,
+            permissionMode: PermissionMode.Collateral,
             minCrossMsgFee: CROSS_MSG_FEE
         });
         vm.expectRevert(WrongGateway.selector);
@@ -285,7 +285,7 @@ contract SubnetRegistryTest is Test {
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
             powerScale: DEFAULT_POWER_SCALE,
-            permissioned: false,
+            permissionMode: PermissionMode.Collateral,
             minCrossMsgFee: CROSS_MSG_FEE
         });
         registerSubnetFacet.newSubnetActor(params);
@@ -305,7 +305,7 @@ contract SubnetRegistryTest is Test {
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: 100,
             powerScale: DEFAULT_POWER_SCALE,
-            permissioned: false,
+            permissionMode: PermissionMode.Collateral,
             minCrossMsgFee: CROSS_MSG_FEE
         });
         registerSubnetFacet.newSubnetActor(params);
@@ -356,7 +356,7 @@ contract SubnetRegistryTest is Test {
             majorityPercentage: _majorityPercentage,
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
-            permissioned: false,
+            permissionMode: PermissionMode.Collateral,
             minCrossMsgFee: _minCrossMsgFee
         });
 
@@ -383,7 +383,7 @@ contract SubnetRegistryTest is Test {
             majorityPercentage: _majorityPercentage,
             activeValidatorsLimit: 100,
             powerScale: _powerScale,
-            permissioned: false,
+            permissionMode: PermissionMode.Collateral,
             minCrossMsgFee: CROSS_MSG_FEE
         });
         registerSubnetFacet.newSubnetActor(params);

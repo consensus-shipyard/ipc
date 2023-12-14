@@ -10,7 +10,7 @@ import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 import {Status} from "../../src/enums/Status.sol";
 import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/Checkpoint.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, IPCAddress, Subnet, ValidatorInfo, Validator} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, IPCAddress, Subnet, ValidatorInfo, Validator} from "../../src/structs/Subnet.sol";
 import {StorableMsg} from "../../src/structs/Checkpoint.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
@@ -336,7 +336,7 @@ contract SubnetActorInvariants is StdInvariant, Test {
                 majorityPercentage: _majorityPercentage,
                 activeValidatorsLimit: 100,
                 powerScale: 12,
-                permissioned: false,
+                permissionMode: PermissionMode.Collateral,
                 minCrossMsgFee: CROSS_MSG_FEE
             })
         );

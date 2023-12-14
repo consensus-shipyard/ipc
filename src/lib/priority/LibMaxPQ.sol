@@ -37,8 +37,8 @@ library LibMaxPQ {
 
         self.inner.size = size;
 
-        uint256 confirmedCollateral = validators.getConfirmedCollateral(validator);
-        swim({self: self, validators: validators, pos: size, value: confirmedCollateral});
+        uint256 power = validators.getPower(validator);
+        swim({self: self, validators: validators, pos: size, value: power});
     }
 
     /// @notice Pop the minimal value in the priority queue.
@@ -53,8 +53,8 @@ library LibMaxPQ {
         self.inner.size = size - 1;
         self.inner.del(size);
 
-        uint256 value = self.inner.getConfirmedCollateral(validators, 1);
-        sink({self: self, validators: validators, pos: 1, value: value});
+        uint256 power = self.inner.getPower(validators, 1);
+        sink({self: self, validators: validators, pos: 1, value: power});
     }
 
     /// @notice Reheapify the heap when the validator is deleted.
@@ -74,28 +74,28 @@ library LibMaxPQ {
         }
 
         // swim pos up in case exchanged index is smaller
-        uint256 val = self.inner.getConfirmedCollateral(validators, pos);
-        swim({self: self, validators: validators, pos: pos, value: val});
+        uint256 power = self.inner.getPower(validators, pos);
+        swim({self: self, validators: validators, pos: pos, value: power});
 
         // sink pos down in case updated pos is larger
-        val = self.inner.getConfirmedCollateral(validators, pos);
-        sink({self: self, validators: validators, pos: pos, value: val});
+        power = self.inner.getPower(validators, pos);
+        sink({self: self, validators: validators, pos: pos, value: power});
     }
 
     /// @notice Reheapify the heap when the collateral of a key has increased.
     /// NOTE that caller should ensure the queue is not empty.
     function increaseReheapify(MaxPQ storage self, ValidatorSet storage validators, address validator) internal {
         uint16 pos = self.inner.getPosOrRevert(validator);
-        uint256 val = validators.getConfirmedCollateral(validator);
-        swim({self: self, validators: validators, pos: pos, value: val});
+        uint256 power = validators.getPower(validator);
+        swim({self: self, validators: validators, pos: pos, value: power});
     }
 
     /// @notice Reheapify the heap when the collateral of a key has decreased.
     /// NOTE that caller should ensure the queue is not empty.
     function decreaseReheapify(MaxPQ storage self, ValidatorSet storage validators, address validator) internal {
         uint16 pos = self.inner.getPosOrRevert(validator);
-        uint256 val = validators.getConfirmedCollateral(validator);
-        sink({self: self, validators: validators, pos: pos, value: val});
+        uint256 power = validators.getPower(validator);
+        sink({self: self, validators: validators, pos: pos, value: power});
     }
 
     /// @notice Get the maximum value in the priority queue.
@@ -104,8 +104,8 @@ library LibMaxPQ {
         self.inner.requireNotEmpty();
 
         address addr = self.inner.posToAddress[1];
-        uint256 collateral = validators.getConfirmedCollateral(addr);
-        return (addr, collateral);
+        uint256 power = validators.getPower(addr);
+        return (addr, power);
     }
 
     /***************************************************************************
@@ -113,14 +113,14 @@ library LibMaxPQ {
      ****************************************************************************/
     function swim(MaxPQ storage self, ValidatorSet storage validators, uint16 pos, uint256 value) internal {
         uint16 parentPos;
-        uint256 parentCollateral;
+        uint256 parentPower;
 
         while (pos > 1) {
             parentPos = pos >> 1; // parentPos = pos / 2
-            parentCollateral = self.inner.getConfirmedCollateral(validators, parentPos);
+            parentPower = self.inner.getPower(validators, parentPos);
 
-            // parent collateral is not larger than that of the current child, heap condition met.
-            if (!firstValueSmaller(parentCollateral, value)) {
+            // parent power is not larger than that of the current child, heap condition met.
+            if (!firstValueSmaller(parentPower, value)) {
                 break;
             }
 
@@ -131,25 +131,25 @@ library LibMaxPQ {
 
     function sink(MaxPQ storage self, ValidatorSet storage validators, uint16 pos, uint256 value) internal {
         uint16 childPos = pos << 1; // childPos = pos * 2
-        uint256 childCollateral;
+        uint256 childPower;
 
         uint16 size = self.inner.size;
 
         while (childPos <= size) {
             if (childPos < size) {
                 // select the min of the two children
-                (childPos, childCollateral) = largerPosition({
+                (childPos, childPower) = largerPosition({
                     self: self,
                     validators: validators,
                     pos1: childPos,
                     pos2: childPos + 1
                 });
             } else {
-                childCollateral = self.inner.getConfirmedCollateral(validators, childPos);
+                childPower = self.inner.getPower(validators, childPos);
             }
 
             // parent, current idx, is not more than its two children, min heap condition is met.
-            if (!firstValueSmaller(value, childCollateral)) {
+            if (!firstValueSmaller(value, childPower)) {
                 break;
             }
 
@@ -166,13 +166,13 @@ library LibMaxPQ {
         uint16 pos1,
         uint16 pos2
     ) internal view returns (uint16, uint256) {
-        uint256 value1 = self.inner.getConfirmedCollateral(validators, pos1);
-        uint256 value2 = self.inner.getConfirmedCollateral(validators, pos2);
+        uint256 power1 = self.inner.getPower(validators, pos1);
+        uint256 power2 = self.inner.getPower(validators, pos2);
 
-        if (firstValueSmaller(value1, value2)) {
-            return (pos2, value2);
+        if (firstValueSmaller(power1, power2)) {
+            return (pos2, power2);
         }
-        return (pos1, value1);
+        return (pos1, power1);
     }
 
     function firstValueSmaller(uint256 v1, uint256 v2) internal pure returns (bool) {

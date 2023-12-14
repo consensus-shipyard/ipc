@@ -171,6 +171,52 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("setFederatedPowers"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("setFederatedPowers"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validators"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address[]"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("publicKeys"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes[]"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("powers"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256[]"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("stake"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -591,6 +637,17 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("InvalidFederationPayload"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidFederationPayload",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("InvalidPublicKeyLength"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -685,6 +742,15 @@ pub mod subnet_actor_manager_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("NotGateway"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("NotOwner"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotOwner"),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -903,6 +969,17 @@ pub mod subnet_actor_manager_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([102, 120, 60, 155], amount)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `setFederatedPowers` (0x2af05ff6) function
+        pub fn set_federated_powers(
+            &self,
+            validators: ::std::vec::Vec<::ethers::core::types::Address>,
+            public_keys: ::std::vec::Vec<::ethers::core::types::Bytes>,
+            powers: ::std::vec::Vec<::ethers::core::types::U256>,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([42, 240, 95, 246], (validators, public_keys, powers))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `stake` (0x3a4b66f1) function
@@ -1131,6 +1208,19 @@ pub mod subnet_actor_manager_facet {
         abi = "InvalidCheckpointMessagesHash()"
     )]
     pub struct InvalidCheckpointMessagesHash;
+    ///Custom Error type `InvalidFederationPayload` with signature `InvalidFederationPayload()` and selector `0x7e659359`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "InvalidFederationPayload", abi = "InvalidFederationPayload()")]
+    pub struct InvalidFederationPayload;
     ///Custom Error type `InvalidPublicKeyLength` with signature `InvalidPublicKeyLength()` and selector `0x637297a4`
     #[derive(
         Clone,
@@ -1248,6 +1338,19 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "NotGateway", abi = "NotGateway()")]
     pub struct NotGateway;
+    ///Custom Error type `NotOwner` with signature `NotOwner()` and selector `0x30cd7471`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "NotOwner", abi = "NotOwner()")]
+    pub struct NotOwner;
     ///Custom Error type `NotOwnerOfPublicKey` with signature `NotOwnerOfPublicKey()` and selector `0x97d24a3a`
     #[derive(
         Clone,
@@ -1380,6 +1483,7 @@ pub mod subnet_actor_manager_facet {
         FailedInnerCall(FailedInnerCall),
         InvalidCheckpointEpoch(InvalidCheckpointEpoch),
         InvalidCheckpointMessagesHash(InvalidCheckpointMessagesHash),
+        InvalidFederationPayload(InvalidFederationPayload),
         InvalidPublicKeyLength(InvalidPublicKeyLength),
         InvalidSignatureErr(InvalidSignatureErr),
         MethodNotAllowed(MethodNotAllowed),
@@ -1389,6 +1493,7 @@ pub mod subnet_actor_manager_facet {
         NotEnoughCollateral(NotEnoughCollateral),
         NotEnoughFunds(NotEnoughFunds),
         NotGateway(NotGateway),
+        NotOwner(NotOwner),
         NotOwnerOfPublicKey(NotOwnerOfPublicKey),
         NotStakedBefore(NotStakedBefore),
         NotValidator(NotValidator),
@@ -1457,6 +1562,11 @@ pub mod subnet_actor_manager_facet {
             ) {
                 return Ok(Self::InvalidCheckpointMessagesHash(decoded));
             }
+            if let Ok(decoded) = <InvalidFederationPayload as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::InvalidFederationPayload(decoded));
+            }
             if let Ok(decoded) = <InvalidPublicKeyLength as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -1501,6 +1611,11 @@ pub mod subnet_actor_manager_facet {
                 data,
             ) {
                 return Ok(Self::NotGateway(decoded));
+            }
+            if let Ok(decoded) = <NotOwner as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::NotOwner(decoded));
             }
             if let Ok(decoded) = <NotOwnerOfPublicKey as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1580,6 +1695,9 @@ pub mod subnet_actor_manager_facet {
                 Self::InvalidCheckpointMessagesHash(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::InvalidFederationPayload(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidPublicKeyLength(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1605,6 +1723,9 @@ pub mod subnet_actor_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotGateway(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotOwner(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotOwnerOfPublicKey(element) => {
@@ -1675,6 +1796,10 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
+                    == <InvalidFederationPayload as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <InvalidPublicKeyLength as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1708,6 +1833,8 @@ pub mod subnet_actor_manager_facet {
                 }
                 _ if selector
                     == <NotGateway as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NotOwner as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <NotOwnerOfPublicKey as ::ethers::contract::EthError>::selector() => {
                     true
@@ -1766,6 +1893,9 @@ pub mod subnet_actor_manager_facet {
                 Self::InvalidCheckpointMessagesHash(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::InvalidFederationPayload(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::InvalidPublicKeyLength(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1785,6 +1915,7 @@ pub mod subnet_actor_manager_facet {
                 }
                 Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotGateway(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotOwner(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotOwnerOfPublicKey(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1863,6 +1994,12 @@ pub mod subnet_actor_manager_facet {
             Self::InvalidCheckpointMessagesHash(value)
         }
     }
+    impl ::core::convert::From<InvalidFederationPayload>
+    for SubnetActorManagerFacetErrors {
+        fn from(value: InvalidFederationPayload) -> Self {
+            Self::InvalidFederationPayload(value)
+        }
+    }
     impl ::core::convert::From<InvalidPublicKeyLength>
     for SubnetActorManagerFacetErrors {
         fn from(value: InvalidPublicKeyLength) -> Self {
@@ -1909,6 +2046,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<NotGateway> for SubnetActorManagerFacetErrors {
         fn from(value: NotGateway) -> Self {
             Self::NotGateway(value)
+        }
+    }
+    impl ::core::convert::From<NotOwner> for SubnetActorManagerFacetErrors {
+        fn from(value: NotOwner) -> Self {
+            Self::NotOwner(value)
         }
     }
     impl ::core::convert::From<NotOwnerOfPublicKey> for SubnetActorManagerFacetErrors {
@@ -2240,6 +2382,26 @@ pub mod subnet_actor_manager_facet {
     pub struct PreReleaseCall {
         pub amount: ::ethers::core::types::U256,
     }
+    ///Container type for all input parameters for the `setFederatedPowers` function with signature `setFederatedPowers(address[],bytes[],uint256[])` and selector `0x2af05ff6`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "setFederatedPowers",
+        abi = "setFederatedPowers(address[],bytes[],uint256[])"
+    )]
+    pub struct SetFederatedPowersCall {
+        pub validators: ::std::vec::Vec<::ethers::core::types::Address>,
+        pub public_keys: ::std::vec::Vec<::ethers::core::types::Bytes>,
+        pub powers: ::std::vec::Vec<::ethers::core::types::U256>,
+    }
     ///Container type for all input parameters for the `stake` function with signature `stake()` and selector `0x3a4b66f1`
     #[derive(
         Clone,
@@ -2321,6 +2483,7 @@ pub mod subnet_actor_manager_facet {
         Leave(LeaveCall),
         PreFund(PreFundCall),
         PreRelease(PreReleaseCall),
+        SetFederatedPowers(SetFederatedPowersCall),
         Stake(StakeCall),
         SubmitCheckpoint(SubmitCheckpointCall),
         Unstake(UnstakeCall),
@@ -2376,6 +2539,11 @@ pub mod subnet_actor_manager_facet {
             ) {
                 return Ok(Self::PreRelease(decoded));
             }
+            if let Ok(decoded) = <SetFederatedPowersCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::SetFederatedPowers(decoded));
+            }
             if let Ok(decoded) = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -2419,6 +2587,9 @@ pub mod subnet_actor_manager_facet {
                 Self::PreRelease(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::SetFederatedPowers(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Stake(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::SubmitCheckpoint(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -2446,6 +2617,9 @@ pub mod subnet_actor_manager_facet {
                 Self::Leave(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PreFund(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PreRelease(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SetFederatedPowers(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::Stake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubmitCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Unstake(element) => ::core::fmt::Display::fmt(element, f),
@@ -2500,6 +2674,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<PreReleaseCall> for SubnetActorManagerFacetCalls {
         fn from(value: PreReleaseCall) -> Self {
             Self::PreRelease(value)
+        }
+    }
+    impl ::core::convert::From<SetFederatedPowersCall> for SubnetActorManagerFacetCalls {
+        fn from(value: SetFederatedPowersCall) -> Self {
+            Self::SetFederatedPowers(value)
         }
     }
     impl ::core::convert::From<StakeCall> for SubnetActorManagerFacetCalls {
