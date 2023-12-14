@@ -11,13 +11,13 @@
 # cargo make teardown
 
 extend = [
-  { path = "../Makefile/common.toml" },
+  { path = "../scripts/common.toml" },
 ]
 
 env_files = [
   { path = "./scripts/smoke.env" },
-  { path = "../Makefile/common.env" },
-  { path = "../Makefile/ci.env", profile = "ci" },
+  { path = "../scripts/common.env" },
+  { path = "../scripts/ci.env", profile = "ci" },
 ]
 
 [tasks.test]

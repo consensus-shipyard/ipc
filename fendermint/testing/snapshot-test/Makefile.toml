@@ -1,14 +1,14 @@
 # See fendermint/testing/snapshot-test/src/lib.rs for description.
 
 extend = [
-  { path = "../Makefile/common.toml" },
+  { path = "../scripts/common.toml" },
 ]
 
 env_files = [
   # `snapshot.env` is the environment for `cargo make`.
   { path = "./scripts/snapshot.env" },
-  { path = "../Makefile/common.env" },
-  { path = "../Makefile/ci.env", profile = "ci" },
+  { path = "../scripts/common.env" },
+  { path = "../scripts/ci.env", profile = "ci" },
 ]
 
 # Overriding the env file to enable snapshotting.

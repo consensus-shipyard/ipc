@@ -39,8 +39,13 @@ use fendermint_rpc::tx::{CallClient, TxClient, TxCommit};
 type MockProvider = ethers::providers::Provider<ethers::providers::MockProvider>;
 type MockContractCall<T> = ethers::prelude::ContractCall<MockProvider, T>;
 
-const CONTRACT_HEX: &'static str =
-    include_str!("../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin");
+// Generate a statically typed interface for the contract.
+// This assumes the `builtin-actors` repo is checked in next to Fendermint,
+// which the `make actor-bundle` command takes care of if it wasn't.
+// This path starts from the root of this project, not this file.
+abigen!(SimpleCoin, "../testing/contracts/SimpleCoin.abi");
+
+const CONTRACT_HEX: &'static str = include_str!("../../testing/contracts/SimpleCoin.bin");
 
 lazy_static! {
     /// Default gas params based on the testkit.
@@ -50,14 +55,6 @@ lazy_static! {
         gas_premium: TokenAmount::default(),
     };
 }
-
-// Generate a statically typed interface for the contract.
-// This assumes the `builtin-actors` repo is checked in next to Fendermint,
-// which the `make actor-bundle` command takes care of if it wasn't.
-abigen!(
-    SimpleCoin,
-    "../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi"
-);
 
 // Alternatively we can generate the ABI code as follows:
 // ```

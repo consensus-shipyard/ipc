@@ -2,7 +2,6 @@
 
 BUILTIN_ACTORS_TAG    ?= v11.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
-BUILTIN_ACTORS_DIR    := ../builtin-actors
 
 # Make sure this tag matches the one in Cargo.toml
 IPC_ACTORS_TAG				?= origin/dev
@@ -37,12 +36,12 @@ install:
 	cargo install --locked --path fendermint/app
 
 # Using --release for testing because wasm can otherwise be slow.
-test: $(IPC_ACTORS_ABI) $(BUILTIN_ACTORS_BUNDLE) $(BUILTIN_ACTORS_DIR)
+test: $(IPC_ACTORS_ABI) $(BUILTIN_ACTORS_BUNDLE)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release --workspace --exclude smoke-test
 
-e2e: docker-build $(BUILTIN_ACTORS_DIR)
+e2e: docker-build
 	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
 	cd fendermint/testing/snapshot-test && cargo make --profile $(PROFILE)
 
@@ -102,14 +101,6 @@ actor-bundle: $(BUILTIN_ACTORS_BUNDLE)
 $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
 	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
-
-# Some test expect the builtin-actors repo to be checked out where they can find test contracts.
-$(BUILTIN_ACTORS_DIR):
-	mkdir -p $(BUILTIN_ACTORS_DIR) && \
-	cd $(BUILTIN_ACTORS_DIR) && \
-	git clone https://github.com/filecoin-project/builtin-actors.git . && \
-	git checkout $(BUILTIN_ACTORS_TAG)
-
 
 # Compile the ABI artifacts of the IPC Solidity actors.
 ipc-actors-abi: $(IPC_ACTORS_ABI)
