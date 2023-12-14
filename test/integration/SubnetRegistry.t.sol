@@ -11,6 +11,7 @@ import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
+import {LibDiamond} from "../../src/lib/LibDiamond.sol";
 
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
@@ -361,6 +362,68 @@ contract SubnetRegistryTest is Test {
         });
 
         registerSubnetFacet.newSubnetActor(params);
+    }
+
+    // Test the updateReferenceSubnetContract method
+    function test_UpdateReferenceSubnetContract() public {
+        // Prepare new facet addresses and selector arrays
+        address newGetterFacet = address(2); // Mocked new facet address
+        address newManagerFacet = address(3); // Mocked new facet address
+        bytes4[] memory newSubnetGetterSelectors = new bytes4[](1);
+        newSubnetGetterSelectors[0] = 0x12345678; // Mocked selector
+        bytes4[] memory newSubnetManagerSelectors = new bytes4[](1);
+        newSubnetManagerSelectors[0] = 0x87654321; // Mocked selector
+
+        subnetGetterFacet.updateReferenceSubnetContract(
+            newGetterFacet,
+            newManagerFacet,
+            newSubnetGetterSelectors,
+            newSubnetManagerSelectors
+        );
+
+        // Validate the updates
+        require(
+            address(subnetGetterFacet.getSubnetActorGetterFacet()) == newGetterFacet,
+            "Getter facet address not updated correctly"
+        );
+        require(
+            address(subnetGetterFacet.getSubnetActorManagerFacet()) == newManagerFacet,
+            "Manager facet address not updated correctly"
+        );
+
+        // Validate the updates for subnetGetterSelectors
+        bytes4[] memory currentSubnetGetterSelectors = subnetGetterFacet.getSubnetActorGetterSelectors();
+        validateBytes4Array(currentSubnetGetterSelectors, newSubnetGetterSelectors, "SubnetGetterSelectors mismatch");
+
+        // Validate the updates for subnetManagerSelectors
+        bytes4[] memory currentSubnetManagerSelectors = subnetGetterFacet.getSubnetActorManagerSelectors();
+        validateBytes4Array(
+            currentSubnetManagerSelectors,
+            newSubnetManagerSelectors,
+            "SubnetManagerSelectors mismatch"
+        );
+
+        // Test only owner can update
+        vm.prank(address(1)); // Set a different address as the sender
+        vm.expectRevert(abi.encodeWithSelector(LibDiamond.NotOwner.selector)); // Expected revert message
+        subnetGetterFacet.updateReferenceSubnetContract(
+            newGetterFacet,
+            newManagerFacet,
+            newSubnetGetterSelectors,
+            newSubnetManagerSelectors
+        );
+    }
+
+    // Helper function to validate bytes4[] arrays
+    function validateBytes4Array(
+        bytes4[] memory array1,
+        bytes4[] memory array2,
+        string memory errorMessage
+    ) internal pure {
+        require(array1.length == array2.length, errorMessage);
+        for (uint i = 0; i < array1.length; i++) {
+            require(array1[i] == array2[i], errorMessage);
+        }
     }
 
     function _assertDeploySubnetActor(
