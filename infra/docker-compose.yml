@@ -24,9 +24,9 @@ services:
     environment:
       - ID=${NODE_ID}
       - LOG=${LOG:-cometbft-node${NODE_ID}.log}
-      - CMT_PEX=true
       - CMT_PROXY_APP=tcp://fendermint-node${NODE_ID}:26658
-      - CMT_PERSISTENT_PEERS="${CMT_PERSISTENT_PEERS}"
+      - CMT_P2P_PEX=true
+      - CMT_P2P_PERSISTENT_PEERS="${CMT_P2P_PERSISTENT_PEERS}"
     volumes:
       - $BASE_DIR/node${NODE_ID}/cometbft:/cometbft
     healthcheck:

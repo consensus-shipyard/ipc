@@ -14,22 +14,31 @@ use fendermint_vm_interpreter::fvm::state::FvmStateParams;
 use fvm_ipld_blockstore::Blockstore;
 use tendermint_rpc::Client;
 
-/// Create snapshots at regular block intervals.
-pub struct SnapshotManager<BS> {
-    /// Blockstore
-    store: BS,
+pub struct SnapshotParams {
     /// Location to store completed snapshots.
-    snapshots_dir: PathBuf,
+    pub snapshots_dir: PathBuf,
+    pub download_dir: PathBuf,
+    pub block_interval: BlockHeight,
     /// Target size in bytes for snapshot chunks.
-    chunk_size: usize,
+    pub chunk_size: usize,
     /// Number of snapshots to keep.
     ///
     /// 0 means unlimited.
-    hist_size: usize,
+    pub hist_size: usize,
     /// Time to hold on from purging a snapshot after a remote client
     /// asked for a chunk from it.
-    last_access_hold: Duration,
+    pub last_access_hold: Duration,
     /// How often to check CometBFT whether it has finished syncing.
+    pub sync_poll_interval: Duration,
+}
+
+/// Create snapshots at regular block intervals.
+pub struct SnapshotManager<BS> {
+    store: BS,
+    snapshots_dir: PathBuf,
+    chunk_size: usize,
+    hist_size: usize,
+    last_access_hold: Duration,
     sync_poll_interval: Duration,
     /// Shared state of snapshots.
     state: SnapshotState,
@@ -43,35 +52,29 @@ where
     BS: Blockstore + Clone + Send + Sync + 'static,
 {
     /// Create a new manager.
-    pub fn new(
-        store: BS,
-        snapshots_dir: PathBuf,
-        block_interval: BlockHeight,
-        chunk_size: usize,
-        hist_size: usize,
-        last_access_hold: Duration,
-        sync_poll_interval: Duration,
-    ) -> anyhow::Result<(Self, SnapshotClient)> {
+    pub fn new(store: BS, params: SnapshotParams) -> anyhow::Result<(Self, SnapshotClient)> {
         // Make sure the target directory exists.
-        std::fs::create_dir_all(&snapshots_dir).context("failed to create snapshots directory")?;
+        std::fs::create_dir_all(&params.snapshots_dir)
+            .context("failed to create snapshots directory")?;
 
-        let snapshot_items = list_manifests(&snapshots_dir).context("failed to list manifests")?;
+        let snapshot_items =
+            list_manifests(&params.snapshots_dir).context("failed to list manifests")?;
 
         let state = SnapshotState::new(snapshot_items);
 
-        let manager = Self {
+        let manager: SnapshotManager<BS> = Self {
             store,
-            snapshots_dir,
-            chunk_size,
-            hist_size,
-            last_access_hold,
-            sync_poll_interval,
+            snapshots_dir: params.snapshots_dir,
+            chunk_size: params.chunk_size,
+            hist_size: params.hist_size,
+            last_access_hold: params.last_access_hold,
+            sync_poll_interval: params.sync_poll_interval,
             state: state.clone(),
             // Assume we are syncing until we can determine otherwise.
             is_syncing: TVar::new(true),
         };
 
-        let client = SnapshotClient::new(block_interval, state);
+        let client = SnapshotClient::new(params.download_dir, params.block_interval, state);
 
         Ok((manager, client))
     }
@@ -225,7 +228,9 @@ where
 
         // Create a checksum over the CAR file.
         let checksum_bytes = file_checksum(&snapshot_path).context("failed to compute checksum")?;
-        std::fs::write(&checksum_path, checksum_bytes).context("failed to write checksum file")?;
+
+        std::fs::write(&checksum_path, checksum_bytes.to_string())
+            .context("failed to write checksum file")?;
 
         // Create a directory for the parts.
         std::fs::create_dir(&parts_path).context("failed to create parts dir")?;
@@ -320,7 +325,7 @@ mod tests {
     use fvm::engine::MultiEngine;
     use quickcheck::Arbitrary;
 
-    use crate::{manifest, PARTS_DIR_NAME};
+    use crate::{manager::SnapshotParams, manifest, PARTS_DIR_NAME};
 
     use super::SnapshotManager;
 
@@ -343,7 +348,8 @@ mod tests {
         let (state_params, store) = init_genesis().await;
 
         // Now we have one store initialized with genesis, let's create a manager and snapshot it.
-        let temp_dir = tempfile::tempdir().expect("failed to create tmp dir");
+        let snapshots_dir = tempfile::tempdir().expect("failed to create tmp dir");
+        let download_dir = tempfile::tempdir().expect("failed to create tmp dir");
 
         // Not polling because it's cumbersome to mock it.
         let never_poll_sync = Duration::ZERO;
@@ -351,12 +357,15 @@ mod tests {
 
         let (snapshot_manager, snapshot_client) = SnapshotManager::new(
             store.clone(),
-            temp_dir.path().into(),
-            1,
-            10000,
-            1,
-            Duration::ZERO,
-            never_poll_sync,
+            SnapshotParams {
+                snapshots_dir: snapshots_dir.path().into(),
+                download_dir: download_dir.path().into(),
+                block_interval: 1,
+                chunk_size: 10000,
+                hist_size: 1,
+                last_access_hold: Duration::ZERO,
+                sync_poll_interval: never_poll_sync,
+            },
         )
         .expect("failed to create snapshot manager");
 
@@ -393,13 +402,13 @@ mod tests {
         assert_eq!(snapshot.manifest.state_params, state_params);
         assert_eq!(
             snapshot.snapshot_dir.as_path(),
-            temp_dir.path().join("snapshot-0")
+            snapshots_dir.path().join("snapshot-0")
         );
 
         let _ = std::fs::File::open(snapshot.snapshot_dir.join("manifest.json"))
             .expect("manifests file exists");
 
-        let snapshots = manifest::list_manifests(temp_dir.path()).unwrap();
+        let snapshots = manifest::list_manifests(snapshots_dir.path()).unwrap();
 
         assert_eq!(snapshots.len(), 1, "can list manifests");
         assert_eq!(snapshots[0], snapshot);
@@ -416,12 +425,15 @@ mod tests {
         // Create a new manager instance
         let (_, new_client) = SnapshotManager::new(
             store,
-            temp_dir.path().into(),
-            1,
-            10000,
-            1,
-            Duration::ZERO,
-            never_poll_sync,
+            SnapshotParams {
+                snapshots_dir: snapshots_dir.path().into(),
+                download_dir: download_dir.path().into(),
+                block_interval: 1,
+                chunk_size: 10000,
+                hist_size: 1,
+                last_access_hold: Duration::ZERO,
+                sync_poll_interval: never_poll_sync,
+            },
         )
         .expect("failed to create snapshot manager");
 

@@ -26,9 +26,8 @@ docker run \
   --volume ${CMT_DIR}:/cometbft \
   --env-file ${ENV_FILE} \
   --env CMT_PROXY_APP=tcp://${FM_CONTAINER_NAME}:26658 \
-  --env CMT_PEX=false \
-  --env CMT_MAX_SUBSCRIPTION_CLIENTS=10 \
-  --env CMT_MAX_SUBSCRIPTIONS_PER_CLIENT=1000 \
+  --env CMT_RPC_MAX_SUBSCRIPTION_CLIENTS=10 \
+  --env CMT_RPC_MAX_SUBSCRIPTIONS_PER_CLIENT=1000 \
   ${CMT_DOCKER_IMAGE} \
   ${CMD}
 """
@@ -197,7 +196,7 @@ sed -i'' -e "s/{{PLACEHOLDER}}/$BOOTSTRAPS/g" ${CMT_DIR}/config/config.toml
 [tasks.set-external-addr]
 script = """
 sed -i'' -e 's|^external_address = ""$|external_address = "{{PLACEHOLDER}}"|g' ${CMT_DIR}/config/config.toml
-sed -i'' -e "s/{{PLACEHOLDER}}/$CMT_EXTERNAL_ADDR/g" ${CMT_DIR}/config/config.toml
+sed -i'' -e "s/{{PLACEHOLDER}}/$CMT_P2P_EXTERNAL_ADDR/g" ${CMT_DIR}/config/config.toml
 """
 
 # This is required to run several validators locally. You may want to disable it when running
