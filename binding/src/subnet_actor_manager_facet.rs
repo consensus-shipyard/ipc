@@ -93,26 +93,6 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("isPausabled"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("isPausabled"),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bool"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("join"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -165,6 +145,26 @@ pub mod subnet_actor_manager_facet {
                             outputs: ::std::vec![],
                             constant: ::core::option::Option::None,
                             state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("paused"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("paused"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bool"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
                         },
                     ],
                 ),
@@ -554,6 +554,22 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("Paused"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("Paused"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("SubnetBootstrapped"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Event {
@@ -572,6 +588,22 @@ pub mod subnet_actor_manager_facet {
                                             ),
                                         ),
                                     ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("Unpaused"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("Unpaused"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
                                     indexed: false,
                                 },
                             ],
@@ -612,15 +644,6 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("AlreadyPaused"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("AlreadyPaused"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("CannotConfirmFutureChanges"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -654,6 +677,24 @@ pub mod subnet_actor_manager_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("EmptyAddress"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("EnforcedPause"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("EnforcedPause"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("ExpectedPause"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("ExpectedPause"),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -996,14 +1037,6 @@ pub mod subnet_actor_manager_facet {
                 .method_hash([249, 0, 43, 177], (height, reward))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `isPausabled` (0x1338c892) function
-        pub fn is_pausabled(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
-            self.0
-                .method_hash([19, 56, 200, 146], ())
-                .expect("method not found (this should never happen)")
-        }
         ///Calls the contract's `join` (0x6170b162) function
         pub fn join(
             &self,
@@ -1029,6 +1062,12 @@ pub mod subnet_actor_manager_facet {
         pub fn pause(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([132, 86, 203, 89], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `paused` (0x5c975abb) function
+        pub fn paused(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
+            self.0
+                .method_hash([92, 151, 90, 187], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `preFund` (0x0b7fbe60) function
@@ -1134,6 +1173,12 @@ pub mod subnet_actor_manager_facet {
         > {
             self.0.event()
         }
+        ///Gets the contract's `Paused` event
+        pub fn paused_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, PausedFilter> {
+            self.0.event()
+        }
         ///Gets the contract's `SubnetBootstrapped` event
         pub fn subnet_bootstrapped_filter(
             &self,
@@ -1141,6 +1186,16 @@ pub mod subnet_actor_manager_facet {
             ::std::sync::Arc<M>,
             M,
             SubnetBootstrappedFilter,
+        > {
+            self.0.event()
+        }
+        ///Gets the contract's `Unpaused` event
+        pub fn unpaused_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            UnpausedFilter,
         > {
             self.0.event()
         }
@@ -1192,19 +1247,6 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "AddressShouldBeValidator", abi = "AddressShouldBeValidator()")]
     pub struct AddressShouldBeValidator;
-    ///Custom Error type `AlreadyPaused` with signature `AlreadyPaused()` and selector `0x1785c681`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "AlreadyPaused", abi = "AlreadyPaused()")]
-    pub struct AlreadyPaused;
     ///Custom Error type `CannotConfirmFutureChanges` with signature `CannotConfirmFutureChanges()` and selector `0x0815540a`
     #[derive(
         Clone,
@@ -1260,6 +1302,32 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "EmptyAddress", abi = "EmptyAddress()")]
     pub struct EmptyAddress;
+    ///Custom Error type `EnforcedPause` with signature `EnforcedPause()` and selector `0xd93c0665`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "EnforcedPause", abi = "EnforcedPause()")]
+    pub struct EnforcedPause;
+    ///Custom Error type `ExpectedPause` with signature `ExpectedPause()` and selector `0x8dfc202b`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "ExpectedPause", abi = "ExpectedPause()")]
+    pub struct ExpectedPause;
     ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
     #[derive(
         Clone,
@@ -1572,11 +1640,12 @@ pub mod subnet_actor_manager_facet {
     pub enum SubnetActorManagerFacetErrors {
         AddressInsufficientBalance(AddressInsufficientBalance),
         AddressShouldBeValidator(AddressShouldBeValidator),
-        AlreadyPaused(AlreadyPaused),
         CannotConfirmFutureChanges(CannotConfirmFutureChanges),
         CannotReleaseZero(CannotReleaseZero),
         CollateralIsZero(CollateralIsZero),
         EmptyAddress(EmptyAddress),
+        EnforcedPause(EnforcedPause),
+        ExpectedPause(ExpectedPause),
         FailedInnerCall(FailedInnerCall),
         InvalidCheckpointEpoch(InvalidCheckpointEpoch),
         InvalidCheckpointMessagesHash(InvalidCheckpointMessagesHash),
@@ -1624,11 +1693,6 @@ pub mod subnet_actor_manager_facet {
             ) {
                 return Ok(Self::AddressShouldBeValidator(decoded));
             }
-            if let Ok(decoded) = <AlreadyPaused as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::AlreadyPaused(decoded));
-            }
             if let Ok(decoded) = <CannotConfirmFutureChanges as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -1648,6 +1712,16 @@ pub mod subnet_actor_manager_facet {
                 data,
             ) {
                 return Ok(Self::EmptyAddress(decoded));
+            }
+            if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::EnforcedPause(decoded));
+            }
+            if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::ExpectedPause(decoded));
             }
             if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1776,9 +1850,6 @@ pub mod subnet_actor_manager_facet {
                 Self::AddressShouldBeValidator(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::AlreadyPaused(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::CannotConfirmFutureChanges(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1789,6 +1860,12 @@ pub mod subnet_actor_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::EmptyAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::EnforcedPause(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ExpectedPause(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::FailedInnerCall(element) => {
@@ -1875,10 +1952,6 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
-                    == <AlreadyPaused as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <CannotConfirmFutureChanges as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1892,6 +1965,14 @@ pub mod subnet_actor_manager_facet {
                 }
                 _ if selector
                     == <EmptyAddress as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ if selector
                     == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
@@ -1989,13 +2070,14 @@ pub mod subnet_actor_manager_facet {
                 Self::AddressShouldBeValidator(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::AlreadyPaused(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotConfirmFutureChanges(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CollateralIsZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EmptyAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::EnforcedPause(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ExpectedPause(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCheckpointEpoch(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -2066,11 +2148,6 @@ pub mod subnet_actor_manager_facet {
             Self::AddressShouldBeValidator(value)
         }
     }
-    impl ::core::convert::From<AlreadyPaused> for SubnetActorManagerFacetErrors {
-        fn from(value: AlreadyPaused) -> Self {
-            Self::AlreadyPaused(value)
-        }
-    }
     impl ::core::convert::From<CannotConfirmFutureChanges>
     for SubnetActorManagerFacetErrors {
         fn from(value: CannotConfirmFutureChanges) -> Self {
@@ -2090,6 +2167,16 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<EmptyAddress> for SubnetActorManagerFacetErrors {
         fn from(value: EmptyAddress) -> Self {
             Self::EmptyAddress(value)
+        }
+    }
+    impl ::core::convert::From<EnforcedPause> for SubnetActorManagerFacetErrors {
+        fn from(value: EnforcedPause) -> Self {
+            Self::EnforcedPause(value)
+        }
+    }
+    impl ::core::convert::From<ExpectedPause> for SubnetActorManagerFacetErrors {
+        fn from(value: ExpectedPause) -> Self {
+            Self::ExpectedPause(value)
         }
     }
     impl ::core::convert::From<FailedInnerCall> for SubnetActorManagerFacetErrors {
@@ -2280,18 +2367,48 @@ pub mod subnet_actor_manager_facet {
         Eq,
         Hash
     )]
+    #[ethevent(name = "Paused", abi = "Paused(address)")]
+    pub struct PausedFilter {
+        pub account: ::ethers::core::types::Address,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
     #[ethevent(
         name = "SubnetBootstrapped",
         abi = "SubnetBootstrapped((uint256,address,bytes)[])"
     )]
     pub struct SubnetBootstrappedFilter(pub ::std::vec::Vec<Validator>);
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(name = "Unpaused", abi = "Unpaused(address)")]
+    pub struct UnpausedFilter {
+        pub account: ::ethers::core::types::Address,
+    }
     ///Container type for all of the contract's events
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorManagerFacetEvents {
         BottomUpCheckpointExecutedFilter(BottomUpCheckpointExecutedFilter),
         BottomUpCheckpointSubmittedFilter(BottomUpCheckpointSubmittedFilter),
         NextBottomUpCheckpointExecutedFilter(NextBottomUpCheckpointExecutedFilter),
+        PausedFilter(PausedFilter),
         SubnetBootstrappedFilter(SubnetBootstrappedFilter),
+        UnpausedFilter(UnpausedFilter),
     }
     impl ::ethers::contract::EthLogDecode for SubnetActorManagerFacetEvents {
         fn decode_log(
@@ -2318,10 +2435,16 @@ pub mod subnet_actor_manager_facet {
                     ),
                 );
             }
+            if let Ok(decoded) = PausedFilter::decode_log(log) {
+                return Ok(SubnetActorManagerFacetEvents::PausedFilter(decoded));
+            }
             if let Ok(decoded) = SubnetBootstrappedFilter::decode_log(log) {
                 return Ok(
                     SubnetActorManagerFacetEvents::SubnetBootstrappedFilter(decoded),
                 );
+            }
+            if let Ok(decoded) = UnpausedFilter::decode_log(log) {
+                return Ok(SubnetActorManagerFacetEvents::UnpausedFilter(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -2338,9 +2461,11 @@ pub mod subnet_actor_manager_facet {
                 Self::NextBottomUpCheckpointExecutedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::PausedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetBootstrappedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::UnpausedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -2362,10 +2487,20 @@ pub mod subnet_actor_manager_facet {
             Self::NextBottomUpCheckpointExecutedFilter(value)
         }
     }
+    impl ::core::convert::From<PausedFilter> for SubnetActorManagerFacetEvents {
+        fn from(value: PausedFilter) -> Self {
+            Self::PausedFilter(value)
+        }
+    }
     impl ::core::convert::From<SubnetBootstrappedFilter>
     for SubnetActorManagerFacetEvents {
         fn from(value: SubnetBootstrappedFilter) -> Self {
             Self::SubnetBootstrappedFilter(value)
+        }
+    }
+    impl ::core::convert::From<UnpausedFilter> for SubnetActorManagerFacetEvents {
+        fn from(value: UnpausedFilter) -> Self {
+            Self::UnpausedFilter(value)
         }
     }
     ///Container type for all input parameters for the `addBootstrapNode` function with signature `addBootstrapNode(string)` and selector `0x10fd4261`
@@ -2428,19 +2563,6 @@ pub mod subnet_actor_manager_facet {
         pub height: u64,
         pub reward: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `isPausabled` function with signature `isPausabled()` and selector `0x1338c892`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(name = "isPausabled", abi = "isPausabled()")]
-    pub struct IsPausabledCall;
     ///Container type for all input parameters for the `join` function with signature `join(bytes)` and selector `0x6170b162`
     #[derive(
         Clone,
@@ -2495,6 +2617,19 @@ pub mod subnet_actor_manager_facet {
     )]
     #[ethcall(name = "pause", abi = "pause()")]
     pub struct PauseCall;
+    ///Container type for all input parameters for the `paused` function with signature `paused()` and selector `0x5c975abb`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "paused", abi = "paused()")]
+    pub struct PausedCall;
     ///Container type for all input parameters for the `preFund` function with signature `preFund()` and selector `0x0b7fbe60`
     #[derive(
         Clone,
@@ -2632,11 +2767,11 @@ pub mod subnet_actor_manager_facet {
         Claim(ClaimCall),
         ClaimRewardForRelayer(ClaimRewardForRelayerCall),
         DistributeRewardToRelayers(DistributeRewardToRelayersCall),
-        IsPausabled(IsPausabledCall),
         Join(JoinCall),
         Kill(KillCall),
         Leave(LeaveCall),
         Pause(PauseCall),
+        Paused(PausedCall),
         PreFund(PreFundCall),
         PreRelease(PreReleaseCall),
         SetFederatedPower(SetFederatedPowerCall),
@@ -2671,11 +2806,6 @@ pub mod subnet_actor_manager_facet {
             ) {
                 return Ok(Self::DistributeRewardToRelayers(decoded));
             }
-            if let Ok(decoded) = <IsPausabledCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::IsPausabled(decoded));
-            }
             if let Ok(decoded) = <JoinCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -2695,6 +2825,11 @@ pub mod subnet_actor_manager_facet {
                 data,
             ) {
                 return Ok(Self::Pause(decoded));
+            }
+            if let Ok(decoded) = <PausedCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::Paused(decoded));
             }
             if let Ok(decoded) = <PreFundCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -2752,13 +2887,11 @@ pub mod subnet_actor_manager_facet {
                 Self::DistributeRewardToRelayers(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::IsPausabled(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::Join(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Leave(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Pause(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Paused(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::PreFund(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::PreRelease(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -2789,11 +2922,11 @@ pub mod subnet_actor_manager_facet {
                 Self::DistributeRewardToRelayers(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::IsPausabled(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Join(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Leave(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Pause(element) => ::core::fmt::Display::fmt(element, f),
+                Self::Paused(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PreFund(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PreRelease(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SetFederatedPower(element) => ::core::fmt::Display::fmt(element, f),
@@ -2829,11 +2962,6 @@ pub mod subnet_actor_manager_facet {
             Self::DistributeRewardToRelayers(value)
         }
     }
-    impl ::core::convert::From<IsPausabledCall> for SubnetActorManagerFacetCalls {
-        fn from(value: IsPausabledCall) -> Self {
-            Self::IsPausabled(value)
-        }
-    }
     impl ::core::convert::From<JoinCall> for SubnetActorManagerFacetCalls {
         fn from(value: JoinCall) -> Self {
             Self::Join(value)
@@ -2852,6 +2980,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<PauseCall> for SubnetActorManagerFacetCalls {
         fn from(value: PauseCall) -> Self {
             Self::Pause(value)
+        }
+    }
+    impl ::core::convert::From<PausedCall> for SubnetActorManagerFacetCalls {
+        fn from(value: PausedCall) -> Self {
+            Self::Paused(value)
         }
     }
     impl ::core::convert::From<PreFundCall> for SubnetActorManagerFacetCalls {
@@ -2895,7 +3028,7 @@ pub mod subnet_actor_manager_facet {
             Self::ValidateActiveQuorumSignatures(value)
         }
     }
-    ///Container type for all return fields from the `isPausabled` function with signature `isPausabled()` and selector `0x1338c892`
+    ///Container type for all return fields from the `paused` function with signature `paused()` and selector `0x5c975abb`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2906,7 +3039,7 @@ pub mod subnet_actor_manager_facet {
         Eq,
         Hash
     )]
-    pub struct IsPausabledReturn(pub bool);
+    pub struct PausedReturn(pub bool);
     ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`
     #[derive(
         Clone,
