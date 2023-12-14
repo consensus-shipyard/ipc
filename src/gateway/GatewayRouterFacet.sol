@@ -140,9 +140,11 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         return configurationNumber;
     }
 
-    /// @notice apply cross messages
+    /// @notice Applies top-down crossnet messages locally. This is invoked by IPC nodes when drawing messages from
+    ///         their parent subnet for local execution. That's why the sender is restricted to the system sender,
+    ///         because this method is implicitly invoked by the node during block production.
     function applyCrossMessages(CrossMsg[] calldata crossMsgs) external systemActorOnly {
-        _applyMessages(SubnetID(0, new address[](0)), crossMsgs);
+        _applyMessages(s.networkName.getParentSubnet(), crossMsgs);
     }
 
     /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
