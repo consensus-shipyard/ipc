@@ -12,7 +12,7 @@ import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
@@ -103,6 +103,10 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_Propagate_Works_WithFeeRemainderNew() external {
+        if (!FEATURE_MULTILEVEL_CROSSMSG) {
+            // skip
+            return;
+        }
         (, address[] memory validators) = setupValidators();
         address caller = validators[0];
 
@@ -118,6 +122,10 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_Propagate_Works_NoFeeReminder() external {
+        if (!FEATURE_MULTILEVEL_CROSSMSG) {
+            // skip
+            return;
+        }
         (, address[] memory validators) = setupValidators();
         address caller = validators[0];
 
@@ -134,6 +142,10 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_Propagate_Fails_NotEnoughFee() public {
+        if (!FEATURE_MULTILEVEL_CROSSMSG) {
+            // skip
+            return;
+        }
         address caller = vm.addr(100);
         vm.deal(caller, 1 ether);
 

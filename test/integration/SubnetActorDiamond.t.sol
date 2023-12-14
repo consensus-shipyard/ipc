@@ -26,7 +26,7 @@ import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
 import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorManagerFacet, ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
@@ -1092,7 +1092,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
 
-        vm.expectRevert(MethodNotAllowed.selector);
+        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
     }
 

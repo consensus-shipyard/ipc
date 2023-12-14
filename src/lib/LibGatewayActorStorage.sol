@@ -66,6 +66,17 @@ struct GatewayActorStorage {
     uint64 bottomUpCheckPeriod;
     /// Tracking validator changes from parent in child subnet
     ParentValidatorsTracker validatorsTracker;
+    //
+    // == Feature flags ==
+    /// @notice Determines the maximum depth that this instance of the gateway
+    /// will enforce. Bear in mind that the deployment is decentralized,
+    /// and a subnet could choose not to change this code and not enforce
+    /// this as a maximum depth in its own subnet.
+    uint8 maxTreeDepth;
+    /// @notice Determines if general purpose cros-net messages are supported
+    bool generalPurposeCrossMsg;
+    /// @notice Determines if multi-level cross-net messages are enbaled.
+    bool multiLevelCrossMsg;
 }
 
 library LibGatewayActorStorage {
@@ -101,11 +112,6 @@ contract GatewayActorModifiers {
 
     modifier systemActorOnly() {
         _systemActorOnly();
-        _;
-    }
-
-    modifier validFee(uint256 fee) {
-        validateFee(fee);
         _;
     }
 }

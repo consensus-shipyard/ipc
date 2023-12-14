@@ -48,7 +48,7 @@ interface IGateway {
     /// the amount of funds that can be released for a specific address.
     function release(FvmAddress calldata to) external payable;
 
-    /// @notice SendCrossMessage sends an arbitrary cross-message to other subnet in the hierarchy.
+    /// @notice SendUserXnetMessage sends an arbitrary cross-message to other subnet in the hierarchy.
     ///
     /// If the message includes any funds they need to be burnt (like in Release)
     /// before being propagated to the corresponding subnet.
@@ -58,7 +58,7 @@ interface IGateway {
     /// included in the message by the actor). Only actors are allowed to send arbitrary
     /// cross-messages as a side-effect of their execution. For plain token exchanges
     /// fund and release have to be used.
-    function sendCrossMessage(CrossMsg memory crossMsg) external payable;
+    function sendUserXnetMessage(CrossMsg memory crossMsg) external payable;
 
     /// @notice Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;

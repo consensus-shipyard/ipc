@@ -71,5 +71,5 @@ error FacetCannotBeZero();
 error WrongGateway();
 error CannotFindSubnet();
 error UnknownSubnet();
-error MethodNotAllowed();
+error MethodNotAllowed(string reason);
 error InvalidFederationPayload();

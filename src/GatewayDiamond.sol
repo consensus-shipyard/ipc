@@ -16,6 +16,10 @@ import {LibStaking} from "./lib/LibStaking.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
+bool constant FEATURE_MULTILEVEL_CROSSMSG = false;
+bool constant FEATURE_GENERAL_PUPRPOSE_CROSSMSG = false;
+uint8 constant FEATURE_SUBNET_DEPTH = 2;
+
 contract GatewayDiamond {
     GatewayActorStorage internal s;
 
@@ -23,6 +27,7 @@ contract GatewayDiamond {
         SubnetID networkName;
         uint64 bottomUpCheckPeriod;
         uint256 minCollateral;
+        // deprecated (for now): no `msgFee` currenlty charged for cross-net messages
         uint256 msgFee;
         uint8 majorityPercentage;
         Validator[] genesisValidators;
@@ -50,6 +55,11 @@ contract GatewayDiamond {
         ds.supportedInterfaces[type(IERC165).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondCut).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondLoupe).interfaceId] = true;
+
+        // Feature flags
+        s.maxTreeDepth = FEATURE_SUBNET_DEPTH;
+        s.generalPurposeCrossMsg = FEATURE_GENERAL_PUPRPOSE_CROSSMSG;
+        s.multiLevelCrossMsg = FEATURE_MULTILEVEL_CROSSMSG;
 
         s.networkName = params.networkName;
         s.minStake = params.minCollateral;

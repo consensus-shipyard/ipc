@@ -634,9 +634,9 @@ contract IntegrationTestBase is Test {
         }
     }
 
-    function release(uint256 releaseAmount, uint256 fee) public {
+    function release(uint256 releaseAmount) public {
         uint256 expectedNonce = gwGetter.bottomUpNonce() + 1;
-        gwManager.release{value: releaseAmount}(FvmAddressHelper.from(msg.sender), fee);
+        gwManager.release{value: releaseAmount}(FvmAddressHelper.from(msg.sender));
         require(gwGetter.bottomUpNonce() == expectedNonce, "gwGetter.bottomUpNonce() == expectedNonce");
     }
 

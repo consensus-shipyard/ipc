@@ -8,12 +8,14 @@ import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
+
+string constant ERR_CHILD_SUBNET_NOT_ALLOWED = "Subnet does not allow child subnets";
 
 contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using FilAddress for address payable;
@@ -23,6 +25,12 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
     /// subnet from genesis (without having to wait for the subnet to be spawned to propagate the funds).
     function register(uint256 genesisCircSupply) external payable {
+        // If L2+ support is not enabled, only allow the registration of new
+        // subnets in the root
+        if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
+            revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
+        }
+
         if (msg.value < genesisCircSupply) {
             revert NotEnoughFunds();
         }
@@ -157,8 +165,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @notice release() burns the received value and releases them from this subnet onto the parent by committing a bottom-up message.
     ///
     /// @param to: the address to which to credit funds in the parent subnet.
-    /// @param fee: the fee that validators on the parent subnet get to keep for including this message.
-    function release(FvmAddress calldata to, uint256 fee) external payable validFee(fee) {
+    function release(FvmAddress calldata to) external payable {
         if (msg.value == 0) {
             // prevent spamming if there's no value to release.
             revert InvalidCrossMsgValue();
@@ -167,8 +174,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             subnet: s.networkName,
             signer: msg.sender,
             to: to,
-            value: msg.value - fee,
-            fee: fee
+            value: msg.value,
+            fee: 0 // making releases free of fee (at least for now)
         });
 
         LibGateway.commitBottomUpMsg(crossMsg);
