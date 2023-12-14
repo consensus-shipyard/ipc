@@ -29,6 +29,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+          # Using a Personal Access Token (PAT) from an admin so that we can push
+          # to a protected branch (dev or main). More settings are potentially relevant:
+          # https://github.com/orgs/community/discussions/13836#discussioncomment-7133341
+          # https://github.com/orgs/community/discussions/25305#discussioncomment-5537395
+          token: ${{secrets.PAT}}
+          persist-credentials: true
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
