@@ -9,7 +9,7 @@ IPC_ACTORS_TAG				?= origin/dev
 IPC_ACTORS_DIR        := $(PWD)/../ipc-solidity-actors
 IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
 IPC_ACTORS_ABI        := .make/.ipc-actors-abi
-IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
+IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/.out
 
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
