@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 fn main() {
     // Run with `cargo build -vv` to see output from any `eprintln!` or `println!`.
 
+    let output_dir = std::env::var("OUTPUT").ok().unwrap_or(".abi".to_string());
+
     // We are not building anything, could be imported as crate.
     if std::env::var("BUILD_BINDINGS").ok().is_none() {
         return;
@@ -50,7 +52,8 @@ fn main() {
         "LibGateway",
     ] {
         let module_name = camel_to_snake(contract_name);
-        let input_path = format!("{ipc_actors_dir}/out/{contract_name}.sol/{contract_name}.json");
+        let input_path =
+            format!("{ipc_actors_dir}/{output_dir}/{contract_name}.sol/{contract_name}.json");
         let output_path = format!("{ipc_actors_dir}/binding/src/{}.rs", module_name);
 
         ethers::prelude::Abigen::new(contract_name, &input_path)
