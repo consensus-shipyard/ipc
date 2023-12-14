@@ -1,23 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {CrossMsg, BottomUpCheckpoint, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
-import {Membership, Validator} from "../structs/Subnet.sol";
+import {Membership} from "../structs/Subnet.sol";
 import {OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {FvmAddress} from "../structs/FvmAddress.sol";
-import {FvmAddressHelper} from "./FvmAddressHelper.sol";
 
 library LibGateway {
-    using FilAddress for address;
-    using FilAddress for address payable;
-    using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
 

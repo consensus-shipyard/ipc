@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
-import {FvmAddress} from "../structs/FvmAddress.sol";
 
 /// @title Subnet Actor interface
 /// @author LimeChain team

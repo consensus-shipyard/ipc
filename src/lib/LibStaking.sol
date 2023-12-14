@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import {IGateway} from "../interfaces/IGateway.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
-import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
@@ -494,7 +493,7 @@ library LibStaking {
     /// @notice Set the federated power of the validator
     function setFederatedPower(address validator, bytes calldata metadata, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        s.changeSet.federatedPowerRequest(validator, metadata, amount);
+        s.changeSet.federatedPowerRequest({validator: validator, metadata: metadata, power: amount});
     }
 
     /// @notice Set the validator metadata

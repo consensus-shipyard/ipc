@@ -3,10 +3,8 @@ pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {FvmAddress} from "../structs/FvmAddress.sol";
 import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
 import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, Validator} from "../structs/Subnet.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 struct SubnetActorStorage {

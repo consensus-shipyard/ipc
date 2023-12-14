@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughBalanceForRewards, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
-import {SubnetID, Validator, ValidatorSet, PermissionMode} from "../structs/Subnet.sol";
-import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
+import {Validator, ValidatorSet, PermissionMode} from "../structs/Subnet.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
-import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
@@ -22,7 +20,6 @@ string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permi
 
 contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
-    using SubnetIDHelper for SubnetID;
     using LibValidatorSet for ValidatorSet;
     using Address for address payable;
 
@@ -190,7 +187,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
                 revert NotOwnerOfPublicKey();
             }
 
-            LibStaking.setFederatedPower(validators[i], publicKeys[i], powers[i]);
+            LibStaking.setFederatedPower({validator: validators[i], metadata: publicKeys[i], amount: powers[i]});
 
             unchecked {
                 ++i;
