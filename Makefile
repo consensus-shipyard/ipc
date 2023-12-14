@@ -16,6 +16,8 @@ upgrade-sa-diamond:
 upgrade-sr-diamond:
 	./ops/upgrade-sr-diamond.sh $(NETWORK)
 
+gen: compile-abi rust-binding
+
 compile-abi: | forge fmt
 	./ops/compile-abi.sh $(OUTPUT)
 

@@ -2,7 +2,7 @@ name: Bindings
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
 
 jobs:
@@ -26,15 +26,10 @@ jobs:
           toolchain: nightly
           components: rustfmt
 
-      - uses: actions/cache@v3
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/binding/Cargo.lock') }}
+          workspaces: "binding"
 
         # for prettier (compile-abi calls the formatter first)
       - name: Set up node.js

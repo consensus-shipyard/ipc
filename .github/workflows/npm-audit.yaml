@@ -2,7 +2,7 @@ name: NPM Audit
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
 
 jobs:
