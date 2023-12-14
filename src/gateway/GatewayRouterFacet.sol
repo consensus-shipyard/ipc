@@ -146,9 +146,9 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     }
 
     /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
-    /// @param forwarder - the subnet that handles the cross message
+    /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsg - the cross message to be executed
-    function _applyMsg(SubnetID memory forwarder, CrossMsg memory crossMsg) internal {
+    function _applyMsg(SubnetID memory arrivingFrom, CrossMsg memory crossMsg) internal {
         if (crossMsg.message.to.subnetId.isEmpty()) {
             revert InvalidCrossMsgDstSubnet();
         }
@@ -159,7 +159,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         if (crossMsg.message.to.subnetId.equals(s.networkName)) {
             if (applyType == IPCMsgType.BottomUp) {
                 // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
-                (bool registered, Subnet storage subnet) = LibGateway.getSubnet(forwarder);
+                (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
                 if (!registered) {
                     revert NotRegisteredSubnet();
                 }
@@ -188,12 +188,12 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
     /// @notice applies a cross-net messages coming from some other subnet.
     /// The forwarder argument determines the previous subnet that submitted the checkpoint triggering the cross-net message execution.
-    /// @param forwarder - the subnet that handles the messages
+    /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsgs - the cross-net messages to apply
-    function _applyMessages(SubnetID memory forwarder, CrossMsg[] memory crossMsgs) internal {
+    function _applyMessages(SubnetID memory arrivingFrom, CrossMsg[] memory crossMsgs) internal {
         uint256 crossMsgsLength = crossMsgs.length;
         for (uint256 i; i < crossMsgsLength; ) {
-            _applyMsg(forwarder, crossMsgs[i]);
+            _applyMsg(arrivingFrom, crossMsgs[i]);
             unchecked {
                 ++i;
             }
