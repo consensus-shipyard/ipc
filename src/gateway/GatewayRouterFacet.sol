@@ -152,11 +152,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         if (crossMsg.message.to.subnetId.isEmpty()) {
             revert InvalidCrossMsgDstSubnet();
         }
-        if (crossMsg.message.method == METHOD_SEND) {
-            if (crossMsg.message.value > address(this).balance) {
-                revert NotEnoughBalance();
-            }
-        }
 
         IPCMsgType applyType = crossMsg.message.applyType(s.networkName);
 
