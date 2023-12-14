@@ -11,12 +11,13 @@ use std::path::{Path, PathBuf};
 fn main() {
     // Run with `cargo build -vv` to see output from any `eprintln!` or `println!`.
 
-    let output_dir = std::env::var("OUTPUT").ok().unwrap_or(".abi".to_string());
-
     // We are not building anything, could be imported as crate.
     if std::env::var("BUILD_BINDINGS").ok().is_none() {
         return;
     }
+
+    // Where are the Solidity artifacts.
+    let output_dir = std::env::var("OUTPUT").expect("OUTPUT env var missing");
 
     let ipc_actors_dir = workspace_dir()
         .parent()

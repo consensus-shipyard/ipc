@@ -33,7 +33,7 @@ commit-abi:
 	./ops/commit-abi.sh $(OUTPUT)
 
 rust-binding:
-	BUILD_BINDINGS=1 cargo build --locked --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
+	OUTPUT=$(OUTPUT) BUILD_BINDINGS=1 cargo build --locked --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
 
 commit-rust-binding:
 	./ops/commit-rust-binding.sh
