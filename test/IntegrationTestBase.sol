@@ -29,6 +29,7 @@ import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
 import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
+import {SubnetActorManagerFacetMock} from "./mocks/SubnetActor.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
@@ -84,8 +85,10 @@ contract IntegrationTestBase is Test {
 
     bytes4[] saGetterSelectors;
     bytes4[] saManagerSelectors;
+    bytes4[] saManagerMockedSelectors;
     SubnetActorDiamond saDiamond;
     SubnetActorManagerFacet saManager;
+    SubnetActorManagerFacetMock saMockedManager;
     SubnetActorGetterFacet saGetter;
     DiamondCutFacet saCutFacet;
     DiamondLoupeFacet saLouper;
@@ -93,6 +96,7 @@ contract IntegrationTestBase is Test {
     constructor() {
         saGetterSelectors = TestUtils.generateSelectors(vm, "SubnetActorGetterFacet");
         saManagerSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacet");
+        saManagerMockedSelectors = TestUtils.generateSelectors(vm, "SubnetActorManagerFacetMock");
 
         gwRouterSelectors = TestUtils.generateSelectors(vm, "GatewayRouterFacet");
         gwGetterSelectors = TestUtils.generateSelectors(vm, "GatewayGetterFacet");
@@ -404,6 +408,35 @@ contract IntegrationTestBase is Test {
         saGetter = SubnetActorGetterFacet(address(saDiamond));
         saCutFacet = DiamondCutFacet(address(saDiamond));
         saLouper = DiamondLoupeFacet(address(saDiamond));
+    }
+
+    function createMockedSubnetActorWithGateway(address gw) public returns (SubnetActorDiamond) {
+        SubnetActorManagerFacetMock mockedManager = new SubnetActorManagerFacetMock();
+        SubnetActorGetterFacet getter = new SubnetActorGetterFacet();
+
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
+
+        diamondCut[0] = (
+            IDiamond.FacetCut({
+                facetAddress: address(mockedManager),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saManagerMockedSelectors
+            })
+        );
+
+        diamondCut[1] = (
+            IDiamond.FacetCut({
+                facetAddress: address(getter),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saGetterSelectors
+            })
+        );
+
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(gw);
+
+        SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params);
+
+        return d;
     }
 
     function totalWeight(uint256[] memory weights) public pure returns (uint256 sum) {

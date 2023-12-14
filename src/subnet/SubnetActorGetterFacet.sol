@@ -116,6 +116,10 @@ contract SubnetActorGetterFacet {
         return LibStaking.getTotalConfirmedCollateral();
     }
 
+    function getTotalCollateral() external view returns (uint256) {
+        return LibStaking.getTotalCollateral();
+    }
+
     function getTotalValidatorCollateral(address validator) external view returns (uint256) {
         return LibStaking.totalValidatorCollateral(validator);
     }

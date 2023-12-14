@@ -161,6 +161,19 @@ library LibValidatorSet {
         }
     }
 
+    /// @notice Get the total collateral of the *waiting* and *active* validators.
+    function getTotalCollateral(ValidatorSet storage validators) internal view returns (uint256 collateral) {
+        uint16 size = validators.waitingValidators.getSize();
+        for (uint16 i = 1; i <= size; ) {
+            address validator = validators.waitingValidators.getAddress(i);
+            collateral += getConfirmedCollateral(validators, validator);
+            unchecked {
+                ++i;
+            }
+        }
+        collateral += getTotalConfirmedCollateral(validators);
+    }
+
     /// @notice Get the total power of the validators.
     /// The function reverts if at least one validator is not in the active validator set.
     function getTotalPowerOfValidators(
@@ -404,6 +417,11 @@ library LibStaking {
     }
 
     function getTotalConfirmedCollateral() internal view returns (uint256) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return s.validatorSet.getTotalConfirmedCollateral();
+    }
+
+    function getTotalCollateral() internal view returns (uint256) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
         return s.validatorSet.getTotalConfirmedCollateral();
     }

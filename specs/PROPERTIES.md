@@ -22,10 +22,10 @@ List of identified and checked invariants of the IPC protocol following the cate
 
 ## Subnet Actor
 
-| Property | Description                                                                                           | Category             | Tested |
-| -------- | ----------------------------------------------------------------------------------------------------- | -------------------- | ------ |
-| SA-01    | The number of joined validators is equal to the number of total validators.                           | Variable Transitions | ✅     |
-| SA-02    | The stake of the subnet is the same from the GatewayActor and SubnetActor perspective.                | Unit Test            | ✅     |
-| SA-03    | The value resulting from all stake and unstake operations is equal to the total confirmed collateral. | Valid State          | ✅     |
-| SA-04    | After leaving the subnet, a validator can claim their collateral.                                     | High Level           | ✅     |
-| SA-05    | Total confirmed collateral equals sum of validator collaterals.                                       | Valid State          | ✅     |
+| Property | Description                                                                                                            | Category             | Tested |
+| -------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------- | ------ |
+| SA-01    | The number of joined validators is equal to the number of total validators, if confirmations are executed immediately. | Variable Transitions | ✅     |
+| SA-02    | The total collateral of the subnet is the same from the SubnetActor and SubnetActorHandler perspective.                | Unit Test            | ✅     |
+| SA-03    | The value resulting from all stake and unstake operations is equal to the total confirmed collateral.                  | Valid State          | ✅     |
+| SA-04    | After leaving the subnet, a validator can claim their collateral.                                                      | High Level           | ✅     |
+| SA-05    | Total confirmed collateral equals sum of validator collaterals.                                                        | Valid State          | ✅     |
