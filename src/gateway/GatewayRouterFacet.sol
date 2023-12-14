@@ -155,23 +155,20 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
         IPCMsgType applyType = crossMsg.message.applyType(s.networkName);
 
-        // If the cross-message destination is the current network.
+        // If the crossnet destination is the current network (network where the gateway is running).
         if (crossMsg.message.to.subnetId.equals(s.networkName)) {
             if (applyType == IPCMsgType.BottomUp) {
-                if (!forwarder.isEmpty()) {
-                    (bool registered, Subnet storage subnet) = LibGateway.getSubnet(forwarder);
-                    if (!registered) {
-                        revert NotRegisteredSubnet();
-                    }
-                    if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
-                        revert InvalidCrossMsgNonce();
-                    }
-
-                    subnet.appliedBottomUpNonce += 1;
+                // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
+                (bool registered, Subnet storage subnet) = LibGateway.getSubnet(forwarder);
+                if (!registered) {
+                    revert NotRegisteredSubnet();
                 }
-            }
-
-            if (applyType == IPCMsgType.TopDown) {
+                if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
+                    revert InvalidCrossMsgNonce();
+                }
+                subnet.appliedBottomUpNonce += 1;
+            } else if (applyType == IPCMsgType.TopDown) {
+                // There is no need to load the subnet, as a top-down application means that _we_ are the subnet.
                 if (s.appliedTopDownNonce != crossMsg.message.nonce) {
                     revert InvalidCrossMsgNonce();
                 }
