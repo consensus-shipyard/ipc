@@ -7,6 +7,8 @@ import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
 import {SubnetID, Validator, ValidatorSet, PermissionMode} from "../structs/Subnet.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
+import {Pausable} from "../lib/LibPausable.sol";
+import {LibDiamond} from "../lib/LibDiamond.sol";
 import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
@@ -18,7 +20,7 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permissioned is enabled and subnet bootstrapped";
 
-contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, ReentrancyGuard {
+contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
     using LibValidatorSet for ValidatorSet;
@@ -43,6 +45,18 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         return;
     }
 
+    /// @notice Pause all methods with `whenNotPaused` modifier
+    function pause() external {
+        LibDiamond.enforceIsContractOwner();
+        _pause();
+    }
+
+    /// @notice Unpause all methods with `whenNotPaused` modifier
+    function unpause() external {
+        LibDiamond.enforceIsContractOwner();
+        _unpause();
+    }
+
     /** @notice submit a checkpoint for execution.
      *  @dev It triggers the commitment of the checkpoint and the execution of related cross-net messages,
      *       and any other side-effects that need to be triggered by the checkpoint such as relayer reward book keeping.
@@ -56,7 +70,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
         CrossMsg[] calldata messages,
         address[] calldata signatories,
         bytes[] calldata signatures
-    ) external {
+    ) external whenNotPaused {
         // the checkpoint height must be equal to the last bottom-up checkpoint height or
         // the next one
         if (
@@ -186,7 +200,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice method that allows a validator to join the subnet
     /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
-    function join(bytes calldata publicKey) external payable nonReentrant notKilled {
+    function join(bytes calldata publicKey) external payable nonReentrant whenNotPaused notKilled {
         // adding this check to prevent new validators from joining
         // after the subnet has been bootstrapped. We will increase the
         // functionality in the future to support explicit permissioning.
@@ -236,8 +250,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice method that allows a validator to increase its stake
-    function stake() external payable notKilled {
-        // disbling validator changes for federated validation subnets (at least for now
+    function stake() external payable whenNotPaused notKilled {
+        // disbling validator changes for permissioned subnets (at least for now
         // until a more complex mechanism is implemented).
         enforceCollateralValidation();
 
@@ -259,8 +273,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
 
     /// @notice method that allows a validator to unstake a part of its collateral from a subnet
     /// @dev `leave` must be used to unstake the entire stake.
-    function unstake(uint256 amount) external notKilled {
-        // disbling validator changes for federated validation subnets (at least for now
+    function unstake(uint256 amount) external whenNotPaused notKilled {
+        // disbling validator changes for permissioned subnets (at least for now
         // until a more complex mechanism is implemented).
         enforceCollateralValidation();
 
@@ -287,8 +301,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @notice method that allows a validator to leave the subnet
     /// @dev it also return the validators initial balance if the
     /// subnet was not yet bootstrapped.
-    function leave() external nonReentrant notKilled {
-        // disbling validator changes for federated validation subnets (at least for now
+    function leave() external nonReentrant whenNotPaused notKilled {
+        // disbling validator changes for permissioned subnets (at least for now
         // until a more complex mechanism is implemented).
         // This means that initial validators won't be able to recover
         // their collateral ever (worth noting in the docs if this ends
@@ -335,17 +349,17 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     }
 
     /// @notice Validator claims their released collateral
-    function claim() external nonReentrant {
+    function claim() external nonReentrant whenNotPaused {
         LibStaking.claimCollateral(msg.sender);
     }
 
     /// @notice Relayer claims its reward
-    function claimRewardForRelayer() external nonReentrant {
+    function claimRewardForRelayer() external nonReentrant whenNotPaused {
         LibStaking.claimRewardForRelayer(msg.sender);
     }
 
     /// @notice add a bootstrap node
-    function addBootstrapNode(string memory netAddress) external {
+    function addBootstrapNode(string memory netAddress) external whenNotPaused {
         if (!s.validatorSet.isActiveValidator(msg.sender)) {
             revert NotValidator(msg.sender);
         }
@@ -361,7 +375,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Reentran
     /// @dev The reward includes the fixed relayer reward and accumulated cross-message fees received from the gateway.
     /// @param height height of the checkpoint the relayers are rewarded for
     /// @param reward The sum of cross-message fees in the checkpoint
-    function distributeRewardToRelayers(uint64 height, uint256 reward) external payable onlyGateway {
+    function distributeRewardToRelayers(uint64 height, uint256 reward) external payable whenNotPaused onlyGateway {
         if (reward == 0) {
             return;
         }
