@@ -11,8 +11,8 @@ import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
-import {CheckpointInfo} from "../../src/structs/Checkpoint.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../../src/structs/Checkpoint.sol";
+import {QuorumInfo} from "../../src/structs/Quorum.sol";
+import {CrossMsg, BottomUpMsgBatch, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -815,7 +815,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(BLS_ACCOUNT_ADDREESS);
         vm.deal(BLS_ACCOUNT_ADDREESS, releaseAmount + 1);
         release(releaseAmount);
-        require(gwGetter.bottomUpMessages(gwGetter.bottomUpCheckPeriod()).length == 1, "no messages");
+        require(gwGetter.bottomUpMsgBatch(gwGetter.bottomUpMsgBatchPeriod()).msgs.length == 1, "no messages");
     }
 
     function testGatewayDiamond_Release_Works_EmptyCrossMsgMeta(uint256 releaseAmount, uint256 crossMsgFee) public {
@@ -1194,16 +1194,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: 0,
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages1")
+            nextConfigurationNumber: 1
         });
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages1")
+            nextConfigurationNumber: 1
         });
 
         // failed to create a checkpoint with zero membership weight
@@ -1214,7 +1212,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // failed create a processed checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.expectRevert(CheckpointAlreadyProcessed.selector);
+        vm.expectRevert(QuorumAlreadyProcessed.selector);
         gwRouter.createBottomUpCheckpoint(old, membershipRoot, weights[0] + weights[1] + weights[2]);
         vm.stopPrank();
 
@@ -1226,18 +1224,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         BottomUpCheckpoint memory recv = gwGetter.bottomUpCheckpoint(gwGetter.bottomUpCheckPeriod());
         require(recv.nextConfigurationNumber == 1, "nextConfigurationNumber incorrect");
         require(recv.blockHash == keccak256("block1"), "block hash incorrect");
-        require(recv.crossMessagesHash == keccak256("messages1"), "received cross messages incorrect");
-        require(gwGetter.bottomUpMessages(gwGetter.bottomUpCheckPeriod()).length == 0, "there are messages");
-
-        uint64 d = gwGetter.bottomUpCheckPeriod();
+        uint256 d = gwGetter.bottomUpCheckPeriod();
 
         // failed to create a checkpoint with the same height
         checkpoint = BottomUpCheckpoint({
             subnetID: gwGetter.getNetworkName(),
             blockHeight: d,
             blockHash: keccak256("block"),
-            nextConfigurationNumber: 2,
-            crossMessagesHash: keccak256("newmessages")
+            nextConfigurationNumber: 2
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -1250,8 +1244,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: d + d / 2,
             blockHash: keccak256("block2"),
-            nextConfigurationNumber: 2,
-            crossMessagesHash: keccak256("newmessages")
+            nextConfigurationNumber: 2
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -1259,24 +1252,21 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
         vm.stopPrank();
 
-        (bool ok, uint64 e, ) = gwGetter.getCurrentBottomUpCheckpoint();
+        (bool ok, uint256 e, ) = gwGetter.getCurrentBottomUpCheckpoint();
         require(ok, "checkpoint not exist");
         require(e == d, "out height incorrect");
     }
 
     function testGatewayDiamond_commitBottomUpCheckpoint_InvalidCheckpointSource() public {
-        CrossMsg[] memory msgs = new CrossMsg[](0);
-
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256(abi.encode(msgs))
+            nextConfigurationNumber: 1
         });
 
         vm.expectRevert(InvalidCheckpointSource.selector);
-        gwRouter.commitBottomUpCheckpoint(checkpoint, msgs);
+        gwRouter.commitCheckpoint(checkpoint);
     }
 
     function testGatewayDiamond_commitBottomUpCheckpoint_Works_NoMessages() public {
@@ -1288,74 +1278,15 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
 
-        CrossMsg[] memory msgs = new CrossMsg[](0);
-
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: subnetId,
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256(abi.encode(msgs))
+            nextConfigurationNumber: 1
         });
 
         vm.prank(caller);
-        gwRouter.commitBottomUpCheckpoint(checkpoint, msgs);
-    }
-
-    function testGatewayDiamond_commitBottomUpCheckpoint_Works_WithMessages() public {
-        address caller = address(saDiamond);
-        vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        vm.stopPrank();
-
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
-        (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
-        require(exist, "subnet does not exist");
-        require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
-
-        gwManager.fund{value: DEFAULT_COLLATERAL_AMOUNT}(subnetId, FvmAddressHelper.from(address(caller)));
-        (, subnetInfo) = gwGetter.getSubnet(subnetId);
-        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
-
-        CrossMsg[] memory msgs = new CrossMsg[](10);
-        for (uint64 i = 0; i < 10; i++) {
-            msgs[i] = CrossMsg({
-                message: StorableMsg({
-                    from: IPCAddress({
-                        subnetId: gwGetter.getNetworkName(),
-                        rawAddress: FvmAddressHelper.from(address(this))
-                    }),
-                    to: IPCAddress({
-                        subnetId: gwGetter.getNetworkName(),
-                        rawAddress: FvmAddressHelper.from(address(this))
-                    }),
-                    value: 0,
-                    nonce: i,
-                    method: this.callback.selector,
-                    params: EMPTY_BYTES,
-                    fee: DEFAULT_CROSS_MSG_FEE
-                }),
-                wrapped: false
-            });
-        }
-
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: subnetId,
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256(abi.encode(msgs))
-        });
-
-        vm.prank(caller);
-        gwRouter.commitBottomUpCheckpoint(checkpoint, msgs);
-
-        (, subnetInfo) = gwGetter.getSubnet(subnetId);
-        require(
-            subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * DEFAULT_CROSS_MSG_FEE,
-            "unexpected circulation supply"
-        );
+        gwRouter.commitCheckpoint(checkpoint);
     }
 
     function testGatewayDiamond_listIncompleteCheckpoints() public {
@@ -1367,16 +1298,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages1")
+            nextConfigurationNumber: 1
         });
 
         BottomUpCheckpoint memory checkpoint2 = BottomUpCheckpoint({
             subnetID: gwGetter.getNetworkName(),
             blockHeight: 2 * gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages2")
+            nextConfigurationNumber: 1
         });
 
         // create a checkpoint
@@ -1391,7 +1320,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(heights[0] == gwGetter.bottomUpCheckPeriod(), "heights[0] == period");
         require(heights[1] == 2 * gwGetter.bottomUpCheckPeriod(), "heights[1] == 2*period");
 
-        CheckpointInfo memory info = gwGetter.getCheckpointInfo(gwGetter.bottomUpCheckPeriod());
+        QuorumInfo memory info = gwGetter.getCheckpointInfo(gwGetter.bottomUpCheckPeriod());
         require(info.rootHash == membershipRoot, "info.rootHash == membershipRoot");
         require(
             info.threshold == gwGetter.getQuorumThreshold(weights[0] + weights[1] + weights[2]),
@@ -1423,8 +1352,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages")
+            nextConfigurationNumber: 1
         });
 
         // create a checkpoint
@@ -1455,10 +1383,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         (
             BottomUpCheckpoint memory ch,
-            CheckpointInfo memory info,
+            QuorumInfo memory info,
             address[] memory signatories,
             bytes[] memory signatures
-        ) = gwGetter.getSignatureBundle(gwGetter.bottomUpCheckPeriod());
+        ) = gwGetter.getCheckpointSignatureBundle(gwGetter.bottomUpCheckPeriod());
         require(ch.blockHash == keccak256("block"), "unexpected block hash");
         require(info.hash == keccak256(abi.encode(checkpoint)), "unexpected checkpoint hash");
         require(signatories.length == 3, "unexpected signatories length");
@@ -1475,8 +1403,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages")
+            nextConfigurationNumber: 1
         });
 
         // create a checkpoint
@@ -1500,7 +1427,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             vm.stopPrank();
         }
 
-        CheckpointInfo memory info = gwGetter.getCheckpointInfo(1);
+        QuorumInfo memory info = gwGetter.getCheckpointInfo(1);
         require(!info.reached, "not reached");
         require(gwGetter.getIncompleteCheckpointHeights().length == 1, "unexpected size");
 
@@ -1539,8 +1466,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages")
+            nextConfigurationNumber: 1
         });
 
         // create a checkpoint
@@ -1556,7 +1482,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(checkpoint)));
         signature = abi.encodePacked(r, s, v);
 
-        uint64 h = gwGetter.bottomUpCheckPeriod();
+        uint256 h = gwGetter.bottomUpCheckPeriod();
         vm.startPrank(vm.addr(privKeys[1]));
         vm.expectRevert(abi.encodeWithSelector(NotAuthorized.selector, vm.addr(privKeys[0])));
         gwRouter.addCheckpointSignature(h, membershipProofs[2], weights[2], signature);
@@ -1573,8 +1499,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages")
+            nextConfigurationNumber: 1
         });
 
         // create a checkpoint
@@ -1590,7 +1515,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(checkpoint)));
         signature = abi.encodePacked(r, s, v);
 
-        uint64 h = gwGetter.bottomUpCheckPeriod();
+        uint256 h = gwGetter.bottomUpCheckPeriod();
         vm.startPrank(vm.addr(privKeys[0]));
 
         // send incorrect signature
@@ -1617,8 +1542,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetID: gwGetter.getNetworkName(),
             blockHeight: gwGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
-            nextConfigurationNumber: 1,
-            crossMessagesHash: keccak256("messages")
+            nextConfigurationNumber: 1
         });
 
         // create a checkpoint
@@ -1637,7 +1561,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(vm.addr(privKeys[0]));
 
         // send correct signature for incorrect height
-        vm.expectRevert(CheckpointAlreadyProcessed.selector);
+        vm.expectRevert(QuorumAlreadyProcessed.selector);
         gwRouter.addCheckpointSignature(0, membershipProofs[0], weights[0], signature);
 
         // send correct signature for incorrect height
@@ -1652,7 +1576,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
-        uint64 index = gwGetter.getBottomUpRetentionHeight();
+        uint256 index = gwGetter.getCheckpointRetentionHeight();
         require(index == 1, "unexpected height");
 
         BottomUpCheckpoint memory checkpoint;
@@ -1665,15 +1589,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 subnetID: gwGetter.getNetworkName(),
                 blockHeight: i * gwGetter.bottomUpCheckPeriod(),
                 blockHash: keccak256("block"),
-                nextConfigurationNumber: 1,
-                crossMessagesHash: keccak256("messages")
+                nextConfigurationNumber: 1
             });
 
             gwRouter.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
         }
         vm.stopPrank();
 
-        index = gwGetter.getBottomUpRetentionHeight();
+        index = gwGetter.getCheckpointRetentionHeight();
         require(index == 1, "retention height is not 1");
 
         uint256[] memory heights = gwGetter.getIncompleteCheckpointHeights();
@@ -1683,10 +1606,628 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwRouter.pruneBottomUpCheckpoints(4);
         vm.stopPrank();
 
-        index = gwGetter.getBottomUpRetentionHeight();
+        index = gwGetter.getCheckpointRetentionHeight();
         require(index == 4, "height was not updated");
         heights = gwGetter.getIncompleteCheckpointHeights();
         require(heights.length == n, "index is not the same");
+    }
+
+    function testGatewayDiamond_create_bottomUpMsgBatch() public {
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+        BottomUpMsgBatch memory old = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: 0,
+            msgs: newListOfMessages(10)
+        });
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d,
+            msgs: newListOfMessages(10)
+        });
+
+        // failed to create a batch with zero membership weight
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(ZeroMembershipWeight.selector);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, 0);
+        vm.stopPrank();
+
+        // failed create a processed batch
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(QuorumAlreadyProcessed.selector);
+        gwRouter.createBottomUpMsgBatch(old, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        // create a batch that hasn't been fully filled (trigger at the batch period).
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        BottomUpMsgBatch memory recv = gwGetter.bottomUpMsgBatch(gwGetter.bottomUpMsgBatchPeriod());
+        require(recv.msgs.length == 10, "msgs length incorrect");
+
+        // failed to create a batch with the same height
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(BatchAlreadyExists.selector);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        // failed to create a batch with the height not multiple of the batch period
+        vm.roll(2 * d + 1);
+        batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d + d / 2,
+            msgs: newListOfMessages(10)
+        });
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(InvalidBatchEpoch.selector);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        BottomUpMsgBatch memory b = gwGetter.bottomUpMsgBatch(2 * d);
+        require(b.blockHeight == 0, "batch shouldn't exist");
+
+        // failed to create a batch with no messages
+        batch = BottomUpMsgBatch({subnetID: gwGetter.getNetworkName(), blockHeight: 2 * d, msgs: new CrossMsg[](0)});
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(BatchWithNoMessages.selector);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        // failed to create a batch with too many messages
+        batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: 2 * d,
+            msgs: newListOfMessages(gwGetter.maxMsgsPerBottomUpBatch() + 1)
+        });
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.expectRevert(MaxMsgsPerBatchExceeded.selector);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_commitBatch_InvalidCheckpointSource() public {
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: gwGetter.bottomUpMsgBatchPeriod(),
+            msgs: newListOfMessages(10)
+        });
+
+        vm.expectRevert(InvalidBatchSource.selector);
+        gwRouter.execBottomUpMsgBatch(batch);
+    }
+
+    function testGatewayDiamond_commitCheckpoint_Fails_NoMessages() public {
+        address caller = address(saDiamond);
+        vm.startPrank(caller);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
+        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
+        vm.stopPrank();
+
+        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
+
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: subnetId,
+            blockHeight: gwGetter.bottomUpMsgBatchPeriod(),
+            msgs: new CrossMsg[](0)
+        });
+
+        vm.prank(caller);
+        vm.expectRevert(BatchWithNoMessages.selector);
+        gwRouter.execBottomUpMsgBatch(batch);
+    }
+
+    function testGatewayDiamond_listIncompleteMsgBatches() public {
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(2 * d + 1);
+        BottomUpMsgBatch memory batch1 = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d,
+            msgs: newListOfMessages(10)
+        });
+
+        BottomUpMsgBatch memory batch2 = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: 2 * d,
+            msgs: newListOfMessages(10)
+        });
+
+        // create a batch
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpMsgBatch(batch1, membershipRoot, weights[0] + weights[1] + weights[2]);
+        gwRouter.createBottomUpMsgBatch(batch2, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        uint256[] memory heights = gwGetter.getIncompleteMsgBatchHeights();
+
+        require(heights.length == 2, "unexpected heights");
+        require(heights[0] == d, "heights[0] == period");
+        require(heights[1] == 2 * d, "heights[1] == 2*period");
+
+        QuorumInfo memory info = gwGetter.getBottomUpMsgBatchInfo(d);
+        require(info.rootHash == membershipRoot, "info.rootHash == membershipRoot");
+        require(
+            info.threshold == gwGetter.getQuorumThreshold(weights[0] + weights[1] + weights[2]),
+            "batch 1 correct threshold"
+        );
+
+        info = gwGetter.getBottomUpMsgBatchInfo(2 * d);
+        require(info.rootHash == membershipRoot, "info.rootHash == membershipRoot");
+        require(
+            info.threshold == gwGetter.getQuorumThreshold(weights[0] + weights[1] + weights[2]),
+            "batch 2 correct threshold"
+        );
+
+        BottomUpMsgBatch[] memory incomplete = gwGetter.getIncompleteMsgBatches();
+        require(incomplete.length == 2, "incomplete.length == 2");
+        require(incomplete[0].blockHeight == d, "incomplete[0].blockHeight");
+        require(incomplete[1].blockHeight == 2 * d, "incomplete[1].blockHeight");
+    }
+
+    function testGatewayDiamond_addMsgBatchSignature_newMsgBatch() public {
+        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+            .createMerkleProofsForValidators(addrs, weights);
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d,
+            msgs: newListOfMessages(10)
+        });
+
+        // create a batch
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        // adds signatures
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        bytes memory signature;
+
+        for (uint64 i = 0; i < 3; i++) {
+            (v, r, s) = vm.sign(privKeys[i], keccak256(abi.encode(batch)));
+            signature = abi.encodePacked(r, s, v);
+
+            vm.startPrank(vm.addr(privKeys[i]));
+            gwRouter.addBottomUpMsgBatchSignature(batch.blockHeight, membershipProofs[i], weights[i], signature);
+            vm.stopPrank();
+        }
+
+        require(
+            gwGetter.getBottomUpMsgBatchCurrentWeight(batch.blockHeight) == totalWeight(weights),
+            "batch weight was not updated"
+        );
+
+        (
+            BottomUpMsgBatch memory b,
+            QuorumInfo memory info,
+            address[] memory signatories,
+            bytes[] memory signatures
+        ) = gwGetter.getBottomUpMsgBatchSignatureBundle(d);
+        require(info.hash == keccak256(abi.encode(b)), "unexpected batch hash");
+        require(keccak256(abi.encode(batch)) == keccak256(abi.encode(b)), "unexpected batch hash");
+        require(signatories.length == 3, "unexpected signatories length");
+        require(signatures.length == 3, "unexpected signatures length");
+    }
+
+    function testGatewayDiamond_addMsgBatchSignature_quorum() public {
+        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+            .createMerkleProofsForValidators(addrs, weights);
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d,
+            msgs: newListOfMessages(10)
+        });
+
+        // create a batch
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        // adds signatures
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        bytes memory signature;
+
+        for (uint64 i = 0; i < 2; i++) {
+            (v, r, s) = vm.sign(privKeys[i], keccak256(abi.encode(batch)));
+            signature = abi.encodePacked(r, s, v);
+
+            vm.startPrank(vm.addr(privKeys[i]));
+            gwRouter.addBottomUpMsgBatchSignature(batch.blockHeight, membershipProofs[i], weights[i], signature);
+            vm.stopPrank();
+        }
+
+        QuorumInfo memory info = gwGetter.getBottomUpMsgBatchInfo(1);
+        require(!info.reached, "not reached");
+        require(gwGetter.getIncompleteMsgBatchHeights().length == 1, "unexpected size");
+
+        info = gwGetter.getBottomUpMsgBatchInfo(1);
+
+        (v, r, s) = vm.sign(privKeys[2], keccak256(abi.encode(batch)));
+        signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(vm.addr(privKeys[2]));
+        gwRouter.addBottomUpMsgBatchSignature(batch.blockHeight, membershipProofs[2], weights[2], signature);
+        vm.stopPrank();
+
+        info = gwGetter.getBottomUpMsgBatchInfo(batch.blockHeight);
+        require(info.reached, "not reached");
+        require(gwGetter.getIncompleteMsgBatchHeights().length == 0, "unexpected size");
+
+        require(
+            gwGetter.getBottomUpMsgBatchCurrentWeight(batch.blockHeight) == totalWeight(weights),
+            "batch weight was not updated"
+        );
+        (v, r, s) = vm.sign(privKeys[3], keccak256(abi.encode(batch)));
+        signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(vm.addr(privKeys[3]));
+        gwRouter.addBottomUpMsgBatchSignature(batch.blockHeight, membershipProofs[3], weights[3], signature);
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_addMsgBatch_notAuthorized() public {
+        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+            .createMerkleProofsForValidators(addrs, weights);
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d,
+            msgs: newListOfMessages(10)
+        });
+
+        // create a batch
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, 10);
+        vm.stopPrank();
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        bytes memory signature;
+
+        (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(batch)));
+        signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(vm.addr(privKeys[1]));
+        vm.expectRevert(abi.encodeWithSelector(NotAuthorized.selector, vm.addr(privKeys[0])));
+        gwRouter.addBottomUpMsgBatchSignature(d, membershipProofs[2], weights[2], signature);
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_addMsgBatchSignature_invalidSignature_replayedSignature() public {
+        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+            .createMerkleProofsForValidators(addrs, weights);
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d,
+            msgs: newListOfMessages(10)
+        });
+
+        // create a batch
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, 10);
+        vm.stopPrank();
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        bytes memory signature;
+
+        (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(batch)));
+        signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(vm.addr(privKeys[0]));
+
+        // send incorrect signature
+        vm.expectRevert(InvalidSignature.selector);
+        gwRouter.addBottomUpMsgBatchSignature(d, membershipProofs[0], weights[0], new bytes(0));
+
+        // send correct signature
+        gwRouter.addBottomUpMsgBatchSignature(d, membershipProofs[0], weights[0], signature);
+
+        // replay the previous signature
+        vm.expectRevert(SignatureReplay.selector);
+        gwRouter.addBottomUpMsgBatchSignature(d, membershipProofs[0], weights[0], signature);
+
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_addMsgBatchSignature_incorrectbatch() public {
+        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+            .createMerkleProofsForValidators(addrs, weights);
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: gwGetter.getNetworkName(),
+            blockHeight: d,
+            msgs: newListOfMessages(10)
+        });
+
+        // create a batch
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.createBottomUpMsgBatch(batch, membershipRoot, 10);
+        vm.stopPrank();
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        bytes memory signature;
+
+        (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(batch)));
+        signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(vm.addr(privKeys[0]));
+
+        // send correct signature for incorrect height
+        vm.expectRevert(QuorumAlreadyProcessed.selector);
+        gwRouter.addBottomUpMsgBatchSignature(0, membershipProofs[0], weights[0], signature);
+
+        // send correct signature for incorrect height
+        vm.expectRevert(BatchNotCreated.selector);
+        gwRouter.addBottomUpMsgBatchSignature(d + 1, membershipProofs[0], weights[0], signature);
+
+        gwRouter.addBottomUpMsgBatchSignature(d, membershipProofs[0], weights[0], signature);
+
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_garbage_collect_msgBatch() public {
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+
+        uint256 index = gwGetter.getBottomUpMsgRetentionHeight();
+        require(index == 1, "unexpected height");
+
+        BottomUpMsgBatch memory batch;
+
+        // create a batch
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        uint64 n = 10;
+        vm.roll(n * d + n);
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        for (uint64 i = 1; i <= n; i++) {
+            batch = BottomUpMsgBatch({
+                subnetID: gwGetter.getNetworkName(),
+                blockHeight: i * d,
+                msgs: newListOfMessages(10)
+            });
+
+            gwRouter.createBottomUpMsgBatch(batch, membershipRoot, 10);
+        }
+        vm.stopPrank();
+
+        index = gwGetter.getBottomUpMsgRetentionHeight();
+        require(index == 1, "retention height is not 1");
+
+        uint256[] memory heights = gwGetter.getIncompleteMsgBatchHeights();
+        require(heights.length == n, "heights.len is not n");
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gwRouter.pruneBottomUpMsgBatches(4);
+        vm.stopPrank();
+
+        index = gwGetter.getBottomUpMsgRetentionHeight();
+        require(index == 4, "height was not updated");
+        heights = gwGetter.getIncompleteMsgBatchHeights();
+        require(heights.length == n, "index is not the same");
+    }
+
+    function testGatewayDiamond_execMsgBatch_WithMessages() public {
+        address caller = address(saDiamond);
+        address from = address(100);
+        vm.startPrank(caller);
+        vm.deal(caller, 2 * DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
+        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
+        vm.stopPrank();
+
+        uint256 amount = 1;
+
+        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
+        (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
+        require(exist, "subnet does not exist");
+        require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
+
+        gwManager.fund{value: DEFAULT_COLLATERAL_AMOUNT}(subnetId, FvmAddressHelper.from(address(caller)));
+        (, subnetInfo) = gwGetter.getSubnet(subnetId);
+        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
+
+        CrossMsg[] memory msgs = new CrossMsg[](10);
+        for (uint64 i = 0; i < 10; i++) {
+            msgs[i] = CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
+                    to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
+                    value: amount,
+                    nonce: i,
+                    method: METHOD_SEND,
+                    params: EMPTY_BYTES,
+                    fee: DEFAULT_CROSS_MSG_FEE
+                }),
+                wrapped: false
+            });
+        }
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({subnetID: subnetId, blockHeight: d, msgs: msgs});
+
+        vm.prank(caller);
+        gwRouter.execBottomUpMsgBatch(batch);
+
+        (, subnetInfo) = gwGetter.getSubnet(subnetId);
+        require(
+            subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * DEFAULT_CROSS_MSG_FEE - 10 * amount,
+            "unexpected circulation supply"
+        );
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_execMsgBatch_Fails_WrongNumberMessages() public {
+        address caller = address(saDiamond);
+        address from = address(100);
+        vm.startPrank(caller);
+        vm.deal(caller, 2 * DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
+        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
+        vm.stopPrank();
+
+        uint256 amount = 1;
+
+        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
+        (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
+        require(exist, "subnet does not exist");
+        require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
+
+        gwManager.fund{value: DEFAULT_COLLATERAL_AMOUNT}(subnetId, FvmAddressHelper.from(address(caller)));
+        (, subnetInfo) = gwGetter.getSubnet(subnetId);
+        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
+
+        uint64 size = gwGetter.maxMsgsPerBottomUpBatch() + 1;
+        CrossMsg[] memory msgs = new CrossMsg[](size);
+        for (uint64 i = 0; i < size; i++) {
+            msgs[i] = CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
+                    to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
+                    value: amount,
+                    nonce: i,
+                    method: METHOD_SEND,
+                    params: EMPTY_BYTES,
+                    fee: DEFAULT_CROSS_MSG_FEE
+                }),
+                wrapped: false
+            });
+        }
+
+        // fail with exceeded messages
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+        vm.roll(d + 1);
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({subnetID: subnetId, blockHeight: d, msgs: msgs});
+
+        vm.prank(caller);
+        vm.expectRevert(MaxMsgsPerBatchExceeded.selector);
+        gwRouter.execBottomUpMsgBatch(batch);
+
+        // fail with no messages
+        batch = BottomUpMsgBatch({subnetID: subnetId, blockHeight: d, msgs: new CrossMsg[](0)});
+
+        vm.prank(caller);
+        vm.expectRevert(BatchWithNoMessages.selector);
+        gwRouter.execBottomUpMsgBatch(batch);
+        vm.stopPrank();
+    }
+
+    function testGatewayDiamond_PopulateBottomUpMsgBatch_Works() public {
+        uint256 releaseAmount = 10;
+        address from = address(100);
+
+        address[] memory path = new address[](2);
+        path[0] = makeAddr("root");
+        path[1] = makeAddr("subnet_one");
+
+        GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: DEFAULT_CROSS_MSG_FEE,
+            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: 100
+        });
+        gatewayDiamond = createGatewayDiamond(constructorParams);
+        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
+        gwManager = GatewayManagerFacet(address(gatewayDiamond));
+        gwRouter = GatewayRouterFacet(address(gatewayDiamond));
+
+        uint256 d = gwGetter.bottomUpMsgBatchPeriod();
+
+        // a few messags in first batch
+        uint64 numMsgs = 10;
+        vm.roll(1);
+        vm.startPrank(from);
+        vm.deal(from, numMsgs * (releaseAmount + DEFAULT_CROSS_MSG_FEE));
+
+        for (uint64 i = 0; i < numMsgs; i++) {
+            release(releaseAmount);
+        }
+        require(gwGetter.bottomUpMsgBatch(d).msgs.length == numMsgs, "no messages");
+
+        numMsgs = gwGetter.maxMsgsPerBottomUpBatch() + 10;
+        vm.roll(d + 1);
+        vm.startPrank(from);
+        vm.deal(from, numMsgs * (releaseAmount + DEFAULT_CROSS_MSG_FEE));
+
+        for (uint64 i = 0; i < numMsgs; i++) {
+            release(releaseAmount);
+        }
+        // one batch should be overflow in d+1 and the rest of the messages should have been
+        // added to the next batch
+        require(
+            gwGetter.bottomUpMsgBatch(d + 1).msgs.length == gwGetter.maxMsgsPerBottomUpBatch(),
+            "wrong number of messages in full batch"
+        );
+        require(gwGetter.bottomUpMsgBatch(2 * d).msgs.length == 10, "wrong number of messages after full batch");
+    }
+
+    function newListOfMessages(uint64 size) internal view returns (CrossMsg[] memory msgs) {
+        msgs = new CrossMsg[](size);
+        for (uint64 i = 0; i < size; i++) {
+            msgs[i] = CrossMsg({
+                message: StorableMsg({
+                    from: IPCAddress({
+                        subnetId: gwGetter.getNetworkName(),
+                        rawAddress: FvmAddressHelper.from(address(this))
+                    }),
+                    to: IPCAddress({
+                        subnetId: gwGetter.getNetworkName(),
+                        rawAddress: FvmAddressHelper.from(address(this))
+                    }),
+                    value: 0,
+                    nonce: i,
+                    method: this.callback.selector,
+                    params: EMPTY_BYTES,
+                    fee: DEFAULT_CROSS_MSG_FEE
+                }),
+                wrapped: false
+            });
+        }
     }
 
     function callback() public view {}

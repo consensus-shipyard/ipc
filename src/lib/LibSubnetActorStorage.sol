@@ -3,13 +3,13 @@ pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint} from "../structs/Checkpoint.sol";
-import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, Validator} from "../structs/Subnet.sol";
+import {RelayerRewardsInfo, BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
+import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 struct SubnetActorStorage {
     /// @notice contains all committed bottom-up checkpoint at specific epoch
-    mapping(uint64 => BottomUpCheckpoint) committedCheckpoints;
+    mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
     /// @notice initial set of validators joining in genesis
     Validator[] genesisValidators;
     /// @notice initial circulating supply provided by genesis validators to use when bootstrapping
@@ -20,11 +20,17 @@ struct SubnetActorStorage {
     /// @notice genesis balance addresses
     address[] genesisBalanceKeys;
     /// @notice The height of the last committed bottom-up checkpoint.
-    uint64 lastBottomUpCheckpointHeight;
+    uint256 lastBottomUpCheckpointHeight;
+    /// @notice Info of the last executed bottom-up batch.
+    BottomUpMsgBatchInfo lastBottomUpBatch;
+    /// @notice bottom-up message batch period in number of epochs for the subnet
+    uint256 bottomUpMsgBatchPeriod;
+    /// @notice Maximum number of messages per batch
+    uint64 maxMsgsPerBottomUpBatch;
     /// @notice Minimal activation collateral
     uint256 minActivationCollateral;
     /// @notice number of blocks in a bottom-up epoch
-    uint64 bottomUpCheckPeriod;
+    uint256 bottomUpCheckPeriod;
     /// @notice Minimal number of validators required for the subnet to be able to validate new blocks.
     uint64 minValidators;
     // @notice Hash of the current subnet id
@@ -41,6 +47,8 @@ struct SubnetActorStorage {
     ConsensusType consensus;
     /// @notice Determines if the subnet has been bootstrapped (i.e. it has been activated)
     bool bootstrapped;
+    /// @notice Determines if the subnet is permissionless or not
+    PermissionMode permissionMode;
     /// @notice Determines if the subnet has been successfully killed
     bool killed;
     // =========== Staking ===========
@@ -55,9 +63,7 @@ struct SubnetActorStorage {
     /// We allow negative values to also allow 10 FIL = 1 unit of power for power_scale = -1.
     int8 powerScale;
     /// @notice relayers rewards
-    mapping(address => uint256) relayerRewards;
-    /// @notice The addresses of the relayers sent the checkpoint at height `h`.
-    mapping(uint64 => EnumerableSet.AddressSet) rewardedRelayers;
+    RelayerRewardsInfo relayerRewards;
     /// =============
     /// mapping of bootstrap owner to its bootstrap node address
     mapping(address => string) bootstrapNodes;

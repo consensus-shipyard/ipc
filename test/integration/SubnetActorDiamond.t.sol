@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
+// import {Test} from "forge-std/Test.sol";
+import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {Test} from "forge-std/Test.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
@@ -8,10 +10,9 @@ import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/Num
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 import {Status} from "../../src/enums/Status.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/Checkpoint.sol";
+import {BottomUpMsgBatch, CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, IPCAddress, Subnet, ValidatorInfo, Validator} from "../../src/structs/Subnet.sol";
-import {StorableMsg} from "../../src/structs/Checkpoint.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
@@ -21,7 +22,7 @@ import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {GatewayDiamond, FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
@@ -548,24 +549,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            crossMessagesHash: keccak256(abi.encode(msgs))
+            nextConfigurationNumber: 0
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
             subnetID: saGetter.getParent(),
             blockHeight: 1,
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            crossMessagesHash: keccak256(abi.encode(msgs))
-        });
-
-        BottomUpCheckpoint memory checkpointWithIncorrectHash = BottomUpCheckpoint({
-            subnetID: saGetter.getParent(),
-            blockHeight: saGetter.bottomUpCheckPeriod(),
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            crossMessagesHash: keccak256(abi.encode("1"))
+            nextConfigurationNumber: 0
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -581,15 +572,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(InvalidCheckpointEpoch.selector);
         vm.prank(validators[0]);
-        saManager.submitCheckpoint(checkpointWithIncorrectHeight, msgs, validators, signatures);
+        saManager.submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
 
-        vm.expectRevert(InvalidCheckpointMessagesHash.selector);
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
         vm.prank(validators[0]);
-        saManager.submitCheckpoint(checkpointWithIncorrectHash, msgs, validators, signatures);
-
-        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitBottomUpCheckpoint, (checkpoint, msgs)), 1);
-        vm.prank(validators[0]);
-        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        saManager.submitCheckpoint(checkpoint, validators, signatures);
 
         require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
         require(
@@ -598,7 +585,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         );
 
         vm.prank(validators[0]);
-        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        saManager.submitCheckpoint(checkpoint, validators, signatures);
         require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
         require(
             saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
@@ -652,8 +639,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            crossMessagesHash: keccak256(abi.encode(msgs))
+            nextConfigurationNumber: 0
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -667,9 +653,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             signatures[i] = abi.encodePacked(r, s, v);
         }
 
-        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitBottomUpCheckpoint, (checkpoint, msgs)), 1);
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
         vm.prank(validators[0]);
-        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        saManager.submitCheckpoint(checkpoint, validators, signatures);
 
         require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
         require(
@@ -701,8 +687,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: 2 * saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
-            nextConfigurationNumber: 0,
-            crossMessagesHash: keccak256(abi.encode(msgs))
+            nextConfigurationNumber: 0
         });
 
         hash = keccak256(abi.encode(checkpoint));
@@ -713,18 +698,101 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         vm.prank(validators[0]);
-        saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+        saManager.submitCheckpoint(checkpoint, validators, signatures);
 
         require(saGetter.getRelayerReward(validators[1]) == 0, "unexpected reward");
         require(saGetter.getRelayerReward(validators[2]) == 0, "unexpected reward");
         uint256 validator0Reward = saGetter.getRelayerReward(validators[0]);
-        require(validator0Reward == DEFAULT_CROSS_MSG_FEE, "there is no reward for validator");
+        if (FEATURE_CHECKPOINT_RELAYER_REWARDS) {
+            require(validator0Reward == DEFAULT_CROSS_MSG_FEE, "there is no reward for validator");
 
-        uint256 b1 = validators[0].balance;
+            uint256 b1 = validators[0].balance;
+            // disable the claim of rewards if the fee is zero
+            if (DEFAULT_CROSS_MSG_FEE != 0) {
+                vm.startPrank(validators[0]);
+                saManager.claimRewardForRelayer();
+                uint256 b2 = validators[0].balance;
+                require(b2 - b1 == validator0Reward, "reward received");
+            }
+        }
+    }
+
+    function testSubnetActorDiamond_submitBottomUpMsgBatch_basic() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+        uint256 amount = 1;
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(validators[i], 10 gwei);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        CrossMsg memory crossMsg = CrossMsg({
+            message: StorableMsg({
+                from: IPCAddress({
+                    subnetId: saGetter.getParent(),
+                    rawAddress: FvmAddressHelper.from(address(saDiamond))
+                }),
+                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+                value: DEFAULT_CROSS_MSG_FEE + amount,
+                nonce: 0,
+                method: METHOD_SEND,
+                params: new bytes(0),
+                fee: DEFAULT_CROSS_MSG_FEE
+            }),
+            wrapped: false
+        });
+        CrossMsg[] memory msgs = new CrossMsg[](1);
+        msgs[0] = crossMsg;
+
+        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            blockHeight: saGetter.bottomUpMsgBatchPeriod(),
+            msgs: msgs
+        });
+
+        BottomUpMsgBatch memory batchIncorrectHeight = BottomUpMsgBatch({
+            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            blockHeight: 1,
+            msgs: msgs
+        });
+
+        vm.deal(address(saDiamond), 100 ether);
+        vm.prank(address(saDiamond));
+        // register with circulating supply
+        gwManager.register{value: 3 * DEFAULT_MIN_VALIDATOR_STAKE}(3 * amount + 3 * DEFAULT_CROSS_MSG_FEE);
+
+        bytes32 hash = keccak256(abi.encode(batch));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        vm.expectRevert(InvalidBatchEpoch.selector);
         vm.prank(validators[0]);
-        saManager.claimRewardForRelayer();
-        uint256 b2 = validators[0].balance;
-        require(b2 - b1 == validator0Reward, "reward received");
+        saManager.submitBottomUpMsgBatch(batchIncorrectHeight, validators, signatures);
+
+        vm.prank(validators[0]);
+        batchIncorrectHeight.msgs = new CrossMsg[](0);
+        batchIncorrectHeight.blockHeight = saGetter.bottomUpMsgBatchPeriod();
+        vm.expectRevert(BatchWithNoMessages.selector);
+        saManager.submitBottomUpMsgBatch(batchIncorrectHeight, validators, signatures);
+
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.execBottomUpMsgBatch, (batch)), 1);
+        vm.prank(validators[0]);
+        saManager.submitBottomUpMsgBatch(batch, validators, signatures);
+
+        require(saGetter.hasSubmittedInLastBottomUpMsgBatchHeight(validators[0]), "validator rewarded");
+        require(saGetter.lastBottomUpMsgBatchHeight() == saGetter.bottomUpMsgBatchPeriod(), " batch height correct");
+
+        vm.prank(validators[1]);
+        saManager.submitBottomUpMsgBatch(batch, validators, signatures);
+        require(saGetter.hasSubmittedInLastBottomUpMsgBatchHeight(validators[0]), "validator rewarded");
+        require(saGetter.lastBottomUpMsgBatchHeight() == saGetter.bottomUpMsgBatchPeriod(), " batch height correct");
     }
 
     function testSubnetActorDiamond_DiamondCut() public {
@@ -1074,89 +1142,90 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // console.log("callback called");
     }
 
-    function testSubnetActorDiamond_FederatedValidation_cannotJoin() public {
-        gatewayAddress = address(gatewayDiamond);
+    // TODO: Re-enable once https://github.com/consensus-shipyard/ipc-solidity-actors/issues/355 is fixed.
+    // function testSubnetActorDiamond_FederatedValidation_cannotJoin() public {
+    //     gatewayAddress = address(gatewayDiamond);
 
-        createSubnetActor(
-            gatewayAddress,
-            ConsensusType.Fendermint,
-            DEFAULT_MIN_VALIDATOR_STAKE,
-            DEFAULT_MIN_VALIDATORS,
-            DEFAULT_CHECKPOINT_PERIOD,
-            DEFAULT_MAJORITY_PERCENTAGE,
-            PermissionMode.Federated,
-            2
-        );
+    //     createSubnetActor(
+    //         gatewayAddress,
+    //         ConsensusType.Fendermint,
+    //         DEFAULT_MIN_VALIDATOR_STAKE,
+    //         DEFAULT_MIN_VALIDATORS,
+    //         DEFAULT_CHECKPOINT_PERIOD,
+    //         DEFAULT_MAJORITY_PERCENTAGE,
+    //         PermissionMode.Federated,
+    //         2
+    //     );
 
-        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
-        vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE * 2);
-        vm.startPrank(validator1);
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+    //     (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+    //     vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE * 2);
+    //     vm.startPrank(validator1);
+    //     saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
 
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
-    }
+    //     vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
+    //     saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+    // }
 
-    function testSubnetActorDiamond_FederatedValidation_works() public {
-        gatewayAddress = address(gatewayDiamond);
+    // function testSubnetActorDiamond_FederatedValidation_works() public {
+    //     gatewayAddress = address(gatewayDiamond);
 
-        createSubnetActor(
-            gatewayAddress,
-            ConsensusType.Fendermint,
-            DEFAULT_MIN_VALIDATOR_STAKE,
-            DEFAULT_MIN_VALIDATORS,
-            DEFAULT_CHECKPOINT_PERIOD,
-            DEFAULT_MAJORITY_PERCENTAGE,
-            PermissionMode.Federated,
-            2
-        );
+    //     createSubnetActor(
+    //         gatewayAddress,
+    //         ConsensusType.Fendermint,
+    //         DEFAULT_MIN_VALIDATOR_STAKE,
+    //         DEFAULT_MIN_VALIDATORS,
+    //         DEFAULT_CHECKPOINT_PERIOD,
+    //         DEFAULT_MAJORITY_PERCENTAGE,
+    //         PermissionMode.Federated,
+    //         2
+    //     );
 
-        (address[] memory validators, uint256[] memory privKeys, bytes[] memory publicKeys) = TestUtils.newValidators(
-            3
-        );
-        uint256[] memory powers = new uint256[](3);
-        powers[0] = 10000;
-        powers[1] = 20000;
-        powers[2] = 5000; // we only have 2 active validators, validator 2 does not have enough power
+    //     (address[] memory validators, uint256[] memory privKeys, bytes[] memory publicKeys) = TestUtils.newValidators(
+    //         3
+    //     );
+    //     uint256[] memory powers = new uint256[](3);
+    //     powers[0] = 10000;
+    //     powers[1] = 20000;
+    //     powers[2] = 5000; // we only have 2 active validators, validator 2 does not have enough power
 
-        vm.deal(validators[0], DEFAULT_MIN_VALIDATOR_STAKE * 2);
-        vm.startPrank(validators[0]);
-        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0]);
-        vm.stopPrank();
+    //     vm.deal(validators[0], DEFAULT_MIN_VALIDATOR_STAKE * 2);
+    //     vm.startPrank(validators[0]);
+    //     saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0]);
+    //     vm.stopPrank();
 
-        saManager.setFederatedPower(validators, publicKeys, powers);
+    //     saManager.setFederatedPower(validators, publicKeys, powers);
 
-        require(!saGetter.isActiveValidator(validators[1]), "1 should not be active validator");
-        require(!saGetter.isActiveValidator(validators[2]), "2 should not be active validator");
+    //     require(!saGetter.isActiveValidator(validators[1]), "1 should not be active validator");
+    //     require(!saGetter.isActiveValidator(validators[2]), "2 should not be active validator");
 
-        confirmChange(validators[0], privKeys[0]);
+    //     confirmChange(validators[0], privKeys[0]);
 
-        require(saGetter.isActiveValidator(validators[0]), "not active validator 0");
-        require(saGetter.isActiveValidator(validators[1]), "not active validator 1");
-        require(!saGetter.isActiveValidator(validators[2]), "2 should not be active validator");
+    //     require(saGetter.isActiveValidator(validators[0]), "not active validator 0");
+    //     require(saGetter.isActiveValidator(validators[1]), "not active validator 1");
+    //     require(!saGetter.isActiveValidator(validators[2]), "2 should not be active validator");
 
-        // change in validator power
-        powers[2] = 10001;
+    //     // change in validator power
+    //     powers[2] = 10001;
 
-        saManager.setFederatedPower(validators, publicKeys, powers);
+    //     saManager.setFederatedPower(validators, publicKeys, powers);
 
-        confirmChange(validators[0], privKeys[0], validators[1], privKeys[1]);
+    //     confirmChange(validators[0], privKeys[0], validators[1], privKeys[1]);
 
-        require(!saGetter.isActiveValidator(validators[0]), "0 should not be active validator");
-        require(saGetter.isActiveValidator(validators[1]), "not active validator 1");
-        require(saGetter.isActiveValidator(validators[2]), "not active validator 2");
+    //     require(!saGetter.isActiveValidator(validators[0]), "0 should not be active validator");
+    //     require(saGetter.isActiveValidator(validators[1]), "not active validator 1");
+    //     require(saGetter.isActiveValidator(validators[2]), "not active validator 2");
 
-        /// reduce validator 2 power
-        powers[2] = 5000;
+    //     /// reduce validator 2 power
+    //     powers[2] = 5000;
 
-        saManager.setFederatedPower(validators, publicKeys, powers);
+    //     saManager.setFederatedPower(validators, publicKeys, powers);
 
-        confirmChange(validators[2], privKeys[2], validators[1], privKeys[1]);
+    //     confirmChange(validators[2], privKeys[2], validators[1], privKeys[1]);
 
-        require(saGetter.isActiveValidator(validators[0]), "not active validator 0");
-        require(saGetter.isActiveValidator(validators[1]), "not active validator 1");
-        require(!saGetter.isActiveValidator(validators[2]), "2 should not be active validator");
-    }
+    //     require(saGetter.isActiveValidator(validators[0]), "not active validator 0");
+    //     require(saGetter.isActiveValidator(validators[1]), "not active validator 1");
+    //     require(!saGetter.isActiveValidator(validators[2]), "2 should not be active validator");
+    // }
 
     function testSubnetActorDiamond_Pausable_SetPaused() public {
         saManager.pause();

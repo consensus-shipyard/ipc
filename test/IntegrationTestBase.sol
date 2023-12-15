@@ -14,8 +14,8 @@ import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
 import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
-import {CheckpointInfo} from "../src/structs/Checkpoint.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/Checkpoint.sol";
+import {QuorumInfo} from "../src/structs/Quorum.sol";
+import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, PermissionMode, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
@@ -605,18 +605,15 @@ contract IntegrationTestBase is Test {
 
         bytes[] memory signatures = new bytes[](n);
 
-        CrossMsg[] memory msgs = new CrossMsg[](0);
-
         (uint64 nextConfigNum, ) = saGetter.getConfigurationNumbers();
 
-        uint64 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
+        uint256 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
-            nextConfigurationNumber: nextConfigNum - 1,
-            crossMessagesHash: keccak256(abi.encode(msgs))
+            nextConfigurationNumber: nextConfigNum - 1
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -630,7 +627,7 @@ contract IntegrationTestBase is Test {
 
         for (uint256 i = 0; i < n; i++) {
             vm.prank(validators[i]);
-            saManager.submitCheckpoint(checkpoint, msgs, validators, signatures);
+            saManager.submitCheckpoint(checkpoint, validators, signatures);
         }
     }
 

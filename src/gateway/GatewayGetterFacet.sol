@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {CrossMsg, BottomUpCheckpoint, BottomUpMsgBatch, StorableMsg, ParentFinality} from "../structs/CrossNet.sol";
+import {QuorumInfo} from "../structs/Quorum.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
+import {LibQuorum} from "../lib/LibQuorum.sol";
 import {GatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
@@ -33,7 +35,15 @@ contract GatewayGetterFacet {
         return s.minStake;
     }
 
-    function bottomUpCheckPeriod() external view returns (uint64) {
+    function maxMsgsPerBottomUpBatch() external view returns (uint64) {
+        return s.maxMsgsPerBottomUpBatch;
+    }
+
+    function bottomUpMsgBatchPeriod() external view returns (uint256) {
+        return s.bottomUpMsgBatchPeriod;
+    }
+
+    function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
     }
 
@@ -41,12 +51,12 @@ contract GatewayGetterFacet {
         return s.networkName;
     }
 
-    function bottomUpCheckpoint(uint64 e) external view returns (BottomUpCheckpoint memory) {
+    function bottomUpCheckpoint(uint256 e) external view returns (BottomUpCheckpoint memory) {
         return s.bottomUpCheckpoints[e];
     }
 
-    function bottomUpMessages(uint64 e) external view returns (CrossMsg[] memory) {
-        return s.bottomUpMessages[e];
+    function bottomUpMsgBatch(uint256 e) external view returns (BottomUpMsgBatch memory) {
+        return s.bottomUpMsgBatches[e];
     }
 
     function getParentFinality(uint256 blockNumber) external view returns (ParentFinality memory) {
@@ -136,23 +146,32 @@ contract GatewayGetterFacet {
     }
 
     /// @notice get the checkpoint information corresponding to the block height
-    function getCheckpointInfo(uint64 h) external view returns (CheckpointInfo memory) {
-        return s.bottomUpCheckpointInfo[h];
+    function getCheckpointInfo(uint256 h) external view returns (QuorumInfo memory) {
+        return s.checkpointQuorumMap.quorumInfo[h];
+    }
+
+    function getBottomUpMsgBatchInfo(uint256 h) external view returns (QuorumInfo memory) {
+        return s.bottomUpMsgBatchQuorumMap.quorumInfo[h];
     }
 
     /// @notice get the checkpoint current weight corresponding to the block height
-    function getCheckpointCurrentWeight(uint64 h) external view returns (uint256) {
-        return s.bottomUpCheckpointInfo[h].currentWeight;
+    function getCheckpointCurrentWeight(uint256 h) external view returns (uint256) {
+        return s.checkpointQuorumMap.quorumInfo[h].currentWeight;
+    }
+
+    /// @notice get the batch current weight corresponding to the block height
+    function getBottomUpMsgBatchCurrentWeight(uint256 h) external view returns (uint256) {
+        return s.bottomUpMsgBatchQuorumMap.quorumInfo[h].currentWeight;
     }
 
     /// @notice get the incomplete checkpoint heights
     function getIncompleteCheckpointHeights() external view returns (uint256[] memory) {
-        return s.incompleteCheckpoints.values();
+        return s.checkpointQuorumMap.incompleteQuorums.values();
     }
 
     /// @notice get the incomplete checkpoints
     function getIncompleteCheckpoints() external view returns (BottomUpCheckpoint[] memory) {
-        uint256[] memory heights = s.incompleteCheckpoints.values();
+        uint256[] memory heights = s.checkpointQuorumMap.incompleteQuorums.values();
         uint256 size = heights.length;
 
         BottomUpCheckpoint[] memory checkpoints = new BottomUpCheckpoint[](size);
@@ -165,45 +184,78 @@ contract GatewayGetterFacet {
         return checkpoints;
     }
 
+    /// @notice get the incomplete batches of messages
+    function getIncompleteMsgBatches() external view returns (BottomUpMsgBatch[] memory) {
+        uint256[] memory heights = s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
+        uint256 size = heights.length;
+
+        BottomUpMsgBatch[] memory batches = new BottomUpMsgBatch[](size);
+        for (uint64 i; i < size; ) {
+            batches[i] = s.bottomUpMsgBatches[uint64(heights[i])];
+            unchecked {
+                ++i;
+            }
+        }
+        return batches;
+    }
+
+    /// @notice get the incomplete msd batches heights
+    function getIncompleteMsgBatchHeights() external view returns (uint256[] memory) {
+        return s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
+    }
+
     /// @notice get the bottom-up checkpoint retention index
-    function getBottomUpRetentionHeight() external view returns (uint64) {
-        return s.bottomUpCheckpointRetentionHeight;
+    function getCheckpointRetentionHeight() external view returns (uint256) {
+        return s.checkpointQuorumMap.retentionHeight;
+    }
+
+    /// @notice get the bottom-up batch retention index
+    function getBottomUpMsgRetentionHeight() external view returns (uint256) {
+        return s.bottomUpMsgBatchQuorumMap.retentionHeight;
     }
 
     /// @notice Calculate the threshold required for quorum in this subnet
     /// based on the configured majority percentage and the total weight of the validators.
     function getQuorumThreshold(uint256 totalWeight) external view returns (uint256) {
-        return LibGateway.weightNeeded(totalWeight, s.majorityPercentage);
+        return LibQuorum.weightNeeded(totalWeight, s.majorityPercentage);
     }
 
     /// @notice get the checkpoint signature bundle consisting of the checkpoint, its info, signatories and the corresponding signatures.
-    function getSignatureBundle(
-        uint64 h
+    function getCheckpointSignatureBundle(
+        uint256 h
     )
         external
         view
         returns (
             BottomUpCheckpoint memory ch,
-            CheckpointInfo memory info,
+            QuorumInfo memory info,
             address[] memory signatories,
             bytes[] memory signatures
         )
     {
         ch = s.bottomUpCheckpoints[h];
-        info = s.bottomUpCheckpointInfo[h];
-        signatories = s.bottomUpSignatureSenders[h].values();
-        uint256 n = signatories.length;
-
-        signatures = new bytes[](n);
-
-        for (uint256 i; i < n; ) {
-            signatures[i] = s.bottomUpSignatures[h][signatories[i]];
-            unchecked {
-                ++i;
-            }
-        }
+        (info, signatories, signatures) = LibQuorum.getSignatureBundle(s.checkpointQuorumMap, h);
 
         return (ch, info, signatories, signatures);
+    }
+
+    /// @notice get the bottom-up msg batch signature bundle
+    function getBottomUpMsgBatchSignatureBundle(
+        uint256 h
+    )
+        external
+        view
+        returns (
+            BottomUpMsgBatch memory batch,
+            QuorumInfo memory info,
+            address[] memory signatories,
+            bytes[] memory signatures
+        )
+    {
+        batch = s.bottomUpMsgBatches[h];
+        (info, signatories, signatures) = LibQuorum.getSignatureBundle(s.bottomUpMsgBatchQuorumMap, h);
+
+        return (batch, info, signatories, signatures);
     }
 
     /// @notice returns the current bottom-up checkpoint
@@ -213,7 +265,7 @@ contract GatewayGetterFacet {
     function getCurrentBottomUpCheckpoint()
         external
         view
-        returns (bool exists, uint64 epoch, BottomUpCheckpoint memory checkpoint)
+        returns (bool exists, uint256 epoch, BottomUpCheckpoint memory checkpoint)
     {
         (exists, epoch, checkpoint) = LibGateway.getCurrentBottomUpCheckpoint();
         return (exists, epoch, checkpoint);

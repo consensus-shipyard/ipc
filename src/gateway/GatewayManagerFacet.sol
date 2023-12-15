@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
-import {CrossMsg} from "../structs/Checkpoint.sol";
+import {CrossMsg} from "../structs/CrossNet.sol";
 import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";

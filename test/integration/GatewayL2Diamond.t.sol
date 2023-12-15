@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
-import {CrossMsg, StorableMsg} from "../../src/structs/Checkpoint.sol";
+import {CrossMsg, StorableMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";

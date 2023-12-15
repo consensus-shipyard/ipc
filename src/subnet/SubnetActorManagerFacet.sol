@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidCheckpointMessagesHash, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
-import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
+import {QuorumObjKind} from "../structs/Quorum.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo, CrossMsg} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet, PermissionMode} from "../structs/Subnet.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
@@ -12,7 +13,6 @@ import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
-import {LibDiamond} from "../lib/LibDiamond.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
@@ -27,8 +27,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     using Address for address payable;
 
     event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
-    event BottomUpCheckpointExecuted(uint64 epoch, address submitter);
-    event NextBottomUpCheckpointExecuted(uint64 epoch, address submitter);
+    event BottomUpCheckpointExecuted(uint256 epoch, address submitter);
+    event NextBottomUpCheckpointExecuted(uint256 epoch, address submitter);
     event SubnetBootstrapped(Validator[]);
 
     function enforceFederatedValidation() internal view {
@@ -57,17 +57,15 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         _unpause();
     }
 
-    /** @notice submit a checkpoint for execution.
-     *  @dev It triggers the commitment of the checkpoint and the execution of related cross-net messages,
-     *       and any other side-effects that need to be triggered by the checkpoint such as relayer reward book keeping.
+    /** @notice submit a checkpoint commitment.
+     *  @dev It triggers the commitment of the checkpoint and any other side-effects that
+     *  need to be triggered by the checkpoint such as relayer reward book keeping.
      * @param checkpoint The executed bottom-up checkpoint
-     * @param messages The list of executed cross-messages
      * @param signatories The addresses of the signatories
      * @param signatures The collected checkpoint signatures
      */
     function submitCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
-        CrossMsg[] calldata messages,
         address[] calldata signatories,
         bytes[] calldata signatures
     ) external whenNotPaused {
@@ -78,9 +76,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
             checkpoint.blockHeight != s.lastBottomUpCheckpointHeight
         ) {
             revert InvalidCheckpointEpoch();
-        }
-        if (keccak256(abi.encode(messages)) != checkpoint.crossMessagesHash) {
-            revert InvalidCheckpointMessagesHash();
         }
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
 
@@ -93,12 +88,12 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
             s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
 
             // slither-disable-next-line unused-return
-            s.rewardedRelayers[checkpoint.blockHeight].add(msg.sender);
+            s.relayerRewards.checkpointRewarded[checkpoint.blockHeight].add(msg.sender);
 
             s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
-            // Execute messages.
-            IGateway(s.ipcGatewayAddr).commitBottomUpCheckpoint(checkpoint, messages);
+            // Commit in gateway to distribute rewards
+            IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
             // confirming the changes in membership in the child
             LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
@@ -113,8 +108,60 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
             bytes32 lastCheckpointHash = keccak256(abi.encode(s.committedCheckpoints[checkpoint.blockHeight]));
             if (checkpointHash == lastCheckpointHash) {
                 // slither-disable-next-line unused-return
-                s.rewardedRelayers[checkpoint.blockHeight].add(msg.sender);
+                s.relayerRewards.checkpointRewarded[checkpoint.blockHeight].add(msg.sender);
             }
+        }
+    }
+
+    /** @notice submit a bottom-up message batch for execution.
+     *  @dev It triggers the execution of a cross-net message batch
+     * @param batch The executed bottom-up checkpoint
+     * @param signatories The addresses of the signatories
+     * @param signatures The collected checkpoint signatures
+     */
+    function submitBottomUpMsgBatch(
+        BottomUpMsgBatch calldata batch,
+        address[] calldata signatories,
+        bytes[] calldata signatures
+    ) external {
+        // forbid the submission of batches from the past
+        if (batch.blockHeight < s.lastBottomUpBatch.blockHeight) {
+            revert InvalidBatchEpoch();
+        }
+        if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
+            revert MaxMsgsPerBatchExceeded();
+        }
+        // if the batch height is not max, we only supoprt batch submission in period epochs
+        if (batch.msgs.length != s.maxMsgsPerBottomUpBatch && batch.blockHeight % s.bottomUpMsgBatchPeriod != 0) {
+            revert InvalidBatchEpoch();
+        }
+        if (batch.msgs.length == 0) {
+            revert BatchWithNoMessages();
+        }
+
+        bytes32 batchHash = keccak256(abi.encode(batch));
+
+        if (batch.blockHeight == s.lastBottomUpBatch.blockHeight) {
+            // If the batch info is equal to the last batch info, then this is a repeated submission.
+            // We should store the relayer, but not to execute batch again following the same reward logic
+            // used for checkpoints.
+            if (batchHash == s.lastBottomUpBatch.hash) {
+                // slither-disable-next-line unused-return
+                s.relayerRewards.batchRewarded[batch.blockHeight].add(msg.sender);
+            }
+        } else {
+            // validate signatures and quorum threshold, revert if validation fails
+            validateActiveQuorumSignatures({signatories: signatories, hash: batchHash, signatures: signatures});
+
+            // If the checkpoint height is the next expected height then this is a new batch,
+            // and should be forwarded to the gateway for execution.
+            s.lastBottomUpBatch = BottomUpMsgBatchInfo({blockHeight: batch.blockHeight, hash: batchHash});
+
+            // slither-disable-next-line unused-return
+            s.relayerRewards.batchRewarded[batch.blockHeight].add(msg.sender);
+
+            // Execute messages.
+            IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(batch);
         }
     }
 
@@ -251,10 +298,9 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
 
     /// @notice method that allows a validator to increase its stake
     function stake() external payable whenNotPaused notKilled {
-        // disbling validator changes for permissioned subnets (at least for now
+        // disbling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
         enforceCollateralValidation();
-
         if (msg.value == 0) {
             revert CollateralIsZero();
         }
@@ -274,7 +320,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     /// @notice method that allows a validator to unstake a part of its collateral from a subnet
     /// @dev `leave` must be used to unstake the entire stake.
     function unstake(uint256 amount) external whenNotPaused notKilled {
-        // disbling validator changes for permissioned subnets (at least for now
+        // disbling validator changes for federated validation subnets (at least for now
         // until a more complex mechanism is implemented).
         enforceCollateralValidation();
 
@@ -302,7 +348,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     /// @dev it also return the validators initial balance if the
     /// subnet was not yet bootstrapped.
     function leave() external nonReentrant whenNotPaused notKilled {
-        // disbling validator changes for permissioned subnets (at least for now
+        // disbling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
         // This means that initial validators won't be able to recover
         // their collateral ever (worth noting in the docs if this ends
@@ -371,34 +417,56 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         s.bootstrapOwners.add(msg.sender);
     }
 
-    /// @notice reward the relayers for of the previous checkpoint after processing the one at height `height`.
+    /// @notice reward the relayers for the previous checkpoint after processing the one at height `height`.
     /// @dev The reward includes the fixed relayer reward and accumulated cross-message fees received from the gateway.
     /// @param height height of the checkpoint the relayers are rewarded for
-    /// @param reward The sum of cross-message fees in the checkpoint
-    function distributeRewardToRelayers(uint64 height, uint256 reward) external payable whenNotPaused onlyGateway {
+    /// @param reward The sum of the reward
+    function distributeRewardToRelayers(
+        uint256 height,
+        uint256 reward,
+        QuorumObjKind kind
+    ) external payable whenNotPaused onlyGateway {
         if (reward == 0) {
             return;
         }
-        uint64 previousHeight = height - s.bottomUpCheckPeriod;
-        address[] memory relayers = s.rewardedRelayers[previousHeight].values();
+
+        // get rewarded addresses
+        address[] memory relayers = new address[](0);
+        if (kind == QuorumObjKind.Checkpoint) {
+            relayers = checkpointRewardedAddrs(height);
+        } else if (kind == QuorumObjKind.BottomUpMsgBatch) {
+            // FIXME: The distribution of rewards for batches can't be done
+            // as for checkpoints (due to how they are submitted). As
+            // we are running out of time, we'll defer this for the future.
+            revert MethodNotAllowed("rewards not defined for batches");
+        } else {
+            revert MethodNotAllowed("rewards not defined for object kind");
+        }
+
+        // comupte reward
+        // we are not distributing equally, this logic should be decoupled
+        // into different reward policies.
         uint256 relayersLength = relayers.length;
         if (relayersLength == 0) {
             return;
         }
         if (reward < relayersLength) {
-            // Reverting here would mean a single message with 1 atto reward
-            // relayed by 2 validators would mean the checkpoint cannot be
-            // submitted.
             return;
         }
         uint256 relayerReward = reward / relayersLength;
 
+        // distribute reward
         for (uint256 i; i < relayersLength; ) {
-            s.relayerRewards[relayers[i]] += relayerReward;
+            s.relayerRewards.rewards[relayers[i]] += relayerReward;
             unchecked {
                 ++i;
             }
         }
+    }
+
+    function checkpointRewardedAddrs(uint256 height) internal view returns (address[] memory relayers) {
+        uint256 previousHeight = height - s.bottomUpCheckPeriod;
+        relayers = s.relayerRewards.checkpointRewarded[previousHeight].values();
     }
 
     /**

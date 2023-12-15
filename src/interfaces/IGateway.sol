@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, CrossMsg, ParentFinality} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, CrossMsg, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
@@ -25,14 +25,10 @@ interface IGateway {
     /// hierarchy.
     function kill() external;
 
-    /// @notice commitBottomUpCheckpoint propagates the commitment of a checkpoint from a child subnet and
-    /// processes the cross-messages directed to the subnets.
-    function commitBottomUpCheckpoint(
-        BottomUpCheckpoint calldata bottomUpCheckpoint,
-        CrossMsg[] calldata messages
-    ) external;
+    /// @notice commitCheckpoint propagates the commitment of a checkpoint from a child
+    function commitCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint) external;
 
-    /// Fund injects new funds from an account of the parent chain to a subnet.
+    /// @notice Fund injects new funds from an account of the parent chain to a subnet.
     ///
     /// This functions receives a transaction with the FILs that want to be injected in the subnet.
     /// - Funds injected are frozen.
@@ -72,4 +68,8 @@ interface IGateway {
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external;
+
+    /// @notice execBottomUpMsgBatch submits a batch of cross-net messages
+    /// from a subnet actor for their execution.
+    function execBottomUpMsgBatch(BottomUpMsgBatch calldata batch) external;
 }

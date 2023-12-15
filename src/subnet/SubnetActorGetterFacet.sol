@@ -2,9 +2,9 @@
 pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
-import {BottomUpCheckpoint, CrossMsg} from "../structs/Checkpoint.sol";
+import {BottomUpCheckpoint, CrossMsg} from "../structs/CrossNet.sol";
 import {SubnetID} from "../structs/Subnet.sol";
-import {SubnetID, ValidatorInfo, Validator} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
@@ -22,6 +22,10 @@ contract SubnetActorGetterFacet {
     /// @notice get the parent subnet id
     function getParent() external view returns (SubnetID memory) {
         return s.parentId;
+    }
+
+    function permissionMode() external view returns (PermissionMode) {
+        return s.permissionMode;
     }
 
     function ipcGatewayAddr() external view returns (address) {
@@ -69,12 +73,20 @@ contract SubnetActorGetterFacet {
         return (addresses, balances);
     }
 
-    function bottomUpCheckPeriod() external view returns (uint64) {
+    function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
     }
 
-    function lastBottomUpCheckpointHeight() external view returns (uint64) {
+    function bottomUpMsgBatchPeriod() external view returns (uint256) {
+        return s.bottomUpMsgBatchPeriod;
+    }
+
+    function lastBottomUpCheckpointHeight() external view returns (uint256) {
         return s.lastBottomUpCheckpointHeight;
+    }
+
+    function lastBottomUpMsgBatchHeight() external view returns (uint256) {
+        return s.lastBottomUpBatch.blockHeight;
     }
 
     function consensus() external view returns (ConsensusType) {
@@ -134,9 +146,14 @@ contract SubnetActorGetterFacet {
         return LibStaking.isWaitingValidator(validator);
     }
 
+    function hasSubmittedInLastBottomUpMsgBatchHeight(address validator) external view returns (bool) {
+        uint256 height = s.lastBottomUpBatch.blockHeight;
+        return s.relayerRewards.batchRewarded[height].contains(validator);
+    }
+
     function hasSubmittedInLastBottomUpCheckpointHeight(address validator) external view returns (bool) {
-        uint64 height = s.lastBottomUpCheckpointHeight;
-        return s.rewardedRelayers[height].contains(validator);
+        uint256 height = s.lastBottomUpCheckpointHeight;
+        return s.relayerRewards.checkpointRewarded[height].contains(validator);
     }
 
     /// @notice returns the committed bottom-up checkpoint at specific epoch
@@ -144,7 +161,7 @@ contract SubnetActorGetterFacet {
     /// @return exists - whether the checkpoint exists
     /// @return checkpoint - the checkpoint struct
     function bottomUpCheckpointAtEpoch(
-        uint64 epoch
+        uint256 epoch
     ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
         checkpoint = s.committedCheckpoints[epoch];
         exists = !checkpoint.subnetID.isEmpty();
@@ -155,7 +172,7 @@ contract SubnetActorGetterFacet {
     /// @param epoch - the epoch to check
     /// @return exists - whether the checkpoint exists
     /// @return hash - the hash of the checkpoint
-    function bottomUpCheckpointHashAtEpoch(uint64 epoch) external view returns (bool, bytes32) {
+    function bottomUpCheckpointHashAtEpoch(uint256 epoch) external view returns (bool, bytes32) {
         (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
         return (exists, keccak256(abi.encode(checkpoint)));
     }
@@ -191,6 +208,6 @@ contract SubnetActorGetterFacet {
     /// @notice Returns the current reward for the relayer
     /// @param relayer - relayer address
     function getRelayerReward(address relayer) external view returns (uint256) {
-        return s.relayerRewards[relayer];
+        return s.relayerRewards.rewards[relayer];
     }
 }

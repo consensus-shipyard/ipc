@@ -12,19 +12,22 @@ import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
+import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
 bool constant FEATURE_MULTILEVEL_CROSSMSG = false;
 bool constant FEATURE_GENERAL_PUPRPOSE_CROSSMSG = false;
 uint8 constant FEATURE_SUBNET_DEPTH = 2;
+bool constant FEATURE_CHECKPOINT_RELAYER_REWARDS = false;
+bool constant FEATURE_CROSSMSG_RELAYER_REWARDS = false;
 
 contract GatewayDiamond {
     GatewayActorStorage internal s;
 
     struct ConstructorParams {
         SubnetID networkName;
-        uint64 bottomUpCheckPeriod;
+        uint256 bottomUpCheckPeriod;
         uint256 minCollateral;
         // deprecated (for now): no `msgFee` currenlty charged for cross-net messages
         uint256 msgFee;
@@ -59,13 +62,22 @@ contract GatewayDiamond {
         s.maxTreeDepth = FEATURE_SUBNET_DEPTH;
         s.generalPurposeCrossMsg = FEATURE_GENERAL_PUPRPOSE_CROSSMSG;
         s.multiLevelCrossMsg = FEATURE_MULTILEVEL_CROSSMSG;
+        s.checkpointRelayerRewards = FEATURE_CHECKPOINT_RELAYER_REWARDS;
+        s.crossMsgRelayerRewards = FEATURE_CROSSMSG_RELAYER_REWARDS;
 
         s.networkName = params.networkName;
         s.minStake = params.minCollateral;
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.minCrossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
-        s.bottomUpCheckpointRetentionHeight = 1;
+        s.checkpointQuorumMap.retentionHeight = 1;
+        s.bottomUpMsgBatchQuorumMap.retentionHeight = 1;
+
+        // BottomUpMsgBatch config parameters.
+        // NOTE: Let's fix them for now, but we could make them configurable
+        // through the gateway constructor in the future.
+        s.bottomUpMsgBatchPeriod = BATCH_PERIOD;
+        s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership

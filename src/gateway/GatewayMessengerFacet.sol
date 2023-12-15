@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
-import {CrossMsg, StorableMsg} from "../structs/Checkpoint.sol";
+import {CrossMsg, StorableMsg} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {InvalidCrossMsgFromSubnet, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
@@ -13,7 +13,7 @@ import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
-string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
+string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
 
 contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;

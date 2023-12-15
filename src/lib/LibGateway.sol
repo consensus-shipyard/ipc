@@ -3,7 +3,8 @@ pragma solidity 0.8.19;
 
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {CrossMsg, BottomUpCheckpoint, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {CrossMsg, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {QuorumInfo} from "../structs/Quorum.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -16,6 +17,8 @@ library LibGateway {
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `CrossMsg.message.to` should be forwarded to.
     event NewTopDownMessage(address indexed subnet, CrossMsg message);
+    /// @dev event emitted when there is a new bottom-up message batch to be signed.
+    event NewBottomUpMsgBatch(uint256 indexed epoch, BottomUpMsgBatch batch);
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -24,7 +27,7 @@ library LibGateway {
     function getCurrentBottomUpCheckpoint()
         internal
         view
-        returns (bool exists, uint64 epoch, BottomUpCheckpoint memory checkpoint)
+        returns (bool exists, uint256 epoch, BottomUpCheckpoint memory checkpoint)
     {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         epoch = LibGateway.getNextEpoch(block.number, s.bottomUpCheckPeriod);
@@ -32,37 +35,73 @@ library LibGateway {
         exists = !checkpoint.subnetID.isEmpty();
     }
 
-    /// @notice returns the bottom-up checkpoint and its info at the target epoch
-    function getBottomUpCheckpointWithInfo(
-        uint64 epoch
+    /// @notice returns the bottom-up checkpoint
+    function getBottomUpCheckpoint(
+        uint256 epoch
     )
         internal
         view
-        returns (bool exists, BottomUpCheckpoint storage checkpoint, CheckpointInfo storage checkpointInfo)
+        returns (bool exists, BottomUpCheckpoint storage checkpoint)
     {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         checkpoint = s.bottomUpCheckpoints[epoch];
-        checkpointInfo = s.bottomUpCheckpointInfo[epoch];
-
         exists = checkpoint.blockHeight != 0;
     }
 
+    /// @notice returns the bottom-up batch
+    function getBottomUpMsgBatch(
+        uint256 epoch
+    )
+        internal
+        view
+        returns (bool exists, BottomUpMsgBatch storage batch)
+    {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        batch = s.bottomUpMsgBatches[epoch];
+        exists = batch.blockHeight != 0;
+    }
+
     /// @notice checks if the bottom-up checkpoint already exists at the target epoch
-    function bottomUpCheckpointExists(uint64 epoch) internal view returns (bool) {
+    function bottomUpCheckpointExists(uint256 epoch) internal view returns (bool) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         return s.bottomUpCheckpoints[epoch].blockHeight != 0;
     }
 
-    /// @notice stores checkpoint and its info to storage.
-    function storeBottomUpCheckpointWithInfo(
-        BottomUpCheckpoint memory checkpoint,
-        CheckpointInfo memory checkpointInfo
+    /// @notice checks if the bottom-up checkpoint already exists at the target epoch
+    function bottomUpBatchMsgsExists(uint256 epoch) internal view returns (bool) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        return s.bottomUpMsgBatches[epoch].blockHeight != 0;
+    }
+
+    /// @notice stores checkpoint
+    function storeBottomUpCheckpoint(
+        BottomUpCheckpoint memory checkpoint
     ) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-
         s.bottomUpCheckpoints[checkpoint.blockHeight] = checkpoint;
-        s.bottomUpCheckpointInfo[checkpoint.blockHeight] = checkpointInfo;
+    }
+
+    /// @notice stores bottom-up batch
+    function storeBottomUpMsgBatch(
+        BottomUpMsgBatch memory batch
+    ) internal {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        BottomUpMsgBatch storage b = s.bottomUpMsgBatches[batch.blockHeight];
+        b.subnetID = batch.subnetID;
+        b.blockHeight = batch.blockHeight;
+
+        uint256 msgLength = batch.msgs.length;
+        for (uint256 i; i < msgLength;) {
+            // We need to push because initializing an array with a static
+            // length will cause a copy from memory to storage, making
+            // the compiler unhappy.
+            b.msgs.push(batch.msgs[i]);
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /// @notice obtain the ipc parent finality at certain block number
@@ -198,16 +237,56 @@ library LibGateway {
         emit NewTopDownMessage({subnet: subnetId.getAddress(), message: crossMessage});
     }
 
-    /// @notice commit bottom-up messages for their execution in the subnet. Adds the message to the checkpoint for future execution
+    /// @notice Commits a new cross-net message to a message batch for execution
     /// @param crossMessage - the cross message to be committed
     function commitBottomUpMsg(CrossMsg memory crossMessage) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        uint64 epoch = getNextEpoch(block.number, s.bottomUpCheckPeriod);
+        uint256 epoch = getNextEpoch(block.number, s.bottomUpMsgBatchPeriod);
 
+        // assign nonce to the message.
         crossMessage.message.nonce = s.bottomUpNonce;
-
-        s.bottomUpMessages[epoch].push(crossMessage);
         s.bottomUpNonce += 1;
+
+        // populate the batch for that epoch
+        (bool exists, BottomUpMsgBatch storage batch) = LibGateway.getBottomUpMsgBatch(epoch);
+        if (!exists) {
+            batch.subnetID = s.networkName;
+            batch.blockHeight = epoch;
+            // we need to use push here to initialize the array.
+            batch.msgs.push(crossMessage);
+        } else {
+            // if the maximum size was already achieved emit already the event
+            // and re-assign the batch to the current epoch.
+            if (batch.msgs.length == s.maxMsgsPerBottomUpBatch){
+                // copy the batch with max messages into the new cut.
+                uint256 epochCut = block.number;
+                BottomUpMsgBatch memory newBatch = BottomUpMsgBatch({
+                    subnetID: s.networkName,
+                    blockHeight: epochCut,
+                    msgs: new CrossMsg[](batch.msgs.length)
+                });
+                uint256 msgLenght = batch.msgs.length;
+                for (uint256 i; i < msgLenght;) {
+                    newBatch.msgs[i] = batch.msgs[i];
+                    unchecked {
+                        ++i;
+                    }
+                }
+                // emit event with the next batch ready to sign quorum over.
+                emit NewBottomUpMsgBatch(epochCut,newBatch);
+
+                // Empty the messages of existing batch with epoch and start populating with the new message.
+                delete batch.msgs;
+                // need to push here to avoid a copy from memory to storage
+                batch.msgs.push(crossMessage);
+
+                LibGateway.storeBottomUpMsgBatch(newBatch);
+            } else {
+                // we append the new message normally, and wait for the batch period
+                // to trigger the cutting of the batch.
+                batch.msgs.push(crossMessage);
+            }
+        }
     }
 
     /// @notice returns the subnet created by a validator
@@ -234,15 +313,9 @@ library LibGateway {
         found = !subnet.id.isEmpty();
     }
 
-    /// @notice returns the needed weight value corresponding to the majority percentage
-    /// @dev `majorityPercentage` must be a valid number
-    function weightNeeded(uint256 weight, uint256 majorityPercentage) internal pure returns (uint256) {
-        return (weight * majorityPercentage) / 100;
-    }
-
     /// @notice method that gives the epoch for a given block number and checkpoint period
     /// @return epoch - the epoch for the given block number and checkpoint period
-    function getNextEpoch(uint256 blockNumber, uint64 checkPeriod) internal pure returns (uint64) {
+    function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 }

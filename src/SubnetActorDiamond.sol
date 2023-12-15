@@ -8,6 +8,7 @@ import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
 import {IERC165} from "./interfaces/IERC165.sol";
 import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage, InvalidPowerScale} from "./errors/IPCErrors.sol";
+import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {SubnetID, PermissionMode} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
@@ -71,7 +72,14 @@ contract SubnetActorDiamond {
         s.powerScale = params.powerScale;
         s.minCrossMsgFee = params.minCrossMsgFee;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
-        s.validatorSet.permissionMode = params.permissionMode;
+        s.permissionMode = params.permissionMode;
+
+        // BottomUpMsgBatch config parameters.
+        // NOTE: Let's fix them for now, but we could make them configurable
+        // through the gateway constructor in the future.
+        s.bottomUpMsgBatchPeriod = BATCH_PERIOD;
+        s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
+
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
         s.changeSet.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;

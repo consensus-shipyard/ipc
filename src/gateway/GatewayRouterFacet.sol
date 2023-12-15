@@ -3,19 +3,22 @@ pragma solidity 0.8.19;
 
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
-import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {METHOD_SEND} from "../constants/Constants.sol";
+import {CrossMsg, StorableMsg, ParentFinality, BottomUpCheckpoint, BottomUpMsgBatch} from "../structs/CrossNet.sol";
+import {QuorumObjKind} from "../structs/Quorum.sol";
 import {Status} from "../enums/Status.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, Subnet, Validator, ValidatorInfo, ValidatorSet} from "../structs/Subnet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight, FailedRemoveIncompleteCheckpoint} from "../errors/IPCErrors.sol";
-import {InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, CheckpointAlreadyProcessed, FailedAddIncompleteCheckpoint, FailedAddSignatory} from "../errors/IPCErrors.sol";
+import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch, InvalidSignature, NotAuthorized, SignatureReplay, InvalidRetentionHeight} from "../errors/IPCErrors.sol";
+import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists, FailedAddSignatory} from "../errors/IPCErrors.sol";
 import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated, ZeroMembershipWeight} from "../errors/IPCErrors.sol";
+import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
-import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
+import {LibQuorum} from "../lib/LibQuorum.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
@@ -29,18 +32,13 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
     using StorableMsgHelper for StorableMsg;
-    using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableSet for EnumerableSet.AddressSet;
     using LibValidatorTracking for ParentValidatorsTracker;
     using LibValidatorSet for ValidatorSet;
 
-    event QuorumReached(uint64 height, bytes32 checkpoint, uint256 quorumWeight);
-    event QuorumWeightUpdated(uint64 height, bytes32 checkpoint, uint256 newWeight);
-
-    /// @notice submit a verified checkpoint in the gateway to trigger side-effects and apply cross-messages.
+    /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
     /// Called from a subnet actor if the checkpoint is cryptographically valid.
-    function commitBottomUpCheckpoint(BottomUpCheckpoint calldata checkpoint, CrossMsg[] calldata messages) external {
+    function commitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
         // checkpoint is used to implement access control
         if (checkpoint.subnetID.getActor() != msg.sender) {
             revert InvalidCheckpointSource();
@@ -52,16 +50,49 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         if (!checkpoint.subnetID.equals(subnet.id)) {
             revert InvalidSubnet();
         }
+        // only active subnets can commit checkpoints
+        if (subnet.status != Status.Active) {
+            revert SubnetNotActive();
+        }
+
+        if (s.checkpointRelayerRewards) {
+            // slither-disable-next-line unused-return
+            Address.functionCallWithValue({
+                target: msg.sender,
+                data: abi.encodeCall(
+                    ISubnetActor.distributeRewardToRelayers,
+                    (checkpoint.blockHeight, 0, QuorumObjKind.Checkpoint)
+                ),
+                value: 0
+            });
+        }
+    }
+
+    /// @notice submit a batch of cross-net messages for execution.
+    /// @dev this method is called by the corresponding subnet actor.
+    /// Called from a subnet actor if the batch is valid.
+    function execBottomUpMsgBatch(BottomUpMsgBatch calldata batch) external {
+        if (batch.subnetID.getActor() != msg.sender) {
+            revert InvalidBatchSource();
+        }
+
+        _checkMsgLength(batch);
+
+        (bool subnetExists, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
+        if (!subnetExists) {
+            revert SubnetNotFound();
+        }
+        // cross-net messages can't be executed in inactive subnets.
         if (subnet.status != Status.Active) {
             revert SubnetNotActive();
         }
 
         uint256 totalValue;
         uint256 totalFee;
-        uint256 crossMsgLength = messages.length;
+        uint256 crossMsgLength = batch.msgs.length;
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += messages[i].message.value;
-            totalFee += messages[i].message.fee;
+            totalValue += batch.msgs[i].message.value;
+            totalFee += batch.msgs[i].message.fee;
             unchecked {
                 ++i;
             }
@@ -76,15 +107,19 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         subnet.circSupply -= totalAmount;
 
         // execute cross-messages
-        _applyMessages(checkpoint.subnetID, messages);
+        _applyMessages(subnet.id, batch.msgs);
 
-        // reward relayers in the subnet for committing the previous checkpoint
-        // slither-disable-next-line unused-return
-        Address.functionCallWithValue({
-            target: msg.sender,
-            data: abi.encodeCall(ISubnetActor.distributeRewardToRelayers, (checkpoint.blockHeight, totalFee)),
-            value: totalFee
-        });
+        if (s.crossMsgRelayerRewards) {
+            // slither-disable-next-line unused-return
+            Address.functionCallWithValue({
+                target: msg.sender,
+                data: abi.encodeCall(
+                    ISubnetActor.distributeRewardToRelayers,
+                    (block.number, totalFee, QuorumObjKind.Checkpoint)
+                ),
+                value: totalFee
+            });
+        }
     }
 
     /// @notice commit the ipc parent finality into storage and returns the previous committed finality
@@ -137,37 +172,43 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         return configurationNumber;
     }
 
-    /// @notice Applies top-down crossnet messages locally. This is invoked by IPC nodes when drawing messages from
-    ///         their parent subnet for local execution. That's why the sender is restricted to the system sender,
-    ///         because this method is implicitly invoked by the node during block production.
+    /// @notice apply cross messages
     function applyCrossMessages(CrossMsg[] calldata crossMsgs) external systemActorOnly {
-        _applyMessages(s.networkName.getParentSubnet(), crossMsgs);
+        _applyMessages(SubnetID(0, new address[](0)), crossMsgs);
     }
 
     /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
-    /// @param arrivingFrom - the immediate subnet from which this message is arriving
+    /// @param forwarder - the subnet that handles the cross message
     /// @param crossMsg - the cross message to be executed
-    function _applyMsg(SubnetID memory arrivingFrom, CrossMsg memory crossMsg) internal {
+    function _applyMsg(SubnetID memory forwarder, CrossMsg memory crossMsg) internal {
         if (crossMsg.message.to.subnetId.isEmpty()) {
             revert InvalidCrossMsgDstSubnet();
+        }
+        if (crossMsg.message.method == METHOD_SEND) {
+            if (crossMsg.message.value > address(this).balance) {
+                revert NotEnoughBalance();
+            }
         }
 
         IPCMsgType applyType = crossMsg.message.applyType(s.networkName);
 
-        // If the crossnet destination is the current network (network where the gateway is running).
+        // If the cross-message destination is the current network.
         if (crossMsg.message.to.subnetId.equals(s.networkName)) {
             if (applyType == IPCMsgType.BottomUp) {
-                // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
-                (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
-                if (!registered) {
-                    revert NotRegisteredSubnet();
+                if (!forwarder.isEmpty()) {
+                    (bool registered, Subnet storage subnet) = LibGateway.getSubnet(forwarder);
+                    if (!registered) {
+                        revert NotRegisteredSubnet();
+                    }
+                    if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
+                        revert InvalidCrossMsgNonce();
+                    }
+
+                    subnet.appliedBottomUpNonce += 1;
                 }
-                if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
-                    revert InvalidCrossMsgNonce();
-                }
-                subnet.appliedBottomUpNonce += 1;
-            } else if (applyType == IPCMsgType.TopDown) {
-                // There is no need to load the subnet, as a top-down application means that _we_ are the subnet.
+            }
+
+            if (applyType == IPCMsgType.TopDown) {
                 if (s.appliedTopDownNonce != crossMsg.message.nonce) {
                     revert InvalidCrossMsgNonce();
                 }
@@ -187,12 +228,12 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
     /// @notice applies a cross-net messages coming from some other subnet.
     /// The forwarder argument determines the previous subnet that submitted the checkpoint triggering the cross-net message execution.
-    /// @param arrivingFrom - the immediate subnet from which this message is arriving
+    /// @param forwarder - the subnet that handles the messages
     /// @param crossMsgs - the cross-net messages to apply
-    function _applyMessages(SubnetID memory arrivingFrom, CrossMsg[] memory crossMsgs) internal {
+    function _applyMessages(SubnetID memory forwarder, CrossMsg[] memory crossMsgs) internal {
         uint256 crossMsgsLength = crossMsgs.length;
         for (uint256 i; i < crossMsgsLength; ) {
-            _applyMsg(arrivingFrom, crossMsgs[i]);
+            _applyMsg(forwarder, crossMsgs[i]);
             unchecked {
                 ++i;
             }
@@ -206,71 +247,27 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     /// @param weight - the weight of the validator
     /// @param signature - the signature of the checkpoint
     function addCheckpointSignature(
-        uint64 height,
+        uint256 height,
         bytes32[] memory membershipProof,
         uint256 weight,
         bytes memory signature
     ) external {
-        if (height < s.bottomUpCheckpointRetentionHeight) {
-            revert CheckpointAlreadyProcessed();
-        }
+        // check if the checkpoint was already pruned before getting checkpoint
+        // and triggering the signature
+        LibQuorum.isHeightAlreadyProcessed(s.checkpointQuorumMap, height);
 
-        (bool exists, BottomUpCheckpoint storage checkpoint, CheckpointInfo storage checkpointInfo) = LibGateway
-            .getBottomUpCheckpointWithInfo(height);
+        // slither-disable-next-line unused-return
+        (bool exists, ) = LibGateway.getBottomUpCheckpoint(height);
         if (!exists) {
             revert CheckpointNotCreated();
         }
-
-        // slither-disable-next-line unused-return
-        (address recoveredSignatory, ECDSA.RecoverError err, ) = ECDSA.tryRecover(checkpointInfo.hash, signature);
-        if (err != ECDSA.RecoverError.NoError) {
-            revert InvalidSignature();
-        }
-
-        // Check whether the validator has already sent a valid signature
-        if (s.bottomUpSignatureSenders[height].contains(recoveredSignatory)) {
-            revert SignatureReplay();
-        }
-
-        // The validator is allowed to send a signature if it was in the membership at the target height
-        // Constructing leaf: https://github.com/OpenZeppelin/merkle-tree#leaf-hash
-        bytes32 validatorLeaf = keccak256(bytes.concat(keccak256(abi.encode(recoveredSignatory, weight))));
-        bool valid = MerkleProof.verify({proof: membershipProof, root: checkpointInfo.rootHash, leaf: validatorLeaf});
-        if (!valid) {
-            revert NotAuthorized(recoveredSignatory);
-        }
-
-        // All checks passed.
-        // Adding signature and emitting events.
-
-        bool ok = s.bottomUpSignatureSenders[height].add(recoveredSignatory);
-        if (!ok) {
-            revert FailedAddSignatory();
-        }
-        s.bottomUpSignatures[height][recoveredSignatory] = signature;
-        checkpointInfo.currentWeight += weight;
-
-        if (checkpointInfo.currentWeight >= checkpointInfo.threshold) {
-            if (!checkpointInfo.reached) {
-                checkpointInfo.reached = true;
-                // checkpoint is completed since the threshold has been reached
-                ok = s.incompleteCheckpoints.remove(checkpoint.blockHeight);
-                if (!ok) {
-                    revert FailedRemoveIncompleteCheckpoint();
-                }
-                emit QuorumReached({
-                    height: height,
-                    checkpoint: checkpointInfo.hash,
-                    quorumWeight: checkpointInfo.currentWeight
-                });
-            } else {
-                emit QuorumWeightUpdated({
-                    height: height,
-                    checkpoint: checkpointInfo.hash,
-                    newWeight: checkpointInfo.currentWeight
-                });
-            }
-        }
+        LibQuorum.addQuorumSignature({
+            self: s.checkpointQuorumMap,
+            height: height,
+            membershipProof: membershipProof,
+            weight: weight,
+            signature: signature
+        });
     }
 
     /// @notice creates a new bottom-up checkpoint
@@ -282,9 +279,6 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
-        if (checkpoint.blockHeight < s.bottomUpCheckpointRetentionHeight) {
-            revert CheckpointAlreadyProcessed();
-        }
         if (checkpoint.blockHeight % s.bottomUpCheckPeriod != 0) {
             revert InvalidCheckpointEpoch();
         }
@@ -292,60 +286,114 @@ contract GatewayRouterFacet is GatewayActorModifiers {
             revert CheckpointAlreadyExists();
         }
 
-        if (membershipWeight == 0) {
-            revert ZeroMembershipWeight();
-        }
-
-        uint256 threshold = LibGateway.weightNeeded(membershipWeight, s.majorityPercentage);
-
-        // process the checkpoint
-        bool ok = s.incompleteCheckpoints.add(checkpoint.blockHeight);
-        if (!ok) {
-            revert FailedAddIncompleteCheckpoint();
-        }
-
-        CheckpointInfo memory info = CheckpointInfo({
-            hash: keccak256(abi.encode(checkpoint)),
-            rootHash: membershipRootHash,
-            threshold: threshold,
-            currentWeight: 0,
-            reached: false
+        LibQuorum.createQuorumInfo({
+            self: s.checkpointQuorumMap,
+            objHeight: checkpoint.blockHeight,
+            objHash: keccak256(abi.encode(checkpoint)),
+            membershipRootHash: membershipRootHash,
+            membershipWeight: membershipWeight,
+            majorityPercentage: s.majorityPercentage
         });
-        LibGateway.storeBottomUpCheckpointWithInfo(checkpoint, info);
+        LibGateway.storeBottomUpCheckpoint(checkpoint);
     }
 
     /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
     /// @dev `retentionHeight` is the height of the first incomplete checkpointswe must keep to implement checkpointing.
     /// All checkpoints with a height less than `retentionHeight` are removed from the history, assuming they are committed to the parent.
     /// @param newRetentionHeight - the height of the oldest checkpoint to keep
-    function pruneBottomUpCheckpoints(uint64 newRetentionHeight) external systemActorOnly {
-        uint64 oldRetentionHeight = s.bottomUpCheckpointRetentionHeight;
-
-        if (newRetentionHeight <= oldRetentionHeight) {
-            revert InvalidRetentionHeight();
-        }
-
-        for (uint64 h = oldRetentionHeight; h < newRetentionHeight; ) {
+    function pruneBottomUpCheckpoints(uint256 newRetentionHeight) external systemActorOnly {
+        // we need to clean manually the checkpoints because Solidity does not support passing
+        // a storage variable as an interface (so we can iterate and remove directly inside pruneQuorums)
+        for (uint256 h = s.checkpointQuorumMap.retentionHeight; h < newRetentionHeight; ) {
             delete s.bottomUpCheckpoints[h];
-            delete s.bottomUpCheckpointInfo[h];
-            delete s.bottomUpSignatureSenders[h];
-            delete s.bottomUpMessages[h];
-
-            address[] memory validators = s.bottomUpSignatureSenders[h].values();
-            uint256 n = validators.length;
-
-            for (uint256 i; i < n; ) {
-                delete s.bottomUpSignatures[h][validators[i]];
-                unchecked {
-                    ++i;
-                }
-            }
-
             unchecked {
                 ++h;
             }
         }
 
-        s.bottomUpCheckpointRetentionHeight = newRetentionHeight;
+        LibQuorum.pruneQuorums(s.checkpointQuorumMap, newRetentionHeight);
+    }
+
+    /// @notice checks whether the provided batch signature for the block at height `height` is valid and accumulates that
+    /// @param height - the height of the block in the checkpoint
+    /// @param membershipProof - a Merkle proof that the validator was in the membership at height `height` with weight `weight`
+    /// @param weight - the weight of the validator
+    /// @param signature - the signature of the checkpoint
+    function addBottomUpMsgBatchSignature(
+        uint256 height,
+        bytes32[] memory membershipProof,
+        uint256 weight,
+        bytes memory signature
+    ) external {
+        LibQuorum.isHeightAlreadyProcessed(s.bottomUpMsgBatchQuorumMap, height);
+
+        // slither-disable-next-line unused-return
+        (bool exists, ) = LibGateway.getBottomUpMsgBatch(height);
+        if (!exists) {
+            revert BatchNotCreated();
+        }
+        LibQuorum.addQuorumSignature({
+            self: s.bottomUpMsgBatchQuorumMap,
+            height: height,
+            membershipProof: membershipProof,
+            weight: weight,
+            signature: signature
+        });
+    }
+
+    /// @notice cuts a new message batch if the batch period is reached without
+    /// the maximum number of messages being reached.
+    /// @param batch - a bottom-up batch
+    /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
+    /// @param membershipWeight - the total weight of the membership
+    function createBottomUpMsgBatch(
+        BottomUpMsgBatch calldata batch,
+        bytes32 membershipRootHash,
+        uint256 membershipWeight
+    ) external systemActorOnly {
+        _checkMsgLength(batch);
+        // We only externally trigger new batches if the maximum number
+        // of messages for the batch hasn't been reached.
+        // We also check that we are not trying to create a batch from
+        // the future
+        if (batch.blockHeight % s.bottomUpMsgBatchPeriod != 0 || block.number <= batch.blockHeight) {
+            revert InvalidBatchEpoch();
+        }
+
+        if (LibGateway.bottomUpBatchMsgsExists(batch.blockHeight)) {
+            revert BatchAlreadyExists();
+        }
+
+        LibQuorum.createQuorumInfo({
+            self: s.bottomUpMsgBatchQuorumMap,
+            objHeight: batch.blockHeight,
+            objHash: keccak256(abi.encode(batch)),
+            membershipRootHash: membershipRootHash,
+            membershipWeight: membershipWeight,
+            majorityPercentage: s.majorityPercentage
+        });
+        LibGateway.storeBottomUpMsgBatch(batch);
+    }
+
+    /// @notice Set a new batch retention height and garbage collect all batches in range [`retentionHeight`, `newRetentionHeight`)
+    /// @param newRetentionHeight - the height of the oldest batch to keep
+    function pruneBottomUpMsgBatches(uint256 newRetentionHeight) external systemActorOnly {
+        for (uint256 h = s.bottomUpMsgBatchQuorumMap.retentionHeight; h < newRetentionHeight; ) {
+            delete s.bottomUpMsgBatches[h];
+            unchecked {
+                ++h;
+            }
+        }
+
+        LibQuorum.pruneQuorums(s.bottomUpMsgBatchQuorumMap, newRetentionHeight);
+    }
+
+    function _checkMsgLength(BottomUpMsgBatch memory batch) internal view {
+        if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
+            revert MaxMsgsPerBatchExceeded();
+        }
+        if (batch.msgs.length == 0) {
+            revert BatchWithNoMessages();
+        }
     }
 }
