@@ -48,6 +48,103 @@ pub mod lib_gateway {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("NewBottomUpMsgBatch"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NewBottomUpMsgBatch",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("epoch"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: true,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("batch"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                        ::std::boxed::Box::new(
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                        ::std::boxed::Box::new(
+                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                        ),
+                                                                                    ),
+                                                                                ],
+                                                                            ),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                                ],
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                        ::std::boxed::Box::new(
+                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                        ),
+                                                                                    ),
+                                                                                ],
+                                                                            ),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                                ],
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(4usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Bool,
+                                                        ],
+                                                    ),
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NewTopDownMessage"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Event {
@@ -132,13 +229,13 @@ pub mod lib_gateway {
         __abi,
     );
     #[rustfmt::skip]
-    const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`:\x90\x81`\x1D\x8290\x81PP\xF3[`\0\x80\xFD\xFE`\0\x80\xFD\xFE\xA2dipfsX\"\x12 @^\xBAl\x8EA\x8Ay\x1B^7\x98(\x8D\x8A\xFCW(\xD8\x06\xC8\xBE?3\xBBJ\xE0\x88\xAE1{\xC4dsolcC\0\x08\x13\x003";
+    const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`:\x90\x81`\x1D\x8290\x81PP\xF3[`\0\x80\xFD\xFE`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \x82\xDA\"\x8E:\xD6\xEE\xAD_T\xCDw6*y.\xC5\xDB\xF8\x83\xFD\x7F\xB6u{\xB0\xBB\x99^C\xA9hdsolcC\0\x08\x13\x003";
     /// The bytecode of the contract.
     pub static LIBGATEWAY_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
         __BYTECODE,
     );
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\0\x80\xFD\xFE\xA2dipfsX\"\x12 @^\xBAl\x8EA\x8Ay\x1B^7\x98(\x8D\x8A\xFCW(\xD8\x06\xC8\xBE?3\xBBJ\xE0\x88\xAE1{\xC4dsolcC\0\x08\x13\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \x82\xDA\"\x8E:\xD6\xEE\xAD_T\xCDw6*y.\xC5\xDB\xF8\x83\xFD\x7F\xB6u{\xB0\xBB\x99^C\xA9hdsolcC\0\x08\x13\x003";
     /// The deployed bytecode of the contract.
     pub static LIBGATEWAY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
         __DEPLOYED_BYTECODE,
@@ -229,6 +326,16 @@ pub mod lib_gateway {
         > {
             self.0.event()
         }
+        ///Gets the contract's `NewBottomUpMsgBatch` event
+        pub fn new_bottom_up_msg_batch_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewBottomUpMsgBatchFilter,
+        > {
+            self.0.event()
+        }
         ///Gets the contract's `NewTopDownMessage` event
         pub fn new_top_down_message_filter(
             &self,
@@ -282,6 +389,25 @@ pub mod lib_gateway {
         Hash
     )]
     #[ethevent(
+        name = "NewBottomUpMsgBatch",
+        abi = "NewBottomUpMsgBatch(uint256,((uint64,address[]),uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)[]))"
+    )]
+    pub struct NewBottomUpMsgBatchFilter {
+        #[ethevent(indexed)]
+        pub epoch: ::ethers::core::types::U256,
+        pub batch: BottomUpMsgBatch,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(
         name = "NewTopDownMessage",
         abi = "NewTopDownMessage(address,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool))"
     )]
@@ -294,6 +420,7 @@ pub mod lib_gateway {
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum LibGatewayEvents {
         MembershipUpdatedFilter(MembershipUpdatedFilter),
+        NewBottomUpMsgBatchFilter(NewBottomUpMsgBatchFilter),
         NewTopDownMessageFilter(NewTopDownMessageFilter),
     }
     impl ::ethers::contract::EthLogDecode for LibGatewayEvents {
@@ -302,6 +429,9 @@ pub mod lib_gateway {
         ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = MembershipUpdatedFilter::decode_log(log) {
                 return Ok(LibGatewayEvents::MembershipUpdatedFilter(decoded));
+            }
+            if let Ok(decoded) = NewBottomUpMsgBatchFilter::decode_log(log) {
+                return Ok(LibGatewayEvents::NewBottomUpMsgBatchFilter(decoded));
             }
             if let Ok(decoded) = NewTopDownMessageFilter::decode_log(log) {
                 return Ok(LibGatewayEvents::NewTopDownMessageFilter(decoded));
@@ -315,6 +445,9 @@ pub mod lib_gateway {
                 Self::MembershipUpdatedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::NewBottomUpMsgBatchFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NewTopDownMessageFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -326,10 +459,31 @@ pub mod lib_gateway {
             Self::MembershipUpdatedFilter(value)
         }
     }
+    impl ::core::convert::From<NewBottomUpMsgBatchFilter> for LibGatewayEvents {
+        fn from(value: NewBottomUpMsgBatchFilter) -> Self {
+            Self::NewBottomUpMsgBatchFilter(value)
+        }
+    }
     impl ::core::convert::From<NewTopDownMessageFilter> for LibGatewayEvents {
         fn from(value: NewTopDownMessageFilter) -> Self {
             Self::NewTopDownMessageFilter(value)
         }
+    }
+    ///`BottomUpMsgBatch((uint64,address[]),uint256,((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)[])`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct BottomUpMsgBatch {
+        pub subnet_id: SubnetID,
+        pub block_height: ::ethers::core::types::U256,
+        pub msgs: ::std::vec::Vec<CrossMsg>,
     }
     ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)`
     #[derive(
