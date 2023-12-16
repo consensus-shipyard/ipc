@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
 use ethers_core::types as et;
+use ethers_core::types::transaction::eip2718::TypedTransaction;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
@@ -41,6 +42,7 @@ pub enum SignedMessageError {
 /// which use a different algorithm than Ethereum.
 ///
 /// We can potentially extend this list to include CID based indexing.
+#[derive(Debug, Clone)]
 pub enum DomainHash {
     Eth([u8; 32]),
 }
@@ -104,8 +106,9 @@ impl SignedMessage {
         // work with regular accounts.
         match maybe_eth_address(&message.from) {
             Some(addr) => {
-                let tx = from_fvm::to_eth_typed_transaction(message, chain_id)
-                    .map_err(SignedMessageError::Ethereum)?;
+                let tx: TypedTransaction = from_fvm::to_eth_transaction_request(message, chain_id)
+                    .map_err(SignedMessageError::Ethereum)?
+                    .into();
 
                 Ok(Signable::Ethereum((tx.sighash(), addr)))
             }
@@ -155,8 +158,10 @@ impl SignedMessage {
         chain_id: &ChainID,
     ) -> Result<Option<DomainHash>, SignedMessageError> {
         if maybe_eth_address(&self.message.from).is_some() {
-            let tx = from_fvm::to_eth_typed_transaction(self.message(), chain_id)
-                .map_err(SignedMessageError::Ethereum)?;
+            let tx: TypedTransaction =
+                from_fvm::to_eth_transaction_request(self.message(), chain_id)
+                    .map_err(SignedMessageError::Ethereum)?
+                    .into();
 
             let sig = from_fvm::to_eth_signature(self.signature(), true)
                 .map_err(SignedMessageError::Ethereum)?;

@@ -630,6 +630,13 @@ where
     // Not using `prepare_call` here because `send_transaction` will fill the missing fields.
     let coin_send_value = U256::from(100);
     let coin_send: TestContractCall<_, bool> = contract.send_coin(to.eth_addr, coin_send_value);
+
+    // Take note of the inputs to ascertain it's the same we get back.
+    let tx_input = match coin_send.tx {
+        TypedTransaction::Eip1559(ref tx) => tx.data.clone(),
+        _ => None,
+    };
+
     // Using `send_transaction` instead of `coin_send.send()` so it gets the receipt.
     // Unfortunately the returned `bool` is not available through the Ethereum API.
     let receipt = request(
@@ -639,6 +646,15 @@ where
     )?;
 
     tracing::info!(tx_hash = ?receipt.transaction_hash, "coin sent");
+
+    request(
+        "eth_getTransactionByHash for input",
+        provider.get_transaction(receipt.transaction_hash).await,
+        |tx| match tx {
+            Some(tx) => tx.input == tx_input.unwrap_or_default(),
+            _ => false,
+        },
+    )?;
 
     request(
         "eth_getLogs",

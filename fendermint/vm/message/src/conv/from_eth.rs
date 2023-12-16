@@ -77,10 +77,18 @@ pub fn to_fvm_tokens(value: &U256) -> TokenAmount {
 #[cfg(test)]
 mod tests {
 
+    use ethers_core::{
+        types::{transaction::eip2718::TypedTransaction, Bytes, TxHash},
+        utils::rlp,
+    };
     use fendermint_testing::arb::ArbTokenAmount;
+    use fvm_shared::{chainid::ChainID, crypto::signature::Signature};
     use quickcheck_macros::quickcheck;
 
-    use crate::conv::from_fvm::to_eth_tokens;
+    use crate::{
+        conv::{from_eth::to_fvm_message, from_fvm::to_eth_tokens},
+        signed::{DomainHash, SignedMessage},
+    };
 
     use super::to_fvm_tokens;
 
@@ -92,5 +100,35 @@ mod tests {
             return tokens0 == tokens1;
         }
         true
+    }
+
+    #[test]
+    fn test_domain_hash() {
+        let expected_hash: TxHash =
+            "0x8fe4fd8e1c7c40dceed249c99a553bc218774f611cfefd8a48ede67b8f6e4725"
+                .parse()
+                .unwrap();
+
+        let raw_tx: Bytes = "0x02f86e87084472af917f2a8080808502540be400948ed26a19f0e0d6708546495611e9a298d9befb598203e880c080a0a37d03d98e50622ec3744ee368565c5e9469852a1d9111197608135928cd2430a010d1575c68602c96c89e9ec30fade44f5844bf34226044d2931afc60b0a8b2de".parse().unwrap();
+
+        let rlp = rlp::Rlp::new(&raw_tx);
+
+        let tx_hash = TxHash::from(ethers_core::utils::keccak256(rlp.as_raw()));
+        assert_eq!(tx_hash, expected_hash);
+
+        let (tx0, sig) = TypedTransaction::decode_signed(&rlp).expect("decode signed tx");
+        let chain_id: ChainID = tx0.chain_id().unwrap().as_u64().into();
+
+        let msg = SignedMessage {
+            message: to_fvm_message(tx0.as_eip1559_ref().unwrap()).expect("to_fvm_message"),
+            signature: Signature::new_secp256k1(sig.to_vec()),
+        };
+
+        let domain_hash = msg.domain_hash(&chain_id).expect("domain_hash");
+
+        match domain_hash {
+            Some(DomainHash::Eth(h)) => assert_eq!(h, tx_hash.0),
+            other => panic!("unexpected domain hash: {other:?}"),
+        }
     }
 }
