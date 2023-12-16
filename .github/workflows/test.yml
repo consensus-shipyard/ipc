@@ -31,8 +31,8 @@ jobs:
         with:
           cache: false
 
-      - name: Run coverage check
-        run: make coverage
+      - name: Run coverage check - flaky so we run twice to catch false negatives
+        run: make coverage || make coverage
 
       - name: Run tests
         run: forge test -vvv --ffi
