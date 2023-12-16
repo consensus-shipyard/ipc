@@ -4,7 +4,6 @@ pragma solidity 0.8.19;
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {CrossMsg, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
-import {QuorumInfo} from "../structs/Quorum.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";

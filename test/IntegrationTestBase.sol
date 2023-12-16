@@ -5,25 +5,19 @@ import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
 
 import "../src/errors/IPCErrors.sol";
-import {NumberContractFacetSeven, NumberContractFacetEight} from "./helpers/NumberContract.sol";
-import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../src/constants/Constants.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {Status} from "../src/enums/Status.sol";
-import {IERC165} from "../src/interfaces/IERC165.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IDiamondLoupe} from "../src/interfaces/IDiamondLoupe.sol";
-import {IDiamondCut} from "../src/interfaces/IDiamondCut.sol";
-import {ISubnetActor} from "../src/interfaces/ISubnetActor.sol";
-import {QuorumInfo} from "../src/structs/Quorum.sol";
 import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, PermissionMode, PermissionMode, Subnet, IPCAddress, Membership, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, PermissionMode, Subnet, IPCAddress, Validator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
 import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {GatewayDiamond, FunctionNotFound} from "../src/GatewayDiamond.sol";
+import {GatewayDiamond} from "../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
@@ -34,8 +28,6 @@ import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
-import {LibDiamond} from "../src/lib/LibDiamond.sol";
-import {MerkleTreeHelper} from "./helpers/MerkleTreeHelper.sol";
 
 import {TestUtils} from "./helpers/TestUtils.sol";
 
@@ -533,7 +525,6 @@ contract IntegrationTestBase is Test {
     function fund(address funderAddress, uint256 fundAmount) public {
         // funding subnets is free, we do not need cross msg fee
         (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore, ) = getSubnet(address(saManager));
-        console.log(circSupplyBefore);
 
         uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
         uint256 expectedNonce = nonceBefore + 1;

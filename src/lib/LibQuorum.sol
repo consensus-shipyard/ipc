@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-
 import {QuorumMap, QuorumInfo, QuorumObjKind} from "../structs/Quorum.sol";
 import {InvalidRetentionHeight, QuorumAlreadyProcessed, FailedAddSignatory, InvalidSignature, SignatureReplay, NotAuthorized, FailedRemoveIncompleteQuorum, ZeroMembershipWeight, FailedAddIncompleteQuorum} from "../errors/IPCErrors.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
-import {LibGateway} from "../lib/LibGateway.sol";
 
 library LibQuorum {
     using EnumerableSet for EnumerableSet.UintSet;

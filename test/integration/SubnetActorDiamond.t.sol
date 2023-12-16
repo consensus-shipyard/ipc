@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-// import {Test} from "forge-std/Test.sol";
-import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {Test} from "forge-std/Test.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
 import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
-import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
+import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
-import {Status} from "../../src/enums/Status.sol";
 import {BottomUpMsgBatch, CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, PermissionMode, IPCAddress, Subnet, ValidatorInfo, Validator} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, IPCAddress, Subnet, ValidatorInfo} from "../../src/structs/Subnet.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
@@ -22,15 +19,10 @@ import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
-import {GatewayDiamond, FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
-import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
-import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
-import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
-import {SubnetActorManagerFacet, ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
+import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {LibStaking} from "../../src/lib/LibStaking.sol";
 import {LibDiamond} from "../../src/lib/LibDiamond.sol";

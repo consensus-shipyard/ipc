@@ -5,7 +5,7 @@ import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, BatchWithNoMessages, Invalid
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {QuorumObjKind} from "../structs/Quorum.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo, CrossMsg} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet, PermissionMode} from "../structs/Subnet.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";

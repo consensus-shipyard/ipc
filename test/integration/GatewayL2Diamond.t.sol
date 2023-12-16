@@ -4,16 +4,14 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
-import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
 import {CrossMsg, StorableMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../src/GatewayDiamond.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
 import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
@@ -21,15 +19,12 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {TestUtils} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
-    using StorableMsgHelper for StorableMsg;
-    using FvmAddressHelper for FvmAddress;
 
     function setUp() public override {
         address[] memory path2 = new address[](2);

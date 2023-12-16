@@ -8,7 +8,6 @@ import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 struct GatewayActorStorage {
     /// @notice List of subnets

@@ -2,13 +2,10 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
-
 import "../../src/lib/CrossMsgHelper.sol";
 import "../../src/lib/SubnetIDHelper.sol";
 import "../../src/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-
 import "openzeppelin-contracts/utils/Address.sol";
 
 contract CrossMsgHelperTest is Test {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, CrossMsg} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint} from "../structs/CrossNet.sol";
 import {QuorumObjKind} from "../structs/Quorum.sol";
 
 /// @title Subnet Actor interface

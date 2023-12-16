@@ -5,7 +5,6 @@ import {EMPTY_BYTES} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
@@ -20,7 +19,6 @@ import {SubnetID, PermissionMode} from "../../src/structs/Subnet.sol";
 import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 
-//facets
 import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
 import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
