@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "../../src/errors/IPCErrors.sol";
 import {Test} from "forge-std/Test.sol";
+import "forge-std/console.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
 import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
 import {METHOD_SEND} from "../../src/constants/Constants.sol";
@@ -16,6 +17,7 @@ import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
+import {MultisignatureChecker} from "../../src/lib/LibMultisignatureChecker.sol";
 import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
@@ -486,7 +488,106 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saManager.validateActiveQuorumSignatures(validators, hash, signatures);
     }
 
+    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidWeightSum() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](1);
+        address[] memory subValidators = new address[](1);
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+
+        for (uint256 i = 0; i < 3; i++) {
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.deal(validators[i], 10 gwei);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        // this should trigger `WeightsSumLessThanThreshold` error since the signature weight will be just 100.
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[0], hash);
+        signatures[0] = abi.encodePacked(r, s, v);
+        subValidators[0] = validators[0];
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidSignatureErr.selector,
+                MultisignatureChecker.Error.WeightsSumLessThanThreshold
+            )
+        );
+        saManager.validateActiveQuorumSignatures(subValidators, hash, signatures);
+    }
+
     function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidSignature() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+
+        uint8 vv = 255;
+
+        for (uint256 i = 0; i < 3; i++) {
+            (, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+
+            // create incorrect signature using `vv` to trigger `InvalidSignature` error.
+            signatures[i] = abi.encodePacked(r, s, vv);
+
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.deal(validators[i], 10 gwei);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        vm.expectRevert(
+            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.InvalidSignature)
+        );
+        saManager.validateActiveQuorumSignatures(validators, hash, signatures);
+    }
+
+    function testSubnetActorDiamond_validateActiveQuorumSignatures_EmptySignatures() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](0);
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+
+        for (uint256 i = 0; i < 3; i++) {
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.deal(validators[i], 10 gwei);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        require(signatures.length == 0, "signatures are not empty");
+        vm.expectRevert(
+            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.EmptySignatures)
+        );
+        saManager.validateActiveQuorumSignatures(validators, hash, signatures);
+    }
+
+    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidArrayLength() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](1);
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+
+        for (uint256 i = 0; i < 3; i++) {
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.deal(validators[i], 10 gwei);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
+
+        require(signatures.length == 1, "signatures are not empty");
+        vm.expectRevert(
+            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.InvalidArrayLength)
+        );
+        saManager.validateActiveQuorumSignatures(validators, hash, signatures);
+    }
+
+    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidSignatory() public {
         (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory pubKeys = new bytes[](3);
         bytes[] memory signatures = new bytes[](3);
@@ -496,14 +597,25 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         for (uint256 i = 0; i < 3; i++) {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+
+            // create incorrect signature using `vv`
             signatures[i] = abi.encodePacked(r, s, v);
+
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.deal(validators[i], 10 gwei);
             vm.prank(validators[i]);
             saManager.join{value: 10}(pubKeys[i]);
         }
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidSignatureErr.selector, 4));
+        // swap validators to trigger `InvalidSignatory` error;
+        address a;
+        a = validators[0];
+        validators[0] = validators[1];
+        validators[1] = a;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.InvalidSignatory)
+        );
         saManager.validateActiveQuorumSignatures(validators, hash0, signatures);
     }
 
