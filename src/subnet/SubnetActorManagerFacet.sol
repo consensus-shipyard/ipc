@@ -31,6 +31,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     event NextBottomUpCheckpointExecuted(uint256 epoch, address submitter);
     event SubnetBootstrapped(Validator[]);
 
+    /// @notice Ensures that the subnet is operating under Federated permission mode.
+    /// @dev Reverts if the subnet is not in Federated mode.
     function enforceFederatedValidation() internal view {
         if (s.validatorSet.permissionMode != PermissionMode.Federated) {
             revert MethodNotAllowed(ERR_PERMISSIONED_AND_BOOTSTRAPPED);
@@ -38,6 +40,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         return;
     }
 
+    /// @notice Ensures that the subnet is operating under Collateral-based permission mode.
+    /// @dev Reverts if the subnet is not in Collateral mode.
     function enforceCollateralValidation() internal view {
         if (s.validatorSet.permissionMode != PermissionMode.Collateral) {
             revert MethodNotAllowed(ERR_PERMISSIONED_AND_BOOTSTRAPPED);
@@ -45,25 +49,24 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         return;
     }
 
-    /// @notice Pause all methods with `whenNotPaused` modifier
+    /// @notice Pauses all contract functions with the `whenNotPaused` modifier.
     function pause() external {
         LibDiamond.enforceIsContractOwner();
         _pause();
     }
 
-    /// @notice Unpause all methods with `whenNotPaused` modifier
+    /// @notice Unpauses all contract functions with the `whenNotPaused` modifier.
     function unpause() external {
         LibDiamond.enforceIsContractOwner();
         _unpause();
     }
 
-    /** @notice submit a checkpoint commitment.
-     *  @dev It triggers the commitment of the checkpoint and any other side-effects that
-     *  need to be triggered by the checkpoint such as relayer reward book keeping.
-     * @param checkpoint The executed bottom-up checkpoint
-     * @param signatories The addresses of the signatories
-     * @param signatures The collected checkpoint signatures
-     */
+    /// @notice Submits a checkpoint commitment for execution.
+    ///  @dev   It triggers the commitment of the checkpoint and any other side-effects that
+    ///         need to be triggered by the checkpoint such as relayer reward book keeping.
+    /// @param checkpoint The executed bottom-up checkpoint.
+    /// @param signatories The addresses of validators signing the checkpoint.
+    /// @param signatures The signatures of validators on the checkpoint.
     function submitCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
         address[] calldata signatories,
@@ -113,12 +116,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         }
     }
 
-    /** @notice submit a bottom-up message batch for execution.
-     *  @dev It triggers the execution of a cross-net message batch
-     * @param batch The executed bottom-up checkpoint
-     * @param signatories The addresses of the signatories
-     * @param signatures The collected checkpoint signatures
-     */
+    /// @notice Submits a batch of bottom-up messages for execution.
+    /// @dev It triggers the execution of a cross-net message batch.
+    /// @param batch The batch of bottom-up messages.
+    /// @param signatories The addresses of validators signing the batch.
+    /// @param signatures The signatures of validators on the batch.
     function submitBottomUpMsgBatch(
         BottomUpMsgBatch calldata batch,
         address[] calldata signatories,
@@ -211,7 +213,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         payable(msg.sender).sendValue(amount);
     }
 
-    /// @notice method that allows the contract owner to set the validators' federated power
+    /// @notice Sets the federated power of validators.
+    /// @dev method that allows the contract owner to set the validators' federated power.
+    /// @param validators The addresses of validators.
+    /// @param publicKeys The public keys of validators.
+    /// @param powers The federated powers to be assigned to validators.
     function setFederatedPower(
         address[] calldata validators,
         bytes[] calldata publicKeys,
@@ -237,7 +243,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     }
 
     /// @notice method that allows a validator to join the subnet
-    /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
+    /// @param publicKey The off-chain 65 byte public key that should be associated with the validator.
     function join(bytes calldata publicKey) external payable nonReentrant whenNotPaused notKilled {
         // adding this check to prevent new validators from joining
         // after the subnet has been bootstrapped. We will increase the
@@ -287,7 +293,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         }
     }
 
-    /// @notice method that allows a validator to increase its stake
+    /// @notice method that allows a validator to increase its stake.
     function stake() external payable whenNotPaused notKilled {
         // disbling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
@@ -308,7 +314,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         LibStaking.deposit(msg.sender, msg.value);
     }
 
-    /// @notice method that allows a validator to unstake a part of its collateral from a subnet
+    /// @notice method that allows a validator to unstake a part of its collateral from a subnet.
     /// @dev `leave` must be used to unstake the entire stake.
     function unstake(uint256 amount) external whenNotPaused notKilled {
         // disbling validator changes for federated validation subnets (at least for now
@@ -335,9 +341,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         LibStaking.withdraw(msg.sender, amount);
     }
 
-    /// @notice method that allows a validator to leave the subnet
-    /// @dev it also return the validators initial balance if the
-    /// subnet was not yet bootstrapped.
+    /// @notice method that allows a validator to leave the subnet.
     function leave() external nonReentrant whenNotPaused notKilled {
         // disbling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
@@ -375,7 +379,8 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         LibStaking.withdraw(msg.sender, amount);
     }
 
-    /// @notice method that allows to kill the subnet when all validators left. It is not a privileged operation.
+    /// @notice method that allows to kill the subnet when all validators left.
+    /// @dev It is not a privileged operation.
     function kill() external notKilled {
         if (LibStaking.totalValidators() != 0) {
             revert NotAllValidatorsHaveLeft();
@@ -385,17 +390,18 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         IGateway(s.ipcGatewayAddr).kill();
     }
 
-    /// @notice Validator claims their released collateral
+    /// @notice Validator claims their released collateral.
     function claim() external nonReentrant whenNotPaused {
         LibStaking.claimCollateral(msg.sender);
     }
 
-    /// @notice Relayer claims its reward
+    /// @notice Relayer claims its reward.
     function claimRewardForRelayer() external nonReentrant whenNotPaused {
         LibStaking.claimRewardForRelayer(msg.sender);
     }
 
-    /// @notice add a bootstrap node
+    /// @notice Add a bootstrap node.
+    /// @param netAddress The network address of the new bootstrap node.
     function addBootstrapNode(string memory netAddress) external whenNotPaused {
         if (!s.validatorSet.isActiveValidator(msg.sender)) {
             revert NotValidator(msg.sender);
@@ -408,10 +414,10 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         s.bootstrapOwners.add(msg.sender);
     }
 
-    /// @notice reward the relayers for the previous checkpoint after processing the one at height `height`.
-    /// @dev The reward includes the fixed relayer reward and accumulated cross-message fees received from the gateway.
-    /// @param height height of the checkpoint the relayers are rewarded for
-    /// @param reward The sum of the reward
+    /// @notice Distributes rewards to relayers for a specific checkpoint.
+    /// @param height The height of the checkpoint for which rewards are being distributed.
+    /// @param reward The total amount of reward to be distributed.
+    /// @param kind The type of object for which rewards are being distributed.
     function distributeRewardToRelayers(
         uint256 height,
         uint256 reward,
@@ -455,20 +461,21 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         }
     }
 
+    /// @notice Retrieves the addresses of relayers who were rewarded for a specific checkpoint at a given height.
+    /// @param height The height of the checkpoint for which to find rewarded relayers.
+    /// @return relayers An array of addresses of the relayers who were rewarded at the specified checkpoint.
     function checkpointRewardedAddrs(uint256 height) internal view returns (address[] memory relayers) {
         uint256 previousHeight = height - s.bottomUpCheckPeriod;
         relayers = s.relayerRewards.checkpointRewarded[previousHeight].values();
     }
 
-    /**
-     * @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
-     *         Reverts otherwise.
-     * @dev Signatories in `signatories` and their signatures in `signatures` must be provided in the same order.
-     *       Having it public allows external users to perform sanity-check verification if needed.
-     * @param signatories The addresses of the signatories.
-     * @param hash The hash of the checkpoint.
-     * @param signatures The packed signatures of the checkpoint.
-     */
+    /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
+    ///         Reverts otherwise.
+    /// @dev Signatories in `signatories` and their signatures in `signatures` must be provided in the same order.
+    ///       Having it public allows external users to perform sanity-check verification if needed.
+    /// @param signatories The addresses of the signatories.
+    /// @param hash The hash of the checkpoint.
+    /// @param signatures The packed signatures of the checkpoint.
     function validateActiveQuorumSignatures(
         address[] memory signatories,
         bytes32 hash,
@@ -493,16 +500,16 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         }
     }
 
-    /**
-     * @notice Hash a 65 byte public key and return the corresponding address.
-     */
+    /// @notice Converts a 65-byte public key to its corresponding address.
+    /// @param publicKey The 65-byte public key to be converted.
+    /// @return The address derived from the given public key.
     function publicKeyToAddress(bytes calldata publicKey) internal pure returns (address) {
         assert(publicKey.length == VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH);
         bytes32 hashed = keccak256(publicKey[1:]);
         return address(uint160(uint256(hashed)));
     }
 
-    /// @notice Removes an address from the initial balance keys
+    /// @notice Removes an address from the initial balance keys.
     function rmAddressFromBalanceKey(address addr) internal {
         uint256 length = s.genesisBalanceKeys.length;
         for (uint256 i; i < length; ) {
