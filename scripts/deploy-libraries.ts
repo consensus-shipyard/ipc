@@ -37,6 +37,14 @@ export async function deploy() {
         {},
         txArgs,
     )
+
+    const { address: libQuorumAddress } = await deployContractWithDeployer(
+        deployer,
+        'LibQuorum',
+        {},
+        txArgs,
+    )
+
     // nested libs
     const { address: crossMsgHelperAddress } = await deployContractWithDeployer(
         deployer,

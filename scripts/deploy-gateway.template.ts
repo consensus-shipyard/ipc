@@ -42,6 +42,7 @@ export async function deploy(libs: { [key in string]: string }) {
 
     const getterFacetLibs: Libraries = {
         SubnetIDHelper: libs['SubnetIDHelper'],
+        LibQuorum: libs['LibQuorum'],
     }
 
     const managerFacetLibs: Libraries = {
