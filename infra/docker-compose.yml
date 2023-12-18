@@ -44,6 +44,7 @@ services:
     image: "fendermint:latest"
     command: "eth run"
     environment:
+      - TENDERMINT_RPC_URL=http://cometbft-node${NODE_ID}:26657
       - TENDERMINT_WS_URL=ws://cometbft-node${NODE_ID}:26657/websocket
       - LOG_LEVEL=debug
       - RUST_BACKTRACE=1

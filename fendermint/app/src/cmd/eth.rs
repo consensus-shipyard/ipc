@@ -4,8 +4,7 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use fendermint_rpc::client::ws_client;
-use tendermint_rpc::{Url, WebSocketClient, WebSocketClientDriver};
+use fendermint_eth_api::HybridClient;
 
 use crate::{
     cmd,
@@ -16,9 +15,9 @@ use crate::{
 cmd! {
   EthArgs(self, settings: EthSettings) {
     match self.command.clone() {
-      EthCommands::Run { url, proxy_url:_, connect_max_retries, connect_retry_delay } => {
+      EthCommands::Run { ws_url, http_url, connect_retry_delay } => {
 
-        let (client, driver) = ws_connect(url, connect_max_retries, Duration::from_secs(connect_retry_delay)).await.context("failed to connect to Tendermint")?;
+        let (client, driver) = HybridClient::new(http_url, ws_url, Duration::from_secs(connect_retry_delay)).context("failed to create HybridClient")?;
 
         let driver_handle = tokio::spawn(async move { driver.run().await });
 
@@ -32,8 +31,8 @@ cmd! {
   }
 }
 
-/// Run the Ethereum
-async fn run(settings: EthSettings, client: WebSocketClient) -> anyhow::Result<()> {
+/// Run the Ethereum API facade.
+async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> {
     let gas = fendermint_eth_api::GasOpt {
         min_gas_premium: settings.gas.min_gas_premium,
         num_blocks_max_prio_fee: settings.gas.num_blocks_max_prio_fee,
@@ -47,29 +46,4 @@ async fn run(settings: EthSettings, client: WebSocketClient) -> anyhow::Result<(
         gas,
     )
     .await
-}
-
-/// Try connecting repeatedly until it succeeds.
-async fn ws_connect(
-    url: Url,
-    max_retries: usize,
-    retry_delay: Duration,
-) -> anyhow::Result<(WebSocketClient, WebSocketClientDriver)> {
-    let mut retry = 0;
-    loop {
-        match ws_client(url.clone()).await {
-            Ok(cd) => {
-                return Ok(cd);
-            }
-            Err(e) => {
-                if retry >= max_retries {
-                    return Err(e);
-                } else {
-                    tracing::warn!("failed to connect to Tendermint; retrying...");
-                    retry += 1;
-                    tokio::time::sleep(retry_delay).await;
-                }
-            }
-        }
-    }
 }
