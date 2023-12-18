@@ -146,4 +146,16 @@ library TestUtils {
         require(_a.length == _b.length, "bytes len not equal");
         require(keccak256(_a) == keccak256(_b), "bytes not equal");
     }
+
+    // Helper function to validate bytes4[] arrays
+    function validateBytes4Array(
+        bytes4[] memory array1,
+        bytes4[] memory array2,
+        string memory errorMessage
+    ) internal pure {
+        require(array1.length == array2.length, errorMessage);
+        for (uint i = 0; i < array1.length; i++) {
+            require(array1[i] == array2[i], errorMessage);
+        }
+    }
 }

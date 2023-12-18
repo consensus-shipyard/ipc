@@ -38,7 +38,7 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
         gwRouter = GatewayRouterFacet(address(gatewayDiamond));
         gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
-        gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
+        gwLoupeFacet = DiamondLoupeFacet(address(gatewayDiamond));
         gwCutFacet = DiamondCutFacet(address(gatewayDiamond));
     }
 

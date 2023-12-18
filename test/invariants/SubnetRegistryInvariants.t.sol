@@ -14,48 +14,13 @@ import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.
 import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 
-contract SubnetRegistryInvariants is StdInvariant, Test {
-    address private constant DEFAULT_IPC_GATEWAY_ADDR = address(1024);
-
+contract SubnetRegistryInvariants is StdInvariant, Test, IntegrationTestBase {
+    SubnetRegistryDiamond registryDiamond;
     SubnetRegistryHandler private registryHandler;
 
-    SubnetRegistryDiamond private registry;
-    bytes4[] private empty;
-
-    address private louperFacetAddr;
-    address private cutFacetAddr;
-    address private registerSubnetFacetAddr;
-    address private subnetGetterFacetAddr;
-
-    DiamondLoupeFacet private louperFacet;
-    DiamondCutFacet private cutFacet;
-    RegisterSubnetFacet private registerSubnetFacet;
-    SubnetGetterFacet private subnetGetterFacet;
-
-    bytes4[] private cutFacetSelectors;
-    bytes4[] private louperSelectors;
-
-    bytes4[] private registerSubnetFacetSelectors;
-    bytes4[] private subnetGetterFacetSelectors;
-
-    error FacetCannotBeZero();
-    error WrongGateway();
-    error CannotFindSubnet();
-    error UnknownSubnet();
-    error GatewayCannotBeZero();
-
-    constructor() {
-        louperSelectors = TestUtils.generateSelectors(vm, "DiamondLoupeFacet");
-        cutFacetSelectors = TestUtils.generateSelectors(vm, "DiamondCutFacet");
-        registerSubnetFacetSelectors = TestUtils.generateSelectors(vm, "RegisterSubnetFacet");
-        subnetGetterFacetSelectors = TestUtils.generateSelectors(vm, "SubnetGetterFacet");
-    }
-
-    // Event emitted when a new SubnetRegistry is created
-    event SubnetRegistryCreated(address indexed subnetRegistryAddress);
-
-    function setUp() public {
+    function setUp() public virtual override {
         bytes4[] memory mockedSelectors = new bytes4[](1);
         mockedSelectors[0] = 0x6cb2ecee;
 
@@ -69,51 +34,8 @@ contract SubnetRegistryInvariants is StdInvariant, Test {
         params.subnetGetterSelectors = mockedSelectors;
         params.subnetManagerSelectors = mockedSelectors2;
 
-        louperFacet = new DiamondLoupeFacet();
-        louperFacetAddr = address(louperFacet);
-
-        cutFacet = new DiamondCutFacet();
-        cutFacetAddr = address(cutFacet);
-
-        registerSubnetFacet = new RegisterSubnetFacet();
-        registerSubnetFacetAddr = address(registerSubnetFacet);
-
-        subnetGetterFacet = new SubnetGetterFacet();
-        subnetGetterFacetAddr = address(subnetGetterFacet);
-
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](4);
-
-        gwDiamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: louperFacetAddr,
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: louperSelectors
-            })
-        );
-        gwDiamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: cutFacetAddr,
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: cutFacetSelectors
-            })
-        );
-        gwDiamondCut[2] = (
-            IDiamond.FacetCut({
-                facetAddress: registerSubnetFacetAddr,
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: registerSubnetFacetSelectors
-            })
-        );
-        gwDiamondCut[3] = (
-            IDiamond.FacetCut({
-                facetAddress: subnetGetterFacetAddr,
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: subnetGetterFacetSelectors
-            })
-        );
-
-        registry = new SubnetRegistryDiamond(gwDiamondCut, params);
-        registryHandler = new SubnetRegistryHandler(registry);
+        registryDiamond = createSubnetRegistry(params);
+        registryHandler = new SubnetRegistryHandler(registryDiamond);
 
         bytes4[] memory fuzzSelectors = new bytes4[](1);
         fuzzSelectors[0] = SubnetRegistryHandler.deploySubnetActorFromRegistry.selector;

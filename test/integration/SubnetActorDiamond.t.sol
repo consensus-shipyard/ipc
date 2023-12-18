@@ -63,10 +63,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(saLouper.facets().length == 4, "unexpected length");
-        require(saLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(saLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(saLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
+        require(saLoupeFacet.facets().length == 4, "unexpected length");
+        require(saLoupeFacet.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(saLoupeFacet.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(saLoupeFacet.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
