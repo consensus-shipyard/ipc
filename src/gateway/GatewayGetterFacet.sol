@@ -19,68 +19,88 @@ contract GatewayGetterFacet {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    /// @notice Returns the minimum fee required for cross-net messages.
     function crossMsgFee() external view returns (uint256) {
         return s.minCrossMsgFee;
     }
 
+    /// @notice Returns the current nonce for bottom-up message processing.
     function bottomUpNonce() external view returns (uint64) {
         return s.bottomUpNonce;
     }
 
+    /// @notice Returns the total number of the registered subnets.
     function totalSubnets() external view returns (uint64) {
         return s.totalSubnets;
     }
 
+    /// @notice Returns the minimum stake required for instantiating a subnet.
     function minStake() external view returns (uint256) {
         return s.minStake;
     }
 
+    /// @notice Returns the maximum number of messages per bottom-up batch.
     function maxMsgsPerBottomUpBatch() external view returns (uint64) {
         return s.maxMsgsPerBottomUpBatch;
     }
 
+    /// @notice Returns the period for processing bottom-up message batches.
     function bottomUpMsgBatchPeriod() external view returns (uint256) {
         return s.bottomUpMsgBatchPeriod;
     }
 
+    /// @notice Returns the period for bottom-up checkpointing.
     function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
     }
 
+    /// @notice Returns the subnet identifier of the network.
     function getNetworkName() external view returns (SubnetID memory) {
         return s.networkName;
     }
 
+    /// @notice Returns a specific bottom-up checkpoint based on an epoch number.
+    /// @param e The epoch number of the checkpoint.
     function bottomUpCheckpoint(uint256 e) external view returns (BottomUpCheckpoint memory) {
         return s.bottomUpCheckpoints[e];
     }
 
+    /// @notice Returns a specific bottom-up message batch based on an index.
+    /// @param e The epoch number of the batch.
     function bottomUpMsgBatch(uint256 e) external view returns (BottomUpMsgBatch memory) {
         return s.bottomUpMsgBatches[e];
     }
 
+    /// @notice Returns the parent chain finality information for a given block number.
+    /// @param blockNumber The block number for which to retrieve parent-finality information.
     function getParentFinality(uint256 blockNumber) external view returns (ParentFinality memory) {
         return LibGateway.getParentFinality(blockNumber);
     }
 
+    /// @notice Gets the most recent parent-finality information from the parent.
     function getLatestParentFinality() external view returns (ParentFinality memory) {
         return LibGateway.getLatestParentFinality();
     }
 
-    /// @notice returns the subnet with the given id
-    /// @param subnetId the id of the subnet
-    /// @return found whether the subnet exists
-    /// @return subnet -  the subnet struct
+    /// @notice Returns the subnet with the given id.
+    /// @param subnetId the id of the subnet.
+    /// @return found whether the subnet exists.
+    /// @return subnet -  the subnet struct.
     function getSubnet(SubnetID calldata subnetId) external view returns (bool, Subnet memory) {
         // slither-disable-next-line unused-return
         return LibGateway.getSubnet(subnetId);
     }
 
+    /// @notice Returns information about a specific subnet using its hash identifier.
+    /// @param h The hash identifier of the subnet to be queried.
+    /// @return subnet The subnet information corresponding to the given hash.
     function subnets(bytes32 h) external view returns (Subnet memory subnet) {
         return s.subnets[h];
     }
 
-    /// @notice get number of top-down messages for the given subnet
+    /// @notice Returns the length of the top-down message queue for a specified subnet.
+    /// @param subnetId The identifier of the subnet for which the message queue length is queried.
+    /// @return The current length of the top-down message queue, indicated by the subnet's top-down nonce.
     function getSubnetTopDownMsgsLength(SubnetID memory subnetId) external view returns (uint256) {
         // slither-disable-next-line unused-return
         (, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
@@ -88,8 +108,9 @@ contract GatewayGetterFacet {
         return subnet.topDownNonce;
     }
 
-    /// @notice Get the latest applied top down nonce
-    /// @param subnetId - The subnet id to fetch messages from
+    /// @notice Returns the current applied top-down nonce for a specified subnet, indicating whether it's registered.
+    /// @param subnetId The identifier of the subnet for which the top-down nonce is queried.
+    /// @return A tuple containing a boolean indicating if the subnet is registered and the current top-down nonce.
     function getAppliedTopDownNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
         if (!registered) {
@@ -98,20 +119,26 @@ contract GatewayGetterFacet {
         return (true, subnet.topDownNonce);
     }
 
+    /// @notice Returns the current applied top-down nonce.
     function appliedTopDownNonce() external view returns (uint64) {
         return s.appliedTopDownNonce;
     }
 
+    /// @notice Returns the storable message and its wrapped status from the postbox by a given identifier.
+    /// @param id The unique identifier of the message in the postbox.
+    /// @return storableMsg The storable message associated with the given id.
+    /// @return wrapped A boolean indicating whether the message is wrapped.
     function postbox(bytes32 id) external view returns (StorableMsg memory storableMsg, bool wrapped) {
         return (s.postbox[id].message, s.postbox[id].wrapped);
     }
 
+    /// @notice Returns the majority percentage required for certain consensus or decision-making processes.
     function majorityPercentage() external view returns (uint64) {
         return s.majorityPercentage;
     }
 
-    /// @notice returns the list of registered subnets in IPC
-    /// @return subnet - the list of subnets
+    /// @notice Returns the list of registered subnets.
+    /// @return The list of the registered subnets.
     function listSubnets() external view returns (Subnet[] memory) {
         uint256 size = s.subnetKeys.length;
         Subnet[] memory out = new Subnet[](size);
@@ -125,51 +152,56 @@ contract GatewayGetterFacet {
         return out;
     }
 
-    /// @notice get the last membership received from the parent
+    /// @notice Returns the last membership received from the parent.
     function getLastMembership() external view returns (Membership memory) {
         return s.lastMembership;
     }
 
-    /// @notice get the last configuration number received from the parent
+    /// @notice Returns the last configuration number received from the parent.
     function getLastConfigurationNumber() external view returns (uint64) {
         return s.lastMembership.configurationNumber;
     }
 
-    /// @notice get the current membership
+    /// @notice Returns the current membership.
     function getCurrentMembership() external view returns (Membership memory) {
         return s.currentMembership;
     }
 
-    /// @notice get the current configuration number
+    /// @notice Returns the current configuration number.
     function getCurrentConfigurationNumber() external view returns (uint64) {
         return s.currentMembership.configurationNumber;
     }
 
-    /// @notice get the checkpoint information corresponding to the block height
+    /// @notice Returns quorum information for a specific checkpoint based on its height.
+    /// @param h The block height of the checkpoint.
+    /// @return Quorum information associated with the given checkpoint height.
     function getCheckpointInfo(uint256 h) external view returns (QuorumInfo memory) {
         return s.checkpointQuorumMap.quorumInfo[h];
     }
 
+    /// @notice Returns quorum information for a specific bottom-up message batch based on its height.
+    /// @param h The block height of the bottom-up message batch.
+    /// @return Quorum information associated with the given bottom-up message batch height.
     function getBottomUpMsgBatchInfo(uint256 h) external view returns (QuorumInfo memory) {
         return s.bottomUpMsgBatchQuorumMap.quorumInfo[h];
     }
 
-    /// @notice get the checkpoint current weight corresponding to the block height
+    /// @notice Returns the checkpoint current weight corresponding to the block height.
     function getCheckpointCurrentWeight(uint256 h) external view returns (uint256) {
         return s.checkpointQuorumMap.quorumInfo[h].currentWeight;
     }
 
-    /// @notice get the batch current weight corresponding to the block height
+    /// @notice Returns the batch current weight corresponding to the block height.
     function getBottomUpMsgBatchCurrentWeight(uint256 h) external view returns (uint256) {
         return s.bottomUpMsgBatchQuorumMap.quorumInfo[h].currentWeight;
     }
 
-    /// @notice get the incomplete checkpoint heights
+    /// @notice Returns the incomplete checkpoint heights.
     function getIncompleteCheckpointHeights() external view returns (uint256[] memory) {
         return s.checkpointQuorumMap.incompleteQuorums.values();
     }
 
-    /// @notice get the incomplete checkpoints
+    /// @notice Returns the incomplete checkpoints.
     function getIncompleteCheckpoints() external view returns (BottomUpCheckpoint[] memory) {
         uint256[] memory heights = s.checkpointQuorumMap.incompleteQuorums.values();
         uint256 size = heights.length;
@@ -184,7 +216,7 @@ contract GatewayGetterFacet {
         return checkpoints;
     }
 
-    /// @notice get the incomplete batches of messages
+    /// @notice Returns the incomplete batches of messages.
     function getIncompleteMsgBatches() external view returns (BottomUpMsgBatch[] memory) {
         uint256[] memory heights = s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
         uint256 size = heights.length;
@@ -199,28 +231,34 @@ contract GatewayGetterFacet {
         return batches;
     }
 
-    /// @notice get the incomplete msd batches heights
+    /// @notice Returns the incomplete msd batches heights.
     function getIncompleteMsgBatchHeights() external view returns (uint256[] memory) {
         return s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
     }
 
-    /// @notice get the bottom-up checkpoint retention index
+    /// @notice Returns the bottom-up checkpoint retention index.
     function getCheckpointRetentionHeight() external view returns (uint256) {
         return s.checkpointQuorumMap.retentionHeight;
     }
 
-    /// @notice get the bottom-up batch retention index
+    /// @notice Returns the bottom-up batch retention index.
     function getBottomUpMsgRetentionHeight() external view returns (uint256) {
         return s.bottomUpMsgBatchQuorumMap.retentionHeight;
     }
 
-    /// @notice Calculate the threshold required for quorum in this subnet
-    /// based on the configured majority percentage and the total weight of the validators.
+    /// @notice Returns the threshold required for quorum in this subnet,
+    ///         based on the configured majority percentage and the total weight of the validators.
+    /// @param totalWeight The total weight to consider for calculating the quorum threshold.
+    /// @return The quorum threshold derived from the total weight and majority percentage.
     function getQuorumThreshold(uint256 totalWeight) external view returns (uint256) {
         return LibQuorum.weightNeeded(totalWeight, s.majorityPercentage);
     }
 
-    /// @notice get the checkpoint signature bundle consisting of the checkpoint, its info, signatories and the corresponding signatures.
+    /// @notice Retrieves a bundle of information and signatures for a specified bottom-up checkpoint.
+    /// @param h The height of the checkpoint for which information is requested.
+    /// @return ch The checkpoint information at the specified height.
+    /// @return info Quorum information related to the checkpoint.
+    /// @return signatories An array of addresses of signatories who have signed the checkpoint.
     function getCheckpointSignatureBundle(
         uint256 h
     )
@@ -239,7 +277,12 @@ contract GatewayGetterFacet {
         return (ch, info, signatories, signatures);
     }
 
-    /// @notice get the bottom-up msg batch signature bundle
+    /// @notice Returns a bundle of information and signatures for a specified bottom-up message batch.
+    /// @param h The height of the message batch for which information is requested.
+    /// @return batch The bottom-up message batch information at the specified height.
+    /// @return info Quorum information related to the message batch.
+    /// @return signatories An array of addresses of signatories who have signed the message batch.
+    /// @return signatures An array of signatures corresponding to each signatory for the message batch.
     function getBottomUpMsgBatchSignatureBundle(
         uint256 h
     )
@@ -258,7 +301,7 @@ contract GatewayGetterFacet {
         return (batch, info, signatories, signatures);
     }
 
-    /// @notice returns the current bottom-up checkpoint
+    /// @notice Returns the current bottom-up checkpoint.
     /// @return exists - whether the checkpoint exists
     /// @return epoch - the epoch of the checkpoint
     /// @return checkpoint - the checkpoint struct

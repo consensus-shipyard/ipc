@@ -19,43 +19,52 @@ contract SubnetActorGetterFacet {
     // slither-disable-next-line uninitialized-state
     SubnetActorStorage internal s;
 
-    /// @notice get the parent subnet id
+    /// @notice Returns the parent subnet id.
     function getParent() external view returns (SubnetID memory) {
         return s.parentId;
     }
 
+    /// @notice Returns the permission mode.
     function permissionMode() external view returns (PermissionMode) {
         return s.validatorSet.permissionMode;
     }
 
+    /// @notice Returns the gateway address.
     function ipcGatewayAddr() external view returns (address) {
         return s.ipcGatewayAddr;
     }
 
+    /// @notice Returns the minimum validators number needed to activate the subnet.
     function minValidators() external view returns (uint64) {
         return s.minValidators;
     }
 
+    /// @notice Returns the majority percentage required for consensus.
     function majorityPercentage() external view returns (uint8) {
         return s.majorityPercentage;
     }
 
+    /// @notice Fetches the limit on the number of active validators.
     function activeValidatorsLimit() external view returns (uint16) {
         return s.validatorSet.activeLimit;
     }
 
+    /// @notice Returns the next and start configuration numbers related to the changes.
     function getConfigurationNumbers() external view returns (uint64, uint64) {
         return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
     }
 
+    /// @notice Returns the initial set of validators of the genesis block.
     function genesisValidators() external view returns (Validator[] memory) {
         return s.genesisValidators;
     }
 
+    // @notice Provides the circulating supply of the genesis block.
     function genesisCircSupply() external view returns (uint256) {
         return s.genesisCircSupply;
     }
 
+    /// @notice Retrieves initial balances and corresponding addresses of the genesis block.
     function genesisBalances() external view returns (address[] memory, uint256[] memory) {
         uint256 numAddresses = s.genesisBalanceKeys.length;
         address[] memory addresses = new address[](numAddresses);
@@ -73,70 +82,85 @@ contract SubnetActorGetterFacet {
         return (addresses, balances);
     }
 
+    /// @notice Returns the period for bottom-up checkpointing operations.
     function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
     }
 
+    /// @notice Returns the batch period for bottom-up messaging.
     function bottomUpMsgBatchPeriod() external view returns (uint256) {
         return s.bottomUpMsgBatchPeriod;
     }
 
+    /// @notice Returns the block height of the last bottom-up checkpoint.
     function lastBottomUpCheckpointHeight() external view returns (uint256) {
         return s.lastBottomUpCheckpointHeight;
     }
 
+    /// @notice Returns the block height of the last bottom-up message batch.
     function lastBottomUpMsgBatchHeight() external view returns (uint256) {
         return s.lastBottomUpBatch.blockHeight;
     }
 
+    /// @notice Returns the consensus protocol type used in the subnet.
     function consensus() external view returns (ConsensusType) {
         return s.consensus;
     }
 
+    /// @notice Checks if the subnet has been bootstrapped.
     function bootstrapped() external view returns (bool) {
         return s.bootstrapped;
     }
 
+    /// @notice Checks if the subnet has been terminated or "killed".
     function killed() external view returns (bool) {
         return s.killed;
     }
 
+    /// @notice Returns the minimum collateral required for subnet activation.
     function minActivationCollateral() external view returns (uint256) {
         return s.minActivationCollateral;
     }
 
+    /// @notice Returns the minimum fee for cross-messaging.
     function minCrossMsgFee() external view returns (uint256) {
         return s.minCrossMsgFee;
     }
 
-    /// @notice Get the information of a validator
+    /// @notice Returns detailed information about a specific validator.
+    /// @param validatorAddress The address of the validator to query information for.
     function getValidator(address validatorAddress) external view returns (ValidatorInfo memory validator) {
         validator = s.validatorSet.validators[validatorAddress];
     }
 
-    /// @notice Get the total number of validators (active and waiting).
+    /// @notice Returns the total number of validators (active and waiting).
     function getTotalValidatorsNumber() external view returns (uint16) {
         return LibStaking.totalValidators();
     }
 
-    /// @notice Get the number of active validators.
+    /// @notice Returns the number of active validators.
     function getActiveValidatorsNumber() external view returns (uint16) {
         return LibStaking.totalActiveValidators();
     }
 
+    /// @notice Returns the total amount of confirmed collateral across all validators.
     function getTotalConfirmedCollateral() external view returns (uint256) {
         return LibStaking.getTotalConfirmedCollateral();
     }
 
+    /// @notice Returns the total collateral held by all validators.
     function getTotalCollateral() external view returns (uint256) {
         return LibStaking.getTotalCollateral();
     }
 
+    /// @notice Returns the total collateral amount for a specific validator.
+    /// @param validator The address of the validator for which collateral is queried.
     function getTotalValidatorCollateral(address validator) external view returns (uint256) {
         return LibStaking.totalValidatorCollateral(validator);
     }
 
-    /// @notice Checks if the validator address is an active validator
+    /// @notice Checks if the validator address is in an active state.
+    /// @param validator The address of the checked validator
     function getPower(address validator) external view returns (uint256) {
         return LibStaking.getPower(validator);
     }
@@ -146,25 +170,30 @@ contract SubnetActorGetterFacet {
         return LibStaking.isActiveValidator(validator);
     }
 
-    /// @notice Checks if the validator is a waiting validator
+    /// @notice Checks if the validator is in a waiting state.
+    /// @param validator The address of the checked validator.
     function isWaitingValidator(address validator) external view returns (bool) {
         return LibStaking.isWaitingValidator(validator);
     }
 
+    /// @notice Determines if a validator has submitted the most recent bottom-up message batch.
+    /// @param validator The address of the validator being checked for participation.
     function hasSubmittedInLastBottomUpMsgBatchHeight(address validator) external view returns (bool) {
         uint256 height = s.lastBottomUpBatch.blockHeight;
         return s.relayerRewards.batchRewarded[height].contains(validator);
     }
 
+    /// @notice Checks whether a validator has submitted the most recent bottom-up checkpoint message.
+    /// @param validator The address of the validator being checked for inclusion in the last checkpoint.
     function hasSubmittedInLastBottomUpCheckpointHeight(address validator) external view returns (bool) {
         uint256 height = s.lastBottomUpCheckpointHeight;
         return s.relayerRewards.checkpointRewarded[height].contains(validator);
     }
 
-    /// @notice returns the committed bottom-up checkpoint at specific epoch
-    /// @param epoch - the epoch to check
-    /// @return exists - whether the checkpoint exists
-    /// @return checkpoint - the checkpoint struct
+    /// @notice returns the committed bottom-up checkpoint at specific epoch.
+    /// @param epoch - the epoch to check.
+    /// @return exists - whether the checkpoint exists.
+    /// @return checkpoint - the checkpoint struct.
     function bottomUpCheckpointAtEpoch(
         uint256 epoch
     ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
@@ -173,7 +202,7 @@ contract SubnetActorGetterFacet {
         return (exists, checkpoint);
     }
 
-    /// @notice returns the historical committed bottom-up checkpoint hash
+    /// @notice returns the historical committed bottom-up checkpoint hash.
     /// @param epoch - the epoch to check
     /// @return exists - whether the checkpoint exists
     /// @return hash - the hash of the checkpoint
@@ -182,12 +211,12 @@ contract SubnetActorGetterFacet {
         return (exists, keccak256(abi.encode(checkpoint)));
     }
 
-    /// @notice returns the power scale in number of decimals from whole FIL
+    /// @notice Returns the power scale in number of decimals from whole FIL.
     function powerScale() external view returns (int8) {
         return s.powerScale;
     }
 
-    /// @notice returns the bootstrap nodes addresses
+    /// @notice Returns the bootstrap nodes addresses.
     function getBootstrapNodes() external view returns (string[] memory) {
         uint256 n = s.bootstrapOwners.length();
         string[] memory nodes = new string[](n);
@@ -204,14 +233,17 @@ contract SubnetActorGetterFacet {
         return nodes;
     }
 
-    /// @notice This exists for testing purposes.
-    /// @param messages - cross-messages to hash
+    /// @notice Computes a hash of an array of cross-chain messages.
+    /// @dev This exists for testing purposes.
+    /// @param messages An array of cross-chain messages to be hashed.
+    /// @return The keccak256 hash of the encoded cross-chain messages.
     function crossMsgsHash(CrossMsg[] calldata messages) external pure returns (bytes32) {
         return keccak256(abi.encode(messages));
     }
 
-    /// @notice Returns the current reward for the relayer
-    /// @param relayer - relayer address
+    /// @notice Retrieves the total reward amount allocated to a specific relayer.
+    /// @param relayer The address of the relayer whose reward amount is to be queried.
+    /// @return The total reward amount accrued by the specified relayer.
     function getRelayerReward(address relayer) external view returns (uint256) {
         return s.relayerRewards.rewards[relayer];
     }
