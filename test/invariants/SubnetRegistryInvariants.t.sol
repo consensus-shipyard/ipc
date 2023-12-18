@@ -14,10 +14,9 @@ import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.
 import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {IntegrationTestBase} from "../IntegrationTestBase.sol";
+import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 
-contract SubnetRegistryInvariants is StdInvariant, Test, IntegrationTestBase {
-    SubnetRegistryDiamond registryDiamond;
+contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, IntegrationTestBase {
     SubnetRegistryHandler private registryHandler;
 
     function setUp() public virtual override {

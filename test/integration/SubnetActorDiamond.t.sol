@@ -47,7 +47,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function testSubnetActorDiamond_NewSubnetActorWithDefaultParams() public view {
         SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithRootGateway();
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
+            address(gatewayDiamond)
+        );
 
         require(saGetter.ipcGatewayAddr() == params.ipcGatewayAddr, "unexpected gateway");
         require(saGetter.minActivationCollateral() == params.minActivationCollateral, "unexpected collateral");
@@ -63,10 +65,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(saLoupeFacet.facets().length == 4, "unexpected length");
-        require(saLoupeFacet.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(saLoupeFacet.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(saLoupeFacet.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
+        require(saLouper.facets().length == 4, "unexpected length");
+        require(saLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(saLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(saLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators

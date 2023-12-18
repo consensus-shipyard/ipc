@@ -23,10 +23,9 @@ import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol"
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
-import {IntegrationTestBase} from "../IntegrationTestBase.sol";
+import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 
-contract SubnetRegistryTest is Test, IntegrationTestBase {
-    SubnetRegistryDiamond registryDiamond;
+contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     bytes4[] empty;
 
     function setUp() public virtual override {
@@ -44,8 +43,8 @@ contract SubnetRegistryTest is Test, IntegrationTestBase {
         params.subnetManagerSelectors = mockedSelectors2;
 
         registryDiamond = createSubnetRegistry(params);
-        registryLoupeFacet = DiamondLoupeFacet(address(registryDiamond));
-        registryCutFacet = DiamondCutFacet(address(registryDiamond));
+        registryLouper = DiamondLoupeFacet(address(registryDiamond));
+        registryCutter = DiamondCutFacet(address(registryDiamond));
         registrySubnetFacet = RegisterSubnetFacet(address(registryDiamond));
         registrySubnetGetterFacet = SubnetGetterFacet(address(registryDiamond));
     }
@@ -56,25 +55,19 @@ contract SubnetRegistryTest is Test, IntegrationTestBase {
         for (uint256 i = 0; i < facetsLength; ++i) {
             address facetAddress = facets[i].facetAddress;
             require(
-                registryLoupeFacet.facetFunctionSelectors(facetAddress).length == facets[i].functionSelectors.length,
+                registryLouper.facetFunctionSelectors(facetAddress).length == facets[i].functionSelectors.length,
                 "unexpected function selector length"
             );
         }
     }
 
     function test_Registry_Deployment_IERC165() public view {
-        require(registryLoupeFacet.facets().length == 4, "unexpected length");
+        require(registryLouper.facets().length == 4, "unexpected length");
+        require(registryLouper.facetAddresses().length == registryLouper.facets().length, "inconsistent diamond size");
+        require(registryLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(registryLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
         require(
-            registryLoupeFacet.facetAddresses().length == registryLoupeFacet.facets().length,
-            "inconsistent diamond size"
-        );
-        require(registryLoupeFacet.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(
-            registryLoupeFacet.supportsInterface(type(IDiamondCut).interfaceId) == true,
-            "IDiamondCut not supported"
-        );
-        require(
-            registryLoupeFacet.supportsInterface(type(IDiamondLoupe).interfaceId) == true,
+            registryLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true,
             "IDiamondLoupe not supported"
         );
     }

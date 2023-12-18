@@ -70,10 +70,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(gwLoupeFacet.facets().length == 6, "unexpected length");
-        require(gwLoupeFacet.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(gwLoupeFacet.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(gwLoupeFacet.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
+        require(gwLouper.facets().length == 6, "unexpected length");
+        require(gwLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
+        require(gwLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
+        require(gwLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
     }
 
     function testGatewayDiamond_DiamondCut() public {
