@@ -25,7 +25,7 @@ contract SubnetActorGetterFacet {
     }
 
     function permissionMode() external view returns (PermissionMode) {
-        return s.permissionMode;
+        return s.validatorSet.permissionMode;
     }
 
     function ipcGatewayAddr() external view returns (address) {
@@ -134,6 +134,11 @@ contract SubnetActorGetterFacet {
 
     function getTotalValidatorCollateral(address validator) external view returns (uint256) {
         return LibStaking.totalValidatorCollateral(validator);
+    }
+
+    /// @notice Checks if the validator address is an active validator
+    function getPower(address validator) external view returns (uint256) {
+        return LibStaking.getPower(validator);
     }
 
     /// @notice Checks if the validator address is an active validator

@@ -747,6 +747,17 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("DuplicatedGenesisValidator"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "DuplicatedGenesisValidator",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("EmptyAddress"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -918,6 +929,17 @@ pub mod subnet_actor_manager_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("NotEnoughGenesisValidators"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NotEnoughGenesisValidators",
+                            ),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -1393,6 +1415,22 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "CollateralIsZero", abi = "CollateralIsZero()")]
     pub struct CollateralIsZero;
+    ///Custom Error type `DuplicatedGenesisValidator` with signature `DuplicatedGenesisValidator()` and selector `0x472b3530`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "DuplicatedGenesisValidator",
+        abi = "DuplicatedGenesisValidator()"
+    )]
+    pub struct DuplicatedGenesisValidator;
     ///Custom Error type `EmptyAddress` with signature `EmptyAddress()` and selector `0x7138356f`
     #[derive(
         Clone,
@@ -1603,6 +1641,22 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "NotEnoughFunds", abi = "NotEnoughFunds()")]
     pub struct NotEnoughFunds;
+    ///Custom Error type `NotEnoughGenesisValidators` with signature `NotEnoughGenesisValidators()` and selector `0x62901620`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "NotEnoughGenesisValidators",
+        abi = "NotEnoughGenesisValidators()"
+    )]
+    pub struct NotEnoughGenesisValidators;
     ///Custom Error type `NotGateway` with signature `NotGateway()` and selector `0xe7e601db`
     #[derive(
         Clone,
@@ -1758,6 +1812,7 @@ pub mod subnet_actor_manager_facet {
         CannotConfirmFutureChanges(CannotConfirmFutureChanges),
         CannotReleaseZero(CannotReleaseZero),
         CollateralIsZero(CollateralIsZero),
+        DuplicatedGenesisValidator(DuplicatedGenesisValidator),
         EmptyAddress(EmptyAddress),
         EnforcedPause(EnforcedPause),
         ExpectedPause(ExpectedPause),
@@ -1774,6 +1829,7 @@ pub mod subnet_actor_manager_facet {
         NotEnoughBalance(NotEnoughBalance),
         NotEnoughCollateral(NotEnoughCollateral),
         NotEnoughFunds(NotEnoughFunds),
+        NotEnoughGenesisValidators(NotEnoughGenesisValidators),
         NotGateway(NotGateway),
         NotOwner(NotOwner),
         NotOwnerOfPublicKey(NotOwnerOfPublicKey),
@@ -1828,6 +1884,11 @@ pub mod subnet_actor_manager_facet {
                 data,
             ) {
                 return Ok(Self::CollateralIsZero(decoded));
+            }
+            if let Ok(decoded) = <DuplicatedGenesisValidator as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::DuplicatedGenesisValidator(decoded));
             }
             if let Ok(decoded) = <EmptyAddress as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1909,6 +1970,11 @@ pub mod subnet_actor_manager_facet {
             ) {
                 return Ok(Self::NotEnoughFunds(decoded));
             }
+            if let Ok(decoded) = <NotEnoughGenesisValidators as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::NotEnoughGenesisValidators(decoded));
+            }
             if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -1988,6 +2054,9 @@ pub mod subnet_actor_manager_facet {
                 Self::CollateralIsZero(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::DuplicatedGenesisValidator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::EmptyAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -2034,6 +2103,9 @@ pub mod subnet_actor_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotEnoughFunds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotEnoughGenesisValidators(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotGateway(element) => {
@@ -2100,6 +2172,10 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
+                    == <DuplicatedGenesisValidator as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <EmptyAddress as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
@@ -2162,6 +2238,10 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
+                    == <NotEnoughGenesisValidators as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <NotGateway as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <NotOwner as ::ethers::contract::EthError>::selector() => true,
@@ -2218,6 +2298,9 @@ pub mod subnet_actor_manager_facet {
                 }
                 Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CollateralIsZero(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DuplicatedGenesisValidator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::EmptyAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EnforcedPause(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ExpectedPause(element) => ::core::fmt::Display::fmt(element, f),
@@ -2250,6 +2333,9 @@ pub mod subnet_actor_manager_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughGenesisValidators(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotGateway(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotOwner(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotOwnerOfPublicKey(element) => {
@@ -2311,6 +2397,12 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<CollateralIsZero> for SubnetActorManagerFacetErrors {
         fn from(value: CollateralIsZero) -> Self {
             Self::CollateralIsZero(value)
+        }
+    }
+    impl ::core::convert::From<DuplicatedGenesisValidator>
+    for SubnetActorManagerFacetErrors {
+        fn from(value: DuplicatedGenesisValidator) -> Self {
+            Self::DuplicatedGenesisValidator(value)
         }
     }
     impl ::core::convert::From<EmptyAddress> for SubnetActorManagerFacetErrors {
@@ -2397,6 +2489,12 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<NotEnoughFunds> for SubnetActorManagerFacetErrors {
         fn from(value: NotEnoughFunds) -> Self {
             Self::NotEnoughFunds(value)
+        }
+    }
+    impl ::core::convert::From<NotEnoughGenesisValidators>
+    for SubnetActorManagerFacetErrors {
+        fn from(value: NotEnoughGenesisValidators) -> Self {
+            Self::NotEnoughGenesisValidators(value)
         }
     }
     impl ::core::convert::From<NotGateway> for SubnetActorManagerFacetErrors {

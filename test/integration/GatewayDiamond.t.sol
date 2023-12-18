@@ -283,13 +283,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(subnets.length == numberOfSubnets, "unexpected length");
     }
 
-    function testGatewayDiamond_Register_Fail_InsufficientCollateral(uint256 collateral) public {
-        vm.assume(collateral < DEFAULT_COLLATERAL_AMOUNT);
-        vm.expectRevert(NotEnoughCollateral.selector);
-
-        gwManager.register{value: collateral}(0);
-    }
-
     function testGatewayDiamond_Register_Fail_SubnetAlreadyExists() public {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, address(this));
 
@@ -2096,7 +2089,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * DEFAULT_CROSS_MSG_FEE - 10 * amount,
             "unexpected circulation supply"
         );
-        vm.stopPrank();
     }
 
     function testGatewayDiamond_execMsgBatch_Fails_WrongNumberMessages() public {
@@ -2150,7 +2142,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(caller);
         vm.expectRevert(BatchWithNoMessages.selector);
         gwRouter.execBottomUpMsgBatch(batch);
-        vm.stopPrank();
     }
 
     function testGatewayDiamond_PopulateBottomUpMsgBatch_Works() public {

@@ -384,6 +384,12 @@ library LibStaking {
     event CollateralClaimed(address validator, uint256 amount);
 
     // =============== Getters =============
+    function getPower(
+        address validator
+    ) internal view returns(uint256 power) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return s.validatorSet.getPower(validator);
+    }
 
     /// @notice Checks if the validator is an active validator
     function isActiveValidator(address validator) internal view returns (bool) {
@@ -433,6 +439,12 @@ library LibStaking {
     }
 
     // =============== Operations directly confirm =============
+
+    /// @notice Set the validator federated power directly without queueing the request
+    function setFederatedPowerWithConfirm(address validator, uint256 power) internal {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        s.validatorSet.confirmFederatedPower(validator, power);
+    }
 
     /// @notice Set the validator metadata directly without queueing the request
     function setMetadataWithConfirm(address validator, bytes calldata metadata) internal {
@@ -647,7 +659,8 @@ library LibValidatorTracking {
             if (change.op == StakingOperation.SetMetadata) {
                 self.validators.validators[validator].metadata = change.payload;
             } else if (change.op == StakingOperation.SetFederatedPower) {
-                uint256 power = abi.decode(change.payload, (uint256));
+                (bytes memory metadata, uint256 power) = abi.decode(change.payload, (bytes, uint256));
+                self.validators.validators[validator].metadata = metadata;
                 self.validators.confirmFederatedPower(validator, power);
             } else {
                 uint256 amount = abi.decode(change.payload, (uint256));

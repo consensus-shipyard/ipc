@@ -98,7 +98,9 @@ enum PermissionMode {
     /// Validator power is determined by the collateral staked
     Collateral,
     /// Validator power is assigned by the owner of the subnet
-    Federated
+    Federated,
+    /// Validator power is determined by the initial collateral staked and does not change anymore
+    Static
 }
 
 /// Keeping track of the list of validators. There are two types of validators:

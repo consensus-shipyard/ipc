@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, NotEnoughGenesisValidators, DuplicatedGenesisValidator, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {QuorumObjKind} from "../structs/Quorum.sol";
@@ -229,19 +229,10 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
             revert InvalidFederationPayload();
         }
 
-        uint256 length = validators.length;
-        for (uint256 i; i < length; ) {
-            // check addresses
-            address convertedAddress = publicKeyToAddress(publicKeys[i]);
-            if (convertedAddress != validators[i]) {
-                revert NotOwnerOfPublicKey();
-            }
-
-            LibStaking.setFederatedPower({validator: validators[i], metadata: publicKeys[i], amount: powers[i]});
-
-            unchecked {
-                ++i;
-            }
+        if (s.bootstrapped) {
+            postBootstrapSetFederatedPower(validators, publicKeys, powers);
+        } else {
+            preBootstrapSetFederatedPower(validators, publicKeys, powers);
         }
     }
 
@@ -521,6 +512,74 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
                 // exit after removing the key
                 break;
             }
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice method that allows the contract owner to set the validators' federated power before
+    /// @notice subnet has already been bootstrapped.
+    function preBootstrapSetFederatedPower(
+        address[] calldata validators,
+        bytes[] calldata publicKeys,
+        uint256[] calldata powers
+    ) internal {
+        uint256 length = validators.length;
+        for (uint256 i; i < length; ) {
+            // check addresses
+            address convertedAddress = publicKeyToAddress(publicKeys[i]);
+            if (convertedAddress != validators[i]) {
+                revert NotOwnerOfPublicKey();
+            }
+
+            // performing deduplication
+            // validator should have no power when first added
+            if (LibStaking.getPower(validators[i]) > 0) {
+                revert DuplicatedGenesisValidator();
+            }
+
+            LibStaking.setMetadataWithConfirm(validators[i], publicKeys[i]);
+            LibStaking.setFederatedPowerWithConfirm(validators[i], powers[i]);
+
+            s.genesisValidators.push(Validator({addr: validators[i], weight: powers[i], metadata: publicKeys[i]}));
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        // check duplication first then check length
+        if (length <= s.minValidators) {
+            revert NotEnoughGenesisValidators();
+        }
+
+        s.bootstrapped = true;
+        emit SubnetBootstrapped(s.genesisValidators);
+
+        // register adding the genesis circulating supply (if it exists)
+        IGateway(s.ipcGatewayAddr).register{value: s.genesisCircSupply}(s.genesisCircSupply);
+    }
+
+    /// @notice method that allows the contract owner to set the validators' federated power after
+    /// @notice subnet has already been bootstrapped.
+    function postBootstrapSetFederatedPower(
+        address[] calldata validators,
+        bytes[] calldata publicKeys,
+        uint256[] calldata powers
+    ) internal {
+        uint256 length = validators.length;
+        for (uint256 i; i < length; ) {
+            // check addresses
+            address convertedAddress = publicKeyToAddress(publicKeys[i]);
+            if (convertedAddress != validators[i]) {
+                revert NotOwnerOfPublicKey();
+            }
+
+            // no need to do deduplication as set directly set the power, there wont be any addition of
+            // federated power.
+            LibStaking.setFederatedPower({validator: validators[i], metadata: publicKeys[i], amount: powers[i]});
+
             unchecked {
                 ++i;
             }

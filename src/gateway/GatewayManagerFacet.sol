@@ -34,10 +34,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert NotEnoughFunds();
         }
         uint256 collateral = msg.value - genesisCircSupply;
-        if (collateral < s.minStake) {
-            revert NotEnoughCollateral();
-        }
-
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);

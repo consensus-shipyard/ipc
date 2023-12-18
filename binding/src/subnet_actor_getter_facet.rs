@@ -502,6 +502,36 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getPower"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("getPower"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getRelayerReward"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -1180,6 +1210,15 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([128, 247, 96, 33], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getPower` (0x5dd9147c) function
+        pub fn get_power(
+            &self,
+            validator: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([93, 217, 20, 124], validator)
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getRelayerReward` (0xb2bd295e) function
         pub fn get_relayer_reward(
             &self,
@@ -1563,6 +1602,21 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "getParent", abi = "getParent()")]
     pub struct GetParentCall;
+    ///Container type for all input parameters for the `getPower` function with signature `getPower(address)` and selector `0x5dd9147c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getPower", abi = "getPower(address)")]
+    pub struct GetPowerCall {
+        pub validator: ::ethers::core::types::Address,
+    }
     ///Container type for all input parameters for the `getRelayerReward` function with signature `getRelayerReward(address)` and selector `0xb2bd295e`
     #[derive(
         Clone,
@@ -1870,6 +1924,7 @@ pub mod subnet_actor_getter_facet {
         GetBootstrapNodes(GetBootstrapNodesCall),
         GetConfigurationNumbers(GetConfigurationNumbersCall),
         GetParent(GetParentCall),
+        GetPower(GetPowerCall),
         GetRelayerReward(GetRelayerRewardCall),
         GetTotalCollateral(GetTotalCollateralCall),
         GetTotalConfirmedCollateral(GetTotalConfirmedCollateralCall),
@@ -1974,6 +2029,11 @@ pub mod subnet_actor_getter_facet {
                 data,
             ) {
                 return Ok(Self::GetParent(decoded));
+            }
+            if let Ok(decoded) = <GetPowerCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetPower(decoded));
             }
             if let Ok(decoded) = <GetRelayerRewardCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -2126,6 +2186,9 @@ pub mod subnet_actor_getter_facet {
                 Self::GetParent(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::GetPower(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetRelayerReward(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -2219,6 +2282,7 @@ pub mod subnet_actor_getter_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::GetParent(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetPower(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRelayerReward(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetTotalCollateral(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -2343,6 +2407,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<GetParentCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetParentCall) -> Self {
             Self::GetParent(value)
+        }
+    }
+    impl ::core::convert::From<GetPowerCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetPowerCall) -> Self {
+            Self::GetPower(value)
         }
     }
     impl ::core::convert::From<GetRelayerRewardCall> for SubnetActorGetterFacetCalls {
@@ -2639,6 +2708,18 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct GetParentReturn(pub SubnetID);
+    ///Container type for all return fields from the `getPower` function with signature `getPower(address)` and selector `0x5dd9147c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetPowerReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getRelayerReward` function with signature `getRelayerReward(address)` and selector `0xb2bd295e`
     #[derive(
         Clone,
