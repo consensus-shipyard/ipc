@@ -71,7 +71,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
             assertNotEq(nonce, 0);
             assertEq(
                 registryHandler.getSubnetDeployedBy(owner),
-                registryHandler.getSubnetDeployedWithNonce(owner, nonce - 1)
+                registryHandler.getSubnetDeployedWithNonce(owner, nonce)
             );
         }
     }
