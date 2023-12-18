@@ -6,7 +6,7 @@ build:
 	cargo build -Z unstable-options --release
 
 test:
-	cargo test --release --workspace
+	cargo test --release --package ipc_ipld_resolver
 
 clean:
 	cargo clean

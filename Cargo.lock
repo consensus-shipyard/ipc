@@ -1366,32 +1366,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
-name = "contract-test"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "arbtest",
- "ethers",
- "fendermint_crypto",
- "fendermint_testing",
- "fendermint_vm_actor_interface",
- "fendermint_vm_core",
- "fendermint_vm_genesis",
- "fendermint_vm_interpreter",
- "fendermint_vm_message",
- "fvm",
- "fvm_ipld_blockstore",
- "fvm_shared",
- "hex",
- "ipc-sdk",
- "ipc_actors_abis",
- "rand 0.8.5",
- "tendermint-rpc",
- "tokio",
-]
-
-[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3003,6 +2977,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_contract_test"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "arbtest",
+ "ethers",
+ "fendermint_crypto",
+ "fendermint_testing",
+ "fendermint_vm_actor_interface",
+ "fendermint_vm_core",
+ "fendermint_vm_genesis",
+ "fendermint_vm_interpreter",
+ "fendermint_vm_message",
+ "fvm",
+ "fvm_ipld_blockstore",
+ "fvm_shared",
+ "hex",
+ "ipc-sdk",
+ "ipc_actors_abis",
+ "rand 0.8.5",
+ "tendermint-rpc",
+ "tokio",
+]
+
+[[package]]
 name = "fendermint_crypto"
 version = "0.1.0"
 dependencies = [
@@ -3106,6 +3106,10 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
 ]
+
+[[package]]
+name = "fendermint_smoke_test"
+version = "0.1.0"
 
 [[package]]
 name = "fendermint_storage"
@@ -8549,10 +8553,6 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
-
-[[package]]
-name = "smoke-test"
-version = "0.1.0"
 
 [[package]]
 name = "snow"

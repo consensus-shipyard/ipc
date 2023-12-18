@@ -3,7 +3,7 @@
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
 
 use arbitrary::{Arbitrary, Unstructured};
-use contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
+use fendermint_contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
 use ethers::types as et;
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_testing::smt::StateMachine;
@@ -29,7 +29,7 @@ use super::{
     choose_amount,
     state::{StakingAccount, StakingState},
 };
-use contract_test::ipc::registry::SubnetConstructorParams;
+use fendermint_contract_test::ipc::registry::SubnetConstructorParams;
 
 /// System Under Test for staking.
 pub struct StakingSystem {
@@ -85,7 +85,7 @@ impl StateMachine for StakingMachine {
         let rt = tokio::runtime::Runtime::new().expect("create tokio runtime for init");
 
         let (mut exec_state, _) = rt
-            .block_on(contract_test::init_exec_state(
+            .block_on(fendermint_contract_test::init_exec_state(
                 self.multi_engine.clone(),
                 state.parent_genesis.clone(),
             ))

@@ -2,13 +2,9 @@
 
 BUILTIN_ACTORS_TAG    ?= v11.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
-BUILTIN_ACTORS_DIR    := ../builtin-actors
+BUILTIN_ACTORS_DIR    := ../../builtin-actors
 
-# Make sure this tag matches the one in Cargo.toml
-IPC_ACTORS_TAG				?= origin/dev
-IPC_ACTORS_DIR        := $(PWD)/../ipc-solidity-actors
-IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f -name "*.sol")
-IPC_ACTORS_ABI        := .make/.ipc-actors-abi
+IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
 
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
@@ -37,10 +33,10 @@ install:
 	cargo install --locked --path fendermint/app
 
 # Using --release for testing because wasm can otherwise be slow.
-test: $(IPC_ACTORS_ABI) $(BUILTIN_ACTORS_BUNDLE) $(BUILTIN_ACTORS_DIR)
+test: $(BUILTIN_ACTORS_BUNDLE) $(BUILTIN_ACTORS_DIR)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
-	cargo test --release --workspace --exclude smoke-test
+	cargo test --release --package 'fendermint_*'
 
 e2e: docker-build $(BUILTIN_ACTORS_DIR)
 	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
@@ -65,7 +61,7 @@ check-fmt:
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
 
-docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE) $(IPC_ACTORS_ABI)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
@@ -108,24 +104,6 @@ $(BUILTIN_ACTORS_DIR):
 	cd $(BUILTIN_ACTORS_DIR) && \
 	git clone https://github.com/filecoin-project/builtin-actors.git . && \
 	git checkout $(BUILTIN_ACTORS_TAG)
-
-
-# Compile the ABI artifacts of the IPC Solidity actors.
-ipc-actors-abi: $(IPC_ACTORS_ABI)
-
-# Check out the IPC Solidity actors if necessary so we get the ABI artifacts, putting down a marker at the end.
-$(IPC_ACTORS_ABI): $(IPC_ACTORS_CODE)
-	if [ ! -d $(IPC_ACTORS_DIR) ]; then \
-		mkdir -p $(IPC_ACTORS_DIR) && \
-		cd $(IPC_ACTORS_DIR) && \
-		git clone https://github.com/consensus-shipyard/ipc-solidity-actors.git .; \
-	fi
-	cd $(IPC_ACTORS_DIR) && \
-	git fetch origin && \
-	git checkout $(IPC_ACTORS_TAG)
-	@# The ABI are already checked in; otherwise we'd have to compile with foundry
-	@# make -C $(IPC_ACTORS_DIR) compile-abi
-	mkdir -p $(dir $@) && touch $@
 
 .PHONY: protoc
 protoc:
