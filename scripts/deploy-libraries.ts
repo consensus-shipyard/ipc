@@ -68,6 +68,7 @@ export async function deploy() {
         CrossMsgHelper: crossMsgHelperAddress,
         StorableMsgHelper: storableMsgHelperAddress,
         LibStaking: libStakingAddress,
+        LibQuorum: libQuorumAddress,
     }
 }
 
