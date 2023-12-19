@@ -19,4 +19,6 @@ git subtree add -P fvm-utils ../fvm-utils main
 git subtree add -P ipld-resolver ../ipc-ipld-resolver main
 ```
 
+You may have to run `git submodule update --init --recursive` to initialize all the submodules under `contracts`.
+
 TODO: Add examples of pulling updates from the upstream repos.

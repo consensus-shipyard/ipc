@@ -1,15 +1,15 @@
-[submodule "lib/forge-std"]
-	path = contracts/lib/forge-std
-	url = https://github.com/foundry-rs/forge-std
-[submodule "lib/openzeppelin-contracts"]
+[submodule "contracts/lib/openzeppelin-contracts"]
 	path = contracts/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "lib/fevmate"]
+[submodule "contracts/lib/fevmate"]
 	path = contracts/lib/fevmate
 	url = https://github.com/wadealexc/fevmate
-[submodule "lib/murky"]
+[submodule "contracts/lib/murky"]
 	path = contracts/lib/murky
 	url = https://github.com/dmfxyz/murky
-[submodule "lib/elliptic-curve-solidity"]
+[submodule "contracts/lib/elliptic-curve-solidity"]
 	path = contracts/lib/elliptic-curve-solidity
 	url = https://github.com/witnet/elliptic-curve-solidity
+[submodule "contracts/lib/forge-std"]
+	path = contracts/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
