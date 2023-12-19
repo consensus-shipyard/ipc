@@ -81,12 +81,12 @@ id = "/r314159"
 [subnets.config]
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "0x2e994B75095a39EB7C6dDA0516731B02AbcDbdb4"
-registry_addr = "0x5FE1a06cA4534cB878260522a572e2254214261D"
+gateway_addr = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3"
+registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
 
 # Mycelium Calibration
 [[subnets]]
-id = "/r314159/t410f3psqt4olacthtwmksoxapz2r2hbsohs6kxe636y"
+id = "/r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q"
 
 [subnets.config]
 network_type = "fevm"
