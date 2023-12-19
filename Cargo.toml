@@ -5,7 +5,8 @@ members = [
   "contracts/binding",
   # fvm-utils,
   "fvm-utils/primitives",
-  "fvm-utils/runtime",
+  # Runtime is no longer needed. `primitives` will be moved under `ipc`
+  # "fvm-utils/runtime",
   # ipc
   "ipc/ipc/cli",
   "ipc/ipc/identity",
@@ -15,7 +16,7 @@ members = [
   # "ipc/ipc/testing/*",
   # resolver
   "ipld-resolver",
-  # fendermint 
+  # fendermint
   "fendermint/fendermint/abci",
   "fendermint/fendermint/app",
   "fendermint/fendermint/app/options",

@@ -5,6 +5,7 @@ crytic-export/
 .idea
 .env
 broadcast/
+out/
 
 node_modules
 
