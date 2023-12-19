@@ -2,7 +2,6 @@
 
 BUILTIN_ACTORS_TAG    ?= v11.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
-BUILTIN_ACTORS_DIR    := ../../builtin-actors
 
 IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
@@ -33,18 +32,18 @@ install:
 	cargo install --locked --path fendermint/app
 
 # Using --release for testing because wasm can otherwise be slow.
-test: $(BUILTIN_ACTORS_BUNDLE) $(BUILTIN_ACTORS_DIR)
+test: $(BUILTIN_ACTORS_BUNDLE)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release --package 'fendermint_*'
 
-e2e: docker-build $(BUILTIN_ACTORS_DIR)
+e2e: docker-build
 	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
+	cd fendermint/testing/snapshot-test && cargo make --profile $(PROFILE)
 
 clean:
 	cargo clean
 	rm $(BUILTIN_ACTORS_BUNDLE)
-	rm -rf .make
 
 lint: \
 	license \
@@ -97,13 +96,6 @@ actor-bundle: $(BUILTIN_ACTORS_BUNDLE)
 $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
 	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
-
-# Some test expect the builtin-actors repo to be checked out where they can find test contracts.
-$(BUILTIN_ACTORS_DIR):
-	mkdir -p $(BUILTIN_ACTORS_DIR) && \
-	cd $(BUILTIN_ACTORS_DIR) && \
-	git clone https://github.com/filecoin-project/builtin-actors.git . && \
-	git checkout $(BUILTIN_ACTORS_TAG)
 
 .PHONY: protoc
 protoc:

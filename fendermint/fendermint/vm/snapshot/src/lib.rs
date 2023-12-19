@@ -18,6 +18,6 @@ const PARTS_DIR_NAME: &str = "parts";
 
 pub use client::SnapshotClient;
 pub use error::SnapshotError;
-pub use manager::SnapshotManager;
+pub use manager::{SnapshotManager, SnapshotParams};
 pub use manifest::SnapshotManifest;
 pub use state::SnapshotItem;

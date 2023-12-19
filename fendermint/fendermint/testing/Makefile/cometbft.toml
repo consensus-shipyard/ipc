@@ -1,3 +1,0 @@
-extend = [
-  { path = "../../../infra/scripts/cometbft.toml" },
-]

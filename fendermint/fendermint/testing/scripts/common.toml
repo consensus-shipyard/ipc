@@ -11,10 +11,11 @@
 # cargo make teardown
 
 extend = [
-  { path = "./docker.toml" },
-  { path = "./cometbft.toml" },
+  { path = "../../../infra/scripts/docker.toml" },
+  { path = "../../../infra/scripts/cometbft.toml" },
+  { path = "../../../infra/scripts/ethapi.toml" },
+  { path = "../../../infra/scripts/fendermint.toml" },
   { path = "./fendermint.toml" },
-  { path = "./ethapi.toml" },
 ]
 
 
@@ -38,6 +39,8 @@ run_task = { name = [
 [tasks.setup]
 dependencies = [
   "test-data-dir",
+  "test-data-env",
+  "test-node-dir",
   "docker-network-create",
   "cometbft-init",
   "fendermint-init",
@@ -57,12 +60,9 @@ dependencies = []
 [tasks.teardown]
 # `dependencies` doesn't seem to work with `cleanup_task`.
 run_task = { name = [
-  "cometbft-stop",
-  "cometbft-rm",
-  "fendermint-stop",
-  "fendermint-rm",
-  "ethapi-stop",
-  "ethapi-rm",
+  "cometbft-destroy",
+  "fendermint-destroy",
+  "ethapi-destroy",
   "docker-network-rm",
   "test-data-dir-rm",
 ] }
@@ -71,12 +71,26 @@ run_task = { name = [
 [tasks.test-data-dir]
 script = """
 mkdir -p ${TEST_DATA_DIR}/keys;
-mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/fendermint/data/logs;
-mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/cometbft;
 cp -r ${TEST_SCRIPTS_DIR} ${TEST_DATA_DIR}/scripts
 """
 
 [tasks.test-data-dir-rm]
 script = """
 rm -rf ${TEST_DATA_DIR}
+"""
+
+[tasks.test-data-env]
+script = """
+touch ${TEST_DATA_DIR}/.env
+"""
+
+[tasks.test-node-dir]
+script = """
+mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/fendermint/data/logs;
+mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/cometbft;
+"""
+
+[tasks.test-node-dir-rm]
+script = """
+rm -rf ${TEST_DATA_DIR}/${NODE_NAME}
 """

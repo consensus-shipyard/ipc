@@ -9,16 +9,16 @@ dependencies = [
 ]
 
 [tasks.node-clear]
-script="""
+script = """
 echo clearing all IPC data
 rm -rf ${BASE_DIR}
 """
 
 [tasks.node-mkdir]
-script="""
+script = """
 echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR
 mkdir -p $BASE_DIR
-
 mkdir -p $FM_DIR
 mkdir -p $CMT_DIR
+touch $ENV_FILE
 """

@@ -9,6 +9,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, Context};
 use ethers_core::types::{self as et};
 use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_message::conv::from_fvm::to_eth_transaction_request;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
@@ -211,30 +212,36 @@ pub fn to_eth_transaction(
     // Based on https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2048
     let sig =
         to_eth_signature(msg.signature(), true).context("failed to convert to eth signature")?;
-    let msg = msg.message;
+
+    // Recover the original request; this method has better tests.
+    let tx = to_eth_transaction_request(&msg.message, &chain_id)
+        .context("failed to convert to tx request")?;
 
     let tx = et::Transaction {
         hash,
-        nonce: et::U256::from(msg.sequence),
+        nonce: tx.nonce.unwrap_or_default(),
         block_hash: None,
         block_number: None,
         transaction_index: None,
-        from: to_eth_address(&msg.from).unwrap_or_default(),
-        to: to_eth_address(&msg.to),
-        value: to_eth_tokens(&msg.value)?,
-        gas: et::U256::from(msg.gas_limit),
-        max_fee_per_gas: Some(to_eth_tokens(&msg.gas_fee_cap)?),
-        max_priority_fee_per_gas: Some(to_eth_tokens(&msg.gas_premium)?),
+        from: tx.from.unwrap_or_default(),
+        to: tx.to.and_then(|to| to.as_address().cloned()),
+        value: tx.value.unwrap_or_default(),
+        gas: tx.gas.unwrap_or_default(),
+        max_fee_per_gas: tx.max_fee_per_gas,
+        max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
         // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
         // has a database constraint that if a transaction is included in a block this can't be null.
-        gas_price: Some(to_eth_tokens(&msg.gas_fee_cap)? + to_eth_tokens(&msg.gas_premium)?),
-        input: et::Bytes::from(msg.params.bytes().to_vec()),
-        chain_id: Some(et::U256::from(u64::from(chain_id))),
+        gas_price: Some(
+            tx.max_fee_per_gas.unwrap_or_default()
+                + tx.max_priority_fee_per_gas.unwrap_or_default(),
+        ),
+        input: tx.data.unwrap_or_default(),
+        chain_id: tx.chain_id.map(|x| et::U256::from(x.as_u64())),
         v: et::U64::from(sig.v),
         r: sig.r,
         s: sig.s,
         transaction_type: Some(2u64.into()),
-        access_list: None,
+        access_list: Some(tx.access_list),
         other: Default::default(),
     };
 

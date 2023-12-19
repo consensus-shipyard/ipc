@@ -25,13 +25,13 @@ dependencies = [
 ]
 
 [tasks.testnode-clear]
-script="""
+script = """
 echo clearing all IPC data
 rm -rf ${BASE_DIR}
 """
 
 [tasks.testnode-mkdir]
-script="""
+script = """
 echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR
 mkdir -p $BASE_DIR
 mkdir -p $FM_DIR
@@ -48,19 +48,16 @@ run_task = { name = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-]}
+] }
 
 [tasks.testnode-down]
 # `dependencies` doesn't seem to work with `cleanup_task`.
 run_task = { name = [
-    "cometbft-stop",
-    "cometbft-rm",
-    "fendermint-stop",
-    "fendermint-rm",
-    "ethapi-stop",
-    "ethapi-rm",
-    "docker-network-rm"
-]}
+    "cometbft-destroy",
+    "fendermint-destroy",
+    "ethapi-destroy",
+    "docker-network-rm",
+] }
 
 # This task create all necessary data structures to run Fendermint:
 # the genesis file with necessary entities and cryptographic keys.
@@ -72,7 +69,7 @@ dependencies = [
     "genesis-add-validator",
     "genesis-new-gateway",
     "genesis-write",
-    "testnode-export-keys"
+    "testnode-export-keys",
 ]
 
 [tasks.testnode-export-keys]

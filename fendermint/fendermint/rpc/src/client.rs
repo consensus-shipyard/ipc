@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use anyhow::{anyhow, Context};
@@ -9,7 +10,7 @@ use fendermint_vm_message::chain::ChainMessage;
 use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint_rpc::{endpoint::abci_query::AbciQuery, Client, HttpClient, Scheme, Url};
-use tendermint_rpc::{WebSocketClient, WebSocketClientDriver};
+use tendermint_rpc::{WebSocketClient, WebSocketClientDriver, WebSocketClientUrl};
 
 use fendermint_vm_message::query::{FvmQuery, FvmQueryHeight};
 
@@ -70,7 +71,10 @@ pub fn http_client(url: Url, proxy_url: Option<Url>) -> anyhow::Result<HttpClien
 /// Create a Tendermint WebSocket client.
 ///
 /// The caller must start the driver in a background task.
-pub async fn ws_client(url: Url) -> anyhow::Result<(WebSocketClient, WebSocketClientDriver)> {
+pub async fn ws_client<U>(url: U) -> anyhow::Result<(WebSocketClient, WebSocketClientDriver)>
+where
+    U: TryInto<WebSocketClientUrl, Error = tendermint_rpc::Error> + Display + Clone,
+{
     // TODO: Doesn't handle proxy.
     tracing::debug!("Using WS client to submit request to: {}", url);
 

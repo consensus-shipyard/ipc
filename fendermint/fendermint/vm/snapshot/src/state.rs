@@ -57,6 +57,11 @@ impl SnapshotItem {
             last_access: SystemTime::UNIX_EPOCH,
         }
     }
+
+    fn parts_dir(&self) -> PathBuf {
+        self.snapshot_dir.join(PARTS_DIR_NAME)
+    }
+
     /// Load the data from disk.
     ///
     /// Returns an error if the chunk isn't within range or if the file doesn't exist any more.
@@ -67,7 +72,7 @@ impl SnapshotItem {
                 self.manifest.chunks
             );
         }
-        let chunk_file = self.snapshot_dir.join("{chunk}.part");
+        let chunk_file = self.parts_dir().join(format!("{chunk}.part"));
 
         let content = std::fs::read(&chunk_file)
             .with_context(|| format!("failed to read chunk {}", chunk_file.to_string_lossy()))?;
@@ -80,8 +85,8 @@ impl SnapshotItem {
     where
         BS: Blockstore + Send + 'static,
     {
-        let parts = manifest::list_parts(self.snapshot_dir.join(PARTS_DIR_NAME))
-            .context("failed to list snapshot parts")?;
+        let parts =
+            manifest::list_parts(self.parts_dir()).context("failed to list snapshot parts")?;
 
         // 1. Restore the snapshots into a complete `snapshot.car` file.
         let car_path = self.snapshot_dir.join(SNAPSHOT_FILE_NAME);
@@ -164,6 +169,12 @@ pub struct SnapshotDownload {
     pub download_dir: Arc<TempDir>,
     // Next expected chunk index.
     pub next_index: TVar<u32>,
+}
+
+impl SnapshotDownload {
+    pub fn parts_dir(&self) -> PathBuf {
+        self.download_dir.path().join(PARTS_DIR_NAME)
+    }
 }
 
 #[cfg(feature = "arb")]

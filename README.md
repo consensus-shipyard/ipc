@@ -21,4 +21,11 @@ git subtree add -P ipld-resolver ../ipc-ipld-resolver main
 
 You may have to run `git submodule update --init --recursive` to initialize all the submodules under `contracts`.
 
-TODO: Add examples of pulling updates from the upstream repos.
+While we are still working on the old repositories, it is possible to pull in updates with the following commands:
+
+```shell
+git subtree pull -P contracts  https://github.com/consensus-shipyard/ipc-solidity-actors.git dev
+git subtree pull -P ipc        https://github.com/consensus-shipyard/ipc.git dev
+git subtree pull -P fendermint https://github.com/consensus-shipyard/fendermint main
+```
+

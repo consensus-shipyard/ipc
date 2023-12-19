@@ -6,16 +6,18 @@ use axum::routing::{get, post};
 use fvm_shared::econ::TokenAmount;
 use jsonrpc_v2::Data;
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
-use tendermint_rpc::WebSocketClient;
 
 mod apis;
 mod cache;
+mod client;
 mod conv;
 mod error;
 mod filters;
 mod gas;
 mod handlers;
 mod state;
+
+pub use client::{HybridClient, HybridClientDriver};
 
 use error::{error, JsonRpcError};
 use state::JsonRpcState;
@@ -29,7 +31,7 @@ type JsonRpcResult<T> = Result<T, JsonRpcError>;
 #[derive(Clone)]
 pub struct AppState {
     pub rpc_server: JsonRpcServer,
-    pub rpc_state: Arc<JsonRpcState<WebSocketClient>>,
+    pub rpc_state: Arc<JsonRpcState<HybridClient>>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,7 +44,7 @@ pub struct GasOpt {
 /// Start listening to JSON-RPC requests.
 pub async fn listen<A: ToSocketAddrs>(
     listen_addr: A,
-    client: WebSocketClient,
+    client: HybridClient,
     filter_timeout: Duration,
     cache_capacity: usize,
     gas_opt: GasOpt,
@@ -71,7 +73,7 @@ pub async fn listen<A: ToSocketAddrs>(
 }
 
 /// Register method handlers with the JSON-RPC server construct.
-fn make_server(state: Arc<JsonRpcState<WebSocketClient>>) -> JsonRpcServer {
+fn make_server(state: Arc<JsonRpcState<HybridClient>>) -> JsonRpcServer {
     let server = jsonrpc_v2::Server::new().with_data(Data(state));
     let server = apis::register_methods(server);
     server.finish()
