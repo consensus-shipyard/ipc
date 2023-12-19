@@ -1267,14 +1267,13 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE * 2);
-        vm.startPrank(validator1);
+        vm.prank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
 
         (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
         vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
-        vm.startPrank(validator2);
+        vm.prank(validator2);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2);
-        vm.stopPrank();
 
         require(saGetter.isActiveValidator(validator1), "not active validator 1");
         require(saGetter.isActiveValidator(validator2), "not active validator 2");
@@ -1292,6 +1291,38 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         powers[1] = 20000;
         powers[2] = 5000; // we only have 2 active validators, validator 2 does not have enough power
         saManager.setFederatedPower(validators, publicKeys, powers);
+    }
+
+    function testSubnetActorDiamond_registration_policy() public {
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_NOT_JOINED));
+        vm.prank(validator1);
+        saManager.stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}();
+
+        vm.prank(validator1);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
+
+        require(saGetter.isActiveValidator(validator1), "active validator 1");
+        require(!saGetter.bootstrapped(), "subnet bootstrapped");
+
+        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_JOINED));
+        vm.prank(validator1);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
+
+        vm.prank(validator1);
+        saManager.stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}();
+
+        require(saGetter.isActiveValidator(validator1), "active validator 1");
+
+        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
+        vm.prank(validator2);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2);
+
+        require(saGetter.isActiveValidator(validator1), "not active validator 1");
+        require(saGetter.bootstrapped(), "subnet not bootstrapped");
     }
 
     function testSubnetActorDiamond_FederatedValidation_bootstrapWorks() public {
