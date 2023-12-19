@@ -80,9 +80,9 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
     }
 
-    /// @notice release amount for an existing subnet
-    /// @dev it can be used to release the stake or reward of the validator
-    /// @notice release collateral for an existing subnet
+    /// @notice release collateral for an existing subnet.
+    /// @dev it can be used to release the stake or reward of the validator.
+    /// @param amount The amount of stake to be released.
     function releaseStake(uint256 amount) external nonReentrant {
         if (amount == 0) {
             revert CannotReleaseZero();
@@ -105,6 +105,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         payable(subnet.id.getActor()).sendValue(amount);
     }
 
+    /// @notice Releases a reward to the relayer.
+    /// @dev This function sends the specified reward amount to the actor associated with the sender's subnet.
+    ///     It checks for subnet registration and also ensures the reward amount is non-zero.
+    ///     This function is protected against re-entrancy attack.
+    /// @param amount The amount of the reward to be released.
     function releaseRewardForRelayer(uint256 amount) external nonReentrant {
         if (amount == 0) {
             revert CannotReleaseZero();
@@ -118,7 +123,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         payable(subnet.id.getActor()).sendValue(amount);
     }
 
-    /// @notice kill an existing subnet. It's balance must be empty
+    /// @notice kill an existing subnet.
+    /// @dev The subnet's balance must be empty.
     function kill() external {
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
 
@@ -139,10 +145,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         payable(msg.sender).sendValue(stake);
     }
 
-    /// @notice fund() credits the received value to the specified address in the specified child subnet.
+    /// @notice credits the received value to the specified address in the specified child subnet.
     ///
-    /// There may be an associated fee that gets distributed to validators in the subnet. Currently this fee is zero,
-    /// i.e. funding a subnet is free.
+    /// @dev There may be an associated fee that gets distributed to validators in the subnet. Currently this fee is zero,
+    ///     i.e. funding a subnet is free.
     ///
     /// @param subnetId: the destination subnet for the funds.
     /// @param to: the address to which to credit funds in the destination subnet.
@@ -173,6 +179,13 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         LibGateway.commitTopDownMsg(crossMsg);
     }
 
+    /// @notice Sends funds to a specified subnet receiver using ERC20 tokens.
+    /// @dev This function locks the amount of ERC20 tokens into custody and then mints the supply in the specified subnet.
+    ///     It checks if the subnet's supply strategy is ERC20 and if not, the operation is reverted.
+    ///     It allows for free injection of funds into a subnet and is protected against reentrancy.
+    /// @param subnetId The ID of the subnet where the funds will be sent to.
+    /// @param to The funded address.
+    /// @param amount The amount of ERC20 tokens to be sent.
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external nonReentrant {
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.

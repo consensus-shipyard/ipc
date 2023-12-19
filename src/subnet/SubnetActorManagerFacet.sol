@@ -192,6 +192,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     /// @notice method to remove funds from the initial balance of a subnet.
     /// @dev This method can be used by users looking to recover part of their
     /// initial balance before the subnet bootstraps.
+    /// @param amount The amount to remove.
     function preRelease(uint256 amount) external nonReentrant {
         if (amount == 0) {
             revert NotEnoughFunds();
@@ -334,6 +335,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
 
     /// @notice method that allows a validator to unstake a part of its collateral from a subnet.
     /// @dev `leave` must be used to unstake the entire stake.
+    /// @param amount The amount to unstake.
     function unstake(uint256 amount) external whenNotPaused notKilled {
         // disbling validator changes for federated validation subnets (at least for now
         // until a more complex mechanism is implemented).
@@ -528,6 +530,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     }
 
     /// @notice Removes an address from the initial balance keys.
+    /// @param addr The address to be removed from the genesis balance keys.
     function rmAddressFromBalanceKey(address addr) internal {
         uint256 length = s.genesisBalanceKeys.length;
         for (uint256 i; i < length; ) {
@@ -543,8 +546,11 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         }
     }
 
-    /// @notice method that allows the contract owner to set the validators' federated power before
+    /// @notice method that allows the contract owner to set the validators' federated power before.
     /// @notice subnet has already been bootstrapped.
+    /// @param validators The list of validators' addresses.
+    /// @param publicKeys The list of validators' public keys.
+    /// @param powers The list of power values of the validators.
     function preBootstrapSetFederatedPower(
         address[] calldata validators,
         bytes[] calldata publicKeys,
@@ -587,7 +593,10 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     }
 
     /// @notice method that allows the contract owner to set the validators' federated power after
-    /// @notice subnet has already been bootstrapped.
+    /// @dev subnet has already been bootstrapped.
+    /// @param validators The list of validators' addresses.
+    /// @param publicKeys The list of validators' public keys.
+    /// @param powers The list of power values of the validators.
     function postBootstrapSetFederatedPower(
         address[] calldata validators,
         bytes[] calldata publicKeys,

@@ -37,7 +37,8 @@ contract GatewayRouterFacet is GatewayActorModifiers {
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
-    /// Called from a subnet actor if the checkpoint is cryptographically valid.
+    ///     Called from a subnet actor if the checkpoint is cryptographically valid.
+    /// @param checkpoint The bottom-up checkpoint to be committed.
     function commitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
         // checkpoint is used to implement access control
         if (checkpoint.subnetID.getActor() != msg.sender) {
@@ -71,6 +72,7 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     /// @notice submit a batch of cross-net messages for execution.
     /// @dev this method is called by the corresponding subnet actor.
     /// Called from a subnet actor if the batch is valid.
+    /// @param batch The batch of bottom-up cross-network messages to be executed.
     function execBottomUpMsgBatch(BottomUpMsgBatch calldata batch) external {
         if (batch.subnetID.getActor() != msg.sender) {
             revert InvalidBatchSource();
@@ -127,6 +129,8 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     /// This is useful to understand if the finalities are consistent or if there have been reorgs.
     /// If there are no previous committed fainality, it will be default to zero values, i.e. zero height and block hash.
     /// @param finality - the parent finality
+    /// @return hasCommittedBefore A flag that indicates if a finality record has been committed before.
+    /// @return previousFinality The previous finality information.
     function commitParentFinality(
         ParentFinality calldata finality
     ) external systemActorOnly returns (bool hasCommittedBefore, ParentFinality memory previousFinality) {
@@ -140,7 +144,8 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
-    /// @notice Apply all changes committed through the commitment of parent finality
+    /// @notice Apply all changes committed through the commitment of parent finality.
+    /// @return configurationNumber The configuration number of the changes set that has been confirmed.
     function applyFinalityChanges() external systemActorOnly returns (uint64) {
         // get the latest configuration number for the change set
         uint64 configurationNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
@@ -176,6 +181,8 @@ contract GatewayRouterFacet is GatewayActorModifiers {
     /// @notice Applies top-down crossnet messages locally. This is invoked by IPC nodes when drawing messages from
     ///         their parent subnet for local execution. That's why the sender is restricted to the system sender,
     ///         because this method is implicitly invoked by the node during block production.
+    /// @dev It requires the caller to be the system actor.
+    /// @param crossMsgs The array of cross-network messages to be applied.
     function applyCrossMessages(CrossMsg[] calldata crossMsgs) external systemActorOnly {
         _applyMessages(s.networkName.getParentSubnet(), crossMsgs);
     }
@@ -392,6 +399,8 @@ contract GatewayRouterFacet is GatewayActorModifiers {
         LibQuorum.pruneQuorums(s.bottomUpMsgBatchQuorumMap, newRetentionHeight);
     }
 
+    /// @notice Checks the length of a message batch, ensuring it is in (0, maxMsgsPerBottomUpBatch).
+    /// @param batch The batch of messages to check.
     function _checkMsgLength(BottomUpMsgBatch memory batch) internal view {
         if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
             revert MaxMsgsPerBatchExceeded();

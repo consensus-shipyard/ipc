@@ -27,7 +27,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      *
      * IMPORTANT: `msg.value` is expected to equal to the value sent in `crossMsg.value` plus the cross-messaging fee.
      *
-     * @param crossMsg - a cross-message to send
+     * @param crossMsg - a cross-message to send.
      */
     function sendUserXnetMessage(CrossMsg calldata crossMsg) external payable {
         if (!s.generalPurposeCrossMsg) {
@@ -80,12 +80,14 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     }
 
     /**
-     * @dev Commit the cross message to storage. It outputs a flag signaling
-     * if the committed messages was bottom-up and some funds need to be
-     * burnt.
+     * @notice Commit the cross message to storage. It outputs a flag signaling
+     *         if the committed messages was bottom-up and some funds need to be
+     *         burnt.
      *
-     * It also validates that destination subnet ID is not empty
-     * and not equal to the current network.
+     * @dev It also validates that destination subnet ID is not empty
+     *      and not equal to the current network.
+     *  @param crossMessage The cross-network message to commit.
+     *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
      */
     function _commitCrossMessage(CrossMsg memory crossMessage) internal returns (bool shouldBurn) {
         SubnetID memory to = crossMessage.message.to.subnetId;
