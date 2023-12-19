@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {RelayerRewardsInfo, BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
-import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, Validator, PermissionMode} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, SupplySource, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 struct SubnetActorStorage {
@@ -67,6 +67,8 @@ struct SubnetActorStorage {
     mapping(address => string) bootstrapNodes;
     /// @notice the list ov validators that announces bootstrap nodes
     EnumerableSet.AddressSet bootstrapOwners;
+    /// @notice subnet supply strategy.
+    SupplySource supplySource;
 }
 
 library LibSubnetActorStorage {

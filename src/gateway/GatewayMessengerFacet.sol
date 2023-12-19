@@ -5,20 +5,22 @@ import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {CrossMsg, StorableMsg} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {SubnetID} from "../structs/Subnet.sol";
+import {SubnetID, SupplyKind} from "../structs/Subnet.sol";
 import {InvalidCrossMsgFromSubnet, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
-string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
+string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
 
 contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
     using StorableMsgHelper for StorableMsg;
+    using SupplySourceHelper for address;
 
     /**
      * @dev sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -98,27 +100,44 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         SubnetID memory from = crossMessage.message.from.subnetId;
         IPCMsgType applyType = crossMessage.message.applyType(s.networkName);
 
-        // slither-disable-next-line uninitialized-local
-        bool shouldCommitBottomUp;
+        // Are we the LCA? (Lowest Common Ancestor)
+        bool isLCA = to.commonParent(from).equals(s.networkName);
 
+        // Even if multi-level messaging is enabled, we reject the xnet message
+        // as soon as we learn that one of the networks involved use an ERC20 supply source.
+        // This will block propagation on the first step, or the last step.
+        //
+        // TODO IPC does not implement fault handling yet, so if the message fails
+        //  to propagate, the user won't be able to reclaim funds. That's one of the
+        //  reasons xnet messages are disabled by default.
+
+        bool reject = false;
         if (applyType == IPCMsgType.BottomUp) {
-            shouldCommitBottomUp = !to.commonParent(from).equals(s.networkName);
+            // We're traversing up, so if we're the first hop, we reject if the subnet was ERC20.
+            // If we're not the first hop, a child propagated this to us, they made a mistake and
+            // and we don't have enough info to evaluate.
+            reject = from.getParentSubnet().equals(s.networkName) && from.getActor().hasSupplyOfKind(SupplyKind.ERC20);
+        } else if (applyType == IPCMsgType.TopDown) {
+            // We're traversing down.
+            // Check the next subnet (which can may be the destination subnet).
+            reject = to.down(s.networkName).getActor().hasSupplyOfKind(SupplyKind.ERC20);
+        }
+        if (reject) {
+            revert MethodNotAllowed("propagation not suppported for subnets with ERC20 supply");
         }
 
-        if (shouldCommitBottomUp) {
-            LibGateway.commitBottomUpMsg(crossMessage);
-
-            // gas-opt: original check: value > 0
-            return (shouldBurn = crossMessage.message.value != 0);
-        }
-
-        if (applyType == IPCMsgType.TopDown) {
+        // If the directionality is top-down, or if we're inverting the direction
+        // because we're the LCA, commit a top-down message.
+        if (applyType == IPCMsgType.TopDown || isLCA) {
             ++s.appliedTopDownNonce;
+            LibGateway.commitTopDownMsg(crossMessage);
+            return (shouldBurn = false);
         }
 
-        LibGateway.commitTopDownMsg(crossMessage);
-
-        return (shouldBurn = false);
+        // Else, commit a bottom up message.
+        LibGateway.commitBottomUpMsg(crossMessage);
+        // gas-opt: original check: value > 0
+        return (shouldBurn = crossMessage.message.value != 0);
     }
 
     /**

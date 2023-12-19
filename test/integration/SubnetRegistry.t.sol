@@ -22,6 +22,7 @@ import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.
 import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 
 import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 
@@ -187,7 +188,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
-            minCrossMsgFee: _minCrossMsgFee
+            minCrossMsgFee: _minCrossMsgFee,
+            supplySource: SupplySourceHelper.native()
         });
 
         registrySubnetFacet.newSubnetActor(params);

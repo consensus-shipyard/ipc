@@ -9,6 +9,8 @@ import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
+import {SupplySource} from "../structs/Subnet.sol";
+import {SupplySourceHelper} from "./SupplySourceHelper.sol";
 
 /// @title Helper library for manipulating StorableMsg struct
 /// @author LimeChain team
@@ -16,6 +18,7 @@ library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
+    using SupplySourceHelper for SupplySource;
 
     function createReleaseMsg(
         SubnetID calldata subnet,
@@ -76,12 +79,12 @@ library CrossMsgHelper {
             crossMsg.message.from.subnetId.root == 0;
     }
 
-    function execute(CrossMsg calldata crossMsg) public returns (bytes memory) {
+    function execute(CrossMsg calldata crossMsg, SupplySource memory supplySource) public returns (bytes memory) {
         uint256 value = crossMsg.message.value;
         address recipient = crossMsg.message.to.rawAddress.extractEvmAddress().normalize();
 
         if (crossMsg.message.method == METHOD_SEND) {
-            Address.sendValue(payable(recipient), value);
+            supplySource.transfer({recipient: payable(recipient), value: value});
             return EMPTY_BYTES;
         }
 
@@ -93,12 +96,7 @@ library CrossMsgHelper {
 
         bytes memory data = bytes.concat(crossMsg.message.method, params);
 
-        // gas-opt: original check: value > 0
-        if (value != 0) {
-            return Address.functionCallWithValue({target: recipient, data: data, value: value});
-        }
-
-        return Address.functionCall(recipient, data);
+        return supplySource.performCall({target: payable(recipient), data: data, value: value});
     }
 
     // checks whether the cross messages are sorted in ascending order or not

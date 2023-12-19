@@ -264,8 +264,8 @@ library LibGateway {
                     blockHeight: epochCut,
                     msgs: new CrossMsg[](batch.msgs.length)
                 });
-                uint256 msgLenght = batch.msgs.length;
-                for (uint256 i; i < msgLenght;) {
+                uint256 msgLength = batch.msgs.length;
+                for (uint256 i; i < msgLength;) {
                     newBatch.msgs[i] = batch.msgs[i];
                     unchecked {
                         ++i;

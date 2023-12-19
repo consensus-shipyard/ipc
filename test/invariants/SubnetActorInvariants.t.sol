@@ -14,6 +14,7 @@ import {SubnetActorHandler, ETH_SUPPLY} from "./handlers/SubnetActorHandler.sol"
 import {SubnetActorManagerFacetMock} from "../mocks/SubnetActor.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
+import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 
 contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;

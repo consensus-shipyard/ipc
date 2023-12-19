@@ -28,7 +28,6 @@ import {ERR_GENERAL_CROSS_MSG_DISABLED} from "../../src/gateway/GatewayMessenger
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {LibDiamond} from "../../src/lib/LibDiamond.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
-
 import {TestUtils} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 

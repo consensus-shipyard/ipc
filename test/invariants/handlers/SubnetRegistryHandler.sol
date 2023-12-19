@@ -10,7 +10,7 @@ import {SubnetActorDiamond} from "../../../src/SubnetActorDiamond.sol";
 import {SubnetRegistryDiamond} from "../../../src/SubnetRegistryDiamond.sol";
 import {ConsensusType} from "../../../src/enums/ConsensusType.sol";
 import {SubnetID, PermissionMode} from "../../../src/structs/Subnet.sol";
-
+import {SupplySourceHelper} from "../../../src/lib/SupplySourceHelper.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
@@ -120,7 +120,8 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
-            minCrossMsgFee: _minCrossMsgFee
+            minCrossMsgFee: _minCrossMsgFee,
+            supplySource: SupplySourceHelper.native()
         });
 
         address owner = getRandomOldAddressOrNewOne(seed);

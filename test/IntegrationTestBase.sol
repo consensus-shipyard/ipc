@@ -11,7 +11,7 @@ import {Status} from "../src/enums/Status.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, PermissionMode, PermissionMode, Subnet, IPCAddress, Validator} from "../src/structs/Subnet.sol";
+import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
@@ -31,6 +31,7 @@ import {RegisterSubnetFacet} from "../src/subnetregistry/RegisterSubnetFacet.sol
 import {SubnetGetterFacet} from "../src/subnetregistry/SubnetGetterFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
+import {SupplySourceHelper} from "../src/lib/SupplySourceHelper.sol";
 import {TestUtils} from "./helpers/TestUtils.sol";
 
 contract TestParams {
@@ -142,6 +143,7 @@ contract TestSubnetActor is Test, TestParams {
     function defaultSubnetActorParamsWithGateway(
         address gw
     ) internal pure virtual returns (SubnetActorDiamond.ConstructorParams memory) {
+        SupplySource memory native = SupplySourceHelper.native();
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             ipcGatewayAddr: gw,
@@ -153,7 +155,8 @@ contract TestSubnetActor is Test, TestParams {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
-            permissionMode: PermissionMode.Collateral
+            permissionMode: PermissionMode.Collateral,
+            supplySource: native
         });
 
         return params;
@@ -162,6 +165,7 @@ contract TestSubnetActor is Test, TestParams {
 
 contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor, TestGatewayActor {
     using SubnetIDHelper for SubnetID;
+    using SupplySourceHelper for SupplySource;
     using CrossMsgHelper for CrossMsg;
     using StorableMsgHelper for StorableMsg;
     using FvmAddressHelper for FvmAddress;
@@ -417,7 +421,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 activeValidatorsLimit: _activeValidatorsLimit,
                 powerScale: 12,
                 permissionMode: _permissionMode,
-                minCrossMsgFee: DEFAULT_CROSS_MSG_FEE
+                minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
+                supplySource: SupplySourceHelper.native()
             })
         );
 
@@ -593,6 +598,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     }
 
     function fund(address funderAddress, uint256 fundAmount) public {
+        fund(funderAddress, fundAmount, SupplyKind.Native);
+    }
+
+    function fund(address funderAddress, uint256 fundAmount, SupplyKind mode) public {
         // funding subnets is free, we do not need cross msg fee
         (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore, ) = getSubnet(address(saManager));
 
@@ -602,7 +611,11 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
 
-        gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
+        if (mode == SupplyKind.Native) {
+            gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
+        } else if (mode == SupplyKind.ERC20) {
+            gwManager.fundWithToken(subnetId, FvmAddressHelper.from(funderAddress), fundAmount);
+        }
 
         (, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(saManager));
 

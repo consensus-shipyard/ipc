@@ -15,6 +15,8 @@ if [ $zero_findings -eq 3 ]; then
     exit 0
 else
     echo "Critical, high, or medium issue found".
-    echo "Inspect $REPORT_FILE for more information".
+    echo "Check $REPORT_FILE for more information".
+    echo "Printing here..."
+    cat $REPORT_FILE
     exit 1;
 fi
