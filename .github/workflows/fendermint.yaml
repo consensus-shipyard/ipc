@@ -1,18 +1,8 @@
-name: CI
+name: Fendermint CI
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - '**'
-    # To add ready_for_review as a trigger we need to list all the defaults.
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
+  workflow_call:
 
 env:
   CARGO_INCREMENTAL: '0'
@@ -38,14 +28,14 @@ jobs:
           components: rustfmt
 
       - name: Check code formatting
-        run: make check-fmt
+        run: cd fendermint && make check-fmt
 
       # This is so `make license` doesn't say "bad revision origin/main"
       - name: Fetch origin for diff
         run: git fetch origin
 
       - name: Check license headers
-        run: make license
+        run: cd fendermint && make license
 
 
   # Test matrix, running tasks from the Makefile.
@@ -100,7 +90,7 @@ jobs:
           cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
       - name: ${{ matrix.make.name }}
-        run: make ${{ matrix.make.task }}
+        run: cd fendermint && make ${{ matrix.make.task }}
 
 
   # Publish Docker image on the main branch
@@ -171,7 +161,7 @@ jobs:
 
       - name: Docker Deps
         run: |
-          make docker-deps
+          cd fendermint && make docker-deps
 
       # https://github.com/marketplace/actions/free-disk-space-ubuntu
       - name: Free Disk Space (Ubuntu)
@@ -190,7 +180,7 @@ jobs:
           export BUILDX_TAG=${{ steps.prep.outputs.IMAGE_TAG }}
           export BUILDX_STORE="--push"
           export BUILDX_FLAGS="--platform linux/amd64,linux/arm64 ${BUILDX_FLAGS}"
-          make docker-build
+          cd fendermint && make docker-build
 
       # https://github.com/Chizkiyahu/delete-untagged-ghcr-action
       - name: Delete all containers from package without tags

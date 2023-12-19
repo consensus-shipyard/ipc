@@ -1,0 +1,21 @@
+name: Fendermint CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+    # To add ready_for_review as a trigger we need to list all the defaults.
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+
+jobs:
+  call-fendermint:
+    uses: ./.github/workflows/fendermint.yaml
+    secrets: inherit
