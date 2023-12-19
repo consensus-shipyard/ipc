@@ -43,14 +43,10 @@ jobs:
         os: [ubuntu-latest]
         rust: [stable]
         make:
-          - name: Lint
-            task: lint
+          - name: Clippy
+            task: check-clippy
           - name: Test
             task: test
-        exclude:
-          - rust: nightly
-            make:
-              name: Lint
 
     env:
       RUST_BACKTRACE: full
