@@ -4,9 +4,9 @@
 // See https://ethereum.org/en/developers/docs/apis/json-rpc/#json-rpc-methods
 // and https://ethereum.github.io/execution-apis/api-documentation/
 
+use crate::HybridClient;
 use jsonrpc_v2::{MapRouter, ServerBuilder};
 use paste::paste;
-use tendermint_rpc::WebSocketClient;
 
 mod eth;
 mod net;
@@ -18,7 +18,7 @@ macro_rules! with_methods {
             $server
                 $(.with_method(
                     stringify!([< $module _ $method >]),
-                    $module :: [< $method:snake >] ::<WebSocketClient>
+                    $module :: [< $method:snake >] ::<HybridClient>
                 ))*
         }
     };

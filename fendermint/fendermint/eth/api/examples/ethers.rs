@@ -58,14 +58,6 @@ use tracing::Level;
 type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
 type TestContractCall<C, T> = ContractCall<TestMiddleware<C>, T>;
 
-// This assumes that https://github.com/filecoin-project/builtin-actors is checked out next to this project,
-// which the Makefile in the root takes care of with `make actor-bundle`, a dependency of creating docker images.
-const SIMPLECOIN_HEX: &'static str =
-    include_str!("../../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin");
-
-// const SIMPLECOIN_ABI: &'static str =
-//     include_str!("../../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi");
-
 /// Gas limit to set for transactions.
 const ENOUGH_GAS: u64 = 10_000_000_000u64;
 
@@ -74,10 +66,11 @@ const FILTERS_ENABLED: bool = true;
 
 // Generate a statically typed interface for the contract.
 // An example of what it looks like is at https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs
-abigen!(
-    SimpleCoin,
-    "../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi"
-);
+abigen!(SimpleCoin, "../../testing/contracts/SimpleCoin.abi");
+
+const SIMPLECOIN_HEX: &'static str = include_str!("../../../testing/contracts/SimpleCoin.bin");
+const SIMPLECOIN_RUNTIME_HEX: &'static str =
+    include_str!("../../../testing/contracts/SimpleCoin.bin-runtime");
 
 #[derive(Parser, Debug)]
 pub struct Options {
@@ -549,6 +542,10 @@ where
     let bytecode =
         Bytes::from(hex::decode(SIMPLECOIN_HEX).context("failed to decode contract hex")?);
 
+    let deployed_bytecode = Bytes::from(
+        hex::decode(SIMPLECOIN_RUNTIME_HEX).context("failed to decode contract runtime hex")?,
+    );
+
     // let abi = serde_json::from_str::<ethers::core::abi::Abi>(SIMPLECOIN_ABI)?;
     let abi: Abi = SIMPLECOIN_ABI.clone();
 
@@ -622,18 +619,7 @@ where
     request(
         "eth_code",
         mw.get_code(contract.address(), None).await,
-        |bz| {
-            // It's not exactly the same as the bytecode above.
-            // The initcode is stripped, only the runtime bytecode is returned.
-            // But the two seem to start and end the same way.
-            let a = bz.iter();
-            let b = bytecode.iter();
-            let ar = bz.iter().rev();
-            let br = bytecode.iter().rev();
-            !bz.is_empty()
-                && a.zip(b).take_while(|(a, b)| a == b).count() > 0
-                && ar.zip(br).take_while(|(a, b)| a == b).count() > 0
-        },
+        |bz| *bz == deployed_bytecode,
     )?;
 
     request("eth_syncing", mw.syncing().await, |s| {
@@ -644,6 +630,13 @@ where
     // Not using `prepare_call` here because `send_transaction` will fill the missing fields.
     let coin_send_value = U256::from(100);
     let coin_send: TestContractCall<_, bool> = contract.send_coin(to.eth_addr, coin_send_value);
+
+    // Take note of the inputs to ascertain it's the same we get back.
+    let tx_input = match coin_send.tx {
+        TypedTransaction::Eip1559(ref tx) => tx.data.clone(),
+        _ => None,
+    };
+
     // Using `send_transaction` instead of `coin_send.send()` so it gets the receipt.
     // Unfortunately the returned `bool` is not available through the Ethereum API.
     let receipt = request(
@@ -653,6 +646,15 @@ where
     )?;
 
     tracing::info!(tx_hash = ?receipt.transaction_hash, "coin sent");
+
+    request(
+        "eth_getTransactionByHash for input",
+        provider.get_transaction(receipt.transaction_hash).await,
+        |tx| match tx {
+            Some(tx) => tx.input == tx_input.unwrap_or_default(),
+            _ => false,
+        },
+    )?;
 
     request(
         "eth_getLogs",

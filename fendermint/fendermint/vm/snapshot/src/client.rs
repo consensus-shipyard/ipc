@@ -8,7 +8,6 @@ use fendermint_vm_interpreter::fvm::state::{
     snapshot::{BlockHeight, SnapshotVersion},
     FvmStateParams,
 };
-use tempfile::tempdir;
 
 use crate::{
     manifest,
@@ -19,14 +18,20 @@ use crate::{
 /// Interface to snapshot state for the application.
 #[derive(Clone)]
 pub struct SnapshotClient {
+    download_dir: PathBuf,
     /// The client will only notify the manager of snapshottable heights.
     snapshot_interval: BlockHeight,
     state: SnapshotState,
 }
 
 impl SnapshotClient {
-    pub fn new(snapshot_interval: BlockHeight, state: SnapshotState) -> Self {
+    pub fn new(
+        download_dir: PathBuf,
+        snapshot_interval: BlockHeight,
+        state: SnapshotState,
+    ) -> Self {
         Self {
+            download_dir,
             snapshot_interval,
             state,
         }
@@ -78,13 +83,8 @@ impl SnapshotClient {
         if manifest.version != 1 {
             abort(SnapshotError::IncompatibleVersion(manifest.version))
         } else {
-            match tempdir() {
+            match tempfile::tempdir_in(&self.download_dir) {
                 Ok(dir) => {
-                    // Create a `parts` sub-directory for the chunks.
-                    if let Err(e) = std::fs::create_dir(dir.path().join("parts")) {
-                        return abort(SnapshotError::from(e));
-                    };
-
                     // Save the manifest into the temp directory;
                     // that way we can always see on the file system what's happening.
                     let json = match serde_json::to_string_pretty(&manifest)
@@ -93,16 +93,22 @@ impl SnapshotClient {
                         Ok(json) => json,
                         Err(e) => return abort(SnapshotError::from(e)),
                     };
-                    if let Err(e) = std::fs::write(dir.path().join(MANIFEST_FILE_NAME), json) {
-                        return abort(SnapshotError::from(e));
-                    }
 
-                    let download_path = dir.path().into();
+                    let download_path: PathBuf = dir.path().into();
                     let download = SnapshotDownload {
                         manifest,
                         download_dir: Arc::new(dir),
                         next_index: TVar::new(0),
                     };
+
+                    // Create a `parts` sub-directory for the chunks.
+                    if let Err(e) = std::fs::create_dir(download.parts_dir()) {
+                        return abort(SnapshotError::from(e));
+                    };
+
+                    if let Err(e) = std::fs::write(download_path.join(MANIFEST_FILE_NAME), json) {
+                        return abort(SnapshotError::from(e));
+                    }
 
                     self.state.current_download.write(Some(download))?;
 
@@ -129,12 +135,7 @@ impl SnapshotClient {
             if index != next_index {
                 abort(SnapshotError::UnexpectedChunk(next_index, index))
             } else {
-                let part_path = cd
-                    .download_dir
-                    .as_ref()
-                    .path()
-                    .join("parts")
-                    .join(format!("{}.part", index));
+                let part_path = cd.parts_dir().join(format!("{}.part", index));
 
                 // We are doing IO inside the STM transaction, but that's okay because there is no contention on the download.
                 match std::fs::write(part_path, contents) {
@@ -144,7 +145,7 @@ impl SnapshotClient {
 
                         if next_index == cd.manifest.chunks {
                             // Verify the checksum then load the snapshot and remove the current download from memory.
-                            match manifest::parts_checksum(cd.download_dir.as_ref()) {
+                            match manifest::parts_checksum(cd.parts_dir()) {
                                 Ok(checksum) => {
                                     if checksum == cd.manifest.checksum {
                                         let item = SnapshotItem::new(

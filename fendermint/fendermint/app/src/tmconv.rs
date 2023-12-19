@@ -400,7 +400,11 @@ pub fn from_snapshot(
     let app_hash = to_app_hash(&metadata.state_params);
 
     if app_hash != offer.app_hash {
-        bail!("the application hash does not match the metadata");
+        bail!(
+            "the application hash does not match the metadata; from-meta = {}, from-offer = {}",
+            app_hash,
+            offer.app_hash,
+        );
     }
 
     let checksum = tendermint::hash::Hash::try_from(offer.snapshot.hash)

@@ -3,7 +3,7 @@
 ########################################################################################################################
 
 [tasks.bootstrap]
-env = { "NETWORK_NAME"="${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/bootstrap/cometbft" }
+env = { "NETWORK_NAME" = "${NETWORK_NAME}", "CMT_DIR" = "${BASE_DIR}/bootstrap/cometbft" }
 run_task = "new-bootstrap"
 
 [tasks.new-bootstrap]
@@ -28,10 +28,8 @@ run_task = "cometbft-node-id"
 
 [tasks.bootstrap-down]
 dependencies = [
-    "cometbft-stop",
-    "cometbft-rm",
-    "fendermint-stop",
-    "fendermint-rm",
+    "cometbft-destroy",
+    "fendermint-destroy",
 ]
 
 [tasks.bootstrap-restart]
@@ -72,7 +70,7 @@ run_task = { name = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-]}
+] }
 
 [tasks.child-fullnode-down]
 run_task = "testnode-down"

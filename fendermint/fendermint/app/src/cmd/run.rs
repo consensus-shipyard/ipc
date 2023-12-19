@@ -15,7 +15,7 @@ use fendermint_vm_interpreter::{
     signed::SignedMessageInterpreter,
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
-use fendermint_vm_snapshot::SnapshotManager;
+use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
@@ -187,12 +187,15 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let snapshots = if settings.snapshots.enabled {
         let (manager, client) = SnapshotManager::new(
             state_store.clone(),
-            settings.snapshots_dir(),
-            settings.snapshots.block_interval,
-            settings.snapshots.chunk_size_bytes,
-            settings.snapshots.hist_size,
-            settings.snapshots.last_access_hold,
-            settings.snapshots.sync_poll_interval,
+            SnapshotParams {
+                snapshots_dir: settings.snapshots_dir(),
+                download_dir: settings.snapshots.download_dir(),
+                block_interval: settings.snapshots.block_interval,
+                chunk_size: settings.snapshots.chunk_size_bytes,
+                hist_size: settings.snapshots.hist_size,
+                last_access_hold: settings.snapshots.last_access_hold,
+                sync_poll_interval: settings.snapshots.sync_poll_interval,
+            },
         )
         .context("failed to create snapshot manager")?;
 

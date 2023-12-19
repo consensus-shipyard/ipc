@@ -175,6 +175,14 @@ pub struct SnapshotSettings {
     /// How often to poll CometBFT to see whether it has caught up with the chain.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub sync_poll_interval: Duration,
+    /// Temporary directory for downloads.
+    download_dir: Option<PathBuf>,
+}
+
+impl SnapshotSettings {
+    pub fn download_dir(&self) -> PathBuf {
+        self.download_dir.clone().unwrap_or(std::env::temp_dir())
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

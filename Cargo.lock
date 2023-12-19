@@ -2070,6 +2070,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dircpy"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8466f8d28ca6da4c9dfbbef6ad4bff6f2fdd5e412d821025b0d3f0a9d74a8c1e"
+dependencies = [
+ "jwalk",
+ "log",
+ "walkdir",
+]
+
+[[package]]
 name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3112,6 +3123,10 @@ name = "fendermint_smoke_test"
 version = "0.1.0"
 
 [[package]]
+name = "fendermint_snapshot_test"
+version = "0.1.0"
+
+[[package]]
 name = "fendermint_storage"
 version = "0.1.0"
 dependencies = [
@@ -3325,6 +3340,7 @@ dependencies = [
  "arbitrary",
  "async-stm",
  "cid",
+ "dircpy",
  "fendermint_testing",
  "fendermint_vm_core",
  "fendermint_vm_genesis",
@@ -5085,6 +5101,16 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_asn1",
+]
+
+[[package]]
+name = "jwalk"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2735847566356cd2179a2a38264839308f7079fa96e6bd5a42d740460e003c56"
+dependencies = [
+ "crossbeam",
+ "rayon",
 ]
 
 [[package]]

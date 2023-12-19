@@ -690,24 +690,17 @@ where
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
         };
 
-        tracing::debug!(
-            height = block_height,
-            app_hash = request.header.app_hash.to_string(),
-            "begin block"
-        );
-
         let db = self.state_store_clone();
         let state = self.committed_state()?;
         let mut state_params = state.state_params.clone();
 
-        // Notify the snapshotter. We don't do this in `commit` because *this* is the height at which
-        // this state has been officially associated with the application hash, which is something
-        // we will receive in `offer_snapshot` and we can compare. If we did it in `commit` we'd
-        // have to associate the snapshot with `block_height + 1`. But this way we also know that
-        // others have agreed with our results.
-        if let Some(ref snapshots) = self.snapshots {
-            atomically(|| snapshots.notify(block_height as u64, state_params.clone())).await;
-        }
+        tracing::debug!(
+            height = block_height,
+            timestamp = request.header.time.unix_timestamp(),
+            app_hash = request.header.app_hash.to_string(),
+            //app_state_hash = to_app_hash(&state_params).to_string(), // should be the same as `app_hash`
+            "begin block"
+        );
 
         state_params.timestamp = to_timestamp(request.header.time);
 
@@ -801,6 +794,13 @@ where
         let app_hash = state.app_hash();
         let block_height = state.block_height;
 
+        // Tell CometBFT how much of the block history it can forget.
+        let retain_height = if self.state_hist_size == 0 {
+            Default::default()
+        } else {
+            block_height.saturating_sub(self.state_hist_size)
+        };
+
         tracing::debug!(
             block_height,
             state_root = state_root.to_string(),
@@ -824,6 +824,24 @@ where
         // notified about), we could add it to the `ChainMessageInterpreter` as a constructor argument,
         // a sort of "ambient state", and not worry about in in the `App` at all.
 
+        // Notify the snapshotter. It wasn't clear whether this should be done in `commit` or `begin_block`,
+        // that is, whether the _height_ of the snapshot should be `block_height` or `block_height+1`.
+        // When CometBFT calls `offer_snapshot` it sends an `app_hash` in it that we compare to the CID
+        // of the `state_params`. Based on end-to-end testing it looks like it gives the `app_hash` from
+        // the *next* block, so we have to do it here.
+        // For example:
+        // a) Notify in `begin_block`: say we are at committing block 899, then we notify in `begin_block`
+        //    that block 900 has this state (so we use `block_height+1` in notification);
+        //    CometBFT is going to offer it with the `app_hash` of block 901, which won't match, because
+        //    by then the timestamp will be different in the state params after committing block 900.
+        // b) Notify in `commit`: say we are committing block 900 and notify immediately that it has this state
+        //    (even though this state will only be available to query from the next height);
+        //    CometBFT is going to offer it with the `app_hash` of 901, but in this case that's good, because
+        //    that hash reflects the changes made by block 900, which this state param is the result of.
+        if let Some(ref snapshots) = self.snapshots {
+            atomically(|| snapshots.notify(block_height, state.state_params.clone())).await;
+        }
+
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
 
@@ -831,20 +849,20 @@ where
         let mut guard = self.check_state.lock().await;
         *guard = None;
 
-        let response = response::Commit {
+        Ok(response::Commit {
             data: app_hash.into(),
-            // We have to retain blocks until we can support Snapshots.
-            retain_height: Default::default(),
-        };
-        Ok(response)
+            retain_height: retain_height.try_into().expect("height is valid"),
+        })
     }
 
     /// List the snapshots available on this node to be served to remote peers.
     async fn list_snapshots(&self) -> AbciResult<response::ListSnapshots> {
         if let Some(ref client) = self.snapshots {
             let snapshots = atomically(|| client.list_snapshots()).await;
+            tracing::info!(snapshot_count = snapshots.len(), "listing snaphots");
             Ok(to_snapshots(snapshots)?)
         } else {
+            tracing::info!("listing snaphots disabled");
             Ok(Default::default())
         }
     }
@@ -882,6 +900,11 @@ where
         request: request::OfferSnapshot,
     ) -> AbciResult<response::OfferSnapshot> {
         if let Some(ref client) = self.snapshots {
+            tracing::info!(
+                height = request.snapshot.height.value(),
+                "received snapshot offer"
+            );
+
             match from_snapshot(request).context("failed to parse snapshot") {
                 Ok(manifest) => {
                     tracing::info!(?manifest, "received snapshot offer");
@@ -955,6 +978,8 @@ where
 
                         // Now insert the new state into the history.
                         let mut state = self.committed_state()?;
+
+                        // The height reflects that it was produced in `commit`.
                         state.block_height = snapshot.manifest.block_height;
                         state.state_params = snapshot.manifest.state_params;
                         self.set_committed_state(state)?;

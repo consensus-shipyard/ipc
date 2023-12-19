@@ -24,9 +24,9 @@ services:
     environment:
       - ID=${NODE_ID}
       - LOG=${LOG:-cometbft-node${NODE_ID}.log}
-      - CMT_PEX=true
       - CMT_PROXY_APP=tcp://fendermint-node${NODE_ID}:26658
-      - CMT_PERSISTENT_PEERS="${CMT_PERSISTENT_PEERS}"
+      - CMT_P2P_PEX=true
+      - CMT_P2P_PERSISTENT_PEERS="${CMT_P2P_PERSISTENT_PEERS}"
     volumes:
       - $BASE_DIR/node${NODE_ID}/cometbft:/cometbft
     healthcheck:
@@ -44,6 +44,7 @@ services:
     image: "fendermint:latest"
     command: "eth run"
     environment:
+      - TENDERMINT_RPC_URL=http://cometbft-node${NODE_ID}:26657
       - TENDERMINT_WS_URL=ws://cometbft-node${NODE_ID}:26657/websocket
       - LOG_LEVEL=debug
       - RUST_BACKTRACE=1
