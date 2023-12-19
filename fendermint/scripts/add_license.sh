@@ -13,7 +13,7 @@ LINES=4
 
 # Ignore auto-generated code.
 IGNORE=(
-	"fendermint/vm/ipc_actors"
+	"contracts/binding"
 );
 
 ignore() {
@@ -32,6 +32,8 @@ ret=0
 # NOTE: When files are moved/split/deleted, the following queries would find and recreate them in the original place.
 # To avoid that, first commit the changes, then run the linter; that way only the new places are affected.
 
+# `git grep` works from the perspective of the current directory
+
 # Look for files without headers.
 for file in $(git grep --cached -Il '' -- '*.rs'); do
 	if ignore "$file"; then
@@ -45,6 +47,9 @@ for file in $(git grep --cached -Il '' -- '*.rs'); do
 		ret=1
 	fi
 done
+
+# `git diff` works from the root's perspective, so we need to go up.
+cd ..
 
 # Look for changes that don't have the new copyright holder.
 for file in $(git diff --diff-filter=d --name-only origin/main -- '*.rs'); do
