@@ -22,7 +22,7 @@ import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
-import {SubnetActorManagerFacet, ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorManagerFacet, ERR_PERMISSIONED_AND_BOOTSTRAPPED, ERR_VALIDATOR_NOT_JOINED, ERR_VALIDATOR_JOINED} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -446,7 +446,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saManager.stake();
 
         vm.prank(validator);
-        vm.expectRevert(NotStakedBefore.selector);
+        vm.expectRevert((abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_NOT_JOINED)));
         saManager.stake{value: 10}();
 
         vm.prank(validator);
@@ -1270,7 +1270,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
 
-        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(100);
+        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
         vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
         vm.startPrank(validator2);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2);
@@ -1282,6 +1282,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // cannot join after bootstrap
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
+        vm.prank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));

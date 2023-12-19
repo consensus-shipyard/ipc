@@ -3,6 +3,7 @@ import argparse
 import json
 
 from eth_abi import encode
+from json.decoder import JSONDecodeError
 
 def get_selectors(args):
     """This function gets the selectors of the functions of the target contract.
@@ -14,9 +15,13 @@ def get_selectors(args):
     contract = args.contract
 
     res = subprocess.run(
-        ["forge", "inspect", contract, "mi"], capture_output=True)
+        ["forge", "inspect", contract, "methodIdentifiers"], capture_output=True)
     res = res.stdout.decode()
-    res = json.loads(res)
+    try:
+        res = json.loads(res)
+    except JSONDecodeError as e:
+        print("failed to load JSON:", e)
+        print("forge output:", res);
 
     selectors = []
     for signature in res:
