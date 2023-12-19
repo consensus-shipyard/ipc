@@ -10,38 +10,37 @@ license-file.workspace = true
 anyhow = { workspace = true }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
-futures-util = { workspace = true }
-reqwest = { workspace = true }
-log = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-cid = { workspace = true }
-tokio = { workspace = true }
-tokio-tungstenite = { workspace = true }
-num-traits = { workspace = true }
-num-derive = "0.3.3"
-env_logger = "0.10.0"
 base64 = { workspace = true }
-strum = { version = "0.24", features = ["derive"] }
-toml = "0.7.2"
-url = { workspace = true }
 bytes = "1.4.0"
-serde_bytes = "0.11.9"
+cid = { workspace = true }
 clap = { version = "4.1.4", features = ["env", "derive"] }
 clap_complete = "4.2.1"
-thiserror = { workspace = true }
-hex = { workspace = true }
-serde_tuple = { workspace = true }
-zeroize = "1.6.0"
-libsecp256k1 = { workspace = true }
-
-ethers-contract = { workspace = true }
+env_logger = "0.10.0"
 ethers = { workspace = true }
-fvm_shared = { workspace = true }
+ethers-contract = { workspace = true }
 fil_actors_runtime = { workspace = true }
+futures-util = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
-primitives = { workspace = true }
+fvm_shared = { workspace = true }
+hex = { workspace = true }
+libsecp256k1 = { workspace = true }
+log = { workspace = true }
+num-derive = "0.3.3"
+num-traits = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_bytes = "0.11.9"
+serde_json = { workspace = true }
+serde_tuple = { workspace = true }
+strum = { version = "0.24", features = ["derive"] }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+toml = "0.7.2"
+url = { workspace = true }
+zeroize = "1.6.0"
 
-ipc-identity = { path = "../identity", features = ["with-ethers"] }
-ipc-provider = { path = "../provider" }
-ipc-sdk = { path = "../sdk" }
+ipc-identity = { workspace = true }
+ipc-provider = { workspace = true }
+ipc-sdk = { workspace = true }
+primitives = { workspace = true }

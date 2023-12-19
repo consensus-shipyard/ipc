@@ -2,58 +2,39 @@
 name = "ipc_ipld_resolver"
 version = "0.1.0"
 description = "P2P library to resolve IPLD content across IPC subnets."
-authors = ["Protocol Labs"]
-edition = "2021"
-license-file = "LICENSE"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
-anyhow = "1.0"
-base64 = "0.21.0"
-blake2b_simd = "1.0"
-bloom = "0.3"
-gcra = "0.4"
-lazy_static = "1.4"
-libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
-libp2p = { version = "0.50", default-features = false, features = [
-  "gossipsub",
-  "kad",
-  "identify",
-  "ping",
-  "noise",
-  "yamux",
-  "tcp",
-  "dns",
-  "mplex",
-  "request-response",
-  "metrics",
-  "tokio",
-  "macros",
-  "serde",
-  "secp256k1",
-  "plaintext",
-] }
-libp2p-bitswap = "0.25.1"
-log = "0.4"
-prometheus = "0.13"
-quickcheck = { version = "1", optional = true }
-rand = "0.8"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.91", features = ["raw_value"] }
-thiserror = "1.0.38"
-tokio = { version = "1.16", features = ["full"] }
+anyhow = { workspace = true }
+base64 = { workspace = true }
+blake2b_simd = { workspace = true }
+bloom = { workspace = true }
+gcra = { workspace = true }
+lazy_static = { workspace = true }
+libipld = { workspace = true }
+libp2p = { workspace = true }
+libp2p-bitswap = { workspace = true }
+log = { workspace = true }
+prometheus = { workspace = true }
+quickcheck = { workspace = true, optional = true }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
+thiserror = { workspace = true }
+tokio = { workspace = true }
 
-fvm_ipld_encoding = "0.3"
-fvm_shared = { version = "~3.2", default-features = false, features = ["crypto"], optional = true }
-fvm_ipld_blockstore = { version = "0.1", optional = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_shared = { workspace = true }
+fvm_ipld_blockstore = { workspace = true, optional = true }
 
-# Using the IPC SDK without the `fil-actor` feature so as not to depend on the actor `Runtime`.
-# Using the `main` branch instead of the highest available tag `v0.3.0` because the latter doesn't have a feature flag for the `Runtime`.
-ipc-sdk = { git = "https://github.com/consensus-shipyard/ipc.git", default-features = false, branch = "dev" }
+ipc-sdk = { path = "../ipc/ipc/sdk", default-features = false }
 
 [dev-dependencies]
-quickcheck_macros = "1"
-env_logger = "0.10"
-fvm_ipld_hamt = "0.6"
+quickcheck_macros = { workspace = true }
+env_logger = { workspace = true }
+fvm_ipld_hamt = { workspace = true }
 
 ipc_ipld_resolver = { path = ".", features = ["arb"] }
 
@@ -61,7 +42,3 @@ ipc_ipld_resolver = { path = ".", features = ["arb"] }
 default = ["arb", "missing_blocks"]
 arb = ["quickcheck", "fvm_shared/arb"]
 missing_blocks = ["fvm_ipld_blockstore"]
-
-[patch.crates-io]
-# Use stable-only features.
-gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }

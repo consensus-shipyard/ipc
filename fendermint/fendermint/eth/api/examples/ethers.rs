@@ -61,10 +61,10 @@ type TestContractCall<C, T> = ContractCall<TestMiddleware<C>, T>;
 // This assumes that https://github.com/filecoin-project/builtin-actors is checked out next to this project,
 // which the Makefile in the root takes care of with `make actor-bundle`, a dependency of creating docker images.
 const SIMPLECOIN_HEX: &'static str =
-    include_str!("../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin");
+    include_str!("../../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.bin");
 
 // const SIMPLECOIN_ABI: &'static str =
-//     include_str!("../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi");
+//     include_str!("../../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi");
 
 /// Gas limit to set for transactions.
 const ENOUGH_GAS: u64 = 10_000_000_000u64;
@@ -76,7 +76,7 @@ const FILTERS_ENABLED: bool = true;
 // An example of what it looks like is at https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs
 abigen!(
     SimpleCoin,
-    "../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi"
+    "../../../../../builtin-actors/actors/evm/tests/contracts/SimpleCoin.abi"
 );
 
 #[derive(Parser, Debug)]

@@ -1,5 +1,5 @@
 [package]
-name = "contract-test"
+name = "fendermint_contract_test"
 description = "Model based testing for smart contracts"
 version = "0.1.0"
 authors.workspace = true

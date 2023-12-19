@@ -1,0 +1,197 @@
+[workspace]
+resolver = "2"
+members = [
+  # contracts
+  "contracts/binding",
+  # fvm-utils,
+  "fvm-utils/primitives",
+  # Runtime is no longer needed. `primitives` will be moved under `ipc`
+  # "fvm-utils/runtime",
+  # ipc
+  "ipc/ipc/cli",
+  "ipc/ipc/identity",
+  "ipc/ipc/provider",
+  "ipc/ipc/sdk",
+  # Tests seem to be obsolete (using IPC agent):
+  # "ipc/ipc/testing/*",
+  # resolver
+  "ipld-resolver",
+  # fendermint 
+  "fendermint/fendermint/abci",
+  "fendermint/fendermint/app",
+  "fendermint/fendermint/app/options",
+  "fendermint/fendermint/crypto",
+  "fendermint/fendermint/app/settings",
+  "fendermint/fendermint/eth/*",
+  "fendermint/fendermint/rocksdb",
+  "fendermint/fendermint/rpc",
+  "fendermint/fendermint/storage",
+  "fendermint/fendermint/testing",
+  "fendermint/fendermint/testing/*-test",
+  "fendermint/fendermint/vm/*",
+]
+
+[workspace.package]
+authors = ["Protocol Labs"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+license-file = "LICENSE-APACHE"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace.dependencies]
+anyhow = "1"
+arbitrary = { version = "1", features = ["derive"] }
+arbtest = "0.2"
+async-stm = "0.4"
+async-trait = "0.1"
+async-channel = "1.8.0"
+axum = { version = "0.6", features = ["ws"] }
+base64 = "0.21"
+blake2b_simd = "1.0"
+bloom = "0.3"
+bytes = "1.4"
+clap = { version = "4.1", features = ["derive", "env"] }
+config = "0.13"
+dirs = "5.0"
+erased-serde = "0.3"
+ethers = { version = "2.0", features = ["abigen", "ws"] }
+ethers-core = { version = "2.0" }
+fnv = "1.0"
+futures = "0.3"
+futures-core = "0.3"
+futures-util = "0.3"
+gcra = "0.4"
+hex = "0.4"
+im = "15.1.0"
+jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v10"] }
+k256 = "0.11" # Same as tendermint-rs
+lazy_static = "1.4"
+libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
+libp2p = { version = "0.50", default-features = false, features = [
+  "gossipsub",
+  "kad",
+  "identify",
+  "ping",
+  "noise",
+  "yamux",
+  "tcp",
+  "dns",
+  "mplex",
+  "request-response",
+  "metrics",
+  "tokio",
+  "macros",
+  "serde",
+  "secp256k1",
+  "plaintext",
+] }
+libp2p-bitswap = "0.25.1"
+lru_time_cache = "0.11"
+merkle-tree-rs = "0.1.0"
+multiaddr = "0.16"
+multihash = { version = "0.16.1", default-features = false }
+num-bigint = "0.4"
+num-derive = "0.3"
+num-traits = "0.2"
+paste = "1"
+pin-project = "1.1.2"
+prost = { version = "0.11" }
+quickcheck = "1"
+quickcheck_macros = "1"
+rand = "0.8"
+rand_chacha = "0.3"
+regex = "1"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+serde_json = { version = "1", features = ["raw_value"] }
+serde_tuple = "0.5"
+serde_with = "2.3"
+tempfile = "3.7"
+thiserror = "1"
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "fs",
+  "io-util",
+  "io-std",
+  "sync",
+] }
+tokio-stream = "0.1.14"
+tokio-util = { version = "0.7.8", features = ["compat"] }
+toml = "0.7"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+url = { version = "2.4.1", features = ["serde"] }
+zeroize = "1.6"
+trace4rs = "0.5.1"
+literally = "0.1.3"
+reqwest = { version = "0.11.13", features = ["json"] }
+log = "0.4"
+env_logger = "0.10"
+prometheus = "0.13"
+tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
+libsecp256k1 = "0.7"
+ethers-contract = "2.0.8"
+integer-encoding = {version = "3.0.3", default-features = false}
+
+# Workspace deps
+ipc-sdk = { path = "ipc/ipc/sdk" }
+ipc-provider = { path = "ipc/ipc/provider" }
+ipc-identity = { path = "ipc/ipc/identity", features = ["with-ethers"] }
+ipc_ipld_resolver = { path = "ipld-resolver" }
+primitives = { path = "fvm-utils/primitives" }
+ipc_actors_abis = { path = "contracts/binding" }
+
+# Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
+openssl = { version = "0.10", features = ["vendored"] }
+
+# Stable FVM dependencies from crates.io
+# Using the 3.3 version of the FVM because the newer ones update the IPLD dependencies
+# to version which are different than the ones in the builtin-actors project, and since
+# they are 0.x cargo cannot upgrade them automatically, which leads to version conflicts.
+fvm = { version = "~3.2", default-features = false }                     # no opencl feature or it fails on CI
+fvm_shared = { version = "~3.2", features = ["crypto"] }
+
+fvm_ipld_blockstore = "0.1"
+fvm_ipld_car = "0.6"
+fvm_ipld_encoding = "0.3"
+fvm_ipld_hamt = "0.6.0"
+
+# Local FVM debugging
+# fvm = { path = "../ref-fvm/fvm", default-features = false }
+# fvm_ipld_blockstore = { path = "../ref-fvm/ipld/blockstore" }
+# fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
+# fvm_ipld_car = { path = "../ref-fvm/ipld/car" }
+# fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
+# fvm_shared = { path = "../ref-fvm/shared", features = ["crypto"] }
+
+# We are using the bundle for the builtin-actors dependency, and repeating DTO classes on our side,
+# to cut down the time it takes to compile everything. However, some projects have a "shared" part,
+# and this copy-paste is clunky, so at least for those that have it, we should use it.
+# Keep the version here in sync with the Makefile!
+fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v11.0.0" }
+fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v11.0.0" }
+
+# Using 0.8 because of ref-fvm.
+# 0.9 would be better because of its updated quickcheck dependency.
+# 0.10 breaks some API.
+cid = { version = "0.8", default-features = false, features = ["serde-codec", "std"] }
+
+# Depending on the release cycle, this dependency might want an earlier version of the FVM.
+# We can work around it by hardcoding the method hashes; currently there is only one.
+# frc42_dispatch = "3.2"
+
+# Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
+tower-abci = { version = "0.7" }
+tendermint = { version = "0.31", features = ["secp256k1"] }
+tendermint-config = "0.33.0"
+tendermint-rpc = { version = "0.31", features = ["secp256k1", "http-client", "websocket-client"] }
+tendermint-proto = { version = "0.31" }
+
+[patch.crates-io]
+# Use stable-only features.
+gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
+# Contains some API changes that the upstream has not merged.
+merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }

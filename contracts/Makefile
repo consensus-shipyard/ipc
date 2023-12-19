@@ -46,7 +46,7 @@ fmt:
 build: | forge
 	forge build
 
-test:
+test: | forge
 	forge test -vvv --ffi
 
 install-dev: install-npm-package install-eth-abi

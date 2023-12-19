@@ -6,7 +6,7 @@ build:
 	cargo build --release -p ipc-cli && mkdir -p bin/ && cp target/release/ipc-cli ./bin/ipc-cli
 
 test:
-	cargo test --release --workspace --exclude ipc_e2e itest
+	cargo test --release --package 'ipc-*'
 
 itest:
 	cargo test -p itest --test checkpoint -- --nocapture

@@ -1,5 +1,5 @@
 [package]
-name = "smoke-test"
+name = "fendermint_smoke_test"
 description = "Provides some end-to-end integration testing between Fendermint and a full Tendermint node."
 version = "0.1.0"
 authors.workspace = true
