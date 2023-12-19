@@ -97,6 +97,10 @@ $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
 	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
 
+# Generate the ABI artifacts if we don't have them already.
+$(IPC_ACTORS_OUT):
+		cd $(IPC_ACTORS_DIR) && make compile-abi
+
 .PHONY: protoc
 protoc:
 	@if [ -z "$(shell which protoc)" ]; then \

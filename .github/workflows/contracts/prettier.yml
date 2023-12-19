@@ -2,12 +2,9 @@
 
 name: Prettier
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-      - dev
-  pull_request:
+  workflow_call:
 
 jobs:
   prettier:
@@ -25,9 +22,10 @@ jobs:
         with:
           node-version: '21'
       - name: Run formatter
-        run: make fmt
+        run: cd contracts && make fmt
       - name: Check diff clean
         run: |
+          cd contracts
           git restore package-lock.json
           git status
           git diff --name-only

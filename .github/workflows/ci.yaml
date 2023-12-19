@@ -16,6 +16,25 @@ on:
 
 
 jobs:
+  contracts-prettier:
+    uses: ./.github/workflows/contracts/prettier.yaml
+
+  contracts-test:
+    uses: ./.github/workflows/contracts/test.yaml
+    needs: [contracts-prettier]
+
+  contracts-storage:
+    uses: ./.github/workflows/contracts/storage.yaml
+    needs: [contracts-prettier]
+
+  contracts-npm-audit:
+    uses: ./.github/workflows/contracts/npm-audit.yaml
+    needs: [contracts-prettier]
+
+  contracts-sast:
+    uses: ./.github/workflows/contracts/sast.yaml
+    needs: [contracts-prettier]
+
   ipc:
     uses: ./.github/workflows/ipc.yaml
     secrets: inherit
@@ -23,4 +42,6 @@ jobs:
   fendermint:
     uses: ./.github/workflows/fendermint.yaml
     secrets: inherit
-    needs: [ipc]
+    needs:
+      - contracts-test # generates the ABI artifacts
+      - ipc

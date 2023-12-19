@@ -1,9 +1,8 @@
 name: Static analysis
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches: [ main, dev ]
-  pull_request:
+  workflow_call:
 
 jobs:
   slither:
@@ -30,7 +29,7 @@ jobs:
       # We remove this file because Aderyn can choose hardhat for compilation if that config file exists.
       # Currently, it is not possible to configure Aderyn to use foundry by default.
       - name: delete hardhat config
-        run: rm -rf ./hardhat.config.ts
+        run: cd contracts && rm -rf ./hardhat.config.ts
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -41,10 +40,10 @@ jobs:
         run: cargo install aderyn
 
       - name: Run aderyn
-        run: aderyn ./
+        run: cd contracts && aderyn ./
 
       - name: Check results
-        run: ./tools/check_aderyn.sh
+        run: cd contracts && ./tools/check_aderyn.sh
 
   solhint:
     name: Solhint check
@@ -57,13 +56,13 @@ jobs:
           node-version: '18.x'
           cache: 'npm'
       - name: Install Node dependencies
-        run: npm i --unsafe-perm
+        run: cd contracts && npm i --unsafe-perm
       - name: Install solidity plugin
-        run: npm i --unsafe-perm prettier prettier-plugin-solidity
+        run: cd contracts && npm i --unsafe-perm prettier prettier-plugin-solidity
       - name: Prettier check
-        run: npx prettier --check 'src/**/*.sol' 'test/*.sol'
+        run: cd contracts && npx prettier --check 'src/**/*.sol' 'test/*.sol'
       - name: Solhint check
-        run: npx solhint 'src/**/*.sol'
+        run: cd contracts && npx solhint 'src/**/*.sol'
 
   codespell:
     name: Codespell check
@@ -75,5 +74,5 @@ jobs:
         with:
           check_hidden: true
           check_filenames: true
-          path: src/*,script/*,scripts/*,test/*
-          ignore_words_file: .codespellignore
+          path: contracts/src/*,contracts/script/*,contracts/scripts/*,contracts/test/*
+          ignore_words_file: contracts/.codespellignore

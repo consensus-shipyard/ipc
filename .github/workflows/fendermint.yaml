@@ -73,6 +73,8 @@ jobs:
     steps:
       - name: Check out the project
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       - name: Install Tools
         uses: ./.github/actions/install-tools
@@ -88,6 +90,12 @@ jobs:
           # Caching everything separately, in case they don't ask for the same things to be compiled.
           cache-prefix: fendermint-${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
           cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Solidity ABI arfiacts
+        uses: actions/cache@v2
+        with:
+          path: ./contracts/out
+          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
       - name: ${{ matrix.make.name }}
         run: cd fendermint && make ${{ matrix.make.task }}
