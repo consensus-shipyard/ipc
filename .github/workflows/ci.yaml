@@ -1,4 +1,4 @@
-name: Fendermint CI
+name: Mono CI
 
 on:
   push:
