@@ -974,15 +974,6 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotStakedBefore"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotStakedBefore"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("NotValidator"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -1696,19 +1687,6 @@ pub mod subnet_actor_manager_facet {
     )]
     #[etherror(name = "NotOwnerOfPublicKey", abi = "NotOwnerOfPublicKey()")]
     pub struct NotOwnerOfPublicKey;
-    ///Custom Error type `NotStakedBefore` with signature `NotStakedBefore()` and selector `0x528fc165`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "NotStakedBefore", abi = "NotStakedBefore()")]
-    pub struct NotStakedBefore;
     ///Custom Error type `NotValidator` with signature `NotValidator(address)` and selector `0xed3db8ac`
     #[derive(
         Clone,
@@ -1833,7 +1811,6 @@ pub mod subnet_actor_manager_facet {
         NotGateway(NotGateway),
         NotOwner(NotOwner),
         NotOwnerOfPublicKey(NotOwnerOfPublicKey),
-        NotStakedBefore(NotStakedBefore),
         NotValidator(NotValidator),
         PQDoesNotContainAddress(PQDoesNotContainAddress),
         PQEmpty(PQEmpty),
@@ -1990,11 +1967,6 @@ pub mod subnet_actor_manager_facet {
             ) {
                 return Ok(Self::NotOwnerOfPublicKey(decoded));
             }
-            if let Ok(decoded) = <NotStakedBefore as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::NotStakedBefore(decoded));
-            }
             if let Ok(decoded) = <NotValidator as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -2115,9 +2087,6 @@ pub mod subnet_actor_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotOwnerOfPublicKey(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NotStakedBefore(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotValidator(element) => {
@@ -2250,10 +2219,6 @@ pub mod subnet_actor_manager_facet {
                     true
                 }
                 _ if selector
-                    == <NotStakedBefore as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <NotValidator as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <PQDoesNotContainAddress as ::ethers::contract::EthError>::selector() => {
@@ -2341,7 +2306,6 @@ pub mod subnet_actor_manager_facet {
                 Self::NotOwnerOfPublicKey(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::NotStakedBefore(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PQDoesNotContainAddress(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -2510,11 +2474,6 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<NotOwnerOfPublicKey> for SubnetActorManagerFacetErrors {
         fn from(value: NotOwnerOfPublicKey) -> Self {
             Self::NotOwnerOfPublicKey(value)
-        }
-    }
-    impl ::core::convert::From<NotStakedBefore> for SubnetActorManagerFacetErrors {
-        fn from(value: NotStakedBefore) -> Self {
-            Self::NotStakedBefore(value)
         }
     }
     impl ::core::convert::From<NotValidator> for SubnetActorManagerFacetErrors {

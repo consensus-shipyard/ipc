@@ -69,6 +69,56 @@ pub mod gateway_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("fundWithToken"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("fundWithToken"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("subnetId"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct SubnetID"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("to"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct FvmAddress"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("amount"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("kill"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -177,6 +227,42 @@ pub mod gateway_manager_facet {
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
+                    ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("target"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "AddressInsufficientBalance",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("AlreadyRegisteredSubnet"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -201,6 +287,15 @@ pub mod gateway_manager_facet {
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -304,6 +399,36 @@ pub mod gateway_manager_facet {
                         },
                     ],
                 ),
+                (
+                    ::std::borrow::ToOwned::to_owned("SafeERC20FailedOperation"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "SafeERC20FailedOperation",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("token"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("UnexpectedSupplySource"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "UnexpectedSupplySource",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
+                ),
             ]),
             receive: false,
             fallback: false,
@@ -368,6 +493,17 @@ pub mod gateway_manager_facet {
                 .method_hash([24, 244, 75, 112], (subnet_id, to))
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `fundWithToken` (0x0517e1aa) function
+        pub fn fund_with_token(
+            &self,
+            subnet_id: SubnetID,
+            to: FvmAddress,
+            amount: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([5, 23, 225, 170], (subnet_id, to, amount))
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `kill` (0x41c0e1b5) function
         pub fn kill(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
@@ -417,6 +553,39 @@ pub mod gateway_manager_facet {
             Self::new(contract.address(), contract.client())
         }
     }
+    ///Custom Error type `AddressEmptyCode` with signature `AddressEmptyCode(address)` and selector `0x9996b315`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "AddressEmptyCode", abi = "AddressEmptyCode(address)")]
+    pub struct AddressEmptyCode {
+        pub target: ::ethers::core::types::Address,
+    }
+    ///Custom Error type `AddressInsufficientBalance` with signature `AddressInsufficientBalance(address)` and selector `0xcd786059`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "AddressInsufficientBalance",
+        abi = "AddressInsufficientBalance(address)"
+    )]
+    pub struct AddressInsufficientBalance {
+        pub account: ::ethers::core::types::Address,
+    }
     ///Custom Error type `AlreadyRegisteredSubnet` with signature `AlreadyRegisteredSubnet()` and selector `0x36a719be`
     #[derive(
         Clone,
@@ -456,6 +625,19 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "CannotReleaseZero", abi = "CannotReleaseZero()")]
     pub struct CannotReleaseZero;
+    ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
+    pub struct FailedInnerCall;
     ///Custom Error type `InsufficientFunds` with signature `InsufficientFunds()` and selector `0x356680b7`
     #[derive(
         Clone,
@@ -575,12 +757,46 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "ReentrancyError", abi = "ReentrancyError()")]
     pub struct ReentrancyError;
+    ///Custom Error type `SafeERC20FailedOperation` with signature `SafeERC20FailedOperation(address)` and selector `0x5274afe7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(
+        name = "SafeERC20FailedOperation",
+        abi = "SafeERC20FailedOperation(address)"
+    )]
+    pub struct SafeERC20FailedOperation {
+        pub token: ::ethers::core::types::Address,
+    }
+    ///Custom Error type `UnexpectedSupplySource` with signature `UnexpectedSupplySource()` and selector `0x80ee5966`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "UnexpectedSupplySource", abi = "UnexpectedSupplySource()")]
+    pub struct UnexpectedSupplySource;
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayManagerFacetErrors {
+        AddressEmptyCode(AddressEmptyCode),
+        AddressInsufficientBalance(AddressInsufficientBalance),
         AlreadyRegisteredSubnet(AlreadyRegisteredSubnet),
         CallFailed(CallFailed),
         CannotReleaseZero(CannotReleaseZero),
+        FailedInnerCall(FailedInnerCall),
         InsufficientFunds(InsufficientFunds),
         InvalidActorAddress(InvalidActorAddress),
         InvalidCrossMsgValue(InvalidCrossMsgValue),
@@ -590,6 +806,8 @@ pub mod gateway_manager_facet {
         NotEnoughFundsToRelease(NotEnoughFundsToRelease),
         NotRegisteredSubnet(NotRegisteredSubnet),
         ReentrancyError(ReentrancyError),
+        SafeERC20FailedOperation(SafeERC20FailedOperation),
+        UnexpectedSupplySource(UnexpectedSupplySource),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
         RevertString(::std::string::String),
@@ -603,6 +821,16 @@ pub mod gateway_manager_facet {
                 data,
             ) {
                 return Ok(Self::RevertString(decoded));
+            }
+            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::AddressEmptyCode(decoded));
+            }
+            if let Ok(decoded) = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::AddressInsufficientBalance(decoded));
             }
             if let Ok(decoded) = <AlreadyRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -618,6 +846,11 @@ pub mod gateway_manager_facet {
                 data,
             ) {
                 return Ok(Self::CannotReleaseZero(decoded));
+            }
+            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::FailedInnerCall(decoded));
             }
             if let Ok(decoded) = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -664,12 +897,28 @@ pub mod gateway_manager_facet {
             ) {
                 return Ok(Self::ReentrancyError(decoded));
             }
+            if let Ok(decoded) = <SafeERC20FailedOperation as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::SafeERC20FailedOperation(decoded));
+            }
+            if let Ok(decoded) = <UnexpectedSupplySource as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::UnexpectedSupplySource(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
     impl ::ethers::core::abi::AbiEncode for GatewayManagerFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
+                Self::AddressEmptyCode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::AddressInsufficientBalance(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::AlreadyRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -677,6 +926,9 @@ pub mod gateway_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::CannotReleaseZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FailedInnerCall(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::InsufficientFunds(element) => {
@@ -706,6 +958,12 @@ pub mod gateway_manager_facet {
                 Self::ReentrancyError(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::SafeERC20FailedOperation(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::UnexpectedSupplySource(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -715,6 +973,14 @@ pub mod gateway_manager_facet {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
                 _ if selector
+                    == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
                     == <AlreadyRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -722,6 +988,10 @@ pub mod gateway_manager_facet {
                     == <CallFailed as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
                     == <CannotReleaseZero as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -760,6 +1030,14 @@ pub mod gateway_manager_facet {
                     == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
                     true
                 }
+                _ if selector
+                    == <SafeERC20FailedOperation as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <UnexpectedSupplySource as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ => false,
             }
         }
@@ -767,11 +1045,16 @@ pub mod gateway_manager_facet {
     impl ::core::fmt::Display for GatewayManagerFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
+                Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AddressInsufficientBalance(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::AlreadyRegisteredSubnet(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::CallFailed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InsufficientFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidActorAddress(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -791,6 +1074,12 @@ pub mod gateway_manager_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SafeERC20FailedOperation(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::UnexpectedSupplySource(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -798,6 +1087,17 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<::std::string::String> for GatewayManagerFacetErrors {
         fn from(value: String) -> Self {
             Self::RevertString(value)
+        }
+    }
+    impl ::core::convert::From<AddressEmptyCode> for GatewayManagerFacetErrors {
+        fn from(value: AddressEmptyCode) -> Self {
+            Self::AddressEmptyCode(value)
+        }
+    }
+    impl ::core::convert::From<AddressInsufficientBalance>
+    for GatewayManagerFacetErrors {
+        fn from(value: AddressInsufficientBalance) -> Self {
+            Self::AddressInsufficientBalance(value)
         }
     }
     impl ::core::convert::From<AlreadyRegisteredSubnet> for GatewayManagerFacetErrors {
@@ -813,6 +1113,11 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<CannotReleaseZero> for GatewayManagerFacetErrors {
         fn from(value: CannotReleaseZero) -> Self {
             Self::CannotReleaseZero(value)
+        }
+    }
+    impl ::core::convert::From<FailedInnerCall> for GatewayManagerFacetErrors {
+        fn from(value: FailedInnerCall) -> Self {
+            Self::FailedInnerCall(value)
         }
     }
     impl ::core::convert::From<InsufficientFunds> for GatewayManagerFacetErrors {
@@ -860,6 +1165,16 @@ pub mod gateway_manager_facet {
             Self::ReentrancyError(value)
         }
     }
+    impl ::core::convert::From<SafeERC20FailedOperation> for GatewayManagerFacetErrors {
+        fn from(value: SafeERC20FailedOperation) -> Self {
+            Self::SafeERC20FailedOperation(value)
+        }
+    }
+    impl ::core::convert::From<UnexpectedSupplySource> for GatewayManagerFacetErrors {
+        fn from(value: UnexpectedSupplySource) -> Self {
+            Self::UnexpectedSupplySource(value)
+        }
+    }
     ///Container type for all input parameters for the `addStake` function with signature `addStake()` and selector `0x5a627dbc`
     #[derive(
         Clone,
@@ -888,6 +1203,26 @@ pub mod gateway_manager_facet {
     pub struct FundCall {
         pub subnet_id: SubnetID,
         pub to: FvmAddress,
+    }
+    ///Container type for all input parameters for the `fundWithToken` function with signature `fundWithToken((uint64,address[]),(uint8,bytes),uint256)` and selector `0x0517e1aa`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "fundWithToken",
+        abi = "fundWithToken((uint64,address[]),(uint8,bytes),uint256)"
+    )]
+    pub struct FundWithTokenCall {
+        pub subnet_id: SubnetID,
+        pub to: FvmAddress,
+        pub amount: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `kill` function with signature `kill()` and selector `0x41c0e1b5`
     #[derive(
@@ -970,6 +1305,7 @@ pub mod gateway_manager_facet {
     pub enum GatewayManagerFacetCalls {
         AddStake(AddStakeCall),
         Fund(FundCall),
+        FundWithToken(FundWithTokenCall),
         Kill(KillCall),
         Register(RegisterCall),
         Release(ReleaseCall),
@@ -990,6 +1326,11 @@ pub mod gateway_manager_facet {
                 data,
             ) {
                 return Ok(Self::Fund(decoded));
+            }
+            if let Ok(decoded) = <FundWithTokenCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::FundWithToken(decoded));
             }
             if let Ok(decoded) = <KillCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1026,6 +1367,9 @@ pub mod gateway_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::Fund(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::FundWithToken(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Register(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -1045,6 +1389,7 @@ pub mod gateway_manager_facet {
             match self {
                 Self::AddStake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Fund(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FundWithToken(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Kill(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Register(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Release(element) => ::core::fmt::Display::fmt(element, f),
@@ -1063,6 +1408,11 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<FundCall> for GatewayManagerFacetCalls {
         fn from(value: FundCall) -> Self {
             Self::Fund(value)
+        }
+    }
+    impl ::core::convert::From<FundWithTokenCall> for GatewayManagerFacetCalls {
+        fn from(value: FundWithTokenCall) -> Self {
+            Self::FundWithToken(value)
         }
     }
     impl ::core::convert::From<KillCall> for GatewayManagerFacetCalls {

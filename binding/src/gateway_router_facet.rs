@@ -956,15 +956,6 @@ pub mod gateway_router_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("NotEnoughSubnetCircSupply"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -1624,19 +1615,6 @@ pub mod gateway_router_facet {
     )]
     #[etherror(name = "NotAuthorized", abi = "NotAuthorized(address)")]
     pub struct NotAuthorized(pub ::ethers::core::types::Address);
-    ///Custom Error type `NotEnoughBalance` with signature `NotEnoughBalance()` and selector `0xad3a8b9e`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "NotEnoughBalance", abi = "NotEnoughBalance()")]
-    pub struct NotEnoughBalance;
     ///Custom Error type `NotEnoughSubnetCircSupply` with signature `NotEnoughSubnetCircSupply()` and selector `0x74db2854`
     #[derive(
         Clone,
@@ -1825,7 +1803,6 @@ pub mod gateway_router_facet {
         InvalidSubnet(InvalidSubnet),
         MaxMsgsPerBatchExceeded(MaxMsgsPerBatchExceeded),
         NotAuthorized(NotAuthorized),
-        NotEnoughBalance(NotEnoughBalance),
         NotEnoughSubnetCircSupply(NotEnoughSubnetCircSupply),
         NotRegisteredSubnet(NotRegisteredSubnet),
         NotSystemActor(NotSystemActor),
@@ -1982,11 +1959,6 @@ pub mod gateway_router_facet {
             ) {
                 return Ok(Self::NotAuthorized(decoded));
             }
-            if let Ok(decoded) = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::NotEnoughBalance(decoded));
-            }
             if let Ok(decoded) = <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -2129,9 +2101,6 @@ pub mod gateway_router_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotAuthorized(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NotEnoughBalance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotEnoughSubnetCircSupply(element) => {
@@ -2281,10 +2250,6 @@ pub mod gateway_router_facet {
                     true
                 }
                 _ if selector
-                    == <NotEnoughBalance as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <NotEnoughSubnetCircSupply as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -2401,7 +2366,6 @@ pub mod gateway_router_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughSubnetCircSupply(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -2566,11 +2530,6 @@ pub mod gateway_router_facet {
     impl ::core::convert::From<NotAuthorized> for GatewayRouterFacetErrors {
         fn from(value: NotAuthorized) -> Self {
             Self::NotAuthorized(value)
-        }
-    }
-    impl ::core::convert::From<NotEnoughBalance> for GatewayRouterFacetErrors {
-        fn from(value: NotEnoughBalance) -> Self {
-            Self::NotEnoughBalance(value)
         }
     }
     impl ::core::convert::From<NotEnoughSubnetCircSupply> for GatewayRouterFacetErrors {
