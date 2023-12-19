@@ -68,9 +68,11 @@ pub mod subnet_actor_getter_facet {
                             outputs: ::std::vec![
                                 ::ethers::core::abi::ethabi::Param {
                                     name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
                                     internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -89,9 +91,11 @@ pub mod subnet_actor_getter_facet {
                             inputs: ::std::vec![
                                 ::ethers::core::abi::ethabi::Param {
                                     name: ::std::borrow::ToOwned::to_owned("epoch"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
                                     internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -117,10 +121,9 @@ pub mod subnet_actor_getter_facet {
                                                     ),
                                                 ],
                                             ),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
@@ -145,9 +148,11 @@ pub mod subnet_actor_getter_facet {
                             inputs: ::std::vec![
                                 ::ethers::core::abi::ethabi::Param {
                                     name: ::std::borrow::ToOwned::to_owned("epoch"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
                                     internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -166,6 +171,30 @@ pub mod subnet_actor_getter_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("bytes32"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("bottomUpMsgBatchPeriod"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "bottomUpMsgBatchPeriod",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -369,6 +398,28 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getActiveValidatorsNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getActiveValidatorsNumber",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint16"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getBootstrapNodes"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -451,6 +502,36 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getPower"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("getPower"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getRelayerReward"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -481,6 +562,106 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getTotalCollateral"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("getTotalCollateral"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getTotalConfirmedCollateral"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getTotalConfirmedCollateral",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getTotalValidatorCollateral"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getTotalValidatorCollateral",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getTotalValidatorsNumber"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getTotalValidatorsNumber",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint16"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getValidator"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -499,6 +680,7 @@ pub mod subnet_actor_getter_facet {
                                     name: ::std::borrow::ToOwned::to_owned("validator"),
                                     kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
                                         ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
@@ -522,6 +704,38 @@ pub mod subnet_actor_getter_facet {
                         ::ethers::core::abi::ethabi::Function {
                             name: ::std::borrow::ToOwned::to_owned(
                                 "hasSubmittedInLastBottomUpCheckpointHeight",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bool"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned(
+                        "hasSubmittedInLastBottomUpMsgBatchHeight",
+                    ),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "hasSubmittedInLastBottomUpMsgBatchHeight",
                             ),
                             inputs: ::std::vec![
                                 ::ethers::core::abi::ethabi::Param {
@@ -653,9 +867,35 @@ pub mod subnet_actor_getter_facet {
                             outputs: ::std::vec![
                                 ::ethers::core::abi::ethabi::Param {
                                     name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
                                     internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("lastBottomUpMsgBatchHeight"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "lastBottomUpMsgBatchHeight",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -742,6 +982,26 @@ pub mod subnet_actor_getter_facet {
                                     kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("uint64"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("permissionMode"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("permissionMode"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("enum PermissionMode"),
                                     ),
                                 },
                             ],
@@ -839,27 +1099,35 @@ pub mod subnet_actor_getter_facet {
         ///Calls the contract's `bottomUpCheckPeriod` (0x06c46853) function
         pub fn bottom_up_check_period(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, u64> {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([6, 196, 104, 83], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `bottomUpCheckpointAtEpoch` (0x6cb2ecee) function
+        ///Calls the contract's `bottomUpCheckpointAtEpoch` (0x4b27aa72) function
         pub fn bottom_up_checkpoint_at_epoch(
             &self,
-            epoch: u64,
+            epoch: ::ethers::core::types::U256,
         ) -> ::ethers::contract::builders::ContractCall<M, (bool, BottomUpCheckpoint)> {
             self.0
-                .method_hash([108, 178, 236, 238], epoch)
+                .method_hash([75, 39, 170, 114], epoch)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `bottomUpCheckpointHashAtEpoch` (0x133f74ea) function
+        ///Calls the contract's `bottomUpCheckpointHashAtEpoch` (0x4b0694e2) function
         pub fn bottom_up_checkpoint_hash_at_epoch(
             &self,
-            epoch: u64,
+            epoch: ::ethers::core::types::U256,
         ) -> ::ethers::contract::builders::ContractCall<M, (bool, [u8; 32])> {
             self.0
-                .method_hash([19, 63, 116, 234], epoch)
+                .method_hash([75, 6, 148, 226], epoch)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `bottomUpMsgBatchPeriod` (0x69e737fd) function
+        pub fn bottom_up_msg_batch_period(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([105, 231, 55, 253], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `consensus` (0x8ef3f761) function
@@ -907,6 +1175,14 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([217, 46, 143, 18], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getActiveValidatorsNumber` (0xc7cda762) function
+        pub fn get_active_validators_number(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u16> {
+            self.0
+                .method_hash([199, 205, 167, 98], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getBootstrapNodes` (0x9754b29e) function
         pub fn get_bootstrap_nodes(
             &self,
@@ -934,6 +1210,15 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([128, 247, 96, 33], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getPower` (0x5dd9147c) function
+        pub fn get_power(
+            &self,
+            validator: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([93, 217, 20, 124], validator)
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getRelayerReward` (0xb2bd295e) function
         pub fn get_relayer_reward(
             &self,
@@ -941,6 +1226,39 @@ pub mod subnet_actor_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([178, 189, 41, 94], relayer)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getTotalCollateral` (0xd6eb5910) function
+        pub fn get_total_collateral(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([214, 235, 89, 16], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getTotalConfirmedCollateral` (0x332a5ac9) function
+        pub fn get_total_confirmed_collateral(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([51, 42, 90, 201], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getTotalValidatorCollateral` (0x1597bf7e) function
+        pub fn get_total_validator_collateral(
+            &self,
+            validator: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([21, 151, 191, 126], validator)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getTotalValidatorsNumber` (0x52d182d1) function
+        pub fn get_total_validators_number(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u16> {
+            self.0
+                .method_hash([82, 209, 130, 209], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getValidator` (0x1904bb2e) function
@@ -959,6 +1277,15 @@ pub mod subnet_actor_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
                 .method_hash([43, 195, 30, 179], validator)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `hasSubmittedInLastBottomUpMsgBatchHeight` (0xf75499dc) function
+        pub fn has_submitted_in_last_bottom_up_msg_batch_height(
+            &self,
+            validator: ::ethers::core::types::Address,
+        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+            self.0
+                .method_hash([247, 84, 153, 220], validator)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `ipcGatewayAddr` (0xcfca2824) function
@@ -999,9 +1326,17 @@ pub mod subnet_actor_getter_facet {
         ///Calls the contract's `lastBottomUpCheckpointHeight` (0x72d0a0e0) function
         pub fn last_bottom_up_checkpoint_height(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, u64> {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([114, 208, 160, 224], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `lastBottomUpMsgBatchHeight` (0x28d5551d) function
+        pub fn last_bottom_up_msg_batch_height(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+            self.0
+                .method_hash([40, 213, 85, 29], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `majorityPercentage` (0x599c7bd1) function
@@ -1034,6 +1369,14 @@ pub mod subnet_actor_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, u64> {
             self.0
                 .method_hash([197, 171, 34, 65], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `permissionMode` (0xf0cf6c96) function
+        pub fn permission_mode(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u8> {
+            self.0
+                .method_hash([240, 207, 108, 150], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `powerScale` (0xad81e4d6) function
@@ -1088,7 +1431,7 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "bottomUpCheckPeriod", abi = "bottomUpCheckPeriod()")]
     pub struct BottomUpCheckPeriodCall;
-    ///Container type for all input parameters for the `bottomUpCheckpointAtEpoch` function with signature `bottomUpCheckpointAtEpoch(uint64)` and selector `0x6cb2ecee`
+    ///Container type for all input parameters for the `bottomUpCheckpointAtEpoch` function with signature `bottomUpCheckpointAtEpoch(uint256)` and selector `0x4b27aa72`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1101,12 +1444,12 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(
         name = "bottomUpCheckpointAtEpoch",
-        abi = "bottomUpCheckpointAtEpoch(uint64)"
+        abi = "bottomUpCheckpointAtEpoch(uint256)"
     )]
     pub struct BottomUpCheckpointAtEpochCall {
-        pub epoch: u64,
+        pub epoch: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `bottomUpCheckpointHashAtEpoch` function with signature `bottomUpCheckpointHashAtEpoch(uint64)` and selector `0x133f74ea`
+    ///Container type for all input parameters for the `bottomUpCheckpointHashAtEpoch` function with signature `bottomUpCheckpointHashAtEpoch(uint256)` and selector `0x4b0694e2`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1119,11 +1462,24 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(
         name = "bottomUpCheckpointHashAtEpoch",
-        abi = "bottomUpCheckpointHashAtEpoch(uint64)"
+        abi = "bottomUpCheckpointHashAtEpoch(uint256)"
     )]
     pub struct BottomUpCheckpointHashAtEpochCall {
-        pub epoch: u64,
+        pub epoch: ::ethers::core::types::U256,
     }
+    ///Container type for all input parameters for the `bottomUpMsgBatchPeriod` function with signature `bottomUpMsgBatchPeriod()` and selector `0x69e737fd`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "bottomUpMsgBatchPeriod", abi = "bottomUpMsgBatchPeriod()")]
+    pub struct BottomUpMsgBatchPeriodCall;
     ///Container type for all input parameters for the `consensus` function with signature `consensus()` and selector `0x8ef3f761`
     #[derive(
         Clone,
@@ -1194,6 +1550,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "genesisValidators", abi = "genesisValidators()")]
     pub struct GenesisValidatorsCall;
+    ///Container type for all input parameters for the `getActiveValidatorsNumber` function with signature `getActiveValidatorsNumber()` and selector `0xc7cda762`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getActiveValidatorsNumber", abi = "getActiveValidatorsNumber()")]
+    pub struct GetActiveValidatorsNumberCall;
     ///Container type for all input parameters for the `getBootstrapNodes` function with signature `getBootstrapNodes()` and selector `0x9754b29e`
     #[derive(
         Clone,
@@ -1233,6 +1602,21 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "getParent", abi = "getParent()")]
     pub struct GetParentCall;
+    ///Container type for all input parameters for the `getPower` function with signature `getPower(address)` and selector `0x5dd9147c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getPower", abi = "getPower(address)")]
+    pub struct GetPowerCall {
+        pub validator: ::ethers::core::types::Address,
+    }
     ///Container type for all input parameters for the `getRelayerReward` function with signature `getRelayerReward(address)` and selector `0xb2bd295e`
     #[derive(
         Clone,
@@ -1248,6 +1632,66 @@ pub mod subnet_actor_getter_facet {
     pub struct GetRelayerRewardCall {
         pub relayer: ::ethers::core::types::Address,
     }
+    ///Container type for all input parameters for the `getTotalCollateral` function with signature `getTotalCollateral()` and selector `0xd6eb5910`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getTotalCollateral", abi = "getTotalCollateral()")]
+    pub struct GetTotalCollateralCall;
+    ///Container type for all input parameters for the `getTotalConfirmedCollateral` function with signature `getTotalConfirmedCollateral()` and selector `0x332a5ac9`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "getTotalConfirmedCollateral",
+        abi = "getTotalConfirmedCollateral()"
+    )]
+    pub struct GetTotalConfirmedCollateralCall;
+    ///Container type for all input parameters for the `getTotalValidatorCollateral` function with signature `getTotalValidatorCollateral(address)` and selector `0x1597bf7e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "getTotalValidatorCollateral",
+        abi = "getTotalValidatorCollateral(address)"
+    )]
+    pub struct GetTotalValidatorCollateralCall {
+        pub validator: ::ethers::core::types::Address,
+    }
+    ///Container type for all input parameters for the `getTotalValidatorsNumber` function with signature `getTotalValidatorsNumber()` and selector `0x52d182d1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "getTotalValidatorsNumber", abi = "getTotalValidatorsNumber()")]
+    pub struct GetTotalValidatorsNumberCall;
     ///Container type for all input parameters for the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,
@@ -1279,6 +1723,24 @@ pub mod subnet_actor_getter_facet {
         abi = "hasSubmittedInLastBottomUpCheckpointHeight(address)"
     )]
     pub struct HasSubmittedInLastBottomUpCheckpointHeightCall {
+        pub validator: ::ethers::core::types::Address,
+    }
+    ///Container type for all input parameters for the `hasSubmittedInLastBottomUpMsgBatchHeight` function with signature `hasSubmittedInLastBottomUpMsgBatchHeight(address)` and selector `0xf75499dc`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "hasSubmittedInLastBottomUpMsgBatchHeight",
+        abi = "hasSubmittedInLastBottomUpMsgBatchHeight(address)"
+    )]
+    pub struct HasSubmittedInLastBottomUpMsgBatchHeightCall {
         pub validator: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
@@ -1353,6 +1815,19 @@ pub mod subnet_actor_getter_facet {
         abi = "lastBottomUpCheckpointHeight()"
     )]
     pub struct LastBottomUpCheckpointHeightCall;
+    ///Container type for all input parameters for the `lastBottomUpMsgBatchHeight` function with signature `lastBottomUpMsgBatchHeight()` and selector `0x28d5551d`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "lastBottomUpMsgBatchHeight", abi = "lastBottomUpMsgBatchHeight()")]
+    pub struct LastBottomUpMsgBatchHeightCall;
     ///Container type for all input parameters for the `majorityPercentage` function with signature `majorityPercentage()` and selector `0x599c7bd1`
     #[derive(
         Clone,
@@ -1405,6 +1880,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "minValidators", abi = "minValidators()")]
     pub struct MinValidatorsCall;
+    ///Container type for all input parameters for the `permissionMode` function with signature `permissionMode()` and selector `0xf0cf6c96`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "permissionMode", abi = "permissionMode()")]
+    pub struct PermissionModeCall;
     ///Container type for all input parameters for the `powerScale` function with signature `powerScale()` and selector `0xad81e4d6`
     #[derive(
         Clone,
@@ -1426,28 +1914,40 @@ pub mod subnet_actor_getter_facet {
         BottomUpCheckPeriod(BottomUpCheckPeriodCall),
         BottomUpCheckpointAtEpoch(BottomUpCheckpointAtEpochCall),
         BottomUpCheckpointHashAtEpoch(BottomUpCheckpointHashAtEpochCall),
+        BottomUpMsgBatchPeriod(BottomUpMsgBatchPeriodCall),
         Consensus(ConsensusCall),
         CrossMsgsHash(CrossMsgsHashCall),
         GenesisBalances(GenesisBalancesCall),
         GenesisCircSupply(GenesisCircSupplyCall),
         GenesisValidators(GenesisValidatorsCall),
+        GetActiveValidatorsNumber(GetActiveValidatorsNumberCall),
         GetBootstrapNodes(GetBootstrapNodesCall),
         GetConfigurationNumbers(GetConfigurationNumbersCall),
         GetParent(GetParentCall),
+        GetPower(GetPowerCall),
         GetRelayerReward(GetRelayerRewardCall),
+        GetTotalCollateral(GetTotalCollateralCall),
+        GetTotalConfirmedCollateral(GetTotalConfirmedCollateralCall),
+        GetTotalValidatorCollateral(GetTotalValidatorCollateralCall),
+        GetTotalValidatorsNumber(GetTotalValidatorsNumberCall),
         GetValidator(GetValidatorCall),
         HasSubmittedInLastBottomUpCheckpointHeight(
             HasSubmittedInLastBottomUpCheckpointHeightCall,
+        ),
+        HasSubmittedInLastBottomUpMsgBatchHeight(
+            HasSubmittedInLastBottomUpMsgBatchHeightCall,
         ),
         IpcGatewayAddr(IpcGatewayAddrCall),
         IsActiveValidator(IsActiveValidatorCall),
         IsWaitingValidator(IsWaitingValidatorCall),
         Killed(KilledCall),
         LastBottomUpCheckpointHeight(LastBottomUpCheckpointHeightCall),
+        LastBottomUpMsgBatchHeight(LastBottomUpMsgBatchHeightCall),
         MajorityPercentage(MajorityPercentageCall),
         MinActivationCollateral(MinActivationCollateralCall),
         MinCrossMsgFee(MinCrossMsgFeeCall),
         MinValidators(MinValidatorsCall),
+        PermissionMode(PermissionModeCall),
         PowerScale(PowerScaleCall),
     }
     impl ::ethers::core::abi::AbiDecode for SubnetActorGetterFacetCalls {
@@ -1480,6 +1980,11 @@ pub mod subnet_actor_getter_facet {
             ) {
                 return Ok(Self::BottomUpCheckpointHashAtEpoch(decoded));
             }
+            if let Ok(decoded) = <BottomUpMsgBatchPeriodCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::BottomUpMsgBatchPeriod(decoded));
+            }
             if let Ok(decoded) = <ConsensusCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -1505,6 +2010,11 @@ pub mod subnet_actor_getter_facet {
             ) {
                 return Ok(Self::GenesisValidators(decoded));
             }
+            if let Ok(decoded) = <GetActiveValidatorsNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetActiveValidatorsNumber(decoded));
+            }
             if let Ok(decoded) = <GetBootstrapNodesCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -1520,10 +2030,35 @@ pub mod subnet_actor_getter_facet {
             ) {
                 return Ok(Self::GetParent(decoded));
             }
+            if let Ok(decoded) = <GetPowerCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetPower(decoded));
+            }
             if let Ok(decoded) = <GetRelayerRewardCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
                 return Ok(Self::GetRelayerReward(decoded));
+            }
+            if let Ok(decoded) = <GetTotalCollateralCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetTotalCollateral(decoded));
+            }
+            if let Ok(decoded) = <GetTotalConfirmedCollateralCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetTotalConfirmedCollateral(decoded));
+            }
+            if let Ok(decoded) = <GetTotalValidatorCollateralCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetTotalValidatorCollateral(decoded));
+            }
+            if let Ok(decoded) = <GetTotalValidatorsNumberCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::GetTotalValidatorsNumber(decoded));
             }
             if let Ok(decoded) = <GetValidatorCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1534,6 +2069,11 @@ pub mod subnet_actor_getter_facet {
                 data,
             ) {
                 return Ok(Self::HasSubmittedInLastBottomUpCheckpointHeight(decoded));
+            }
+            if let Ok(decoded) = <HasSubmittedInLastBottomUpMsgBatchHeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::HasSubmittedInLastBottomUpMsgBatchHeight(decoded));
             }
             if let Ok(decoded) = <IpcGatewayAddrCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1560,6 +2100,11 @@ pub mod subnet_actor_getter_facet {
             ) {
                 return Ok(Self::LastBottomUpCheckpointHeight(decoded));
             }
+            if let Ok(decoded) = <LastBottomUpMsgBatchHeightCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::LastBottomUpMsgBatchHeight(decoded));
+            }
             if let Ok(decoded) = <MajorityPercentageCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -1579,6 +2124,11 @@ pub mod subnet_actor_getter_facet {
                 data,
             ) {
                 return Ok(Self::MinValidators(decoded));
+            }
+            if let Ok(decoded) = <PermissionModeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::PermissionMode(decoded));
             }
             if let Ok(decoded) = <PowerScaleCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -1606,6 +2156,9 @@ pub mod subnet_actor_getter_facet {
                 Self::BottomUpCheckpointHashAtEpoch(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::BottomUpMsgBatchPeriod(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Consensus(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1621,6 +2174,9 @@ pub mod subnet_actor_getter_facet {
                 Self::GenesisValidators(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::GetActiveValidatorsNumber(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetBootstrapNodes(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1630,13 +2186,31 @@ pub mod subnet_actor_getter_facet {
                 Self::GetParent(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::GetPower(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetRelayerReward(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTotalCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTotalConfirmedCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTotalValidatorCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTotalValidatorsNumber(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetValidator(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::HasSubmittedInLastBottomUpCheckpointHeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::HasSubmittedInLastBottomUpMsgBatchHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::IpcGatewayAddr(element) => {
@@ -1652,6 +2226,9 @@ pub mod subnet_actor_getter_facet {
                 Self::LastBottomUpCheckpointHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::LastBottomUpMsgBatchHeight(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::MajorityPercentage(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1662,6 +2239,9 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::MinValidators(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::PermissionMode(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::PowerScale(element) => {
@@ -1686,19 +2266,41 @@ pub mod subnet_actor_getter_facet {
                 Self::BottomUpCheckpointHashAtEpoch(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::BottomUpMsgBatchPeriod(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::Consensus(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CrossMsgsHash(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisBalances(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisCircSupply(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisValidators(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetActiveValidatorsNumber(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GetBootstrapNodes(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetConfigurationNumbers(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::GetParent(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetPower(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRelayerReward(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetTotalCollateral(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetTotalConfirmedCollateral(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetTotalValidatorCollateral(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GetTotalValidatorsNumber(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::HasSubmittedInLastBottomUpCheckpointHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::HasSubmittedInLastBottomUpMsgBatchHeight(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::IpcGatewayAddr(element) => ::core::fmt::Display::fmt(element, f),
@@ -1710,6 +2312,9 @@ pub mod subnet_actor_getter_facet {
                 Self::LastBottomUpCheckpointHeight(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::LastBottomUpMsgBatchHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::MajorityPercentage(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1718,6 +2323,7 @@ pub mod subnet_actor_getter_facet {
                 }
                 Self::MinCrossMsgFee(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinValidators(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PermissionMode(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PowerScale(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
@@ -1750,6 +2356,12 @@ pub mod subnet_actor_getter_facet {
             Self::BottomUpCheckpointHashAtEpoch(value)
         }
     }
+    impl ::core::convert::From<BottomUpMsgBatchPeriodCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: BottomUpMsgBatchPeriodCall) -> Self {
+            Self::BottomUpMsgBatchPeriod(value)
+        }
+    }
     impl ::core::convert::From<ConsensusCall> for SubnetActorGetterFacetCalls {
         fn from(value: ConsensusCall) -> Self {
             Self::Consensus(value)
@@ -1775,6 +2387,12 @@ pub mod subnet_actor_getter_facet {
             Self::GenesisValidators(value)
         }
     }
+    impl ::core::convert::From<GetActiveValidatorsNumberCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetActiveValidatorsNumberCall) -> Self {
+            Self::GetActiveValidatorsNumber(value)
+        }
+    }
     impl ::core::convert::From<GetBootstrapNodesCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetBootstrapNodesCall) -> Self {
             Self::GetBootstrapNodes(value)
@@ -1791,9 +2409,37 @@ pub mod subnet_actor_getter_facet {
             Self::GetParent(value)
         }
     }
+    impl ::core::convert::From<GetPowerCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetPowerCall) -> Self {
+            Self::GetPower(value)
+        }
+    }
     impl ::core::convert::From<GetRelayerRewardCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetRelayerRewardCall) -> Self {
             Self::GetRelayerReward(value)
+        }
+    }
+    impl ::core::convert::From<GetTotalCollateralCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetTotalCollateralCall) -> Self {
+            Self::GetTotalCollateral(value)
+        }
+    }
+    impl ::core::convert::From<GetTotalConfirmedCollateralCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetTotalConfirmedCollateralCall) -> Self {
+            Self::GetTotalConfirmedCollateral(value)
+        }
+    }
+    impl ::core::convert::From<GetTotalValidatorCollateralCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetTotalValidatorCollateralCall) -> Self {
+            Self::GetTotalValidatorCollateral(value)
+        }
+    }
+    impl ::core::convert::From<GetTotalValidatorsNumberCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: GetTotalValidatorsNumberCall) -> Self {
+            Self::GetTotalValidatorsNumber(value)
         }
     }
     impl ::core::convert::From<GetValidatorCall> for SubnetActorGetterFacetCalls {
@@ -1805,6 +2451,12 @@ pub mod subnet_actor_getter_facet {
     for SubnetActorGetterFacetCalls {
         fn from(value: HasSubmittedInLastBottomUpCheckpointHeightCall) -> Self {
             Self::HasSubmittedInLastBottomUpCheckpointHeight(value)
+        }
+    }
+    impl ::core::convert::From<HasSubmittedInLastBottomUpMsgBatchHeightCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: HasSubmittedInLastBottomUpMsgBatchHeightCall) -> Self {
+            Self::HasSubmittedInLastBottomUpMsgBatchHeight(value)
         }
     }
     impl ::core::convert::From<IpcGatewayAddrCall> for SubnetActorGetterFacetCalls {
@@ -1833,6 +2485,12 @@ pub mod subnet_actor_getter_facet {
             Self::LastBottomUpCheckpointHeight(value)
         }
     }
+    impl ::core::convert::From<LastBottomUpMsgBatchHeightCall>
+    for SubnetActorGetterFacetCalls {
+        fn from(value: LastBottomUpMsgBatchHeightCall) -> Self {
+            Self::LastBottomUpMsgBatchHeight(value)
+        }
+    }
     impl ::core::convert::From<MajorityPercentageCall> for SubnetActorGetterFacetCalls {
         fn from(value: MajorityPercentageCall) -> Self {
             Self::MajorityPercentage(value)
@@ -1852,6 +2510,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<MinValidatorsCall> for SubnetActorGetterFacetCalls {
         fn from(value: MinValidatorsCall) -> Self {
             Self::MinValidators(value)
+        }
+    }
+    impl ::core::convert::From<PermissionModeCall> for SubnetActorGetterFacetCalls {
+        fn from(value: PermissionModeCall) -> Self {
+            Self::PermissionMode(value)
         }
     }
     impl ::core::convert::From<PowerScaleCall> for SubnetActorGetterFacetCalls {
@@ -1894,8 +2557,8 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash
     )]
-    pub struct BottomUpCheckPeriodReturn(pub u64);
-    ///Container type for all return fields from the `bottomUpCheckpointAtEpoch` function with signature `bottomUpCheckpointAtEpoch(uint64)` and selector `0x6cb2ecee`
+    pub struct BottomUpCheckPeriodReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `bottomUpCheckpointAtEpoch` function with signature `bottomUpCheckpointAtEpoch(uint256)` and selector `0x4b27aa72`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1910,7 +2573,7 @@ pub mod subnet_actor_getter_facet {
         pub exists: bool,
         pub checkpoint: BottomUpCheckpoint,
     }
-    ///Container type for all return fields from the `bottomUpCheckpointHashAtEpoch` function with signature `bottomUpCheckpointHashAtEpoch(uint64)` and selector `0x133f74ea`
+    ///Container type for all return fields from the `bottomUpCheckpointHashAtEpoch` function with signature `bottomUpCheckpointHashAtEpoch(uint256)` and selector `0x4b0694e2`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1922,6 +2585,18 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct BottomUpCheckpointHashAtEpochReturn(pub bool, pub [u8; 32]);
+    ///Container type for all return fields from the `bottomUpMsgBatchPeriod` function with signature `bottomUpMsgBatchPeriod()` and selector `0x69e737fd`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct BottomUpMsgBatchPeriodReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `consensus` function with signature `consensus()` and selector `0x8ef3f761`
     #[derive(
         Clone,
@@ -1985,6 +2660,18 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct GenesisValidatorsReturn(pub ::std::vec::Vec<Validator>);
+    ///Container type for all return fields from the `getActiveValidatorsNumber` function with signature `getActiveValidatorsNumber()` and selector `0xc7cda762`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetActiveValidatorsNumberReturn(pub u16);
     ///Container type for all return fields from the `getBootstrapNodes` function with signature `getBootstrapNodes()` and selector `0x9754b29e`
     #[derive(
         Clone,
@@ -2021,6 +2708,18 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct GetParentReturn(pub SubnetID);
+    ///Container type for all return fields from the `getPower` function with signature `getPower(address)` and selector `0x5dd9147c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetPowerReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getRelayerReward` function with signature `getRelayerReward(address)` and selector `0xb2bd295e`
     #[derive(
         Clone,
@@ -2033,6 +2732,54 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct GetRelayerRewardReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getTotalCollateral` function with signature `getTotalCollateral()` and selector `0xd6eb5910`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetTotalCollateralReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getTotalConfirmedCollateral` function with signature `getTotalConfirmedCollateral()` and selector `0x332a5ac9`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetTotalConfirmedCollateralReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getTotalValidatorCollateral` function with signature `getTotalValidatorCollateral(address)` and selector `0x1597bf7e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetTotalValidatorCollateralReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `getTotalValidatorsNumber` function with signature `getTotalValidatorsNumber()` and selector `0x52d182d1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct GetTotalValidatorsNumberReturn(pub u16);
     ///Container type for all return fields from the `getValidator` function with signature `getValidator(address)` and selector `0x1904bb2e`
     #[derive(
         Clone,
@@ -2059,6 +2806,18 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct HasSubmittedInLastBottomUpCheckpointHeightReturn(pub bool);
+    ///Container type for all return fields from the `hasSubmittedInLastBottomUpMsgBatchHeight` function with signature `hasSubmittedInLastBottomUpMsgBatchHeight(address)` and selector `0xf75499dc`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct HasSubmittedInLastBottomUpMsgBatchHeightReturn(pub bool);
     ///Container type for all return fields from the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
         Clone,
@@ -2118,7 +2877,19 @@ pub mod subnet_actor_getter_facet {
         Eq,
         Hash
     )]
-    pub struct LastBottomUpCheckpointHeightReturn(pub u64);
+    pub struct LastBottomUpCheckpointHeightReturn(pub ::ethers::core::types::U256);
+    ///Container type for all return fields from the `lastBottomUpMsgBatchHeight` function with signature `lastBottomUpMsgBatchHeight()` and selector `0x28d5551d`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct LastBottomUpMsgBatchHeightReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `majorityPercentage` function with signature `majorityPercentage()` and selector `0x599c7bd1`
     #[derive(
         Clone,
@@ -2167,6 +2938,18 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct MinValidatorsReturn(pub u64);
+    ///Container type for all return fields from the `permissionMode` function with signature `permissionMode()` and selector `0xf0cf6c96`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct PermissionModeReturn(pub u8);
     ///Container type for all return fields from the `powerScale` function with signature `powerScale()` and selector `0xad81e4d6`
     #[derive(
         Clone,
@@ -2179,7 +2962,7 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct PowerScaleReturn(pub i8);
-    ///`BottomUpCheckpoint((uint64,address[]),uint64,bytes32,uint64,bytes32)`
+    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2192,10 +2975,9 @@ pub mod subnet_actor_getter_facet {
     )]
     pub struct BottomUpCheckpoint {
         pub subnet_id: SubnetID,
-        pub block_height: u64,
+        pub block_height: ::ethers::core::types::U256,
         pub block_hash: [u8; 32],
         pub next_configuration_number: u64,
-        pub cross_messages_hash: [u8; 32],
     }
     ///`CrossMsg((((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint256,uint64,bytes4,bytes,uint256),bool)`
     #[derive(
@@ -2293,7 +3075,7 @@ pub mod subnet_actor_getter_facet {
         pub addr: ::ethers::core::types::Address,
         pub metadata: ::ethers::core::types::Bytes,
     }
-    ///`ValidatorInfo(uint256,uint256,bytes)`
+    ///`ValidatorInfo(uint256,uint256,uint256,bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2305,6 +3087,7 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct ValidatorInfo {
+        pub federated_power: ::ethers::core::types::U256,
         pub confirmed_collateral: ::ethers::core::types::U256,
         pub total_collateral: ::ethers::core::types::U256,
         pub metadata: ::ethers::core::types::Bytes,

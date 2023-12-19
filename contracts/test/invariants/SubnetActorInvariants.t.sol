@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+pragma solidity 0.8.19;
+
+import "../../src/errors/IPCErrors.sol";
+import {StdInvariant} from "forge-std/Test.sol";
+import {SubnetID, Subnet} from "../../src/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
+import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
+import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
+import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
+import {SubnetActorHandler, ETH_SUPPLY} from "./handlers/SubnetActorHandler.sol";
+import {SubnetActorManagerFacetMock} from "../mocks/SubnetActor.sol";
+import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
+import {IntegrationTestBase} from "../IntegrationTestBase.sol";
+import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+
+contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
+    using SubnetIDHelper for SubnetID;
+
+    SubnetActorHandler private subnetActorHandler;
+
+    address gatewayAddress;
+
+    function setUp() public override {
+        GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
+
+        gatewayDiamond = createGatewayDiamond(gwConstructorParams);
+
+        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
+        gwManager = GatewayManagerFacet(address(gatewayDiamond));
+        gwRouter = GatewayRouterFacet(address(gatewayDiamond));
+        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
+        gatewayAddress = address(gatewayDiamond);
+
+        saDiamond = createMockedSubnetActorWithGateway(gatewayAddress);
+
+        saMockedManager = SubnetActorManagerFacetMock(address(saDiamond));
+        saGetter = SubnetActorGetterFacet(address(saDiamond));
+        subnetActorHandler = new SubnetActorHandler(saDiamond);
+
+        bytes4[] memory fuzzSelectors = new bytes4[](4);
+        fuzzSelectors[0] = SubnetActorHandler.join.selector;
+        fuzzSelectors[1] = SubnetActorHandler.leave.selector;
+        fuzzSelectors[2] = SubnetActorHandler.stake.selector;
+        fuzzSelectors[3] = SubnetActorHandler.unstake.selector;
+
+        targetSelector(FuzzSelector({addr: address(subnetActorHandler), selectors: fuzzSelectors}));
+        targetContract(address(subnetActorHandler));
+    }
+
+    /// @notice The number of validators called `join` is equal to the number of total validators,
+    /// if confirmations are executed immediately.
+    function invariant_SA_01_total_validators_number_is_correct() public {
+        assertEq(
+            saGetter.getTotalValidatorsNumber(),
+            subnetActorHandler.joinedValidatorsNumber(),
+            "unexpected total validators number"
+        );
+    }
+
+    /// @notice The stake of the subnet is the same from the SubnetActor and SubnetActorHandler perspectives.
+    /// @dev Confirmations are executed immediately via the mocked manager facet.
+    /// forge-config: default.invariant.runs = 50
+    /// forge-config: default.invariant.depth = 100
+    /// forge-config: default.invariant.fail-on-revert = false
+    function invariant_SA_02_conservationOfETH() public {
+        assertEq(
+            ETH_SUPPLY,
+            address(subnetActorHandler).balance + subnetActorHandler.ghost_stakedSum(),
+            "subnet actor handler: unexpected stake"
+        );
+        assertEq(
+            ETH_SUPPLY,
+            address(subnetActorHandler).balance +
+                saGetter.getTotalCollateral() +
+                subnetActorHandler.ghost_unstakedSum(),
+            "subnet actor: unexpected stake"
+        );
+        assertEq(
+            ETH_SUPPLY,
+            address(subnetActorHandler).balance +
+                saGetter.getTotalConfirmedCollateral() +
+                subnetActorHandler.ghost_unstakedSum(),
+            "subnet actor: unexpected stake"
+        );
+
+        if (saGetter.bootstrapped()) {
+            SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(address(saDiamond));
+            Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
+
+            assertEq(
+                subnetActorHandler.ghost_stakedSum() - subnetActorHandler.ghost_unstakedSum(),
+                subnet.stake,
+                "gateway actor: unexpected stake"
+            );
+        }
+    }
+
+    /// @notice The value resulting from all stake and unstake operations is equal to the total confirmed collateral.
+    function invariant_SA_03_sum_of_stake_equals_collateral() public {
+        assertEq(
+            saGetter.getTotalConfirmedCollateral(),
+            subnetActorHandler.ghost_stakedSum() - subnetActorHandler.ghost_unstakedSum()
+        );
+    }
+
+    /// @notice Validator can withdraw all ETHs that it staked after leaving.
+    /// forge-config: default.invariant.runs = 500
+    /// forge-config: default.invariant.depth = 5
+    function invariant_SA_04_validator_can_claim_collateral() public {
+        address validator = subnetActorHandler.leave(0);
+        if (validator == address(0)) {
+            return;
+        }
+        if (!saGetter.bootstrapped()) {
+            return;
+        }
+
+        uint256 subnetBalanceBefore = address(saDiamond).balance;
+        uint256 balanceBefore = validator.balance;
+
+        vm.prank(validator);
+        saMockedManager.claim();
+        saMockedManager.confirmNextChange();
+
+        uint256 balanceAfter = validator.balance;
+        uint256 subnetBalanceAfter = address(saDiamond).balance;
+
+        assertEq(balanceAfter - balanceBefore, subnetBalanceBefore - subnetBalanceAfter, "unexpected claim amount");
+    }
+
+    /// @notice Total confirmed collateral equals sum of validator collaterals.
+    function invariant_SA_05_total_collateral_equals_sum_of_validator_collaterals() public {
+        uint256 sumOfCollaterals;
+        address[] memory validators = subnetActorHandler.joinedValidators();
+        uint256 n = validators.length;
+        for (uint256 i; i < n; ++i) {
+            sumOfCollaterals += saGetter.getTotalValidatorCollateral(validators[i]);
+        }
+
+        uint256 totalCollateral = saGetter.getTotalConfirmedCollateral();
+
+        assertEq(sumOfCollaterals, totalCollateral, "unexpected sum of validators collateral");
+    }
+}

@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import {SubnetID} from "./Subnet.sol";
 import {FvmAddress} from "./FvmAddress.sol";
-import {BottomUpCheckpoint, CrossMsg} from "./Checkpoint.sol";
 import {Status} from "../enums/Status.sol";
 import {MaxPQ} from "../lib/priority/LibMaxPQ.sol";
 import {MinPQ} from "../lib/priority/LibMinPQ.sol";
@@ -29,7 +28,8 @@ struct Subnet {
 enum StakingOperation {
     Deposit,
     Withdraw,
-    SetMetadata
+    SetMetadata,
+    SetFederatedPower
 }
 
 /// The change request to validator staking
@@ -83,12 +83,24 @@ struct StakingReleaseQueue {
 ///     - Confirmed: The amount of collateral actually confirmed in child subnet
 ///     - Total: Aside from Confirmed, there is also the collateral has been supplied, but not yet confirmed in child.
 struct ValidatorInfo {
+    /// The power set by contract admin
+    uint256 federatedPower;
     uint256 confirmedCollateral;
     uint256 totalCollateral;
     /// The metadata associated with the validator, i.e. off-chain network address.
     /// This information is not important to the protocol, off-chain should know how
     /// to parse or decode the bytes.
     bytes metadata;
+}
+
+/// Determines the permission mode for validators.
+enum PermissionMode {
+    /// Validator power is determined by the collateral staked
+    Collateral,
+    /// Validator power is assigned by the owner of the subnet
+    Federated,
+    /// Validator power is determined by the initial collateral staked and does not change anymore
+    Static
 }
 
 /// Keeping track of the list of validators. There are two types of validators:
@@ -103,6 +115,8 @@ struct ValidatorInfo {
 /// With each validator staking change, waiting validators can be promoted to active validators
 /// and active validators can be knocked off.
 struct ValidatorSet {
+    /// The permission mode for validators
+    PermissionMode permissionMode;
     /// The total number of active validators allowed.
     uint16 activeLimit;
     /// The total collateral confirmed.
@@ -137,4 +151,18 @@ struct Validator {
 struct Membership {
     Validator[] validators;
     uint64 configurationNumber;
+}
+
+/// @title Defines the supply source of a subnet on its parent subnet.
+struct SupplySource {
+    /// @notice The kind of supply.
+    SupplyKind kind;
+    /// @notice The address of the ERC20 token if that supply kind is selected.
+    address tokenAddress;
+}
+
+/// @title Determines the type of supply used by the subnet.
+enum SupplyKind {
+    Native,
+    ERC20
 }

@@ -2,8 +2,8 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import {TestUtils} from "./TestUtils.sol";
-import {MultisignatureChecker} from "../src/lib/LibMultisignatureChecker.sol";
+import {TestUtils} from "../helpers/TestUtils.sol";
+import {MultisignatureChecker} from "../../src/lib/LibMultisignatureChecker.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 

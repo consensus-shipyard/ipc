@@ -1,19 +1,40 @@
 name: Bindings
 
+# https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#running-your-pull_request-workflow-when-a-pull-request-merges
+# * run it in case someone pushes to `dev` directly
+# * run it *after* successful merges
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - dev
   pull_request:
+    types:
+      - closed
 
 jobs:
   bindings:
+    name: "Code Generation"
     runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.merged == true ||
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
+      !contains(github.event.head_commit.message, 'GEN:')
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the
+      # added or changed files to the repository.
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
           submodules: recursive
+          # Using a Personal Access Token (PAT) from an admin so that we can push
+          # to a protected branch (dev or main). More settings are potentially relevant:
+          # https://github.com/orgs/community/discussions/13836#discussioncomment-7133341
+          # https://github.com/orgs/community/discussions/25305#discussioncomment-5537395
+          token: ${{secrets.PAT}}
+          persist-credentials: true
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -25,6 +46,17 @@ jobs:
         with:
           toolchain: nightly
           components: rustfmt
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "binding"
+
+      # for prettier (compile-abi calls the formatter first)
+      - name: Set up node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
 
       - name: Create binding
         run: make compile-abi && make rust-binding

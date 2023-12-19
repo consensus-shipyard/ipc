@@ -1,8 +1,8 @@
 /* global ethers */
-/* eslint prefer-const: "off" */
 
-import hre, { ethers } from 'hardhat'
+/* eslint prefer-const: "off" */
 import { deployContractWithDeployer, getTransactionFees } from './util'
+import hre, { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
@@ -42,6 +42,7 @@ export async function deploy(libs: { [key in string]: string }) {
 
     const getterFacetLibs: Libraries = {
         SubnetIDHelper: libs['SubnetIDHelper'],
+        LibQuorum: libs['LibQuorum'],
     }
 
     const managerFacetLibs: Libraries = {

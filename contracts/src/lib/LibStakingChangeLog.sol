@@ -24,6 +24,30 @@ library LibStakingChangeLog {
         });
     }
 
+    /// @notice Records a request to update the federated power of a validator
+    function federatedPowerRequest(
+        StakingChangeLog storage changes,
+        address validator,
+        bytes calldata metadata,
+        uint256 power
+    ) internal {
+        bytes memory payload = abi.encode(metadata, power);
+
+        uint64 configurationNumber = recordChange({
+            changes: changes,
+            validator: validator,
+            op: StakingOperation.SetFederatedPower,
+            payload: payload
+        });
+
+        emit NewStakingChangeRequest({
+            op: StakingOperation.SetFederatedPower,
+            validator: validator,
+            payload: payload,
+            configurationNumber: configurationNumber
+        });
+    }
+
     /// @notice Perform upsert operation to the withdraw changes, return total value to withdraw
     /// @notice of the validator.
     /// Each insert will increment the configuration number by 1, update will not.

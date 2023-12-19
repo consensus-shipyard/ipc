@@ -8,10 +8,13 @@ import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
 import {IERC165} from "./interfaces/IERC165.sol";
 import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage, InvalidPowerScale} from "./errors/IPCErrors.sol";
+import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
-import {SubnetID} from "./structs/Subnet.sol";
+import {PermissionMode, SubnetID, SupplyKind, SupplySource} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {SupplySourceHelper} from "./lib/SupplySourceHelper.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
@@ -19,6 +22,7 @@ contract SubnetActorDiamond {
     SubnetActorStorage internal s;
 
     using SubnetIDHelper for SubnetID;
+    using SupplySourceHelper for SupplySource;
 
     struct ConstructorParams {
         SubnetID parentId;
@@ -31,7 +35,8 @@ contract SubnetActorDiamond {
         uint16 activeValidatorsLimit;
         uint256 minCrossMsgFee;
         int8 powerScale;
-        bool permissioned;
+        PermissionMode permissionMode;
+        SupplySource supplySource;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -42,7 +47,7 @@ contract SubnetActorDiamond {
         if (params.bottomUpCheckPeriod == 0) {
             revert InvalidSubmissionPeriod();
         }
-        if (params.minActivationCollateral == 0) {
+        if (params.permissionMode != PermissionMode.Federated && params.minActivationCollateral == 0) {
             revert InvalidCollateral();
         }
         if (params.majorityPercentage < 51 || params.majorityPercentage > 100) {
@@ -52,6 +57,8 @@ contract SubnetActorDiamond {
             revert InvalidPowerScale();
         }
 
+        params.supplySource.validate();
+
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 
@@ -60,6 +67,11 @@ contract SubnetActorDiamond {
         ds.supportedInterfaces[type(IERC165).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondCut).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondLoupe).interfaceId] = true;
+
+        if (params.permissionMode == PermissionMode.Federated) {
+            // ignore min activation collateral for now
+            params.minActivationCollateral = 0;
+        }
 
         s.parentId = params.parentId;
         s.ipcGatewayAddr = params.ipcGatewayAddr;
@@ -71,7 +83,13 @@ contract SubnetActorDiamond {
         s.powerScale = params.powerScale;
         s.minCrossMsgFee = params.minCrossMsgFee;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
-        s.permissioned = params.permissioned;
+        s.validatorSet.permissionMode = params.permissionMode;
+
+        // BottomUpMsgBatch config parameters.
+        // NOTE: Let's fix them for now, but we could make them configurable
+        // through the gateway constructor in the future.
+        s.bottomUpMsgBatchPeriod = BATCH_PERIOD;
+        s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
@@ -79,6 +97,8 @@ contract SubnetActorDiamond {
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
         // empty validator change logs
         s.changeSet.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        // Set the supply strategy.
+        s.supplySource = params.supplySource;
     }
 
     function _fallback() internal {

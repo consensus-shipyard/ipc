@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - dev
   pull_request:
 
 jobs:
@@ -19,20 +20,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+      - name: Set up node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '14'
-      - name: Install Prettier and Prettier Solidity Plugin
-        run: npm install --save-dev prettier prettier-plugin-solidity
-      - name: Run Prettier on JavaScript/TypeScript/JSON/CSS/MD
-        run: npx prettier --write '**/*.{js,jsx,ts,tsx,json,css,md}'
-      - name: Run Prettier on Solidity Files
-        run: npx prettier --write '**/*.sol'
-      - name: Debugging - Show changed files
-        run: git restore package-lock.json && git status && git diff --name-only
-      - name: Commit changes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: Apply Prettier formatting
-          branch: ${{ github.head_ref }}
+          node-version: '21'
+      - name: Run formatter
+        run: make fmt
+      - name: Check diff clean
+        run: |
+          git restore package-lock.json
+          git status
+          git diff --name-only
+          git --no-pager diff --quiet
+
+#      - name: Commit changes
+#        uses: stefanzweifel/git-auto-commit-action@v5
+#        with:
+#          commit_message: Apply Prettier formatting
+#          branch: ${{ github.head_ref }}
