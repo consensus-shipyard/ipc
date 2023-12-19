@@ -16,6 +16,11 @@ on:
 
 
 jobs:
-  call-fendermint:
+  ipc:
+    uses: ./.github/workflows/ipc.yaml
+    secrets: inherit
+
+  fendermint:
     uses: ./.github/workflows/fendermint.yaml
     secrets: inherit
+    needs: [ipc]

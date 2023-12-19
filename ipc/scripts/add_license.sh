@@ -27,6 +27,9 @@ for file in $(git grep --cached -Il '' -- '*.rs'); do
 	fi
 done
 
+# `git diff` works from the root perspective
+cd ..
+
 # Look for changes that don't have the new copyright holder.
 for file in $(git diff --diff-filter=d --name-only main -- '*.rs'); do
   header=$(head -$LINES "$file")

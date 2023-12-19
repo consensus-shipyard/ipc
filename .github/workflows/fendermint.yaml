@@ -86,7 +86,7 @@ jobs:
         continue-on-error: true
         with:
           # Caching everything separately, in case they don't ask for the same things to be compiled.
-          cache-prefix: ${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
+          cache-prefix: fendermint-${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
           cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
       - name: ${{ matrix.make.name }}
