@@ -32,7 +32,8 @@ clean-infra:
 	rm -rf ./bin/ipc-infra
 
 check-fmt:
-	cargo fmt --all --check
+	@# `nightly` is required to support ignore list in rustfmt.toml
+	cargo +nightly fmt --all --check
 
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
