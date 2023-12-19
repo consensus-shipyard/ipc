@@ -36,8 +36,8 @@ library LibMinPQ {
 
         self.inner.size = size;
 
-        uint256 confirmedCollateral = validators.getConfirmedCollateral(validator);
-        swim({self: self, validators: validators, pos: size, value: confirmedCollateral});
+        uint256 power = validators.getPower(validator);
+        swim({self: self, validators: validators, pos: size, value: power});
     }
 
     /// @notice Pop the minimal value in the priority queue.
@@ -51,8 +51,8 @@ library LibMinPQ {
         self.inner.size = size - 1;
         self.inner.del(size);
 
-        uint256 value = self.inner.getConfirmedCollateral(validators, 1);
-        sink({self: self, validators: validators, pos: 1, value: value});
+        uint256 power = self.inner.getPower(validators, 1);
+        sink({self: self, validators: validators, pos: 1, value: power});
     }
 
     /// @notice Reheapify the heap when the validator is deleted.
@@ -71,25 +71,25 @@ library LibMinPQ {
         }
 
         // swim pos up in case exchanged index is smaller
-        uint256 val = self.inner.getConfirmedCollateral(validators, pos);
+        uint256 val = self.inner.getPower(validators, pos);
         swim({self: self, validators: validators, pos: pos, value: val});
 
         // sink pos down in case updated pos is larger
-        val = self.inner.getConfirmedCollateral(validators, pos);
+        val = self.inner.getPower(validators, pos);
         sink({self: self, validators: validators, pos: pos, value: val});
     }
 
     /// @notice Reheapify the heap when the collateral of a key has increased.
     function increaseReheapify(MinPQ storage self, ValidatorSet storage validators, address validator) internal {
         uint16 pos = self.inner.getPosOrRevert(validator);
-        uint256 val = validators.getConfirmedCollateral(validator);
+        uint256 val = validators.getPower(validator);
         sink({self: self, validators: validators, pos: pos, value: val});
     }
 
     /// @notice Reheapify the heap when the collateral of a key has decreased.
     function decreaseReheapify(MinPQ storage self, ValidatorSet storage validators, address validator) internal {
         uint16 pos = self.inner.getPosOrRevert(validator);
-        uint256 val = validators.getConfirmedCollateral(validator);
+        uint256 val = validators.getPower(validator);
         swim({self: self, validators: validators, pos: pos, value: val});
     }
 
@@ -99,8 +99,8 @@ library LibMinPQ {
         self.inner.requireNotEmpty();
 
         address addr = self.inner.posToAddress[1];
-        uint256 collateral = validators.getConfirmedCollateral(addr);
-        return (addr, collateral);
+        uint256 power = validators.getPower(addr);
+        return (addr, power);
     }
 
     /***************************************************************************
@@ -108,15 +108,15 @@ library LibMinPQ {
      ****************************************************************************/
     function swim(MinPQ storage self, ValidatorSet storage validators, uint16 pos, uint256 value) internal {
         uint16 parentPos;
-        uint256 parentCollateral;
+        uint256 parentPower;
 
         while (pos > 1) {
             // parentPos = pos / 2;
             parentPos = pos >> 1;
-            parentCollateral = self.inner.getConfirmedCollateral(validators, parentPos);
+            parentPower = self.inner.getPower(validators, parentPos);
 
-            // parent collateral is not more than that of the current child, heap condition met.
-            if (!firstValueLarger(parentCollateral, value)) {
+            // parent power is not more than that of the current child, heap condition met.
+            if (!firstValueLarger(parentPower, value)) {
                 break;
             }
 
@@ -127,25 +127,25 @@ library LibMinPQ {
 
     function sink(MinPQ storage self, ValidatorSet storage validators, uint16 pos, uint256 value) internal {
         uint16 childPos = pos * 2;
-        uint256 childCollateral;
+        uint256 childPower;
 
         uint16 size = self.inner.size;
 
         while (childPos <= size) {
             if (childPos < size) {
                 // select the min of the two children
-                (childPos, childCollateral) = smallerPosition({
+                (childPos, childPower) = smallerPosition({
                     self: self,
                     validators: validators,
                     pos1: childPos,
                     pos2: childPos + 1
                 });
             } else {
-                childCollateral = self.inner.getConfirmedCollateral(validators, childPos);
+                childPower = self.inner.getPower(validators, childPos);
             }
 
             // parent, current idx, is not more than its two children, min heap condition is met.
-            if (!firstValueLarger(value, childCollateral)) {
+            if (!firstValueLarger(value, childPower)) {
                 break;
             }
 
@@ -162,8 +162,8 @@ library LibMinPQ {
         uint16 pos1,
         uint16 pos2
     ) internal view returns (uint16, uint256) {
-        uint256 value1 = self.inner.getConfirmedCollateral(validators, pos1);
-        uint256 value2 = self.inner.getConfirmedCollateral(validators, pos2);
+        uint256 value1 = self.inner.getPower(validators, pos1);
+        uint256 value2 = self.inner.getPower(validators, pos2);
 
         if (!firstValueLarger(value1, value2)) {
             return (pos1, value1);

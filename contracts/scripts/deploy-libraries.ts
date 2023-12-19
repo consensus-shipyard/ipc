@@ -1,8 +1,8 @@
 /* global ethers */
-/* eslint prefer-const: "off" */
 
-import hre, { ethers } from 'hardhat'
+/* eslint prefer-const: "off" */
 import { deployContractWithDeployer, getTransactionFees } from './util'
+import hre, { ethers } from 'hardhat'
 
 export async function deploy() {
     await hre.run('compile')
@@ -37,6 +37,14 @@ export async function deploy() {
         {},
         txArgs,
     )
+
+    const { address: libQuorumAddress } = await deployContractWithDeployer(
+        deployer,
+        'LibQuorum',
+        {},
+        txArgs,
+    )
+
     // nested libs
     const { address: crossMsgHelperAddress } = await deployContractWithDeployer(
         deployer,
@@ -60,6 +68,7 @@ export async function deploy() {
         CrossMsgHelper: crossMsgHelperAddress,
         StorableMsgHelper: storableMsgHelperAddress,
         LibStaking: libStakingAddress,
+        LibQuorum: libQuorumAddress,
     }
 }
 

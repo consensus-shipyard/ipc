@@ -2,12 +2,11 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
-
-import "../src/lib/CrossMsgHelper.sol";
-import "../src/lib/SubnetIDHelper.sol";
-import "../src/lib/FvmAddressHelper.sol";
-import {FvmAddress} from "../src/structs/FvmAddress.sol";
+import "../../src/lib/CrossMsgHelper.sol";
+import "../../src/lib/SubnetIDHelper.sol";
+import "../../src/lib/FvmAddressHelper.sol";
+import {FvmAddress} from "../../src/structs/FvmAddress.sol";
+import {SupplySource} from "../../src/structs/Subnet.sol";
 
 import "openzeppelin-contracts/utils/Address.sol";
 
@@ -164,7 +163,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.deal(sender, 1 ether);
 
-        bytes memory result = crossMsg.execute();
+        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
         require(recipient.balance == 1);
@@ -184,7 +183,7 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.message.value, abi.encodeCall(this.callback, EMPTY_BYTES));
 
-        bytes memory result = crossMsg.execute();
+        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
         bytes memory decoded = abi.decode(result, (bytes));
 
         require(keccak256(decoded) == keccak256(EMPTY_BYTES));
@@ -203,7 +202,7 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.message.value, abi.encodeCall(this.callback, EMPTY_BYTES));
 
-        bytes memory result = crossMsg.execute();
+        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
         bytes memory decoded = abi.decode(result, (bytes));
 
         require(keccak256(decoded) == keccak256(EMPTY_BYTES));
@@ -222,7 +221,7 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
 
         vm.expectCall(recipient, crossMsg.message.value, abi.encodeCall(this.callbackWrapped, crossMsg));
-        bytes memory result = crossMsg.execute();
+        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
 
         bytes memory decoded = abi.decode(result, (bytes));
         CrossMsg memory decodedCrossMsg = abi.decode(decoded, (CrossMsg));
@@ -231,12 +230,13 @@ contract CrossMsgHelperTest is Test {
     }
 
     function test_Execute_Fails_InvalidMethod() public {
-        vm.expectRevert(Address.FailedInnerCall.selector);
+        SupplySource memory native = SupplySourceHelper.native();
 
         crossMsg.message.to.rawAddress = FvmAddressHelper.from(address(this));
         crossMsg.message.method = bytes4("1");
 
-        crossMsg.execute();
+        vm.expectRevert(Address.FailedInnerCall.selector);
+        crossMsg.execute(native);
     }
 
     function callback(bytes calldata params) public payable returns (bytes memory) {

@@ -120,15 +120,6 @@ pub mod gateway_manager_facet {
                                         ::std::borrow::ToOwned::to_owned("struct FvmAddress"),
                                     ),
                                 },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("fee"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
                             ],
                             outputs: ::std::vec![],
                             constant: ::core::option::Option::None,
@@ -246,21 +237,29 @@ pub mod gateway_manager_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("reason"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::String,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("string"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NotEmptySubnetCircSupply"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned(
                                 "NotEmptySubnetCircSupply",
                             ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFee"),
                             inputs: ::std::vec![],
                         },
                     ],
@@ -384,14 +383,13 @@ pub mod gateway_manager_facet {
                 .method_hash([242, 7, 86, 78], genesis_circ_supply)
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `release` (0x9ba53580) function
+        ///Calls the contract's `release` (0x6b2c1eef) function
         pub fn release(
             &self,
             to: FvmAddress,
-            fee: ::ethers::core::types::U256,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([155, 165, 53, 128], (to, fee))
+                .method_hash([107, 44, 30, 239], (to,))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `releaseRewardForRelayer` (0xd8e25572) function
@@ -497,6 +495,21 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "InvalidCrossMsgValue", abi = "InvalidCrossMsgValue()")]
     pub struct InvalidCrossMsgValue;
+    ///Custom Error type `MethodNotAllowed` with signature `MethodNotAllowed(string)` and selector `0x015538b1`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[etherror(name = "MethodNotAllowed", abi = "MethodNotAllowed(string)")]
+    pub struct MethodNotAllowed {
+        pub reason: ::std::string::String,
+    }
     ///Custom Error type `NotEmptySubnetCircSupply` with signature `NotEmptySubnetCircSupply()` and selector `0xf8cf8e02`
     #[derive(
         Clone,
@@ -510,19 +523,6 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "NotEmptySubnetCircSupply", abi = "NotEmptySubnetCircSupply()")]
     pub struct NotEmptySubnetCircSupply;
-    ///Custom Error type `NotEnoughFee` with signature `NotEnoughFee()` and selector `0x688e55ae`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[etherror(name = "NotEnoughFee", abi = "NotEnoughFee()")]
-    pub struct NotEnoughFee;
     ///Custom Error type `NotEnoughFunds` with signature `NotEnoughFunds()` and selector `0x81b5ad68`
     #[derive(
         Clone,
@@ -584,8 +584,8 @@ pub mod gateway_manager_facet {
         InsufficientFunds(InsufficientFunds),
         InvalidActorAddress(InvalidActorAddress),
         InvalidCrossMsgValue(InvalidCrossMsgValue),
+        MethodNotAllowed(MethodNotAllowed),
         NotEmptySubnetCircSupply(NotEmptySubnetCircSupply),
-        NotEnoughFee(NotEnoughFee),
         NotEnoughFunds(NotEnoughFunds),
         NotEnoughFundsToRelease(NotEnoughFundsToRelease),
         NotRegisteredSubnet(NotRegisteredSubnet),
@@ -634,15 +634,15 @@ pub mod gateway_manager_facet {
             ) {
                 return Ok(Self::InvalidCrossMsgValue(decoded));
             }
+            if let Ok(decoded) = <MethodNotAllowed as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::MethodNotAllowed(decoded));
+            }
             if let Ok(decoded) = <NotEmptySubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
                 return Ok(Self::NotEmptySubnetCircSupply(decoded));
-            }
-            if let Ok(decoded) = <NotEnoughFee as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::NotEnoughFee(decoded));
             }
             if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(
                 data,
@@ -688,10 +688,10 @@ pub mod gateway_manager_facet {
                 Self::InvalidCrossMsgValue(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEmptySubnetCircSupply(element) => {
+                Self::MethodNotAllowed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEnoughFee(element) => {
+                Self::NotEmptySubnetCircSupply(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotEnoughFunds(element) => {
@@ -737,11 +737,13 @@ pub mod gateway_manager_facet {
                     true
                 }
                 _ if selector
-                    == <NotEmptySubnetCircSupply as ::ethers::contract::EthError>::selector() => {
+                    == <MethodNotAllowed as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotEnoughFee as ::ethers::contract::EthError>::selector() => true,
+                    == <NotEmptySubnetCircSupply as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ if selector
                     == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
                     true
@@ -777,10 +779,10 @@ pub mod gateway_manager_facet {
                 Self::InvalidCrossMsgValue(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::MethodNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEmptySubnetCircSupply(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::NotEnoughFee(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughFundsToRelease(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -828,14 +830,14 @@ pub mod gateway_manager_facet {
             Self::InvalidCrossMsgValue(value)
         }
     }
+    impl ::core::convert::From<MethodNotAllowed> for GatewayManagerFacetErrors {
+        fn from(value: MethodNotAllowed) -> Self {
+            Self::MethodNotAllowed(value)
+        }
+    }
     impl ::core::convert::From<NotEmptySubnetCircSupply> for GatewayManagerFacetErrors {
         fn from(value: NotEmptySubnetCircSupply) -> Self {
             Self::NotEmptySubnetCircSupply(value)
-        }
-    }
-    impl ::core::convert::From<NotEnoughFee> for GatewayManagerFacetErrors {
-        fn from(value: NotEnoughFee) -> Self {
-            Self::NotEnoughFee(value)
         }
     }
     impl ::core::convert::From<NotEnoughFunds> for GatewayManagerFacetErrors {
@@ -915,7 +917,7 @@ pub mod gateway_manager_facet {
     pub struct RegisterCall {
         pub genesis_circ_supply: ::ethers::core::types::U256,
     }
-    ///Container type for all input parameters for the `release` function with signature `release((uint8,bytes),uint256)` and selector `0x9ba53580`
+    ///Container type for all input parameters for the `release` function with signature `release((uint8,bytes))` and selector `0x6b2c1eef`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -926,10 +928,9 @@ pub mod gateway_manager_facet {
         Eq,
         Hash
     )]
-    #[ethcall(name = "release", abi = "release((uint8,bytes),uint256)")]
+    #[ethcall(name = "release", abi = "release((uint8,bytes))")]
     pub struct ReleaseCall {
         pub to: FvmAddress,
-        pub fee: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `releaseRewardForRelayer` function with signature `releaseRewardForRelayer(uint256)` and selector `0xd8e25572`
     #[derive(

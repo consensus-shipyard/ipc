@@ -2,7 +2,7 @@ name: Static analysis
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
 
 jobs:
@@ -18,6 +18,33 @@ jobs:
         uses: crytic/slither-action@v0.3.0
         with:
           fail-on: low
+
+  aderyn:
+    name: Aderyn check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      # We remove this file because Aderyn can choose hardhat for compilation if that config file exists.
+      # Currently, it is not possible to configure Aderyn to use foundry by default.
+      - name: delete hardhat config
+        run: rm -rf ./hardhat.config.ts
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          cache: false
+
+      - name: Install aderyn
+        run: cargo install aderyn
+
+      - name: Run aderyn
+        run: aderyn ./
+
+      - name: Check results
+        run: ./tools/check_aderyn.sh
 
   solhint:
     name: Solhint check
@@ -39,6 +66,7 @@ jobs:
         run: npx solhint 'src/**/*.sol'
 
   codespell:
+    name: Codespell check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

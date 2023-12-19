@@ -3,10 +3,10 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 
-import {METHOD_SEND, EMPTY_BYTES} from "../src/constants/Constants.sol";
-import "../src/lib/StorableMsgHelper.sol";
-import "../src/lib/FvmAddressHelper.sol";
-import {IPCAddress} from "../src/structs/Subnet.sol";
+import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
+import "../../src/lib/StorableMsgHelper.sol";
+import "../../src/lib/FvmAddressHelper.sol";
+import {IPCAddress} from "../../src/structs/Subnet.sol";
 
 contract StorableMsgHelperTest is Test {
     using StorableMsgHelper for StorableMsg;

@@ -2,7 +2,7 @@ name: Storage check
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
 env:
   RPC_URL: https://filecoin-calibration.chainup.net/rpc/v1

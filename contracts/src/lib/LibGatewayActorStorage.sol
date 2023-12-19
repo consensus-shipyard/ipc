@@ -2,12 +2,12 @@
 pragma solidity 0.8.19;
 
 import {NotEnoughFee, NotSystemActor, NotEnoughFunds} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, CrossMsg, ParentFinality, CheckpointInfo} from "../structs/Checkpoint.sol";
+import {QuorumMap} from "../structs/Quorum.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, CrossMsg, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 struct GatewayActorStorage {
     /// @notice List of subnets
@@ -27,24 +27,14 @@ struct GatewayActorStorage {
     Membership lastMembership;
     /// @notice A mapping of block numbers to bottom-up checkpoints
     // slither-disable-next-line uninitialized-state
-    mapping(uint64 => BottomUpCheckpoint) bottomUpCheckpoints;
-    /// @notice A mapping of block numbers to checkpoint data
-    // slither-disable-next-line uninitialized-state
-    mapping(uint64 => CheckpointInfo) bottomUpCheckpointInfo;
+    mapping(uint256 => BottomUpCheckpoint) bottomUpCheckpoints;
     /// @notice A mapping of block numbers to bottom-up cross-messages
     // slither-disable-next-line uninitialized-state
-    mapping(uint64 => CrossMsg[]) bottomUpMessages;
-    /// @notice The height of the first bottom-up checkpoint that must be retained since they have not been processed in the parent.
-    /// All checkpoint with the height less than this number may be garbage collected in the child subnet.
-    /// @dev Initial retention index is 1.
-    uint64 bottomUpCheckpointRetentionHeight;
-    /// @notice A list of incomplete checkpoints.
-    // slither-disable-next-line uninitialized-state
-    EnumerableSet.UintSet incompleteCheckpoints;
-    /// @notice The addresses of the validators that have already sent signatures at height `h`
-    mapping(uint64 => EnumerableSet.AddressSet) bottomUpSignatureSenders;
-    /// @notice The list of the collected signatures at height `h`
-    mapping(uint64 => mapping(address => bytes)) bottomUpSignatures;
+    mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;
+    /// @notice Quorum information for checkpoints
+    QuorumMap checkpointQuorumMap;
+    /// @notice Quorum information for bottom-up msg batches
+    QuorumMap bottomUpMsgBatchQuorumMap;
     /// @notice Keys of the registered subnets. Useful to iterate through them
     bytes32[] subnetKeys;
     /// @notice path to the current network
@@ -62,10 +52,29 @@ struct GatewayActorStorage {
     uint64 appliedTopDownNonce;
     /// @notice Number of active subnets spawned from this one
     uint64 totalSubnets;
-    // @notice bottom-up period in number of epochs for the subnet
-    uint64 bottomUpCheckPeriod;
+    /// @notice bottom-up period in number of epochs for the subnet
+    uint256 bottomUpCheckPeriod;
+    /// @notice bottom-up message batch period in number of epochs for the subnet
+    uint256 bottomUpMsgBatchPeriod;
+    /// @notice Maximum number of messages per batch
+    uint64 maxMsgsPerBottomUpBatch;
     /// Tracking validator changes from parent in child subnet
     ParentValidatorsTracker validatorsTracker;
+    //
+    // == Feature flags ==
+    /// @notice Determines the maximum depth that this instance of the gateway
+    /// will enforce. Bear in mind that the deployment is decentralized,
+    /// and a subnet could choose not to change this code and not enforce
+    /// this as a maximum depth in its own subnet.
+    uint8 maxTreeDepth;
+    /// @notice Determines if general purpose cros-net messages are supported
+    bool generalPurposeCrossMsg;
+    /// @notice Determines if multi-level cross-net messages are enbaled.
+    bool multiLevelCrossMsg;
+    /// @notice Determines if relayers should be rewarded for checkpoint submissions
+    bool checkpointRelayerRewards;
+    /// @notice Determines if relayers should be rewarded for cross-net message execution
+    bool crossMsgRelayerRewards;
 }
 
 library LibGatewayActorStorage {
@@ -101,11 +110,6 @@ contract GatewayActorModifiers {
 
     modifier systemActorOnly() {
         _systemActorOnly();
-        _;
-    }
-
-    modifier validFee(uint256 fee) {
-        validateFee(fee);
         _;
     }
 }

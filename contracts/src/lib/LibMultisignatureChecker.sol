@@ -11,7 +11,6 @@ library MultisignatureChecker {
         Nil,
         InvalidArrayLength,
         EmptySignatures,
-        InvalidSignatureLength,
         InvalidSignatory,
         InvalidSignature,
         WeightsSumLessThanThreshold
