@@ -54,9 +54,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
-          node-version-file: 'contracts/package.json'
           cache: 'npm'
-          cache-dependency-path: 'contracts/pakcage-lock.json'
+          cache-dependency-path: 'contracts/package-lock.json'
       - name: Install Node dependencies
         run: cd contracts && npm i --unsafe-perm
       - name: Install solidity plugin

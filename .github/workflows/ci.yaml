@@ -43,5 +43,5 @@ jobs:
     uses: ./.github/workflows/fendermint.yaml
     secrets: inherit
     needs:
-      - contracts-test # generates the ABI artifacts
-      - ipc
+      - contracts-test # generates the ABI artifacts (can do on its own too)
+      - ipc # not strictly necessary but if fendermint tests pass they publish docker too, so this better work
