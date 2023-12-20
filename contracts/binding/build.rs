@@ -11,13 +11,14 @@ use std::path::{Path, PathBuf};
 fn main() {
     // Run with `cargo build -vv` to see output from any `eprintln!` or `println!`.
 
-    // We are not building anything, could be imported as crate.
-    if std::env::var("BUILD_BINDINGS").ok().is_none() {
+    // Maybe we want to skip the build and use the files as-is, could be imported as crate.
+    // Enabled by default so that in the monorepo we don't have to worry about stale code.
+    if std::env::var("BUILD_BINDINGS").unwrap_or("1".to_string()) == "0" {
         return;
     }
 
     // Where are the Solidity artifacts.
-    let output_dir = std::env::var("OUTPUT").expect("OUTPUT env var missing");
+    let output_dir = std::env::var("OUTPUT").unwrap_or("out".to_string());
 
     let ipc_actors_dir = workspace_dir()
         .join("contracts")

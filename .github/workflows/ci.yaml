@@ -56,7 +56,7 @@ jobs:
     uses: ./.github/workflows/contracts-prettier.yaml
     needs: [changes]
     if: >-
-      needs.changes.filter.outputs.contracts == 'true' ||
+      needs.changes.outputs.contracts == 'true' ||
       github.ref == 'refs/heads/main'
 
   contracts-test:
@@ -79,32 +79,32 @@ jobs:
     uses: ./.github/workflows/fvm-utils.yaml
     needs: [changes, license]
     if: >-
-      needs.changes.filter.outputs.fvm-utils == 'true' ||
+      needs.changes.outputs.fvm-utils == 'true' ||
       github.ref == 'refs/heads/main'
 
   ipc:
     uses: ./.github/workflows/ipc.yaml
     needs: [changes, license]
     if: >-
-      needs.changes.filter.outputs.contracts == 'true' ||
-      needs.changes.filter.outputs.ipc == 'true' ||
+      needs.changes.outputs.contracts == 'true' ||
+      needs.changes.outputs.ipc == 'true' ||
       github.ref == 'refs/heads/main'
 
   ipld-resolver:
     uses: ./.github/workflows/ipld-resolver.yaml
     needs: [changes, license]
     if: >-
-      needs.changes.filter.outputs.ipld-resolver == 'true' ||
+      needs.changes.outputs.ipld-resolver == 'true' ||
       github.ref == 'refs/heads/main'
 
   fendermint-test:
     uses: ./.github/workflows/fendermint-test.yaml
     needs: [changes, license]
     if: >-
-      needs.changes.filter.outputs.contracts == 'true' ||
-      needs.changes.filter.outputs.ipc == 'true' ||
-      needs.changes.filter.outputs.ipld-resolver == 'true' ||
-      needs.changes.filter.outputs.fendermint == 'true' ||
+      needs.changes.outputs.contracts == 'true' ||
+      needs.changes.outputs.ipc == 'true' ||
+      needs.changes.outputs.ipld-resolver == 'true' ||
+      needs.changes.outputs.fendermint == 'true' ||
       github.ref == 'refs/heads/main'
 
   fendermint-publish:

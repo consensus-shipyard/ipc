@@ -7,8 +7,6 @@ NETWORK ?= auto
 # It is required by docker builds, but shouldn't be checked into git.
 OUTPUT ?= out
 
-IPC_ACTORS_CODE := $(shell find . -type f \( -name "*.sol" \))
-
 deploy-ipc:
 	./ops/deploy.sh $(NETWORK)
 
@@ -36,7 +34,7 @@ compile-abi: | forge
 	./ops/compile-abi.sh $(OUTPUT)
 
 rust-binding:
-	OUTPUT=$(OUTPUT) BUILD_BINDINGS=1 cargo build --locked --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
+	OUTPUT=$(OUTPUT) cargo build --locked --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
 
 # commit-abi:
 # 	./ops/commit-abi.sh $(OUTPUT)

@@ -5,7 +5,8 @@ BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 
 IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
-IPC_ACTORS_GEN				:= $(IPC_ACTORS_DIR)/.gen
+IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f \( -name "*.sol" \))
+IPC_ACTORS_GEN				:= .contracts-gen
 
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
@@ -33,7 +34,7 @@ install: $(IPC_ACTORS_GEN)
 	cargo install --locked --path fendermint/app
 
 # Using --release for testing because wasm can otherwise be slow.
-test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_OUT) $(IPC_ACTORS_GEN)
+test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release --package 'fendermint_*'
@@ -73,14 +74,14 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			$(BUILDX_STORE) \
 			$(BUILDX_FLAGS) \
 			-f docker/Dockerfile \
-			-t $(BUILDX_TAG) $(PWD); \
+			-t $(BUILDX_TAG) $(PWD)/..; \
 	else \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		DOCKER_BUILDKIT=1 \
 		docker build \
 			$(BUILDX_STORE) \
 			-f docker/Dockerfile \
-			-t fendermint:latest $(PWD); \
+			-t fendermint:latest $(PWD)/..; \
 	fi
 
 
@@ -94,11 +95,10 @@ $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
 	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
 
-# Generate the ABI artifacts if we don't have them already.
-$(IPC_ACTORS_GEN):
-		cd $(IPC_ACTORS_DIR) && make .gen
-
-$(IPC_ACTORS_OUT): $(IPC_ACTORS_GEN)
+# Regenerate the ABI artifacts if we don't have them already, or they changed.
+$(IPC_ACTORS_GEN): $(IPC_ACTORS_CODE)
+		cd $(IPC_ACTORS_DIR) && make compile-abi
+		touch $@
 
 .PHONY: protoc
 protoc:

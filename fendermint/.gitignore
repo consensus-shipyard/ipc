@@ -6,3 +6,4 @@ cometbft
 test-network
 .idea
 .make
+.contracts-gen

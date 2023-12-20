@@ -12,16 +12,16 @@ FROM --platform=$BUILDPLATFORM ubuntu:latest as stripper
 
 WORKDIR /app
 
-# Copy the Cargo artifacts and Rust sources.
+# Copy the Cargo artifacts and Rust sources everything; even though we only need Cargo.* artifacts and Rust sources.
 COPY Cargo.toml Cargo.lock ./
-COPY fendermint fendermint/
+COPY . .
 
 # Delete anything other than cargo files: Rust sources, config files, Markdown, etc.
-RUN find fendermint -type f \! -name "Cargo.*" | xargs rm -rf
+RUN find . -type f \! -name "Cargo.*" | xargs rm -rf
 
 # Construct dummy sources. Add a print to help debug the case if we failed to properly replace the file.
-RUN echo "fn main() { println!(\"I'm the dummy.\"); }" > fendermint/app/src/main.rs && \
-  for crate in $(find fendermint -name "Cargo.toml" | xargs dirname); do \
+RUN echo "fn main() { println!(\"I'm the dummy.\"); }" > fendermint/fendermint/app/src/main.rs && \
+  for crate in $(find . -name "Cargo.toml" | xargs dirname | grep -v infra | grep -v node_modules | grep /); do \
   touch $crate/src/lib.rs; \
   done
 
@@ -76,7 +76,7 @@ RUN set -eux; \
 COPY . .
 
 # Need to invalidate build caches otherwise they won't be recompiled with the real code.
-RUN find fendermint -type f \( -wholename "**/src/lib.rs" -o -wholename "**/src/main.rs" \) | xargs touch
+RUN find . -type f \( -wholename "**/src/lib.rs" -o -wholename "**/src/main.rs" \) | xargs touch
 
 # Do the final build.
 RUN set -eux; \
@@ -84,4 +84,4 @@ RUN set -eux; \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64' ;; \
   esac; \
-  cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu
+  cargo install --locked --root output --path fendermint/fendermint/app --target ${ARCH}-unknown-linux-gnu
