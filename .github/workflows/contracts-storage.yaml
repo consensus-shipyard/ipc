@@ -12,6 +12,7 @@ jobs:
   storage:
     name: Storage layout check
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v3
         with:

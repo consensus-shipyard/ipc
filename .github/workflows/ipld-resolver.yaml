@@ -27,6 +27,7 @@ jobs:
 
   # Test matrix, running tasks from the Makefile.
   tests:
+    if: ${{ !github.event.pull_request.draft }}
     needs: [pre-compile-checks]
     name: ${{ matrix.make.name }} (${{ matrix.os }}, ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
@@ -53,18 +54,11 @@ jobs:
       - name: Check out the project
         uses: actions/checkout@v3
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          targets: wasm32-unknown-unknown
-          toolchain: ${{ matrix.rust }}
-          components: rustfmt,clippy
-
-      # Protobuf compiler required by libp2p-core
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: ${{ matrix.rust }}
 
       - name: Setup Cache
         uses: ./.github/actions/setup-cache

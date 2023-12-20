@@ -34,6 +34,7 @@ jobs:
 
   # Test matrix, running tasks from the Makefile.
   tests:
+    if: ${{ !github.event.pull_request.draft }}
     needs: [pre-compile-checks]
     name: ${{ matrix.make.name }} (${{ matrix.os }}, ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}

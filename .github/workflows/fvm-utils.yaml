@@ -5,19 +5,6 @@ on:
   workflow_call:
 
 jobs:
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          target: wasm32-unknown-unknown
-          toolchain: stable
-          override: true
-      - run: cd fvm-utils && cargo t --all --release
-
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
@@ -34,18 +21,36 @@ jobs:
       - name: Check code formatting
         run: cd fvm-utils && make check-fmt
 
-  clippy:
-    name: Clippy
+  test:
+    name: Test Suite
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    needs: fmt
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
         with:
-          targets: wasm32-unknown-unknown
-          toolchain: stable
-          components: clippy
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
+
+      - run: cd fvm-utils && make test
+
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
 
       - name: Check clippy
         run: cd fvm-utils && make check-clippy

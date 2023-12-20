@@ -6,8 +6,9 @@ on:
 
 jobs:
   npm-audit:
-    runs-on: ubuntu-latest
     name: NPM Audit
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2

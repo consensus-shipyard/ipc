@@ -8,6 +8,7 @@ jobs:
   slither:
     name: Slither check
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -21,6 +22,7 @@ jobs:
   aderyn:
     name: Aderyn check
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -48,6 +50,7 @@ jobs:
   solhint:
     name: Solhint check
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v3
       - name: Setup Node 16
@@ -68,6 +71,7 @@ jobs:
   codespell:
     name: Codespell check
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v3
       - name: CodeSpell check
