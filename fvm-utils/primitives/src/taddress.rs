@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 #![allow(clippy::upper_case_acronyms)] // this is to disable warning for BLS
 
 use std::{convert::TryFrom, fmt::Display, marker::PhantomData, str::FromStr};
