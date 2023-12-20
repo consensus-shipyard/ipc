@@ -4,7 +4,8 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
-import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
+import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
+import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
 import {Status} from "../../src/enums/Status.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";

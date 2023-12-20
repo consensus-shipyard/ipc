@@ -100,7 +100,12 @@ make coverage-for-mac: | forge
 	genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category
 	./tools/check_coverage.sh
 
-prepare: fmt lint test slither
+prepare: build-selector-library fmt lint test slither
+
+
+build-selector-library: | forge
+	python scripts/python/build_selector_library.py
+	npx prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
 .PHONY: forge

@@ -4,7 +4,8 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
-import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
+import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
+import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
 import {Status} from "../../src/enums/Status.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
@@ -30,6 +31,7 @@ import {LibDiamond} from "../../src/lib/LibDiamond.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
+import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -86,7 +88,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         DiamondCutFacet gwDiamondCutter = DiamondCutFacet(address(gatewayDiamond));
         IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](1);
-        bytes4[] memory ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetSeven");
+        bytes4[] memory ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetSeven");
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -105,7 +107,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         NumberContractFacetSeven gwNumberContract = NumberContractFacetSeven(address(gatewayDiamond));
         assert(gwNumberContract.getNum() == 7);
 
-        ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetEight");
+        ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetEight");
+
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
                 facetAddress: address(ncFacetB),

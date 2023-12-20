@@ -6,7 +6,7 @@ import "forge-std/StdCheats.sol";
 import {CommonBase} from "forge-std/Base.sol";
 import {SubnetActorDiamond} from "../../../src/SubnetActorDiamond.sol";
 import {SubnetActorGetterFacet} from "../../../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorManagerFacetMock} from "../../mocks/SubnetActor.sol";
+import {SubnetActorManagerFacetMock} from "../../mocks/SubnetActorManagerFacetMock.sol";
 import {TestUtils} from "../../helpers/TestUtils.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
