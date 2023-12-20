@@ -45,6 +45,12 @@ jobs:
           cache-prefix: publish-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
           cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Cache Solidity ABI arfiacts
+        uses: actions/cache@v2
+        with:
+          path: ./contracts/out
+          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
+
       # - name: Docker Build
       #   run: make docker-build
 
