@@ -4,7 +4,6 @@ crytic-export/
 .vscode
 .idea
 .env
-.gen
 broadcast/
 out/
 
