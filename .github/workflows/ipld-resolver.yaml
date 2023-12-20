@@ -36,8 +36,8 @@ jobs:
         os: [ubuntu-latest]
         rust: [stable]
         make:
-          - name: Lint
-            task: lint
+          - name: Check clippy
+            task: check-clippy
           - name: Test
             task: test
 
