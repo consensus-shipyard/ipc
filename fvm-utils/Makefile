@@ -6,3 +6,8 @@ check-fmt:
 
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
+
+
+lint: \
+	check-fmt \
+	check-clippy

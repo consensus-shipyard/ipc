@@ -16,6 +16,15 @@ on:
 
 
 jobs:
+  license:
+    steps:
+      # This is so `make license` doesn't say "bad revision origin/main"
+      - name: Fetch origin for diff
+        run: git fetch origin
+
+      - name: Check license headers
+        run: make license
+
   contracts-prettier:
     uses: ./.github/workflows/contracts-prettier.yaml
 
@@ -37,15 +46,19 @@ jobs:
 
   fvm-utils:
     uses: ./.github/workflows/fvm-utils.yaml
+    needs: [license]
 
   ipc:
     uses: ./.github/workflows/ipc.yaml
+    needs: [license]
 
   ipld-resolver:
     uses: ./.github/workflows/ipld-resolver.yaml
+    needs: [license]
 
   fendermint-test:
     uses: ./.github/workflows/fendermint-test.yaml
+    needs: [license]
 
   fendermint-publish:
     uses: ./.github/workflows/fendermint-publish.yaml

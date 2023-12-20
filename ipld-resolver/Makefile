@@ -12,12 +12,8 @@ clean:
 	cargo clean
 
 lint: \
-	license \
 	check-fmt \
 	check-clippy
-
-license:
-	./scripts/add_license.sh
 
 check-fmt:
 	cargo +nightly fmt --all --check

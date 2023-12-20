@@ -30,13 +30,6 @@ jobs:
       - name: Check code formatting
         run: cd fendermint && make check-fmt
 
-      # This is so `make license` doesn't say "bad revision origin/main"
-      - name: Fetch origin for diff
-        run: git fetch origin
-
-      - name: Check license headers
-        run: cd fendermint && make license
-
 
   # Test matrix, running tasks from the Makefile.
   tests:

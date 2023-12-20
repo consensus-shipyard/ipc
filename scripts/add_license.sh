@@ -5,19 +5,40 @@
 COPYRIGHT_TXT=$(dirname $0)/copyright.txt
 
 # Any year is fine. We can update the year as a single PR in all files that have it up to last year.
-PAT_PL=".*// Copyright 2022-202\d Protocol Labs.*"
-PAT_SPDX="/*// SPDX-License-Identifier: MIT.*"
+PAT_PL=".*// Copyright 202(1|2)-202\d Protocol Labs.*"
+PAT_SPDX="/*// SPDX-License-Identifier: Apache-2.0, MIT.*"
 
 # Look at enough lines so that we can include multiple copyright holders.
 LINES=4
 
+# Ignore auto-generated code.
+IGNORE=(
+	"contracts/binding"
+);
+
+ignore() {
+	file=$1
+	for path in $IGNORE; do
+		if echo "$file" | grep -q "$path"; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 ret=0
+
 
 # NOTE: When files are moved/split/deleted, the following queries would find and recreate them in the original place.
 # To avoid that, first commit the changes, then run the linter; that way only the new places are affected.
 
+# `git grep` works from the perspective of the current directory
+
 # Look for files without headers.
 for file in $(git grep --cached -Il '' -- '*.rs'); do
+	if ignore "$file"; then
+		continue
+	fi
   header=$(head -$LINES "$file")
 	if ! echo "$header" | grep -q -P "$PAT_SPDX"; then
 		echo "$file was missing header"
@@ -27,11 +48,13 @@ for file in $(git grep --cached -Il '' -- '*.rs'); do
 	fi
 done
 
-# `git diff` works from the root perspective
-cd ..
+# `git diff` works from the root's perspective.
 
 # Look for changes that don't have the new copyright holder.
 for file in $(git diff --diff-filter=d --name-only origin/main -- '*.rs'); do
+	if ignore "$file"; then
+		continue
+	fi
   header=$(head -$LINES "$file")
 	if ! echo "$header" | grep -q -P "$PAT_PL"; then
 		echo "$file was missing Protocol Labs"

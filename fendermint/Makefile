@@ -47,12 +47,8 @@ clean:
 	rm $(BUILTIN_ACTORS_BUNDLE)
 
 lint: \
-	license \
 	check-fmt \
 	check-clippy
-
-license:
-	./scripts/add_license.sh
 
 check-fmt:
 	@# `nightly` is required to support ignore list in rustfmt.toml

@@ -22,13 +22,6 @@ jobs:
       - name: Check code formatting
         run: cd ipc && make check-fmt
 
-      # This is so `make license` doesn't say "bad revision origin/main"
-      - name: Fetch origin for diff
-        run: git fetch origin
-
-      - name: Check license headers
-        run: cd ipc && make license
-
       # - name: Check diagrams
       #   run: make check-diagrams
 
