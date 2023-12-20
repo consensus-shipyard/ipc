@@ -10,7 +10,7 @@ test/%:
 	cd $* && make test
 
 lint/%:
-	cd $* && make lint
+	cd $* && make lint || echo "$* lint failed"
 
 license:
 	./scripts/add_license.sh

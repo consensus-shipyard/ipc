@@ -64,7 +64,7 @@ check-subnet:
 # ==============================================================================
 # Development support
 
-lint:
+lint: fmt
 	solhint 'src/**/*.sol'
 
 fmt:
