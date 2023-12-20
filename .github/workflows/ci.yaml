@@ -17,14 +17,7 @@ on:
 
 jobs:
   license:
-    runs-on: ubuntu-latest
-    steps:
-      # This is so `make license` doesn't say "bad revision origin/main"
-      - name: Fetch origin for diff
-        run: git fetch origin
-
-      - name: Check license headers
-        run: make license
+    uses: ./.github/workflows/license.yaml
 
   contracts-prettier:
     uses: ./.github/workflows/contracts-prettier.yaml
