@@ -21,7 +21,7 @@ RUN find . -type f \! -name "Cargo.*" | xargs rm -rf
 
 # Construct dummy sources. Add a print to help debug the case if we failed to properly replace the file.
 RUN echo "fn main() { println!(\"I'm the dummy.\"); }" > fendermint/fendermint/app/src/main.rs && \
-  for crate in $(find . -name "Cargo.toml" | xargs dirname); do \
+  for crate in $(find . -name "Cargo.toml" | xargs dirname | grep -v infra | grep -v node_modules | grep /); do \
   touch $crate/src/lib.rs; \
   done
 
