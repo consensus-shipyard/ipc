@@ -1,12 +1,8 @@
 name: Tests
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - "main"
-  pull_request:
-    branches:
-      - '**'
+  workflow_call:
 
 jobs:
   test:

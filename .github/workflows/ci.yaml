@@ -35,13 +35,22 @@ jobs:
     uses: ./.github/workflows/contracts-sast.yaml
     needs: [contracts-prettier]
 
+  fvm-utils:
+    uses: ./.github/workflows/fvm-utils.yaml
+
   ipc:
     uses: ./.github/workflows/ipc.yaml
+    secrets: inherit
+
+  ipld-resolver:
+    uses: ./.github/workflows/ipld-resolver.yaml
     secrets: inherit
 
   fendermint:
     uses: ./.github/workflows/fendermint.yaml
     secrets: inherit
+    # Dependencies are not strictly necessary, but if fendermint tests pass they publish docker too, so they better work
     needs:
-      - contracts-test # generates the ABI artifacts (can do on its own too)
-      - ipc # not strictly necessary but if fendermint tests pass they publish docker too, so this better work
+      - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
+      - fvm-utils
+      - ipc

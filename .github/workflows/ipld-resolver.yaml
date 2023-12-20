@@ -1,12 +1,8 @@
-name: CI
+name: IPLD Resolver CI
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - '**'
+  workflow_call:
 
 jobs:
   # Check code formatting; anything that doesn't require compilation.
@@ -38,16 +34,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        rust: [nightly]
+        rust: [stable]
         make:
           - name: Lint
             task: lint
           - name: Test
             task: test
-        exclude:
-          - rust: stable
-            make:
-              name: Lint
 
     env:
       RUST_BACKTRACE: full
