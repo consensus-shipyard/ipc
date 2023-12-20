@@ -40,17 +40,20 @@ jobs:
 
   ipc:
     uses: ./.github/workflows/ipc.yaml
-    secrets: inherit
 
   ipld-resolver:
     uses: ./.github/workflows/ipld-resolver.yaml
-    secrets: inherit
 
-  fendermint:
-    uses: ./.github/workflows/fendermint.yaml
+  fendermint-test:
+    uses: ./.github/workflows/fendermint-test.yaml
+
+  fendermint-publish:
+    uses: ./.github/workflows/fendermint-publish.yaml
     secrets: inherit
     # Dependencies are not strictly necessary, but if fendermint tests pass they publish docker too, so they better work
     needs:
       - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
       - fvm-utils
       - ipc
+      - ipld-resolver
+      - fendermint-test
