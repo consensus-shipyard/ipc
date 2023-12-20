@@ -101,10 +101,10 @@ jobs:
     uses: ./.github/workflows/fendermint-test.yaml
     needs: [changes, license]
     if: >-
-      needs.changes.filter.outputs.contracts == 'true' ||
-      needs.changes.filter.outputs.ipc == 'true' ||
-      needs.changes.filter.outputs.ipld-resolver == 'true' ||
-      needs.changes.filter.outputs.fendermint == 'true' ||
+      jobs.changes.filter.outputs.contracts == 'true' ||
+      jobs.changes.filter.outputs.ipc == 'true' ||
+      jobs.changes.filter.outputs.ipld-resolver == 'true' ||
+      jobs.changes.filter.outputs.fendermint == 'true' ||
       github.ref == 'refs/heads/main'
 
   fendermint-publish:
