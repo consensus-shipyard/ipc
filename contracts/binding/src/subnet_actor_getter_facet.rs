@@ -1030,6 +1030,31 @@ pub mod subnet_actor_getter_facet {
                         },
                     ],
                 ),
+                (
+                    ::std::borrow::ToOwned::to_owned("supplySource"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("supplySource"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("supply"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct SupplySource"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
             ]),
             events: ::std::collections::BTreeMap::new(),
             errors: ::std::collections::BTreeMap::new(),
@@ -1383,6 +1408,14 @@ pub mod subnet_actor_getter_facet {
         pub fn power_scale(&self) -> ::ethers::contract::builders::ContractCall<M, i8> {
             self.0
                 .method_hash([173, 129, 228, 214], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `supplySource` (0x80875df7) function
+        pub fn supply_source(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, SupplySource> {
+            self.0
+                .method_hash([128, 135, 93, 247], ())
                 .expect("method not found (this should never happen)")
         }
     }
@@ -1906,6 +1939,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "powerScale", abi = "powerScale()")]
     pub struct PowerScaleCall;
+    ///Container type for all input parameters for the `supplySource` function with signature `supplySource()` and selector `0x80875df7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "supplySource", abi = "supplySource()")]
+    pub struct SupplySourceCall;
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorGetterFacetCalls {
@@ -1949,6 +1995,7 @@ pub mod subnet_actor_getter_facet {
         MinValidators(MinValidatorsCall),
         PermissionMode(PermissionModeCall),
         PowerScale(PowerScaleCall),
+        SupplySource(SupplySourceCall),
     }
     impl ::ethers::core::abi::AbiDecode for SubnetActorGetterFacetCalls {
         fn decode(
@@ -2135,6 +2182,11 @@ pub mod subnet_actor_getter_facet {
             ) {
                 return Ok(Self::PowerScale(decoded));
             }
+            if let Ok(decoded) = <SupplySourceCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
+                return Ok(Self::SupplySource(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -2247,6 +2299,9 @@ pub mod subnet_actor_getter_facet {
                 Self::PowerScale(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::SupplySource(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -2325,6 +2380,7 @@ pub mod subnet_actor_getter_facet {
                 Self::MinValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PermissionMode(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PowerScale(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SupplySource(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -2520,6 +2576,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<PowerScaleCall> for SubnetActorGetterFacetCalls {
         fn from(value: PowerScaleCall) -> Self {
             Self::PowerScale(value)
+        }
+    }
+    impl ::core::convert::From<SupplySourceCall> for SubnetActorGetterFacetCalls {
+        fn from(value: SupplySourceCall) -> Self {
+            Self::SupplySource(value)
         }
     }
     ///Container type for all return fields from the `activeValidatorsLimit` function with signature `activeValidatorsLimit()` and selector `0x3354c3e1`
@@ -2962,6 +3023,20 @@ pub mod subnet_actor_getter_facet {
         Hash
     )]
     pub struct PowerScaleReturn(pub i8);
+    ///Container type for all return fields from the `supplySource` function with signature `supplySource()` and selector `0x80875df7`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct SupplySourceReturn {
+        pub supply: SupplySource,
+    }
     ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64)`
     #[derive(
         Clone,
@@ -3058,6 +3133,21 @@ pub mod subnet_actor_getter_facet {
     pub struct SubnetID {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
+    }
+    ///`SupplySource(uint8,address)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct SupplySource {
+        pub kind: u8,
+        pub token_address: ::ethers::core::types::Address,
     }
     ///`Validator(uint256,address,bytes)`
     #[derive(

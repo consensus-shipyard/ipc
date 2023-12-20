@@ -1,0 +1,66 @@
+name: Mono CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+    # To add ready_for_review as a trigger we need to list all the defaults.
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+
+jobs:
+  license:
+    uses: ./.github/workflows/license.yaml
+
+  contracts-prettier:
+    uses: ./.github/workflows/contracts-prettier.yaml
+
+  contracts-test:
+    uses: ./.github/workflows/contracts-test.yaml
+    needs: [contracts-prettier]
+
+  contracts-storage:
+    uses: ./.github/workflows/contracts-storage.yaml
+    needs: [contracts-prettier]
+
+  contracts-npm-audit:
+    uses: ./.github/workflows/contracts-npm-audit.yaml
+    needs: [contracts-prettier]
+
+  contracts-sast:
+    uses: ./.github/workflows/contracts-sast.yaml
+    needs: [contracts-prettier]
+
+  fvm-utils:
+    uses: ./.github/workflows/fvm-utils.yaml
+    needs: [license]
+
+  ipc:
+    uses: ./.github/workflows/ipc.yaml
+    needs: [license]
+
+  ipld-resolver:
+    uses: ./.github/workflows/ipld-resolver.yaml
+    needs: [license]
+
+  fendermint-test:
+    uses: ./.github/workflows/fendermint-test.yaml
+    needs: [license]
+
+  fendermint-publish:
+    uses: ./.github/workflows/fendermint-publish.yaml
+    secrets: inherit
+    # Dependencies are not strictly necessary, but if fendermint tests pass they publish docker too, so they better work
+    needs:
+      - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
+      - fvm-utils
+      - ipc
+      - ipld-resolver
+      - fendermint-test

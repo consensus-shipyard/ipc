@@ -7,6 +7,8 @@ NETWORK ?= auto
 # It is required by docker builds, but shouldn't be checked into git.
 OUTPUT ?= out
 
+IPC_ACTORS_CODE := $(shell find . -type f \( -name "*.sol" \))
+
 deploy-ipc:
 	./ops/deploy.sh $(NETWORK)
 
@@ -22,18 +24,22 @@ upgrade-sr-diamond:
 # ==============================================================================
 # Code generation
 
+# Regenerate bindings and ABI artifacts when sources change with the `make .gen` target.
+.gen: $(IPC_ACTORS_CODE)
+	$(MAKE) gen
+	touch $@
+
 gen: compile-abi rust-binding
 
 compile-abi: | forge
-	rm -rf $(OUTPUT)
 	mkdir -p $(OUTPUT)
 	./ops/compile-abi.sh $(OUTPUT)
 
-# commit-abi:
-# 	./ops/commit-abi.sh $(OUTPUT)
-
 rust-binding:
 	OUTPUT=$(OUTPUT) BUILD_BINDINGS=1 cargo build --locked --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
+
+# commit-abi:
+# 	./ops/commit-abi.sh $(OUTPUT)
 
 # commit-rust-binding:
 # 	./ops/commit-rust-binding.sh
@@ -58,7 +64,7 @@ check-subnet:
 # ==============================================================================
 # Development support
 
-lint:
+lint: fmt
 	solhint 'src/**/*.sol'
 
 fmt:
@@ -95,7 +101,7 @@ coverage: | forge
 	genhtml -o coverage_report lcov.info --branch-coverage
 	./tools/check_coverage.sh
 
-make coverage-for-mac: | forge
+coverage-for-mac: | forge
 	forge coverage --ffi --report lcov -C ./src
 	genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category
 	./tools/check_coverage.sh

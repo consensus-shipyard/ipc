@@ -18,12 +18,8 @@ clean:
 	cargo clean
 
 lint: \
-	license \
 	check-fmt \
 	check-clippy
-
-license:
-	./scripts/add_license.sh
 
 install-infra:
 	./scripts/install_infra.sh
@@ -32,7 +28,8 @@ clean-infra:
 	rm -rf ./bin/ipc-infra
 
 check-fmt:
-	cargo fmt --all --check
+	@# `nightly` is required to support ignore list in rustfmt.toml
+	cargo +nightly fmt --all --check
 
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all

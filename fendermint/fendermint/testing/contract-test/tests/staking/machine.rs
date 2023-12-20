@@ -3,8 +3,8 @@
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
 
 use arbitrary::{Arbitrary, Unstructured};
-use fendermint_contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
 use ethers::types as et;
+use fendermint_contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_testing::smt::StateMachine;
 use fendermint_vm_actor_interface::{

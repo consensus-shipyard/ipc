@@ -5,6 +5,7 @@ BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 
 IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
+IPC_ACTORS_GEN				:= $(IPC_ACTORS_DIR)/.gen
 
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
@@ -25,14 +26,14 @@ all: test build diagrams
 diagrams:
 	make -C docs/diagrams diagrams
 
-build: | protoc
+build: $(IPC_ACTORS_GEN) | protoc
 	cargo build --release
 
-install:
+install: $(IPC_ACTORS_GEN)
 	cargo install --locked --path fendermint/app
 
 # Using --release for testing because wasm can otherwise be slow.
-test: $(BUILTIN_ACTORS_BUNDLE)
+test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_OUT) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release --package 'fendermint_*'
@@ -46,12 +47,8 @@ clean:
 	rm $(BUILTIN_ACTORS_BUNDLE)
 
 lint: \
-	license \
 	check-fmt \
 	check-clippy
-
-license:
-	./scripts/add_license.sh
 
 check-fmt:
 	@# `nightly` is required to support ignore list in rustfmt.toml
@@ -60,7 +57,7 @@ check-fmt:
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
 
-docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_OUT) $(IPC_ACTORS_GEN)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
@@ -69,7 +66,7 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(FENDERMINT_CODE)
 # To use `buildx` locally to produce multiplatform images, one needs to run `docker buildx create --use`.
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
-docker-build: docker-deps
+docker-build: docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		docker buildx build \
@@ -96,6 +93,12 @@ actor-bundle: $(BUILTIN_ACTORS_BUNDLE)
 $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
 	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
+
+# Generate the ABI artifacts if we don't have them already.
+$(IPC_ACTORS_GEN):
+		cd $(IPC_ACTORS_DIR) && make .gen
+
+$(IPC_ACTORS_OUT): $(IPC_ACTORS_GEN)
 
 .PHONY: protoc
 protoc:

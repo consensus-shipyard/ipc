@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 // to silence construct_uint! clippy warnings
 // see https://github.com/paritytech/parity-common/issues/660
 #![allow(clippy::ptr_offset_with_cast, clippy::assign_op_pattern)]

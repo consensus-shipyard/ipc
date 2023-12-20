@@ -1,13 +1,13 @@
 name: Tests
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches: [ main, dev ]
-  pull_request:
+  workflow_call:
 
 jobs:
   tests:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -31,9 +31,14 @@ jobs:
         with:
           cache: false
 
+      - name: Cache Solidity ABI arfiacts
+        uses: actions/cache@v2
+        with:
+          path: ./contracts/out
+          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
+
       - name: Run coverage check - flaky so we run twice to catch false negatives
-        run: make coverage || make coverage
+        run: cd contracts; make coverage || make coverage
 
       - name: Run tests
-        run: forge test -vvv --ffi
-          
+        run: cd contracts; forge test -vvv --ffi

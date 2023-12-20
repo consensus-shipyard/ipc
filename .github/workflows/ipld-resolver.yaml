@@ -1,12 +1,8 @@
-name: CI
+name: IPLD Resolver CI
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - '**'
+  workflow_call:
 
 jobs:
   # Check code formatting; anything that doesn't require compilation.
@@ -17,19 +13,20 @@ jobs:
       - name: Check out the project
         uses: actions/checkout@v3
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: actions-rs/toolchain@v1
         with:
+          profile: minimal
           toolchain: nightly
           components: rustfmt
       - name: Check code formatting
-        run: make check-fmt
-      - name: Check license headers
-        run: make license
+        run: cd ipld-resolver && make check-fmt
+
       # - name: Check diagrams
       #   run: make check-diagrams
 
   # Test matrix, running tasks from the Makefile.
   tests:
+    if: ${{ !github.event.pull_request.draft }}
     needs: [pre-compile-checks]
     name: ${{ matrix.make.name }} (${{ matrix.os }}, ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
@@ -37,16 +34,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        rust: [nightly]
+        rust: [stable]
         make:
-          - name: Lint
-            task: lint
+          - name: Check clippy
+            task: check-clippy
           - name: Test
             task: test
-        exclude:
-          - rust: stable
-            make:
-              name: Lint
 
     env:
       RUST_BACKTRACE: full
@@ -60,30 +53,20 @@ jobs:
       - name: Check out the project
         uses: actions/checkout@v3
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          targets: wasm32-unknown-unknown
-          toolchain: ${{ matrix.rust }}
-          components: rustfmt,clippy
-
-      # Protobuf compiler required by libp2p-core
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: ${{ matrix.rust }}
 
-      - name: Setup sccache
-        uses: hanabi1224/sccache-action@v1.2.0 # https://github.com/hanabi1224/sccache-action used by Forest.
+      - name: Setup Cache
+        uses: ./.github/actions/setup-cache
         timeout-minutes: 5
         continue-on-error: true
         with:
-          release-name: v0.3.1
           # Caching everything separately, in case they don't ask for the same things to be compiled.
-          cache-key: ${{ matrix.make.name }}-${{ matrix.os }}-${{matrix.rust}}-${{ hashFiles('Cargo.lock', 'rust-toolchain', 'rust-toolchain.toml') }}
-          # Not sure why we should ever update a cache that has the hash of the lock file in it.
-          # In Forest it only contains the rust-toolchain, so it makes sense to update because dependencies could have changed.
-          cache-update: false
+          cache-prefix: ipld-resolver-${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
+          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
       - name: ${{ matrix.make.name }}
-        run: make ${{ matrix.make.task }}
+        run: cd ipld-resolver && make ${{ matrix.make.task }}
