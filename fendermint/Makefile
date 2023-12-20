@@ -73,14 +73,14 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			$(BUILDX_STORE) \
 			$(BUILDX_FLAGS) \
 			-f docker/Dockerfile \
-			-t $(BUILDX_TAG) $(PWD); \
+			-t $(BUILDX_TAG) $(PWD)/..; \
 	else \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		DOCKER_BUILDKIT=1 \
 		docker build \
 			$(BUILDX_STORE) \
 			-f docker/Dockerfile \
-			-t fendermint:latest $(PWD); \
+			-t fendermint:latest $(PWD)/..; \
 	fi
 
 
