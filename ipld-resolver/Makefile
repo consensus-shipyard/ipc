@@ -20,7 +20,7 @@ license:
 	./scripts/add_license.sh
 
 check-fmt:
-	cargo fmt --all --check
+	cargo +nightly fmt --all --check
 
 check-clippy:
 	cargo clippy --all --tests -- -D clippy::all

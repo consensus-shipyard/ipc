@@ -19,9 +19,9 @@ jobs:
           toolchain: nightly
           components: rustfmt
       - name: Check code formatting
-        run: make check-fmt
+        run: cd ipld-resolver && make check-fmt
       - name: Check license headers
-        run: make license
+        run: cd ipld-resolver && make license
       # - name: Check diagrams
       #   run: make check-diagrams
 
@@ -66,17 +66,14 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup sccache
-        uses: hanabi1224/sccache-action@v1.2.0 # https://github.com/hanabi1224/sccache-action used by Forest.
+      - name: Setup Cache
+        uses: ./.github/actions/setup-cache
         timeout-minutes: 5
         continue-on-error: true
         with:
-          release-name: v0.3.1
           # Caching everything separately, in case they don't ask for the same things to be compiled.
-          cache-key: ${{ matrix.make.name }}-${{ matrix.os }}-${{matrix.rust}}-${{ hashFiles('Cargo.lock', 'rust-toolchain', 'rust-toolchain.toml') }}
-          # Not sure why we should ever update a cache that has the hash of the lock file in it.
-          # In Forest it only contains the rust-toolchain, so it makes sense to update because dependencies could have changed.
-          cache-update: false
+          cache-prefix: ipld-resolver-${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
+          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
       - name: ${{ matrix.make.name }}
-        run: make ${{ matrix.make.task }}
+        run: cd ipld-resolver && make ${{ matrix.make.task }}

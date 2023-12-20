@@ -14,41 +14,38 @@ jobs:
         with:
           profile: minimal
           target: wasm32-unknown-unknown
-          toolchain: nightly-2022-10-03
+          toolchain: stable
           override: true
-      - run: cargo b --all --release
-      - run: cargo t --all --release
+      - run: cd fvm-utils && cargo t --all --release
 
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          target: wasm32-unknown-unknown
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+          targets: wasm32-unknown-unknown
+          toolchain: nightly
+          components: rustfmt
+
+      - name: Check code formatting
+        run: cd fvm-utils && make check-fmt
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          target: wasm32-unknown-unknown
+          targets: wasm32-unknown-unknown
           toolchain: stable
-          override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+          components: clippy
+
+      - name: Check clippy
+        run: cd fvm-utils && make check-clippy
