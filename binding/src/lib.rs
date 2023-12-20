@@ -35,6 +35,8 @@ pub mod lib_staking;
 pub mod lib_staking_change_log;
 #[allow(clippy::all)]
 pub mod lib_gateway;
+#[allow(clippy::all)]
+pub mod lib_quorum;
 
 // The list of contracts need to convert FvmAddress to fvm_shared::Address
 fvm_address_conversion!(gateway_manager_facet);
