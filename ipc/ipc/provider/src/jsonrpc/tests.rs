@@ -12,18 +12,6 @@ const HTTP_ENDPOINT: &str = "https://api.node.glif.io/rpc/v0";
 const WS_ENDPOINT: &str = "wss://wss.node.glif.io/apigw/lotus/rpc/v0";
 
 #[tokio::test]
-async fn test_request() {
-    let url = Url::parse(HTTP_ENDPOINT).unwrap();
-    let client = JsonRpcClientImpl::new(url, None);
-    let response = client
-        .request::<serde_json::Value>("Filecoin.ChainHead", NO_PARAMS)
-        .await
-        .unwrap();
-    assert!(response.get("Blocks").is_some());
-    assert!(response.get("Height").is_some());
-}
-
-#[tokio::test]
 async fn test_request_error() {
     let url = Url::parse(HTTP_ENDPOINT).unwrap();
     let client = JsonRpcClientImpl::new(url, None);

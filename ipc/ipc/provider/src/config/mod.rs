@@ -6,7 +6,6 @@
 //! [`Config`] struct.
 
 pub mod deserialize;
-mod reload;
 pub mod subnet;
 
 pub mod serialize;
@@ -20,7 +19,6 @@ use std::path::Path;
 use anyhow::Result;
 use deserialize::deserialize_subnets_from_vec;
 use ipc_sdk::subnet_id::SubnetID;
-pub use reload::ReloadableConfig;
 use serde::{Deserialize, Serialize};
 use serialize::serialize_subnets_to_str;
 pub use subnet::Subnet;

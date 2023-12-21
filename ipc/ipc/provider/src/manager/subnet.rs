@@ -7,7 +7,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_sdk::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_sdk::checkpoint::{
+    BottomUpCheckpoint, BottomUpCheckpointBundle, BottomUpMsgBatch, QuorumReachedEvent, Signature,
+};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_sdk::subnet::ConstructParams;
@@ -94,7 +96,6 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         from: Address,
         to: Address,
         amount: TokenAmount,
-        fee: Option<TokenAmount>,
     ) -> Result<ChainEpoch>;
 
     /// Propagate a cross-net message forward. For `postbox_msg_key`, we are using bytes because different
@@ -106,13 +107,6 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         gateway_addr: Address,
         from: Address,
         postbox_msg_key: Vec<u8>,
-    ) -> Result<()>;
-
-    async fn send_cross_message(
-        &self,
-        gateway_addr: Address,
-        from: Address,
-        cross_msg: CrossMsg,
     ) -> Result<()>;
 
     /// Send value between two addresses in a subnet
@@ -209,7 +203,9 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn submit_checkpoint(
         &self,
         submitter: &Address,
-        bundle: BottomUpCheckpointBundle,
+        checkpoint: BottomUpCheckpoint,
+        signatures: Vec<Signature>,
+        signatories: Vec<Address>,
     ) -> Result<ChainEpoch>;
     /// The last confirmed/submitted checkpoint height.
     async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
@@ -227,4 +223,13 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
     /// Get the current epoch in the current subnet
     async fn current_epoch(&self) -> Result<ChainEpoch>;
+    /// Submits a batch of bottom-up messages for execution.
+    async fn submit_bottom_up_msg_batch(
+        &self,
+        submitter: &Address,
+        subnet_id: &SubnetID,
+        batch: BottomUpMsgBatch,
+        signatories: &[Address],
+        signatures: &[Signature],
+    ) -> Result<ChainEpoch>;
 }

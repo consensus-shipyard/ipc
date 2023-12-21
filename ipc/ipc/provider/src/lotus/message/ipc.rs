@@ -6,7 +6,6 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use ipc_sdk::address::IPCAddress;
-use ipc_sdk::gateway::Status;
 use ipc_sdk::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 
@@ -79,9 +78,6 @@ pub struct SubnetInfo {
     #[serde(deserialize_with = "deserialize_token_amount_from_str")]
     #[serde(serialize_with = "serialize_token_amount_to_atto")]
     pub circ_supply: TokenAmount,
-    /// State of the Subnet (Initialized, Active, Killed)
-    #[serde(rename(deserialize = "Status"))]
-    pub status: Status,
     pub genesis_epoch: ChainEpoch,
 }
 
@@ -143,7 +139,7 @@ mod tests {
     #[test]
     fn deserialize_ipc_subnet_state() {
         let raw = r#"
-        {"Name":"test2","ParentID":{"Parent":"/r31415926","Actor":"t00"},"IPCGatewayAddr":"f064","Consensus":3,"MinValidatorStake":"1000000000000000000","TotalStake":"10000000000000000000","Stake":{"/":"bafy2bzacebentzoqaapingrxwknlxqcusl23rqaa7cwb42u76fgvb25nxpmhq"},"Status":1,"Genesis":null,"BottomUpCheckPeriod":10,"TopDownCheckPeriod":10,"GenesisEpoch":0,"CommittedCheckpoints":{"/":"bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay"},"ValidatorSet":{"validators":[{"addr":"t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq","net_addr":"test","weight":"10000000000000000000"}],"configuration_number":1},"MinValidators":1,"PreviousExecutedCheckpoint":{"/":"bafy2bzacedkoa623kvi5gfis2yks7xxjl73vg7xwbojz4tpq63dd5jpfz757i"},"BottomUpCheckpointVoting":{"GenesisEpoch":0,"SubmissionPeriod":10,"LastVotingExecuted":0,"ExecutableEpochQueue":null,"EpochVoteSubmission":{"/":"bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay"},"Ratio":{"Num":2,"Denom":3}}}
+        {"Name":"test2","ParentID":{"Parent":"/r31415926","Actor":"t00"},"IPCGatewayAddr":"f064","Consensus":3,"MinValidatorStake":"1000000000000000000","TotalStake":"10000000000000000000","Stake":{"/":"bafy2bzacebentzoqaapingrxwknlxqcusl23rqaa7cwb42u76fgvb25nxpmhq"},"Genesis":null,"BottomUpCheckPeriod":10,"TopDownCheckPeriod":10,"GenesisEpoch":0,"CommittedCheckpoints":{"/":"bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay"},"ValidatorSet":{"validators":[{"addr":"t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq","net_addr":"test","weight":"10000000000000000000"}],"configuration_number":1},"MinValidators":1,"PreviousExecutedCheckpoint":{"/":"bafy2bzacedkoa623kvi5gfis2yks7xxjl73vg7xwbojz4tpq63dd5jpfz757i"},"BottomUpCheckpointVoting":{"GenesisEpoch":0,"SubmissionPeriod":10,"LastVotingExecuted":0,"ExecutableEpochQueue":null,"EpochVoteSubmission":{"/":"bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay"},"Ratio":{"Num":2,"Denom":3}}}
         "#;
 
         let r = serde_json::from_str::<IPCReadSubnetActorStateResponse>(raw);

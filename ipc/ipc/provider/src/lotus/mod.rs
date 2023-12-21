@@ -21,8 +21,6 @@ use message::wallet::{WalletKeyType, WalletListResponse};
 pub mod client;
 mod json;
 pub mod message;
-#[cfg(test)]
-mod tests;
 
 /// The network version of lotus network.
 /// see https://github.com/filecoin-project/go-state-types/blob/f6fd668a32b4b4a0bc39fd69d8a5f8fb11f49461/network/version.go#L7

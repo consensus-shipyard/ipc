@@ -4,7 +4,9 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_sdk::subnet::{PermissionMode, SupplyKind, SupplySource};
 use ipc_sdk::subnet_id::SubnetID;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -30,6 +32,16 @@ impl CreateSubnet {
             None => None,
         };
 
+        let permission_mode = PermissionMode::try_from(arguments.permission_mode)?;
+        let token_address = if let Some(addr) = &arguments.supply_source_address {
+            Some(Address::from_str(addr)?)
+        } else {
+            None
+        };
+        let supply_source = SupplySource {
+            kind: SupplyKind::try_from(arguments.supply_source_kind)?,
+            token_address,
+        };
         let addr = provider
             .create_subnet(
                 from,
@@ -41,7 +53,8 @@ impl CreateSubnet {
                     .active_validators_limit
                     .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
                 f64_to_token_amount(arguments.min_cross_msg_fee)?,
-                arguments.permissioned,
+                permission_mode,
+                supply_source,
             )
             .await?;
 
@@ -99,7 +112,17 @@ pub struct CreateSubnetArgs {
     pub min_cross_msg_fee: f64,
     #[arg(
         long,
-        help = "Deploy static network where validators can't join in a permissionless manner"
+        help = "The permission mode for the subnet, collateral(0), federated(1) and static(2)"
     )]
-    pub permissioned: bool,
+    pub permission_mode: u8,
+    #[arg(
+        long,
+        help = "The kind of supply source of a subnet on its parent subnet, native(0), erc20(1)"
+    )]
+    pub supply_source_kind: u8,
+    #[arg(
+        long,
+        help = "The address of supply source of a subnet on its parent subnet. None if kind is native"
+    )]
+    pub supply_source_address: Option<String>,
 }
