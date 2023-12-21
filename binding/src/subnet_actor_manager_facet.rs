@@ -633,32 +633,6 @@ pub mod subnet_actor_manager_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("SubnetBootstrapped"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Event {
-                            name: ::std::borrow::ToOwned::to_owned("SubnetBootstrapped"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::EventParam {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                ],
-                                            ),
-                                        ),
-                                    ),
-                                    indexed: false,
-                                },
-                            ],
-                            anonymous: false,
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("Unpaused"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Event {
@@ -1281,16 +1255,6 @@ pub mod subnet_actor_manager_facet {
         pub fn paused_filter(
             &self,
         ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, PausedFilter> {
-            self.0.event()
-        }
-        ///Gets the contract's `SubnetBootstrapped` event
-        pub fn subnet_bootstrapped_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            SubnetBootstrappedFilter,
-        > {
             self.0.event()
         }
         ///Gets the contract's `Unpaused` event
@@ -2592,21 +2556,6 @@ pub mod subnet_actor_manager_facet {
         Eq,
         Hash
     )]
-    #[ethevent(
-        name = "SubnetBootstrapped",
-        abi = "SubnetBootstrapped((uint256,address,bytes)[])"
-    )]
-    pub struct SubnetBootstrappedFilter(pub ::std::vec::Vec<Validator>);
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
     #[ethevent(name = "Unpaused", abi = "Unpaused(address)")]
     pub struct UnpausedFilter {
         pub account: ::ethers::core::types::Address,
@@ -2618,7 +2567,6 @@ pub mod subnet_actor_manager_facet {
         BottomUpCheckpointSubmittedFilter(BottomUpCheckpointSubmittedFilter),
         NextBottomUpCheckpointExecutedFilter(NextBottomUpCheckpointExecutedFilter),
         PausedFilter(PausedFilter),
-        SubnetBootstrappedFilter(SubnetBootstrappedFilter),
         UnpausedFilter(UnpausedFilter),
     }
     impl ::ethers::contract::EthLogDecode for SubnetActorManagerFacetEvents {
@@ -2649,11 +2597,6 @@ pub mod subnet_actor_manager_facet {
             if let Ok(decoded) = PausedFilter::decode_log(log) {
                 return Ok(SubnetActorManagerFacetEvents::PausedFilter(decoded));
             }
-            if let Ok(decoded) = SubnetBootstrappedFilter::decode_log(log) {
-                return Ok(
-                    SubnetActorManagerFacetEvents::SubnetBootstrappedFilter(decoded),
-                );
-            }
             if let Ok(decoded) = UnpausedFilter::decode_log(log) {
                 return Ok(SubnetActorManagerFacetEvents::UnpausedFilter(decoded));
             }
@@ -2673,9 +2616,6 @@ pub mod subnet_actor_manager_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::PausedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SubnetBootstrappedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
                 Self::UnpausedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
@@ -2701,12 +2641,6 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<PausedFilter> for SubnetActorManagerFacetEvents {
         fn from(value: PausedFilter) -> Self {
             Self::PausedFilter(value)
-        }
-    }
-    impl ::core::convert::From<SubnetBootstrappedFilter>
-    for SubnetActorManagerFacetEvents {
-        fn from(value: SubnetBootstrappedFilter) -> Self {
-            Self::SubnetBootstrappedFilter(value)
         }
     }
     impl ::core::convert::From<UnpausedFilter> for SubnetActorManagerFacetEvents {
@@ -3401,21 +3335,5 @@ pub mod subnet_actor_manager_facet {
     pub struct SubnetID {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
-    }
-    ///`Validator(uint256,address,bytes)`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct Validator {
-        pub weight: ::ethers::core::types::U256,
-        pub addr: ::ethers::core::types::Address,
-        pub metadata: ::ethers::core::types::Bytes,
     }
 }

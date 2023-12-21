@@ -1278,7 +1278,6 @@ pub mod gateway_getter_facet {
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
                                             ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                 ::std::vec![
                                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
@@ -1360,7 +1359,6 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
@@ -1419,28 +1417,6 @@ pub mod gateway_getter_facet {
                                     kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("uint64"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("minStake"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("minStake"),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
                                     ),
                                 },
                             ],
@@ -1560,7 +1536,6 @@ pub mod gateway_getter_facet {
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
                                             ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                 ::std::vec![
                                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
@@ -1967,14 +1942,6 @@ pub mod gateway_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, u64> {
             self.0
                 .method_hash([5, 175, 240, 179], ())
-                .expect("method not found (this should never happen)")
-        }
-        ///Calls the contract's `minStake` (0x375b3c0a) function
-        pub fn min_stake(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
-            self.0
-                .method_hash([55, 91, 60, 10], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `postbox` (0x8cfd78e7) function
@@ -2517,19 +2484,6 @@ pub mod gateway_getter_facet {
     )]
     #[ethcall(name = "maxMsgsPerBottomUpBatch", abi = "maxMsgsPerBottomUpBatch()")]
     pub struct MaxMsgsPerBottomUpBatchCall;
-    ///Container type for all input parameters for the `minStake` function with signature `minStake()` and selector `0x375b3c0a`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethcall(name = "minStake", abi = "minStake()")]
-    pub struct MinStakeCall;
     ///Container type for all input parameters for the `postbox` function with signature `postbox(bytes32)` and selector `0x8cfd78e7`
     #[derive(
         Clone,
@@ -2610,7 +2564,6 @@ pub mod gateway_getter_facet {
         ListSubnets(ListSubnetsCall),
         MajorityPercentage(MajorityPercentageCall),
         MaxMsgsPerBottomUpBatch(MaxMsgsPerBottomUpBatchCall),
-        MinStake(MinStakeCall),
         Postbox(PostboxCall),
         Subnets(SubnetsCall),
         TotalSubnets(TotalSubnetsCall),
@@ -2790,11 +2743,6 @@ pub mod gateway_getter_facet {
             ) {
                 return Ok(Self::MaxMsgsPerBottomUpBatch(decoded));
             }
-            if let Ok(decoded) = <MinStakeCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
-                return Ok(Self::MinStake(decoded));
-            }
             if let Ok(decoded) = <PostboxCall as ::ethers::core::abi::AbiDecode>::decode(
                 data,
             ) {
@@ -2918,9 +2866,6 @@ pub mod gateway_getter_facet {
                 Self::MaxMsgsPerBottomUpBatch(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::MinStake(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::Postbox(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Subnets(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::TotalSubnets(element) => {
@@ -3016,7 +2961,6 @@ pub mod gateway_getter_facet {
                 Self::MaxMsgsPerBottomUpBatch(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::MinStake(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Postbox(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Subnets(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalSubnets(element) => ::core::fmt::Display::fmt(element, f),
@@ -3204,11 +3148,6 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<MaxMsgsPerBottomUpBatchCall> for GatewayGetterFacetCalls {
         fn from(value: MaxMsgsPerBottomUpBatchCall) -> Self {
             Self::MaxMsgsPerBottomUpBatch(value)
-        }
-    }
-    impl ::core::convert::From<MinStakeCall> for GatewayGetterFacetCalls {
-        fn from(value: MinStakeCall) -> Self {
-            Self::MinStake(value)
         }
     }
     impl ::core::convert::From<PostboxCall> for GatewayGetterFacetCalls {
@@ -3652,18 +3591,6 @@ pub mod gateway_getter_facet {
         Hash
     )]
     pub struct MaxMsgsPerBottomUpBatchReturn(pub u64);
-    ///Container type for all return fields from the `minStake` function with signature `minStake()` and selector `0x375b3c0a`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    pub struct MinStakeReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `postbox` function with signature `postbox(bytes32)` and selector `0x8cfd78e7`
     #[derive(
         Clone,
@@ -3851,7 +3778,7 @@ pub mod gateway_getter_facet {
         pub params: ::ethers::core::types::Bytes,
         pub fee: ::ethers::core::types::U256,
     }
-    ///`Subnet(uint256,uint256,uint256,uint64,uint64,uint8,(uint64,address[]))`
+    ///`Subnet(uint256,uint256,uint256,uint64,uint64,(uint64,address[]))`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -3868,7 +3795,6 @@ pub mod gateway_getter_facet {
         pub circ_supply: ::ethers::core::types::U256,
         pub top_down_nonce: u64,
         pub applied_bottom_up_nonce: u64,
-        pub status: u8,
         pub id: SubnetID,
     }
     ///`SubnetID(uint64,address[])`
