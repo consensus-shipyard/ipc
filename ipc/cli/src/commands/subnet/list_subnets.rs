@@ -32,8 +32,8 @@ impl CommandLineHandler for ListSubnets {
 
         for (_, s) in ls.iter() {
             println!(
-                "{} - status: {:?}, collateral: {} FIL, circ.supply: {} FIL, genesis: {}",
-                s.id, s.status, s.stake, s.circ_supply, s.genesis_epoch
+                "{} - collateral: {} FIL, circ.supply: {} FIL, genesis: {}",
+                s.id, s.stake, s.circ_supply, s.genesis_epoch
             );
         }
 

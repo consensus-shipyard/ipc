@@ -29,9 +29,10 @@ pub type Signature = Vec<u8>;
 /// The event emitted
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct QuorumReachedEvent {
+    pub obj_kind: u8,
     pub height: ChainEpoch,
     /// The checkpoint hash
-    pub checkpoint: Vec<u8>,
+    pub obj_hash: Vec<u8>,
     pub quorum_weight: TokenAmount,
 }
 
@@ -41,7 +42,7 @@ impl Display for QuorumReachedEvent {
             f,
             "QuorumReachedEvent<height: {}, checkpoint: {}, quorum_weight: {}>",
             self.height,
-            hex::encode(&self.checkpoint),
+            hex::encode(&self.obj_hash),
             self.quorum_weight
         )
     }
@@ -59,6 +60,17 @@ pub struct BottomUpCheckpointBundle {
     pub cross_msgs: Vec<CrossMsg>,
 }
 
+/// The collection of items for the bottom up checkpoint submission
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct BottomUpMsgBatch {
+    /// Child subnet ID, for replay protection from other subnets where the exact same validators operate
+    pub subnet_id: SubnetID,
+    /// The height of the child subnet at which the batch was cut
+    pub block_height: ChainEpoch,
+    /// Batch of messages to execute
+    pub msgs: Vec<CrossMsg>,
+}
+
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BottomUpCheckpoint {
     /// Child subnet ID, for replay protection from other subnets where the exact same validators operate.
@@ -73,9 +85,4 @@ pub struct BottomUpCheckpoint {
     /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
     /// 0 could mean "no change".
     pub next_configuration_number: u64,
-    /// Hash over the bottom-up messages.
-    /// By not including cross messages here directly, we can be compatible with IPLD Resolver based
-    /// approach where the messages are fetched with Bitswap and provided by Fendermint, or the full-fat
-    /// approach we need with Lotus, where the messages are part of the relayed transaction.
-    pub cross_messages_hash: Vec<u8>,
 }
