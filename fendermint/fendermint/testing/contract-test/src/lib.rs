@@ -22,7 +22,10 @@ pub async fn init_exec_state(
     multi_engine: Arc<MultiEngine>,
     genesis: Genesis,
 ) -> anyhow::Result<(FvmExecState<MemoryBlockstore>, FvmGenesisOutput)> {
-    let bundle = std::fs::read(bundle_path()).context("failed to read bundle")?;
+    let bundle_path = bundle_path();
+    let bundle = std::fs::read(&bundle_path)
+        .with_context(|| format!("failed to read bundle: {}", bundle_path.to_string_lossy()))?;
+
     let store = MemoryBlockstore::new();
 
     let state = FvmGenesisState::new(store, multi_engine, &bundle)
