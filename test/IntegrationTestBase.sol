@@ -22,7 +22,12 @@ import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "../src/gateway/GatewayRouterFacet.sol";
+
+import {CheckpointingFacet} from "../src/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../src/gateway/router/XnetMessagingFacet.sol";
+import {TopDownFinalityFacet} from "../src/gateway/router/TopDownFinalityFacet.sol";
+import {BottomUpRouterFacet} from "../src/gateway/router/BottomUpRouterFacet.sol";
+
 import {SubnetActorManagerFacetMock} from "./mocks/SubnetActorManagerFacetMock.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
@@ -80,23 +85,35 @@ contract TestRegistry is Test, TestParams {
 }
 
 contract TestGatewayActor is Test, TestParams {
-    bytes4[] gwRouterSelectors;
+    bytes4[] gwCheckpointingFacetSelectors;
+    bytes4[] gwXnetMessagingFacetSelectors;
+    bytes4[] gwTopDownFinalityFacetSelectors;
+    bytes4[] gwBottomUpRouterFacetSelectors;
+
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
     bytes4[] gwMessengerSelectors;
+
     bytes4[] gwCutterSelectors;
     bytes4[] gwLoupeSelectors;
 
     GatewayDiamond gatewayDiamond;
     GatewayManagerFacet gwManager;
     GatewayGetterFacet gwGetter;
-    GatewayRouterFacet gwRouter;
+    CheckpointingFacet gwCheckpointingFacet;
+    XnetMessagingFacet gwXnetMessagingFacet;
+    TopDownFinalityFacet gwTopDownFinalityFacet;
+    BottomUpRouterFacet gwBottomUpRouterFacet;
     GatewayMessengerFacet gwMessenger;
     DiamondCutFacet gwCutter;
     DiamondLoupeFacet gwLouper;
 
     constructor() {
-        gwRouterSelectors = SelectorLibrary.resolveSelectors("GatewayRouterFacet");
+        gwCheckpointingFacetSelectors = SelectorLibrary.resolveSelectors("CheckpointingFacet");
+        gwXnetMessagingFacetSelectors = SelectorLibrary.resolveSelectors("XnetMessagingFacet");
+        gwTopDownFinalityFacetSelectors = SelectorLibrary.resolveSelectors("TopDownFinalityFacet");
+        gwBottomUpRouterFacetSelectors = SelectorLibrary.resolveSelectors("BottomUpRouterFacet");
+
         gwGetterSelectors = SelectorLibrary.resolveSelectors("GatewayGetterFacet");
         gwManagerSelectors = SelectorLibrary.resolveSelectors("GatewayManagerFacet");
         gwMessengerSelectors = SelectorLibrary.resolveSelectors("GatewayMessengerFacet");
@@ -182,9 +199,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         // create the root gateway actor.
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
+
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwRouter = GatewayRouterFacet(address(gatewayDiamond));
+        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
+        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
+        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
+        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
         gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
         gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
         gwCutter = DiamondCutFacet(address(gatewayDiamond));
@@ -204,20 +225,48 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     }
 
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
-        GatewayRouterFacet router = new GatewayRouterFacet();
+        CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
+        XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
+        TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
+        BottomUpRouterFacet bottomUpRouterFacet = new BottomUpRouterFacet();
+
         GatewayManagerFacet manager = new GatewayManagerFacet();
         GatewayGetterFacet getter = new GatewayGetterFacet();
         GatewayMessengerFacet messenger = new GatewayMessengerFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](6);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](9);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
-                facetAddress: address(router),
+                facetAddress: address(checkpointingFacet),
                 action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwRouterSelectors
+                functionSelectors: gwCheckpointingFacetSelectors
+            })
+        );
+
+        gwDiamondCut[6] = (
+            IDiamond.FacetCut({
+                facetAddress: address(xnetMessagingFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwXnetMessagingFacetSelectors
+            })
+        );
+
+        gwDiamondCut[7] = (
+            IDiamond.FacetCut({
+                facetAddress: address(topDownFinalityFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwTopDownFinalityFacetSelectors
+            })
+        );
+
+        gwDiamondCut[8] = (
+            IDiamond.FacetCut({
+                facetAddress: address(bottomUpRouterFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwBottomUpRouterFacetSelectors
             })
         );
 
@@ -538,7 +587,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwRouter.commitParentFinality(finality);
+        gwTopDownFinalityFacet.commitParentFinality(finality);
     }
 
     function setupWhiteListMethod(address caller, address src) public returns (bytes32) {
@@ -570,7 +619,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         // addValidator(caller, 1000);
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwRouter.applyCrossMessages(msgs);
+        gwXnetMessagingFacet.applyCrossMessages(msgs);
 
         return crossMsg.toHash();
     }
@@ -590,7 +639,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwRouter.commitParentFinality(finality);
+        gwTopDownFinalityFacet.commitParentFinality(finality);
         vm.stopPrank();
     }
 
@@ -756,7 +805,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         address subnetAddress,
         GatewayDiamond gw
     ) public returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
-        gwRouter = GatewayRouterFacet(address(gw));
         gwManager = GatewayManagerFacet(address(gw));
         gwGetter = GatewayGetterFacet(address(gw));
 

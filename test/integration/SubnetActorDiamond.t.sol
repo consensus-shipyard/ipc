@@ -24,7 +24,7 @@ import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
-import {SubnetActorManagerFacet, ERR_PERMISSIONED_AND_BOOTSTRAPPED, ERR_VALIDATOR_NOT_JOINED, ERR_VALIDATOR_JOINED} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";

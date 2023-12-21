@@ -25,7 +25,6 @@ import {GatewayDiamond, FunctionNotFound} from "../../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {LibDiamond} from "../../src/lib/LibDiamond.sol";
 import {LibGateway} from "../../src/lib/LibGateway.sol";
@@ -37,7 +36,6 @@ import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
 import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
@@ -183,7 +181,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(address(saDiamond));
         vm.expectEmit(true, true, true, true, address(token));
         emit Transfer(address(gatewayDiamond), recipient, value);
-        gwRouter.execBottomUpMsgBatch(batch);
+        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
 
         // Assert post-conditions.
         (, Subnet memory subnetAfter) = gwGetter.getSubnet(subnet.id);
@@ -198,7 +196,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // This reverts.
         vm.prank(address(saDiamond));
         vm.expectRevert();
-        gwRouter.execBottomUpMsgBatch(batch);
+        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
     }
 
     function test_childToParentCall() public {
@@ -232,7 +230,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(address(saDiamond));
         vm.etch(recipient, bytes("foo")); // set some code at the destination address to trick Solidity into calling the contract.
         vm.expectCall(recipient, bytes.concat(bytes4(0x11223344), bytes("hello")));
-        gwRouter.execBottomUpMsgBatch(batch);
+        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
         assertEq(token.balanceOf(recipient), 8);
     }
 
