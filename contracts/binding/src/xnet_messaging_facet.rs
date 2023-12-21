@@ -7,7 +7,7 @@ pub use xnet_messaging_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod xnet_messaging_facet {
     #[allow(deprecated)]
@@ -143,8 +143,9 @@ pub mod xnet_messaging_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static XNETMESSAGINGFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static XNETMESSAGINGFACET_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     pub struct XnetMessagingFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for XnetMessagingFacet<M> {
         fn clone(&self) -> Self {
@@ -176,11 +177,13 @@ pub mod xnet_messaging_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                XNETMESSAGINGFACET_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    XNETMESSAGINGFACET_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Calls the contract's `applyCrossMessages` (0xc62eb4d5) function
         pub fn apply_cross_messages(
@@ -193,8 +196,7 @@ pub mod xnet_messaging_facet {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for XnetMessagingFacet<M>
-    {
+    for XnetMessagingFacet<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -208,7 +210,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidCrossMsgDstSubnet", abi = "InvalidCrossMsgDstSubnet()")]
     pub struct InvalidCrossMsgDstSubnet;
@@ -221,7 +223,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidCrossMsgNonce", abi = "InvalidCrossMsgNonce()")]
     pub struct InvalidCrossMsgNonce;
@@ -234,7 +236,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotRegisteredSubnet", abi = "NotRegisteredSubnet()")]
     pub struct NotRegisteredSubnet;
@@ -247,7 +249,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
@@ -267,27 +269,29 @@ pub mod xnet_messaging_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCrossMsgDstSubnet(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidCrossMsgNonce as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidCrossMsgNonce as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCrossMsgNonce(decoded));
             }
-            if let Ok(decoded) =
-                <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotRegisteredSubnet(decoded));
             }
-            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotSystemActor(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -305,7 +309,9 @@ pub mod xnet_messaging_facet {
                 Self::NotRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotSystemActor(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -315,21 +321,19 @@ pub mod xnet_messaging_facet {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
                 _ if selector
-                    == <InvalidCrossMsgDstSubnet as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidCrossMsgDstSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidCrossMsgNonce as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidCrossMsgNonce as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ => false,
@@ -339,9 +343,15 @@ pub mod xnet_messaging_facet {
     impl ::core::fmt::Display for XnetMessagingFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::InvalidCrossMsgDstSubnet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidCrossMsgNonce(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidCrossMsgDstSubnet(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidCrossMsgNonce(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NotRegisteredSubnet(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
@@ -381,7 +391,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "applyCrossMessages",
@@ -399,7 +409,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct CrossMsg {
         pub message: StorableMsg,
@@ -414,7 +424,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct FvmAddress {
         pub addr_type: u8,
@@ -429,7 +439,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct Ipcaddress {
         pub subnet_id: SubnetID,
@@ -444,7 +454,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct StorableMsg {
         pub from: Ipcaddress,
@@ -464,7 +474,7 @@ pub mod xnet_messaging_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct SubnetID {
         pub root: u64,

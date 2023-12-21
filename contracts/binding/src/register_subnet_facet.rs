@@ -7,86 +7,110 @@ pub use register_subnet_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod register_subnet_facet {
     #[allow(deprecated)]
     fn __abi() -> ::ethers::core::abi::Abi {
         ::ethers::core::abi::ethabi::Contract {
             constructor: ::core::option::Option::None,
-            functions: ::core::convert::From::from([(
-                ::std::borrow::ToOwned::to_owned("newSubnetActor"),
-                ::std::vec![::ethers::core::abi::ethabi::Function {
-                    name: ::std::borrow::ToOwned::to_owned("newSubnetActor"),
-                    inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                        name: ::std::borrow::ToOwned::to_owned("_params"),
-                        kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                            ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                ::ethers::core::abi::ethabi::ParamType::Array(
-                                    ::std::boxed::Box::new(
-                                        ::ethers::core::abi::ethabi::ParamType::Address,
+            functions: ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("newSubnetActor"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("newSubnetActor"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("_params"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                        ::std::boxed::Box::new(
+                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Int(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ],
+                                            ),
+                                        ],
                                     ),
-                                ),
-                            ],),
-                            ::ethers::core::abi::ethabi::ParamType::Address,
-                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                            ::ethers::core::abi::ethabi::ParamType::Uint(16usize),
-                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                            ::ethers::core::abi::ethabi::ParamType::Int(8usize),
-                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                            ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                ::ethers::core::abi::ethabi::ParamType::Address,
-                            ],),
-                        ],),
-                        internal_type: ::core::option::Option::Some(
-                            ::std::borrow::ToOwned::to_owned(
-                                "struct SubnetActorDiamond.ConstructorParams",
-                            ),
-                        ),
-                    },],
-                    outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                        name: ::std::borrow::ToOwned::to_owned("subnetAddr"),
-                        kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                        internal_type: ::core::option::Option::Some(
-                            ::std::borrow::ToOwned::to_owned("address"),
-                        ),
-                    },],
-                    constant: ::core::option::Option::None,
-                    state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                },],
-            )]),
-            events: ::core::convert::From::from([(
-                ::std::borrow::ToOwned::to_owned("SubnetDeployed"),
-                ::std::vec![::ethers::core::abi::ethabi::Event {
-                    name: ::std::borrow::ToOwned::to_owned("SubnetDeployed"),
-                    inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                        name: ::std::borrow::ToOwned::to_owned("subnetAddr"),
-                        kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                        indexed: false,
-                    },],
-                    anonymous: false,
-                },],
-            )]),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned(
+                                            "struct SubnetActorDiamond.ConstructorParams",
+                                        ),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("subnetAddr"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
+                ),
+            ]),
+            events: ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("SubnetDeployed"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("SubnetDeployed"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("subnetAddr"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+            ]),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("ReentrancyError"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("ReentrancyError"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("ReentrancyError"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("WrongGateway"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("WrongGateway"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("WrongGateway"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
             ]),
             receive: false,
@@ -94,8 +118,9 @@ pub mod register_subnet_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static REGISTERSUBNETFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static REGISTERSUBNETFACET_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     pub struct RegisterSubnetFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for RegisterSubnetFacet<M> {
         fn clone(&self) -> Self {
@@ -127,17 +152,22 @@ pub mod register_subnet_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                REGISTERSUBNETFACET_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    REGISTERSUBNETFACET_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Calls the contract's `newSubnetActor` (0x7be005d5) function
         pub fn new_subnet_actor(
             &self,
             params: ConstructorParams,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([123, 224, 5, 213], (params,))
                 .expect("method not found (this should never happen)")
@@ -145,22 +175,26 @@ pub mod register_subnet_facet {
         ///Gets the contract's `SubnetDeployed` event
         pub fn subnet_deployed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SubnetDeployedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            SubnetDeployedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SubnetDeployedFilter>
-        {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            SubnetDeployedFilter,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for RegisterSubnetFacet<M>
-    {
+    for RegisterSubnetFacet<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -174,7 +208,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ReentrancyError", abi = "ReentrancyError()")]
     pub struct ReentrancyError;
@@ -187,7 +221,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "WrongGateway", abi = "WrongGateway()")]
     pub struct WrongGateway;
@@ -205,15 +239,19 @@ pub mod register_subnet_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ReentrancyError(decoded));
             }
-            if let Ok(decoded) = <WrongGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <WrongGateway as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::WrongGateway(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -222,8 +260,12 @@ pub mod register_subnet_facet {
     impl ::ethers::core::abi::AbiEncode for RegisterSubnetFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::ReentrancyError(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::WrongGateway(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ReentrancyError(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::WrongGateway(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -232,10 +274,12 @@ pub mod register_subnet_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <WrongGateway as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <WrongGateway as ::ethers::contract::EthError>::selector() => true,
                 _ => false,
             }
         }
@@ -272,7 +316,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "SubnetDeployed", abi = "SubnetDeployed(address)")]
     pub struct SubnetDeployedFilter {
@@ -287,7 +331,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "newSubnetActor",
@@ -305,7 +349,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct NewSubnetActorReturn {
         pub subnet_addr: ::ethers::core::types::Address,
@@ -319,7 +363,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct ConstructorParams {
         pub parent_id: SubnetID,
@@ -344,7 +388,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct SubnetID {
         pub root: u64,
@@ -359,7 +403,7 @@ pub mod register_subnet_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct SupplySource {
         pub kind: u8,
