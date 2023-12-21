@@ -5,7 +5,9 @@ import "../../src/errors/IPCErrors.sol";
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
-import {NumberContractFacetSeven, NumberContractFacetEight} from "../helpers/NumberContract.sol";
+import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
+import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
+import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 import {BottomUpMsgBatch, CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/CrossNet.sol";
@@ -22,7 +24,7 @@ import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
-import {SubnetActorManagerFacet, ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -446,7 +448,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saManager.stake();
 
         vm.prank(validator);
-        vm.expectRevert(NotStakedBefore.selector);
+        vm.expectRevert((abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_NOT_JOINED)));
         saManager.stake{value: 10}();
 
         vm.prank(validator);
@@ -915,7 +917,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         DiamondCutFacet saDiamondCutter = DiamondCutFacet(address(saDiamond));
         IDiamond.FacetCut[] memory saDiamondCut = new IDiamond.FacetCut[](1);
-        bytes4[] memory ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetSeven");
+        bytes4[] memory ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetSeven");
 
         saDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -934,7 +936,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         NumberContractFacetSeven saNumberContract = NumberContractFacetSeven(address(saDiamond));
         assert(saNumberContract.getNum() == 7);
 
-        ncGetterSelectors = TestUtils.generateSelectors(vm, "NumberContractFacetEight");
+        ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetEight");
         saDiamondCut[0] = (
             IDiamond.FacetCut({
                 facetAddress: address(ncFacetB),
@@ -1165,32 +1167,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
     }
 
-    function testSubnetActorDiamond_Join_Works_LessThanMinStake() public {
-        uint256 n = 10;
-
-        (address[] memory validators, uint256[] memory privKeys, bytes[] memory publicKeys) = TestUtils.newValidators(
-            n
-        );
-
-        for (uint i = 0; i < n; i++) {
-            vm.deal(validators[i], 100 * DEFAULT_MIN_VALIDATOR_STAKE);
-        }
-
-        vm.prank(validators[0]);
-        saManager.join{value: 100 * DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0]);
-
-        for (uint i = 1; i < n; i++) {
-            vm.prank(validators[i]);
-            saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE - 1}(publicKeys[i]);
-        }
-
-        confirmChange(validators[0], privKeys[0]);
-
-        for (uint i = 0; i < n; i++) {
-            require(saGetter.isActiveValidator(validators[i]), "not active validator");
-        }
-    }
-
     function testSubnetActorDiamond_Join_Works_WithMinimalStake() public {
         uint256 n = 10;
 
@@ -1267,14 +1243,13 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE * 2);
-        vm.startPrank(validator1);
+        vm.prank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
 
-        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(100);
+        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
         vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
-        vm.startPrank(validator2);
+        vm.prank(validator2);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2);
-        vm.stopPrank();
 
         require(saGetter.isActiveValidator(validator1), "not active validator 1");
         require(saGetter.isActiveValidator(validator2), "not active validator 2");
@@ -1282,6 +1257,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // cannot join after bootstrap
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
+        vm.prank(validator1);
         saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
@@ -1291,6 +1267,38 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         powers[1] = 20000;
         powers[2] = 5000; // we only have 2 active validators, validator 2 does not have enough power
         saManager.setFederatedPower(validators, publicKeys, powers);
+    }
+
+    function testSubnetActorDiamond_registration_policy() public {
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_NOT_JOINED));
+        vm.prank(validator1);
+        saManager.stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}();
+
+        vm.prank(validator1);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
+
+        require(saGetter.isActiveValidator(validator1), "active validator 1");
+        require(!saGetter.bootstrapped(), "subnet bootstrapped");
+
+        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_JOINED));
+        vm.prank(validator1);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
+
+        vm.prank(validator1);
+        saManager.stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}();
+
+        require(saGetter.isActiveValidator(validator1), "active validator 1");
+
+        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
+        vm.prank(validator2);
+        saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2);
+
+        require(saGetter.isActiveValidator(validator1), "not active validator 1");
+        require(saGetter.bootstrapped(), "subnet not bootstrapped");
     }
 
     function testSubnetActorDiamond_FederatedValidation_bootstrapWorks() public {

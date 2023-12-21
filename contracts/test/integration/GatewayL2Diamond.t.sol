@@ -13,7 +13,7 @@ import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../src/GatewayDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {GatewayRouterFacet} from "../../src/gateway/GatewayRouterFacet.sol";
+import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
@@ -31,11 +31,11 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
         path2[1] = CHILD_NETWORK_ADDRESS_2;
 
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
-
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
+
         gwGetter = GatewayGetterFacet(address(gatewayDiamond));
         gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwRouter = GatewayRouterFacet(address(gatewayDiamond));
+        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
         gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
         gwCutter = DiamondCutFacet(address(gatewayDiamond));
@@ -50,7 +50,6 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path2}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: DEFAULT_CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
@@ -88,7 +87,7 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
-        gwRouter.applyCrossMessages(topDownMsgs);
+        gwXnetMessagingFacet.applyCrossMessages(topDownMsgs);
         require(gwGetter.getSubnetTopDownMsgsLength(id) == 0, "unexpected top-down message");
         (bool ok, uint64 tdn) = gwGetter.getAppliedTopDownNonce(id);
         require(!ok && tdn == 0, "unexpected nonce");
@@ -172,7 +171,7 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
         msgs[0] = crossMsg;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwRouter.applyCrossMessages(msgs);
+        gwXnetMessagingFacet.applyCrossMessages(msgs);
 
         return crossMsg.toHash();
     }

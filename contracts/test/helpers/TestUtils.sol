@@ -28,16 +28,6 @@ library TestUtils {
         return abi.encodePacked(uint8(0x4), pubKeyX, pubKeyY);
     }
 
-    function generateSelectors(Vm vm, string memory facetName) internal returns (bytes4[] memory facetSelectors) {
-        string[] memory inputs = new string[](3);
-        inputs[0] = "python3";
-        inputs[1] = "scripts/python/get_selectors.py";
-        inputs[2] = facetName;
-
-        bytes memory res = vm.ffi(inputs);
-        facetSelectors = abi.decode(res, (bytes4[]));
-    }
-
     function getFourValidators(
         Vm vm
     ) internal returns (uint256[] memory validatorKeys, address[] memory addresses, uint256[] memory weights) {

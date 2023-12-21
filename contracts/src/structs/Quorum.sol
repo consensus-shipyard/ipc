@@ -3,11 +3,13 @@ pragma solidity 0.8.19;
 
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
+/// @notice A kind of quorum.
 enum QuorumObjKind {
     Checkpoint,
     BottomUpMsgBatch
 }
 
+/// @notice Checkpoint quorum information.
 struct QuorumInfo {
     /// @dev The hash of the corresponding bottom-up checkpoint.
     bytes32 hash;
@@ -21,6 +23,7 @@ struct QuorumInfo {
     bool reached;
 }
 
+/// @notice A type aggregating quorum related information.
 struct QuorumMap {
     /// @notice flags the type of object we are running a quorum over.
     QuorumObjKind quorumObjKind;
