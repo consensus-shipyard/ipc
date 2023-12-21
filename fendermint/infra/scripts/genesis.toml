@@ -32,7 +32,7 @@ env = { "ENTRY" = "fendermint", "CMD" = """genesis --genesis-file /data/genesis.
     --bottom-up-check-period 10 \
     --msg-fee 10 \
     --majority-percentage 67 \
-    --min-collateral 1""" }
+    """ }
 
 [tasks.genesis-write]
 extend = "fendermint-tool"
