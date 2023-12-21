@@ -5,7 +5,6 @@ import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {BottomUpCheckpoint} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
-import {Status} from "../../enums/Status.sol";
 import {Subnet} from "../../structs/Subnet.sol";
 import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
@@ -36,10 +35,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
         }
         if (!checkpoint.subnetID.equals(subnet.id)) {
             revert InvalidSubnet();
-        }
-        // only active subnets can commit checkpoints
-        if (subnet.status != Status.Active) {
-            revert SubnetNotActive();
         }
 
         if (s.checkpointRelayerRewards) {

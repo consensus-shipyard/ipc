@@ -1167,32 +1167,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
     }
 
-    function testSubnetActorDiamond_Join_Works_LessThanMinStake() public {
-        uint256 n = 10;
-
-        (address[] memory validators, uint256[] memory privKeys, bytes[] memory publicKeys) = TestUtils.newValidators(
-            n
-        );
-
-        for (uint i = 0; i < n; i++) {
-            vm.deal(validators[i], 100 * DEFAULT_MIN_VALIDATOR_STAKE);
-        }
-
-        vm.prank(validators[0]);
-        saManager.join{value: 100 * DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0]);
-
-        for (uint i = 1; i < n; i++) {
-            vm.prank(validators[i]);
-            saManager.join{value: DEFAULT_MIN_VALIDATOR_STAKE - 1}(publicKeys[i]);
-        }
-
-        confirmChange(validators[0], privKeys[0]);
-
-        for (uint i = 0; i < n; i++) {
-            require(saGetter.isActiveValidator(validators[i]), "not active validator");
-        }
-    }
-
     function testSubnetActorDiamond_Join_Works_WithMinimalStake() public {
         uint256 n = 10;
 

@@ -7,7 +7,6 @@ import "../../src/errors/IPCErrors.sol";
 import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
 import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
-import {Status} from "../../src/enums/Status.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
@@ -67,7 +66,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         address caller = vm.addr(1);
         vm.deal(caller, 100);
 
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
 
         vm.prank(caller);
         vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);

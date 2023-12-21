@@ -7,7 +7,6 @@ import "../../src/errors/IPCErrors.sol";
 import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
 import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {Status} from "../../src/enums/Status.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
@@ -51,8 +50,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_Constructor() public view {
         require(gwGetter.totalSubnets() == 0, "unexpected totalSubnets");
         require(gwGetter.bottomUpNonce() == 0, "unexpected bottomUpNonce");
-        require(gwGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "unexpected minStake");
-
         require(gwGetter.crossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected crossMsgFee");
         require(gwGetter.bottomUpCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD, "unexpected bottomUpCheckPeriod");
         require(
@@ -163,7 +160,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
             msgFee: DEFAULT_CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -176,7 +172,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory networkName = depGetter.getNetworkName();
 
         require(networkName.isRoot(), "unexpected networkName");
-        require(depGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "gw.minStake() == MIN_COLLATERAL_AMOUNT");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
         require(
             depGetter.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE,
@@ -199,7 +194,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
             msgFee: DEFAULT_CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: 100,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -231,13 +225,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory networkName = depGetter.getNetworkName();
 
         require(networkName.isRoot() == false, "unexpected networkName");
-        require(depGetter.minStake() == DEFAULT_COLLATERAL_AMOUNT, "unexpected minStake");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "unexpected bottomUpCheckPeriod");
         require(depGetter.majorityPercentage() == 100, "unexpected majorityPercentage");
     }
 
     function testGatewayDiamond_Register_Works_SingleSubnet(uint256 subnetCollateral) public {
-        vm.assume(subnetCollateral >= DEFAULT_COLLATERAL_AMOUNT && subnetCollateral < type(uint64).max);
+        vm.assume(subnetCollateral < type(uint64).max);
         address subnetAddress = vm.addr(100);
         vm.prank(subnetAddress);
         vm.deal(subnetAddress, subnetCollateral);
@@ -253,10 +246,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         require(ok, "subnet not found");
 
-        (SubnetID memory id, uint256 stake, , , , Status status) = getSubnet(subnetAddress);
+        (SubnetID memory id, uint256 stake, , , ) = getSubnet(subnetAddress);
 
-        require(targetSubnet.status == Status.Active, "unexpected status");
-        require(targetSubnet.status == status, "unexpected status value");
         require(targetSubnet.stake == stake, "unexpected stake");
         require(targetSubnet.stake == subnetCollateral, "unexpected collateral");
         require(id.equals(subnetId), "unexpected id");
@@ -288,7 +279,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
     function testGatewayDiamond_AddStake_Works_SingleStaking(uint256 stakeAmount, uint256 registerAmount) public {
         address subnetAddress = vm.addr(100);
-        vm.assume(registerAmount >= DEFAULT_COLLATERAL_AMOUNT && registerAmount < type(uint64).max);
+        vm.assume(registerAmount < type(uint64).max);
         vm.assume(stakeAmount > 0 && stakeAmount < type(uint256).max - registerAmount);
 
         uint256 totalAmount = stakeAmount + registerAmount;
@@ -299,7 +290,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(registerAmount, subnetAddress);
         addStake(stakeAmount, subnetAddress);
 
-        (, uint256 totalStaked, , , , ) = getSubnet(subnetAddress);
+        (, uint256 totalStaked, , , ) = getSubnet(subnetAddress);
 
         require(totalStaked == totalAmount, "unexpected staked amount");
     }
@@ -315,16 +306,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(registerAmount, subnetAddress);
         gwManager.releaseStake(registerAmount);
 
-        (, , , , , Status statusInactive) = getSubnet(subnetAddress);
-        require(statusInactive == Status.Inactive, "unexpected status");
-
         vm.deal(subnetAddress, stakeAmount);
         addStake(stakeAmount, subnetAddress);
 
-        (, uint256 staked, , , , Status statusActive) = getSubnet(subnetAddress);
+        (, uint256 staked, , , ) = getSubnet(subnetAddress);
 
         require(staked == stakeAmount, "unexpected amount");
-        require(statusActive == Status.Active, "not active status");
     }
 
     function testGatewayDiamond_AddStake_Works_NotEnoughFundsToReactivate() public {
@@ -341,10 +328,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(subnetAddress, stakeAmount);
         addStake(stakeAmount, subnetAddress);
 
-        (, uint256 staked, , , , Status status) = getSubnet(subnetAddress);
+        (, uint256 staked, , , ) = getSubnet(subnetAddress);
 
         require(staked == stakeAmount, "unexpected amount");
-        require(status == Status.Inactive, "unexpected inactive status");
     }
 
     function testGatewayDiamond_AddStake_Works_MultipleStakings(uint8 numberOfStakes) public {
@@ -366,7 +352,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             expectedStakedAmount += singleStakeAmount;
         }
 
-        (, uint256 totalStake, , , , ) = getSubnet(subnetAddress);
+        (, uint256 totalStake, , , ) = getSubnet(subnetAddress);
 
         require(totalStake == expectedStakedAmount, "unexpected stake");
     }
@@ -401,10 +387,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         gwManager.releaseStake(fullAmount);
 
-        (, uint256 stake, , , , Status status) = getSubnet(subnetAddress);
+        (, uint256 stake, , , ) = getSubnet(subnetAddress);
 
         require(stake == 0, "unexpected stake");
-        require(status == Status.Inactive, "unexpected status");
         require(subnetAddress.balance == fullAmount, "unexpected balance");
     }
 
@@ -416,9 +401,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         gwManager.releaseStake(DEFAULT_COLLATERAL_AMOUNT / 2);
 
-        (, uint256 stake, , , , Status status) = getSubnet(subnetAddress);
+        (, uint256 stake, , , ) = getSubnet(subnetAddress);
         require(stake == DEFAULT_COLLATERAL_AMOUNT / 2, "unexpected stake");
-        require(status == Status.Inactive, "unexpected status");
     }
 
     function testGatewayDiamond_ReleaseStake_Works_PartialAmount(uint256 partialAmount) public {
@@ -437,10 +421,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         gwManager.releaseStake(partialAmount);
 
-        (, uint256 stake, , , , Status status) = getSubnet(subnetAddress);
+        (, uint256 stake, , , ) = getSubnet(subnetAddress);
 
         require(stake == registerAmount, "unexpected stake");
-        require(status == Status.Active, "unexpected status");
         require(subnetAddress.balance == partialAmount, "unexpected balance");
     }
 
@@ -486,10 +469,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         gwManager.releaseStake(10);
 
-        (, uint256 stake, , , , Status status) = getSubnet(subnetAddress);
+        (, uint256 stake, , , ) = getSubnet(subnetAddress);
 
         require(stake == DEFAULT_COLLATERAL_AMOUNT - 10, "unexpected stake");
-        require(status == Status.Inactive, "unexpected status");
     }
 
     function testGatewayDiamond_Kill_Works() public {
@@ -504,15 +486,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         gwManager.kill();
 
-        (SubnetID memory id, uint256 stake, uint256 nonce, , uint256 circSupply, Status status) = getSubnet(
-            subnetAddress
-        );
+        (SubnetID memory id, uint256 stake, uint256 nonce, , uint256 circSupply) = getSubnet(subnetAddress);
 
         require(id.toHash() == SubnetID(0, new address[](0)).toHash(), "unexpected ID hash");
         require(stake == 0, "unexpected stake");
         require(nonce == 0, "unexpected nonce");
         require(circSupply == 0, "unexpected circSupply");
-        require(status == Status.Unset, "unexpected status");
         require(gwGetter.totalSubnets() == 0, "unexpected total subnets");
         require(subnetAddress.balance == DEFAULT_COLLATERAL_AMOUNT, "unexpected balance");
     }
@@ -649,7 +628,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         address funderAddress = address(101);
 
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
 
         vm.expectRevert(InvalidCrossMsgValue.selector);
         gwManager.fund{value: 0}(subnetId, FvmAddressHelper.from(funderAddress));
@@ -684,7 +663,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(funderAddress, amount);
 
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
         vm.prank(funderAddress);
         gwManager.fund{value: amount}(subnetId, FvmAddressHelper.from(msg.sender));
     }
@@ -755,7 +734,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: DEFAULT_CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -791,7 +769,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -825,7 +802,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -860,7 +836,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: crossMsgFee,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -1276,7 +1251,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         vm.stopPrank();
 
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: subnetId,
@@ -1729,7 +1704,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         vm.stopPrank();
 
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
 
         BottomUpMsgBatch memory batch = BottomUpMsgBatch({
             subnetID: subnetId,
@@ -2098,7 +2073,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         uint256 amount = 1;
 
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
         (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
         require(exist, "subnet does not exist");
         require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
@@ -2147,7 +2122,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         uint256 amount = 1;
 
-        (SubnetID memory subnetId, , , , , ) = getSubnet(address(caller));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
         (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
         require(exist, "subnet does not exist");
         require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
@@ -2202,7 +2177,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: DEFAULT_CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100

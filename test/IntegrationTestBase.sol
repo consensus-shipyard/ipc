@@ -7,7 +7,6 @@ import "../src/errors/IPCErrors.sol";
 
 import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
-import {Status} from "../src/enums/Status.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
@@ -126,7 +125,6 @@ contract TestGatewayActor is Test, TestParams {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: DEFAULT_CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
@@ -653,7 +651,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
     function fund(address funderAddress, uint256 fundAmount, SupplyKind mode) public {
         // funding subnets is free, we do not need cross msg fee
-        (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore, ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore) = getSubnet(address(saManager));
 
         uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
         uint256 expectedNonce = nonceBefore + 1;
@@ -667,7 +665,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             gwManager.fundWithToken(subnetId, FvmAddressHelper.from(funderAddress), fundAmount);
         }
 
-        (, , uint256 nonce, , uint256 circSupply, ) = getSubnet(address(saManager));
+        (, , uint256 nonce, , uint256 circSupply) = getSubnet(address(saManager));
 
         require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength, "unexpected lengths");
 
@@ -764,12 +762,12 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function addStake(uint256 stakeAmount, address subnetAddress) public {
         uint256 balanceBefore = subnetAddress.balance;
 
-        (, uint256 stakedBefore, , , , ) = getSubnet(subnetAddress);
+        (, uint256 stakedBefore, , , ) = getSubnet(subnetAddress);
 
         gwManager.addStake{value: stakeAmount}();
 
         uint256 balanceAfter = subnetAddress.balance;
-        (, uint256 stakedAfter, , , , ) = getSubnet(subnetAddress);
+        (, uint256 stakedAfter, , , ) = getSubnet(subnetAddress);
 
         require(balanceAfter == balanceBefore - stakeAmount, "unexpected balance");
         require(stakedAfter == stakedBefore + stakeAmount, "unexpected stake");
@@ -780,7 +778,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         manager.register{value: collateral}(0);
 
-        (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply, Status status) = getSubnetGW(
+        (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply) = getSubnetGW(
             subnetAddress,
             gw
         );
@@ -794,7 +792,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         require(stake == collateral, "unexpected stake");
         require(topDownNonce == 0, "unexpected nonce");
         require(circSupply == 0, "unexpected circSupply");
-        require(status == Status.Active, "unexpected status");
     }
 
     function registerSubnet(uint256 collateral, address subnetAddress) public {
@@ -804,7 +801,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function getSubnetGW(
         address subnetAddress,
         GatewayDiamond gw
-    ) public returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
+    ) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         gwManager = GatewayManagerFacet(address(gw));
         gwGetter = GatewayGetterFacet(address(gw));
 
@@ -812,19 +809,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
 
-        return (
-            subnet.id,
-            subnet.stake,
-            subnet.topDownNonce,
-            subnet.appliedBottomUpNonce,
-            subnet.circSupply,
-            subnet.status
-        );
+        return (subnet.id, subnet.stake, subnet.topDownNonce, subnet.appliedBottomUpNonce, subnet.circSupply);
     }
 
-    function getSubnet(
-        address subnetAddress
-    ) public returns (SubnetID memory, uint256, uint256, uint256, uint256, Status) {
+    function getSubnet(address subnetAddress) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
     }
 }

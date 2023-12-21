@@ -5,7 +5,6 @@ import {ISubnetActor} from "../../interfaces/ISubnetActor.sol";
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {BottomUpMsgBatch} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
-import {Status} from "../../enums/Status.sol";
 import {BatchNotCreated, BatchAlreadyExists, InvalidBatchEpoch, NotEnoughSubnetCircSupply, SubnetNotActive, SubnetNotFound, InvalidBatchSource, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCrossMsgDstSubnet, NotRegisteredSubnet, InvalidCrossMsgNonce} from "../../errors/IPCErrors.sol";
 import {Subnet} from "../../structs/Subnet.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
@@ -44,10 +43,6 @@ contract BottomUpRouterFacet is GatewayActorModifiers {
         (bool subnetExists, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
         if (!subnetExists) {
             revert SubnetNotFound();
-        }
-        // cross-net messages can't be executed in inactive subnets.
-        if (subnet.status != Status.Active) {
-            revert SubnetNotActive();
         }
 
         uint256 totalValue;

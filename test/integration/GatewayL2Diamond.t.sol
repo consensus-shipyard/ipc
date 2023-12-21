@@ -50,7 +50,6 @@ contract GatewayL2ActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path2}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             msgFee: DEFAULT_CROSS_MSG_FEE,
-            minCollateral: DEFAULT_COLLATERAL_AMOUNT,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT

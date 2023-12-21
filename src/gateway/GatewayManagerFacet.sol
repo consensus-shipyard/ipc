@@ -5,7 +5,6 @@ import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {CrossMsg} from "../structs/CrossNet.sol";
-import {Status} from "../enums/Status.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {Membership, SupplyKind} from "../structs/Subnet.sol";
@@ -50,7 +49,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         subnet.id = subnetId;
         subnet.stake = collateral;
-        subnet.status = Status.Active;
         subnet.genesisEpoch = block.number;
         subnet.circSupply = genesisCircSupply;
 
@@ -72,12 +70,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
 
         subnet.stake += msg.value;
-
-        if (subnet.status == Status.Inactive) {
-            if (subnet.stake >= s.minStake) {
-                subnet.status = Status.Active;
-            }
-        }
     }
 
     /// @notice release collateral for an existing subnet.
@@ -99,9 +91,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         subnet.stake -= amount;
 
-        if (subnet.stake < s.minStake) {
-            subnet.status = Status.Inactive;
-        }
         payable(subnet.id.getActor()).sendValue(amount);
     }
 
