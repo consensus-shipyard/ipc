@@ -1,20 +1,17 @@
 .PHONY: all build test lint license check-fmt check-clippy diagrams install-infra clean-infra
 
-IPC_ACTORS_DIR := $(PWD)/../contracts
-IPC_ACTORS_OUT := $(IPC_ACTORS_DIR)/out
-
 all: test build
 
-build: $(IPC_ACTORS_OUT)
+build:
 	cargo build --release -p ipc-cli && mkdir -p bin/ && cp target/release/ipc-cli ./bin/ipc-cli
 
-test: $(IPC_ACTORS_OUT)
+test:
 	cargo test --release --package 'ipc-*'
 
-itest: $(IPC_ACTORS_OUT)
+itest:
 	cargo test -p itest --test checkpoint -- --nocapture
 
-e2e: $(IPC_ACTORS_OUT)
+e2e:
 	cargo test --release -p ipc_e2e
 
 clean:
@@ -34,7 +31,7 @@ check-fmt:
 	@# `nightly` is required to support ignore list in rustfmt.toml
 	cargo +nightly fmt --all --check
 
-check-clippy: $(IPC_ACTORS_OUT)
+check-clippy:
 	cargo clippy --all --tests -- -D clippy::all
 
 diagrams:
@@ -45,7 +42,3 @@ check-diagrams: diagrams
 		echo "There are uncommitted changes to the diagrams"; \
 		exit 1; \
 	fi
-
-# Regenerate the ABI artifacts if we don't have them already, or they changed.
-$(IPC_ACTORS_OUT):
-	cd $(IPC_ACTORS_DIR) && make compile-abi

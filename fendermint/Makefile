@@ -6,7 +6,7 @@ BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
 IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f \( -name "*.sol" \))
-IPC_ACTORS_GEN				:= .contracts-gen
+IPC_ACTORS_GEN        := .contracts-gen
 
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
 
@@ -89,6 +89,8 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 # which means we are not tied to the release cycle of both FVM _and_ actors;
 # so long as they work together.
 actor-bundle: $(BUILTIN_ACTORS_BUNDLE)
+
+compile-abi: $(IPC_ACTORS_GEN)
 
 # Download a released builtin-actors bundle CAR file.
 $(BUILTIN_ACTORS_BUNDLE):
