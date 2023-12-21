@@ -1,12 +1,15 @@
 .PHONY: all build test lint license check-fmt check-clippy diagrams
 
+CRATE   := ipc_ipld_resolver
+PACKAGE := $(patsubst %, --package %, $(CRATE))
+
 all: test build
 
 build:
 	cargo build -Z unstable-options --release
 
 test:
-	cargo test --release --package ipc_ipld_resolver
+	cargo test --release $(PACKAGE)
 
 clean:
 	cargo clean
@@ -16,10 +19,10 @@ lint: \
 	check-clippy
 
 check-fmt:
-	cargo +nightly fmt --all --check
+	cargo +nightly fmt $(PACKAGE) --check
 
 check-clippy:
-	cargo clippy --all --tests -- -D clippy::all
+	cargo clippy $(PACKAGE) --tests --no-deps -- -D clippy::all
 
 diagrams:
 	$(MAKE) -C docs/diagrams

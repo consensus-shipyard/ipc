@@ -1,11 +1,14 @@
+CRATE   := primitives
+PACKAGE := $(patsubst %, --package %, $(CRATE))
+
 test:
-	cargo test --release --package primitives --package "fil_*"
+	cargo test --release $(PACKAGE)
 
 check-fmt:
-	cargo +nightly fmt --all --check
+	cargo +nightly fmt $(PACKAGE) --check
 
 check-clippy:
-	cargo clippy --all --tests -- -D clippy::all
+	cargo clippy $(PACKAGE) --tests --no-deps -- -D clippy::all
 
 
 lint: \
