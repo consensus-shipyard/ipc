@@ -9,8 +9,8 @@
 use crate::subnet_id::SubnetID;
 use anyhow::anyhow;
 use fvm_ipld_encoding::repr::*;
-use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
+use serde::{Deserialize, Serialize};
 
 /// ID used in the builtin-actors bundle manifest
 pub const MANIFEST_ID: &str = "ipc_subnet_actor";
@@ -28,7 +28,7 @@ pub enum PermissionMode {
 }
 
 /// Defines the supply source of a subnet on its parent subnet.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SupplySource {
     /// The kind of supply.
     pub kind: SupplyKind,
@@ -44,7 +44,7 @@ pub enum SupplyKind {
     ERC20,
 }
 
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConstructParams {
     pub parent: SubnetID,
     pub ipc_gateway_addr: Address,
@@ -74,6 +74,18 @@ impl TryFrom<u8> for PermissionMode {
             1 => PermissionMode::Federated,
             2 => PermissionMode::Static,
             _ => return Err(anyhow!("unknown permission mode {value}")),
+        })
+    }
+}
+
+impl TryFrom<u8> for SupplyKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => SupplyKind::Native,
+            1 => SupplyKind::ERC20,
+            _ => return Err(anyhow!("unknown supply kind {value}")),
         })
     }
 }

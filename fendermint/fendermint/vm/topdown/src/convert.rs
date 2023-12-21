@@ -5,9 +5,9 @@
 use crate::IPCParentFinality;
 use anyhow::anyhow;
 use ethers::types::U256;
-use ipc_actors_abis::{gateway_getter_facet, gateway_router_facet};
+use ipc_actors_abis::{gateway_getter_facet, top_down_finality_facet};
 
-impl TryFrom<IPCParentFinality> for gateway_router_facet::ParentFinality {
+impl TryFrom<IPCParentFinality> for top_down_finality_facet::ParentFinality {
     type Error = anyhow::Error;
 
     fn try_from(value: IPCParentFinality) -> Result<Self, Self::Error> {
@@ -34,8 +34,8 @@ impl From<gateway_getter_facet::ParentFinality> for IPCParentFinality {
     }
 }
 
-impl From<gateway_router_facet::ParentFinality> for IPCParentFinality {
-    fn from(value: gateway_router_facet::ParentFinality) -> Self {
+impl From<top_down_finality_facet::ParentFinality> for IPCParentFinality {
+    fn from(value: top_down_finality_facet::ParentFinality) -> Self {
         IPCParentFinality {
             height: value.height.as_u64(),
             block_hash: value.block_hash.to_vec(),

@@ -13,7 +13,7 @@ use fendermint_vm_genesis::{Power, Validator};
 use fvm_shared::address::Error as AddressError;
 use fvm_shared::address::Payload;
 use ipc_actors_abis as ia;
-pub use ipc_actors_abis::gateway_router_facet::BottomUpCheckpoint;
+pub use ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint;
 use ipc_sdk::subnet_id::SubnetID;
 use lazy_static::lazy_static;
 use merkle_tree_rs::{
@@ -49,8 +49,16 @@ lazy_static! {
                             abi: ia::gateway_manager_facet::GATEWAYMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "GatewayRouterFacet",
-                            abi: ia::gateway_router_facet::GATEWAYROUTERFACET_ABI.to_owned(),
+                            name: "BottomUpRouterFacet",
+                            abi: ia::bottom_up_router_facet::BOTTOMUPROUTERFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "TopDownFinalityFacet",
+                            abi: ia::top_down_finality_facet::TOPDOWNFINALITYFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "CheckpointingFacet",
+                            abi: ia::checkpointing_facet::CHECKPOINTINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "GatewayMessengerFacet",
@@ -256,7 +264,7 @@ macro_rules! abi_hash {
     };
 }
 
-abi_hash!(struct ipc_actors_abis::gateway_router_facet::BottomUpCheckpoint);
+abi_hash!(struct ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint);
 abi_hash!(struct ipc_actors_abis::subnet_actor_manager_facet::BottomUpCheckpoint);
 abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::CrossMsg>);
 abi_hash!(Vec<ipc_actors_abis::subnet_actor_manager_facet::CrossMsg>);
@@ -271,8 +279,8 @@ pub mod gateway {
     use fvm_shared::address::Error as AddressError;
     use fvm_shared::econ::TokenAmount;
 
+    use ipc_actors_abis::gateway_diamond::SubnetID as GatewaySubnetID;
     pub use ipc_actors_abis::gateway_getter_facet::Validator as GatewayValidator;
-    use ipc_actors_abis::gateway_router_facet::SubnetID as GatewaySubnetID;
 
     use crate::eam::EthAddress;
 
@@ -288,8 +296,7 @@ pub mod gateway {
     #[derive(Clone, EthAbiType, EthAbiCodec, Default, Debug, PartialEq, Eq, Hash)]
     pub struct ConstructorParameters {
         pub network_name: GatewaySubnetID,
-        pub bottom_up_check_period: u64,
-        pub min_collateral: U256,
+        pub bottom_up_check_period: U256,
         pub msg_fee: U256,
         pub majority_percentage: u8,
         pub validators: Vec<GatewayValidator>,
@@ -300,7 +307,7 @@ pub mod gateway {
         pub fn new(
             params: GatewayParams,
             validators: Vec<Validator<Collateral>>,
-        ) -> Result<Self, AddressError> {
+        ) -> anyhow::Result<Self> {
             // Every validator has an Ethereum address.
             let validators = validators
                 .into_iter()
@@ -320,8 +327,7 @@ pub mod gateway {
 
             Ok(Self {
                 network_name: GatewaySubnetID { root, route },
-                bottom_up_check_period: params.bottom_up_check_period,
-                min_collateral: tokens_to_u256(params.min_collateral),
+                bottom_up_check_period: U256::from(params.bottom_up_check_period),
                 msg_fee: tokens_to_u256(params.msg_fee),
                 majority_percentage: params.majority_percentage,
                 validators,
@@ -343,8 +349,8 @@ pub mod gateway {
             types::{Bytes, H160},
         };
         use fvm_shared::{bigint::BigInt, econ::TokenAmount};
+        use ipc_actors_abis::gateway_diamond::SubnetID as GatewaySubnetID;
         use ipc_actors_abis::gateway_getter_facet::Validator as GatewayValidator;
-        use ipc_actors_abis::gateway_router_facet::SubnetID as GatewaySubnetID;
         use std::str::FromStr;
 
         use crate::ipc::tests::{check_param_types, constructor_param_types};
@@ -358,8 +364,7 @@ pub mod gateway {
                     root: 0,
                     route: Vec::new(),
                 },
-                bottom_up_check_period: 100,
-                min_collateral: U256::from(1),
+                bottom_up_check_period: U256::from(100),
                 msg_fee: U256::from(0),
                 majority_percentage: 67,
                 validators: vec![GatewayValidator {
@@ -422,9 +427,11 @@ pub mod registry {
 
 pub mod subnet {
     use crate::revert_errors;
+    use ipc_actors_abis::bottom_up_router_facet::BottomUpRouterFacetErrors;
+    use ipc_actors_abis::checkpointing_facet::CheckpointingFacetErrors;
     use ipc_actors_abis::gateway_manager_facet::GatewayManagerFacetErrors;
-    use ipc_actors_abis::gateway_router_facet::GatewayRouterFacetErrors;
     use ipc_actors_abis::subnet_actor_manager_facet::SubnetActorManagerFacetErrors;
+    use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacetErrors;
 
     pub const CONTRACT_NAME: &str = "SubnetActorDiamond";
 
@@ -433,7 +440,9 @@ pub mod subnet {
         SubnetActorErrors {
             SubnetActorManagerFacetErrors,
             GatewayManagerFacetErrors,
-            GatewayRouterFacetErrors
+            CheckpointingFacetErrors,
+            BottomUpRouterFacetErrors,
+            TopDownFinalityFacetErrors
         }
     }
 
@@ -457,16 +466,12 @@ pub mod subnet {
                     .map(|h| h.parse().unwrap())
                     .collect(),
                 },
-                block_height: 21,
+                block_height: ethers::types::U256::from(21),
                 block_hash: [
                     107, 115, 111, 52, 42, 179, 77, 154, 254, 66, 52, 169, 43, 219, 25, 12, 53,
                     178, 232, 216, 34, 217, 96, 27, 0, 185, 215, 8, 155, 25, 15, 1,
                 ],
                 next_configuration_number: 1,
-                cross_messages_hash: [
-                    86, 158, 117, 252, 119, 193, 168, 86, 246, 218, 175, 158, 105, 216, 169, 86,
-                    108, 163, 74, 164, 127, 145, 51, 113, 28, 224, 101, 165, 113, 175, 12, 253,
-                ],
             };
 
             let param_type = BottomUpCheckpoint::param_type();

@@ -7,7 +7,7 @@ pub use lib_staking_change_log::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod lib_staking_change_log {
     #[allow(deprecated)]
@@ -15,64 +15,53 @@ pub mod lib_staking_change_log {
         ::ethers::core::abi::ethabi::Contract {
             constructor: ::core::option::Option::None,
             functions: ::std::collections::BTreeMap::new(),
-            events: ::core::convert::From::from([
-                (
-                    ::std::borrow::ToOwned::to_owned("NewStakingChangeRequest"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Event {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "NewStakingChangeRequest",
-                            ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::EventParam {
-                                    name: ::std::borrow::ToOwned::to_owned("op"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    indexed: false,
-                                },
-                                ::ethers::core::abi::ethabi::EventParam {
-                                    name: ::std::borrow::ToOwned::to_owned("validator"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    indexed: false,
-                                },
-                                ::ethers::core::abi::ethabi::EventParam {
-                                    name: ::std::borrow::ToOwned::to_owned("payload"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    indexed: false,
-                                },
-                                ::ethers::core::abi::ethabi::EventParam {
-                                    name: ::std::borrow::ToOwned::to_owned(
-                                        "configurationNumber",
-                                    ),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                    indexed: false,
-                                },
-                            ],
-                            anonymous: false,
+            events: ::core::convert::From::from([(
+                ::std::borrow::ToOwned::to_owned("NewStakingChangeRequest"),
+                ::std::vec![::ethers::core::abi::ethabi::Event {
+                    name: ::std::borrow::ToOwned::to_owned("NewStakingChangeRequest",),
+                    inputs: ::std::vec![
+                        ::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("op"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                            indexed: false,
+                        },
+                        ::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("validator"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            indexed: false,
+                        },
+                        ::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("payload"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                            indexed: false,
+                        },
+                        ::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("configurationNumber",),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                            indexed: false,
                         },
                     ],
-                ),
-            ]),
+                    anonymous: false,
+                },],
+            )]),
             errors: ::std::collections::BTreeMap::new(),
             receive: false,
             fallback: false,
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static LIBSTAKINGCHANGELOG_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(__abi);
+    pub static LIBSTAKINGCHANGELOG_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`:\x90\x81`\x1D\x8290\x81PP\xF3[`\0\x80\xFD\xFE`\0\x80\xFD\xFE\xA2dipfsX\"\x12 +z\xB6\x83\xC1H!\x19\xD7\x92\xCE\xBA\xB2\xA7\xF6\xACR\x11\xF1\x8A\xEF\xCE\xE2\xD9\x97\xB5\x9A\xB8\xF4$\x9F:dsolcC\0\x08\x13\x003";
     /// The bytecode of the contract.
-    pub static LIBSTAKINGCHANGELOG_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static LIBSTAKINGCHANGELOG_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = b"`\0\x80\xFD\xFE\xA2dipfsX\"\x12 +z\xB6\x83\xC1H!\x19\xD7\x92\xCE\xBA\xB2\xA7\xF6\xACR\x11\xF1\x8A\xEF\xCE\xE2\xD9\x97\xB5\x9A\xB8\xF4$\x9F:dsolcC\0\x08\x13\x003";
     /// The deployed bytecode of the contract.
-    pub static LIBSTAKINGCHANGELOG_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static LIBSTAKINGCHANGELOG_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct LibStakingChangeLog<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for LibStakingChangeLog<M> {
         fn clone(&self) -> Self {
@@ -104,13 +93,11 @@ pub mod lib_staking_change_log {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    LIBSTAKINGCHANGELOG_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                LIBSTAKINGCHANGELOG_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -169,11 +156,13 @@ pub mod lib_staking_change_log {
             M,
             NewStakingChangeRequestFilter,
         > {
-            self.0.event_with_filter(::core::default::Default::default())
+            self.0
+                .event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for LibStakingChangeLog<M> {
+        for LibStakingChangeLog<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -186,7 +175,7 @@ pub mod lib_staking_change_log {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethevent(
         name = "NewStakingChangeRequest",

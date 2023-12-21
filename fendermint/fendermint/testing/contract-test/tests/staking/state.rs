@@ -62,13 +62,6 @@ pub struct StakingDistribution {
 }
 
 impl StakingDistribution {
-    /// Sum of all collaterals from active an inactive validators.
-    ///
-    /// Do not compare this against signature weights because it contains inactive ones!
-    pub fn total_collateral(&self) -> TokenAmount {
-        self.total_collateral.clone()
-    }
-
     /// Collateral of a validator.
     pub fn collateral(&self, addr: &EthAddress) -> TokenAmount {
         self.collaterals
@@ -229,23 +222,12 @@ impl StakingState {
 
         if !self.activated {
             self.checkpoint(configuration_number, 0);
-
-            let total_collateral = self.current_configuration.total_collateral();
-            let min_collateral = self.min_collateral();
-
-            if total_collateral >= min_collateral {
-                self.activated = true;
-                self.next_configuration_number = 1;
-            }
         }
     }
 
     /// Check if checkpoints can be sent to the system.
     pub fn can_checkpoint(&self) -> bool {
         if !self.activated {
-            return true;
-        }
-        if self.current_configuration.total_collateral() >= self.min_collateral() {
             return true;
         }
         false
@@ -295,15 +277,6 @@ impl StakingState {
             .ipc
             .as_ref()
             .map(|ipc| ipc.gateway.active_validators_limit)
-            .unwrap_or_default()
-    }
-
-    /// Minimum collateral required to activate the subnet.
-    pub fn min_collateral(&self) -> TokenAmount {
-        self.parent_genesis
-            .ipc
-            .as_ref()
-            .map(|ipc| ipc.gateway.min_collateral.clone())
             .unwrap_or_default()
     }
 
@@ -525,18 +498,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Choose an activation limit so that the last joiner activates it,
-        // simulating the effects of genesis.
-        let initial_stake = TokenAmount::from_atto(
-            current_configuration
-                .iter()
-                .map(|v| v.power.0.atto())
-                .sum::<BigInt>(),
-        );
-        let last_stake = &current_configuration.last().unwrap().power.0;
-        let min_collateral = initial_stake - last_stake
-            + choose_amount(u, last_stake)?.max(TokenAmount::from_atto(1));
-
         // IPC of the parent subnet itself - most are not going to be used.
         let parent_ipc = IpcParams {
             gateway: GatewayParams {
@@ -544,7 +505,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
                 msg_fee: ArbTokenAmount::arbitrary(u)?.0,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,
-                min_collateral,
                 active_validators_limit: 1 + u.choose_index(100)? as u16,
             },
         };
@@ -573,9 +533,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
                 msg_fee: ArbTokenAmount::arbitrary(u)?.0,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,
-                min_collateral: ArbTokenAmount::arbitrary(u)?
-                    .0
-                    .max(TokenAmount::from_atto(1)),
                 active_validators_limit: num_max_validators as u16,
             },
         };

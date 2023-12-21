@@ -7,7 +7,7 @@ pub use checkpointing_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod checkpointing_facet {
     #[allow(deprecated)]
@@ -17,407 +17,295 @@ pub mod checkpointing_facet {
             functions: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("addCheckpointSignature"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "addCheckpointSignature",
-                            ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("height"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("addCheckpointSignature",),
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("height"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("membershipProof"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                    ::std::boxed::Box::new(
+                                        ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
                                     ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("membershipProof"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
-                                        ),
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes32[]"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("weight"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("signature"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes"),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
+                                ),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bytes32[]"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("weight"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("signature"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bytes"),
+                                ),
+                            },
+                        ],
+                        outputs: ::std::vec![],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("commitCheckpoint"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned("commitCheckpoint"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("checkpoint"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                        ::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                        ::std::boxed::Box::new(
-                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                        ),
-                                                    ),
-                                                ],
-                                            ),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                        ],
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned(
-                                            "struct BottomUpCheckpoint",
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("commitCheckpoint"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("checkpoint"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
                                         ),
                                     ),
-                                },
-                            ],
-                            outputs: ::std::vec![],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
+                                ],),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                            ],),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("struct BottomUpCheckpoint",),
+                            ),
+                        },],
+                        outputs: ::std::vec![],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("createBottomUpCheckpoint"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "createBottomUpCheckpoint",
-                            ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("checkpoint"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                        ::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                        ::std::boxed::Box::new(
-                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                        ),
-                                                    ),
-                                                ],
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("createBottomUpCheckpoint",),
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("checkpoint"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Array(
+                                            ::std::boxed::Box::new(
+                                                ::ethers::core::abi::ethabi::ParamType::Address,
                                             ),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                        ],
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned(
-                                            "struct BottomUpCheckpoint",
                                         ),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned(
-                                        "membershipRootHash",
-                                    ),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
-                                        32usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bytes32"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("membershipWeight"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                ],),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("struct BottomUpCheckpoint",),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("membershipRootHash",),
+                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bytes32"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("membershipWeight"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                        ],
+                        outputs: ::std::vec![],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("pruneBottomUpCheckpoints"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "pruneBottomUpCheckpoints",
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("pruneBottomUpCheckpoints",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("newRetentionHeight",),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint256"),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned(
-                                        "newRetentionHeight",
-                                    ),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
-                                        256usize,
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint256"),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
+                        },],
+                        outputs: ::std::vec![],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
                 ),
             ]),
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("target"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("address"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("target"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "AddressInsufficientBalance",
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("account"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("account"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("address"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("CheckpointAlreadyExists"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CheckpointAlreadyExists",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("CheckpointAlreadyExists",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("CheckpointNotCreated"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CheckpointNotCreated",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("CheckpointNotCreated",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("FailedAddIncompleteQuorum"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "FailedAddIncompleteQuorum",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("FailedAddIncompleteQuorum",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("FailedAddSignatory"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("FailedAddSignatory"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("FailedAddSignatory"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("FailedRemoveIncompleteQuorum"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "FailedRemoveIncompleteQuorum",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("FailedRemoveIncompleteQuorum",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidActorAddress"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InvalidActorAddress",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidActorAddress",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidCheckpointEpoch"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InvalidCheckpointEpoch",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidCheckpointEpoch",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidCheckpointSource"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InvalidCheckpointSource",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidCheckpointSource",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidRetentionHeight"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InvalidRetentionHeight",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidRetentionHeight",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidSignature"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("InvalidSignature"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidSignature"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidSubnet"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("InvalidSubnet"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidSubnet"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotAuthorized"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotAuthorized"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("address"),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("NotAuthorized"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotSystemActor"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotSystemActor"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("NotSystemActor"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("QuorumAlreadyProcessed"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "QuorumAlreadyProcessed",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("QuorumAlreadyProcessed",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("SignatureReplay"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("SignatureReplay"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("SignatureReplay"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("SubnetNotFound"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("SubnetNotFound"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("SubnetNotFound"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ZeroMembershipWeight"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "ZeroMembershipWeight",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("ZeroMembershipWeight",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
             ]),
             receive: false,
@@ -425,9 +313,8 @@ pub mod checkpointing_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static CHECKPOINTINGFACET_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(__abi);
+    pub static CHECKPOINTINGFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(__abi);
     pub struct CheckpointingFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for CheckpointingFacet<M> {
         fn clone(&self) -> Self {
@@ -459,13 +346,11 @@ pub mod checkpointing_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    CHECKPOINTINGFACET_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                CHECKPOINTINGFACET_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `addCheckpointSignature` (0x53b4e7bf) function
         pub fn add_checkpoint_signature(
@@ -516,7 +401,8 @@ pub mod checkpointing_facet {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for CheckpointingFacet<M> {
+        for CheckpointingFacet<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -530,7 +416,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "AddressEmptyCode", abi = "AddressEmptyCode(address)")]
     pub struct AddressEmptyCode {
@@ -545,7 +431,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "AddressInsufficientBalance",
@@ -563,7 +449,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "CheckpointAlreadyExists", abi = "CheckpointAlreadyExists()")]
     pub struct CheckpointAlreadyExists;
@@ -576,7 +462,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "CheckpointNotCreated", abi = "CheckpointNotCreated()")]
     pub struct CheckpointNotCreated;
@@ -589,9 +475,12 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
-    #[etherror(name = "FailedAddIncompleteQuorum", abi = "FailedAddIncompleteQuorum()")]
+    #[etherror(
+        name = "FailedAddIncompleteQuorum",
+        abi = "FailedAddIncompleteQuorum()"
+    )]
     pub struct FailedAddIncompleteQuorum;
     ///Custom Error type `FailedAddSignatory` with signature `FailedAddSignatory()` and selector `0x3363140f`
     #[derive(
@@ -602,7 +491,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "FailedAddSignatory", abi = "FailedAddSignatory()")]
     pub struct FailedAddSignatory;
@@ -615,7 +504,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
     pub struct FailedInnerCall;
@@ -628,7 +517,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "FailedRemoveIncompleteQuorum",
@@ -644,7 +533,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidActorAddress", abi = "InvalidActorAddress()")]
     pub struct InvalidActorAddress;
@@ -657,7 +546,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidCheckpointEpoch", abi = "InvalidCheckpointEpoch()")]
     pub struct InvalidCheckpointEpoch;
@@ -670,7 +559,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidCheckpointSource", abi = "InvalidCheckpointSource()")]
     pub struct InvalidCheckpointSource;
@@ -683,7 +572,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidRetentionHeight", abi = "InvalidRetentionHeight()")]
     pub struct InvalidRetentionHeight;
@@ -696,7 +585,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidSignature", abi = "InvalidSignature()")]
     pub struct InvalidSignature;
@@ -709,7 +598,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidSubnet", abi = "InvalidSubnet()")]
     pub struct InvalidSubnet;
@@ -722,7 +611,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "NotAuthorized", abi = "NotAuthorized(address)")]
     pub struct NotAuthorized(pub ::ethers::core::types::Address);
@@ -735,7 +624,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
@@ -748,7 +637,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "QuorumAlreadyProcessed", abi = "QuorumAlreadyProcessed()")]
     pub struct QuorumAlreadyProcessed;
@@ -761,7 +650,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "SignatureReplay", abi = "SignatureReplay()")]
     pub struct SignatureReplay;
@@ -774,7 +663,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "SubnetNotFound", abi = "SubnetNotFound()")]
     pub struct SubnetNotFound;
@@ -787,7 +676,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "ZeroMembershipWeight", abi = "ZeroMembershipWeight()")]
     pub struct ZeroMembershipWeight;
@@ -823,109 +712,95 @@ pub mod checkpointing_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddressEmptyCode(decoded));
             }
-            if let Ok(decoded) = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddressInsufficientBalance(decoded));
             }
-            if let Ok(decoded) = <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CheckpointAlreadyExists(decoded));
             }
-            if let Ok(decoded) = <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CheckpointNotCreated(decoded));
             }
-            if let Ok(decoded) = <FailedAddIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <FailedAddIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::FailedAddIncompleteQuorum(decoded));
             }
-            if let Ok(decoded) = <FailedAddSignatory as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <FailedAddSignatory as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::FailedAddSignatory(decoded));
             }
-            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::FailedInnerCall(decoded));
             }
-            if let Ok(decoded) = <FailedRemoveIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <FailedRemoveIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::FailedRemoveIncompleteQuorum(decoded));
             }
-            if let Ok(decoded) = <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidActorAddress(decoded));
             }
-            if let Ok(decoded) = <InvalidCheckpointEpoch as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidCheckpointEpoch as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidCheckpointEpoch(decoded));
             }
-            if let Ok(decoded) = <InvalidCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidCheckpointSource(decoded));
             }
-            if let Ok(decoded) = <InvalidRetentionHeight as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidRetentionHeight as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidRetentionHeight(decoded));
             }
-            if let Ok(decoded) = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidSignature(decoded));
             }
-            if let Ok(decoded) = <InvalidSubnet as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <InvalidSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidSubnet(decoded));
             }
-            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotAuthorized(decoded));
             }
-            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotSystemActor(decoded));
             }
-            if let Ok(decoded) = <QuorumAlreadyProcessed as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <QuorumAlreadyProcessed as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::QuorumAlreadyProcessed(decoded));
             }
-            if let Ok(decoded) = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SignatureReplay(decoded));
             }
-            if let Ok(decoded) = <SubnetNotFound as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <SubnetNotFound as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SubnetNotFound(decoded));
             }
-            if let Ok(decoded) = <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ZeroMembershipWeight(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -934,9 +809,7 @@ pub mod checkpointing_facet {
     impl ::ethers::core::abi::AbiEncode for CheckpointingFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AddressEmptyCode(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::AddressEmptyCode(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::AddressInsufficientBalance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -952,9 +825,7 @@ pub mod checkpointing_facet {
                 Self::FailedAddSignatory(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::FailedInnerCall(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::FailedInnerCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::FailedRemoveIncompleteQuorum(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -970,27 +841,15 @@ pub mod checkpointing_facet {
                 Self::InvalidRetentionHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::InvalidSignature(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::InvalidSubnet(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NotAuthorized(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NotSystemActor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::InvalidSignature(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::InvalidSubnet(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotAuthorized(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::QuorumAlreadyProcessed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::SignatureReplay(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SubnetNotFound(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::SignatureReplay(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SubnetNotFound(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ZeroMembershipWeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1002,84 +861,89 @@ pub mod checkpointing_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
+                _ if selector == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
+                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <CheckpointAlreadyExists as ::ethers::contract::EthError>::selector() => {
+                    == <CheckpointAlreadyExists as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <CheckpointNotCreated as ::ethers::contract::EthError>::selector() => {
+                    == <CheckpointNotCreated as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <FailedAddIncompleteQuorum as ::ethers::contract::EthError>::selector() => {
+                    == <FailedAddIncompleteQuorum as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <FailedAddSignatory as ::ethers::contract::EthError>::selector() => {
+                    == <FailedAddSignatory as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
+                    == <FailedRemoveIncompleteQuorum as ::ethers::contract::EthError>::selector(
+                    ) =>
+                {
                     true
                 }
                 _ if selector
-                    == <FailedRemoveIncompleteQuorum as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidCheckpointEpoch as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidCheckpointEpoch as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidCheckpointSource as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidCheckpointSource as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidRetentionHeight as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <InvalidSignature as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector == <InvalidSubnet as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidRetentionHeight as ::ethers::contract::EthError>::selector() => {
+                    == <QuorumAlreadyProcessed as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <SignatureReplay as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector == <SubnetNotFound as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidSignature as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <InvalidSubnet as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <QuorumAlreadyProcessed as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <SignatureReplay as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <SubnetNotFound as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <ZeroMembershipWeight as ::ethers::contract::EthError>::selector() => {
+                    == <ZeroMembershipWeight as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ => false,
@@ -1090,49 +954,27 @@ pub mod checkpointing_facet {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddressInsufficientBalance(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::CheckpointAlreadyExists(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::CheckpointNotCreated(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::FailedAddIncompleteQuorum(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::FailedAddSignatory(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CheckpointAlreadyExists(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CheckpointNotCreated(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FailedAddIncompleteQuorum(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FailedAddSignatory(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedRemoveIncompleteQuorum(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::InvalidActorAddress(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidCheckpointEpoch(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidCheckpointSource(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidRetentionHeight(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::InvalidActorAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidCheckpointEpoch(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidCheckpointSource(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidRetentionHeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSignature(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::QuorumAlreadyProcessed(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::QuorumAlreadyProcessed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SignatureReplay(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetNotFound(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ZeroMembershipWeight(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::ZeroMembershipWeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -1177,8 +1019,7 @@ pub mod checkpointing_facet {
             Self::FailedInnerCall(value)
         }
     }
-    impl ::core::convert::From<FailedRemoveIncompleteQuorum>
-    for CheckpointingFacetErrors {
+    impl ::core::convert::From<FailedRemoveIncompleteQuorum> for CheckpointingFacetErrors {
         fn from(value: FailedRemoveIncompleteQuorum) -> Self {
             Self::FailedRemoveIncompleteQuorum(value)
         }
@@ -1252,7 +1093,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "addCheckpointSignature",
@@ -1273,7 +1114,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "commitCheckpoint",
@@ -1291,7 +1132,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "createBottomUpCheckpoint",
@@ -1311,7 +1152,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "pruneBottomUpCheckpoints",
@@ -1333,24 +1174,24 @@ pub mod checkpointing_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <AddCheckpointSignatureCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <AddCheckpointSignatureCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddCheckpointSignature(decoded));
             }
-            if let Ok(decoded) = <CommitCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CommitCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CommitCheckpoint(decoded));
             }
-            if let Ok(decoded) = <CreateBottomUpCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CreateBottomUpCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CreateBottomUpCheckpoint(decoded));
             }
-            if let Ok(decoded) = <PruneBottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <PruneBottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::PruneBottomUpCheckpoints(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1362,9 +1203,7 @@ pub mod checkpointing_facet {
                 Self::AddCheckpointSignature(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::CommitCheckpoint(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::CommitCheckpoint(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::CreateBottomUpCheckpoint(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1377,16 +1216,10 @@ pub mod checkpointing_facet {
     impl ::core::fmt::Display for CheckpointingFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddCheckpointSignature(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AddCheckpointSignature(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CommitCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CreateBottomUpCheckpoint(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::PruneBottomUpCheckpoints(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::CreateBottomUpCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PruneBottomUpCheckpoints(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -1400,14 +1233,12 @@ pub mod checkpointing_facet {
             Self::CommitCheckpoint(value)
         }
     }
-    impl ::core::convert::From<CreateBottomUpCheckpointCall>
-    for CheckpointingFacetCalls {
+    impl ::core::convert::From<CreateBottomUpCheckpointCall> for CheckpointingFacetCalls {
         fn from(value: CreateBottomUpCheckpointCall) -> Self {
             Self::CreateBottomUpCheckpoint(value)
         }
     }
-    impl ::core::convert::From<PruneBottomUpCheckpointsCall>
-    for CheckpointingFacetCalls {
+    impl ::core::convert::From<PruneBottomUpCheckpointsCall> for CheckpointingFacetCalls {
         fn from(value: PruneBottomUpCheckpointsCall) -> Self {
             Self::PruneBottomUpCheckpoints(value)
         }
@@ -1421,7 +1252,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct BottomUpCheckpoint {
         pub subnet_id: SubnetID,
@@ -1438,7 +1269,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct SubnetID {
         pub root: u64,

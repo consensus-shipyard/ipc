@@ -7,7 +7,7 @@ pub use top_down_finality_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod top_down_finality_facet {
     #[allow(deprecated)]
@@ -17,200 +17,142 @@ pub mod top_down_finality_facet {
             functions: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("applyFinalityChanges"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "applyFinalityChanges",
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("applyFinalityChanges",),
+                        inputs: ::std::vec![],
+                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::string::String::new(),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint64"),
                             ),
-                            inputs: ::std::vec![],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::string::String::new(),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("uint64"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
+                        },],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("commitParentFinality"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "commitParentFinality",
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("commitParentFinality",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("finality"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                            ],),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("struct ParentFinality"),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("finality"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                        ::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
-                                        ],
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("struct ParentFinality"),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned(
-                                        "hasCommittedBefore",
-                                    ),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("bool"),
-                                    ),
-                                },
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("previousFinality"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                        ::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
-                                        ],
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("struct ParentFinality"),
-                                    ),
-                                },
-                            ],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
+                        },],
+                        outputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("hasCommittedBefore",),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("bool"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("previousFinality"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                ],),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("struct ParentFinality"),
+                                ),
+                            },
+                        ],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("storeValidatorChanges"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::Function {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "storeValidatorChanges",
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name: ::std::borrow::ToOwned::to_owned("storeValidatorChanges",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("changeRequests"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                ::std::boxed::Box::new(
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ],),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ],),
+                                ),
                             ),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("changeRequests"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                        ::std::boxed::Box::new(
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                        ],
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                ],
-                                            ),
-                                        ),
-                                    ),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned(
-                                            "struct StakingChangeRequest[]",
-                                        ),
-                                    ),
-                                },
-                            ],
-                            outputs: ::std::vec![],
-                            constant: ::core::option::Option::None,
-                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                        },
-                    ],
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("struct StakingChangeRequest[]",),
+                            ),
+                        },],
+                        outputs: ::std::vec![],
+                        constant: ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
                 ),
             ]),
             events: ::std::collections::BTreeMap::new(),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("AddressShouldBeValidator"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "AddressShouldBeValidator",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("AddressShouldBeValidator",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("CannotConfirmFutureChanges"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CannotConfirmFutureChanges",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("CannotConfirmFutureChanges",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidConfigurationNumber"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InvalidConfigurationNumber",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("InvalidConfigurationNumber",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotSystemActor"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("NotSystemActor"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("NotSystemActor"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("OldConfigurationNumber"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "OldConfigurationNumber",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("OldConfigurationNumber",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("PQDoesNotContainAddress"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "PQDoesNotContainAddress",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("PQDoesNotContainAddress",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("PQEmpty"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("PQEmpty"),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("PQEmpty"),
+                        inputs: ::std::vec![],
+                    },],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ParentFinalityAlreadyCommitted"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "ParentFinalityAlreadyCommitted",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("ParentFinalityAlreadyCommitted",),
+                        inputs: ::std::vec![],
+                    },],
                 ),
             ]),
             receive: false,
@@ -218,9 +160,8 @@ pub mod top_down_finality_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static TOPDOWNFINALITYFACET_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(__abi);
+    pub static TOPDOWNFINALITYFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(__abi);
     pub struct TopDownFinalityFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for TopDownFinalityFacet<M> {
         fn clone(&self) -> Self {
@@ -252,18 +193,14 @@ pub mod top_down_finality_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    TOPDOWNFINALITYFACET_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                TOPDOWNFINALITYFACET_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `applyFinalityChanges` (0x0df14461) function
-        pub fn apply_finality_changes(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, u64> {
+        pub fn apply_finality_changes(&self) -> ::ethers::contract::builders::ContractCall<M, u64> {
             self.0
                 .method_hash([13, 241, 68, 97], ())
                 .expect("method not found (this should never happen)")
@@ -288,7 +225,8 @@ pub mod top_down_finality_facet {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for TopDownFinalityFacet<M> {
+        for TopDownFinalityFacet<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -302,7 +240,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "AddressShouldBeValidator", abi = "AddressShouldBeValidator()")]
     pub struct AddressShouldBeValidator;
@@ -315,7 +253,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "CannotConfirmFutureChanges",
@@ -331,7 +269,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "InvalidConfigurationNumber",
@@ -347,7 +285,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
@@ -360,7 +298,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "OldConfigurationNumber", abi = "OldConfigurationNumber()")]
     pub struct OldConfigurationNumber;
@@ -373,7 +311,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "PQDoesNotContainAddress", abi = "PQDoesNotContainAddress()")]
     pub struct PQDoesNotContainAddress;
@@ -386,7 +324,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "PQEmpty", abi = "PQEmpty()")]
     pub struct PQEmpty;
@@ -399,7 +337,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "ParentFinalityAlreadyCommitted",
@@ -426,49 +364,45 @@ pub mod top_down_finality_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AddressShouldBeValidator as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <AddressShouldBeValidator as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddressShouldBeValidator(decoded));
             }
-            if let Ok(decoded) = <CannotConfirmFutureChanges as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CannotConfirmFutureChanges as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CannotConfirmFutureChanges(decoded));
             }
-            if let Ok(decoded) = <InvalidConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidConfigurationNumber(decoded));
             }
-            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotSystemActor(decoded));
             }
-            if let Ok(decoded) = <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <OldConfigurationNumber as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::OldConfigurationNumber(decoded));
             }
-            if let Ok(decoded) = <PQDoesNotContainAddress as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <PQDoesNotContainAddress as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::PQDoesNotContainAddress(decoded));
             }
-            if let Ok(decoded) = <PQEmpty as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <PQEmpty as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::PQEmpty(decoded));
             }
-            if let Ok(decoded) = <ParentFinalityAlreadyCommitted as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <ParentFinalityAlreadyCommitted as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ParentFinalityAlreadyCommitted(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -486,9 +420,7 @@ pub mod top_down_finality_facet {
                 Self::InvalidConfigurationNumber(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotSystemActor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::OldConfigurationNumber(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -544,22 +476,12 @@ pub mod top_down_finality_facet {
     impl ::core::fmt::Display for TopDownFinalityFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddressShouldBeValidator(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::CannotConfirmFutureChanges(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidConfigurationNumber(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AddressShouldBeValidator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CannotConfirmFutureChanges(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OldConfigurationNumber(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::PQDoesNotContainAddress(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::OldConfigurationNumber(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PQDoesNotContainAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::PQEmpty(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ParentFinalityAlreadyCommitted(element) => {
                     ::core::fmt::Display::fmt(element, f)
@@ -578,14 +500,12 @@ pub mod top_down_finality_facet {
             Self::AddressShouldBeValidator(value)
         }
     }
-    impl ::core::convert::From<CannotConfirmFutureChanges>
-    for TopDownFinalityFacetErrors {
+    impl ::core::convert::From<CannotConfirmFutureChanges> for TopDownFinalityFacetErrors {
         fn from(value: CannotConfirmFutureChanges) -> Self {
             Self::CannotConfirmFutureChanges(value)
         }
     }
-    impl ::core::convert::From<InvalidConfigurationNumber>
-    for TopDownFinalityFacetErrors {
+    impl ::core::convert::From<InvalidConfigurationNumber> for TopDownFinalityFacetErrors {
         fn from(value: InvalidConfigurationNumber) -> Self {
             Self::InvalidConfigurationNumber(value)
         }
@@ -610,8 +530,7 @@ pub mod top_down_finality_facet {
             Self::PQEmpty(value)
         }
     }
-    impl ::core::convert::From<ParentFinalityAlreadyCommitted>
-    for TopDownFinalityFacetErrors {
+    impl ::core::convert::From<ParentFinalityAlreadyCommitted> for TopDownFinalityFacetErrors {
         fn from(value: ParentFinalityAlreadyCommitted) -> Self {
             Self::ParentFinalityAlreadyCommitted(value)
         }
@@ -625,7 +544,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(name = "applyFinalityChanges", abi = "applyFinalityChanges()")]
     pub struct ApplyFinalityChangesCall;
@@ -638,7 +557,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "commitParentFinality",
@@ -656,7 +575,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "storeValidatorChanges",
@@ -677,19 +596,19 @@ pub mod top_down_finality_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <ApplyFinalityChangesCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <ApplyFinalityChangesCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ApplyFinalityChanges(decoded));
             }
-            if let Ok(decoded) = <CommitParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CommitParentFinalityCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CommitParentFinality(decoded));
             }
-            if let Ok(decoded) = <StoreValidatorChangesCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <StoreValidatorChangesCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::StoreValidatorChanges(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -713,15 +632,9 @@ pub mod top_down_finality_facet {
     impl ::core::fmt::Display for TopDownFinalityFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::ApplyFinalityChanges(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::CommitParentFinality(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::StoreValidatorChanges(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::ApplyFinalityChanges(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CommitParentFinality(element) => ::core::fmt::Display::fmt(element, f),
+                Self::StoreValidatorChanges(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -749,7 +662,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct ApplyFinalityChangesReturn(pub u64);
     ///Container type for all return fields from the `commitParentFinality` function with signature `commitParentFinality((uint256,bytes32))` and selector `0x11196974`
@@ -761,7 +674,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct CommitParentFinalityReturn {
         pub has_committed_before: bool,
@@ -776,7 +689,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct ParentFinality {
         pub height: ::ethers::core::types::U256,
@@ -791,7 +704,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct StakingChange {
         pub op: u8,
@@ -807,7 +720,7 @@ pub mod top_down_finality_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct StakingChangeRequest {
         pub change: StakingChange,

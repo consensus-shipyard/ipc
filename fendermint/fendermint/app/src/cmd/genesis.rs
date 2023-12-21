@@ -235,7 +235,6 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
         let gateway_params = ipc::GatewayParams {
             subnet_id: args.subnet_id.clone(),
             bottom_up_check_period: args.bottom_up_check_period,
-            min_collateral: args.min_collateral.clone(),
             msg_fee: args.msg_fee.clone(),
             majority_percentage: args.majority_percentage,
             active_validators_limit: args.active_validators_limit,
@@ -285,7 +284,6 @@ async fn new_genesis_from_parent(
         gateway: ipc::GatewayParams {
             subnet_id: args.subnet_id.clone(),
             bottom_up_check_period: genesis_info.bottom_up_checkpoint_period,
-            min_collateral: genesis_info.min_collateral,
             msg_fee: genesis_info.msg_fee,
             majority_percentage: genesis_info.majority_percentage,
             active_validators_limit: genesis_info.active_validators_limit,

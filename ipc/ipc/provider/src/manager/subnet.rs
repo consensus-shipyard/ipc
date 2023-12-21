@@ -12,7 +12,7 @@ use ipc_sdk::checkpoint::{
 };
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
-use ipc_sdk::subnet::ConstructParams;
+use ipc_sdk::subnet::{ConstructParams, PermissionMode, SupplySource};
 use ipc_sdk::subnet_id::SubnetID;
 use ipc_sdk::validator::Validator;
 
@@ -152,6 +152,8 @@ pub struct SubnetGenesisInfo {
     pub genesis_epoch: ChainEpoch,
     pub validators: Vec<Validator>,
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
+    pub permission_mode: PermissionMode,
+    pub supply_source: SupplySource,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual

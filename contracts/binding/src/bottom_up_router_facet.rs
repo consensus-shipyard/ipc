@@ -7,7 +7,7 @@ pub use bottom_up_router_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod bottom_up_router_facet {
     #[allow(deprecated)]
@@ -584,9 +584,8 @@ pub mod bottom_up_router_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static BOTTOMUPROUTERFACET_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(__abi);
+    pub static BOTTOMUPROUTERFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(__abi);
     pub struct BottomUpRouterFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for BottomUpRouterFacet<M> {
         fn clone(&self) -> Self {
@@ -618,13 +617,11 @@ pub mod bottom_up_router_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    BOTTOMUPROUTERFACET_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                BOTTOMUPROUTERFACET_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `addBottomUpMsgBatchSignature` (0x0db0f77c) function
         pub fn add_bottom_up_msg_batch_signature(
@@ -675,7 +672,8 @@ pub mod bottom_up_router_facet {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for BottomUpRouterFacet<M> {
+        for BottomUpRouterFacet<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -689,7 +687,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "AddressEmptyCode", abi = "AddressEmptyCode(address)")]
     pub struct AddressEmptyCode {
@@ -704,7 +702,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "AddressInsufficientBalance",
@@ -722,7 +720,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "BatchAlreadyExists", abi = "BatchAlreadyExists()")]
     pub struct BatchAlreadyExists;
@@ -735,7 +733,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "BatchNotCreated", abi = "BatchNotCreated()")]
     pub struct BatchNotCreated;
@@ -748,7 +746,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "BatchWithNoMessages", abi = "BatchWithNoMessages()")]
     pub struct BatchWithNoMessages;
@@ -761,9 +759,12 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
-    #[etherror(name = "FailedAddIncompleteQuorum", abi = "FailedAddIncompleteQuorum()")]
+    #[etherror(
+        name = "FailedAddIncompleteQuorum",
+        abi = "FailedAddIncompleteQuorum()"
+    )]
     pub struct FailedAddIncompleteQuorum;
     ///Custom Error type `FailedAddSignatory` with signature `FailedAddSignatory()` and selector `0x3363140f`
     #[derive(
@@ -774,7 +775,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "FailedAddSignatory", abi = "FailedAddSignatory()")]
     pub struct FailedAddSignatory;
@@ -787,7 +788,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
     pub struct FailedInnerCall;
@@ -800,7 +801,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(
         name = "FailedRemoveIncompleteQuorum",
@@ -816,7 +817,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidActorAddress", abi = "InvalidActorAddress()")]
     pub struct InvalidActorAddress;
@@ -829,7 +830,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidBatchEpoch", abi = "InvalidBatchEpoch()")]
     pub struct InvalidBatchEpoch;
@@ -842,7 +843,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidBatchSource", abi = "InvalidBatchSource()")]
     pub struct InvalidBatchSource;
@@ -855,7 +856,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidCrossMsgDstSubnet", abi = "InvalidCrossMsgDstSubnet()")]
     pub struct InvalidCrossMsgDstSubnet;
@@ -868,7 +869,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidCrossMsgNonce", abi = "InvalidCrossMsgNonce()")]
     pub struct InvalidCrossMsgNonce;
@@ -881,7 +882,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidRetentionHeight", abi = "InvalidRetentionHeight()")]
     pub struct InvalidRetentionHeight;
@@ -894,7 +895,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "InvalidSignature", abi = "InvalidSignature()")]
     pub struct InvalidSignature;
@@ -907,7 +908,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "MaxMsgsPerBatchExceeded", abi = "MaxMsgsPerBatchExceeded()")]
     pub struct MaxMsgsPerBatchExceeded;
@@ -920,7 +921,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "NotAuthorized", abi = "NotAuthorized(address)")]
     pub struct NotAuthorized(pub ::ethers::core::types::Address);
@@ -933,9 +934,12 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
-    #[etherror(name = "NotEnoughSubnetCircSupply", abi = "NotEnoughSubnetCircSupply()")]
+    #[etherror(
+        name = "NotEnoughSubnetCircSupply",
+        abi = "NotEnoughSubnetCircSupply()"
+    )]
     pub struct NotEnoughSubnetCircSupply;
     ///Custom Error type `NotRegisteredSubnet` with signature `NotRegisteredSubnet()` and selector `0xe991abd0`
     #[derive(
@@ -946,7 +950,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "NotRegisteredSubnet", abi = "NotRegisteredSubnet()")]
     pub struct NotRegisteredSubnet;
@@ -959,7 +963,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
@@ -972,7 +976,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "QuorumAlreadyProcessed", abi = "QuorumAlreadyProcessed()")]
     pub struct QuorumAlreadyProcessed;
@@ -985,7 +989,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "SignatureReplay", abi = "SignatureReplay()")]
     pub struct SignatureReplay;
@@ -998,7 +1002,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "SubnetNotFound", abi = "SubnetNotFound()")]
     pub struct SubnetNotFound;
@@ -1011,7 +1015,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[etherror(name = "ZeroMembershipWeight", abi = "ZeroMembershipWeight()")]
     pub struct ZeroMembershipWeight;
@@ -1052,134 +1056,119 @@ pub mod bottom_up_router_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddressEmptyCode(decoded));
             }
-            if let Ok(decoded) = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddressInsufficientBalance(decoded));
             }
-            if let Ok(decoded) = <BatchAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <BatchAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::BatchAlreadyExists(decoded));
             }
-            if let Ok(decoded) = <BatchNotCreated as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <BatchNotCreated as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BatchNotCreated(decoded));
             }
-            if let Ok(decoded) = <BatchWithNoMessages as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <BatchWithNoMessages as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::BatchWithNoMessages(decoded));
             }
-            if let Ok(decoded) = <FailedAddIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <FailedAddIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::FailedAddIncompleteQuorum(decoded));
             }
-            if let Ok(decoded) = <FailedAddSignatory as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <FailedAddSignatory as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::FailedAddSignatory(decoded));
             }
-            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::FailedInnerCall(decoded));
             }
-            if let Ok(decoded) = <FailedRemoveIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <FailedRemoveIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::FailedRemoveIncompleteQuorum(decoded));
             }
-            if let Ok(decoded) = <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidActorAddress(decoded));
             }
-            if let Ok(decoded) = <InvalidBatchEpoch as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <InvalidBatchEpoch as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidBatchEpoch(decoded));
             }
-            if let Ok(decoded) = <InvalidBatchSource as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidBatchSource as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidBatchSource(decoded));
             }
-            if let Ok(decoded) = <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidCrossMsgDstSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidCrossMsgDstSubnet(decoded));
             }
-            if let Ok(decoded) = <InvalidCrossMsgNonce as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidCrossMsgNonce as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidCrossMsgNonce(decoded));
             }
-            if let Ok(decoded) = <InvalidRetentionHeight as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <InvalidRetentionHeight as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidRetentionHeight(decoded));
             }
-            if let Ok(decoded) = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::InvalidSignature(decoded));
             }
-            if let Ok(decoded) = <MaxMsgsPerBatchExceeded as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <MaxMsgsPerBatchExceeded as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::MaxMsgsPerBatchExceeded(decoded));
             }
-            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotAuthorized(decoded));
             }
-            if let Ok(decoded) = <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::NotEnoughSubnetCircSupply(decoded));
             }
-            if let Ok(decoded) = <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::NotRegisteredSubnet(decoded));
             }
-            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotSystemActor(decoded));
             }
-            if let Ok(decoded) = <QuorumAlreadyProcessed as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <QuorumAlreadyProcessed as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::QuorumAlreadyProcessed(decoded));
             }
-            if let Ok(decoded) = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SignatureReplay(decoded));
             }
-            if let Ok(decoded) = <SubnetNotFound as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) = <SubnetNotFound as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SubnetNotFound(decoded));
             }
-            if let Ok(decoded) = <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ZeroMembershipWeight(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1188,18 +1177,14 @@ pub mod bottom_up_router_facet {
     impl ::ethers::core::abi::AbiEncode for BottomUpRouterFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AddressEmptyCode(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::AddressEmptyCode(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::AddressInsufficientBalance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::BatchAlreadyExists(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::BatchNotCreated(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::BatchNotCreated(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::BatchWithNoMessages(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1209,18 +1194,14 @@ pub mod bottom_up_router_facet {
                 Self::FailedAddSignatory(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::FailedInnerCall(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::FailedInnerCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::FailedRemoveIncompleteQuorum(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::InvalidActorAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::InvalidBatchEpoch(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::InvalidBatchEpoch(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidBatchSource(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1233,33 +1214,23 @@ pub mod bottom_up_router_facet {
                 Self::InvalidRetentionHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::InvalidSignature(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::InvalidSignature(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::MaxMsgsPerBatchExceeded(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotAuthorized(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::NotAuthorized(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotEnoughSubnetCircSupply(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotSystemActor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::QuorumAlreadyProcessed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::SignatureReplay(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SubnetNotFound(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::SignatureReplay(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SubnetNotFound(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ZeroMembershipWeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1271,104 +1242,114 @@ pub mod bottom_up_router_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
+                _ if selector == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
+                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <BatchAlreadyExists as ::ethers::contract::EthError>::selector() => {
+                    == <BatchAlreadyExists as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <BatchNotCreated as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <BatchNotCreated as ::ethers::contract::EthError>::selector() => {
+                    == <BatchWithNoMessages as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <BatchWithNoMessages as ::ethers::contract::EthError>::selector() => {
+                    == <FailedAddIncompleteQuorum as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <FailedAddIncompleteQuorum as ::ethers::contract::EthError>::selector() => {
+                    == <FailedAddSignatory as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <FailedAddSignatory as ::ethers::contract::EthError>::selector() => {
+                    == <FailedRemoveIncompleteQuorum as ::ethers::contract::EthError>::selector(
+                    ) =>
+                {
                     true
                 }
                 _ if selector
-                    == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <FailedRemoveIncompleteQuorum as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidBatchEpoch as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidBatchSource as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidBatchEpoch as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidCrossMsgDstSubnet as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidBatchSource as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidCrossMsgNonce as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidCrossMsgDstSubnet as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidRetentionHeight as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <InvalidSignature as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidCrossMsgNonce as ::ethers::contract::EthError>::selector() => {
+                    == <MaxMsgsPerBatchExceeded as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidRetentionHeight as ::ethers::contract::EthError>::selector() => {
+                    == <NotEnoughSubnetCircSupply as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ if selector
-                    == <InvalidSignature as ::ethers::contract::EthError>::selector() => {
+                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <MaxMsgsPerBatchExceeded as ::ethers::contract::EthError>::selector() => {
+                    == <QuorumAlreadyProcessed as ::ethers::contract::EthError>::selector() =>
+                {
+                    true
+                }
+                _ if selector == <SignatureReplay as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector == <SubnetNotFound as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NotEnoughSubnetCircSupply as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <QuorumAlreadyProcessed as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <SignatureReplay as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <SubnetNotFound as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <ZeroMembershipWeight as ::ethers::contract::EthError>::selector() => {
+                    == <ZeroMembershipWeight as ::ethers::contract::EthError>::selector() =>
+                {
                     true
                 }
                 _ => false,
@@ -1379,62 +1360,32 @@ pub mod bottom_up_router_facet {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddressInsufficientBalance(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::BatchAlreadyExists(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
+                Self::BatchAlreadyExists(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BatchNotCreated(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BatchWithNoMessages(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::FailedAddIncompleteQuorum(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::FailedAddSignatory(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::BatchWithNoMessages(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FailedAddIncompleteQuorum(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FailedAddSignatory(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedRemoveIncompleteQuorum(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::InvalidActorAddress(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::InvalidActorAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidBatchEpoch(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidBatchSource(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidCrossMsgDstSubnet(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidCrossMsgNonce(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidRetentionHeight(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::InvalidBatchSource(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidCrossMsgDstSubnet(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidCrossMsgNonce(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidRetentionHeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSignature(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MaxMsgsPerBatchExceeded(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::MaxMsgsPerBatchExceeded(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughSubnetCircSupply(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::NotRegisteredSubnet(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::NotEnoughSubnetCircSupply(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::QuorumAlreadyProcessed(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::QuorumAlreadyProcessed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SignatureReplay(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetNotFound(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ZeroMembershipWeight(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::ZeroMembershipWeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -1449,8 +1400,7 @@ pub mod bottom_up_router_facet {
             Self::AddressEmptyCode(value)
         }
     }
-    impl ::core::convert::From<AddressInsufficientBalance>
-    for BottomUpRouterFacetErrors {
+    impl ::core::convert::From<AddressInsufficientBalance> for BottomUpRouterFacetErrors {
         fn from(value: AddressInsufficientBalance) -> Self {
             Self::AddressInsufficientBalance(value)
         }
@@ -1485,8 +1435,7 @@ pub mod bottom_up_router_facet {
             Self::FailedInnerCall(value)
         }
     }
-    impl ::core::convert::From<FailedRemoveIncompleteQuorum>
-    for BottomUpRouterFacetErrors {
+    impl ::core::convert::From<FailedRemoveIncompleteQuorum> for BottomUpRouterFacetErrors {
         fn from(value: FailedRemoveIncompleteQuorum) -> Self {
             Self::FailedRemoveIncompleteQuorum(value)
         }
@@ -1580,7 +1529,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "addBottomUpMsgBatchSignature",
@@ -1601,7 +1550,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "createBottomUpMsgBatch",
@@ -1621,7 +1570,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "execBottomUpMsgBatch",
@@ -1639,7 +1588,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     #[ethcall(
         name = "pruneBottomUpMsgBatches",
@@ -1661,24 +1610,24 @@ pub mod bottom_up_router_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <AddBottomUpMsgBatchSignatureCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <AddBottomUpMsgBatchSignatureCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::AddBottomUpMsgBatchSignature(decoded));
             }
-            if let Ok(decoded) = <CreateBottomUpMsgBatchCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <CreateBottomUpMsgBatchCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::CreateBottomUpMsgBatch(decoded));
             }
-            if let Ok(decoded) = <ExecBottomUpMsgBatchCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <ExecBottomUpMsgBatchCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ExecBottomUpMsgBatch(decoded));
             }
-            if let Ok(decoded) = <PruneBottomUpMsgBatchesCall as ::ethers::core::abi::AbiDecode>::decode(
-                data,
-            ) {
+            if let Ok(decoded) =
+                <PruneBottomUpMsgBatchesCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::PruneBottomUpMsgBatches(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1708,20 +1657,13 @@ pub mod bottom_up_router_facet {
                 Self::AddBottomUpMsgBatchSignature(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::CreateBottomUpMsgBatch(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ExecBottomUpMsgBatch(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::PruneBottomUpMsgBatches(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::CreateBottomUpMsgBatch(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ExecBottomUpMsgBatch(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PruneBottomUpMsgBatches(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<AddBottomUpMsgBatchSignatureCall>
-    for BottomUpRouterFacetCalls {
+    impl ::core::convert::From<AddBottomUpMsgBatchSignatureCall> for BottomUpRouterFacetCalls {
         fn from(value: AddBottomUpMsgBatchSignatureCall) -> Self {
             Self::AddBottomUpMsgBatchSignature(value)
         }
@@ -1736,8 +1678,7 @@ pub mod bottom_up_router_facet {
             Self::ExecBottomUpMsgBatch(value)
         }
     }
-    impl ::core::convert::From<PruneBottomUpMsgBatchesCall>
-    for BottomUpRouterFacetCalls {
+    impl ::core::convert::From<PruneBottomUpMsgBatchesCall> for BottomUpRouterFacetCalls {
         fn from(value: PruneBottomUpMsgBatchesCall) -> Self {
             Self::PruneBottomUpMsgBatches(value)
         }
@@ -1751,7 +1692,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct BottomUpMsgBatch {
         pub subnet_id: SubnetID,
@@ -1767,7 +1708,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct CrossMsg {
         pub message: StorableMsg,
@@ -1782,7 +1723,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct FvmAddress {
         pub addr_type: u8,
@@ -1797,7 +1738,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct Ipcaddress {
         pub subnet_id: SubnetID,
@@ -1812,7 +1753,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct StorableMsg {
         pub from: Ipcaddress,
@@ -1832,7 +1773,7 @@ pub mod bottom_up_router_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash
+        Hash,
     )]
     pub struct SubnetID {
         pub root: u64,

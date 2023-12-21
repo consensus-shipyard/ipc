@@ -16,6 +16,7 @@ use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_a
 use ipc_sdk::validator::from_contract_validators;
 use std::net::{IpAddr, SocketAddr};
 
+use ipc_sdk::subnet::{PermissionMode, SupplyKind, SupplySource};
 use ipc_sdk::{eth_to_fil_amount, ethers_address_to_fil_address};
 
 use crate::config::subnet::SubnetConfig;
@@ -699,6 +700,12 @@ impl SubnetManager for EthSubnetManager {
             msg_fee: eth_to_fil_amount(&contract.min_cross_msg_fee().call().await?)?,
             validators: from_contract_validators(contract.genesis_validators().call().await?)?,
             genesis_balances: into_genesis_balance_map(genesis_balances.0, genesis_balances.1)?,
+            // TODO: fixme https://github.com/consensus-shipyard/ipc-monorepo/issues/496
+            permission_mode: PermissionMode::Collateral,
+            supply_source: SupplySource {
+                kind: SupplyKind::Native,
+                token_address: None,
+            },
         })
     }
 

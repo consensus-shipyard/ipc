@@ -110,13 +110,15 @@ impl StateMachine for StakingMachine {
             majority_percentage: child_ipc.gateway.majority_percentage,
             active_validators_limit: child_ipc.gateway.active_validators_limit,
             power_scale: state.child_genesis.power_scale,
-            // The `min_activation_collateral` has to be at least as high as the parent gateway's `min_collateral`,
-            // otherwise it will refuse the subnet trying to register itself.
-            min_activation_collateral: from_fvm::to_eth_tokens(&parent_ipc.gateway.min_collateral)
-                .unwrap(),
+            // activate the subnet by default
+            min_activation_collateral: et::U256::zero(),
             min_validators: 1,
             min_cross_msg_fee: et::U256::zero(),
-            permissioned: false,
+            permission_mode: 0, // collateral based
+            supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
+                kind: 0, // native token
+                token_address: ethers::types::Address::zero(),
+            },
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
@@ -274,21 +276,13 @@ impl StateMachine for StakingMachine {
 
                 // Build the checkpoint payload.
 
-                // No messages in this test. If we generated some messages, they couldn't be just some
-                // random data thrown in, because the contracts would actually try to execute them.
-                // What I'm mainly interested in is whether the ABI hash is calculated correctly
-                // for a vector, which we can test by trying to pass the empty vector as a tuple.
-                let cross_messages = Vec::<subnet_manager::CrossMsg>::new();
-                let cross_messages_hash = cross_messages.abi_hash();
-
                 let (root, route) = subnet_id_to_eth(&system.subnet_id).unwrap();
 
                 let checkpoint = subnet_manager::BottomUpCheckpoint {
                     subnet_id: subnet_manager::SubnetID { root, route },
-                    block_height: *block_height,
+                    block_height: ethers::types::U256::from(*block_height),
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
-                    cross_messages_hash,
                 };
                 let checkpoint_hash = checkpoint.clone().abi_hash();
 
