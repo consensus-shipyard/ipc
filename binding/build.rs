@@ -45,9 +45,12 @@ fn main() {
         "TopDownFinalityFacet",
         "XnetMessagingFacet",
         "GatewayMessengerFacet",
+        "SubnetActorCheckpointingFacet",
         "SubnetActorDiamond",
         "SubnetActorGetterFacet",
         "SubnetActorManagerFacet",
+        "SubnetActorPauseFacet",
+        "SubnetActorRewardFacet",
         "SubnetRegistryDiamond",
         "RegisterSubnetFacet",
         "SubnetGetterFacet",
@@ -84,7 +87,8 @@ fn main() {
         "BottomUpRouterFacet",
         "XnetMessagingFacet",
         "GatewayMessengerFacet",
-        "SubnetActorManagerFacet",
+        "SubnetActorCheckpointingFacet",
+        "SubnetActorGetterFacet",
         "LibGateway",
     ];
 
@@ -99,7 +103,6 @@ fn main() {
     )
     .unwrap();
     let common_type_conversion = vec![
-        ("GatewayGetterFacet", "SubnetActorManagerFacet"),
         ("SubnetActorGetterFacet", "BottomUpRouterFacet"),
         ("SubnetActorGetterFacet", "CheckpointingFacet"),
         ("SubnetActorGetterFacet", "XnetMessagingFacet"),
