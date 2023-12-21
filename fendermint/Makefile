@@ -55,7 +55,7 @@ check-fmt:
 	@# `nightly` is required to support ignore list in rustfmt.toml
 	cargo +nightly fmt --all --check
 
-check-clippy:
+check-clippy: $(IPC_ACTORS_GEN)
 	cargo clippy --all --tests -- -D clippy::all
 
 docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_OUT) $(IPC_ACTORS_GEN)
