@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import "forge-std/StdInvariant.sol";
 import "../src/errors/IPCErrors.sol";
 
 import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
@@ -124,19 +123,6 @@ contract TestGatewayActor is Test, TestParams {
         gwCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         gwLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
     }
-
-    function defaultGatewayParams() internal pure virtual returns (GatewayDiamond.ConstructorParams memory) {
-        GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
-            networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
-        });
-
-        return params;
-    }
 }
 
 contract TestSubnetActor is Test, TestParams {
@@ -238,6 +224,19 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         saCutter = DiamondCutFacet(address(saDiamond));
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
+    }
+
+    function defaultGatewayParams() internal pure virtual returns (GatewayDiamond.ConstructorParams memory) {
+        GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
+            networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            msgFee: DEFAULT_CROSS_MSG_FEE,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+        });
+
+        return params;
     }
 
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
