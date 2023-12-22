@@ -16,7 +16,10 @@ use fendermint_vm_interpreter::fvm::{
     state::{fevm::ContractResult, ipc::GatewayCaller, FvmExecState},
     store::memory::MemoryBlockstore,
 };
-use fendermint_vm_message::{conv::from_fvm, signed::sign_secp256k1};
+use fendermint_vm_message::{
+    conv::from_fvm::{self, to_eth_tokens},
+    signed::sign_secp256k1,
+};
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::bigint::Integer;
@@ -110,8 +113,8 @@ impl StateMachine for StakingMachine {
             majority_percentage: child_ipc.gateway.majority_percentage,
             active_validators_limit: child_ipc.gateway.active_validators_limit,
             power_scale: state.child_genesis.power_scale,
-            min_activation_collateral: et::U256::from_dec_str(&state.min_activation_collateral.0.atto().to_string()).unwrap(),
-            min_validators: state.child_genesis.validators.len() as u64,
+            min_activation_collateral: to_eth_tokens(&state.min_collateral()).unwrap(),
+            min_validators: state.min_validators() as u64,
             min_cross_msg_fee: et::U256::zero(),
             permission_mode: 0, // collateral based
             supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
