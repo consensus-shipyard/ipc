@@ -38,17 +38,17 @@ use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 pub struct GatewayCaller<DB> {
     addr: EthAddress,
     getter: ContractCaller<DB, GatewayGetterFacet<MockProvider>, NoRevert>,
-    checkpoint_router: ContractCaller<
+    checkpointing: ContractCaller<
         DB,
         CheckpointingFacet<MockProvider>,
         checkpointing_facet::CheckpointingFacetErrors,
     >,
-    topdown_router: ContractCaller<
+    topdown: ContractCaller<
         DB,
         TopDownFinalityFacet<MockProvider>,
         top_down_finality_facet::TopDownFinalityFacetErrors,
     >,
-    xnet_messaging_facet: ContractCaller<
+    xnet: ContractCaller<
         DB,
         XnetMessagingFacet<MockProvider>,
         xnet_messaging_facet::XnetMessagingFacetErrors,
@@ -70,9 +70,9 @@ impl<DB> GatewayCaller<DB> {
         Self {
             addr,
             getter: ContractCaller::new(addr, GatewayGetterFacet::new),
-            checkpoint_router: ContractCaller::new(addr, CheckpointingFacet::new),
-            topdown_router: ContractCaller::new(addr, TopDownFinalityFacet::new),
-            xnet_messaging_facet: ContractCaller::new(addr, XnetMessagingFacet::new),
+            checkpointing: ContractCaller::new(addr, CheckpointingFacet::new),
+            topdown: ContractCaller::new(addr, TopDownFinalityFacet::new),
+            xnet: ContractCaller::new(addr, XnetMessagingFacet::new),
         }
     }
 
@@ -136,7 +136,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             p.saturating_add(et::U256::from(v.power.0))
         });
 
-        self.checkpoint_router.call(state, |c| {
+        self.checkpointing.call(state, |c| {
             c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power)
         })
     }
@@ -151,8 +151,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
     pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
-        self.topdown_router
-            .call(state, |c| c.apply_finality_changes())
+        self.topdown.call(state, |c| c.apply_finality_changes())
     }
 
     /// Get the currently active validator set.
@@ -195,7 +194,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .map(|p| p.into())
             .collect();
 
-        let call = self.checkpoint_router.contract().add_checkpoint_signature(
+        let call = self.checkpointing.contract().add_checkpoint_signature(
             height,
             membership_proof,
             weight,
@@ -219,7 +218,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         let evm_finality = top_down_finality_facet::ParentFinality::try_from(finality)?;
 
         let (has_committed, prev_finality) = self
-            .topdown_router
+            .topdown
             .call(state, |c| c.commit_parent_finality(evm_finality))?;
 
         Ok(if !has_committed {
@@ -243,7 +242,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             change_requests.push(top_down_finality_facet::StakingChangeRequest::try_from(c)?);
         }
 
-        self.topdown_router
+        self.topdown
             .call(state, |c| c.store_validator_changes(change_requests))
     }
 
@@ -272,7 +271,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .collect::<Result<Vec<_>, _>>()
             .context("failed to convert cross messages")?;
         let r = self
-            .xnet_messaging_facet
+            .xnet
             .call_with_return(state, |c| c.apply_cross_messages(messages))?;
         Ok(r.into_return())
     }
