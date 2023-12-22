@@ -366,7 +366,7 @@ impl StateMachine for StakingMachine {
             StakingCommand::Join(eth_addr, value, _) => {
                 if value.is_zero() {
                     result.expect_err("should not join with 0 value");
-                } else if pre_state.has_staked(&eth_addr) {
+                } else if pre_state.has_staked(eth_addr) {
                     result.expect_err("should not join again");
                 } else {
                     result.expect("join should succeed");
