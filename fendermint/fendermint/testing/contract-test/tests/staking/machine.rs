@@ -146,9 +146,6 @@ impl StateMachine for StakingMachine {
                 .expect("failed to join subnet");
         }
 
-        let config_num = subnet.get_configuration_numbers(&mut exec_state).expect("");
-        eprintln!("\n> config num: {:?}", config_num);
-
         let bootstrapped = subnet
             .bootstrapped(&mut exec_state)
             .expect("failed to call bootstrapped");
@@ -456,7 +453,7 @@ impl StateMachine for StakingMachine {
         match cmd {
             StakingCommand::Checkpoint { .. } => {
                 // Sanity check the reference state while we have no contract to compare with.
-                debug_assert!(
+                assert!(
                     post_state
                         .accounts
                         .iter()
@@ -464,7 +461,7 @@ impl StateMachine for StakingMachine {
                     "no account goes over initial balance"
                 );
 
-                debug_assert!(
+                assert!(
                     post_state
                         .current_configuration
                         .collaterals
@@ -578,7 +575,7 @@ impl StateMachine for StakingMachine {
             | StakingCommand::Leave(addr)
             | StakingCommand::Claim(addr) => {
                 let a = post_state.accounts.get(addr).unwrap();
-                debug_assert!(a.current_balance <= a.initial_balance);
+                assert!(a.current_balance <= a.initial_balance);
 
                 // Check collaterals
                 let total = post_system

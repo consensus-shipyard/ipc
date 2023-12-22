@@ -211,11 +211,11 @@ impl StakingState {
             state.join(addr, c.0);
         }
 
-        debug_assert!(
+        assert!(
             state.activated,
             "subnet should be activated by the child genesis"
         );
-        debug_assert_eq!(state.next_configuration_number, 1);
+        assert_eq!(state.next_configuration_number, 1);
 
         state
     }
@@ -249,10 +249,22 @@ impl StakingState {
 
     /// Check if checkpoints can be sent to the system.
     pub fn can_checkpoint(&self) -> bool {
+        // This is a technical thing of how the the state does transitions, it's all done in the checkpoint method.
         if !self.activated {
             return true;
         }
-        false
+        // Now the contract expects to be killed explicitly.
+        // if self.current_configuration.total_collateral() >= self.min_collateral()
+        //     && self.current_configuration.total_validators() >= self.min_collateral()
+        // {
+        //     return true;
+        // }
+
+        // This used to be the case when the collateral fell below a threshold,
+        // but now with explicit kill you can always checkpoint until then.
+        // return false;
+
+        true
     }
 
     /// Apply the changes up to the `next_configuration_number`.
