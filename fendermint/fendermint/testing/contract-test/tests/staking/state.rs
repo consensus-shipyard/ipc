@@ -396,7 +396,7 @@ impl StakingState {
     ///
     /// Unlike the contract, the model doesn't require metadata here.
     pub fn join(&mut self, addr: EthAddress, value: TokenAmount) {
-        if value.is_zero() {
+        if value.is_zero() || self.has_staked(&addr) {
             return;
         }
         self.update(|this| {
