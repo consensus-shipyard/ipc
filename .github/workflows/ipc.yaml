@@ -69,5 +69,15 @@ jobs:
           cache-prefix: ipc-${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
           cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Cache Solidity ABI arfiacts
+        uses: actions/cache@v2
+        with:
+          path: ./contracts/out
+          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
+
+      - name: Generate Solidity ABI artifacts
+        run: >-
+          [ -d contracts/out ] || (cd contracts && make compile-abi)
+
       - name: ${{ matrix.make.name }}
         run: cd ipc && make ${{ matrix.make.task }}

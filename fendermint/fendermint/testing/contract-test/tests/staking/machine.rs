@@ -16,7 +16,10 @@ use fendermint_vm_interpreter::fvm::{
     state::{fevm::ContractResult, ipc::GatewayCaller, FvmExecState},
     store::memory::MemoryBlockstore,
 };
-use fendermint_vm_message::{conv::from_fvm, signed::sign_secp256k1};
+use fendermint_vm_message::{
+    conv::from_fvm::{self, to_eth_tokens},
+    signed::sign_secp256k1,
+};
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::bigint::Integer;
@@ -110,13 +113,14 @@ impl StateMachine for StakingMachine {
             majority_percentage: child_ipc.gateway.majority_percentage,
             active_validators_limit: child_ipc.gateway.active_validators_limit,
             power_scale: state.child_genesis.power_scale,
-            // The `min_activation_collateral` has to be at least as high as the parent gateway's `min_collateral`,
-            // otherwise it will refuse the subnet trying to register itself.
-            min_activation_collateral: from_fvm::to_eth_tokens(&parent_ipc.gateway.min_collateral)
-                .unwrap(),
-            min_validators: 1,
+            min_activation_collateral: to_eth_tokens(&state.min_collateral()).unwrap(),
+            min_validators: state.min_validators() as u64,
             min_cross_msg_fee: et::U256::zero(),
-            permissioned: false,
+            permission_mode: 0, // collateral based
+            supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
+                kind: 0, // native token
+                token_address: ethers::types::Address::zero(),
+            },
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
@@ -274,21 +278,13 @@ impl StateMachine for StakingMachine {
 
                 // Build the checkpoint payload.
 
-                // No messages in this test. If we generated some messages, they couldn't be just some
-                // random data thrown in, because the contracts would actually try to execute them.
-                // What I'm mainly interested in is whether the ABI hash is calculated correctly
-                // for a vector, which we can test by trying to pass the empty vector as a tuple.
-                let cross_messages = Vec::<subnet_manager::CrossMsg>::new();
-                let cross_messages_hash = cross_messages.abi_hash();
-
                 let (root, route) = subnet_id_to_eth(&system.subnet_id).unwrap();
 
                 let checkpoint = subnet_manager::BottomUpCheckpoint {
                     subnet_id: subnet_manager::SubnetID { root, route },
-                    block_height: *block_height,
+                    block_height: ethers::types::U256::from(*block_height),
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
-                    cross_messages_hash,
                 };
                 let checkpoint_hash = checkpoint.clone().abi_hash();
 
@@ -367,9 +363,11 @@ impl StateMachine for StakingMachine {
                     result.expect("checkpoint submission should succeed");
                 }
             }
-            StakingCommand::Join(_, value, _) => {
+            StakingCommand::Join(eth_addr, value, _) => {
                 if value.is_zero() {
                     result.expect_err("should not join with 0 value");
+                } else if pre_state.has_staked(eth_addr) {
+                    result.expect_err("should not join again");
                 } else {
                     result.expect("join should succeed");
                 }
@@ -455,7 +453,7 @@ impl StateMachine for StakingMachine {
         match cmd {
             StakingCommand::Checkpoint { .. } => {
                 // Sanity check the reference state while we have no contract to compare with.
-                debug_assert!(
+                assert!(
                     post_state
                         .accounts
                         .iter()
@@ -463,7 +461,7 @@ impl StateMachine for StakingMachine {
                     "no account goes over initial balance"
                 );
 
-                debug_assert!(
+                assert!(
                     post_state
                         .current_configuration
                         .collaterals
@@ -577,7 +575,7 @@ impl StateMachine for StakingMachine {
             | StakingCommand::Leave(addr)
             | StakingCommand::Claim(addr) => {
                 let a = post_state.accounts.get(addr).unwrap();
-                debug_assert!(a.current_balance <= a.initial_balance);
+                assert!(a.current_balance <= a.initial_balance);
 
                 // Check collaterals
                 let total = post_system

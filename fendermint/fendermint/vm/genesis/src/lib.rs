@@ -221,8 +221,6 @@ pub mod ipc {
         #[serde_as(as = "IsHumanReadable")]
         pub msg_fee: TokenAmount,
         pub majority_percentage: u8,
-        #[serde_as(as = "IsHumanReadable")]
-        pub min_collateral: TokenAmount,
         pub active_validators_limit: u16,
     }
 }

@@ -1,7 +1,7 @@
 # Each major sub-repository in this monorepo has their own Makefiles;
 # instead of making an even more compilicated common one, let's delegate to them.
 
-SUBTREES := contracts fvm-utils ipc ipld-resolver fendermint
+SUBTREES := fendermint ipc ipld-resolver fvm-utils contracts
 
 test: $(patsubst %, test/%, $(SUBTREES))
 

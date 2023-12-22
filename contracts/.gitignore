@@ -6,6 +6,7 @@ crytic-export/
 .env
 broadcast/
 out/
+binding/src
 
 node_modules
 

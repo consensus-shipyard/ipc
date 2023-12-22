@@ -6,9 +6,12 @@ BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
 IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f \( -name "*.sol" \))
-IPC_ACTORS_GEN				:= .contracts-gen
+IPC_ACTORS_GEN        := .contracts-gen
 
 FENDERMINT_CODE       := $(shell find . -type f \( -name "*.rs" -o -name "Cargo.toml" \) | grep -v target)
+
+CRATE   := $(shell cargo test -p 2>&1 | grep fendermint)
+PACKAGE := $(patsubst %, --package %, $(CRATE))
 
 # Override PROFILE env var to choose between `local | ci`
 PROFILE ?= local
@@ -37,9 +40,9 @@ install: $(IPC_ACTORS_GEN)
 test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
-	cargo test --release --package 'fendermint_*'
+	cargo test --release $(PACKAGE)
 
-e2e: docker-build
+e2e: docker-build | cargo-make
 	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
 	cd fendermint/testing/snapshot-test && cargo make --profile $(PROFILE)
 
@@ -53,12 +56,14 @@ lint: \
 
 check-fmt:
 	@# `nightly` is required to support ignore list in rustfmt.toml
-	cargo +nightly fmt --all --check
+	cargo +nightly fmt $(PACKAGE) --check
 
-check-clippy:
-	cargo clippy --all --tests -- -D clippy::all
+check-clippy: $(IPC_ACTORS_GEN)
+	@# --all actually runs on the whole workspace but since fendermint depends on all, it's okay.
+	@# We could have a separate top level job that does `fmt` and `clippy` check on the whole project.
+	cargo clippy $(PACKAGE) --no-deps --tests -- -D clippy::all
 
-docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_OUT) $(IPC_ACTORS_GEN)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
@@ -90,6 +95,8 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 # so long as they work together.
 actor-bundle: $(BUILTIN_ACTORS_BUNDLE)
 
+compile-abi: $(IPC_ACTORS_GEN)
+
 # Download a released builtin-actors bundle CAR file.
 $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
@@ -105,4 +112,10 @@ protoc:
 	@if [ -z "$(shell which protoc)" ]; then \
 		echo "Please install the Protobuf Compiler. See https://grpc.io/docs/protoc-installation/"; \
 		exit 1; \
+	fi
+
+.PHONY: cargo-make
+cargo-make:
+	@if [ -z "$(shell cargo --list | grep make)" ]; then \
+		cargo install cargo-make; \
 	fi

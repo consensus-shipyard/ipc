@@ -7,7 +7,6 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::ipc::AbiHash;
 use fendermint_vm_genesis::Collateral;
 use fendermint_vm_genesis::PowerScale;
 use fendermint_vm_message::conv::from_eth;
@@ -23,8 +22,8 @@ use fvm_shared::{address::Address, chainid::ChainID};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
-use ipc_actors_abis::gateway_router_facet as router;
 
 use super::state::ipc::tokens_to_burn;
 use super::{
@@ -49,7 +48,7 @@ pub struct PowerUpdates(pub Vec<Validator<Power>>);
 pub fn maybe_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
-) -> anyhow::Result<Option<(router::BottomUpCheckpoint, PowerUpdates)>>
+) -> anyhow::Result<Option<(checkpoint::BottomUpCheckpoint, PowerUpdates)>>
 where
     DB: Blockstore + Sync + Send + 'static,
 {
@@ -97,15 +96,12 @@ where
                 *circ_supply -= burnt_tokens;
             });
 
-            let cross_messages_hash = cross_msgs.abi_hash();
-
             // Construct checkpoint.
             let checkpoint = BottomUpCheckpoint {
                 subnet_id,
-                block_height: height.value(),
+                block_height: ethers::types::U256::from(height.value()),
                 block_hash,
                 next_configuration_number,
-                cross_messages_hash,
             };
 
             // Save the checkpoint in the ledger.
@@ -179,7 +175,7 @@ where
 
     for cp in incomplete_checkpoints {
         let signatories = gateway
-            .checkpoint_signatories(state, cp.block_height)
+            .checkpoint_signatories(state, cp.block_height.as_u64())
             .context("failed to get checkpoint signatories")?;
 
         if !signatories.contains(&validator_addr) {
@@ -208,13 +204,17 @@ where
         .map(|cp| cp.block_height)
         .max()
     {
-        wait_for_commit(client, highest + 1, validator_ctx.broadcaster.retry_delay())
-            .await
-            .context("failed to wait for commit")?;
+        wait_for_commit(
+            client,
+            highest.as_u64() + 1,
+            validator_ctx.broadcaster.retry_delay(),
+        )
+        .await
+        .context("failed to wait for commit")?;
     }
 
     for cp in incomplete_checkpoints {
-        let height = Height::try_from(cp.block_height)?;
+        let height = Height::try_from(cp.block_height.as_u64())?;
         // Getting the power table from CometBFT where the history is available.
         let power_table = bft_power_table(client, height)
             .await
@@ -227,15 +227,14 @@ where
             .cloned()
         {
             // TODO: Code generation in the ipc-solidity-actors repo should cater for this.
-            let checkpoint = router::BottomUpCheckpoint {
-                subnet_id: router::SubnetID {
+            let checkpoint = checkpoint::BottomUpCheckpoint {
+                subnet_id: checkpoint::SubnetID {
                     root: cp.subnet_id.root,
                     route: cp.subnet_id.route,
                 },
                 block_height: cp.block_height,
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
-                cross_messages_hash: cp.cross_messages_hash,
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.
@@ -261,7 +260,7 @@ where
 pub async fn broadcast_signature<C, DB>(
     broadcaster: &Broadcaster<C>,
     gateway: &GatewayCaller<DB>,
-    checkpoint: router::BottomUpCheckpoint,
+    checkpoint: checkpoint::BottomUpCheckpoint,
     power_table: &PowerTable,
     validator: &Validator<Power>,
     secret_key: &SecretKey,
@@ -290,7 +289,7 @@ fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
     height: Height,
-) -> anyhow::Result<Option<router::SubnetID>>
+) -> anyhow::Result<Option<checkpoint::SubnetID>>
 where
     DB: Blockstore,
 {
@@ -299,7 +298,7 @@ where
         let is_root = id.route.is_empty();
 
         if !is_root && height.value() % gateway.bottom_up_check_period(state)? == 0 {
-            let id = router::SubnetID {
+            let id = checkpoint::SubnetID {
                 root: id.root,
                 route: id.route,
             };

@@ -172,7 +172,7 @@ where
                         .await;
 
                         if let Err(e) = res {
-                            tracing::error!(error =? e, height, "error broadcasting checkpoint signature");
+                            tracing::error!(error =? e, height = height.as_u64(), "error broadcasting checkpoint signature");
                         }
                     });
                 }
