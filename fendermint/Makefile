@@ -63,7 +63,7 @@ check-clippy: $(IPC_ACTORS_GEN)
 	@# We could have a separate top level job that does `fmt` and `clippy` check on the whole project.
 	cargo clippy $(PACKAGE) --no-deps --tests -- -D clippy::all
 
-docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_OUT) $(IPC_ACTORS_GEN)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
