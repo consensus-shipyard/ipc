@@ -110,9 +110,8 @@ impl StateMachine for StakingMachine {
             majority_percentage: child_ipc.gateway.majority_percentage,
             active_validators_limit: child_ipc.gateway.active_validators_limit,
             power_scale: state.child_genesis.power_scale,
-            // activate the subnet by default
-            min_activation_collateral: et::U256::zero(),
-            min_validators: 1,
+            min_activation_collateral: et::U256::one(),
+            min_validators: state.child_genesis.validators.len() as u64,
             min_cross_msg_fee: et::U256::zero(),
             permission_mode: 0, // collateral based
             supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
@@ -139,10 +138,27 @@ impl StateMachine for StakingMachine {
             let _addr = EthAddress::from(v.public_key.0);
             eprintln!("\n> JOINING SUBNET: addr={_addr} deposit={}", v.power.0);
 
+            eprintln!(
+                "\n> IS BOOTSTRAPPED: {}",
+                subnet
+                    .bootstrapped(&mut exec_state)
+                    .expect("failed to call bootstrapped")
+            );
+
             subnet
                 .join(&mut exec_state, v)
                 .expect("failed to join subnet");
+
+            eprintln!(
+                "\n> IS BOOTSTRAPPED after: {}",
+                subnet
+                    .bootstrapped(&mut exec_state)
+                    .expect("failed to call bootstrapped")
+            );
         }
+
+        let config_num = subnet.get_configuration_numbers(&mut exec_state).expect("");
+        eprintln!("\n> config num: {:?}", config_num);
 
         let bootstrapped = subnet
             .bootstrapped(&mut exec_state)
@@ -361,9 +377,11 @@ impl StateMachine for StakingMachine {
                     result.expect("checkpoint submission should succeed");
                 }
             }
-            StakingCommand::Join(_, value, _) => {
+            StakingCommand::Join(eth_addr, value, _) => {
                 if value.is_zero() {
                     result.expect_err("should not join with 0 value");
+                } else if pre_state.has_staked(&eth_addr) {
+                    result.expect_err("should not join again");
                 } else {
                     result.expect("join should succeed");
                 }

@@ -31,9 +31,9 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     function register(uint256 genesisCircSupply) external payable {
         // If L2+ support is not enabled, only allow the registration of new
         // subnets in the root
-        if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
-            revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
-        }
+        // if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
+        //     revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
+        // }
 
         if (msg.value < genesisCircSupply) {
             revert NotEnoughFunds();
