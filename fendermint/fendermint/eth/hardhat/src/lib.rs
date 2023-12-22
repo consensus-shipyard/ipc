@@ -274,7 +274,7 @@ mod tests {
     fn contracts_path() -> PathBuf {
         let contracts_path = std::env::var("FM_CONTRACTS_DIR").unwrap_or_else(|_| {
             workspace_dir()
-                .join("../ipc-solidity-actors/out")
+                .join("contracts/out")
                 .to_string_lossy()
                 .into_owned()
         });
