@@ -14,6 +14,7 @@ use ipc_identity::{
 };
 use ipc_sdk::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
+use ipc_sdk::subnet::{PermissionMode, SupplySource};
 use ipc_sdk::{
     cross::CrossMsg,
     subnet::{ConsensusType, ConstructParams},
@@ -239,7 +240,8 @@ impl IpcProvider {
         bottomup_check_period: ChainEpoch,
         active_validators_limit: u16,
         min_cross_msg_fee: TokenAmount,
-        permissioned: bool,
+        permission_mode: PermissionMode,
+        supply_source: SupplySource,
     ) -> anyhow::Result<Address> {
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -258,7 +260,8 @@ impl IpcProvider {
             bottomup_check_period,
             active_validators_limit,
             min_cross_msg_fee,
-            permissioned,
+            permission_mode,
+            supply_source,
         };
 
         conn.manager()
@@ -485,7 +488,6 @@ impl IpcProvider {
         from: Option<Address>,
         to: Option<Address>,
         amount: TokenAmount,
-        fee: Option<TokenAmount>,
     ) -> anyhow::Result<ChainEpoch> {
         let conn = match self.connection(&subnet) {
             None => return Err(anyhow!("target subnet not found")),
@@ -501,7 +503,7 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .release(gateway_addr, sender, to.unwrap_or(sender), amount, fee)
+            .release(gateway_addr, sender, to.unwrap_or(sender), amount)
             .await
     }
 
@@ -514,15 +516,6 @@ impl IpcProvider {
         _gateway_addr: Address,
         _from: Address,
         _postbox_msg_key: Vec<u8>,
-    ) -> anyhow::Result<()> {
-        todo!()
-    }
-
-    pub async fn send_cross_message(
-        &self,
-        _gateway_addr: Address,
-        _from: Address,
-        _cross_msg: CrossMsg,
     ) -> anyhow::Result<()> {
         todo!()
     }

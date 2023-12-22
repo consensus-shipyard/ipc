@@ -278,7 +278,6 @@ where
         let constructor = abi
             .constructor()
             .ok_or_else(|| anyhow!("contract doesn't have a constructor"))?;
-
         let initcode = constructor
             .encode_input(bytecode, &constructor_params.into_tokens())
             .context("failed to encode constructor input")?;

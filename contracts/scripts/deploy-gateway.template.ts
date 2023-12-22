@@ -54,7 +54,23 @@ export async function deploy(libs: { [key in string]: string }) {
         StorableMsgHelper: libs['StorableMsgHelper'],
     }
 
-    const routerFacetLibs: Libraries = {
+    const checkpointingFacetLibs: Libraries = {
+        AccountHelper: libs['AccountHelper'],
+        SubnetIDHelper: libs['SubnetIDHelper'],
+    }
+
+    const xnetMessagingFacetLibs: Libraries = {
+        AccountHelper: libs['AccountHelper'],
+        CrossMsgHelper: libs['CrossMsgHelper'],
+        SubnetIDHelper: libs['SubnetIDHelper'],
+        StorableMsgHelper: libs['StorableMsgHelper'],
+    }
+
+    const topDownFinalityFacetLibs: Libraries = {
+        AccountHelper: libs['AccountHelper'],
+    }
+
+    const bottomUpRouterFacetLibs: Libraries = {
         CrossMsgHelper: libs['CrossMsgHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
         AccountHelper: libs['AccountHelper'],
@@ -67,7 +83,19 @@ export async function deploy(libs: { [key in string]: string }) {
         { name: 'DiamondCutFacet', libs: {} },
         { name: 'GatewayManagerFacet', libs: managerFacetLibs },
         { name: 'GatewayMessengerFacet', libs: messengerFacetLibs },
-        { name: 'GatewayRouterFacet', libs: routerFacetLibs },
+        {
+            name: 'CheckpointingFacet',
+            libs: checkpointingFacetLibs,
+        },
+        {
+            name: 'XnetMessagingFacet',
+            libs: xnetMessagingFacetLibs,
+        },
+        { name: 'TopDownFinalityFacet', libs: topDownFinalityFacetLibs },
+        {
+            name: 'BottomUpRouterFacet',
+            libs: bottomUpRouterFacetLibs,
+        },
     ]
 
     for (const facet of facets) {

@@ -60,7 +60,6 @@ fendermint \
   ipc gateway \
     --subnet-id /r0 \
     --bottom-up-check-period 10 \
-    --min-collateral 1 \
     --msg-fee 10 \
     --majority-percentage 66
 

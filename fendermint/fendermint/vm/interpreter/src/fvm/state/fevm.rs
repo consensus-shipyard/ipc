@@ -130,7 +130,7 @@ impl std::fmt::Debug for NoRevert {
 ///
 /// let mut state: FvmExecState<DB> = todo!();
 ///
-/// let _period: u64 = caller.call(&mut state, |c| c.bottom_up_check_period()).unwrap();
+/// let _period: u64 = caller.call(&mut state, |c| c.bottom_up_check_period()).unwrap().as_u64();
 /// ```
 #[derive(Clone)]
 pub struct ContractCaller<DB, C, E> {

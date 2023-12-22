@@ -9,7 +9,6 @@
 ///
 use crate::subnet_id::SubnetID;
 use cid::Cid;
-use fvm_ipld_encoding::repr::{Deserialize_repr, Serialize_repr};
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::address::Address;
 
@@ -28,12 +27,4 @@ pub struct ReleaseParams {
 pub struct PropagateParams {
     /// The postbox message cid
     pub postbox_cid: Cid,
-}
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Deserialize_repr, Serialize_repr)]
-#[repr(i32)]
-pub enum Status {
-    Active,
-    Inactive,
-    Killed,
 }

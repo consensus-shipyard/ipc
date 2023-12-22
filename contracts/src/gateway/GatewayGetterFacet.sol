@@ -34,11 +34,6 @@ contract GatewayGetterFacet {
         return s.totalSubnets;
     }
 
-    /// @notice Returns the minimum stake required for instantiating a subnet.
-    function minStake() external view returns (uint256) {
-        return s.minStake;
-    }
-
     /// @notice Returns the maximum number of messages per bottom-up batch.
     function maxMsgsPerBottomUpBatch() external view returns (uint64) {
         return s.maxMsgsPerBottomUpBatch;

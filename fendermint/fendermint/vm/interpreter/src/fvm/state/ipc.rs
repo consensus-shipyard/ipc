@@ -19,8 +19,7 @@ use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
-use ipc_actors_abis::gateway_router_facet as router;
-use ipc_actors_abis::gateway_router_facet::GatewayRouterFacet;
+use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 
@@ -31,12 +30,29 @@ use super::{
 use crate::fvm::FvmApplyRet;
 use fendermint_vm_actor_interface::ipc;
 use fvm_shared::econ::TokenAmount;
+use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
+use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
+use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
     addr: EthAddress,
     getter: ContractCaller<DB, GatewayGetterFacet<MockProvider>, NoRevert>,
-    router: ContractCaller<DB, GatewayRouterFacet<MockProvider>, router::GatewayRouterFacetErrors>,
+    checkpointing: ContractCaller<
+        DB,
+        CheckpointingFacet<MockProvider>,
+        checkpointing_facet::CheckpointingFacetErrors,
+    >,
+    topdown: ContractCaller<
+        DB,
+        TopDownFinalityFacet<MockProvider>,
+        top_down_finality_facet::TopDownFinalityFacetErrors,
+    >,
+    xnet: ContractCaller<
+        DB,
+        XnetMessagingFacet<MockProvider>,
+        xnet_messaging_facet::XnetMessagingFacetErrors,
+    >,
 }
 
 impl<DB> Default for GatewayCaller<DB> {
@@ -54,7 +70,9 @@ impl<DB> GatewayCaller<DB> {
         Self {
             addr,
             getter: ContractCaller::new(addr, GatewayGetterFacet::new),
-            router: ContractCaller::new(addr, GatewayRouterFacet::new),
+            checkpointing: ContractCaller::new(addr, CheckpointingFacet::new),
+            topdown: ContractCaller::new(addr, TopDownFinalityFacet::new),
+            xnet: ContractCaller::new(addr, XnetMessagingFacet::new),
         }
     }
 
@@ -84,7 +102,10 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 
     /// Fetch the period with which the current subnet has to submit checkpoints to its parent.
     pub fn bottom_up_check_period(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
-        self.getter.call(state, |c| c.bottom_up_check_period())
+        Ok(self
+            .getter
+            .call(state, |c| c.bottom_up_check_period())?
+            .as_u64())
     }
 
     /// Fetch the bottom-up messages enqueued for a given checkpoint height.
@@ -93,14 +114,17 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         height: u64,
     ) -> anyhow::Result<Vec<getter::CrossMsg>> {
-        self.getter.call(state, |c| c.bottom_up_messages(height))
+        let batch = self.getter.call(state, |c| {
+            c.bottom_up_msg_batch(ethers::types::U256::from(height))
+        })?;
+        Ok(batch.msgs)
     }
 
     /// Insert a new checkpoint at the period boundary.
     pub fn create_bottom_up_checkpoint(
         &self,
         state: &mut FvmExecState<DB>,
-        checkpoint: router::BottomUpCheckpoint,
+        checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
     ) -> anyhow::Result<()> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
@@ -112,7 +136,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             p.saturating_add(et::U256::from(v.power.0))
         });
 
-        self.router.call(state, |c| {
+        self.checkpointing.call(state, |c| {
             c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power)
         })
     }
@@ -127,7 +151,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
     pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
-        self.router.call(state, |c| c.apply_finality_changes())
+        self.topdown.call(state, |c| c.apply_finality_changes())
     }
 
     /// Get the currently active validator set.
@@ -143,7 +167,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     /// This will need to be broadcasted as a transaction.
     pub fn add_checkpoint_signature_calldata(
         &self,
-        checkpoint: router::BottomUpCheckpoint,
+        checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
         validator: &Validator<Power>,
         secret_key: &SecretKey,
@@ -170,7 +194,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .map(|p| p.into())
             .collect();
 
-        let call = self.router.contract().add_checkpoint_signature(
+        let call = self.checkpointing.contract().add_checkpoint_signature(
             height,
             membership_proof,
             weight,
@@ -191,10 +215,10 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         finality: IPCParentFinality,
     ) -> anyhow::Result<Option<IPCParentFinality>> {
-        let evm_finality = router::ParentFinality::try_from(finality)?;
+        let evm_finality = top_down_finality_facet::ParentFinality::try_from(finality)?;
 
         let (has_committed, prev_finality) = self
-            .router
+            .topdown
             .call(state, |c| c.commit_parent_finality(evm_finality))?;
 
         Ok(if !has_committed {
@@ -215,10 +239,10 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 
         let mut change_requests = vec![];
         for c in changes {
-            change_requests.push(router::StakingChangeRequest::try_from(c)?);
+            change_requests.push(top_down_finality_facet::StakingChangeRequest::try_from(c)?);
         }
 
-        self.router
+        self.topdown
             .call(state, |c| c.store_validator_changes(change_requests))
     }
 
@@ -243,11 +267,11 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     ) -> anyhow::Result<FvmApplyRet> {
         let messages = cross_messages
             .into_iter()
-            .map(router::CrossMsg::try_from)
+            .map(xnet_messaging_facet::CrossMsg::try_from)
             .collect::<Result<Vec<_>, _>>()
             .context("failed to convert cross messages")?;
         let r = self
-            .router
+            .xnet
             .call_with_return(state, |c| c.apply_cross_messages(messages))?;
         Ok(r.into_return())
     }
@@ -268,9 +292,9 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         height: u64,
     ) -> anyhow::Result<Vec<EthAddress>> {
-        let (_, _, addrs, _) = self
-            .getter
-            .call(state, |c| c.get_signature_bundle(height))?;
+        let (_, _, addrs, _) = self.getter.call(state, |c| {
+            c.get_checkpoint_signature_bundle(ethers::types::U256::from(height))
+        })?;
 
         let addrs = addrs.into_iter().map(|a| a.into()).collect();
 

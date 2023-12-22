@@ -29,7 +29,7 @@ struct BottomUpCheckpoint {
     uint64 nextConfigurationNumber;
 }
 
-/// @notice A batch of bottom-up messages for execution
+/// @notice A batch of bottom-up messages for execution.
 struct BottomUpMsgBatch {
     /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.
     SubnetID subnetID;
@@ -39,13 +39,13 @@ struct BottomUpMsgBatch {
     CrossMsg[] msgs;
 }
 
-/// @notice Tracks information about the last batch executed
+/// @notice Tracks information about the last batch executed.
 struct BottomUpMsgBatchInfo {
     uint256 blockHeight;
     bytes32 hash;
 }
 
-/// @notice Tracks information about relayer rewards
+/// @notice Tracks information about relayer rewards.
 struct RelayerRewardsInfo {
     /// @dev user rewards
     mapping(address => uint256) rewards;
@@ -55,16 +55,15 @@ struct RelayerRewardsInfo {
     mapping(uint256 => EnumerableSet.AddressSet) batchRewarded;
 }
 
-/**
- * @dev The goal of `wrapped` flag is to signal that a cross-net message should be sent as-is without changes to the destination.
- *
- * IMPORTANT: This is not currently used but it is a basic primitive required for atomic execution.
- */
+/// @notice A cross-net message type.
+/// @dev The goal of `wrapped` flag is to signal that a cross-net message should be sent as-is without changes to the destination.
+/// IMPORTANT: This is not currently used but it is a basic primitive required for atomic execution.
 struct CrossMsg {
     StorableMsg message;
     bool wrapped;
 }
 
+/// @notice A storable message type.
 struct StorableMsg {
     IPCAddress from;
     IPCAddress to;

@@ -39,8 +39,6 @@ struct GatewayActorStorage {
     bytes32[] subnetKeys;
     /// @notice path to the current network
     SubnetID networkName;
-    /// @notice Minimum stake required to create a new subnet
-    uint256 minStake;
     /// @notice minimum fee amount charged per cross message
     uint256 minCrossMsgFee;
     /// @notice majority percentage value (must be greater than or equal to 51)

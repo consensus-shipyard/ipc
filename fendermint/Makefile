@@ -42,7 +42,7 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release $(PACKAGE)
 
-e2e: docker-build
+e2e: docker-build | cargo-make
 	cd fendermint/testing/smoke-test && cargo make --profile $(PROFILE)
 	cd fendermint/testing/snapshot-test && cargo make --profile $(PROFILE)
 
@@ -63,7 +63,7 @@ check-clippy: $(IPC_ACTORS_GEN)
 	@# We could have a separate top level job that does `fmt` and `clippy` check on the whole project.
 	cargo clippy $(PACKAGE) --no-deps --tests -- -D clippy::all
 
-docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_OUT) $(IPC_ACTORS_GEN)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
@@ -112,4 +112,10 @@ protoc:
 	@if [ -z "$(shell which protoc)" ]; then \
 		echo "Please install the Protobuf Compiler. See https://grpc.io/docs/protoc-installation/"; \
 		exit 1; \
+	fi
+
+.PHONY: cargo-make
+cargo-make:
+	@if [ -z "$(shell cargo --list | grep make)" ]; then \
+		cargo install cargo-make; \
 	fi

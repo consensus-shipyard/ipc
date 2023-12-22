@@ -1,7 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use fvm_shared::address::Address;
-use ipc_sdk::gateway::Status;
 use std::str::FromStr;
 
 use crate::lotus::message::deserialize::{
@@ -129,7 +128,6 @@ fn test_subnet_info_to_str() {
         id: Default::default(),
         stake: Default::default(),
         circ_supply: Default::default(),
-        status: Status::Active,
         genesis_epoch: 0,
     };
 

@@ -110,18 +110,17 @@ impl<DB: Blockstore> SubnetCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         checkpoint: manager::BottomUpCheckpoint,
-        messages: Vec<manager::CrossMsg>,
+        _messages: Vec<manager::CrossMsg>,
         signatures: Vec<(EthAddress, [u8; SECP_SIG_LEN])>,
     ) -> TryCallResult<()> {
         let mut addrs = Vec::new();
         let mut sigs = Vec::new();
         for (addr, sig) in signatures {
-            addrs.push(addr.into());
+            addrs.push(ethers::types::Address::from(addr));
             sigs.push(sig.into());
         }
-        self.manager.try_call(state, |c| {
-            c.submit_checkpoint(checkpoint, messages, addrs, sigs)
-        })
+        self.manager
+            .try_call(state, |c| c.submit_checkpoint(checkpoint, addrs, sigs))
     }
 
     /// Get information about the validator's current and total collateral.

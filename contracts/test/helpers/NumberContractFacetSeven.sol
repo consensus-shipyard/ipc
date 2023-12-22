@@ -6,9 +6,3 @@ contract NumberContractFacetSeven {
         return 7;
     }
 }
-
-contract NumberContractFacetEight {
-    function getNum() external pure returns (uint8) {
-        return 8;
-    }
-}

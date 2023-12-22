@@ -156,22 +156,24 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         let bundle = self.child_handler.checkpoint_bundle_at(height).await?;
         log::debug!("bottom up bundle: {bundle:?}");
 
-        let epoch = self
-            .parent_handler
-            .submit_checkpoint(submitter, bundle)
-            .await
-            .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
-        log::info!(
-            "submitted bottom up checkpoint({}) in parent at height {}",
-            height,
-            epoch
-        );
+        todo!("implement submit checkpoint")
 
-        Ok(())
+        // let epoch = self
+        //     .parent_handler
+        //     .submit_checkpoint(submitter, bundle)
+        //     .await
+        //     .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+        // log::info!(
+        //     "submitted bottom up checkpoint({}) in parent at height {}",
+        //     height,
+        //     epoch
+        // );
+        //
+        // Ok(())
     }
 
     /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
-    async fn submit_next_epoch(&self, submitter: &Address) -> Result<()> {
+    async fn submit_next_epoch(&self, _submitter: &Address) -> Result<()> {
         let next_submission_height = self.next_submission_height().await?;
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
@@ -201,17 +203,18 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await?;
                 log::debug!("bottom up bundle: {bundle:?}");
 
-                let epoch = self
-                    .parent_handler
-                    .submit_checkpoint(submitter, bundle)
-                    .await
-                    .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
-
-                log::info!(
-                    "submitted bottom up checkpoint({}) in parent at height {}",
-                    event.height,
-                    epoch
-                );
+                todo!("implement submiet checkpoint")
+                // let epoch = self
+                //     .parent_handler
+                //     .submit_checkpoint(submitter, bundle)
+                //     .await
+                //     .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+                //
+                // log::info!(
+                //     "submitted bottom up checkpoint({}) in parent at height {}",
+                //     event.height,
+                //     epoch
+                // );
             }
         }
 

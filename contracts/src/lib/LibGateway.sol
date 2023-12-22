@@ -1,17 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
+import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
-import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {CrossMsg, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
+import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
+import {CrossMsg, StorableMsg, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
+import {MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
+import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
+    using SupplySourceHelper for SupplySource;
+    using StorableMsgHelper for StorableMsg;
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `CrossMsg.message.to` should be forwarded to.
@@ -316,5 +322,84 @@ library LibGateway {
     /// @return epoch - the epoch for the given block number and checkpoint period
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
+    }
+
+    /// @notice applies a cross-net messages coming from some other subnet.
+    /// The forwarder argument determines the previous subnet that submitted the checkpoint triggering the cross-net message execution.
+    /// @param arrivingFrom - the immediate subnet from which this message is arriving
+    /// @param crossMsgs - the cross-net messages to apply
+    function applyMessages(SubnetID memory arrivingFrom, CrossMsg[] memory crossMsgs) internal {
+        uint256 crossMsgsLength = crossMsgs.length;
+        for (uint256 i; i < crossMsgsLength; ) {
+            applyMsg(arrivingFrom, crossMsgs[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
+    /// @param arrivingFrom - the immediate subnet from which this message is arriving
+    /// @param crossMsg - the cross message to be executed
+    function applyMsg(SubnetID memory arrivingFrom, CrossMsg memory crossMsg) internal {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        if (crossMsg.message.to.subnetId.isEmpty()) {
+            revert InvalidCrossMsgDstSubnet();
+        }
+
+        // If the crossnet destination is NOT the current network (network where the gateway is running),
+        // we add it to the postbox for further propagation.
+        if (!crossMsg.message.to.subnetId.equals(s.networkName)) {
+            bytes32 cid = crossMsg.toHash();
+            s.postbox[cid] = crossMsg;
+            return;
+        }
+
+        // Now, let's find out the directionality of this message and act accordingly.
+        // slither-disable-next-line uninitialized-local
+        SupplySource memory supplySource;
+        IPCMsgType applyType = crossMsg.message.applyType(s.networkName);
+        if (applyType == IPCMsgType.BottomUp) {
+            // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
+            (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
+            if (!registered) {
+                revert NotRegisteredSubnet();
+            }
+            if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
+                revert InvalidCrossMsgNonce();
+            }
+            subnet.appliedBottomUpNonce += 1;
+
+            // The value carried in bottom-up messages needs to be treated according to the supply source
+            // configuration of the subnet.
+            supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
+        } else if (applyType == IPCMsgType.TopDown) {
+            // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
+            if (s.appliedTopDownNonce != crossMsg.message.nonce) {
+                revert InvalidCrossMsgNonce();
+            }
+            s.appliedTopDownNonce += 1;
+
+            // The value carried in top-down messages locally maps to the native coin, so we pass over the
+            // native supply source.
+            supplySource = SupplySourceHelper.native();
+        }
+
+        // slither-disable-next-line unused-return
+        crossMsg.execute(supplySource);
+    }
+
+    /// @notice Checks the length of a message batch, ensuring it is in (0, maxMsgsPerBottomUpBatch).
+    /// @param batch The batch of messages to check.
+    function checkMsgLength(BottomUpMsgBatch memory batch) internal view {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
+            revert MaxMsgsPerBatchExceeded();
+        }
+        if (batch.msgs.length == 0) {
+            revert BatchWithNoMessages();
+        }
     }
 }

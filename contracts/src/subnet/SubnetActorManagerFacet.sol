@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {InvalidBatchEpoch, NotEnoughGenesisValidators, DuplicatedGenesisValidator, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol";
+import {ERR_PERMISSIONED_AND_BOOTSTRAPPED, ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, NotStakedBefore, InvalidSignatureErr, InvalidCheckpointEpoch, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {QuorumObjKind} from "../structs/Quorum.sol";
@@ -15,11 +17,7 @@ import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
-
-string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permissioned is enabled and subnet bootstrapped";
-
-// The length of the public key that is associated with a validator.
-uint256 constant VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH = 65;
+import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 
 contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -29,25 +27,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     event BottomUpCheckpointSubmitted(BottomUpCheckpoint checkpoint, address submitter);
     event BottomUpCheckpointExecuted(uint256 epoch, address submitter);
     event NextBottomUpCheckpointExecuted(uint256 epoch, address submitter);
-    event SubnetBootstrapped(Validator[]);
-
-    /// @notice Ensures that the subnet is operating under Federated permission mode.
-    /// @dev Reverts if the subnet is not in Federated mode.
-    function enforceFederatedValidation() internal view {
-        if (s.validatorSet.permissionMode != PermissionMode.Federated) {
-            revert MethodNotAllowed(ERR_PERMISSIONED_AND_BOOTSTRAPPED);
-        }
-        return;
-    }
-
-    /// @notice Ensures that the subnet is operating under Collateral-based permission mode.
-    /// @dev Reverts if the subnet is not in Collateral mode.
-    function enforceCollateralValidation() internal view {
-        if (s.validatorSet.permissionMode != PermissionMode.Collateral) {
-            revert MethodNotAllowed(ERR_PERMISSIONED_AND_BOOTSTRAPPED);
-        }
-        return;
-    }
 
     /// @notice Pauses all contract functions with the `whenNotPaused` modifier.
     function pause() external {
@@ -190,6 +169,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     /// @notice method to remove funds from the initial balance of a subnet.
     /// @dev This method can be used by users looking to recover part of their
     /// initial balance before the subnet bootstraps.
+    /// @param amount The amount to remove.
     function preRelease(uint256 amount) external nonReentrant {
         if (amount == 0) {
             revert NotEnoughFunds();
@@ -207,7 +187,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         s.genesisCircSupply -= amount;
 
         if (s.genesisBalance[msg.sender] == 0) {
-            rmAddressFromBalanceKey(msg.sender);
+            LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
         }
 
         payable(msg.sender).sendValue(amount);
@@ -225,7 +205,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
     ) external notKilled {
         LibDiamond.enforceIsContractOwner();
 
-        enforceFederatedValidation();
+        LibSubnetActor.enforceFederatedValidation();
 
         if (validators.length != powers.length) {
             revert InvalidFederationPayload();
@@ -236,23 +216,30 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         }
 
         if (s.bootstrapped) {
-            postBootstrapSetFederatedPower(validators, publicKeys, powers);
+            LibSubnetActor.postBootstrapSetFederatedPower(validators, publicKeys, powers);
         } else {
-            preBootstrapSetFederatedPower(validators, publicKeys, powers);
+            LibSubnetActor.preBootstrapSetFederatedPower(validators, publicKeys, powers);
         }
     }
 
-    /// @notice method that allows a validator to join the subnet
-    /// @param publicKey The off-chain 65 byte public key that should be associated with the validator.
+    /// @notice method that allows a validator to join the subnet.
+    ///         If the total confirmed collateral of the subnet is greater
+    ///         or equal to minimum activation collateral as a result of this operation,
+    ///         then  subnet will be registered.
+    /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant whenNotPaused notKilled {
         // adding this check to prevent new validators from joining
         // after the subnet has been bootstrapped. We will increase the
         // functionality in the future to support explicit permissioning.
         if (s.bootstrapped) {
-            enforceCollateralValidation();
+            LibSubnetActor.enforceCollateralValidation();
         }
         if (msg.value == 0) {
             revert CollateralIsZero();
+        }
+
+        if (LibStaking.isValidator(msg.sender)) {
+            revert MethodNotAllowed(ERR_VALIDATOR_JOINED);
         }
 
         if (publicKey.length != VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH) {
@@ -260,7 +247,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
             revert InvalidPublicKeyLength();
         }
 
-        address convertedAddress = publicKeyToAddress(publicKey);
+        address convertedAddress = LibSubnetActor.publicKeyToAddress(publicKey);
         if (convertedAddress != msg.sender) {
             revert NotOwnerOfPublicKey();
         }
@@ -274,52 +261,46 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
             LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
             LibStaking.depositWithConfirm(msg.sender, msg.value);
 
-            uint256 totalCollateral = LibStaking.getTotalConfirmedCollateral();
-
-            if (totalCollateral >= s.minActivationCollateral) {
-                if (LibStaking.totalActiveValidators() >= s.minValidators) {
-                    s.bootstrapped = true;
-                    emit SubnetBootstrapped(s.genesisValidators);
-
-                    // register adding the genesis circulating supply (if it exists)
-                    IGateway(s.ipcGatewayAddr).register{value: totalCollateral + s.genesisCircSupply}(
-                        s.genesisCircSupply
-                    );
-                }
-            }
+            LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
+            // if the subnet has been bootstrapped, join with postponed confirmation.
             LibStaking.setValidatorMetadata(msg.sender, publicKey);
             LibStaking.deposit(msg.sender, msg.value);
         }
     }
 
     /// @notice method that allows a validator to increase its stake.
+    ///         If the total confirmed collateral of the subnet is greater
+    ///         or equal to minimum activation collateral as a result of this operation,
+    ///         then  subnet will be registered.
     function stake() external payable whenNotPaused notKilled {
-        // disbling validator changes for federated subnets (at least for now
+        // disabling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
-        enforceCollateralValidation();
+        LibSubnetActor.enforceCollateralValidation();
         if (msg.value == 0) {
             revert CollateralIsZero();
         }
 
-        if (!LibStaking.hasStaked(msg.sender)) {
-            revert NotStakedBefore();
+        if (!LibStaking.isValidator(msg.sender)) {
+            revert MethodNotAllowed(ERR_VALIDATOR_NOT_JOINED);
         }
 
         if (!s.bootstrapped) {
             LibStaking.depositWithConfirm(msg.sender, msg.value);
-            return;
-        }
 
-        LibStaking.deposit(msg.sender, msg.value);
+            LibSubnetActor.bootstrapSubnetIfNeeded();
+        } else {
+            LibStaking.deposit(msg.sender, msg.value);
+        }
     }
 
     /// @notice method that allows a validator to unstake a part of its collateral from a subnet.
     /// @dev `leave` must be used to unstake the entire stake.
+    /// @param amount The amount to unstake.
     function unstake(uint256 amount) external whenNotPaused notKilled {
         // disbling validator changes for federated validation subnets (at least for now
         // until a more complex mechanism is implemented).
-        enforceCollateralValidation();
+        LibSubnetActor.enforceCollateralValidation();
 
         if (amount == 0) {
             revert CannotReleaseZero();
@@ -349,7 +330,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         // their collateral ever (worth noting in the docs if this ends
         // up sticking around for a while).
         if (s.bootstrapped) {
-            enforceCollateralValidation();
+            LibSubnetActor.enforceCollateralValidation();
         }
 
         // remove bootstrap nodes added by this validator
@@ -368,7 +349,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
             if (genesisBalance != 0) {
                 s.genesisBalance[msg.sender] == 0;
                 s.genesisCircSupply -= genesisBalance;
-                rmAddressFromBalanceKey(msg.sender);
+                LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
                 payable(msg.sender).sendValue(genesisBalance);
             }
 
@@ -430,7 +411,7 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         // get rewarded addresses
         address[] memory relayers = new address[](0);
         if (kind == QuorumObjKind.Checkpoint) {
-            relayers = checkpointRewardedAddrs(height);
+            relayers = LibSubnetActor.checkpointRewardedAddrs(height);
         } else if (kind == QuorumObjKind.BottomUpMsgBatch) {
             // FIXME: The distribution of rewards for batches can't be done
             // as for checkpoints (due to how they are submitted). As
@@ -461,14 +442,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
         }
     }
 
-    /// @notice Retrieves the addresses of relayers who were rewarded for a specific checkpoint at a given height.
-    /// @param height The height of the checkpoint for which to find rewarded relayers.
-    /// @return relayers An array of addresses of the relayers who were rewarded at the specified checkpoint.
-    function checkpointRewardedAddrs(uint256 height) internal view returns (address[] memory relayers) {
-        uint256 previousHeight = height - s.bottomUpCheckPeriod;
-        relayers = s.relayerRewards.checkpointRewarded[previousHeight].values();
-    }
-
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
     ///         Reverts otherwise.
     /// @dev Signatories in `signatories` and their signatures in `signatures` must be provided in the same order.
@@ -497,99 +470,6 @@ contract SubnetActorManagerFacet is ISubnetActor, SubnetActorModifiers, Pausable
 
         if (!valid) {
             revert InvalidSignatureErr(uint8(err));
-        }
-    }
-
-    /// @notice Converts a 65-byte public key to its corresponding address.
-    /// @param publicKey The 65-byte public key to be converted.
-    /// @return The address derived from the given public key.
-    function publicKeyToAddress(bytes calldata publicKey) internal pure returns (address) {
-        assert(publicKey.length == VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH);
-        bytes32 hashed = keccak256(publicKey[1:]);
-        return address(uint160(uint256(hashed)));
-    }
-
-    /// @notice Removes an address from the initial balance keys.
-    function rmAddressFromBalanceKey(address addr) internal {
-        uint256 length = s.genesisBalanceKeys.length;
-        for (uint256 i; i < length; ) {
-            if (s.genesisBalanceKeys[i] == addr) {
-                s.genesisBalanceKeys[i] = s.genesisBalanceKeys[length - 1];
-                s.genesisBalanceKeys.pop();
-                // exit after removing the key
-                break;
-            }
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /// @notice method that allows the contract owner to set the validators' federated power before
-    /// @notice subnet has already been bootstrapped.
-    function preBootstrapSetFederatedPower(
-        address[] calldata validators,
-        bytes[] calldata publicKeys,
-        uint256[] calldata powers
-    ) internal {
-        uint256 length = validators.length;
-        for (uint256 i; i < length; ) {
-            // check addresses
-            address convertedAddress = publicKeyToAddress(publicKeys[i]);
-            if (convertedAddress != validators[i]) {
-                revert NotOwnerOfPublicKey();
-            }
-
-            // performing deduplication
-            // validator should have no power when first added
-            if (LibStaking.getPower(validators[i]) > 0) {
-                revert DuplicatedGenesisValidator();
-            }
-
-            LibStaking.setMetadataWithConfirm(validators[i], publicKeys[i]);
-            LibStaking.setFederatedPowerWithConfirm(validators[i], powers[i]);
-
-            s.genesisValidators.push(Validator({addr: validators[i], weight: powers[i], metadata: publicKeys[i]}));
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        // check duplication first then check length
-        if (length <= s.minValidators) {
-            revert NotEnoughGenesisValidators();
-        }
-
-        s.bootstrapped = true;
-        emit SubnetBootstrapped(s.genesisValidators);
-
-        // register adding the genesis circulating supply (if it exists)
-        IGateway(s.ipcGatewayAddr).register{value: s.genesisCircSupply}(s.genesisCircSupply);
-    }
-
-    /// @notice method that allows the contract owner to set the validators' federated power after
-    /// @notice subnet has already been bootstrapped.
-    function postBootstrapSetFederatedPower(
-        address[] calldata validators,
-        bytes[] calldata publicKeys,
-        uint256[] calldata powers
-    ) internal {
-        uint256 length = validators.length;
-        for (uint256 i; i < length; ) {
-            // check addresses
-            address convertedAddress = publicKeyToAddress(publicKeys[i]);
-            if (convertedAddress != validators[i]) {
-                revert NotOwnerOfPublicKey();
-            }
-
-            // no need to do deduplication as set directly set the power, there wont be any addition of
-            // federated power.
-            LibStaking.setFederatedPower({validator: validators[i], metadata: publicKeys[i], amount: powers[i]});
-
-            unchecked {
-                ++i;
-            }
         }
     }
 }
