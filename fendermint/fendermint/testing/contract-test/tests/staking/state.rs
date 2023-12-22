@@ -62,6 +62,17 @@ pub struct StakingDistribution {
 }
 
 impl StakingDistribution {
+    /// Sum of all collaterals from active an inactive validators.
+    ///
+    /// Do not compare this against signature weights because it contains inactive ones!
+    pub fn total_collateral(&self) -> TokenAmount {
+        self.total_collateral.clone()
+    }
+
+    pub fn total_validators(&self) -> usize {
+        self.collaterals.len()
+    }
+
     /// Collateral of a validator.
     pub fn collateral(&self, addr: &EthAddress) -> TokenAmount {
         self.collaterals
@@ -200,11 +211,11 @@ impl StakingState {
             state.join(addr, c.0);
         }
 
-        debug_assert!(
+        assert!(
             state.activated,
             "subnet should be activated by the child genesis"
         );
-        debug_assert_eq!(state.next_configuration_number, 1);
+        assert_eq!(state.next_configuration_number, 1);
 
         state
     }
@@ -222,15 +233,42 @@ impl StakingState {
 
         if !self.activated {
             self.checkpoint(configuration_number, 0);
+
+            let total_collateral = self.current_configuration.total_collateral();
+            let total_validators = self.current_configuration.total_validators();
+
+            let min_collateral = self.min_collateral();
+            let min_validators = self.min_validators();
+
+            if total_collateral >= min_collateral && total_validators >= min_validators {
+                self.activated = true;
+                self.next_configuration_number = 1;
+            }
         }
     }
 
     /// Check if checkpoints can be sent to the system.
     pub fn can_checkpoint(&self) -> bool {
+        // This is a technical thing of how the the state does transitions, it's all done in the checkpoint method.
         if !self.activated {
             return true;
         }
-        false
+        // Now the contract expects to be killed explicitly.
+        // if self.current_configuration.total_collateral() >= self.min_collateral()
+        //     && self.current_configuration.total_validators() >= self.min_collateral()
+        // {
+        //     return true;
+        // }
+
+        // This used to be the case when the collateral fell below a threshold,
+        // but now with explicit kill you can always checkpoint until then.
+        // return false;
+
+        if self.active_validators().next().is_none() {
+            return false;
+        }
+
+        true
     }
 
     /// Apply the changes up to the `next_configuration_number`.
@@ -278,6 +316,22 @@ impl StakingState {
             .as_ref()
             .map(|ipc| ipc.gateway.active_validators_limit)
             .unwrap_or_default()
+    }
+
+    /// Minimum number of validators required to activate the subnet.
+    pub fn min_validators(&self) -> usize {
+        // For now just make it so that when all genesis validators join, the subnet is activated.
+        self.child_genesis.validators.len()
+    }
+
+    /// Minimum collateral required to activate the subnet.
+    pub fn min_collateral(&self) -> TokenAmount {
+        // For now just make it so that when all genesis validators join, the subnet is activated.
+        self.child_genesis
+            .validators
+            .iter()
+            .map(|v| v.power.0.clone())
+            .sum()
     }
 
     /// Top N validators ordered by collateral.
@@ -346,7 +400,7 @@ impl StakingState {
     ///
     /// Unlike the contract, the model doesn't require metadata here.
     pub fn join(&mut self, addr: EthAddress, value: TokenAmount) {
-        if value.is_zero() {
+        if value.is_zero() || self.has_staked(&addr) {
             return;
         }
         self.update(|this| {
@@ -498,10 +552,16 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Currently there is a feature flag in the contracts called `FEATURE_SUBNET_DEPTH`
+        // that restricts the creation of subnets to be L2 only, so the creator has
+        // to live under the root directly.
+        let subnet_id = ArbSubnetID::arbitrary(u)?.0;
+        let subnet_id = SubnetID::new_root(subnet_id.root_id());
+
         // IPC of the parent subnet itself - most are not going to be used.
         let parent_ipc = IpcParams {
             gateway: GatewayParams {
-                subnet_id: ArbSubnetID::arbitrary(u)?.0,
+                subnet_id,
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
                 msg_fee: ArbTokenAmount::arbitrary(u)?.0,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,

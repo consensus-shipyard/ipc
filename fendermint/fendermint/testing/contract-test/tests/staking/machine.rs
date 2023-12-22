@@ -16,7 +16,10 @@ use fendermint_vm_interpreter::fvm::{
     state::{fevm::ContractResult, ipc::GatewayCaller, FvmExecState},
     store::memory::MemoryBlockstore,
 };
-use fendermint_vm_message::{conv::from_fvm, signed::sign_secp256k1};
+use fendermint_vm_message::{
+    conv::from_fvm::{self, to_eth_tokens},
+    signed::sign_secp256k1,
+};
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::bigint::Integer;
@@ -110,9 +113,8 @@ impl StateMachine for StakingMachine {
             majority_percentage: child_ipc.gateway.majority_percentage,
             active_validators_limit: child_ipc.gateway.active_validators_limit,
             power_scale: state.child_genesis.power_scale,
-            // activate the subnet by default
-            min_activation_collateral: et::U256::zero(),
-            min_validators: 1,
+            min_activation_collateral: to_eth_tokens(&state.min_collateral()).unwrap(),
+            min_validators: state.min_validators() as u64,
             min_cross_msg_fee: et::U256::zero(),
             permission_mode: 0, // collateral based
             supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
@@ -361,9 +363,11 @@ impl StateMachine for StakingMachine {
                     result.expect("checkpoint submission should succeed");
                 }
             }
-            StakingCommand::Join(_, value, _) => {
+            StakingCommand::Join(eth_addr, value, _) => {
                 if value.is_zero() {
                     result.expect_err("should not join with 0 value");
+                } else if pre_state.has_staked(eth_addr) {
+                    result.expect_err("should not join again");
                 } else {
                     result.expect("join should succeed");
                 }
@@ -449,7 +453,7 @@ impl StateMachine for StakingMachine {
         match cmd {
             StakingCommand::Checkpoint { .. } => {
                 // Sanity check the reference state while we have no contract to compare with.
-                debug_assert!(
+                assert!(
                     post_state
                         .accounts
                         .iter()
@@ -457,7 +461,7 @@ impl StateMachine for StakingMachine {
                     "no account goes over initial balance"
                 );
 
-                debug_assert!(
+                assert!(
                     post_state
                         .current_configuration
                         .collaterals
@@ -571,7 +575,7 @@ impl StateMachine for StakingMachine {
             | StakingCommand::Leave(addr)
             | StakingCommand::Claim(addr) => {
                 let a = post_state.accounts.get(addr).unwrap();
-                debug_assert!(a.current_balance <= a.initial_balance);
+                assert!(a.current_balance <= a.initial_balance);
 
                 // Check collaterals
                 let total = post_system
