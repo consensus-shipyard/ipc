@@ -4,7 +4,6 @@
 use arbitrary::{Arbitrary, Unstructured};
 use fendermint_testing::arb::ArbTokenAmount;
 use fvm_shared::{bigint::Integer, econ::TokenAmount};
-use std::ops::Add;
 
 pub mod machine;
 pub mod state;

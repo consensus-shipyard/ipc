@@ -296,7 +296,6 @@ impl StakingState {
     /// Get and increment the configuration number.
     fn next_configuration_number(&mut self) -> u64 {
         let n = self.next_configuration_number;
-        println!("actived? {}", self.activated);
         if self.activated {
             self.next_configuration_number += 1;
         }

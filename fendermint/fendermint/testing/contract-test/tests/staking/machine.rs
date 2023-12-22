@@ -138,23 +138,9 @@ impl StateMachine for StakingMachine {
             let _addr = EthAddress::from(v.public_key.0);
             eprintln!("\n> JOINING SUBNET: addr={_addr} deposit={}", v.power.0);
 
-            eprintln!(
-                "\n> IS BOOTSTRAPPED: {}",
-                subnet
-                    .bootstrapped(&mut exec_state)
-                    .expect("failed to call bootstrapped")
-            );
-
             subnet
                 .join(&mut exec_state, v)
                 .expect("failed to join subnet");
-
-            eprintln!(
-                "\n> IS BOOTSTRAPPED after: {}",
-                subnet
-                    .bootstrapped(&mut exec_state)
-                    .expect("failed to call bootstrapped")
-            );
         }
 
         let config_num = subnet.get_configuration_numbers(&mut exec_state).expect("");
