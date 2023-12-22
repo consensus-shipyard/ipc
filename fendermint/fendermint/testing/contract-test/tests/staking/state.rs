@@ -264,6 +264,10 @@ impl StakingState {
         // but now with explicit kill you can always checkpoint until then.
         // return false;
 
+        if self.active_validators().next().is_none() {
+            return false;
+        }
+
         true
     }
 
