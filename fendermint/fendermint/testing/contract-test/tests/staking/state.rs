@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::{BTreeMap, VecDeque};
+use std::ops::Add;
 
 use arbitrary::Unstructured;
 use fendermint_crypto::{PublicKey, SecretKey};
@@ -62,6 +63,17 @@ pub struct StakingDistribution {
 }
 
 impl StakingDistribution {
+    /// Sum of all collaterals from active an inactive validators.
+    ///
+    /// Do not compare this against signature weights because it contains inactive ones!
+    pub fn total_collateral(&self) -> TokenAmount {
+        self.total_collateral.clone()
+    }
+
+    pub fn total_validators(&self) -> usize {
+        self.collaterals.len()
+    }
+
     /// Collateral of a validator.
     pub fn collateral(&self, addr: &EthAddress) -> TokenAmount {
         self.collaterals
@@ -150,6 +162,10 @@ pub struct StakingState {
     pub activated: bool,
     /// Configuration number to be used in the next operation.
     pub next_configuration_number: u64,
+    /// Minimal activation collateral
+    pub min_activation_collateral: Collateral,
+    /// The minimal number of validators
+    pub min_activators: usize,
     /// Unconfirmed staking operations.
     pub pending_updates: VecDeque<StakingUpdate>,
     /// The block height of the last checkpoint.
@@ -163,14 +179,15 @@ impl StakingState {
         parent_genesis: Genesis,
         child_genesis: Genesis,
     ) -> Self {
-        let current_configuration = child_genesis
-            .validators
-            .iter()
-            .map(|v| {
-                let addr = EthAddress::new_secp256k1(&v.public_key.0.serialize()).unwrap();
-                (addr, v.power.clone())
-            })
-            .collect::<Vec<_>>();
+        let min_activators = child_genesis.validators.len();
+        let mut total_validator_collateral = TokenAmount::from_atto(1);
+
+        let mut current_configuration = vec![];
+        for v in &child_genesis.validators {
+            let addr = EthAddress::new_secp256k1(&v.public_key.0.serialize()).unwrap();
+            current_configuration.push((addr, v.power.clone()));
+            total_validator_collateral = total_validator_collateral.add(v.power.0.clone());
+        }
 
         let accounts = accounts
             .into_iter()
@@ -191,6 +208,8 @@ impl StakingState {
             next_configuration: StakingDistribution::default(),
             activated: false,
             next_configuration_number: 0,
+            min_activation_collateral: Collateral(total_validator_collateral),
+            min_activators,
             pending_updates: VecDeque::new(),
             last_checkpoint_height: 0,
         };
@@ -222,6 +241,13 @@ impl StakingState {
 
         if !self.activated {
             self.checkpoint(configuration_number, 0);
+
+            let total_collateral = self.current_configuration.total_collateral();
+            let total_activators = self.current_configuration.total_validators();
+
+            if total_collateral >= self.min_activation_collateral.0 && total_activators >= self.min_activators {
+                self.activated = true;
+            }
         }
     }
 

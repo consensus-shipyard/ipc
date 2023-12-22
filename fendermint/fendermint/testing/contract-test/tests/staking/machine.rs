@@ -110,7 +110,7 @@ impl StateMachine for StakingMachine {
             majority_percentage: child_ipc.gateway.majority_percentage,
             active_validators_limit: child_ipc.gateway.active_validators_limit,
             power_scale: state.child_genesis.power_scale,
-            min_activation_collateral: et::U256::one(),
+            min_activation_collateral: et::U256::from_dec_str(&state.min_activation_collateral.0.atto().to_string()).unwrap(),
             min_validators: state.child_genesis.validators.len() as u64,
             min_cross_msg_fee: et::U256::zero(),
             permission_mode: 0, // collateral based
