@@ -536,10 +536,16 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Currently there is a feature flag in the contracts called `FEATURE_SUBNET_DEPTH`
+        // that restricts the creation of subnets to be L2 only, so the creator has
+        // to live under the root directly.
+        let subnet_id = ArbSubnetID::arbitrary(u)?.0;
+        let subnet_id = SubnetID::new_root(subnet_id.root_id());
+
         // IPC of the parent subnet itself - most are not going to be used.
         let parent_ipc = IpcParams {
             gateway: GatewayParams {
-                subnet_id: ArbSubnetID::arbitrary(u)?.0,
+                subnet_id,
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
                 msg_fee: ArbTokenAmount::arbitrary(u)?.0,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,
