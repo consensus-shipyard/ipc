@@ -296,6 +296,7 @@ impl StakingState {
     /// Get and increment the configuration number.
     fn next_configuration_number(&mut self) -> u64 {
         let n = self.next_configuration_number;
+        println!("actived? {}", self.activated);
         if self.activated {
             self.next_configuration_number += 1;
         }
@@ -349,7 +350,6 @@ impl StakingState {
         if value.is_zero() {
             return;
         }
-
         self.update(|this| {
             this.debit(&addr, value.clone());
 
@@ -357,10 +357,7 @@ impl StakingState {
                 configuration_number: {
                     // Add an extra because joining in the model would cause a metadata update as well.
                     this.next_configuration_number();
-
-                    let next_config_num = this.next_configuration_number();
-                    eprintln!("after join next config num: {next_config_num}");
-                    next_config_num
+                    this.next_configuration_number()
                 },
                 addr,
                 op: StakingOp::Deposit(value),
@@ -377,11 +374,8 @@ impl StakingState {
         self.update(|this| {
             this.debit(&addr, value.clone());
 
-            let next_config_num = this.next_configuration_number();
-            eprintln!("after stake next config num: {next_config_num}");
-
             StakingUpdate {
-                configuration_number: next_config_num,
+                configuration_number: this.next_configuration_number(),
                 addr,
                 op: StakingOp::Deposit(value),
             }
@@ -393,15 +387,10 @@ impl StakingState {
         if value.is_zero() || self.total_deposit(&addr) <= value {
             return;
         }
-
-        self.update(|this| {
-            let next_config_num = this.next_configuration_number();
-            eprintln!("after unstake next config num: {next_config_num}");
-            StakingUpdate {
-                configuration_number: next_config_num,
-                addr,
-                op: StakingOp::Withdraw(value),
-            }
+        self.update(|this| StakingUpdate {
+            configuration_number: this.next_configuration_number(),
+            addr,
+            op: StakingOp::Withdraw(value),
         });
     }
 
@@ -411,15 +400,10 @@ impl StakingState {
             return;
         }
         let value = self.total_deposit(&addr);
-
-        self.update(|this| {
-            let next_config_num = this.next_configuration_number();
-            eprintln!("after leave next config num: {next_config_num}");
-            StakingUpdate {
-                configuration_number: next_config_num,
-                addr,
-                op: StakingOp::Withdraw(value),
-            }
+        self.update(|this| StakingUpdate {
+            configuration_number: this.next_configuration_number(),
+            addr,
+            op: StakingOp::Withdraw(value),
         });
     }
 
