@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use self::fund::{PreFund, PreFundArgs, FundWithToken, FundWithTokenArgs};
+use self::fund::{FundWithToken, FundWithTokenArgs, PreFund, PreFundArgs};
 use self::release::{PreRelease, PreReleaseArgs};
 use self::topdown_cross::{
     LatestParentFinality, LatestParentFinalityArgs, ListTopdownMsgs, ListTopdownMsgsArgs,
