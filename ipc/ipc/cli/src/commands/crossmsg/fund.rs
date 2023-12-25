@@ -114,3 +114,52 @@ pub struct PreFundArgs {
     #[arg(help = "Add an initial balance for the address in genesis in the subnet")]
     pub initial_balance: f64,
 }
+
+/// The command to send ERC20 tokens to a subnet from parent
+pub(crate) struct FundWithToken;
+
+#[async_trait]
+impl CommandLineHandler for FundWithToken {
+    type Arguments = FundWithTokenArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("fund with token operation with args: {:?}", arguments);
+
+        let mut provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let from = match &arguments.from {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
+        let to = match &arguments.to {
+            Some(address) => Some(require_fil_addr_from_str(address)?),
+            None => None,
+        };
+
+        println!(
+            "fund with token performed in epoch: {:?}",
+            provider
+                .fund_with_token(subnet, from, to, f64_to_token_amount(arguments.amount)?,)
+                .await?,
+        );
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args)]
+#[command(about = "Send erc20 tokens from a parent to a child subnet")]
+pub(crate) struct FundWithTokenArgs {
+    #[arg(long, short, help = "The address to send funds from")]
+    pub from: Option<String>,
+    #[arg(
+        long,
+        short,
+        help = "The address to send funds to (if not set, amount sent to from address)"
+    )]
+    pub to: Option<String>,
+    #[arg(long, short, help = "The subnet to fund")]
+    pub subnet: String,
+    #[arg(help = "The amount to fund in erc20, in ether, supports up to 9 decimal places")]
+    pub amount: f64,
+}

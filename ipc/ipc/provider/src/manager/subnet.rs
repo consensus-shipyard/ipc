@@ -88,6 +88,25 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         amount: TokenAmount,
     ) -> Result<ChainEpoch>;
 
+    /// Sends funds to a specified subnet receiver using ERC20 tokens.
+    /// This function locks the amount of ERC20 tokens into custody and then mints the supply in the specified subnet.
+    /// It checks if the subnet's supply strategy is ERC20 and if not, the operation is reverted.
+    /// It allows for free injection of funds into a subnet and is protected against reentrancy.
+    ///
+    /// # Arguments
+    ///
+    /// * `subnetId` - The ID of the subnet where the funds will be sent to.
+    /// * `from`     - The funding address.
+    /// * `to`       - The funded address.
+    /// * `amount`   - The amount of ERC20 tokens to be sent.
+    async fn fund_with_token(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        to: Address,
+        amount: TokenAmount,
+    ) -> Result<ChainEpoch>;
+
     /// Release creates a new check message to release funds in parent chain
     /// Returns the epoch that the released is executed in the child.
     async fn release(

@@ -1,6 +1,6 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
-use self::fund::{PreFund, PreFundArgs};
+use self::fund::{PreFund, PreFundArgs, FundWithToken, FundWithTokenArgs};
 use self::release::{PreRelease, PreReleaseArgs};
 use self::topdown_cross::{
     LatestParentFinality, LatestParentFinalityArgs, ListTopdownMsgs, ListTopdownMsgsArgs,
@@ -32,6 +32,7 @@ impl CrossMsgsCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
             Commands::Fund(args) => Fund::handle(global, args).await,
+            Commands::FundWithToken(args) => FundWithToken::handle(global, args).await,
             Commands::PreFund(args) => PreFund::handle(global, args).await,
             Commands::Release(args) => Release::handle(global, args).await,
             Commands::PreRelease(args) => PreRelease::handle(global, args).await,
@@ -45,6 +46,7 @@ impl CrossMsgsCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     Fund(FundArgs),
+    FundWithToken(FundWithTokenArgs),
     PreFund(PreFundArgs),
     Release(ReleaseArgs),
     PreRelease(PreReleaseArgs),
