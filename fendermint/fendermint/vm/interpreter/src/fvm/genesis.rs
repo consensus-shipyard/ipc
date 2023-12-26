@@ -282,7 +282,6 @@ where
                 let facets = deployer
                     .facets(ipc::gateway::CONTRACT_NAME)
                     .context("failed to collect gateway facets")?;
-                tracing::info!(?facets, "deploying ipc gateway with facets");
 
                 deployer.deploy_contract(
                     &mut state,
