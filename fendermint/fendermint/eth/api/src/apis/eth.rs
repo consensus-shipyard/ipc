@@ -731,14 +731,19 @@ where
     let params = RawBytes::serialize(params).context("failed to serialize position to IPLD")?;
     let height = data.query_height(block_id).await?;
 
-    let ret = data
+    let Ok(ret) = data
         .read_evm_actor::<evm::GetStorageAtReturn>(
             address,
             evm::Method::GetStorageAt,
             params,
             height,
         )
-        .await?;
+        .await
+    else {
+        // TODO Actually compare the actor type and return empty if not an EVM actor.
+        //  See https://github.com/consensus-shipyard/ipc-monorepo/issues/506.
+        return Ok(Default::default());
+    };
 
     // The client library expects hex encoded string.
     let mut bz = [0u8; 32];
@@ -760,9 +765,14 @@ where
     let params = RawBytes::default();
     let height = data.query_height(block_id).await?;
 
-    let ret = data
+    let Ok(ret) = data
         .read_evm_actor::<evm::BytecodeReturn>(address, evm::Method::GetBytecode, params, height)
-        .await?;
+        .await
+    else {
+        // TODO Actually compare the actor type and return empty if not an EVM actor.
+        //  See https://github.com/consensus-shipyard/ipc-monorepo/issues/506.
+        return Ok(Default::default());
+    };
 
     match ret.and_then(|r| r.code) {
         None => Ok(et::Bytes::default()),
