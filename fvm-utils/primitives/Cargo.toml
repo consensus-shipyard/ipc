@@ -6,19 +6,19 @@ version = "0.1.0"
 
 [dependencies]
 fil_actors_runtime = {path = "../runtime", features = ["fil-actor"]}
-fvm_ipld_blockstore = "0.1.1"
-fvm_ipld_encoding = "0.3.3"
-fvm_ipld_hamt = "0.5.1"
-fvm_shared = {version = "=3.2.0", default-features = false}
+fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_ipld_hamt = { workspace = true }
+fvm_shared = { workspace = true }
 
-anyhow = "1.0.56"
-cid = {version = "0.8.3", default-features = false, features = ["serde-codec"]}
-hex = "0.4.3"
+anyhow = { workspace = true }
+cid = { workspace = true, default-features = false, features = ["serde-codec"]}
+hex = { workspace = true }
 indexmap = {version = "1.8.0", features = ["serde-1"]}
-integer-encoding = {version = "3.0.3", default-features = false}
-lazy_static = "1.4.0"
-log = "0.4.14"
-num-derive = "0.3.3"
-num-traits = "0.2.14"
-serde = {version = "1.0.136", features = ["derive"]}
+integer-encoding =  { workspace = true, default-features = false}
+lazy_static =  { workspace = true }
+log =  { workspace = true }
+num-derive =  { workspace = true }
+num-traits =  { workspace = true }
+serde =  { workspace = true, features = ["derive"]}
 uint = {version = "0.9.3", default-features = false}
