@@ -4,9 +4,6 @@
 // see https://github.com/paritytech/parity-common/issues/660
 #![allow(clippy::ptr_offset_with_cast, clippy::assign_op_pattern)]
 
-#[doc(inline)]
-pub use uint::byteorder;
-
 use serde::{Deserialize, Serialize};
 //use substrate_bn::arith;
 

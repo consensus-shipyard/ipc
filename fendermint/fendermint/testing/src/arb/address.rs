@@ -3,9 +3,6 @@
 use fvm_shared::address::Address;
 use quickcheck::{Arbitrary, Gen};
 
-pub use crate::arb::cid::ArbCid;
-pub use crate::arb::subnetid::ArbSubnetID;
-
 /// Unfortunately an arbitrary `DelegatedAddress` can be inconsistent with bytes that do not correspond to its length.
 #[derive(Clone, Debug)]
 pub struct ArbAddress(pub Address);

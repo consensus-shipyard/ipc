@@ -349,7 +349,8 @@ impl FinalityWithNull {
 
 #[cfg(test)]
 mod tests {
-    use crate::finality::{FinalityWithNull, ParentViewPayload};
+    use super::FinalityWithNull;
+    use crate::finality::ParentViewPayload;
     use crate::{BlockHeight, Config, IPCParentFinality};
     use async_stm::{atomically, atomically_or_err};
 

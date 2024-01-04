@@ -833,8 +833,7 @@ impl IpcProvider {
             key_type,
             base64::engine::general_purpose::STANDARD.decode(&keyinfo.private_key)?,
         ));
-        let key_info = ipc_identity::KeyInfo::try_from(key_info)
-            .map_err(|_| anyhow!("couldn't get fvm key info from string"))?;
+        let key_info = ipc_identity::KeyInfo::from(key_info);
         Ok(wallet.import(key_info)?)
     }
 
