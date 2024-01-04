@@ -11,7 +11,6 @@ use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 
 pub use fetch::CachedFinalityProvider;
-pub use null::FinalityWithNull;
 
 pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<CrossMsg>);
 

@@ -224,7 +224,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         Ok(if !has_committed {
             None
         } else {
-            Some(IPCParentFinality::try_from(prev_finality)?)
+            Some(IPCParentFinality::from(prev_finality))
         })
     }
 
@@ -283,7 +283,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         let r = self
             .getter
             .call(state, |c| c.get_latest_parent_finality())?;
-        Ok(IPCParentFinality::try_from(r)?)
+        Ok(IPCParentFinality::from(r))
     }
 
     /// Get the Ethereum adresses of validators who signed a checkpoint.
