@@ -617,9 +617,15 @@ where
     )?;
 
     request(
-        "eth_code",
+        "eth_getCode",
         mw.get_code(contract.address(), None).await,
         |bz| *bz == deployed_bytecode,
+    )?;
+
+    request(
+        "eth_getCode /w account",
+        mw.get_code(from.eth_addr, None).await,
+        |bz| bz.is_empty(),
     )?;
 
     request("eth_syncing", mw.syncing().await, |s| {
