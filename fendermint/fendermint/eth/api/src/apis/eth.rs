@@ -618,8 +618,9 @@ where
         // Ok(et::TxHash::from_slice(res.hash.as_bytes()))
         Ok(msghash)
     } else {
-        error(
+        error_with_data(
             ExitCode::new(res.code.value()),
+            res.log,
             hex::encode(res.data.as_ref()), // TODO: What is the content?
         )
     }
