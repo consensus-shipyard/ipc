@@ -105,16 +105,18 @@ pub fn to_deliver_tx(
     // Emit general message metadata.
     events.push(to_message_event(ret.from, ret.to));
 
+    let message = ret
+        .apply_ret
+        .failure_info
+        .map(|i| i.to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| to_error_msg(receipt.exit_code).to_owned());
+
     response::DeliverTx {
         code: to_code(receipt.exit_code),
         data,
         log: Default::default(),
-        info: ret
-            .apply_ret
-            .failure_info
-            .map(|i| i.to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| to_error_msg(receipt.exit_code).to_owned()),
+        info: message,
         gas_wanted,
         gas_used,
         events,
@@ -123,12 +125,16 @@ pub fn to_deliver_tx(
 }
 
 pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
+    // Putting the message `log` because only `log` appears in the `tx_sync` JSON-RPC response.
+    let message = ret
+        .info
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| to_error_msg(ret.exit_code).to_owned());
+
     response::CheckTx {
         code: to_code(ret.exit_code),
-        info: ret
-            .info
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| to_error_msg(ret.exit_code).to_owned()),
+        log: message.clone(),
+        info: Default::default(),
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
         ..Default::default()
