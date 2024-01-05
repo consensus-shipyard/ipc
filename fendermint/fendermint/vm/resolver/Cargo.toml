@@ -16,7 +16,11 @@ tokio = { workspace = true }
 
 cid = { workspace = true }
 ipc-sdk = { workspace = true }
-ipc_ipld_resolver = { workspace = true }
+ipc_ipld_resolver = { path = "../../../../ipld-resolver", optional = true }
+
+[features]
+default = []
+experimental-ipld-resolver = ["ipc_ipld_resolver"]
 
 [dev-dependencies]
 tokio = { workspace = true }

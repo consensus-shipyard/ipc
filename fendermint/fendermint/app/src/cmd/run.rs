@@ -3,7 +3,9 @@
 
 use anyhow::{anyhow, bail, Context};
 use fendermint_abci::ApplicationService;
-use fendermint_app::{App, AppConfig, AppParentFinalityQuery, AppStore, BitswapBlockstore};
+use fendermint_app::{App, AppConfig, AppParentFinalityQuery, AppStore};
+#[cfg(feature = "experimental-ipld-resolver")]
+use fendermint_app::BitswapBlockstore;
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
@@ -14,6 +16,7 @@ use fendermint_vm_interpreter::{
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
+#[cfg(feature = "experimental-ipld-resolver")]
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
@@ -22,7 +25,9 @@ use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
+#[cfg(feature = "experimental-ipld-resolver")]
 use libp2p::identity::secp256k1;
+#[cfg(feature = "experimental-ipld-resolver")]
 use libp2p::identity::Keypair;
 use std::sync::Arc;
 use tracing::info;
@@ -130,6 +135,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let resolve_pool = CheckpointPool::new();
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
+    #[cfg(feature = "experimental-ipld-resolver")]
     if settings.resolver.enabled() {
         let service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
@@ -286,6 +292,7 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     Ok(db)
 }
 
+#[cfg(feature = "experimental-ipld-resolver")]
 fn make_resolver_service(
     settings: &Settings,
     db: RocksDb,
@@ -306,6 +313,7 @@ fn make_resolver_service(
     Ok(service)
 }
 
+#[cfg(feature = "experimental-ipld-resolver")]
 fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {
     use ipc_ipld_resolver::{
         Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig,

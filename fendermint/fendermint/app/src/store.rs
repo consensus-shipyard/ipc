@@ -1,5 +1,4 @@
 use cid::Cid;
-use ipc_ipld_resolver::missing_blocks::missing_blocks;
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use libp2p_bitswap::BitswapStore;
@@ -111,6 +110,16 @@ impl BitswapStore for BitswapBlockstore {
     }
 
     fn missing_blocks(&mut self, cid: &Cid) -> anyhow::Result<Vec<Cid>> {
-        missing_blocks::<Self, Self::Params>(self, cid)
+        let mut stack = vec![*cid];
+        let mut missing = vec![];
+        while let Some(cid) = stack.pop() {
+            if let Some(data) = Blockstore::get(self, &cid)? {
+                let block = libipld::Block::<Self::Params>::new_unchecked(cid, data);
+                block.references(&mut stack)?;
+            } else {
+                missing.push(cid);
+            }
+        }
+        Ok(missing)
     }
 }

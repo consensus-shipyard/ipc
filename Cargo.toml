@@ -15,7 +15,7 @@ members = [
   # Tests seem to be obsolete (using IPC agent):
   # "ipc/ipc/testing/*",
   # resolver
-  "ipld-resolver",
+  # "ipld-resolver",
   # fendermint
   "fendermint/fendermint/abci",
   "fendermint/fendermint/app",
@@ -30,6 +30,7 @@ members = [
   "fendermint/fendermint/testing/*-test",
   "fendermint/fendermint/vm/*",
 ]
+exclude = ["ipld-resolver"]
 
 [workspace.package]
 authors = ["Protocol Labs"]
@@ -69,25 +70,6 @@ jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v1
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
-libp2p = { version = "0.50", default-features = false, features = [
-  "gossipsub",
-  "kad",
-  "identify",
-  "ping",
-  "noise",
-  "yamux",
-  "tcp",
-  "dns",
-  "mplex",
-  "request-response",
-  "metrics",
-  "tokio",
-  "macros",
-  "serde",
-  "secp256k1",
-  "plaintext",
-] }
-libp2p-bitswap = "0.25.1"
 lru_time_cache = "0.11"
 merkle-tree-rs = "0.1.0"
 multiaddr = "0.16"
@@ -141,7 +123,6 @@ integer-encoding = {version = "3.0.3", default-features = false}
 ipc-sdk = { path = "ipc/ipc/sdk" }
 ipc-provider = { path = "ipc/ipc/provider" }
 ipc-identity = { path = "ipc/ipc/identity", features = ["with-ethers"] }
-ipc_ipld_resolver = { path = "ipld-resolver" }
 primitives = { path = "fvm-utils/primitives" }
 ipc_actors_abis = { path = "contracts/binding" }
 

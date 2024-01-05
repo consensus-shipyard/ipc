@@ -433,7 +433,7 @@ version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7125e42787d53db9dd54261812ef17e937c95a51e4d291373b670342fa44310c"
 dependencies = [
- "event-listener 4.0.1",
+ "event-listener 4.0.2",
  "event-listener-strategy",
  "pin-project-lite",
 ]
@@ -2767,9 +2767,9 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
 name = "event-listener"
-version = "4.0.1"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84f2cdcf274580f2d63697192d744727b3198894b1bf02923643bf59e2c26712"
+checksum = "218a870470cce1469024e9fb66b901aa983929d81304a1cdb299f28118e550d5"
 dependencies = [
  "concurrent-queue",
  "parking",
@@ -2782,7 +2782,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "958e4d70b6d5e81971bebec42271ec641e7ff4e170a6fa605f2b8a8b65cb97d3"
 dependencies = [
- "event-listener 4.0.1",
+ "event-listener 4.0.2",
  "pin-project-lite",
 ]
 
@@ -4930,14 +4930,11 @@ dependencies = [
  "base64 0.21.5",
  "blake2b_simd",
  "bloom",
- "env_logger 0.10.1",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding 0.3.3",
- "fvm_ipld_hamt",
  "fvm_shared",
  "gcra",
  "ipc-sdk",
- "ipc_ipld_resolver",
  "lazy_static",
  "libipld",
  "libp2p",
@@ -4945,7 +4942,6 @@ dependencies = [
  "log",
  "prometheus",
  "quickcheck 1.0.3",
- "quickcheck_macros",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -7022,9 +7018,9 @@ checksum = "69d3587f8a9e599cc7ec2c00e331f71c4e69a5f9a4b8a6efd5b07466b9736f9a"
 
 [[package]]
 name = "platforms"
-version = "3.2.0"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14e6ab3f592e6fb464fc9712d8d6e6912de6473954635fd76a589d832cffcbb0"
+checksum = "626dec3cac7cc0e1577a2ec3fc496277ec2baa084bebad95bb6fdbfae235f84c"
 
 [[package]]
 name = "polling"
