@@ -8,16 +8,16 @@ use bloom::{BloomFilter, ASMS};
 use ipc_sdk::subnet_id::SubnetID;
 use libipld::store::StoreParams;
 use libipld::Cid;
+use libp2p::connection_limits::ConnectionLimits;
+use libp2p::core::transport::upgrade::Multiplex;
 use libp2p::futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{
     core::{muxing::StreamMuxerBox, transport::Boxed},
     identity::Keypair,
-    mplex, noise,
-    swarm::{ConnectionLimits, SwarmBuilder},
-    yamux, Multiaddr, PeerId, Swarm, Transport,
+    noise, yamux, Multiaddr, PeerId, Swarm, Transport,
 };
-use libp2p::{identify, ping};
+use libp2p::{identify, ping, SwarmBuilder};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
 use log::{debug, error, info, trace, warn};
 use prometheus::Registry;
@@ -286,7 +286,7 @@ impl<P: StoreParams> Service<P> {
     fn handle_ping_event(&mut self, event: ping::Event) {
         let peer_id = event.peer.to_base58();
         match event.result {
-            Ok(ping::Success::Ping { rtt }) => {
+            Ok(rtt) => {
                 stats::PING_SUCCESS.inc();
                 stats::PING_RTT.observe(rtt.as_millis() as f64);
                 trace!(
@@ -295,9 +295,6 @@ impl<P: StoreParams> Service<P> {
                     self.peer_id,
                     rtt.as_millis()
                 );
-            }
-            Ok(ping::Success::Pong) => {
-                trace!("PingSuccess::Pong from {peer_id} to {}", self.peer_id);
             }
             Err(ping::Failure::Timeout) => {
                 stats::PING_TIMEOUT.inc();
@@ -556,20 +553,19 @@ fn send_resolve_result(tx: Sender<ResolveResult>, res: ResolveResult) {
 pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
     let tcp_transport =
         || libp2p::tcp::tokio::Transport::new(libp2p::tcp::Config::new().nodelay(true));
-    let transport = libp2p::dns::TokioDnsConfig::system(tcp_transport()).unwrap();
+    let transport = libp2p::dns::tokio::Transport::system(tcp_transport()).unwrap();
     let auth_config = {
-        let dh_keys = noise::Keypair::<noise::X25519Spec>::new()
-            .into_authentic(&local_key)
-            .expect("Noise key generation failed");
+        let dh_keys = noise::Config::new(&local_key).expect("Noise key generation failed");
 
-        noise::NoiseConfig::xx(dh_keys).into_authenticated()
+        noise::Config::xx(dh_keys).into_authenticated()
     };
 
     let mplex_config = {
-        let mut mplex_config = mplex::MplexConfig::new();
+        let mut mplex_config = Multiplex::MplexConfig::new();
         mplex_config.set_max_buffer_size(usize::MAX);
 
-        let mut yamux_config = yamux::YamuxConfig::default();
+        // FIXME: Yamux will end up beaing deprecated.
+        let mut yamux_config = yamux::Config::default();
         yamux_config.set_max_buffer_size(16 * 1024 * 1024);
         yamux_config.set_receive_window_size(16 * 1024 * 1024);
         // yamux_config.set_window_update_mode(WindowUpdateMode::OnRead);

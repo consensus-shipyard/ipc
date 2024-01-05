@@ -68,8 +68,8 @@ im = "15.1.0"
 jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v10"] }
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
-libipld = { version = "0.16", default-features = false, features = ["dag-cbor"] }
-libp2p = { version = "0.50", default-features = false, features = [
+libipld = { version = "0.15.0", default-features = false, features = ["dag-cbor"] }
+libp2p = { git = "https://github.com/libp2p/rust-libp2p.git", default-features = false, features = [
   "gossipsub",
   "kad",
   "identify",
@@ -78,7 +78,7 @@ libp2p = { version = "0.50", default-features = false, features = [
   "yamux",
   "tcp",
   "dns",
-  "mplex",
+  #"mplex",
   "request-response",
   "metrics",
   "tokio",
@@ -87,10 +87,11 @@ libp2p = { version = "0.50", default-features = false, features = [
   "secp256k1",
   "plaintext",
 ] }
-libp2p-bitswap = { git = "https://github.com/fridrik01/libp2p-bitswap.git", branch = "upgrade-fvm" }
+#libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap.git", branch = "chore-upgrade-libp2p" }
+libp2p-bitswap = { path = "/home/fridrik/workspace3/libp2p-bitswap", default-features = false }
 lru_time_cache = "0.11"
 merkle-tree-rs = "0.1.0"
-multiaddr = "0.16"
+multiaddr = "0.18.1"
 multihash = "0.18.1"
 num-bigint = "0.4"
 num-derive = "0.3"
