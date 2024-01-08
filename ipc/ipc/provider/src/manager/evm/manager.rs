@@ -570,6 +570,36 @@ impl SubnetManager for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
+    async fn fund_with_token(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        to: Address,
+        amount: TokenAmount,
+    ) -> Result<ChainEpoch> {
+        log::debug!("fund with token, subnet: {subnet}, amount: {amount}, from: {from}, to: {to}");
+
+        let value = fil_amount_to_eth_amount(&amount)?;
+        let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
+
+        let signer = Arc::new(self.get_signer(&from)?);
+        let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
+
+        let txn = gateway_contract.fund_with_token(
+            evm_subnet_id,
+            gateway_manager_facet::FvmAddress::try_from(to)?,
+            value,
+        );
+        let txn = call_with_premium_estimation(signer, txn).await?;
+
+        let pending_tx = txn.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
+    }
+
     async fn release(
         &self,
         gateway_addr: Address,
@@ -1334,6 +1364,11 @@ fn into_genesis_balance_map(
         map.insert(ethers_address_to_fil_address(&a)?, eth_to_fil_amount(&b)?);
     }
     Ok(map)
+}
+
+pub(crate) fn fil_amount_to_eth_amount(amount: &TokenAmount) -> Result<ethers::types::U256> {
+    let v = ethers::types::U256::from_dec_str(&amount.atto().to_string())?;
+    Ok(v)
 }
 
 /// Convert the ipc SubnetID type to an evm address. It extracts the last address from the Subnet id

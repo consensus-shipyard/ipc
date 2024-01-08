@@ -64,6 +64,10 @@ lazy_static! {
                             name: "GatewayMessengerFacet",
                             abi: ia::gateway_messenger_facet::GATEWAYMESSENGERFACET_ABI.to_owned(),
                         },
+                        EthFacet {
+                            name: "XnetMessagingFacet",
+                            abi: ia::xnet_messaging_facet::XNETMESSAGINGFACET_ABI.to_owned(),
+                        },
                     ],
                 },
             ),

@@ -49,14 +49,17 @@ where
     DB: Blockstore + Sync + Send + 'static,
 {
     let minted_tokens = tokens_to_mint(&messages);
+    tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");
 
-    gateway_caller
-        .mint_to_gateway(state, minted_tokens.clone())
-        .context("failed to mint to gateway")?;
+    if !minted_tokens.is_zero() {
+        gateway_caller
+            .mint_to_gateway(state, minted_tokens.clone())
+            .context("failed to mint to gateway")?;
 
-    state.update_circ_supply(|circ_supply| {
-        *circ_supply += minted_tokens;
-    });
+        state.update_circ_supply(|circ_supply| {
+            *circ_supply += minted_tokens;
+        });
+    }
 
     gateway_caller.apply_cross_messages(state, messages)
 }

@@ -479,6 +479,30 @@ impl IpcProvider {
             .await
     }
 
+    /// Funds an account in a child subnet with erc20 token, provided that the supply source kind is
+    /// `ERC20`. If `from` is None, it will use the default address config in `ipc.toml`.
+    /// If `to` is `None`, the `from` account will be funded.
+    pub async fn fund_with_token(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        to: Option<Address>,
+        amount: TokenAmount,
+    ) -> anyhow::Result<ChainEpoch> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager()
+            .fund_with_token(subnet, sender, to.unwrap_or(sender), amount)
+            .await
+    }
+
     /// Release to an account in a child subnet, if `to` is `None`, the self account
     /// is funded.
     pub async fn release(
