@@ -99,6 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let provider = Provider::<Http>::try_from(opts.http_endpoint())?;
+
     run_http(provider, &opts).await?;
 
     Ok(())

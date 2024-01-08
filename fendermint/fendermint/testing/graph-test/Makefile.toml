@@ -1,0 +1,43 @@
+extend = [
+  { path = "../scripts/common.toml" },
+]
+
+env_files = [
+  { path = "./scripts/graph.env" },
+  { path = "../scripts/common.env" },
+  { path = "../scripts/ci.env", profile = "ci" },
+]
+
+[tasks.test-data-env]
+script = """
+cat << EOF > ${TEST_DATA_DIR}/.env
+CMT_P2P_MAX_NUM_OUTBOUND_PEERS=0
+CMT_CONSENSUS_TIMEOUT_COMMIT=1s
+EOF
+"""
+
+[tasks.test]
+clear = true
+run_task = { name = [
+  "graph-setup",
+  "greeter-example",
+], fork = true, cleanup_task = "graph-teardown" }
+
+
+[tasks.greeter-example]
+script = """
+cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
+cargo run -p fendermint_rpc --release --example simplecoin -- \
+  --secret-key fendermint/testing/graph-test/test-data/keys/veronica.sk \
+  ${VERBOSITY}
+"""
+
+[tasks.graph-setup]
+script = """
+echo "TODO: docker-compose up the graph"
+"""
+
+[tasks.graph-teardown]
+script = """
+echo "TODO: docker-compose down the graph"
+"""
