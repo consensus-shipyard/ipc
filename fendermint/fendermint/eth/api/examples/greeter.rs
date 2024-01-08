@@ -13,41 +13,26 @@
 //! cargo run -p fendermint_eth_api --release --example GREETER --
 //! ```
 
-use std::{
-    fmt::{Debug, Display},
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use clap::Parser;
-use ethers::{contract::LogMeta, providers::StreamExt};
+use ethers::contract::LogMeta;
 use ethers::{
-    prelude::{abigen, ContractCall, ContractFactory, SignerMiddleware},
-    providers::{FilterKind, Http, JsonRpcClient, Middleware, Provider, Ws},
-    signers::{Signer, Wallet},
+    prelude::{abigen, ContractFactory},
+    providers::{Http, JsonRpcClient, Middleware, Provider},
 };
 use ethers_core::{
     abi::Abi,
-    k256::ecdsa::SigningKey,
-    types::{
-        transaction::eip2718::TypedTransaction, Address, BlockId, BlockNumber, Bytes,
-        Eip1559TransactionRequest, Filter, Log, SyncingStatus, TransactionReceipt, TxHash, H160,
-        H256, U256, U64,
-    },
+    types::{Bytes, TransactionReceipt},
 };
-use fendermint_crypto::SecretKey;
-use fendermint_rpc::message::MessageFactory;
-use fendermint_vm_actor_interface::eam::EthAddress;
+use serde_json::json;
 use tracing::Level;
 
-use crate::common::{adjust_provider, make_middleware, TestAccount};
+use crate::common::{adjust_provider, make_middleware, TestAccount, TestContractCall};
 
+#[allow(dead_code)]
 mod common;
-
-/// Disabling filters helps when inspecting docker logs. The background data received for filters is rather noisy.
-const FILTERS_ENABLED: bool = true;
 
 // Generate a statically typed interface for the contract.
 abigen!(Greeter, "../../testing/contracts/Greeter.abi");
@@ -68,7 +53,11 @@ pub struct Options {
     ///
     /// Assumed to exist with a non-zero balance.
     #[arg(long, short)]
-    pub secret_key_from: PathBuf,
+    pub secret_key: PathBuf,
+
+    /// Path to write the contract metadata to.
+    #[arg(long, short)]
+    pub out: Option<PathBuf>,
 
     /// Enable DEBUG logs.
     #[arg(long, short)]
@@ -109,7 +98,7 @@ async fn run<C>(provider: &Provider<C>, opts: &Options) -> anyhow::Result<()>
 where
     C: JsonRpcClient + Clone + 'static,
 {
-    let from = TestAccount::new(&opts.secret_key_from)?;
+    let from = TestAccount::new(&opts.secret_key)?;
 
     tracing::info!(from = ?from.eth_addr, "ethereum address");
     tracing::info!("deploying Greeter");
@@ -124,11 +113,11 @@ where
 
     let mw = Arc::new(mw);
 
-    const GREETING0: &str = "Hello, weary traveller!";
+    const GREETING0: &str = "Welcome, weary traveller!";
     const GREETING1: &str = "Howdy doody!";
 
     let factory = ContractFactory::new(abi, bytecode.clone(), mw.clone());
-    let mut deployer = factory.deploy((GREETING0.to_string(),))?;
+    let deployer = factory.deploy((GREETING0.to_string(),))?;
 
     let (contract, deploy_receipt): (_, TransactionReceipt) = deployer
         .send_with_receipt()
@@ -147,17 +136,19 @@ where
 
     assert_eq!(greeting, GREETING0);
 
-    let block_height = provider
-        .get_block_number()
-        .await
-        .context("failed to get block number")?;
+    let deploy_height = deploy_receipt.block_number.expect("deploy height is known");
 
     // Set the greeting to emit an event.
-    contract
-        .set_greeting(GREETING1.to_string())
-        .call()
+    let set_greeting: TestContractCall<_, ()> = contract.set_greeting(GREETING1.to_string());
+
+    let _tx_receipt: TransactionReceipt = set_greeting
+        .send()
         .await
-        .context("failed to set greeting")?;
+        .context("failed to set greeting")?
+        .log_msg("set_greeting")
+        .retries(3)
+        .await?
+        .context("cannot get receipt")?;
 
     let greeting: String = contract
         .greet()
@@ -167,17 +158,30 @@ where
 
     assert_eq!(greeting, GREETING1);
 
-    let logs: Vec<(_, LogMeta)> = contract
+    let logs: Vec<(GreetingSetFilter, LogMeta)> = contract
         .greeting_set_filter()
-        .from_block(block_height)
+        .address(contract.address().into())
+        .from_block(deploy_height)
         .query_with_meta()
         .await
         .context("failed to query logs")?;
 
-    assert_eq!(logs.len(), 1);
-    assert_eq!(logs[0].0.greeting, GREETING1);
+    assert_eq!(logs.len(), 2, "events: constructor + invocation");
+    assert_eq!(logs[0].0.greeting, GREETING0);
+    assert_eq!(logs[1].0.greeting, GREETING1);
 
-    let log_meta: LogMeta = logs[0].1;
+    if let Some(ref out) = opts.out {
+        // Print some metadata so that we can configure The Graph:
+        // `subgraph.yaml` requires the `address` and `startBlock` to be configured.
+        let output = json!({
+            "address": format!("{:?}", contract.address()),
+            "deploy_height": deploy_height.as_u64(),
+        });
+
+        let json = serde_json::to_string_pretty(&output).unwrap();
+
+        std::fs::write(out, json).expect("failed to write metadata");
+    }
 
     Ok(())
 }

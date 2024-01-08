@@ -19,22 +19,32 @@ EOF
 [tasks.test]
 clear = true
 run_task = { name = [
-  "graph-setup",
   "greeter-example",
+  "graph-setup",
 ], fork = true, cleanup_task = "graph-teardown" }
 
 
+# Run the Greeter example and export the data to a file where we can pick it up from
+# and put it into the subgraph.yaml file.
 [tasks.greeter-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_rpc --release --example simplecoin -- \
+cargo run -p fendermint_eth_api --release --example greeter -- \
   --secret-key fendermint/testing/graph-test/test-data/keys/veronica.sk \
+  --out ${TEST_DATA_DIR}/greeter.json \
   ${VERBOSITY}
 """
 
 [tasks.graph-setup]
 script = """
+echo "TODO: configure the graph"
+cat ${TEST_DATA_DIR}/greeter.json
 echo "TODO: docker-compose up the graph"
+"""
+
+[tasks.graph-test]
+script = """
+echo "TODO: run GraphQuery with curl"
 """
 
 [tasks.graph-teardown]
