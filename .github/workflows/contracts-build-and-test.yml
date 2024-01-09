@@ -21,7 +21,7 @@ jobs:
         node-version: '18' # Adjust this as needed for your project
 
     - name: Install dependencies
-      run: npm install
+      run: cd contracts && npm install
 
     - name: Install Foundry
       run: |
@@ -32,6 +32,7 @@ jobs:
 
     - name: Generate Ethereum Private Key and Create .env File and run make
       run: |
+        cd contracts
         PRIVATE_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
         echo "export PRIVATE_KEY=0x$PRIVATE_KEY" > .env
         echo "export RPC_URL=http://127.0.0.1:1337" >> .env
