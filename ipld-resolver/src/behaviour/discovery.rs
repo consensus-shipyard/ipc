@@ -2,7 +2,6 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: MIT
 use std::{
-    borrow::Cow,
     cmp,
     collections::VecDeque,
     task::{Context, Poll},
@@ -17,10 +16,10 @@ use libp2p::{
     swarm::{
         behaviour::toggle::{Toggle, ToggleConnectionHandler},
         derive_prelude::FromSwarm,
-        ConnectionDenied, ConnectionHandler, ConnectionId, NetworkBehaviour, THandler,
-        THandlerInEvent, THandlerOutEvent, ToSwarm,
+        ConnectionDenied, ConnectionId, NetworkBehaviour, THandler, THandlerInEvent,
+        THandlerOutEvent, ToSwarm,
     },
-    Multiaddr, PeerId,
+    Multiaddr, PeerId, StreamProtocol,
 };
 use log::{debug, warn};
 use tokio::time::Interval;
@@ -77,7 +76,7 @@ pub struct Behaviour {
     /// Typically includes bootstrap nodes, or it can be used for a static network.
     static_addresses: Vec<(PeerId, Multiaddr)>,
     /// Name of the peer discovery protocol.
-    protocol_name: String,
+    protocol_name: StreamProtocol,
     /// Kademlia behaviour, if enabled.
     inner: Toggle<kad::Behaviour<MemoryStore>>,
     /// Number of current connections.
@@ -103,8 +102,7 @@ impl Behaviour {
         let mut static_addresses = Vec::new();
         for multiaddr in dc.static_addresses {
             let mut addr = multiaddr.clone();
-            if let Some(Protocol::P2p(mh)) = addr.pop() {
-                let peer_id = PeerId::from_multihash(mh).unwrap();
+            if let Some(Protocol::P2p(peer_id)) = addr.pop() {
                 static_addresses.push((peer_id, addr))
             } else {
                 return Err(ConfigError::InvalidBootstrapAddress(multiaddr));
@@ -113,12 +111,14 @@ impl Behaviour {
 
         let mut outbox = VecDeque::new();
         let protocol_name = format!("/ipc/{}/kad/1.0.0", nc.network_name);
+        let protocol_name =
+            StreamProtocol::try_from_owned(protocol_name).expect("valid protocol name");
 
         let mut bootstrap_buffer = None;
 
         let kademlia_opt = if dc.enable_kademlia {
             let mut kad_config = kad::Config::default();
-            kad_config.set_protocol_names(vec![Cow::Owned(protocol_name.as_bytes().to_vec())]);
+            kad_config.set_protocol_names(vec![protocol_name]);
 
             // Disable inserting records into the memory store, so peers cannot send `PutRecord`
             // messages to store content in the memory of our node.
@@ -166,7 +166,7 @@ impl Behaviour {
 
     /// Lookup a peer, unless we already know their address, so that we have a chance to connect to them later.
     pub fn background_lookup(&mut self, peer_id: PeerId) {
-        if self.addresses_of_peer(&peer_id).is_empty() {
+        if self.addresses_of_peer(peer_id.clone()).is_empty() {
             if let Some(kademlia) = self.inner.as_mut() {
                 stats::DISCOVERY_BACKGROUND_LOOKUP.inc();
                 kademlia.get_closest_peers(peer_id);
@@ -207,6 +207,16 @@ impl Behaviour {
         if let Some(kademlia) = self.inner.as_mut() {
             kademlia.add_address(peer_id, address);
         }
+    }
+
+    fn addresses_of_peer(&mut self, peer_id: PeerId) -> Vec<Multiaddr> {
+        self.handle_pending_outbound_connection(
+            ConnectionId::new_unchecked(0),
+            Some(peer_id),
+            &[],
+            Endpoint::Listener,
+        )
+        .unwrap_or_default()
     }
 }
 
@@ -286,7 +296,7 @@ impl NetworkBehaviour for Behaviour {
             addrs.extend(
                 self.static_addresses
                     .iter()
-                    .filter(|(p, _)| p == peer_id)
+                    .filter(|(p, _)| *p == peer_id)
                     .map(|(_, a)| a.clone()),
             );
         }
