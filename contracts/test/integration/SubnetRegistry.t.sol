@@ -39,12 +39,29 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         bytes4[] memory mockedSelectors2 = new bytes4[](1);
         mockedSelectors2[0] = 0x133f74ea;
 
+        bytes4[] memory mockedSelectors3 = new bytes4[](1);
+        mockedSelectors3[0] = 0x433f74ea;
+
+        bytes4[] memory mockedSelectors4 = new bytes4[](1);
+        mockedSelectors4[0] = 0x333f74ea;
+
+        bytes4[] memory mockedSelectors5 = new bytes4[](1);
+        mockedSelectors5[0] = 0x233f74ea;
+
         SubnetRegistryDiamond.ConstructorParams memory params;
         params.gateway = DEFAULT_IPC_GATEWAY_ADDR;
+
         params.getterFacet = address(new SubnetActorGetterFacet());
         params.managerFacet = address(new SubnetActorManagerFacet());
-        params.subnetGetterSelectors = mockedSelectors;
-        params.subnetManagerSelectors = mockedSelectors2;
+        params.rewarderFacet = address(new SubnetActorRewardFacet());
+        params.checkpointerFacet = address(new SubnetActorCheckpointingFacet());
+        params.pauserFacet = address(new SubnetActorPauseFacet());
+
+        params.subnetActorGetterSelectors = mockedSelectors;
+        params.subnetActorManagerSelectors = mockedSelectors2;
+        params.subnetActorRewarderSelectors = mockedSelectors3;
+        params.subnetActorCheckpointerSelectors = mockedSelectors4;
+        params.subnetActorPauserSelectors = mockedSelectors5;
 
         registryDiamond = createSubnetRegistry(params);
         registryLouper = DiamondLoupeFacet(address(registryDiamond));
@@ -76,29 +93,33 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         );
     }
 
-    function test_Registry_Deployment_ZeroGetterFacet() public {
+    function test_Registry_Deployment_ZeroAddressFacet() public {
         SubnetRegistryDiamond.ConstructorParams memory params;
         params.gateway = DEFAULT_IPC_GATEWAY_ADDR;
-        params.getterFacet = address(0);
-        params.managerFacet = address(1);
-        params.subnetGetterSelectors = empty;
-        params.subnetManagerSelectors = empty;
+        params.subnetActorGetterSelectors = empty;
+        params.subnetActorManagerSelectors = empty;
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](0);
         vm.expectRevert(FacetCannotBeZero.selector);
         new SubnetRegistryDiamond(diamondCut, params);
-    }
 
-    function test_Registry_Deployment_ZeroManagerFacet() public {
-        SubnetRegistryDiamond.ConstructorParams memory params;
-        params.gateway = DEFAULT_IPC_GATEWAY_ADDR;
         params.getterFacet = address(1);
-        params.managerFacet = address(0);
-        params.subnetGetterSelectors = empty;
-        params.subnetManagerSelectors = empty;
-
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](0);
         vm.expectRevert(FacetCannotBeZero.selector);
+        new SubnetRegistryDiamond(diamondCut, params);
+
+        params.managerFacet = address(2);
+        vm.expectRevert(FacetCannotBeZero.selector);
+        new SubnetRegistryDiamond(diamondCut, params);
+
+        params.rewarderFacet = address(3);
+        vm.expectRevert(FacetCannotBeZero.selector);
+        new SubnetRegistryDiamond(diamondCut, params);
+
+        params.checkpointerFacet = address(4);
+        vm.expectRevert(FacetCannotBeZero.selector);
+        new SubnetRegistryDiamond(diamondCut, params);
+
+        params.pauserFacet = address(5);
         new SubnetRegistryDiamond(diamondCut, params);
     }
 
@@ -107,8 +128,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.gateway = address(0);
         params.getterFacet = address(1);
         params.managerFacet = address(1);
-        params.subnetGetterSelectors = empty;
-        params.subnetManagerSelectors = empty;
+        params.subnetActorGetterSelectors = empty;
+        params.subnetActorManagerSelectors = empty;
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](0);
         vm.expectRevert(GatewayCannotBeZero.selector);
@@ -206,7 +227,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         bytes4[] memory newSubnetGetterSelectors = new bytes4[](1);
         newSubnetGetterSelectors[0] = 0x12345678; // Mocked selector
         bytes4[] memory newSubnetManagerSelectors = new bytes4[](1);
-        newSubnetManagerSelectors[0] = 0x87654321; // Mocked selector
+        newSubnetManagerSelectors[0] = 0x87654322; // Mocked selector
 
         registrySubnetGetterFacet.updateReferenceSubnetContract(
             newGetterFacet,

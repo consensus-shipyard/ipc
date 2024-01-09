@@ -345,6 +345,9 @@ mod tests {
             "GatewayMessengerFacet",
             "SubnetActorGetterFacet",
             "SubnetActorManagerFacet",
+            "SubnetActorRewardFacet",
+            "SubnetActorCheckpointingFacet",
+            "SubnetActorPauseFacet",
         ]
         .into_iter()
         .map(|c| (format!("{c}.sol"), c))

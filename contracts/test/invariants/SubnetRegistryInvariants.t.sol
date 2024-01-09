@@ -29,12 +29,29 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         bytes4[] memory mockedSelectors2 = new bytes4[](1);
         mockedSelectors2[0] = 0x133f74ea;
 
+        bytes4[] memory mockedSelectors3 = new bytes4[](1);
+        mockedSelectors3[0] = 0x433f74ea;
+
+        bytes4[] memory mockedSelectors4 = new bytes4[](1);
+        mockedSelectors4[0] = 0x333f74ea;
+
+        bytes4[] memory mockedSelectors5 = new bytes4[](1);
+        mockedSelectors5[0] = 0x233f74ea;
+
         SubnetRegistryDiamond.ConstructorParams memory params;
         params.gateway = DEFAULT_IPC_GATEWAY_ADDR;
+
         params.getterFacet = address(new SubnetActorGetterFacet());
         params.managerFacet = address(new SubnetActorManagerFacet());
-        params.subnetGetterSelectors = mockedSelectors;
-        params.subnetManagerSelectors = mockedSelectors2;
+        params.rewarderFacet = address(new SubnetActorRewardFacet());
+        params.checkpointerFacet = address(new SubnetActorCheckpointingFacet());
+        params.pauserFacet = address(new SubnetActorPauseFacet());
+
+        params.subnetActorGetterSelectors = mockedSelectors;
+        params.subnetActorManagerSelectors = mockedSelectors2;
+        params.subnetActorRewarderSelectors = mockedSelectors3;
+        params.subnetActorCheckpointerSelectors = mockedSelectors4;
+        params.subnetActorPauserSelectors = mockedSelectors5;
 
         registryDiamond = createSubnetRegistry(params);
         registryHandler = new SubnetRegistryHandler(registryDiamond);

@@ -89,12 +89,12 @@ lazy_static! {
                                 .to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorCheckpointingFacet",
-                            abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
                             name: "SubnetActorRewardFacet",
                             abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorCheckpointingFacet",
+                            abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "SubnetActorPauseFacet",
@@ -153,12 +153,12 @@ lazy_static! {
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorCheckpointingFacet",
-                            abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
                             name: "SubnetActorRewardFacet",
                             abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorCheckpointingFacet",
+                            abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "SubnetActorPauseFacet",
@@ -448,8 +448,14 @@ pub mod registry {
         pub gateway: Address,
         pub getter_facet: Address,
         pub manager_facet: Address,
+        pub rewarder_facet: Address,
+        pub pauser_facet: Address,
+        pub checkpointer_facet: Address,
         pub subnet_getter_selectors: Vec<FunctionSelector>,
         pub subnet_manager_selectors: Vec<FunctionSelector>,
+        pub subnet_rewarder_selectors: Vec<FunctionSelector>,
+        pub subnet_pauser_selectors: Vec<FunctionSelector>,
+        pub subnet_checkpointer_selectors: Vec<FunctionSelector>,
     }
 }
 

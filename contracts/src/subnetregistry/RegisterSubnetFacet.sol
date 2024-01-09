@@ -23,20 +23,38 @@ contract RegisterSubnetFacet is ReentrancyGuard {
             revert WrongGateway();
         }
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](5);
 
         // set the diamond cut for subnet getter
         diamondCut[0] = IDiamond.FacetCut({
-            facetAddress: s.SUBNET_GETTER_FACET,
+            facetAddress: s.SUBNET_ACTOR_GETTER_FACET,
             action: IDiamond.FacetCutAction.Add,
-            functionSelectors: s.subnetGetterSelectors
+            functionSelectors: s.subnetActorGetterSelectors
         });
 
         // set the diamond cut for subnet manager
         diamondCut[1] = IDiamond.FacetCut({
-            facetAddress: s.SUBNET_MANAGER_FACET,
+            facetAddress: s.SUBNET_ACTOR_MANAGER_FACET,
             action: IDiamond.FacetCutAction.Add,
-            functionSelectors: s.subnetManagerSelectors
+            functionSelectors: s.subnetActorManagerSelectors
+        });
+
+        diamondCut[2] = IDiamond.FacetCut({
+            facetAddress: s.SUBNET_ACTOR_REWARD_FACET,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: s.subnetActorRewarderSelectors
+        });
+
+        diamondCut[3] = IDiamond.FacetCut({
+            facetAddress: s.SUBNET_ACTOR_CHECKPOINTING_FACET,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: s.subnetActorCheckpointerSelectors
+        });
+
+        diamondCut[4] = IDiamond.FacetCut({
+            facetAddress: s.SUBNET_ACTOR_PAUSE_FACET,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: s.subnetActorPauserSelectors
         });
 
         // slither-disable-next-line reentrancy-benign
