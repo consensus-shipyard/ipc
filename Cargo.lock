@@ -2627,7 +2627,7 @@ dependencies = [
  "libp2p",
  "libp2p-bitswap",
  "literally",
- "multiaddr 0.16.0",
+ "multiaddr",
  "num-traits",
  "openssl",
  "prost",
@@ -2681,7 +2681,7 @@ dependencies = [
  "fvm_shared",
  "ipc-provider",
  "ipc-sdk",
- "multiaddr 0.16.0",
+ "multiaddr",
  "serde",
  "serde_with",
  "tendermint-rpc",
@@ -5030,7 +5030,7 @@ dependencies = [
  "libp2p-tcp",
  "libp2p-upnp",
  "libp2p-yamux",
- "multiaddr 0.18.1",
+ "multiaddr",
  "pin-project",
  "rw-stream-sink",
  "thiserror",
@@ -5089,7 +5089,7 @@ dependencies = [
  "futures-timer",
  "instant",
  "libp2p-identity",
- "multiaddr 0.18.1",
+ "multiaddr",
  "multihash 0.19.1",
  "multistream-select",
  "once_cell",
@@ -5299,7 +5299,7 @@ dependencies = [
  "futures",
  "libp2p-core",
  "libp2p-identity",
- "multiaddr 0.18.1",
+ "multiaddr",
  "multihash 0.19.1",
  "once_cell",
  "quick-protobuf",
@@ -5788,24 +5788,6 @@ dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "multiaddr"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4aebdb21e90f81d13ed01dc84123320838e53963c2ca94b60b305d3fa64f31e"
-dependencies = [
- "arrayref",
- "byteorder",
- "data-encoding",
- "multibase",
- "multihash 0.16.3",
- "percent-encoding",
- "serde",
- "static_assertions",
- "unsigned-varint 0.7.2",
- "url",
 ]
 
 [[package]]
