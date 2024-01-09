@@ -88,6 +88,18 @@ lazy_static! {
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI
                                 .to_owned(),
                         },
+                        EthFacet {
+                            name: "SubnetActorCheckpointingFacet",
+                            abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorRewardFacet",
+                            abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorPauseFacet",
+                            abi: ia::subnet_actor_pause_facet::SUBNETACTORPAUSEFACET_ABI.to_owned(),
+                        },
                         // The registry has its own facets:
                         // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/b01a2dffe367745f55111a65536a3f6fea9165f5/scripts/deploy-registry.template.ts#L58-L67
                         EthFacet {
@@ -139,6 +151,18 @@ lazy_static! {
                         EthFacet {
                             name: "SubnetActorManagerFacet",
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorCheckpointingFacet",
+                            abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorRewardFacet",
+                            abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorPauseFacet",
+                            abi: ia::subnet_actor_pause_facet::SUBNETACTORPAUSEFACET_ABI.to_owned(),
                         },
                     ],
                 },
@@ -434,7 +458,10 @@ pub mod subnet {
     use ipc_actors_abis::bottom_up_router_facet::BottomUpRouterFacetErrors;
     use ipc_actors_abis::checkpointing_facet::CheckpointingFacetErrors;
     use ipc_actors_abis::gateway_manager_facet::GatewayManagerFacetErrors;
+    use ipc_actors_abis::subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacetErrors;
     use ipc_actors_abis::subnet_actor_manager_facet::SubnetActorManagerFacetErrors;
+    use ipc_actors_abis::subnet_actor_pause_facet::SubnetActorPauseFacetErrors;
+    use ipc_actors_abis::subnet_actor_reward_facet::SubnetActorRewardFacetErrors;
     use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacetErrors;
 
     pub const CONTRACT_NAME: &str = "SubnetActorDiamond";
@@ -443,6 +470,9 @@ pub mod subnet {
     revert_errors! {
         SubnetActorErrors {
             SubnetActorManagerFacetErrors,
+            SubnetActorRewardFacetErrors,
+            SubnetActorPauseFacetErrors,
+            SubnetActorCheckpointingFacetErrors,
             GatewayManagerFacetErrors,
             CheckpointingFacetErrors,
             BottomUpRouterFacetErrors,

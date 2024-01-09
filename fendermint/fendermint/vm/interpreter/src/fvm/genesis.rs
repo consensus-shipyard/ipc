@@ -290,7 +290,7 @@ where
                 )?
             };
 
-            // IPC SubnetRegistry actory.
+            // IPC SubnetRegistry actor.
             {
                 use ipc::registry::ConstructorParameters;
 

@@ -28,7 +28,7 @@ pub struct SubnetCaller<DB> {
     manager: ContractCaller<DB, SubnetActorManagerFacet<MockProvider>, SubnetActorErrors>,
     rewarder: ContractCaller<DB, SubnetActorRewardFacet<MockProvider>, SubnetActorErrors>,
     checkpointer:
-        ContractCaller<DB, SubnetActorCheckpointingFacet<MockProvider>, SubnetActorErrors>,
+        ContractCaller<DB, SubnetActorCheckpointingFacet<MockProvider>, SubnetActorErrors>
 }
 
 impl<DB> SubnetCaller<DB> {
@@ -38,7 +38,7 @@ impl<DB> SubnetCaller<DB> {
             getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
             manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),
             rewarder: ContractCaller::new(addr, SubnetActorRewardFacet::new),
-            checkpointer: ContractCaller::new(addr, SubnetActorCheckpointingFacet::new),
+            checkpointer: ContractCaller::new(addr, SubnetActorCheckpointingFacet::new)
         }
     }
 
