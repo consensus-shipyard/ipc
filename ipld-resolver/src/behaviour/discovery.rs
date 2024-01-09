@@ -166,7 +166,7 @@ impl Behaviour {
 
     /// Lookup a peer, unless we already know their address, so that we have a chance to connect to them later.
     pub fn background_lookup(&mut self, peer_id: PeerId) {
-        if self.addresses_of_peer(peer_id.clone()).is_empty() {
+        if self.addresses_of_peer(peer_id).is_empty() {
             if let Some(kademlia) = self.inner.as_mut() {
                 stats::DISCOVERY_BACKGROUND_LOOKUP.inc();
                 kademlia.get_closest_peers(peer_id);
@@ -273,9 +273,12 @@ impl NetworkBehaviour for Behaviour {
         local_addr: &Multiaddr,
         remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        self.inner
-            .handle_established_inbound_connection(connection_id, peer, local_addr, remote_addr)
-            .into()
+        self.inner.handle_established_inbound_connection(
+            connection_id,
+            peer,
+            local_addr,
+            remote_addr,
+        )
     }
 
     fn handle_pending_outbound_connection(
@@ -313,7 +316,6 @@ impl NetworkBehaviour for Behaviour {
     ) -> Result<THandler<Self>, ConnectionDenied> {
         self.inner
             .handle_established_outbound_connection(connection_id, peer, addr, role_override)
-            .into()
     }
 
     fn poll(

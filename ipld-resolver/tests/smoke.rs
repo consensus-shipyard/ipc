@@ -98,7 +98,7 @@ impl ClusterBuilder {
             let config = &self.agents[i].config;
             let peer_id = config.network.local_peer_id();
             let mut addr = config.connection.listen_addr.clone();
-            addr.push(Protocol::P2p(peer_id.into()));
+            addr.push(Protocol::P2p(peer_id));
             addr
         });
         let config = make_config(&mut self.rng, self.size, bootstrap_addr);

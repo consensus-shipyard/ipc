@@ -219,46 +219,49 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         connection_id: ConnectionId,
         event: THandlerOutEvent<Self>,
     ) {
-        match event {
-            // TODO: `request_response::handler` is now private, so we cannot pattern match on the handler event.
-            // By the looks of the only way to access the request event is to let it go right into the RR protocol
-            // wrapped by the Bitswap behaviour and let it raise an event, however we will not see that event here.
-            // I'm not sure what we can do without moving rate limiting into the bitswap library itself, because
-            // what we did here relied on the ability to redirect the channels inside the request, but if the event
-            // itself is private to the `request_response` protocol there's nothing I can do.
+        // TODO: `request_response::handler` is now private, so we cannot pattern match on the handler event.
+        // By the looks of the only way to access the request event is to let it go right into the RR protocol
+        // wrapped by the Bitswap behaviour and let it raise an event, however we will not see that event here.
+        // I'm not sure what we can do without moving rate limiting into the bitswap library itself, because
+        // what we did here relied on the ability to redirect the channels inside the request, but if the event
+        // itself is private to the `request_response` protocol there's nothing I can do.
+        // match event {
 
-            // request_response::handler::Event::Request {
-            //     request_id,
-            //     request,
-            //     sender,
-            // } if self.rate_limit.is_some() => {
-            //     if !self.check_rate_limit(&peer_id, &request.cid) {
-            //         warn!("rate limiting {peer_id}");
-            //         stats::CONTENT_RATE_LIMITED.inc();
-            //         return;
-            //     }
-            //     // We need to hijack the response channel to record the size, otherwise it goes straight to the handler.
-            //     let (tx, rx) = libp2p::futures::channel::oneshot::channel();
-            //     let event = request_response::Event::Request {
-            //         request_id,
-            //         request,
-            //         sender: tx,
-            //     };
+        //     request_response::handler::Event::Request {
+        //         request_id,
+        //         request,
+        //         sender,
+        //     } if self.rate_limit.is_some() => {
+        //         if !self.check_rate_limit(&peer_id, &request.cid) {
+        //             warn!("rate limiting {peer_id}");
+        //             stats::CONTENT_RATE_LIMITED.inc();
+        //             return;
+        //         }
+        //         // We need to hijack the response channel to record the size, otherwise it goes straight to the handler.
+        //         let (tx, rx) = libp2p::futures::channel::oneshot::channel();
+        //         let event = request_response::Event::Request {
+        //             request_id,
+        //             request,
+        //             sender: tx,
+        //         };
 
-            //     self.inner
-            //         .on_connection_handler_event(peer_id, connection_id, event);
+        //         self.inner
+        //             .on_connection_handler_event(peer_id, connection_id, event);
 
-            //     let forward = Event::BitswapForward {
-            //         peer_id,
-            //         response_rx: rx,
-            //         response_tx: sender,
-            //     };
-            //     self.outbox.push_back(forward);
-            // }
-            _ => self
-                .inner
-                .on_connection_handler_event(peer_id, connection_id, event),
-        }
+        //         let forward = Event::BitswapForward {
+        //             peer_id,
+        //             response_rx: rx,
+        //             response_tx: sender,
+        //         };
+        //         self.outbox.push_back(forward);
+        //     }
+        //     _ => self
+        //         .inner
+        //         .on_connection_handler_event(peer_id, connection_id, event),
+        // }
+
+        self.inner
+            .on_connection_handler_event(peer_id, connection_id, event)
     }
 
     fn handle_pending_inbound_connection(
