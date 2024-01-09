@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
+use ethers::abi::{Detokenize, Tokenize};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_genesis::Collateral;
@@ -22,8 +23,8 @@ use fvm_shared::{address::Address, chainid::ChainID};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
-use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_actors_abis::{bottom_up_router_facet, checkpointing_facet as checkpoint};
 
 use super::state::ipc::tokens_to_burn;
 use super::{
@@ -39,6 +40,55 @@ pub struct PowerTable(pub Vec<Validator<Power>>);
 /// Changes in the power table.
 #[derive(Debug, Clone, Default)]
 pub struct PowerUpdates(pub Vec<Validator<Power>>);
+
+/// Construct and store a batch of bottom up message for the parent to execute. There are two conditions
+/// where a batch can be created:
+/// 1. A checkpoint period is reached
+/// 2. Max number of bottom up messages is reached in a batch
+/// Query the state to check if there is a new batch at every height will cover the above two cases.
+pub fn maybe_create_msg_batch<DB>(
+    gateway: &GatewayCaller<DB>,
+    state: &mut FvmExecState<DB>,
+) -> anyhow::Result<Option<getter::BottomUpMsgBatch>>
+where
+    DB: Blockstore + Sync + Send + 'static,
+{
+    // gateway not enabled, nothing much to do
+    if !gateway.enabled(state)? {
+        return Ok(None);
+    }
+
+    let id = gateway.subnet_id(state)?;
+
+    // we are not processing bottom up message batch for root, i.e. root has no parent
+    if id.route.is_empty() {
+        return Ok(None);
+    }
+
+    // Get the current block height
+    let height: tendermint::block::Height = state
+        .block_height()
+        .try_into()
+        .context("block height is not u64")?;
+
+    let batch = gateway.bottom_up_batch(state, height.into())?;
+    Ok(if batch.msgs.is_empty() {
+        let (_, curr_power_table) =
+            ipc_power_table(gateway, state).context("failed to get the current power table")?;
+
+        let batch =
+            bottom_up_router_facet::BottomUpMsgBatch::from_tokens(batch.clone().into_tokens())?;
+
+        // Save the batch in the ledger.
+        // Pass in the current power table, because these are the validators who can sign this checkpoint.
+        gateway
+            .create_bottom_up_msg_batch(state, batch, &curr_power_table.0)
+            .context("failed to store checkpoint")?;
+        None
+    } else {
+        Some(batch)
+    })
+}
 
 /// Construct and store a checkpoint if this is the end of the checkpoint period.
 /// Perform end-of-checkpoint-period transitions in the ledger.
@@ -153,6 +203,33 @@ where
     }
 }
 
+pub fn unsigned_bottom_up_msg_batches<DB>(
+    gateway: &GatewayCaller<DB>,
+    state: &mut FvmExecState<DB>,
+    validator_key: PublicKey,
+) -> anyhow::Result<Vec<getter::BottomUpMsgBatch>>
+where
+    DB: Blockstore + Send + Sync + 'static,
+{
+    let mut unsigned_checkpoints = Vec::new();
+    let validator_addr = EthAddress::from(validator_key);
+
+    for batch in gateway
+        .incomplete_bottom_up_msg_batches(state)
+        .context("failed to fetch incomplete bottom up message batches")?
+    {
+        let signatories = gateway
+            .bottom_up_batch_signatories(state, batch.block_height.as_u64())
+            .context("failed to get checkpoint signatories")?;
+
+        if !signatories.contains(&validator_addr) {
+            unsigned_checkpoints.push(batch);
+        }
+    }
+
+    Ok(unsigned_checkpoints)
+}
+
 /// Collect incomplete signatures from the ledger which this validator hasn't signed yet.
 ///
 /// It doesn't check whether the validator should have signed it, that's done inside
@@ -184,6 +261,63 @@ where
     }
 
     Ok(unsigned_checkpoints)
+}
+
+/// Sign the current and any incomplete checkpoints.
+pub async fn broadcast_incomplete_batches<C, DB>(
+    client: &C,
+    validator_ctx: &ValidatorContext<C>,
+    gateway: &GatewayCaller<DB>,
+    chain_id: ChainID,
+    incomplete_batches: Vec<getter::BottomUpMsgBatch>,
+) -> anyhow::Result<()>
+where
+    C: Client + Clone + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + 'static,
+{
+    // Make sure that these had time to be added to the ledger.
+    if let Some(highest) = incomplete_batches.iter().map(|cp| cp.block_height).max() {
+        wait_for_commit(
+            client,
+            highest.as_u64() + 1,
+            validator_ctx.broadcaster.retry_delay(),
+        )
+        .await
+        .context("failed to wait for commit")?;
+    }
+
+    for batch in incomplete_batches {
+        let height = Height::try_from(batch.block_height.as_u64())?;
+        // Getting the power table from CometBFT where the history is available.
+        let power_table = bft_power_table(client, height)
+            .await
+            .context("failed to get power table")?;
+
+        if let Some(validator) = power_table
+            .0
+            .iter()
+            .find(|v| v.public_key.0 == validator_ctx.public_key)
+            .cloned()
+        {
+            let batch = bottom_up_router_facet::BottomUpMsgBatch::from_tokens(batch.into_tokens())?;
+
+            // We mustn't do these in parallel because of how nonces are fetched.
+            broadcast_msg_batch_signature(
+                &validator_ctx.broadcaster,
+                gateway,
+                batch,
+                &power_table,
+                &validator,
+                &validator_ctx.secret_key,
+                chain_id,
+            )
+            .await
+            .context("failed to broadcast checkpoint signature")?;
+
+            tracing::debug!(?height, "submitted checkpoint signature");
+        }
+    }
+    Ok(())
 }
 
 /// Sign the current and any incomplete checkpoints.
@@ -253,6 +387,35 @@ where
             tracing::debug!(?height, "submitted checkpoint signature");
         }
     }
+    Ok(())
+}
+
+/// As a validator, sign the batch and broadcast a transaction to add our signature to the ledger.
+pub async fn broadcast_msg_batch_signature<C, DB>(
+    broadcaster: &Broadcaster<C>,
+    gateway: &GatewayCaller<DB>,
+    batch: bottom_up_router_facet::BottomUpMsgBatch,
+    power_table: &PowerTable,
+    validator: &Validator<Power>,
+    secret_key: &SecretKey,
+    chain_id: ChainID,
+) -> anyhow::Result<()>
+where
+    C: Client + Clone + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + 'static,
+{
+    let calldata = gateway
+        .add_batch_signature_calldata(batch, &power_table.0, validator, secret_key)
+        .context("failed to produce checkpoint signature calldata")?;
+
+    let tx_hash = broadcaster
+        .fevm_invoke(Address::from(gateway.addr()), calldata, chain_id)
+        .await
+        .context("failed to broadcast signature")?;
+
+    // The transaction should be in the mempool now.
+    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+
     Ok(())
 }
 

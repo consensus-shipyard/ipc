@@ -269,6 +269,7 @@ macro_rules! abi_hash {
 }
 
 abi_hash!(struct ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint);
+abi_hash!(struct ipc_actors_abis::bottom_up_router_facet::BottomUpMsgBatch);
 abi_hash!(struct ipc_actors_abis::subnet_actor_manager_facet::BottomUpCheckpoint);
 abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::CrossMsg>);
 abi_hash!(Vec<ipc_actors_abis::subnet_actor_manager_facet::CrossMsg>);

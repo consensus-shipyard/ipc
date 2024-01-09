@@ -19,7 +19,9 @@ use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
-use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
+use ipc_actors_abis::{
+    bottom_up_router_facet, checkpointing_facet, top_down_finality_facet, xnet_messaging_facet,
+};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::StakingChangeRequest;
 
@@ -30,6 +32,7 @@ use super::{
 use crate::fvm::FvmApplyRet;
 use fendermint_vm_actor_interface::ipc;
 use fvm_shared::econ::TokenAmount;
+use ipc_actors_abis::bottom_up_router_facet::BottomUpRouterFacet;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
@@ -42,6 +45,11 @@ pub struct GatewayCaller<DB> {
         DB,
         CheckpointingFacet<MockProvider>,
         checkpointing_facet::CheckpointingFacetErrors,
+    >,
+    bottom_up: ContractCaller<
+        DB,
+        BottomUpRouterFacet<MockProvider>,
+        bottom_up_router_facet::BottomUpRouterFacetErrors,
     >,
     topdown: ContractCaller<
         DB,
@@ -70,6 +78,7 @@ impl<DB> GatewayCaller<DB> {
         Self {
             addr,
             getter: ContractCaller::new(addr, GatewayGetterFacet::new),
+            bottom_up: ContractCaller::new(addr, BottomUpRouterFacet::new),
             checkpointing: ContractCaller::new(addr, CheckpointingFacet::new),
             topdown: ContractCaller::new(addr, TopDownFinalityFacet::new),
             xnet: ContractCaller::new(addr, XnetMessagingFacet::new),
@@ -108,6 +117,17 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .as_u64())
     }
 
+    /// Fetch the bottom-up message batch enqueued for a given checkpoint height.
+    pub fn bottom_up_batch(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: u64,
+    ) -> anyhow::Result<getter::BottomUpMsgBatch> {
+        self.getter.call(state, |c| {
+            c.bottom_up_msg_batch(ethers::types::U256::from(height))
+        })
+    }
+
     /// Fetch the bottom-up messages enqueued for a given checkpoint height.
     pub fn bottom_up_msgs(
         &self,
@@ -118,6 +138,27 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             c.bottom_up_msg_batch(ethers::types::U256::from(height))
         })?;
         Ok(batch.msgs)
+    }
+
+    /// Create a new bottom up msg batch in the child
+    pub fn create_bottom_up_msg_batch(
+        &self,
+        state: &mut FvmExecState<DB>,
+        batch: bottom_up_router_facet::BottomUpMsgBatch,
+        power_table: &[Validator<Power>],
+    ) -> anyhow::Result<()> {
+        // Construct a Merkle tree from the power table, which we can use to validate validator set membership
+        // when the signatures are submitted in transactions for accumulation.
+        let tree =
+            ValidatorMerkleTree::new(power_table).context("failed to create validator tree")?;
+
+        let total_power = power_table.iter().fold(et::U256::zero(), |p, v| {
+            p.saturating_add(et::U256::from(v.power.0))
+        });
+
+        self.bottom_up.call(state, |c| {
+            c.create_bottom_up_msg_batch(batch, tree.root_hash().0, total_power)
+        })
     }
 
     /// Insert a new checkpoint at the period boundary.
@@ -149,6 +190,14 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         self.getter.call(state, |c| c.get_incomplete_checkpoints())
     }
 
+    /// Retrieve bottom up message batches which have not reached a quorum.
+    pub fn incomplete_bottom_up_msg_batches(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<Vec<getter::BottomUpMsgBatch>> {
+        self.getter.call(state, |c| c.get_incomplete_msg_batches())
+    }
+
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
     pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
         self.topdown.call(state, |c| c.apply_finality_changes())
@@ -160,6 +209,52 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
     ) -> anyhow::Result<getter::Membership> {
         self.getter.call(state, |c| c.get_current_membership())
+    }
+
+    /// Construct the input parameters for adding a signature to the message batch.
+    ///
+    /// This will need to be broadcasted as a transaction.
+    pub fn add_batch_signature_calldata(
+        &self,
+        batch: bottom_up_router_facet::BottomUpMsgBatch,
+        power_table: &[Validator<Power>],
+        validator: &Validator<Power>,
+        secret_key: &SecretKey,
+    ) -> anyhow::Result<et::Bytes> {
+        debug_assert_eq!(validator.public_key.0, secret_key.public_key());
+
+        let height = batch.block_height;
+        let weight = et::U256::from(validator.power.0);
+
+        let hash = batch.abi_hash();
+
+        let signature = sign_secp256k1(secret_key, &hash);
+        let signature =
+            from_fvm::to_eth_signature(&signature, false).context("invalid signature")?;
+        let signature = et::Bytes::from(signature.to_vec());
+
+        let tree =
+            ValidatorMerkleTree::new(power_table).context("failed to construct Merkle tree")?;
+
+        let membership_proof = tree
+            .prove(validator)
+            .context("failed to construct Merkle proof")?
+            .into_iter()
+            .map(|p| p.into())
+            .collect();
+
+        let call = self.bottom_up.contract().add_bottom_up_msg_batch_signature(
+            height,
+            membership_proof,
+            weight,
+            signature,
+        );
+
+        let calldata = call
+            .calldata()
+            .ok_or_else(|| anyhow!("no calldata for adding signature"))?;
+
+        Ok(calldata)
     }
 
     /// Construct the input parameters for adding a signature to the checkpoint.
@@ -294,6 +389,21 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     ) -> anyhow::Result<Vec<EthAddress>> {
         let (_, _, addrs, _) = self.getter.call(state, |c| {
             c.get_checkpoint_signature_bundle(ethers::types::U256::from(height))
+        })?;
+
+        let addrs = addrs.into_iter().map(|a| a.into()).collect();
+
+        Ok(addrs)
+    }
+
+    /// Get the Ethereum adresses of validators who signed a bottom up message batch.
+    pub fn bottom_up_batch_signatories(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: u64,
+    ) -> anyhow::Result<Vec<EthAddress>> {
+        let (_, _, addrs, _) = self.getter.call(state, |c| {
+            c.get_bottom_up_msg_batch_signature_bundle(ethers::types::U256::from(height))
         })?;
 
         let addrs = addrs.into_iter().map(|a| a.into()).collect();

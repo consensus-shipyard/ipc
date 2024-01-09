@@ -134,6 +134,8 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        self.create_bottom_up_msg_batch(&mut state).await?;
+
         let updates = if let Some((checkpoint, updates)) =
             checkpoint::maybe_create_checkpoint(&self.gateway, &mut state)
                 .context("failed to create checkpoint")?
@@ -184,5 +186,57 @@ where
         };
 
         Ok((state, updates.0))
+    }
+}
+
+impl<DB, TC> FvmMessageInterpreter<DB, TC>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+    TC: Client + Clone + Send + Sync + 'static,
+{
+    async fn create_bottom_up_msg_batch(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<()> {
+        let batch = if let Some(v) = checkpoint::maybe_create_msg_batch(&self.gateway, state)
+            .context("failed to create bottom up msg batch")?
+        {
+            v
+        } else {
+            return Ok(());
+        };
+
+        // Asynchronously broadcast signature, if validating.
+        if let Some(ref ctx) = self.validator_ctx {
+            // Do not resend past signatures.
+            if !self.syncing().await {
+                // Fetch any incomplete msg batch synchronously because the state can't be shared across threads.
+                let incomplete = checkpoint::unsigned_bottom_up_msg_batches(
+                    &self.gateway,
+                    state,
+                    ctx.public_key,
+                )
+                .context("failed to fetch incomplete checkpoints")?;
+
+                let client = self.client.clone();
+                let gateway = self.gateway.clone();
+                let chain_id = state.chain_id();
+                let height = batch.block_height;
+                let validator_ctx = ctx.clone();
+
+                tokio::spawn(async move {
+                    let res = checkpoint::broadcast_incomplete_batches(
+                        &client,
+                        &validator_ctx,
+                        &gateway,
+                        chain_id,
+                        incomplete,
+                    )
+                    .await;
+
+                    if let Err(e) = res {
+                        tracing::error!(error =? e, height = height.as_u64(), "error broadcasting checkpoint signature");
+                    }
+                });
+            }
+        }
+        Ok(())
     }
 }
