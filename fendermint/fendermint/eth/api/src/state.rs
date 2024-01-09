@@ -371,7 +371,14 @@ where
             .context("failed to call contract")?;
 
         if result.value.code.is_err() {
-            return error(ExitCode::new(result.value.code.value()), result.value.info);
+            return match ExitCode::new(result.value.code.value()) {
+                ExitCode::USR_UNHANDLED_MESSAGE => {
+                    // If the account is an ETHACCOUNT then it doesn't handle certain methods like `GetCode`.
+                    // Let's make it work the same way as a PLACEHOLDER and return nothing.
+                    Ok(None)
+                }
+                other => error(other, result.value.info),
+            };
         }
 
         tracing::debug!(addr = ?address, method_num, data = hex::encode(&result.value.data), "evm actor response");

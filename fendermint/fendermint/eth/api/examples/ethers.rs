@@ -601,25 +601,36 @@ where
     // We could calculate the storage location of the balance of the owner of the contract,
     // but let's just see what it returns with at slot 0. See an example at
     // https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getstorageat
+    let storage_location = {
+        let mut bz = [0u8; 32];
+        U256::zero().to_big_endian(&mut bz);
+        H256::from_slice(&bz)
+    };
+
     request(
         "eth_getStorageAt",
-        mw.get_storage_at(
-            contract.address(),
-            {
-                let mut bz = [0u8; 32];
-                U256::zero().to_big_endian(&mut bz);
-                H256::from_slice(&bz)
-            },
-            None,
-        )
-        .await,
+        mw.get_storage_at(contract.address(), storage_location, None)
+            .await,
         |_| true,
     )?;
 
     request(
-        "eth_code",
+        "eth_getStorageAt /w account",
+        mw.get_storage_at(from.eth_addr, storage_location, None)
+            .await,
+        |_| true,
+    )?;
+
+    request(
+        "eth_getCode",
         mw.get_code(contract.address(), None).await,
         |bz| *bz == deployed_bytecode,
+    )?;
+
+    request(
+        "eth_getCode /w account",
+        mw.get_code(from.eth_addr, None).await,
+        |bz| bz.is_empty(),
     )?;
 
     request("eth_syncing", mw.syncing().await, |s| {
