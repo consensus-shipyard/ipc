@@ -25,6 +25,7 @@ jobs:
 
     - name: Install Foundry
       run: |
+        cd contractsg
         curl -L https://foundry.paradigm.xyz | bash
         export PATH="$PATH:/home/runner/.config/.foundry/bin"
         foundryup
