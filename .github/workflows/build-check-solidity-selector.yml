@@ -1,0 +1,30 @@
+name: Build and Check Solidity Selector Library
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Set Up Environment
+      run: # Add any setup commands here, if necessary
+
+    - name: Build Selector Library
+      run: |
+        cd contracts && 
+        make build-selector-library
+
+    - name: Check Git Status
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "Error: Git status is dirty after build"
+          exit 1
+        fi
+
