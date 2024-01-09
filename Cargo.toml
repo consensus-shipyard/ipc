@@ -72,7 +72,7 @@ jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v1
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
-libp2p = { version = "0.50", default-features = false, features = [
+libp2p = { version = "0.53", default-features = false, features = [
   "gossipsub",
   "kad",
   "identify",
@@ -81,7 +81,6 @@ libp2p = { version = "0.50", default-features = false, features = [
   "yamux",
   "tcp",
   "dns",
-  "mplex",
   "request-response",
   "metrics",
   "tokio",
@@ -198,3 +197,5 @@ tendermint-proto = { version = "0.31" }
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
 # Contains some API changes that the upstream has not merged.
 merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }
+# Updated to libp2p v0.53
+libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap.git", branch = "chore-upgrade-libp2p" }
