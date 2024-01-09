@@ -25,7 +25,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::bigint::Integer;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::{address::Address, bigint::BigInt};
-use ipc_actors_abis::subnet_actor_manager_facet as subnet_manager;
+use ipc_actors_abis::subnet_actor_checkpointing_facet as checkpointer;
 use ipc_sdk::subnet_id::SubnetID;
 
 use super::{
@@ -280,8 +280,8 @@ impl StateMachine for StakingMachine {
 
                 let (root, route) = subnet_id_to_eth(&system.subnet_id).unwrap();
 
-                let checkpoint = subnet_manager::BottomUpCheckpoint {
-                    subnet_id: subnet_manager::SubnetID { root, route },
+                let checkpoint = checkpointer::BottomUpCheckpoint {
+                    subnet_id: checkpointer::SubnetID { root, route },
                     block_height: ethers::types::U256::from(*block_height),
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
