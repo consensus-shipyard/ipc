@@ -10,7 +10,8 @@ use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     bottom_up_router_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
-    subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_actor_reward_facet, subnet_actor_checkpointing_facet,
+    subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
+    subnet_actor_reward_facet,
 };
 use ipc_sdk::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_sdk::validator::from_contract_validators;
@@ -1011,11 +1012,14 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         //     .into_iter()
         //     .map(subnet_actor_manager_facet::CrossMsg::try_from)
         //     .collect::<result::Result<Vec<_>, _>>()?;
-        let checkpoint = subnet_actor_checkpointing_facet::BottomUpCheckpoint::try_from(checkpoint)?;
+        let checkpoint =
+            subnet_actor_checkpointing_facet::BottomUpCheckpoint::try_from(checkpoint)?;
 
         let signer = Arc::new(self.get_signer(submitter)?);
-        let contract =
-            subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(address, signer.clone());
+        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
+            address,
+            signer.clone(),
+        );
         let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
         let call = call_with_premium_estimation(signer, call).await?;
 
@@ -1159,8 +1163,10 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .collect::<result::Result<Vec<_>, _>>()?;
 
         let signer = Arc::new(self.get_signer(submitter)?);
-        let contract =
-            subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(address, signer.clone());
+        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
+            address,
+            signer.clone(),
+        );
         let call = contract.submit_bottom_up_msg_batch(
             subnet_actor_checkpointing_facet::BottomUpMsgBatch::try_from(batch)?,
             signatories,

@@ -19,7 +19,11 @@ use fvm_shared::address::{Address, Payload};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
-use ipc_actors_abis::{bottom_up_router_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond, subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet};
+use ipc_actors_abis::{
+    bottom_up_router_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
+    lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
+    subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
+};
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
 /// the abigen is creating the same struct but under different modules. This save a lot of
