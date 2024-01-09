@@ -29,8 +29,8 @@ impl CommandLineHandler for GetBottomUpBundles {
         for h in arguments.from_epoch..=arguments.to_epoch {
             let bundle = provider.get_bottom_up_bundle(&subnet, h).await?;
             println!(
-                "checkpoint: {:?}, signatures: {:?}, signatories: {:?}, cross_msgs: {:?}",
-                bundle.checkpoint, bundle.signatures, bundle.signatories, bundle.cross_msgs,
+                "checkpoint: {:?}, signatures: {:?}, signatories: {:?}",
+                bundle.checkpoint, bundle.signatures, bundle.signatories,
             );
             println!("{bundle:?}");
         }

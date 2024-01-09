@@ -12,7 +12,7 @@ use fvm_shared::{
 use ipc_identity::{
     EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
 };
-use ipc_sdk::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_sdk::checkpoint::{BottomUpBundle, BottomUpCheckpoint, QuorumReachedEvent};
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_sdk::subnet::{PermissionMode, SupplySource};
 use ipc_sdk::{
@@ -699,13 +699,13 @@ impl IpcProvider {
         &self,
         subnet: &SubnetID,
         height: ChainEpoch,
-    ) -> anyhow::Result<BottomUpCheckpointBundle> {
+    ) -> anyhow::Result<BottomUpBundle<BottomUpCheckpoint>> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
         };
 
-        conn.manager().checkpoint_bundle_at(height).await
+        conn.manager().bundle_at(height).await
     }
 
     pub async fn has_submitted_in_last_checkpoint_height(
@@ -720,7 +720,7 @@ impl IpcProvider {
         };
 
         conn.manager()
-            .has_submitted_in_last_checkpoint_height(subnet, addr)
+            .has_submitted_in_last_confirmed_height(subnet, addr)
             .await
     }
 

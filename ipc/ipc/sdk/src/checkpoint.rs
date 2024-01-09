@@ -50,6 +50,16 @@ impl Display for QuorumReachedEvent {
 
 /// The collection of items for the bottom up checkpoint submission
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct BottomUpBundle<T> {
+    pub checkpoint: T,
+    /// The list of signatures that have signed the checkpoint hash
+    pub signatures: Vec<Signature>,
+    /// The list of addresses that have signed the checkpoint hash
+    pub signatories: Vec<Address>,
+}
+
+/// The collection of items for the bottom up checkpoint submission
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BottomUpCheckpointBundle {
     pub checkpoint: BottomUpCheckpoint,
     /// The list of signatures that have signed the checkpoint hash
