@@ -9,14 +9,14 @@ use std::{
 
 use libipld::{store::StoreParams, Cid};
 use libp2p::{
-    core::ConnectedPoint,
+    core::{ConnectedPoint, Endpoint},
     futures::channel::oneshot,
     multiaddr::Protocol,
-    request_response::handler::RequestResponseHandlerEvent,
+    request_response,
     swarm::{
         derive_prelude::{ConnectionId, FromSwarm},
-        ConnectionHandler, IntoConnectionHandler, NetworkBehaviour, NetworkBehaviourAction,
-        PollParameters,
+        ConnectionDenied, ConnectionHandler, NetworkBehaviour, THandler, THandlerInEvent,
+        THandlerOutEvent, ToSwarm,
     },
     Multiaddr, PeerId,
 };
@@ -181,17 +181,9 @@ impl<P: StoreParams> Behaviour<P> {
 
 impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
     type ConnectionHandler = <Bitswap<P> as NetworkBehaviour>::ConnectionHandler;
-    type OutEvent = Event;
+    type ToSwarm = Event;
 
-    fn new_handler(&mut self) -> Self::ConnectionHandler {
-        self.inner.new_handler()
-    }
-
-    fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
-        self.inner.addresses_of_peer(peer_id)
-    }
-
-    fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
+    fn on_swarm_event(&mut self, event: FromSwarm) {
         // Store the remote address.
         match &event {
             FromSwarm::ConnectionEstablished(c) => {
@@ -226,10 +218,10 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         &mut self,
         peer_id: PeerId,
         connection_id: ConnectionId,
-        event: <<Self::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::OutEvent,
+        event: THandlerOutEvent<Self>,
     ) {
         match event {
-            RequestResponseHandlerEvent::Request {
+            request_response::Event::Request {
                 request_id,
                 request,
                 sender,
@@ -241,7 +233,7 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
                 }
                 // We need to hijack the response channel to record the size, otherwise it goes straight to the handler.
                 let (tx, rx) = libp2p::futures::channel::oneshot::channel();
-                let event = RequestResponseHandlerEvent::Request {
+                let event = request_response::Event::Request {
                     request_id,
                     request,
                     sender: tx,
@@ -263,24 +255,74 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         }
     }
 
+    fn handle_pending_inbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        local_addr: &Multiaddr,
+        remote_addr: &Multiaddr,
+    ) -> Result<(), ConnectionDenied> {
+        self.inner
+            .handle_pending_inbound_connection(connection_id, local_addr, remote_addr)
+    }
+
+    fn handle_established_inbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        peer: PeerId,
+        local_addr: &Multiaddr,
+        remote_addr: &Multiaddr,
+    ) -> Result<THandler<Self>, ConnectionDenied> {
+        self.inner.handle_established_inbound_connection(
+            connection_id,
+            peer,
+            local_addr,
+            remote_addr,
+        )
+    }
+
+    fn handle_pending_outbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        maybe_peer: Option<PeerId>,
+        addresses: &[Multiaddr],
+        effective_role: Endpoint,
+    ) -> Result<Vec<Multiaddr>, ConnectionDenied> {
+        self.inner.handle_pending_outbound_connection(
+            connection_id,
+            maybe_peer,
+            addresses,
+            effective_role,
+        )
+    }
+
+    fn handle_established_outbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        peer: PeerId,
+        addr: &Multiaddr,
+        role_override: Endpoint,
+    ) -> Result<THandler<Self>, ConnectionDenied> {
+        self.inner
+            .handle_established_outbound_connection(connection_id, peer, addr, role_override)
+    }
+
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
-        params: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ConnectionHandler>> {
+    ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         // Emit own events first.
         if let Some(ev) = self.outbox.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(ev));
+            return Poll::Ready(ToSwarm::GenerateEvent(ev));
         }
         // Poll Bitswap.
-        while let Poll::Ready(ev) = self.inner.poll(cx, params) {
+        while let Poll::Ready(ev) = self.inner.poll(cx) {
             match ev {
-                NetworkBehaviourAction::GenerateEvent(ev) => match ev {
+                ToSwarm::GenerateEvent(ev) => match ev {
                     BitswapEvent::Progress(_, _) => {}
                     BitswapEvent::Complete(id, result) => {
                         stats::CONTENT_RESOLVE_RUNNING.dec();
                         let out = Event::Complete(id, result);
-                        return Poll::Ready(NetworkBehaviourAction::GenerateEvent(out));
+                        return Poll::Ready(ToSwarm::GenerateEvent(out));
                     }
                 },
                 other => {
