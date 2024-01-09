@@ -269,9 +269,9 @@ macro_rules! abi_hash {
 }
 
 abi_hash!(struct ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint);
-abi_hash!(struct ipc_actors_abis::subnet_actor_manager_facet::BottomUpCheckpoint);
+abi_hash!(struct ipc_actors_abis::subnet_actor_checkpointing_facet::BottomUpCheckpoint);
 abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::CrossMsg>);
-abi_hash!(Vec<ipc_actors_abis::subnet_actor_manager_facet::CrossMsg>);
+abi_hash!(Vec<ipc_actors_abis::subnet_actor_checkpointing_facet::CrossMsg>);
 abi_hash!(Vec<ipc_actors_abis::subnet_actor_getter_facet::CrossMsg>);
 
 pub mod gateway {
@@ -454,7 +454,7 @@ pub mod subnet {
     mod tests {
         use ethers::abi::{AbiType, Tokenize};
         use ethers::core::types::Bytes;
-        use ipc_actors_abis::subnet_actor_manager_facet::{BottomUpCheckpoint, SubnetID};
+        use ipc_actors_abis::subnet_actor_checkpointing_facet::{BottomUpCheckpoint, SubnetID};
 
         #[test]
         fn checkpoint_abi() {
