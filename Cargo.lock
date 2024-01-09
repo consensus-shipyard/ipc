@@ -4691,6 +4691,7 @@ dependencies = [
  "libipld",
  "libp2p",
  "libp2p-bitswap",
+ "libp2p-mplex",
  "log",
  "lru_time_cache",
  "prometheus",
@@ -5265,6 +5266,25 @@ dependencies = [
  "libp2p-swarm",
  "pin-project",
  "prometheus-client",
+]
+
+[[package]]
+name = "libp2p-mplex"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e895765e27e30217b25f7cb7ac4686dad1ff80bf2fdeffd1d898566900a924"
+dependencies = [
+ "asynchronous-codec 0.6.2",
+ "bytes",
+ "futures",
+ "libp2p-core",
+ "libp2p-identity",
+ "nohash-hasher",
+ "parking_lot",
+ "rand 0.8.5",
+ "smallvec",
+ "tracing",
+ "unsigned-varint 0.7.2",
 ]
 
 [[package]]

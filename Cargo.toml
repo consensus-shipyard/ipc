@@ -89,6 +89,7 @@ libp2p = { version = "0.53", default-features = false, features = [
   "secp256k1",
   "plaintext",
 ] }
+libp2p-mplex = { version = "0.41" }
 # libp2p-bitswap = "0.25.1"
 libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap.git", branch = "chore-upgrade-libp2p" } # Updated to libp2p v0.53
 libsecp256k1 = "0.7"
@@ -198,4 +199,3 @@ tendermint-proto = { version = "0.31" }
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
 # Contains some API changes that the upstream has not merged.
 merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }
-

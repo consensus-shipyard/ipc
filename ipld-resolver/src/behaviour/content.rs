@@ -51,6 +51,7 @@ pub enum Event {
     /// This is only raised if we are tracking rate limits. The service has to
     /// do the forwarding between the two oneshot channels, and call this module
     /// back between doing so.
+    #[allow(dead_code)]
     BitswapForward {
         peer_id: PeerId,
         /// Receive response from the [`Bitswap`] behaviour.
@@ -143,6 +144,7 @@ impl<P: StoreParams> Behaviour<P> {
     }
 
     /// Check whether the peer has already exhaused their rate limit.
+    #[allow(dead_code)]
     fn check_rate_limit(&mut self, peer_id: &PeerId, cid: &Cid) -> bool {
         if let Some(ref rate_limit) = self.rate_limit {
             if let Some(addr) = self.peer_addresses.get(peer_id).cloned() {

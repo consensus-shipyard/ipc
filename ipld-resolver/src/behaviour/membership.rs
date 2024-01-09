@@ -14,8 +14,8 @@ use libp2p::gossipsub::{
 use libp2p::identity::Keypair;
 use libp2p::swarm::derive_prelude::FromSwarm;
 use libp2p::swarm::{
-    ConnectionDenied, ConnectionHandler, ConnectionId, NetworkBehaviour, THandler, THandlerInEvent,
-    THandlerOutEvent, ToSwarm,
+    ConnectionDenied, ConnectionId, NetworkBehaviour, THandler, THandlerInEvent, THandlerOutEvent,
+    ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId};
 use log::{debug, error, warn};
@@ -135,7 +135,7 @@ impl Behaviour {
 
         let gossipsub_config = gossipsub_config
             .build()
-            .map_err(|s| ConfigError::InvalidGossipsubConfig(s.into()))?;
+            .map_err(|s| ConfigError::InvalidGossipsubConfig(s.to_string()))?;
 
         let mut gossipsub = gossipsub::Behaviour::new(
             MessageAuthenticity::Signed(nc.local_key.clone()),

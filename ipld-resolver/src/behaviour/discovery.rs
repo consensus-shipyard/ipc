@@ -118,7 +118,7 @@ impl Behaviour {
 
         let kademlia_opt = if dc.enable_kademlia {
             let mut kad_config = kad::Config::default();
-            kad_config.set_protocol_names(vec![protocol_name]);
+            kad_config.set_protocol_names(vec![protocol_name.clone()]);
 
             // Disable inserting records into the memory store, so peers cannot send `PutRecord`
             // messages to store content in the memory of our node.
