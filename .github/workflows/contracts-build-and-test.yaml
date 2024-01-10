@@ -1,4 +1,4 @@
-name: Build and Test Workflow
+name: Contract Build and Test Workflow
 
 on:
   push:
