@@ -65,6 +65,14 @@ impl Cluster {
     pub fn size(&self) -> usize {
         self.agents.len()
     }
+
+    /// Wait until the cluster is formed,
+    /// ie. nodes discover each other through their bootstrap.
+    pub async fn await_connect(&self) {
+        // Wait a little for the cluster to connect.
+        // TODO: Wait on some condition instead of sleep.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 struct ClusterBuilder {
@@ -125,12 +133,25 @@ impl ClusterBuilder {
     }
 }
 
+/// Run the tests with `RUST_LOG=debug` for example to see the logs, for example:
+///
+/// ```text
+/// RUST_LOG=debug cargo test -p ipc_ipld_resolver --test smoke resolve
+/// ```
+fn init_log() {
+    // This line means the test runner will buffer the logs (if `RUST_LOG` is on)
+    // and print them after any failure. With `-- --nocapture` we see them as we go.
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    // Alternatively with this we see them printed to the console regardless of outcome:
+    //env_logger::init();
+}
+
 /// Start a cluster of agents from a single bootstrap node,
 /// make available some content on one agent and resolve it from another.
 #[tokio::test]
 async fn single_bootstrap_single_provider_resolve_one() {
-    let _ = env_logger::builder().is_test(true).try_init();
-    //env_logger::init();
+    init_log();
 
     // Choose agents.
     let cluster_size = 3;
@@ -138,26 +159,13 @@ async fn single_bootstrap_single_provider_resolve_one() {
     let provider_idx = 1;
     let resolver_idx = 2;
 
-    // TODO: Get the seed from QuickCheck
-    let mut builder = ClusterBuilder::new(cluster_size);
-
-    // Build a cluster of nodes.
-    for i in 0..builder.size {
-        builder.add_node(if i == 0 { None } else { Some(bootstrap_idx) });
-    }
-
-    // Start the swarms.
-    let mut cluster = builder.run();
+    let mut cluster = make_cluster_with_bootstrap(cluster_size, bootstrap_idx).await;
 
     // Insert a CID of a complex recursive data structure.
     let cid = insert_test_data(&mut cluster.agents[provider_idx]).expect("failed to insert data");
 
     // Sanity check that we can read the data back.
     check_test_data(&mut cluster.agents[provider_idx], &cid).expect("failed to read back the data");
-
-    // Wait a little for the cluster to connect.
-    // TODO: Wait on some condition instead of sleep.
-    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Announce the support of some subnet.
     let subnet_id = make_subnet_id(1001);
@@ -169,7 +177,7 @@ async fn single_bootstrap_single_provider_resolve_one() {
 
     // Wait a little for the gossip to spread and peer lookups to happen, then another round of gossip.
     // TODO: Wait on some condition instead of sleep.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
 
     // Ask for the CID to be resolved from by another peer.
     cluster.agents[resolver_idx]
@@ -186,23 +194,9 @@ async fn single_bootstrap_single_provider_resolve_one() {
 /// Start two agents, subscribe to the same subnet, publish and receive a vote.
 #[tokio::test]
 async fn single_bootstrap_publish_receive_vote() {
-    let _ = env_logger::builder().is_test(true).try_init();
-    //env_logger::init();
+    init_log();
 
-    // TODO: Get the seed from QuickCheck
-    let mut builder = ClusterBuilder::new(2);
-
-    // Build a cluster of nodes.
-    for i in 0..builder.size {
-        builder.add_node(if i == 0 { None } else { Some(0) });
-    }
-
-    // Start the swarms.
-    let mut cluster = builder.run();
-
-    // Wait a little for the cluster to connect.
-    // TODO: Wait on some condition instead of sleep.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut cluster = make_cluster_with_bootstrap(2, 0).await;
 
     // Announce the support of some subnet.
     let subnet_id = make_subnet_id(1001);
@@ -246,22 +240,9 @@ async fn single_bootstrap_publish_receive_vote() {
 /// Start two agents, pin a subnet, publish preemptively and receive.
 #[tokio::test]
 async fn single_bootstrap_publish_receive_preemptive() {
-    let _ = env_logger::builder().is_test(true).try_init();
+    init_log();
 
-    // TODO: Get the seed from QuickCheck
-    let mut builder = ClusterBuilder::new(2);
-
-    // Build a cluster of nodes.
-    for i in 0..builder.size {
-        builder.add_node(if i == 0 { None } else { Some(0) });
-    }
-
-    // Start the swarms.
-    let mut cluster = builder.run();
-
-    // Wait a little for the cluster to connect.
-    // TODO: Wait on some condition instead of sleep.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut cluster = make_cluster_with_bootstrap(2, 0).await;
 
     // Pin a subnet on the bootstrap node.
     let subnet_id = make_subnet_id(1001);
@@ -293,6 +274,21 @@ async fn single_bootstrap_publish_receive_preemptive() {
     } else {
         panic!("unexpected {event:?}")
     }
+}
+
+async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) -> Cluster {
+    // TODO: Get the seed from QuickCheck
+    let mut builder = ClusterBuilder::new(cluster_size);
+
+    // Build a cluster of nodes.
+    for i in 0..builder.size {
+        builder.add_node(if i == 0 { None } else { Some(bootstrap_idx) });
+    }
+
+    // Start the swarms.
+    let cluster = builder.run();
+    cluster.await_connect().await;
+    cluster
 }
 
 fn make_service(config: Config) -> (Service<TestStoreParams>, TestBlockstore) {
