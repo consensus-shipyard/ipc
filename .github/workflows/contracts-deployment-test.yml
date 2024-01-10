@@ -31,7 +31,7 @@ jobs:
         foundryup
         forge install
 
-    - name: Generate Ethereum Private Key and create .env file
+    - name: Generate Ethereum Private Key and Create .env File and run make
       run: |
         cd contracts
         PRIVATE_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
@@ -41,8 +41,4 @@ jobs:
         export PATH="$PATH:/home/runner/.config/.foundry/bin"
         npx ganache-cli -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
         sleep 5
-
-    - name: Deploy IPC contracts
-      run: |
-        cd contracts
-        make deploy-ipc    
+        make ipc-deploy
