@@ -174,6 +174,22 @@ macro_rules! bottom_up_type_conversion {
             }
         }
 
+        impl TryFrom<$module::BottomUpMsgBatch> for BottomUpMsgBatch {
+            type Error = anyhow::Error;
+
+            fn try_from(value: $module::BottomUpMsgBatch) -> Result<Self, Self::Error> {
+                Ok(BottomUpMsgBatch {
+                    subnet_id: SubnetID::try_from(value.subnet_id)?,
+                    block_height: value.block_height.as_u128() as ChainEpoch,
+                    msgs: value
+                        .msgs
+                        .into_iter()
+                        .map(CrossMsg::try_from)
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
+            }
+        }
+
         impl TryFrom<BottomUpCheckpoint> for $module::BottomUpCheckpoint {
             type Error = anyhow::Error;
 

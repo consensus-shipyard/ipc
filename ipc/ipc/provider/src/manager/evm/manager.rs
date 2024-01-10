@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use ethers_contract::{ContractError, EthLogDecode, LogMeta};
+use ethers_contract::{ContractCall, ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     bottom_up_router_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
@@ -39,8 +39,8 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_identity::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use ipc_sdk::checkpoint::{
-    BottomUpBundle, BottomUpCheckpoint, BottomUpCheckpointBundle, BottomUpMsgBatch,
-    QuorumReachedEvent, Signature,
+    BottomUpBundle, BottomUpCheckpoint, BottomUpMsgBatch, QuorumObjKind, QuorumReachedEvent,
+    Signature,
 };
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
@@ -50,6 +50,7 @@ use num_traits::ToPrimitive;
 use std::result;
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
+type SubnetActorGetter = subnet_actor_getter_facet::SubnetActorGetterFacet<Provider<Http>>;
 
 /// Default polling time used by the Ethers provider to check for pending
 /// transactions and events. Default is 7, and for our child subnets we
@@ -988,32 +989,99 @@ impl EthSubnetManager {
 
 #[async_trait]
 impl BottomUpRelayer<BottomUpMsgBatch> for EthSubnetManager {
-    async fn submit_checkpoint(&self, submitter: &Address, checkpoint: BottomUpMsgBatch, signatures: Vec<Signature>, signatories: Vec<Address>) -> Result<ChainEpoch> {
-        todo!()
+    async fn submit_checkpoint(
+        &self,
+        submitter: &Address,
+        batch: BottomUpMsgBatch,
+        signatures: Vec<Signature>,
+        signatories: Vec<Address>,
+    ) -> Result<ChainEpoch> {
+        let address = contract_address_from_subnet(&batch.subnet_id)?;
+        log::debug!(
+            "submit bottom up checkpoint msg batch {batch:?} in evm subnet contract: {address:}"
+        );
+
+        let signatures = signatures
+            .into_iter()
+            .map(ethers::types::Bytes::from)
+            .collect::<Vec<_>>();
+        let signatories = signatories
+            .into_iter()
+            .map(|addr| payload_to_evm_address(addr.payload()))
+            .collect::<result::Result<Vec<_>, _>>()?;
+
+        let signer = Arc::new(self.get_signer(submitter)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+        let call = contract.submit_bottom_up_msg_batch(
+            subnet_actor_manager_facet::BottomUpMsgBatch::try_from(batch)?,
+            signatories,
+            signatures,
+        );
+        let call = call_with_premium_estimation(signer, call).await?;
+
+        let pending_tx = call.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
     }
 
     async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
-        todo!()
+        self.last_bottom_up_checkpoint_height_inner(subnet_id, |c| {
+            c.last_bottom_up_msg_batch_height()
+        })
+        .await
     }
 
-    async fn has_submitted_in_last_confirmed_height(&self, subnet_id: &SubnetID, submitter: &Address) -> Result<bool> {
-        todo!()
+    async fn has_submitted_in_last_confirmed_height(
+        &self,
+        subnet_id: &SubnetID,
+        submitter: &Address,
+    ) -> Result<bool> {
+        self.has_submitted_in_last_confirmed_height_inner(subnet_id, submitter, |c, addr| {
+            c.has_submitted_in_last_bottom_up_msg_batch_height(addr)
+        })
+        .await
     }
 
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
-        todo!()
+        self.checkpoint_period_inner(subnet_id, |c| c.bottom_up_msg_batch_period())
+            .await
     }
 
     async fn bundle_at(&self, height: ChainEpoch) -> Result<BottomUpBundle<BottomUpMsgBatch>> {
-        todo!()
+        let contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let (p, _, signatories, signatures) = contract
+            .get_bottom_up_msg_batch_signature_bundle(U256::from(height))
+            .call()
+            .await?;
+        let checkpoint = BottomUpMsgBatch::try_from(p)?;
+        let signatories = signatories
+            .into_iter()
+            .map(|s| ethers_address_to_fil_address(&s))
+            .collect::<Result<Vec<_>, _>>()?;
+        let signatures = signatures
+            .into_iter()
+            .map(|s| s.to_vec())
+            .collect::<Vec<_>>();
+
+        Ok(BottomUpBundle {
+            checkpoint,
+            signatures,
+            signatories,
+        })
     }
 
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>> {
-        todo!()
+        self.quorum_reached_events_inner(height, QuorumObjKind::BottomUpMsgBatch)
+            .await
     }
 
     async fn current_epoch(&self) -> Result<ChainEpoch> {
-        todo!()
+        self.current_epoch_inner().await
     }
 }
 
@@ -1025,7 +1093,7 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
         checkpoint: BottomUpCheckpoint,
         signatures: Vec<Signature>,
         signatories: Vec<Address>,
-    ) -> anyhow::Result<ChainEpoch> {
+    ) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(&checkpoint.subnet_id)?;
         log::debug!(
             "submit bottom up checkpoint: {checkpoint:?} in evm subnet contract: {address:}"
@@ -1052,17 +1120,11 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
-    async fn last_bottom_up_checkpoint_height(
-        &self,
-        subnet_id: &SubnetID,
-    ) -> anyhow::Result<ChainEpoch> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let epoch = contract.last_bottom_up_checkpoint_height().call().await?;
-        Ok(epoch.as_u64() as ChainEpoch)
+    async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
+        self.last_bottom_up_checkpoint_height_inner(subnet_id, |c| {
+            c.last_bottom_up_checkpoint_height()
+        })
+        .await
     }
 
     async fn has_submitted_in_last_confirmed_height(
@@ -1070,32 +1132,18 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
         subnet_id: &SubnetID,
         submitter: &Address,
     ) -> Result<bool> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let addr = payload_to_evm_address(submitter.payload())?;
-        Ok(contract
-            .has_submitted_in_last_bottom_up_checkpoint_height(addr)
-            .call()
-            .await?)
+        self.has_submitted_in_last_confirmed_height_inner(subnet_id, submitter, |c, addr| {
+            c.has_submitted_in_last_bottom_up_checkpoint_height(addr)
+        })
+        .await
     }
 
-    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let epoch = contract.bottom_up_check_period().call().await?;
-        Ok(epoch.as_u64() as ChainEpoch)
+    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
+        self.checkpoint_period_inner(subnet_id, |c| c.bottom_up_check_period())
+            .await
     }
 
-    async fn bundle_at(
-        &self,
-        height: ChainEpoch,
-    ) -> anyhow::Result<BottomUpBundle<BottomUpCheckpoint>> {
+    async fn bundle_at(&self, height: ChainEpoch) -> Result<BottomUpBundle<BottomUpCheckpoint>> {
         let contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
@@ -1105,11 +1153,6 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
             .get_checkpoint_signature_bundle(U256::from(height))
             .call()
             .await?;
-        // let bottom_up_msg_batch = contract
-        //     .bottom_up_msg_batch(U256::from(height))
-        //     .call()
-        //     .await?;
-
         let checkpoint = BottomUpCheckpoint::try_from(checkpoint)?;
         let signatories = signatories
             .into_iter()
@@ -1128,6 +1171,69 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
     }
 
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>> {
+        self.quorum_reached_events_inner(height, QuorumObjKind::Checkpoint)
+            .await
+    }
+
+    async fn current_epoch(&self) -> Result<ChainEpoch> {
+        self.current_epoch_inner().await
+    }
+}
+
+impl EthSubnetManager {
+    async fn last_bottom_up_checkpoint_height_inner<F>(
+        &self,
+        subnet_id: &SubnetID,
+        f: F,
+    ) -> Result<ChainEpoch>
+    where
+        F: FnOnce(&SubnetActorGetter) -> ContractCall<Provider<Http>, U256>,
+    {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let epoch = f(&contract).call().await?;
+        Ok(epoch.as_u64() as ChainEpoch)
+    }
+
+    async fn has_submitted_in_last_confirmed_height_inner<F>(
+        &self,
+        subnet_id: &SubnetID,
+        submitter: &Address,
+        f: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&SubnetActorGetter, ethers::types::Address) -> ContractCall<Provider<Http>, bool>,
+    {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let addr = payload_to_evm_address(submitter.payload())?;
+        Ok(f(&contract, addr).call().await?)
+    }
+
+    async fn checkpoint_period_inner<F>(&self, subnet_id: &SubnetID, f: F) -> Result<ChainEpoch>
+    where
+        F: FnOnce(&SubnetActorGetter) -> ContractCall<Provider<Http>, U256>,
+    {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let epoch = f(&contract).call().await?;
+        Ok(epoch.as_u64() as ChainEpoch)
+    }
+
+    async fn quorum_reached_events_inner(
+        &self,
+        height: ChainEpoch,
+        quorum_kind: QuorumObjKind,
+    ) -> Result<Vec<QuorumReachedEvent>> {
         let contract = bottom_up_router_facet::BottomUpRouterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
@@ -1140,8 +1246,13 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
 
         let mut events = vec![];
         for (event, _meta) in query_with_meta(ev, contract.client()).await? {
+            let kind = QuorumObjKind::try_from(event.obj_kind)?;
+            if kind != quorum_kind {
+                continue;
+            }
+
             events.push(QuorumReachedEvent {
-                obj_kind: event.obj_kind,
+                obj_kind: kind,
                 height: event.height.as_u64() as ChainEpoch,
                 obj_hash: event.obj_hash.to_vec(),
                 quorum_weight: eth_to_fil_amount(&event.quorum_weight)?,
@@ -1150,7 +1261,8 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
 
         Ok(events)
     }
-    async fn current_epoch(&self) -> Result<ChainEpoch> {
+
+    async fn current_epoch_inner(&self) -> Result<ChainEpoch> {
         let epoch = self
             .ipc_contract_info
             .provider
@@ -1159,41 +1271,6 @@ impl BottomUpRelayer<BottomUpCheckpoint> for EthSubnetManager {
             .as_u64();
         Ok(epoch as ChainEpoch)
     }
-
-    // async fn submit_bottom_up_msg_batch(
-    //     &self,
-    //     submitter: &Address,
-    //     subnet_id: &SubnetID,
-    //     batch: BottomUpMsgBatch,
-    //     signatories: &[Address],
-    //     signatures: &[Signature],
-    // ) -> Result<ChainEpoch> {
-    //     let address = contract_address_from_subnet(subnet_id)?;
-    //     log::debug!("submit bottom up checkpoint msg batch in evm subnet contract: {address:}");
-    //
-    //     let signatures = signatures
-    //         .iter()
-    //         .map(|b| ethers::types::Bytes::from(b.clone()))
-    //         .collect::<Vec<_>>();
-    //     let signatories = signatories
-    //         .iter()
-    //         .map(|addr| payload_to_evm_address(addr.payload()))
-    //         .collect::<result::Result<Vec<_>, _>>()?;
-    //
-    //     let signer = Arc::new(self.get_signer(submitter)?);
-    //     let contract =
-    //         subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
-    //     let call = contract.submit_bottom_up_msg_batch(
-    //         subnet_actor_manager_facet::BottomUpMsgBatch::try_from(batch)?,
-    //         signatories,
-    //         signatures,
-    //     );
-    //     let call = call_with_premium_estimation(signer, call).await?;
-    //
-    //     let pending_tx = call.send().await?;
-    //     let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-    //     block_number_from_receipt(receipt)
-    // }
 }
 
 /// Receives an input `FunctionCall` and returns a new instance

@@ -8,9 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_sdk::checkpoint::{
-    BottomUpBundle, BottomUpCheckpoint, BottomUpMsgBatch, QuorumReachedEvent, Signature,
-};
+use ipc_sdk::checkpoint::{BottomUpBundle, BottomUpCheckpoint, QuorumReachedEvent, Signature};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_sdk::subnet::{ConstructParams, PermissionMode, SupplySource};

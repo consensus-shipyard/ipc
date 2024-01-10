@@ -4,6 +4,7 @@
 
 use crate::cross::CrossMsg;
 use crate::subnet_id::SubnetID;
+use anyhow::anyhow;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
@@ -26,10 +27,17 @@ lazy_static! {
 
 pub type Signature = Vec<u8>;
 
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum QuorumObjKind {
+    Checkpoint,
+    BottomUpMsgBatch,
+}
+
 /// The event emitted
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct QuorumReachedEvent {
-    pub obj_kind: u8,
+    pub obj_kind: QuorumObjKind,
     pub height: ChainEpoch,
     /// The checkpoint hash
     pub obj_hash: Vec<u8>,
@@ -95,4 +103,16 @@ pub struct BottomUpCheckpoint {
     /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
     /// 0 could mean "no change".
     pub next_configuration_number: u64,
+}
+
+impl TryFrom<u8> for QuorumObjKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(QuorumObjKind::Checkpoint),
+            1 => Ok(QuorumObjKind::BottomUpMsgBatch),
+            _ => Err(anyhow!("unknown quorum obj kind")),
+        }
+    }
 }
