@@ -26,7 +26,7 @@ use fvm_shared::bigint::Integer;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::{address::Address, bigint::BigInt};
 use ipc_actors_abis::subnet_actor_checkpointing_facet as checkpointer;
-use ipc_sdk::subnet_id::SubnetID;
+use ipc_api::subnet_id::SubnetID;
 
 use super::{
     choose_amount,
