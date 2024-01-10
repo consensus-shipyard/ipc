@@ -31,6 +31,7 @@ extend = "fendermint-tool"
 env = { "ENTRY" = "fendermint", "CMD" = """genesis --genesis-file /data/genesis.json ipc gateway --subnet-id /r0 \
     --bottom-up-check-period 10 \
     --msg-fee 10 \
+    --min-collateral 1000000000000000000 \
     --majority-percentage 67 \
     """ }
 
