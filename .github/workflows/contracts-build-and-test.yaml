@@ -1,10 +1,8 @@
 name: Contract Build and Test Workflow
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  workflow_call:
 
 jobs:
   build:
