@@ -4,7 +4,7 @@ We recommend that you connect to the existing contracts on CalibrationNet. Never
 
 ## Install prerequisites
 
-* Install the basic requirements for IPC (see [README](/README.md))
+* Install the basic requirements for IPC (see [README](../ipc/README.md))
 
 * Install Node.js [Ubuntu] ([details](https://github.com/nodesource/distributions))
 ```bash
@@ -23,7 +23,7 @@ foundryup
 git clone --recurse-submodules https://github.com/consensus-shipyard/ipc-solidity-actors
 cd ipc-solidity-actors
 npm install
-``` 
+```
 
 ## Set up and fund an EVM account
 
@@ -36,7 +36,7 @@ npm install
 
 ## Deploy the contracts
 
-Once inside the repo, you'll need to populate the `.env.template` file with the private key of the address you provided with funds in the previous step, and the endpoint of the target network on which you want to deploy 
+Once inside the repo, you'll need to populate the `.env.template` file with the private key of the address you provided with funds in the previous step, and the endpoint of the target network on which you want to deploy
 ```bash
 export PRIVATE_KEY=<your_private_key>
 export RPC_URL=https://api.calibration.node.glif.io/rpc/v1
@@ -49,7 +49,7 @@ source .env.template
 make deploy-ipc NETWORK=calibrationnet
 ```
 
-If the deployment is successful, you should receive an output similar to this one: 
+If the deployment is successful, you should receive an output similar to this one:
 
 ```
 $ ./ops/deploy.sh localnet
@@ -57,7 +57,7 @@ $ ./ops/deploy.sh localnet
 [*] Output libraries available in /home/workspace/pl/ipc-solidity-actors/scripts/libraries.out
 [*] Populating deploy-gateway script
 [*] Gateway script in /home/workspace/pl/ipc-solidity-actors/scripts/deploy-gateway.ts
-[*] Gateway deployed: 
+[*] Gateway deployed:
 { Gateway: '<GATEWAY_ADDRESS>' }
 [*] Output gateway address in /home/workspace/pl/ipc-solidity-actors/scripts/gateway.out
 [*] Populating deploy-registry script
