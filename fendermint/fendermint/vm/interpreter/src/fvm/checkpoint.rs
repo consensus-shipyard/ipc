@@ -78,7 +78,7 @@ where
             None
         } else {
             tracing::debug!(
-                height = height.to_string(),
+                batch = ?height,
                 "creating bottom up msg batch at height"
             );
 
