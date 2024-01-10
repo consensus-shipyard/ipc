@@ -1,12 +1,12 @@
-.PHONY: all build test lint license check-fmt check-clippy diagrams install-infra clean-infra
+.PHONY: all build test lint license check-fmt check-clippy diagrams
 
-CRATE   := ipc-cli ipc-identity ipc-provider ipc-sdk
+CRATE   := ipc-cli ipc-wallet ipc-provider ipc-api ipc-types
 PACKAGE := $(patsubst %, --package %, $(CRATE))
 
 all: test build
 
 build:
-	cargo build --release -p ipc-cli && mkdir -p bin/ && cp target/release/ipc-cli ./bin/ipc-cli
+	cargo build --release
 
 test:
 	cargo test --release $(PACKAGE)
@@ -23,12 +23,6 @@ clean:
 lint: \
 	check-fmt \
 	check-clippy
-
-install-infra:
-	./scripts/install_infra.sh
-
-clean-infra:
-	rm -rf ./bin/ipc-infra
 
 check-fmt:
 	@# `nightly` is required to support ignore list in rustfmt.toml
