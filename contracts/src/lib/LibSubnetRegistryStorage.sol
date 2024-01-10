@@ -6,13 +6,25 @@ struct SubnetRegistryActorStorage {
     address GATEWAY;
     /// The getter and manager facet shared by diamond
     // solhint-disable-next-line var-name-mixedcase
-    address SUBNET_GETTER_FACET;
+    address SUBNET_ACTOR_GETTER_FACET;
     // solhint-disable-next-line var-name-mixedcase
-    address SUBNET_MANAGER_FACET;
-    /// The subnet getter facet functions selectors
-    bytes4[] subnetGetterSelectors;
-    /// The subnet manager facet functions selectors
-    bytes4[] subnetManagerSelectors;
+    address SUBNET_ACTOR_MANAGER_FACET;
+    // solhint-disable-next-line var-name-mixedcase
+    address SUBNET_ACTOR_REWARD_FACET;
+    // solhint-disable-next-line var-name-mixedcase
+    address SUBNET_ACTOR_CHECKPOINTING_FACET;
+    // solhint-disable-next-line var-name-mixedcase
+    address SUBNET_ACTOR_PAUSE_FACET;
+    /// The subnet actor getter facet functions selectors
+    bytes4[] subnetActorGetterSelectors;
+    /// The subnet actor manager facet functions selectors
+    bytes4[] subnetActorManagerSelectors;
+    /// The subnet actor reward facet functions selectors
+    bytes4[] subnetActorRewarderSelectors;
+    /// The subnet actor checkpointing facet functions selectors
+    bytes4[] subnetActorCheckpointerSelectors;
+    /// The subnet actor pause facet functions selectors
+    bytes4[] subnetActorPauserSelectors;
     /// @notice Mapping that tracks the deployed subnet actors per user.
     /// Key is the hash of Subnet ID, values are addresses.
     /// mapping owner => nonce => subnet

@@ -1,5 +1,5 @@
-import { ethers } from 'hardhat'
 import { deployContractWithDeployer, getTransactionFees } from './util'
+import { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
@@ -26,18 +26,38 @@ export async function deploy() {
         txArgs,
     )
     const getterSelectors = getSelectors(getterFacet)
-    // console.log("getter address:", getterFacet.address);
 
     const managerFacet = await deployContractWithDeployer(
         deployer,
         'SubnetActorManagerFacet',
-        {
-            LibStaking: LIBMAP['LibStaking'],
-        },
+        {},
         txArgs,
     )
     const managerSelectors = getSelectors(managerFacet)
-    // console.log("manager address:", managerFacet.address);
+
+    const pauserFacet = await deployContractWithDeployer(
+        deployer,
+        'SubnetActorPauseFacet',
+        {},
+        txArgs,
+    )
+    const pauserSelectors = getSelectors(pauserFacet)
+
+    const rewarderFacet = await deployContractWithDeployer(
+        deployer,
+        'SubnetActorRewardFacet',
+        { LibStaking: LIBMAP['LibStaking'] },
+        txArgs,
+    )
+    const rewarderSelectors = getSelectors(rewarderFacet)
+
+    const checkpointerFacet = await deployContractWithDeployer(
+        deployer,
+        'SubnetActorCheckpointingFacet',
+        {},
+        txArgs,
+    )
+    const checkpointerSelectors = getSelectors(checkpointerFacet)
 
     //deploy subnet registry diamond
     const registry = await ethers.getContractFactory('SubnetRegistryDiamond', {
@@ -48,8 +68,14 @@ export async function deploy() {
         gateway: gatewayAddress,
         getterFacet: getterFacet.address,
         managerFacet: managerFacet.address,
-        subnetGetterSelectors: getterSelectors,
-        subnetManagerSelectors: managerSelectors,
+        rewarderFacet: rewarderFacet.address,
+        checkpointerFacet: checkpointerFacet.address,
+        pauserFacet: pauserFacet.address,
+        subnetActorGetterSelectors: getterSelectors,
+        subnetActorManagerSelectors: managerSelectors,
+        subnetActorRewarderSelectors: rewarderSelectors,
+        subnetActorCheckpointerSelectors: checkpointerSelectors,
+        subnetActorPauserSelectors: pauserSelectors,
     }
 
     const facetCuts = [] //TODO

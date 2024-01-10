@@ -290,7 +290,7 @@ where
                 )?
             };
 
-            // IPC SubnetRegistry actory.
+            // IPC SubnetRegistry actor.
             {
                 use ipc::registry::ConstructorParameters;
 
@@ -300,6 +300,9 @@ where
 
                 let getter_facet = facets.remove(0);
                 let manager_facet = facets.remove(0);
+                let rewarder_facet = facets.remove(0);
+                let checkpointer_facet = facets.remove(0);
+                let pauser_facet = facets.remove(0);
 
                 debug_assert_eq!(facets.len(), 4, "SubnetRegistry has 4 facets of its own");
 
@@ -307,8 +310,14 @@ where
                     gateway: gateway_addr,
                     getter_facet: getter_facet.facet_address,
                     manager_facet: manager_facet.facet_address,
+                    rewarder_facet: rewarder_facet.facet_address,
+                    checkpointer_facet: checkpointer_facet.facet_address,
+                    pauser_facet: pauser_facet.facet_address,
                     subnet_getter_selectors: getter_facet.function_selectors,
                     subnet_manager_selectors: manager_facet.function_selectors,
+                    subnet_rewarder_selectors: rewarder_facet.function_selectors,
+                    subnet_checkpointer_selectors: checkpointer_facet.function_selectors,
+                    subnet_pauser_selectors: pauser_facet.function_selectors,
                 };
 
                 deployer.deploy_contract(

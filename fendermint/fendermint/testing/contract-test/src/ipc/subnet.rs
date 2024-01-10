@@ -12,16 +12,23 @@ use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::crypto::signature::SECP_SIG_LEN;
 use fvm_shared::econ::TokenAmount;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::{
+    self as checkpointer, SubnetActorCheckpointingFacet,
+};
 use ipc_actors_abis::subnet_actor_getter_facet::{self as getter, SubnetActorGetterFacet};
-use ipc_actors_abis::subnet_actor_manager_facet::{self as manager, SubnetActorManagerFacet};
+use ipc_actors_abis::subnet_actor_manager_facet::SubnetActorManagerFacet;
 
 pub use ipc_actors_abis::register_subnet_facet::ConstructorParams as SubnetConstructorParams;
+use ipc_actors_abis::subnet_actor_reward_facet::SubnetActorRewardFacet;
 
 #[derive(Clone)]
 pub struct SubnetCaller<DB> {
     addr: EthAddress,
     getter: ContractCaller<DB, SubnetActorGetterFacet<MockProvider>, NoRevert>,
     manager: ContractCaller<DB, SubnetActorManagerFacet<MockProvider>, SubnetActorErrors>,
+    rewarder: ContractCaller<DB, SubnetActorRewardFacet<MockProvider>, SubnetActorErrors>,
+    checkpointer:
+        ContractCaller<DB, SubnetActorCheckpointingFacet<MockProvider>, SubnetActorErrors>,
 }
 
 impl<DB> SubnetCaller<DB> {
@@ -30,6 +37,8 @@ impl<DB> SubnetCaller<DB> {
             addr,
             getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
             manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),
+            rewarder: ContractCaller::new(addr, SubnetActorRewardFacet::new),
+            checkpointer: ContractCaller::new(addr, SubnetActorCheckpointingFacet::new),
         }
     }
 
@@ -102,15 +111,15 @@ impl<DB: Blockstore> SubnetCaller<DB> {
 
     /// Claim any refunds.
     pub fn try_claim(&self, state: &mut FvmExecState<DB>, addr: &EthAddress) -> TryCallResult<()> {
-        self.manager.try_call(state, |c| c.claim().from(addr))
+        self.rewarder.try_call(state, |c| c.claim().from(addr))
     }
 
     /// Submit a bottom-up checkpoint.
     pub fn try_submit_checkpoint(
         &self,
         state: &mut FvmExecState<DB>,
-        checkpoint: manager::BottomUpCheckpoint,
-        _messages: Vec<manager::CrossMsg>,
+        checkpoint: checkpointer::BottomUpCheckpoint,
+        _messages: Vec<checkpointer::CrossMsg>,
         signatures: Vec<(EthAddress, [u8; SECP_SIG_LEN])>,
     ) -> TryCallResult<()> {
         let mut addrs = Vec::new();
@@ -119,7 +128,7 @@ impl<DB: Blockstore> SubnetCaller<DB> {
             addrs.push(ethers::types::Address::from(addr));
             sigs.push(sig.into());
         }
-        self.manager
+        self.checkpointer
             .try_call(state, |c| c.submit_checkpoint(checkpoint, addrs, sigs))
     }
 

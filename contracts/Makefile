@@ -10,6 +10,12 @@ OUTPUT ?= out
 deploy-ipc:
 	./ops/deploy.sh $(NETWORK)
 
+deploy-subnet-registry:
+	./ops/deploy-subnet-registry.sh $(NETWORK)
+
+deploy-subnet:
+	./ops/deploy-subnet.sh $(NETWORK)
+
 upgrade-gw-diamond:
 	./ops/upgrade-gw-diamond.sh $(NETWORK)
 
@@ -105,7 +111,6 @@ coverage-for-mac: | forge
 	./tools/check_coverage.sh
 
 prepare: build-selector-library fmt lint test slither
-
 
 build-selector-library: | forge
 	python scripts/python/build_selector_library.py
