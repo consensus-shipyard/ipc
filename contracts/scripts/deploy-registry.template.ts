@@ -26,7 +26,7 @@ export async function deploy() {
         txArgs,
     )
     const getterSelectors = getSelectors(getterFacet)
-    // console.log("getter address:", getterFacet.address);
+    console.log("getter address:", getterFacet.address);
 
     const managerFacet = await deployContractWithDeployer(
         deployer,
@@ -35,7 +35,7 @@ export async function deploy() {
         txArgs,
     )
     const managerSelectors = getSelectors(managerFacet)
-    // console.log("manager address:", managerFacet.address);
+    console.log("manager address:", managerFacet.address);
 
     const pauserFacet = await deployContractWithDeployer(
         deployer,
@@ -44,6 +44,7 @@ export async function deploy() {
         txArgs,
     )
     const pauserSelectors = getSelectors(pauserFacet)
+    console.log("pauser address:", pauserFacet.address);
 
     const rewarderFacet = await deployContractWithDeployer(
         deployer,
@@ -52,6 +53,7 @@ export async function deploy() {
         txArgs,
     )
     const rewarderSelectors = getSelectors(rewarderFacet)
+    console.log("rewarder address:", rewarderFacet.address);
 
     const checkpointerFacet = await deployContractWithDeployer(
         deployer,
@@ -60,6 +62,7 @@ export async function deploy() {
         txArgs,
     )
     const checkpointerSelectors = getSelectors(checkpointerFacet)
+    console.log("checkpointer address:", checkpointerFacet.address);
 
     //deploy subnet registry diamond
     const registry = await ethers.getContractFactory('SubnetRegistryDiamond', {

@@ -1,4 +1,4 @@
-name: NPM Audit
+name: Contracts NPM Audit
 
 # This workflow is triggered from the main CI workflow.
 on:
