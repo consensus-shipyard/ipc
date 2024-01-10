@@ -1,12 +1,12 @@
 .PHONY: all build test lint license check-fmt check-clippy diagrams
 
-CRATE   := ipc-wallet ipc-provider ipc-api ipc-types
+CRATE   := ipc-cli ipc-wallet ipc-provider ipc-api ipc-types
 PACKAGE := $(patsubst %, --package %, $(CRATE))
 
 all: test build
 
 build:
-	cargo build --release -p ipc-cli && mkdir -p bin/ && cp target/release/ipc-cli ./bin/ipc-cli
+	cargo build --release
 
 test:
 	cargo test --release $(PACKAGE)

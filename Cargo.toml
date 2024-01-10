@@ -3,14 +3,15 @@ resolver = "2"
 members = [
   # contracts
   "contracts/binding",
-  "cli",
+  # ipc
+  "ipc/cli",
   "ipc/wallet",
   "ipc/provider",
   "ipc/api",
   "ipc/types",
   # Tests seem to be obsolete (using IPC agent):
   # "ipc/ipc/testing/*",
-  # resolver
+  # ipld
   "ipld/resolver",
   # fendermint
   "fendermint/abci",

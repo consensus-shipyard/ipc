@@ -43,7 +43,7 @@ make test
 
 ## Code organization
 
-- `cli`: A Rust binary crate for our client `ipc-cli`` application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.
+- `ipc/cli`: A Rust binary crate for our client `ipc-cli` application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.
 - `ipc/provider` A Rust crate that implements the `IpcProvider` library. This provider can be used to interact with IPC from Rust applications (and is what the `ipc-cli` uses under the hood).
 - `ipc/api`: IPC common types and utils.
 - `ipc/wallet`: IPC key management and identity.
