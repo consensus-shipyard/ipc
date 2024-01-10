@@ -10,55 +10,23 @@ Several steps in this guide involve running long-lived processes. In each of the
 
 <!-- >💡If you're only looking to connect to an existing subnet, please see the [README](deploying-hierarchy.md) instead. -->
 
-## Step 0: Prepare your system
+## Step 1: Prepare your system
 
-We assume an Ubuntu Linux instance when discussing prerequisites, but annotate steps with system-specificity and links to detailed multi-OS instructions. Exact procedures will vary for other systems, so please follow the links if running something different. Details on IPC-specific requirements can also be found in the [README](/README.md).
+Install the basic requirements for IPC (see [README](../../README.md#Prerequisites))
 
-* Install basic dependencies [Ubuntu/Debian] ([details](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms))
+Also install the following dependencies ([details](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms))
 ```bash
-sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y 
-```
-
-* Install Rust [Linux] ([details](https://www.rust-lang.org/tools/install))
-```bash
-curl https://sh.rustup.rs -sSf | sh
-source "$HOME/.cargo/env"
-```
-
-* Install Docker Engine [Ubuntu] ([details](https://docs.docker.com/engine/install/))
-```bash
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update && sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-sudo usermod -aG docker $USER && newgrp docker
-```
-
-
-## Step 1: Build the IPC stack
-
-Next, we'll download and build the different components (mainly, `ipc-cli` and Fendermint).
-
-* Pick a folder where to build the IPC stack.
-* Download and compile the `ipc-cli`.
-```bash
-git clone https://github.com/consensus-shipyard/ipc.git
-(cd ipc && make build && make install-infra)
+sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 ```
 
 ## Step 2: Initialise your config
 
 * Initialise the config
 ```bash
-./bin/ipc-cli config init
+ipc-cli config init
 ```
 
 This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs. You may need to replace the content of the config to reflect the address of the up-to-date contracts in Calibration.
-
 
 * You can run `nano ~/.ipc/config.toml` to double-check that the config file has been populated with the following content:
 ```toml
@@ -90,14 +58,14 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 
 * Create the three different wallets
 ```bash
-./bin/ipc-cli wallet new -w evm
-./bin/ipc-cli wallet new -w evm
-./bin/ipc-cli wallet new -w evm
+ipc-cli wallet new -w evm
+ipc-cli wallet new -w evm
+ipc-cli wallet new -w evm
 ```
 
 * You can optionally set one of the wallets as your default so you don't have to use the `--from` flag explicitly in some of the commands:
 ```bash
-./bin/ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
+ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
 ```
 
 <!-- * Convert the 0x addresses to f4 addresses for later usage (OWNER_1_F4, OWNER_2_F4, and OWNER_3_F4)  -->
@@ -107,9 +75,9 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 <!-- ./ipc-agent/bin/ipc-agent util eth-to-f4-addr --addr <OWNER_3> -->
 <!-- ``` -->
 
-* Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses 
+* Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses
 
->💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `./bin/ipc-cli wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
+>💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `ipc-cli wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
 
 >💡 Note that you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
 
@@ -118,7 +86,7 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 
 * The next step is to create a subnet under `/r314159` in calibration. Remember to set a default wallet or explicitly specifying the wallet from which you want to perform the action with the `--from` flag.
 ```bash
-./bin/ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
+ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
 ```
 
 * Make a note of the address of the subnet you created.
@@ -129,16 +97,16 @@ Before we deploy the infrastructure for the subnet, we will have to bootstrap th
 
 * Get the public key for all of your wallets and note it down. This is the public key that each of your validators will use to sign blocks in the subnet.
 ```bash
-./bin/ipc-cli wallet pub-key -w evm --address <WALLET_ADDR1>
-./bin/ipc-cli wallet pub-key -w evm --address <WALLET_ADDR2>
-./bin/ipc-cli wallet pub-key -w evm --address <WALLET_ADDR3>
+ipc-cli wallet pub-key -w evm --address <WALLET_ADDR1>
+ipc-cli wallet pub-key -w evm --address <WALLET_ADDR2>
+ipc-cli wallet pub-key -w evm --address <WALLET_ADDR3>
 ```
 
 * Join the subnet with each validator
 ```bash
-./bin/ipc-cli subnet join --from=<WALLET_ADDR1> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET1> --initial-balance 1
-./bin/ipc-cli subnet join --from=<WALLET_ADDR2> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET2> --initial-balance 1
-./bin/ipc-cli subnet join --from=<WALLET_ADDR3> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET3> --initial-balance 1
+ipc-cli subnet join --from=<WALLET_ADDR1> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET1> --initial-balance 1
+ipc-cli subnet join --from=<WALLET_ADDR2> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET2> --initial-balance 1
+ipc-cli subnet join --from=<WALLET_ADDR3> --subnet=/r314159/<SUBNET_ID> --collateral=10 --public-key=<PUBKEY_WALLET3> --initial-balance 1
 ```
 
 ## Step 6: Deploy the infrastructure
@@ -147,9 +115,9 @@ With the collateral and number of minimum validators fulfilled, the subnet is bo
 ### Deploying a bootstrap node
 Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
 
-* We can deploy a new bootstrap node in the subnet by running: 
+* We can deploy a new bootstrap node in the subnet by running:
 ```bash
-cargo make --makefile infra/Makefile.toml \
+cargo make --makefile infra/fendermint/Makefile.toml \
     -e PRIVATE_KEY_PATH=<VALIDATOR_PRIV_KEY> \
     -e SUBNET_ID=<SUBNET_ID> \
     -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT> \
@@ -174,23 +142,23 @@ Remember the address of your bootstrap for the next step. This address has the f
 
 * We can get the address of the deployed bootstrap node by running:
 ```bash
-cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-node-id
+cargo make --makefile infra/fendermint/Makefile.toml bootstrap-node-id
 ```
 
 * To shut down the bootstrap node run:
 ```bash
-cargo make --makefile bin/ipc-infra/Makefile.toml bootstrap-down
+cargo make --makefile infra/fendermint/Makefile.toml bootstrap-down
 ```
 
 * To advertise the endpoint to the rest of nodes in the network we need to run:
 ```bash
 # Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
-./bin/ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint="<BOOTSRAP_ENDPOINT>"
+ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint="<BOOTSRAP_ENDPOINT>"
 ```
 
 * The bootstrap nodes currently deployed in the network can be queried through the following command:
 ```bash
-./bin/ipc-cli subnet list-bootstraps --subnet=<SUBNET_ID>
+ipc-cli subnet list-bootstraps --subnet=<SUBNET_ID>
 ```
 
 ### Deploying the validator infrastructure
@@ -198,15 +166,15 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 
 * First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
 ```bash
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR2> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_2>
-./bin/ipc-cli wallet export -w evm -a <WALLET_ADDR3> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_3>
+ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
+ipc-cli wallet export -w evm -a <WALLET_ADDR2> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_2>
+ipc-cli wallet export -w evm -a <WALLET_ADDR3> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_3>
 ```
 
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
 
 ```bash
-cargo make --makefile ./bin/ipc-infra/Makefile.toml \
+cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-<n> \
     -e PRIVATE_KEY_PATH=<PATH_PRIV_KEY_VALIDATOR_n> \
     -e SUBNET_ID=<SUBNET_ID> \
@@ -243,7 +211,7 @@ registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 
 With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through the following command. The result should show the initial balance that you have included for your validators address in genesis:
 ```bash
-./bin/ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
+ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
 ```
 
 > The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively.
@@ -257,16 +225,16 @@ IPC relies on the role of a specific type of peer on the network called the rela
 
 * *session* Run the relayer process for your subnet using your default address by calling:
 ```bash
-./bin/ipc-cli checkpoint relayer --subnet <SUBNET_ID>
+ipc-cli checkpoint relayer --subnet <SUBNET_ID>
 ```
-* In order to run the relayer from a different address you can use the `--submitted` flag: 
+* In order to run the relayer from a different address you can use the `--submitted` flag:
 ```bash
-./bin/ipc-cli checkpoint relayer --subnet <SUBNET_ID> --submitter <RELAYER_ADDR>
+ipc-cli checkpoint relayer --subnet <SUBNET_ID> --submitter <RELAYER_ADDR>
 ```
 
 Relayers are rewarded through cross-net messages fees for the timely submission of bottom-up checkpoints to the parent. In order to claim the checkpointing rewards collected for a subnet, the following command need to be run from the relayer address:
 ```bash
-./bin/ipc-cli subnet claim --subnet=<SUBNET_ID> --reward
+ipc-cli subnet claim --subnet=<SUBNET_ID> --reward
 ```
 
 ## Step 10: What now?

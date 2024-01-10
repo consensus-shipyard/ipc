@@ -6,20 +6,24 @@ IPC is a framework that enables on-demand horizontal scalability of networks, by
 
 Visit the [IPC project page](https://www.ipc.space/) for news and guides.
 
+## Prerequisites
+
+On Linux (links and instructions for Ubuntu):
+
+- Install system packages: `sudo apt install build-essential clang cmake pkg-config libssl-dev protobuf-compiler git curl`.
+- Install Rust. See [instructions](https://www.rust-lang.org/tools/install).
+- Install cargo-make: `cargo install --force cargo-make`.
+- Install Docker. See [instructions](https://docs.docker.com/engine/install/ubuntu/).
+- Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
+
 ## Building
 
-IPC is mostly written in Rust, so you'll need to install Rust on your system. We currently use Rust `stable` (as described in the `toolchain`). You can look for instructions on [how to run Rust and rustup following this link](https://www.rust-lang.org/tools/install).
-
-We also recommend installing docker if you want to test running your own subnets. In order to install Docker, follow the [Docker engine](https://docs.docker.com/engine/install/) instructions.
-
 ```
-# install dependencies
-sudo apt-get install build-essential libssl-dev git curl pkg-config
+# make sure that rust has the wasm32 target
 rustup target add wasm32-unknown-unknown
 
-# (optional): if you installed docker, we recommend adding your user to the docker group
-sudo usermod -aG docker $USER
-newgrp docker
+# add your user to the docker group
+sudo usermod -aG docker $USER && newgrp docker
 
 # clone this repo and build
 git clone https://github.com/consensus-shipyard/ipc-monorepo.git

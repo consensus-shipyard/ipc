@@ -11,7 +11,7 @@ IPC_PARENT_AGENT_NR ?= 0
 IPC_SUBNET_NAME     ?= ""
 
 PROJECT_ROOT     := ../..
-IPC_INFRA_DIR    := $(PROJECT_ROOT)/bin/ipc-infra
+IPC_INFRA_DIR    := $(PROJECT_ROOT)/infra/fendermint
 IPC_SRC          := $(shell find $(PROJECT_ROOT) -type f \( -name "*.rs" \) | grep -v target | grep -v testing)
 IPC_AGENT        := $(PROJECT_ROOT)/bin/ipc-agent
 

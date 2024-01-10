@@ -6,13 +6,7 @@ This docs are only focused on the infrastructure deployment, for an end-to-end w
 
 ## Prerequisites
 
-On Linux (links and instructions for Ubuntu):
-
-- Install system packages: `sudo apt install build-essential clang cmake pkg-config libssl-dev protobuf-compiler`.
-- Install Rust. See [instructions](https://www.rust-lang.org/tools/install).
-- Install cargo-make: `cargo install --force cargo-make`.
-- Install Docker. See [instructions](https://docs.docker.com/engine/install/ubuntu/).
-- Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
+* Install the basic requirements for IPC (see [README](../../README.md#Prerequisites))
 
 ## Deploy subnet bootstrap
 In order not to expose directly the network address information from validators, subnets leverage the use of bootstrap nodes (or `seeds` in CometBFT parlance), for new nodes to discover peers in the network and connect to the subnet's validators. To run a bootstrap node you can run the following command from the root of the repo:

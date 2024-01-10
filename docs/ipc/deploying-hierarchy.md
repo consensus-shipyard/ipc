@@ -4,7 +4,7 @@ We recommend that you connect to the existing contracts on CalibrationNet. Never
 
 ## Install prerequisites
 
-* Install the basic requirements for IPC (see [README](../ipc/README.md))
+* Install the basic requirements for IPC (see [README](../../README.md#Prerequisites))
 
 * Install Node.js [Ubuntu] ([details](https://github.com/nodesource/distributions))
 ```bash
@@ -12,16 +12,9 @@ curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install nodejs
 ```
 
-* Install Foundry [Linux] ([details](https://github.com/foundry-rs/foundry))
-```bash
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
-```
-
 * Get the Solidity actors and install dependencies
 ```bash
-git clone --recurse-submodules https://github.com/consensus-shipyard/ipc-solidity-actors
-cd ipc-solidity-actors
+cd contracts
 npm install
 ```
 
@@ -52,7 +45,7 @@ make deploy-ipc NETWORK=calibrationnet
 If the deployment is successful, you should receive an output similar to this one:
 
 ```
-$ ./ops/deploy.sh localnet
+$ contracts/ops/deploy.sh localnet
 [*] Deploying libraries
 [*] Output libraries available in /home/workspace/pl/ipc-solidity-actors/scripts/libraries.out
 [*] Populating deploy-gateway script
