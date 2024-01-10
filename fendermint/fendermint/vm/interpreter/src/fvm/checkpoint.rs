@@ -78,7 +78,7 @@ where
             None
         } else {
             tracing::debug!(
-                batch = ?height,
+                batch = ?batch,
                 "creating bottom up msg batch at height"
             );
 
