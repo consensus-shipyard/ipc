@@ -4,8 +4,8 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ipc_wallet::WalletType;
 use ipc_provider::lotus::message::wallet::WalletKeyType;
+use ipc_wallet::WalletType;
 use std::fmt::Debug;
 use std::str::FromStr;
 
