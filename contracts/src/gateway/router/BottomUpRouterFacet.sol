@@ -100,10 +100,6 @@ contract BottomUpRouterFacet is GatewayActorModifiers {
             revert InvalidBatchEpoch();
         }
 
-        if (LibGateway.bottomUpBatchMsgsExists(batch.blockHeight)) {
-            revert BatchAlreadyExists();
-        }
-
         LibQuorum.createQuorumInfo({
             self: s.bottomUpMsgBatchQuorumMap,
             objHeight: batch.blockHeight,
@@ -112,7 +108,6 @@ contract BottomUpRouterFacet is GatewayActorModifiers {
             membershipWeight: membershipWeight,
             majorityPercentage: s.majorityPercentage
         });
-        LibGateway.storeBottomUpMsgBatch(batch);
     }
 
     /// @notice Set a new batch retention height and garbage collect all batches in range [`retentionHeight`, `newRetentionHeight`)
