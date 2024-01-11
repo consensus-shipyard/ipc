@@ -322,7 +322,7 @@ where
             .await
             .context("failed to broadcast checkpoint signature")?;
 
-            tracing::debug!(?height, "submitted checkpoint signature");
+            tracing::debug!(?height, "submitted bottom up batch signature");
         }
     }
     Ok(())
