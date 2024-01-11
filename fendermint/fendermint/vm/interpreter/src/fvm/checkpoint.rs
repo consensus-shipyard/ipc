@@ -285,7 +285,7 @@ where
 {
     // Make sure that these had time to be added to the ledger.
     if let Some(highest) = incomplete_batches.iter().map(|cp| cp.block_height).max() {
-        tracing::info!(block = highest.as_u64(), "waiting for block to be committed(msg batch)");
+        tracing::debug!(block = highest.as_u64(), "waiting for block to be committed(msg batch)");
         wait_for_commit(
             client,
             highest.as_u64() + 1,
@@ -322,10 +322,8 @@ where
             )
             .await
             .context("failed to broadcast checkpoint signature")?;
-
-            tracing::info!(?height, "submitted bottom up batch signature");
         } else {
-            tracing::info!(
+            tracing::debug!(
                 height = batch.block_height.as_u64(),
                 "validator not in active list, not signing for batch"
             );
@@ -428,7 +426,7 @@ where
         .context("failed to broadcast signature")?;
 
     // The transaction should be in the mempool now.
-    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted msg batch signature");
 
     Ok(())
 }
@@ -457,7 +455,7 @@ where
         .context("failed to broadcast signature")?;
 
     // The transaction should be in the mempool now.
-    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted checkpoint signature");
 
     Ok(())
 }
