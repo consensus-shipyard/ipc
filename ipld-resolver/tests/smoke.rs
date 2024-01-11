@@ -179,13 +179,17 @@ async fn single_bootstrap_single_provider_resolve_one() {
     // TODO: Wait on some condition instead of sleep.
     tokio::time::sleep(Duration::from_secs(3)).await;
 
-    // Ask for the CID to be resolved from by another peer.
-    cluster.agents[resolver_idx]
-        .client
-        .resolve(cid, subnet_id.clone())
-        .await
-        .expect("failed to send request")
-        .expect("failed to resolve content");
+    // Ask for the CID to be resolved from another peer.
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        cluster.agents[resolver_idx]
+            .client
+            .resolve(cid, subnet_id.clone()),
+    )
+    .await
+    .expect("resolution timed out")
+    .expect("failed to send request")
+    .expect("failed to resolve content");
 
     // Check that the CID is deposited into the store of the requestor.
     check_test_data(&mut cluster.agents[resolver_idx], &cid).expect("failed to resolve from store");
