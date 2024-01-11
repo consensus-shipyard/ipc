@@ -71,7 +71,7 @@ where
         .try_into()
         .context("block height is not u64")?;
 
-    let batch = gateway.bottom_up_batch(state, height.into())?;
+    let mut batch = gateway.bottom_up_batch(state, height.into())?;
     Ok(
         // block height is 0 means the batch does not exists
         if batch.block_height.as_u64() == 0
@@ -88,6 +88,7 @@ where
             let (_, curr_power_table) =
                 ipc_power_table(gateway, state).context("failed to get the current power table")?;
 
+            batch.block_height = ethers::types::U256::from(height.value());
             let router_batch =
                 bottom_up_router_facet::BottomUpMsgBatch::from_tokens(batch.clone().into_tokens())?;
 
