@@ -55,7 +55,7 @@ pub struct GenesisNewArgs {
     #[arg(long, short = 'n')]
     pub chain_name: String,
     /// Network version, governs which set of built-in actors to use.
-    #[arg(long, short = 'v', default_value = "18", value_parser = parse_network_version)]
+    #[arg(long, short = 'v', default_value = "21", value_parser = parse_network_version)]
     pub network_version: NetworkVersion,
     /// Base fee for running transactions in atto.
     #[arg(long, short = 'f', value_parser = parse_token_amount)]
@@ -165,7 +165,7 @@ pub struct GenesisFromParentArgs {
     pub parent_registry: Address,
 
     /// Network version, governs which set of built-in actors to use.
-    #[arg(long, short = 'v', default_value = "18", value_parser = parse_network_version)]
+    #[arg(long, short = 'v', default_value = "21", value_parser = parse_network_version)]
     pub network_version: NetworkVersion,
 
     /// Base fee for running transactions in atto.
