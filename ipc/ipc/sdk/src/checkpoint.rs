@@ -27,7 +27,7 @@ lazy_static! {
 
 pub type Signature = Vec<u8>;
 
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum QuorumObjKind {
     Checkpoint,

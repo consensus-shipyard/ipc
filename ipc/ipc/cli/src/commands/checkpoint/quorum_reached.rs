@@ -8,6 +8,7 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::clock::ChainEpoch;
+use ipc_sdk::checkpoint::QuorumObjKind;
 use ipc_sdk::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
@@ -25,9 +26,10 @@ impl CommandLineHandler for GetQuorumReacehdEvents {
 
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let kind = QuorumObjKind::try_from(arguments.kind)?;
 
         for h in arguments.from_epoch..=arguments.to_epoch {
-            let events = provider.quorum_reached_events(&subnet, h).await?;
+            let events = provider.quorum_reached_events(&subnet, h, kind).await?;
             for e in events {
                 println!("{e}");
             }
@@ -42,6 +44,12 @@ impl CommandLineHandler for GetQuorumReacehdEvents {
 pub(crate) struct GetQuorumReachedEventsArgs {
     #[arg(long, short, help = "The target subnet to perform query")]
     pub subnet: String,
+    #[arg(
+        long,
+        short,
+        help = "List the bottom up checkpoint(0) or the msg batch(1)"
+    )]
+    pub kind: u8,
     #[arg(long, short, help = "Include events from this epoch")]
     pub from_epoch: ChainEpoch,
     #[arg(long, short, help = "Include events up to this epoch")]

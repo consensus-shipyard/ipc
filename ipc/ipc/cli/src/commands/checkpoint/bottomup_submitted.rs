@@ -7,6 +7,7 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
+use ipc_sdk::checkpoint::QuorumObjKind;
 use ipc_sdk::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
@@ -28,9 +29,10 @@ impl CommandLineHandler for SubmittedInBottomUpHeight {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
         let address = Address::from_str(&arguments.submitter)?;
+        let kind = QuorumObjKind::try_from(arguments.kind)?;
 
         let submitted = provider
-            .has_submitted_in_last_checkpoint_height(&subnet, &address)
+            .has_submitted_in_last_checkpoint_height(&subnet, &address, kind)
             .await?;
         println!("has submitted: {submitted}");
 
@@ -47,4 +49,10 @@ pub(crate) struct SubmittedInBottomUpHeightArgs {
     pub subnet: String,
     #[arg(long, short, help = "The hex encoded address of the submitter")]
     pub submitter: String,
+    #[arg(
+        long,
+        short,
+        help = "List the bottom up checkpoint(0) or the msg batch(1)"
+    )]
+    pub kind: u8,
 }

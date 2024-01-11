@@ -8,6 +8,7 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::clock::ChainEpoch;
+use ipc_sdk::checkpoint::QuorumObjKind;
 use ipc_sdk::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
@@ -25,14 +26,25 @@ impl CommandLineHandler for GetBottomUpBundles {
 
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let kind = QuorumObjKind::try_from(arguments.kind)?;
 
         for h in arguments.from_epoch..=arguments.to_epoch {
-            let bundle = provider.get_bottom_up_bundle(&subnet, h).await?;
-            println!(
-                "checkpoint: {:?}, signatures: {:?}, signatories: {:?}",
-                bundle.checkpoint, bundle.signatures, bundle.signatories,
-            );
-            println!("{bundle:?}");
+            match kind {
+                QuorumObjKind::Checkpoint => {
+                    let bundle = provider.get_bottom_up_checkpoint_bundle(&subnet, h).await?;
+                    println!(
+                        "checkpoint: {:?}, signatures: {:?}, signatories: {:?}",
+                        bundle.checkpoint, bundle.signatures, bundle.signatories,
+                    );
+                }
+                QuorumObjKind::BottomUpMsgBatch => {
+                    let bundle = provider.get_bottom_up_msg_batch_bundle(&subnet, h).await?;
+                    println!(
+                        "batch: {:?}, signatures: {:?}, signatories: {:?}",
+                        bundle.checkpoint, bundle.signatures, bundle.signatories,
+                    );
+                }
+            }
         }
 
         Ok(())
@@ -44,8 +56,14 @@ impl CommandLineHandler for GetBottomUpBundles {
 pub(crate) struct GetBottomUpBundlesArgs {
     #[arg(long, short, help = "The target subnet to perform query")]
     pub subnet: String,
-    #[arg(long, short, help = "Include checkpoints from this epoch")]
+    #[arg(
+        long,
+        short,
+        help = "List the bottom up checkpoint(0) or the msg batch(1)"
+    )]
+    pub kind: u8,
+    #[arg(long, short, help = "Include data from this epoch")]
     pub from_epoch: ChainEpoch,
-    #[arg(long, short, help = "Include checkpoints up to this epoch")]
+    #[arg(long, short, help = "Include data up to this epoch")]
     pub to_epoch: ChainEpoch,
 }

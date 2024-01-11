@@ -8,7 +8,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_sdk::checkpoint::{BottomUpBundle, BottomUpCheckpoint, QuorumReachedEvent, Signature};
+use ipc_sdk::checkpoint::{
+    BottomUpBundle, BottomUpCheckpoint, BottomUpMsgBatch, QuorumReachedEvent, Signature,
+};
 use ipc_sdk::cross::CrossMsg;
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_sdk::subnet::{ConstructParams, PermissionMode, SupplySource};
@@ -20,7 +22,11 @@ use crate::lotus::message::ipc::SubnetInfo;
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
 pub trait SubnetManager:
-    Send + Sync + TopDownFinalityQuery + BottomUpRelayer<BottomUpCheckpoint>
+    Send
+    + Sync
+    + TopDownFinalityQuery
+    + BottomUpRelayer<BottomUpCheckpoint>
+    + BottomUpRelayer<BottomUpMsgBatch>
 {
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.

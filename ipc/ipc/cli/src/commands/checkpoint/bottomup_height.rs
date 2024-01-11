@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 use clap::Args;
+use ipc_sdk::checkpoint::QuorumObjKind;
 use ipc_sdk::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
@@ -26,8 +27,11 @@ impl CommandLineHandler for LastBottomUpCheckpointHeight {
 
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let kind = QuorumObjKind::try_from(arguments.kind)?;
 
-        let height = provider.last_bottom_up_checkpoint_height(&subnet).await?;
+        let height = provider
+            .last_bottom_up_checkpoint_height(&subnet, kind)
+            .await?;
         println!("height: {height}");
 
         Ok(())
@@ -39,4 +43,10 @@ impl CommandLineHandler for LastBottomUpCheckpointHeight {
 pub(crate) struct LastBottomUpCheckpointHeightArgs {
     #[arg(long, short, help = "The target subnet to perform query")]
     pub subnet: String,
+    #[arg(
+        long,
+        short,
+        help = "List the bottom up checkpoint(0) or the msg batch(1)"
+    )]
+    pub kind: u8,
 }

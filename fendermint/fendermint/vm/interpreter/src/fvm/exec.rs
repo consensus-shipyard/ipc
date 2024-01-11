@@ -214,7 +214,10 @@ where
                     ctx.public_key,
                 )
                 .context("failed to fetch incomplete checkpoints")?;
-                tracing::debug!(batch_size = incomplete.len(), "obtained list of incomplete batches");
+                tracing::debug!(
+                    batch_size = incomplete.len(),
+                    "obtained list of incomplete batches"
+                );
 
                 let client = self.client.clone();
                 let gateway = self.gateway.clone();

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
-use crate::manager::{GetBlockHashResult, TopDownQueryPayload};
+use crate::manager::{BottomUpRelayer, GetBlockHashResult, TopDownQueryPayload};
 use anyhow::anyhow;
 use base64::Engine;
 use config::Config;
@@ -12,7 +12,9 @@ use fvm_shared::{
 use ipc_identity::{
     EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
 };
-use ipc_sdk::checkpoint::{BottomUpBundle, BottomUpCheckpoint, QuorumReachedEvent};
+use ipc_sdk::checkpoint::{
+    BottomUpBundle, BottomUpCheckpoint, BottomUpMsgBatch, QuorumObjKind, QuorumReachedEvent,
+};
 use ipc_sdk::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_sdk::subnet::{PermissionMode, SupplySource};
 use ipc_sdk::{
@@ -695,7 +697,7 @@ impl IpcProvider {
         conn.manager().chain_head_height().await
     }
 
-    pub async fn get_bottom_up_bundle(
+    pub async fn get_bottom_up_checkpoint_bundle(
         &self,
         subnet: &SubnetID,
         height: ChainEpoch,
@@ -705,13 +707,29 @@ impl IpcProvider {
             Some(conn) => conn,
         };
 
-        conn.manager().bundle_at(height).await
+        let manager = conn.manager();
+        <dyn SubnetManager as BottomUpRelayer<BottomUpCheckpoint>>::bundle_at(manager, height).await
+    }
+
+    pub async fn get_bottom_up_msg_batch_bundle(
+        &self,
+        subnet: &SubnetID,
+        height: ChainEpoch,
+    ) -> anyhow::Result<BottomUpBundle<BottomUpMsgBatch>> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let manager = conn.manager();
+        <dyn SubnetManager as BottomUpRelayer<BottomUpMsgBatch>>::bundle_at(manager, height).await
     }
 
     pub async fn has_submitted_in_last_checkpoint_height(
         &self,
         subnet: &SubnetID,
         addr: &Address,
+        kind: QuorumObjKind,
     ) -> anyhow::Result<bool> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
@@ -719,14 +737,28 @@ impl IpcProvider {
             Some(conn) => conn,
         };
 
-        conn.manager()
-            .has_submitted_in_last_confirmed_height(subnet, addr)
-            .await
+        let manager = conn.manager();
+
+        match kind {
+            QuorumObjKind::Checkpoint => <dyn SubnetManager as BottomUpRelayer<
+                BottomUpCheckpoint,
+            >>::has_submitted_in_last_confirmed_height(
+                manager, subnet, addr
+            )
+            .await,
+            QuorumObjKind::BottomUpMsgBatch => <dyn SubnetManager as BottomUpRelayer<
+                BottomUpMsgBatch,
+            >>::has_submitted_in_last_confirmed_height(
+                manager, subnet, addr
+            )
+            .await,
+        }
     }
 
     pub async fn last_bottom_up_checkpoint_height(
         &self,
         subnet: &SubnetID,
+        kind: QuorumObjKind,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
@@ -734,22 +766,51 @@ impl IpcProvider {
             Some(conn) => conn,
         };
 
-        conn.manager()
-            .last_bottom_up_checkpoint_height(subnet)
-            .await
+        let manager = conn.manager();
+
+        match kind {
+            QuorumObjKind::Checkpoint => <dyn SubnetManager as BottomUpRelayer<
+                BottomUpCheckpoint,
+            >>::last_bottom_up_checkpoint_height(
+                manager, subnet
+            )
+            .await,
+            QuorumObjKind::BottomUpMsgBatch => <dyn SubnetManager as BottomUpRelayer<
+                BottomUpMsgBatch,
+            >>::last_bottom_up_checkpoint_height(
+                manager, subnet
+            )
+            .await,
+        }
     }
 
     pub async fn quorum_reached_events(
         &self,
         subnet: &SubnetID,
         height: ChainEpoch,
+        kind: QuorumObjKind,
     ) -> anyhow::Result<Vec<QuorumReachedEvent>> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
         };
 
-        conn.manager().quorum_reached_events(height).await
+        let manager = conn.manager();
+
+        match kind {
+            QuorumObjKind::Checkpoint => {
+                <dyn SubnetManager as BottomUpRelayer<BottomUpCheckpoint>>::quorum_reached_events(
+                    manager, height,
+                )
+                .await
+            }
+            QuorumObjKind::BottomUpMsgBatch => {
+                <dyn SubnetManager as BottomUpRelayer<BottomUpMsgBatch>>::quorum_reached_events(
+                    manager, height,
+                )
+                .await
+            }
+        }
     }
 
     /// Advertises the endpoint of a bootstrap node for the subnet.
