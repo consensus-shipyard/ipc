@@ -11,6 +11,7 @@ import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} f
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
+import {QuorumObjKind} from "./structs/Quorum.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
@@ -66,6 +67,7 @@ contract GatewayDiamond {
         s.minCrossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.checkpointQuorumMap.retentionHeight = 1;
+        s.checkpointQuorumMap.quorumObjKind = QuorumObjKind.BottomUpMsgBatch;
         s.bottomUpMsgBatchQuorumMap.retentionHeight = 1;
 
         // BottomUpMsgBatch config parameters.
