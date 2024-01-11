@@ -238,7 +238,7 @@ where
         }
 
         let prev_h = next_submission_height - self.checkpoint_period();
-        log::debug!("start querying quorum reached events from : {prev_h} to {finalized_height}");
+        log::debug!("start querying quorum reached events from : {} to {finalized_height}", prev_h + 1);
 
         for h in (prev_h + 1)..=finalized_height {
             let events = self.child_handler.quorum_reached_events(h).await?;
@@ -247,7 +247,7 @@ where
                 continue;
             }
 
-            log::debug!("found reached events at height : {h}");
+            log::debug!("found reached events {events:?} at height : {h}");
 
             for event in events {
                 let bundle = self.child_handler.bundle_at(event.height).await?;
