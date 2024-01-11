@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use ipc_api::subnet_id::SubnetID;
-use libp2p::core::Endpoint;
 use libp2p::core::connection::ConnectionId;
+use libp2p::core::Endpoint;
 use libp2p::gossipsub::error::SubscriptionError;
 use libp2p::gossipsub::{
     self, IdentTopic, MessageAuthenticity, MessageId, PublishError, Sha256Topic, SubscriptionError,
