@@ -74,7 +74,10 @@ where
     let batch = gateway.bottom_up_batch(state, height.into())?;
     Ok(
         // block height is 0 means the batch does not exists
-        if batch.block_height.as_u64() == 0 {
+        if batch.block_height.as_u64() == 0
+            && height.value() % gateway.bottom_up_msg_batch_period(state)? != 0
+        {
+            // this means the batch does not already exist and submission period not reached
             None
         } else {
             tracing::debug!(
@@ -285,7 +288,10 @@ where
 {
     // Make sure that these had time to be added to the ledger.
     if let Some(highest) = incomplete_batches.iter().map(|cp| cp.block_height).max() {
-        tracing::debug!(block = highest.as_u64(), "waiting for block to be committed(msg batch)");
+        tracing::debug!(
+            block = highest.as_u64(),
+            "waiting for block to be committed(msg batch)"
+        );
         wait_for_commit(
             client,
             highest.as_u64() + 1,
@@ -426,7 +432,10 @@ where
         .context("failed to broadcast signature")?;
 
     // The transaction should be in the mempool now.
-    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted msg batch signature");
+    tracing::info!(
+        tx_hash = tx_hash.to_string(),
+        "broadcasted msg batch signature"
+    );
 
     Ok(())
 }
@@ -455,7 +464,10 @@ where
         .context("failed to broadcast signature")?;
 
     // The transaction should be in the mempool now.
-    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted checkpoint signature");
+    tracing::info!(
+        tx_hash = tx_hash.to_string(),
+        "broadcasted checkpoint signature"
+    );
 
     Ok(())
 }

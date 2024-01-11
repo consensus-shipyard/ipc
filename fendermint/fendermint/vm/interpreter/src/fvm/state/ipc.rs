@@ -117,6 +117,14 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .as_u64())
     }
 
+    /// Fetch the period with which the current subnet has to submit msg batches to its parent.
+    pub fn bottom_up_msg_batch_period(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        Ok(self
+            .getter
+            .call(state, |c| c.bottom_up_msg_batch_period())?
+            .as_u64())
+    }
+
     /// Fetch the bottom-up message batch enqueued for a given checkpoint height.
     pub fn bottom_up_batch(
         &self,

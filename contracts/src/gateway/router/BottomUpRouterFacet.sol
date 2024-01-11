@@ -108,6 +108,15 @@ contract BottomUpRouterFacet is GatewayActorModifiers {
             membershipWeight: membershipWeight,
             majorityPercentage: s.majorityPercentage
         });
+
+        if (LibGateway.bottomUpBatchMsgsExists(batch.blockHeight)) {
+            return;
+        }
+
+        if (batch.blockHeight % s.bottomUpMsgBatchPeriod != 0) {
+            revert InvalidBatchEpoch();
+        }
+        LibGateway.storeBottomUpMsgBatch(batch);
     }
 
     /// @notice Set a new batch retention height and garbage collect all batches in range [`retentionHeight`, `newRetentionHeight`)
