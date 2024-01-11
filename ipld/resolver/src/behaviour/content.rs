@@ -13,8 +13,8 @@ use libp2p::{
     futures::channel::oneshot,
     multiaddr::Protocol,
     swarm::{
-        derive_prelude::{ConnectionId, FromSwarm},
-        ConnectionDenied, NetworkBehaviour, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+        derive_prelude::FromSwarm, ConnectionDenied, ConnectionId, NetworkBehaviour, THandler,
+        THandlerInEvent, THandlerOutEvent, ToSwarm,
     },
     Multiaddr, PeerId,
 };
