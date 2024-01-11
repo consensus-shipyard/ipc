@@ -1,4 +1,4 @@
-name: Contract Build and Test Workflow
+name: Build and Test Workflow
 
 # This workflow is triggered from the main CI workflow.
 on:
