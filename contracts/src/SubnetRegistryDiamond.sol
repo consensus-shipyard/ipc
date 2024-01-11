@@ -17,8 +17,14 @@ contract SubnetRegistryDiamond {
         address gateway;
         address getterFacet;
         address managerFacet;
-        bytes4[] subnetGetterSelectors;
-        bytes4[] subnetManagerSelectors;
+        address rewarderFacet;
+        address checkpointerFacet;
+        address pauserFacet;
+        bytes4[] subnetActorGetterSelectors;
+        bytes4[] subnetActorManagerSelectors;
+        bytes4[] subnetActorRewarderSelectors;
+        bytes4[] subnetActorCheckpointerSelectors;
+        bytes4[] subnetActorPauserSelectors;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -29,6 +35,15 @@ contract SubnetRegistryDiamond {
             revert FacetCannotBeZero();
         }
         if (params.managerFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+        if (params.rewarderFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+        if (params.checkpointerFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+        if (params.pauserFacet == address(0)) {
             revert FacetCannotBeZero();
         }
 
@@ -42,11 +57,17 @@ contract SubnetRegistryDiamond {
         ds.supportedInterfaces[type(IDiamondLoupe).interfaceId] = true;
 
         s.GATEWAY = params.gateway;
-        s.SUBNET_GETTER_FACET = params.getterFacet;
-        s.SUBNET_MANAGER_FACET = params.managerFacet;
+        s.SUBNET_ACTOR_GETTER_FACET = params.getterFacet;
+        s.SUBNET_ACTOR_MANAGER_FACET = params.managerFacet;
+        s.SUBNET_ACTOR_REWARD_FACET = params.rewarderFacet;
+        s.SUBNET_ACTOR_CHECKPOINTING_FACET = params.checkpointerFacet;
+        s.SUBNET_ACTOR_PAUSE_FACET = params.pauserFacet;
 
-        s.subnetGetterSelectors = params.subnetGetterSelectors;
-        s.subnetManagerSelectors = params.subnetManagerSelectors;
+        s.subnetActorGetterSelectors = params.subnetActorGetterSelectors;
+        s.subnetActorManagerSelectors = params.subnetActorManagerSelectors;
+        s.subnetActorRewarderSelectors = params.subnetActorRewarderSelectors;
+        s.subnetActorCheckpointerSelectors = params.subnetActorCheckpointerSelectors;
+        s.subnetActorPauserSelectors = params.subnetActorPauserSelectors;
     }
 
     function _fallback() internal {
