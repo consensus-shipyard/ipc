@@ -128,6 +128,10 @@ impl Behaviour {
 
             let mut kademlia = kad::Behaviour::with_config(nc.local_peer_id(), store, kad_config);
 
+            // Setting the mode to server so that it doesn't deny connections until the external address is established.
+            // At least this seems to prevent in-memory tests from working, I'm not sure about what will happen with real servers.
+            kademlia.set_mode(Some(kad::Mode::Server));
+
             // Bootstrap from the seeds. The first seed to stand up might have nobody to bootstrap from,
             // although ideally there would be at least another peer, so we can easily restart it and come back.
             if !static_addresses.is_empty() {
