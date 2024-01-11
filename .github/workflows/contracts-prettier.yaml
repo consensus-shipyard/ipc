@@ -1,5 +1,5 @@
 # .github/workflows/prettier.yml
-name: Contracts Prettier
+name: Prettier
 
 # This workflow is triggered from the main CI workflow.
 on:

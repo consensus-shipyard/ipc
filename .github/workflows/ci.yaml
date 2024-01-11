@@ -56,6 +56,10 @@ jobs:
       needs.changes.outputs.contracts == 'true' ||
       github.ref == 'refs/heads/main'
 
+  contracts-deployment-test:
+    uses: ./.github/workflows/contracts-deployment-test.yaml
+    needs: [ contracts-prettier ]
+
   contracts-build-and-test:
     uses: ./.github/workflows/contracts-build-and-test.yaml
     needs: [contracts-prettier]

@@ -1,4 +1,4 @@
-name: Contracts Tests
+name: Tests
 
 # This workflow is triggered from the main CI workflow.
 on:
