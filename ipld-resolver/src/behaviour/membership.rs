@@ -8,8 +8,8 @@ use anyhow::anyhow;
 use ipc_sdk::subnet_id::SubnetID;
 use libp2p::core::Endpoint;
 use libp2p::gossipsub::{
-    self, IdentTopic, MessageAuthenticity, MessageId, Sha256Topic, SubscriptionError, Topic,
-    TopicHash,
+    self, IdentTopic, MessageAuthenticity, MessageId, PublishError, Sha256Topic, SubscriptionError,
+    Topic, TopicHash,
 };
 use libp2p::identity::Keypair;
 use libp2p::swarm::derive_prelude::FromSwarm;
@@ -18,7 +18,7 @@ use libp2p::swarm::{
     ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId};
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use tokio::time::{Instant, Interval};
 
 use crate::hash::blake2b_256;
@@ -184,6 +184,16 @@ impl Behaviour {
         Ok(membership)
     }
 
+    fn subscribe(&mut self, topic: &Sha256Topic) -> Result<bool, SubscriptionError> {
+        info!("subscribing to ${topic}");
+        self.inner.subscribe(topic)
+    }
+
+    fn unsubscribe(&mut self, topic: &Sha256Topic) -> Result<bool, PublishError> {
+        info!("unsubscribing from ${topic}");
+        self.inner.unsubscribe(topic)
+    }
+
     /// Construct the topic used to gossip about pre-emptively published data.
     ///
     /// Replaces "/" with "_" to avoid clashes from prefix/suffix overlap.
@@ -199,7 +209,7 @@ impl Behaviour {
     /// Subscribe to a preemptive topic.
     fn preemptive_subscribe(&mut self, subnet_id: SubnetID) -> Result<(), SubscriptionError> {
         let topic = self.preemptive_topic(&subnet_id);
-        self.inner.subscribe(&topic)?;
+        self.subscribe(&topic)?;
         self.preemptive_topics.insert(topic.hash(), subnet_id);
         Ok(())
     }
@@ -207,7 +217,7 @@ impl Behaviour {
     /// Subscribe to a preemptive topic.
     fn preemptive_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
         let topic = self.preemptive_topic(subnet_id);
-        self.inner.unsubscribe(&topic)?;
+        self.unsubscribe(&topic)?;
         self.preemptive_topics.remove(&topic.hash());
         Ok(())
     }
@@ -227,7 +237,7 @@ impl Behaviour {
     /// Subscribe to a voting topic.
     fn voting_subscribe(&mut self, subnet_id: &SubnetID) -> Result<(), SubscriptionError> {
         let topic = self.voting_topic(subnet_id);
-        self.inner.subscribe(&topic)?;
+        self.subscribe(&topic)?;
         self.voting_topics.insert(topic.hash());
         Ok(())
     }
@@ -235,7 +245,7 @@ impl Behaviour {
     /// Unsubscribe from a voting topic.
     fn voting_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
         let topic = self.voting_topic(subnet_id);
-        self.inner.unsubscribe(&topic)?;
+        self.unsubscribe(&topic)?;
         self.voting_topics.remove(&topic.hash());
         Ok(())
     }
@@ -302,6 +312,10 @@ impl Behaviour {
     fn publish_membership(&mut self) -> anyhow::Result<()> {
         let record = ProviderRecord::signed(&self.local_key, self.subnet_ids.clone())?;
         let data = record.into_envelope().into_protobuf_encoding();
+        debug!(
+            "publishing membership in {:?} to {}",
+            self.subnet_ids, self.membership_topic
+        );
         match self.inner.publish(self.membership_topic.clone(), data) {
             Err(e) => {
                 stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
@@ -419,6 +433,7 @@ impl Behaviour {
     /// If this is the first time we receive a record from the peer,
     /// reciprocate by publishing our own.
     fn handle_provider_record(&mut self, record: ProviderRecord) {
+        debug!("received provider record: {record:?}");
         let (event, publish) = match self.provider_cache.add_provider(&record) {
             None => {
                 stats::MEMBERSHIP_SKIPPED_PEERS.inc();
@@ -594,7 +609,7 @@ impl NetworkBehaviour for Behaviour {
                         // connected to. If we assume there are hundreds of agents in each subnet which may
                         // or may not overlap, and each agent is connected to ~50 other agents, then the chance
                         // that there are subnets from which there are no or just a few connections is not
-                        // insignificant. For this reason I oped to use messages instead, and let the content
+                        // insignificant. For this reason I opted to use messages instead, and let the content
                         // carry the information, spreading through the Gossipsub network regardless of the
                         // number of connected peers.
                         gossipsub::Event::Subscribed { peer_id, topic } => {
