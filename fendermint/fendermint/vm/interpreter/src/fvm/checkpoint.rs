@@ -72,22 +72,30 @@ where
         .context("block height is not u64")?;
 
     let batch = gateway.bottom_up_batch(state, height.into())?;
-    Ok(if batch.msgs.is_empty() {
-        let (_, curr_power_table) =
-            ipc_power_table(gateway, state).context("failed to get the current power table")?;
+    Ok(
+        // block height is 0 means the batch does not exists
+        if batch.block_height.as_u64() == 0 {
+            None
+        } else {
+            tracing::debug!(
+                batch = ?batch,
+                "creating bottom up msg batch at height"
+            );
 
-        let batch =
-            bottom_up_router_facet::BottomUpMsgBatch::from_tokens(batch.clone().into_tokens())?;
+            let (_, curr_power_table) =
+                ipc_power_table(gateway, state).context("failed to get the current power table")?;
 
-        // Save the batch in the ledger.
-        // Pass in the current power table, because these are the validators who can sign this checkpoint.
-        gateway
-            .create_bottom_up_msg_batch(state, batch, &curr_power_table.0)
-            .context("failed to store checkpoint")?;
-        None
-    } else {
-        Some(batch)
-    })
+            let router_batch =
+                bottom_up_router_facet::BottomUpMsgBatch::from_tokens(batch.clone().into_tokens())?;
+
+            // Save the batch in the ledger.
+            // Pass in the current power table, because these are the validators who can sign this checkpoint.
+            gateway
+                .create_bottom_up_msg_batch(state, router_batch, &curr_power_table.0)
+                .context("failed to store msg batch")?;
+            Some(batch)
+        },
+    )
 }
 
 /// Construct and store a checkpoint if this is the end of the checkpoint period.
@@ -277,6 +285,7 @@ where
 {
     // Make sure that these had time to be added to the ledger.
     if let Some(highest) = incomplete_batches.iter().map(|cp| cp.block_height).max() {
+        tracing::debug!(block = highest.as_u64(), "waiting for block to be committed(msg batch)");
         wait_for_commit(
             client,
             highest.as_u64() + 1,
@@ -313,8 +322,11 @@ where
             )
             .await
             .context("failed to broadcast checkpoint signature")?;
-
-            tracing::debug!(?height, "submitted checkpoint signature");
+        } else {
+            tracing::debug!(
+                height = batch.block_height.as_u64(),
+                "validator not in active list, not signing for batch"
+            );
         }
     }
     Ok(())
@@ -414,7 +426,7 @@ where
         .context("failed to broadcast signature")?;
 
     // The transaction should be in the mempool now.
-    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted msg batch signature");
 
     Ok(())
 }
@@ -443,7 +455,7 @@ where
         .context("failed to broadcast signature")?;
 
     // The transaction should be in the mempool now.
-    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted checkpoint signature");
 
     Ok(())
 }
