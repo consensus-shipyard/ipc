@@ -19,6 +19,7 @@ use libp2p::{
     Multiaddr, PeerId,
 };
 use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapResponse, BitswapStore};
+use log::debug;
 use prometheus::Registry;
 
 use crate::{
@@ -138,6 +139,7 @@ impl<P: StoreParams> Behaviour<P> {
     /// The underlying [`libp2p_request_response::RequestResponse`] behaviour
     /// will initiate connections to the peers which aren't connected at the moment.
     pub fn resolve(&mut self, cid: Cid, peers: Vec<PeerId>) -> QueryId {
+        debug!("resolving {cid} from {peers:?}");
         stats::CONTENT_RESOLVE_RUNNING.inc();
         // Not passing any missing items, which will result in a call to `BitswapStore::missing_blocks`.
         self.inner.sync(cid, peers, [].into_iter())
@@ -260,6 +262,8 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         //         .on_connection_handler_event(peer_id, connection_id, event),
         // }
 
+        // debug!("BITSWAP CONNECTION HANDLER EVENT: {event:?}");
+
         self.inner
             .on_connection_handler_event(peer_id, connection_id, event)
     }
@@ -325,6 +329,7 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
         }
         // Poll Bitswap.
         while let Poll::Ready(ev) = self.inner.poll(cx) {
+            // debug!("BITSWAP POLL: {ev:?}");
             match ev {
                 ToSwarm::GenerateEvent(ev) => match ev {
                     BitswapEvent::Progress(_, _) => {}
