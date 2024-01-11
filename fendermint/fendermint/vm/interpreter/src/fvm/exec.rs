@@ -237,6 +237,8 @@ where
                     }
                 });
             }
+        } else {
+            tracing::debug!("validator not configured, not signing bottom up msg batch");
         }
         Ok(())
     }
