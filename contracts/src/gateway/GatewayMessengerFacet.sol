@@ -3,13 +3,12 @@ pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
-import {CrossMsg, StorableMsg} from "../structs/CrossNet.sol";
+import {IpcEnvelope, IpcMsg} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, SupplyKind} from "../structs/Subnet.sol";
 import {InvalidCrossMsgFromSubnet, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
-import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 
@@ -19,7 +18,6 @@ string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cro
 contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
-    using StorableMsgHelper for StorableMsg;
     using SupplySourceHelper for address;
 
     /**
@@ -29,7 +27,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      *
      * @param crossMsg - a cross-message to send.
      */
-    function sendUserXnetMessage(CrossMsg calldata crossMsg) external payable {
+    function sendUserXnetMessage(IpcEnvelope calldata crossMsg) external payable {
         if (!s.generalPurposeCrossMsg) {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
         }
@@ -59,7 +57,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert MethodNotAllowed(ERR_MULTILEVEL_CROSS_MSG_DISABLED);
         }
 
-        CrossMsg storage crossMsg = s.postbox[msgCid];
+        IpcEnvelope storage crossMsg = s.postbox[msgCid];
         validateFee(crossMsg.message.fee);
 
         bool shouldBurn = _commitCrossMessage(crossMsg);
@@ -89,7 +87,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      *  @param crossMessage The cross-network message to commit.
      *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
      */
-    function _commitCrossMessage(CrossMsg memory crossMessage) internal returns (bool shouldBurn) {
+    function _commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
         SubnetID memory to = crossMessage.message.to.subnetId;
         if (to.isEmpty()) {
             revert InvalidCrossMsgDstSubnet();

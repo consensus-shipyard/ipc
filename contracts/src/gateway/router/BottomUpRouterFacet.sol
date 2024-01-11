@@ -12,7 +12,7 @@ import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {IPCMsgType} from "../../enums/IPCMsgType.sol";
 
-import {CrossMsg, SubnetID} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 
 import {SupplySourceHelper} from "../../lib/SupplySourceHelper.sol";
@@ -20,14 +20,12 @@ import {SupplySource} from "../../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../../subnet/SubnetActorGetterFacet.sol";
 
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
-import {StorableMsgHelper} from "../../lib/StorableMsgHelper.sol";
-import {StorableMsg} from "../../structs/CrossNet.sol";
+import {IpcMsg} from "../../structs/CrossNet.sol";
 
 contract BottomUpRouterFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
+    using CrossMsgHelper for IpcEnvelope;
     using SupplySourceHelper for SupplySource;
-    using StorableMsgHelper for StorableMsg;
 
     /// @notice submit a batch of cross-net messages for execution.
     /// @dev this method is called by the corresponding subnet actor.

@@ -10,7 +10,7 @@ import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol"
 import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
-import {BottomUpMsgBatch, CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/CrossNet.sol";
+import {BottomUpMsgBatch, CrossMsg, BottomUpCheckpoint, IpcMsgm "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo} from "../../src/structs/Subnet.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
@@ -20,7 +20,6 @@ import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {MultisignatureChecker} from "../../src/lib/LibMultisignatureChecker.sol";
-import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
@@ -468,9 +467,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_crossMsgGetter() public view {
-        CrossMsg[] memory msgs = new CrossMsg[](1);
-        msgs[0] = CrossMsg({
-            message: StorableMsg({
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
                 to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
                 value: DEFAULT_CROSS_MSG_FEE + 1,
@@ -647,8 +646,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saManager.join{value: 10}(pubKeys[i]);
         }
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({
                     subnetId: saGetter.getParent(),
                     rawAddress: FvmAddressHelper.from(address(saDiamond))
@@ -662,7 +661,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             }),
             wrapped: false
         });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
@@ -737,8 +736,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         // send the first checkpoint
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({
                     subnetId: saGetter.getParent(),
                     rawAddress: FvmAddressHelper.from(address(saDiamond))
@@ -752,7 +751,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             }),
             wrapped: false
         });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
@@ -786,8 +785,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saGetter.getRelayerReward(validators[0]) == 0, "there is a reward");
 
         // send the second checkpoint
-        crossMsg = CrossMsg({
-            message: StorableMsg({
+        crossMsg = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({
                     subnetId: saGetter.getParent(),
                     rawAddress: FvmAddressHelper.from(address(saDiamond))
@@ -850,8 +849,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saManager.join{value: 10}(pubKeys[i]);
         }
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({
                     subnetId: saGetter.getParent(),
                     rawAddress: FvmAddressHelper.from(address(saDiamond))
@@ -865,7 +864,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             }),
             wrapped: false
         });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
         BottomUpMsgBatch memory batch = BottomUpMsgBatch({
@@ -897,7 +896,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saCheckpointer.submitBottomUpMsgBatch(batchIncorrectHeight, validators, signatures);
 
         vm.prank(validators[0]);
-        batchIncorrectHeight.msgs = new CrossMsg[](0);
+        batchIncorrectHeight.msgs = new IpcEnvelope[](0);
         batchIncorrectHeight.blockHeight = saGetter.bottomUpMsgBatchPeriod();
         vm.expectRevert(BatchWithNoMessages.selector);
         saCheckpointer.submitBottomUpMsgBatch(batchIncorrectHeight, validators, signatures);

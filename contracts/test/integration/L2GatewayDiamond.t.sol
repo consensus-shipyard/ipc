@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {CrossMsg, StorableMsg} from "../../src/structs/CrossNet.sol";
+import {CrossMsg, IpcMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -37,10 +37,10 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         SubnetID memory id = gwGetter.getNetworkName();
 
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](n);
+        IpcEnvelope[] memory topDownMsgs = new IpcEnvelope[](n);
         for (uint64 i = 0; i < n; i++) {
-            topDownMsgs[i] = CrossMsg({
-                message: StorableMsg({
+            topDownMsgs[i] = IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                     to: IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                     value: 0,
@@ -117,8 +117,8 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     function setupWhiteListMethod(address caller) internal returns (bytes32) {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, address(this));
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({
                     subnetId: gwGetter.getNetworkName().createSubnetId(caller),
                     rawAddress: FvmAddressHelper.from(caller)
@@ -135,7 +135,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
             }),
             wrapped: false
         });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);

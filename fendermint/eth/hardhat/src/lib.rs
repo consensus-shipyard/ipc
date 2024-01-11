@@ -291,7 +291,6 @@ mod tests {
         "AccountHelper",
         "SubnetIDHelper",
         "CrossMsgHelper",
-        "StorableMsgHelper",
         "LibStaking",
         "LibQuorum",
     ];

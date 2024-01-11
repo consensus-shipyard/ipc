@@ -4,18 +4,18 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 
 import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
-import "../../src/lib/StorableMsgHelper.sol";
+import "../../src/lib/IpcMsgHelper.sol";
 import "../../src/lib/FvmAddressHelper.sol";
 import {IPCAddress} from "../../src/structs/Subnet.sol";
 
-contract StorableMsgHelperTest is Test {
-    using StorableMsgHelper for StorableMsg;
+contract IpcMsgHelperTest is Test {
+    using IpcMsgHelper for IpcMsg;
 
     uint64 private constant ROOTNET_CHAINID = 123;
     uint256 private constant CROSS_MSG_FEE = 10 gwei;
 
-    // StorableMsg EMPTY_STORABLE_MESSAGE =
-    //     StorableMsg({
+    // IpcMsg EMPTY_STORABLE_MESSAGE =
+    //     IpcMsg({
     //         from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
     //         to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: address(0)}),
     //         value: 0,
@@ -26,13 +26,13 @@ contract StorableMsgHelperTest is Test {
 
     // function test_ToHash_Works_EmptyMessage() public view {
     //     require(
-    //         EMPTY_STORABLE_MESSAGE.toHash() == StorableMsgHelper.EMPTY_STORABLE_MESSAGE_HASH,
+    //         EMPTY_STORABLE_MESSAGE.toHash() == IpcMsgHelper.EMPTY_STORABLE_MESSAGE_HASH,
     //         "Hashes should be equal"
     //     );
     // }
 
     function test_ToHash_Works_NonEmptyMessage() public pure {
-        StorableMsg memory storableMsg = StorableMsg({
+        IpcMsg memory storableMsg = StoraIpcMsg
             from: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: FvmAddressHelper.from(address(0))}),
             to: IPCAddress({subnetId: SubnetID(0, new address[](0)), rawAddress: FvmAddressHelper.from(address(0))}),
             value: 1,
@@ -54,7 +54,7 @@ contract StorableMsgHelperTest is Test {
         to[2] = address(3);
         to[3] = address(4);
 
-        StorableMsg memory storableMsg = StorableMsg({
+        IpcMsg memory storableMsg = StoraIpcMsg
             from: IPCAddress({
                 subnetId: SubnetID({root: ROOTNET_CHAINID, route: from}),
                 rawAddress: FvmAddressHelper.from(address(3))
@@ -100,7 +100,7 @@ contract StorableMsgHelperTest is Test {
         address[] memory to = new address[](1);
         to[0] = address(1);
 
-        StorableMsg memory storableMsg = StorableMsg({
+        IpcMsg memory storableMsg = StoraIpcMsg
             from: IPCAddress({
                 subnetId: SubnetID({root: ROOTNET_CHAINID, route: from}),
                 rawAddress: FvmAddressHelper.from(address(3))

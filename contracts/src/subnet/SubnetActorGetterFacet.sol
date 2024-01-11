@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
-import {BottomUpCheckpoint, CrossMsg} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, IpcEnvelope} from "../structs/CrossNet.sol";
 import {SubnetID, SupplySource} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
@@ -233,11 +233,11 @@ contract SubnetActorGetterFacet {
         return nodes;
     }
 
-    /// @notice Computes a hash of an array of cross-chain messages.
+    /// @notice Computes a hash of an array of IpcEnvelopes.
     /// @dev This exists for testing purposes.
-    /// @param messages An array of cross-chain messages to be hashed.
+    /// @param messages An array of cross-chain envelopes to be hashed.
     /// @return The keccak256 hash of the encoded cross-chain messages.
-    function crossMsgsHash(CrossMsg[] calldata messages) external pure returns (bytes32) {
+    function crossMsgsHash(IpcEnvelope[] calldata messages) external pure returns (bytes32) {
         return keccak256(abi.encode(messages));
     }
 

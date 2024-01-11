@@ -52,21 +52,11 @@ export async function deploy() {
         { SubnetIDHelper: subnetIDHelperAddress },
         txArgs,
     )
-    const { address: storableMsgHelperAddress } =
-        await deployContractWithDeployer(
-            deployer,
-            'StorableMsgHelper',
-            {
-                SubnetIDHelper: subnetIDHelperAddress,
-            },
-            txArgs,
-        )
 
     return {
         AccountHelper: accountHelperAddress,
         SubnetIDHelper: subnetIDHelperAddress,
         CrossMsgHelper: crossMsgHelperAddress,
-        StorableMsgHelper: storableMsgHelperAddress,
         LibStaking: libStakingAddress,
         LibQuorum: libQuorumAddress,
     }

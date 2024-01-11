@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, BottomUpMsgBatch, CrossMsg, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
@@ -59,16 +59,8 @@ interface IGateway {
     function release(FvmAddress calldata to) external payable;
 
     /// @notice SendUserXnetMessage sends an arbitrary cross-message to other subnet in the hierarchy.
-    ///
-    /// If the message includes any funds they need to be burnt (like in Release)
-    /// before being propagated to the corresponding subnet.
-    /// The circulating supply in each subnet needs to be updated as the message passes through them.
-    ///
-    /// Params expect a raw message without any subnet context (the IPC address is
-    /// included in the message by the actor). Only actors are allowed to send arbitrary
-    /// cross-messages as a side-effect of their execution. For plain token exchanges
-    /// fund and release have to be used.
-    function sendUserXnetMessage(CrossMsg memory crossMsg) external payable;
+    // TODO: add the right comment and function name here.
+    function sendUserXnetMessage(IpcEnvelope calldata msg) external payable;
 
     /// @notice Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;

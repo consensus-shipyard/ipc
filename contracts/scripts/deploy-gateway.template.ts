@@ -51,7 +51,6 @@ export async function deploy(libs: { [key in string]: string }) {
     }
     const messengerFacetLibs: Libraries = {
         SubnetIDHelper: libs['SubnetIDHelper'],
-        StorableMsgHelper: libs['StorableMsgHelper'],
     }
 
     const checkpointingFacetLibs: Libraries = {
@@ -63,7 +62,6 @@ export async function deploy(libs: { [key in string]: string }) {
         AccountHelper: libs['AccountHelper'],
         CrossMsgHelper: libs['CrossMsgHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
-        StorableMsgHelper: libs['StorableMsgHelper'],
     }
 
     const topDownFinalityFacetLibs: Libraries = {
@@ -74,7 +72,6 @@ export async function deploy(libs: { [key in string]: string }) {
         CrossMsgHelper: libs['CrossMsgHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
         AccountHelper: libs['AccountHelper'],
-        StorableMsgHelper: libs['StorableMsgHelper'],
     }
 
     const facets = [

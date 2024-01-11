@@ -29,7 +29,7 @@ contract CrossMsgHelperTest is Test {
     }
 
     function test_ToHash_Works() public view {
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
         require(CrossMsgHelper.toHash(crossMsg) == CrossMsgHelper.toHash(msgs[0]));
         require(CrossMsgHelper.toHash(crossMsg) != CrossMsgHelper.toHash(msgs));
@@ -49,7 +49,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory releaseMsg = CrossMsgHelper.createReleaseMsg(
+        IpcEnvelope memory releaseMsg = CrossMsgHelper.createReleaseMsg(
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
@@ -93,7 +93,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(
+        IpcEnvelope memory fundMsg = CrossMsgHelper.createFundMsg(
             parentSubnetId,
             sender,
             FvmAddressHelper.from(sender),
@@ -122,7 +122,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(
+        IpcEnvelope memory fundMsg = CrossMsgHelper.createFundMsg(
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
@@ -224,7 +224,7 @@ contract CrossMsgHelperTest is Test {
         bytes memory result = crossMsg.execute(SupplySourceHelper.native());
 
         bytes memory decoded = abi.decode(result, (bytes));
-        CrossMsg memory decodedCrossMsg = abi.decode(decoded, (CrossMsg));
+        IpcEnvelope memory decodedCrossMsg = abi.decode(decoded, (CrossMsg));
 
         require(decodedCrossMsg.toHash() == crossMsg.toHash(), "decoded.toHash() == crossMsg.toHash()");
     }
@@ -243,7 +243,7 @@ contract CrossMsgHelperTest is Test {
         return params;
     }
 
-    function callbackWrapped(CrossMsg memory w) public payable returns (bytes memory) {
+    function callbackWrapped(IpcEnvelope memory w) public payable returns (bytes memory) {
         return abi.encode(w);
     }
 
@@ -275,10 +275,10 @@ contract CrossMsgHelperTest is Test {
         require(CrossMsgHelper.isSorted(crossMsgs) == false);
     }
 
-    function createCrossMsg(uint64 nonce, uint256 fee) internal pure returns (CrossMsg memory) {
+    function createCrossMsg(uint64 nonce, uint256 fee) internal pure returns (IpcEnvelope memory) {
         return
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID(0, new address[](0)),
                         rawAddress: FvmAddressHelper.from(address(0))
@@ -297,8 +297,8 @@ contract CrossMsgHelperTest is Test {
             });
     }
 
-    function createCrossMsgs(uint256 length, uint64 nonce) internal view returns (CrossMsg[] memory _crossMsgs) {
-        _crossMsgs = new CrossMsg[](length);
+    function createCrossMsgs(uint256 length, uint64 nonce) internal view returns (IpcEnvelope[] memory _crossMsgs) {
+        _crossMsgs = new IpcEnvelope[](length);
 
         for (uint256 i = 0; i < length; i++) {
             _crossMsgs[i] = createCrossMsg(nonce, CROSS_MESSAGE_FEE);

@@ -5,23 +5,21 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
-import {CrossMsg, StorableMsg, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {IpcMsg, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
-import {StorableMsgHelper} from "../lib/StorableMsgHelper.sol";
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
+    using CrossMsgHelper for IpcEnvelope;
     using SupplySourceHelper for SupplySource;
-    using StorableMsgHelper for StorableMsg;
 
     event MembershipUpdated(Membership);
-    /// @dev subnet refers to the next "down" subnet that the `CrossMsg.message.to` should be forwarded to.
-    event NewTopDownMessage(address indexed subnet, CrossMsg message);
+    /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
+    event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch, BottomUpMsgBatch batch);
 
@@ -43,11 +41,7 @@ library LibGateway {
     /// @notice returns the bottom-up checkpoint
     function getBottomUpCheckpoint(
         uint256 epoch
-    )
-        internal
-        view
-        returns (bool exists, BottomUpCheckpoint storage checkpoint)
-    {
+    ) internal view returns (bool exists, BottomUpCheckpoint storage checkpoint) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         checkpoint = s.bottomUpCheckpoints[epoch];
@@ -55,13 +49,7 @@ library LibGateway {
     }
 
     /// @notice returns the bottom-up batch
-    function getBottomUpMsgBatch(
-        uint256 epoch
-    )
-        internal
-        view
-        returns (bool exists, BottomUpMsgBatch storage batch)
-    {
+    function getBottomUpMsgBatch(uint256 epoch) internal view returns (bool exists, BottomUpMsgBatch storage batch) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         batch = s.bottomUpMsgBatches[epoch];
@@ -81,24 +69,20 @@ library LibGateway {
     }
 
     /// @notice stores checkpoint
-    function storeBottomUpCheckpoint(
-        BottomUpCheckpoint memory checkpoint
-    ) internal {
+    function storeBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         s.bottomUpCheckpoints[checkpoint.blockHeight] = checkpoint;
     }
 
     /// @notice stores bottom-up batch
-    function storeBottomUpMsgBatch(
-        BottomUpMsgBatch memory batch
-    ) internal {
+    function storeBottomUpMsgBatch(BottomUpMsgBatch memory batch) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         BottomUpMsgBatch storage b = s.bottomUpMsgBatches[batch.blockHeight];
         b.subnetID = batch.subnetID;
         b.blockHeight = batch.blockHeight;
 
         uint256 msgLength = batch.msgs.length;
-        for (uint256 i; i < msgLength;) {
+        for (uint256 i; i < msgLength; ) {
             // We need to push because initializing an array with a static
             // length will cause a copy from memory to storage, making
             // the compiler unhappy.
@@ -223,9 +207,9 @@ library LibGateway {
 
     /// @notice commit topdown messages for their execution in the subnet. Adds the message to the subnet struct for future execution
     /// @param crossMessage - the cross message to be committed
-    function commitTopDownMsg(CrossMsg memory crossMessage) internal {
+    function commitTopDownMsg(IpcEnvelope memory crossMessage) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        SubnetID memory subnetId = crossMessage.message.to.subnetId.down(s.networkName);
+        SubnetID memory subnetId = crossMessage.to.subnetId.down(s.networkName);
 
         (bool registered, Subnet storage subnet) = getSubnet(subnetId);
 
@@ -235,21 +219,21 @@ library LibGateway {
 
         uint64 topDownNonce = subnet.topDownNonce;
 
-        crossMessage.message.nonce = topDownNonce;
+        crossMessage.nonce = topDownNonce;
         subnet.topDownNonce = topDownNonce + 1;
-        subnet.circSupply += crossMessage.message.value;
+        subnet.circSupply += crossMessage.getValue();
 
         emit NewTopDownMessage({subnet: subnetId.getAddress(), message: crossMessage});
     }
 
     /// @notice Commits a new cross-net message to a message batch for execution
     /// @param crossMessage - the cross message to be committed
-    function commitBottomUpMsg(CrossMsg memory crossMessage) internal {
+    function commitBottomUpMsg(IpcEnvelope memory crossMessage) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         uint256 epoch = getNextEpoch(block.number, s.bottomUpMsgBatchPeriod);
 
         // assign nonce to the message.
-        crossMessage.message.nonce = s.bottomUpNonce;
+        crossMessage.nonce = s.bottomUpNonce;
         s.bottomUpNonce += 1;
 
         // populate the batch for that epoch
@@ -262,23 +246,23 @@ library LibGateway {
         } else {
             // if the maximum size was already achieved emit already the event
             // and re-assign the batch to the current epoch.
-            if (batch.msgs.length == s.maxMsgsPerBottomUpBatch){
+            if (batch.msgs.length == s.maxMsgsPerBottomUpBatch) {
                 // copy the batch with max messages into the new cut.
                 uint256 epochCut = block.number;
                 BottomUpMsgBatch memory newBatch = BottomUpMsgBatch({
                     subnetID: s.networkName,
                     blockHeight: epochCut,
-                    msgs: new CrossMsg[](batch.msgs.length)
+                    msgs: new IpcEnvelope[](batch.msgs.length)
                 });
                 uint256 msgLength = batch.msgs.length;
-                for (uint256 i; i < msgLength;) {
+                for (uint256 i; i < msgLength; ) {
                     newBatch.msgs[i] = batch.msgs[i];
                     unchecked {
                         ++i;
                     }
                 }
                 // emit event with the next batch ready to sign quorum over.
-                emit NewBottomUpMsgBatch(epochCut,newBatch);
+                emit NewBottomUpMsgBatch(epochCut, newBatch);
 
                 // Empty the messages of existing batch with epoch and start populating with the new message.
                 delete batch.msgs;
@@ -328,7 +312,7 @@ library LibGateway {
     /// The forwarder argument determines the previous subnet that submitted the checkpoint triggering the cross-net message execution.
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsgs - the cross-net messages to apply
-    function applyMessages(SubnetID memory arrivingFrom, CrossMsg[] memory crossMsgs) internal {
+    function applyMessages(SubnetID memory arrivingFrom, IpcEnvelope[] memory crossMsgs) internal {
         uint256 crossMsgsLength = crossMsgs.length;
         for (uint256 i; i < crossMsgsLength; ) {
             applyMsg(arrivingFrom, crossMsgs[i]);
@@ -341,16 +325,16 @@ library LibGateway {
     /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsg - the cross message to be executed
-    function applyMsg(SubnetID memory arrivingFrom, CrossMsg memory crossMsg) internal {
+    function applyMsg(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        if (crossMsg.message.to.subnetId.isEmpty()) {
+        if (crossMsg.to.subnetId.isEmpty()) {
             revert InvalidCrossMsgDstSubnet();
         }
 
         // If the crossnet destination is NOT the current network (network where the gateway is running),
         // we add it to the postbox for further propagation.
-        if (!crossMsg.message.to.subnetId.equals(s.networkName)) {
+        if (!crossMsg.to.subnetId.equals(s.networkName)) {
             bytes32 cid = crossMsg.toHash();
             s.postbox[cid] = crossMsg;
             return;
@@ -359,14 +343,14 @@ library LibGateway {
         // Now, let's find out the directionality of this message and act accordingly.
         // slither-disable-next-line uninitialized-local
         SupplySource memory supplySource;
-        IPCMsgType applyType = crossMsg.message.applyType(s.networkName);
+        IPCMsgType applyType = crossMsg.applyType(s.networkName);
         if (applyType == IPCMsgType.BottomUp) {
             // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
             (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
             if (!registered) {
                 revert NotRegisteredSubnet();
             }
-            if (subnet.appliedBottomUpNonce != crossMsg.message.nonce) {
+            if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
                 revert InvalidCrossMsgNonce();
             }
             subnet.appliedBottomUpNonce += 1;
@@ -376,7 +360,7 @@ library LibGateway {
             supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
         } else if (applyType == IPCMsgType.TopDown) {
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
-            if (s.appliedTopDownNonce != crossMsg.message.nonce) {
+            if (s.appliedTopDownNonce != crossMsg.nonce) {
                 revert InvalidCrossMsgNonce();
             }
             s.appliedTopDownNonce += 1;

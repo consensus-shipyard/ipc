@@ -5,14 +5,13 @@ import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
-import {CrossMsg, BottomUpMsgBatch, StorableMsg} from "../../src/structs/CrossNet.sol";
+import {CrossMsg, BottomUpMsgBatch, IpcMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, SupplySource, SupplyKind, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
-import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
 import {LibGateway} from "../../src/lib/LibGateway.sol";
@@ -34,7 +33,6 @@ import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
-    using StorableMsgHelper for StorableMsg;
     using FvmAddressHelper for FvmAddress;
 
     IERC20 private token;
@@ -101,7 +99,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         token.approve(address(gatewayDiamond), 10);
 
         // Funding succeeds and the right event is emitted.
-        CrossMsg memory expected = CrossMsgHelper.createFundMsg(
+        IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
             subnet.id,
             caller,
             FvmAddressHelper.from(caller),
@@ -153,7 +151,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         address recipient = vm.addr(42);
 
         // Commit the withdrawal message on the parent.
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         uint256 value = 8;
         msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value, 0);
 
@@ -199,7 +197,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         address recipient = vm.addr(42);
 
         // Commit a xnet message that isn't a simple bare transfer.
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         uint256 value = 8;
         msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value, 0);
         msgs[0].message.method = bytes4(0x11223344);

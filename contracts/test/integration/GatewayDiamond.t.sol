@@ -12,13 +12,12 @@ import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../src/structs/Quorum.sol";
-import {CrossMsg, BottomUpMsgBatch, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../../src/structs/CrossNet.sol";
+import {CrossMsg, BottomUpMsgBatch, BottomUpCheckpoint, IpcMsgentFinality} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond, FunctionNotFound} from "../../src/GatewayDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
@@ -40,7 +39,6 @@ import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for CrossMsg;
-    using StorableMsgHelper for StorableMsg;
     using FvmAddressHelper for FvmAddress;
 
     function setUp() public override {
@@ -58,8 +56,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         );
         require(gwGetter.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE, "unexpected majorityPercentage");
 
-        (StorableMsg memory storableMsg, bool wrapped) = gwGetter.postbox(0);
-        StorableMsg memory msg1;
+        (IpcMsgry storableMsg, bool wrapped) = gwGetter.postbox(0);
+        IpcMsg memory msg1;
         require(msg1.toHash() == storableMsg.toHash(), "unexpected hash");
         require(!wrapped, "unexpected wrapped message");
     }
@@ -513,8 +511,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE - 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -537,8 +535,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -568,8 +566,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert();
         gwMessenger.sendUserXnetMessage{value: fee - 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -869,8 +867,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -901,8 +899,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -930,8 +928,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -961,8 +959,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -990,8 +988,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: 0, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -1019,8 +1017,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -1048,8 +1046,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
         gwMessenger.sendUserXnetMessage{value: 0}(
-            CrossMsg({
-                message: StorableMsg({
+            IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                         rawAddress: FvmAddressHelper.from(caller)
@@ -1666,7 +1664,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(b.blockHeight == 0, "batch shouldn't exist");
 
         // failed to create a batch with no messages
-        batch = BottomUpMsgBatch({subnetID: gwGetter.getNetworkName(), blockHeight: 2 * d, msgs: new CrossMsg[](0)});
+        batch = BottomUpMsgBatch({subnetID: gwGetter.getNetworkName(), blockHeight: 2 * d, msgs: new IpcEnvelope[](0)});
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(BatchWithNoMessages.selector);
@@ -1709,7 +1707,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         BottomUpMsgBatch memory batch = BottomUpMsgBatch({
             subnetID: subnetId,
             blockHeight: gwGetter.bottomUpMsgBatchPeriod(),
-            msgs: new CrossMsg[](0)
+            msgs: new IpcEnvelope[](0)
         });
 
         vm.prank(caller);
@@ -2082,10 +2080,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (, subnetInfo) = gwGetter.getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
-        CrossMsg[] memory msgs = new CrossMsg[](10);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](10);
         for (uint64 i = 0; i < 10; i++) {
-            msgs[i] = CrossMsg({
-                message: StorableMsg({
+            msgs[i] = IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
                     to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
                     value: amount,
@@ -2132,10 +2130,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
         uint64 size = gwGetter.maxMsgsPerBottomUpBatch() + 1;
-        CrossMsg[] memory msgs = new CrossMsg[](size);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](size);
         for (uint64 i = 0; i < size; i++) {
-            msgs[i] = CrossMsg({
-                message: StorableMsg({
+            msgs[i] = IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
                     to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
                     value: amount,
@@ -2158,7 +2156,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
 
         // fail with no messages
-        batch = BottomUpMsgBatch({subnetID: subnetId, blockHeight: d, msgs: new CrossMsg[](0)});
+        batch = BottomUpMsgBatch({subnetID: subnetId, blockHeight: d, msgs: new IpcEnvelope[](0)});
 
         vm.prank(caller);
         vm.expectRevert(BatchWithNoMessages.selector);
@@ -2219,11 +2217,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(gwGetter.bottomUpMsgBatch(2 * d).msgs.length == 10, "wrong number of messages after full batch");
     }
 
-    function newListOfMessages(uint64 size) internal view returns (CrossMsg[] memory msgs) {
-        msgs = new CrossMsg[](size);
+    function newListOfMessages(uint64 size) internal view returns (IpcEnvelope[] memory msgs) {
+        msgs = new IpcEnvelope[](size);
         for (uint64 i = 0; i < size; i++) {
-            msgs[i] = CrossMsg({
-                message: StorableMsg({
+            msgs[i] = IpcEnvelope({
+                message: IpcMsg({
                     from: IPCAddress({
                         subnetId: gwGetter.getNetworkName(),
                         rawAddress: FvmAddressHelper.from(address(this))

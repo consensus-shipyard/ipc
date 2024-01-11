@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, BottomUpMsgBatch, StorableMsg, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, IpcMsg, ParentFinality} from "../structs/CrossNet.sol";
 import {QuorumInfo} from "../structs/Quorum.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
@@ -123,7 +123,7 @@ contract GatewayGetterFacet {
     /// @param id The unique identifier of the message in the postbox.
     /// @return storableMsg The storable message associated with the given id.
     /// @return wrapped A boolean indicating whether the message is wrapped.
-    function postbox(bytes32 id) external view returns (StorableMsg memory storableMsg, bool wrapped) {
+    function postbox(bytes32 id) external view returns (IpcMsg memory storableMsg, bool wrapped) {
         return (s.postbox[id].message, s.postbox[id].wrapped);
     }
 

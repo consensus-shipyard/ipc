@@ -35,8 +35,8 @@ struct BottomUpMsgBatch {
     SubnetID subnetID;
     /// @dev The height of the child subnet at which the batch was cut.
     uint256 blockHeight;
-    /// @dev Batch of messages to execute.
-    CrossMsg[] msgs;
+    /// @dev Batch of envelope to execute.
+    IpcEnvelope[] msgs;
 }
 
 /// @notice Tracks information about the last batch executed.
@@ -55,21 +55,58 @@ struct RelayerRewardsInfo {
     mapping(uint256 => EnumerableSet.AddressSet) batchRewarded;
 }
 
-/// @notice A cross-net message type.
-/// @dev The goal of `wrapped` flag is to signal that a cross-net message should be sent as-is without changes to the destination.
-/// IMPORTANT: This is not currently used but it is a basic primitive required for atomic execution.
-struct CrossMsg {
-    StorableMsg message;
-    bool wrapped;
+/// @notice Type of cross-net messages currently supported
+enum IpcMsgKind {
+    /// @dev for cross-net messages that move native token, i.e. fund/release.
+    /// and in the future multi-level token transactions.
+    Transfer,
+    /// @dev general-purpose cross-net transaction that call smart contracts.
+    Call,
+    /// @dev receipt from the execution of cross-net messages
+    /// (currently limited to `Transfer` messages)
+    Receipt
 }
 
-/// @notice A storable message type.
-struct StorableMsg {
-    IPCAddress from;
+/// @notice Envelope used to propagate IPC cross-net messages
+struct IpcEnvelope {
+    /// @dev type of message being propagated.
+    IpcMsgKind kind;
+    /// @dev destination of the message
+    /// It makes sense to extract from the encoded message
+    /// all shared fields required by all message, so they
+    /// can be inspected without having to decode the message.
     IPCAddress to;
-    uint256 value;
+    /// @dev address sending the message
+    IPCAddress from;
+    /// @dev abi.encoded message
+    bytes message;
+    /// @dev outgoing nonce for the envelope.
+    /// This nonce is set by the gateway when committing the message for propagation
     uint64 nonce;
-    bytes4 method;
-    bytes params;
+    /// @dev fee is currently not used.
     uint256 fee;
+    /// @dev the gas limit is currently not used.
+    // FIXME: currently not used and no code uses it, so keeping it out.
+    // uint256 gasLimit;
+}
+
+/// @notice Message format used for `Transfer` and `Call` messages.
+struct IpcMsg {
+    /// @dev the gas limit is currently not used.
+    uint256 value;
+    /// @dev abi.encoded method being called by the contract.
+    bytes4 method;
+    /// @dev arguments of the method being called.
+    bytes params;
+}
+
+struct ReceiptMsg {
+    /// @dev Flag to signal if the call succeeded or failed.
+    bool success;
+    /// @dev Id of the message the receipt belongs to.
+    bytes32 id;
+    /// @dev abi encoded reason for the failure (if any)
+    bytes reason;
+    // TODO: In the future we may include here events and other
+    // feedback information.
 }

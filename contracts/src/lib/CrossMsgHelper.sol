@@ -2,7 +2,8 @@
 pragma solidity 0.8.19;
 
 import {METHOD_SEND, EMPTY_BYTES} from "../constants/Constants.sol";
-import {StorableMsg, CrossMsg} from "../structs/CrossNet.sol";
+import {IpcEnvelope, ReceiptMsg, IpcMsg, IpcMsgKind} from "../structs/CrossNet.sol";
+import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
@@ -12,13 +13,36 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySource} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "./SupplySourceHelper.sol";
 
-/// @title Helper library for manipulating StorableMsg struct
-/// @author LimeChain team
+// Interface that needs to be implemented by IPC-enabled contracts.
+// This is really convenient to call it from other contracts.
+interface IpcContract {
+    function IpcEntrypoint(IpcEnvelope calldata envelope) external returns (bytes memory);
+}
+
+/// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
     using SupplySourceHelper for SupplySource;
+
+    function createTransferMsg(
+        IPCAddress memory from,
+        IPCAddress memory to,
+        uint256 value,
+        uint256 fee
+    ) public pure returns (IpcEnvelope memory) {
+        IpcMsg memory message = IpcMsg({value: value, method: METHOD_SEND, params: EMPTY_BYTES});
+        return
+            IpcEnvelope({
+                kind: IpcMsgKind.Transfer,
+                from: from,
+                to: to,
+                message: abi.encode(message),
+                nonce: 0,
+                fee: fee
+            });
+    }
 
     function createReleaseMsg(
         SubnetID calldata subnet,
@@ -26,20 +50,14 @@ library CrossMsgHelper {
         FvmAddress calldata to,
         uint256 value,
         uint256 fee
-    ) public pure returns (CrossMsg memory) {
+    ) public pure returns (IpcEnvelope memory) {
         return
-            CrossMsg({
-                message: StorableMsg({
-                    from: IPCAddress({subnetId: subnet, rawAddress: FvmAddressHelper.from(signer)}),
-                    to: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: to}),
-                    value: value,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: EMPTY_BYTES,
-                    fee: fee
-                }),
-                wrapped: false
-            });
+            createTransferMsg(
+                IPCAddress({subnetId: subnet, rawAddress: FvmAddressHelper.from(signer)}),
+                IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: to}),
+                value,
+                fee
+            );
     }
 
     function createFundMsg(
@@ -48,63 +66,81 @@ library CrossMsgHelper {
         FvmAddress calldata to,
         uint256 value,
         uint256 fee
-    ) public pure returns (CrossMsg memory) {
+    ) public pure returns (IpcEnvelope memory) {
         return
-            CrossMsg({
-                message: StorableMsg({
-                    from: IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: FvmAddressHelper.from(signer)}),
-                    to: IPCAddress({subnetId: subnet, rawAddress: to}),
-                    value: value,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: EMPTY_BYTES,
-                    fee: fee
-                }),
-                wrapped: false
-            });
+            createTransferMsg(
+                IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: FvmAddressHelper.from(signer)}),
+                IPCAddress({subnetId: subnet, rawAddress: to}),
+                value,
+                fee
+            );
     }
 
-    function toHash(CrossMsg memory crossMsg) internal pure returns (bytes32) {
+    function applyType(IpcEnvelope calldata message, SubnetID calldata currentSubnet) public pure returns (IPCMsgType) {
+        SubnetID memory toSubnet = message.to.subnetId;
+        SubnetID memory fromSubnet = message.from.subnetId;
+        SubnetID memory currentParentSubnet = currentSubnet.commonParent(toSubnet);
+        SubnetID memory messageParentSubnet = fromSubnet.commonParent(toSubnet);
+
+        if (currentParentSubnet.equals(messageParentSubnet)) {
+            if (fromSubnet.route.length > messageParentSubnet.route.length) {
+                return IPCMsgType.BottomUp;
+            }
+        }
+
+        return IPCMsgType.TopDown;
+    }
+
+    function toHash(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
         return keccak256(abi.encode(crossMsg));
     }
 
-    function toHash(CrossMsg[] memory crossMsgs) public pure returns (bytes32) {
+    function toHash(IpcEnvelope[] memory crossMsgs) public pure returns (bytes32) {
         return keccak256(abi.encode(crossMsgs));
     }
 
-    function isEmpty(CrossMsg memory crossMsg) internal pure returns (bool) {
-        return
-            crossMsg.message.nonce == 0 &&
-            crossMsg.message.to.subnetId.root == 0 &&
-            crossMsg.message.from.subnetId.root == 0;
+    function isEmpty(IpcEnvelope memory crossMsg) internal pure returns (bool) {
+        return crossMsg.message.length == 0;
     }
 
-    function execute(CrossMsg calldata crossMsg, SupplySource memory supplySource) public returns (bytes memory) {
-        uint256 value = crossMsg.message.value;
-        address recipient = crossMsg.message.to.rawAddress.extractEvmAddress().normalize();
+    function execute(IpcEnvelope calldata crossMsg, SupplySource memory supplySource) public returns (bytes memory) {
+        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Call) {
+            IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
+            uint256 value = message.value;
+            address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
 
-        if (crossMsg.message.method == METHOD_SEND) {
-            supplySource.transfer({recipient: payable(recipient), value: value});
-            return EMPTY_BYTES;
+            // if the message is of type transfer we can send it immediately
+            if (crossMsg.kind == IpcMsgKind.Transfer) {
+                supplySource.transfer({recipient: payable(recipient), value: value});
+                return EMPTY_BYTES;
+            } else {
+                // send the envelope directly to the entrypoint
+                IpcContract ipcContract = IpcContract(recipient);
+                return ipcContract.IpcEntrypoint(crossMsg);
+            }
+        } else if (crossMsg.kind == IpcMsgKind.Receipt) {
+            address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
+            // send the envelope directly to the entrypoint
+            IpcContract ipcContract = IpcContract(recipient);
+            return ipcContract.IpcEntrypoint(crossMsg);
         }
+    }
 
-        bytes memory params = crossMsg.message.params;
-
-        if (crossMsg.wrapped) {
-            params = abi.encode(crossMsg);
+    function getValue(IpcEnvelope calldata crossMsg) public returns (uint256) {
+        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Call) {
+            IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
+            return message.value;
         }
-
-        bytes memory data = bytes.concat(crossMsg.message.method, params);
-
-        return supplySource.performCall({target: payable(recipient), data: data, value: value});
+        // messages without value return 0
+        return 0;
     }
 
     // checks whether the cross messages are sorted in ascending order or not
-    function isSorted(CrossMsg[] calldata crossMsgs) external pure returns (bool) {
+    function isSorted(IpcEnvelope[] calldata crossMsgs) external pure returns (bool) {
         uint256 prevNonce;
         uint256 length = crossMsgs.length;
         for (uint256 i; i < length; ) {
-            uint256 nonce = crossMsgs[i].message.nonce;
+            uint256 nonce = crossMsgs[i].nonce;
 
             if (prevNonce >= nonce) {
                 // gas-opt: original check: i > 0

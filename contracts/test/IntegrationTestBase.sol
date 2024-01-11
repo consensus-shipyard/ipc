@@ -7,13 +7,12 @@ import "../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, IpcMsg, ParentFinality} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
-import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond} from "../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
@@ -183,8 +182,7 @@ contract TestSubnetActor is Test, TestParams {
 contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor, TestGatewayActor {
     using SubnetIDHelper for SubnetID;
     using SupplySourceHelper for SupplySource;
-    using CrossMsgHelper for CrossMsg;
-    using StorableMsgHelper for StorableMsg;
+    using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
 
     event SubnetRegistryCreated(address indexed subnetRegistryAddress);
@@ -693,8 +691,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function setupWhiteListMethod(address caller, address src) public returns (bytes32) {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, src);
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({
                     subnetId: gwGetter.getNetworkName().createSubnetId(caller),
                     rawAddress: FvmAddressHelper.from(caller)
@@ -711,7 +709,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             }),
             wrapped: false
         });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
         // we add a validator with 10 times as much weight as the default validator.
