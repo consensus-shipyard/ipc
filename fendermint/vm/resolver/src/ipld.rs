@@ -7,12 +7,15 @@ use async_stm::{atomically, queues::TQueueLike};
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::Client as ResolverClient;
 
-use crate::pool::{ResolveQueue, ResolveTask};
+use crate::{
+    pool::{ResolveQueue, ResolveTask},
+    voting::Vote,
+};
 
 /// The IPLD Resolver takes resolution tasks from the [ResolvePool] and
 /// uses the [ipc_ipld_resolver] to fetch the content from subnets.
 pub struct IpldResolver {
-    client: ResolverClient,
+    client: ResolverClient<Vote>,
     queue: ResolveQueue,
     retry_delay: Duration,
     own_subnet_id: SubnetID,
@@ -20,7 +23,7 @@ pub struct IpldResolver {
 
 impl IpldResolver {
     pub fn new(
-        client: ResolverClient,
+        client: ResolverClient<Vote>,
         queue: ResolveQueue,
         retry_delay: Duration,
         own_subnet_id: SubnetID,
@@ -62,7 +65,7 @@ impl IpldResolver {
 /// subnets being tried.
 fn start_resolve(
     task: ResolveTask,
-    client: ResolverClient,
+    client: ResolverClient<Vote>,
     queue: ResolveQueue,
     retry_delay: Duration,
     own_subnet_id: Option<SubnetID>,

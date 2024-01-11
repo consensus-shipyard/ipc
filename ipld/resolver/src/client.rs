@@ -13,17 +13,17 @@ use crate::{
 
 /// A facade to the [`Service`] to provide a nicer interface than message passing would allow on its own.
 #[derive(Clone)]
-pub struct Client {
-    request_tx: UnboundedSender<Request>,
+pub struct Client<V> {
+    request_tx: UnboundedSender<Request<V>>,
 }
 
-impl Client {
-    pub(crate) fn new(request_tx: UnboundedSender<Request>) -> Self {
+impl<V> Client<V> {
+    pub(crate) fn new(request_tx: UnboundedSender<Request<V>>) -> Self {
         Self { request_tx }
     }
 
     /// Send a request to the [`Service`], unless it has stopped listening.
-    fn send_request(&self, req: Request) -> anyhow::Result<()> {
+    fn send_request(&self, req: Request<V>) -> anyhow::Result<()> {
         self.request_tx
             .send(req)
             .map_err(|_| anyhow!("disconnected"))
@@ -82,7 +82,7 @@ impl Client {
     }
 
     /// Publish a signed vote into a topic based on its subnet.
-    pub fn publish_vote(&self, vote: SignedVoteRecord) -> anyhow::Result<()> {
+    pub fn publish_vote(&self, vote: SignedVoteRecord<V>) -> anyhow::Result<()> {
         let req = Request::PublishVote(Box::new(vote));
         self.send_request(req)
     }

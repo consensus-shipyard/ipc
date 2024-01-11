@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::marker::PhantomData;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -19,6 +20,8 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId};
 use log::{debug, error, info, warn};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use tokio::time::{Instant, Interval};
 
 use crate::hash::blake2b_256;
@@ -38,7 +41,7 @@ const PUBSUB_PREEMPTIVE: &str = "/ipc/ipld/pre-emptive";
 
 /// Events emitted by the [`membership::Behaviour`] behaviour.
 #[derive(Debug)]
-pub enum Event {
+pub enum Event<V> {
     /// Indicate a change in the subnets a peer is known to support.
     Updated(PeerId, ProviderDelta),
 
@@ -51,7 +54,7 @@ pub enum Event {
     Skipped(PeerId),
 
     /// We received a [`VoteRecord`] in one of the subnets we are providing data for.
-    ReceivedVote(Box<VoteRecord>),
+    ReceivedVote(Box<VoteRecord<V>>),
 
     /// We received preemptive data published in a subnet we were interested in.
     ReceivedPreemptive(SubnetID, Vec<u8>),
@@ -84,11 +87,11 @@ pub enum ConfigError {
 
 /// A [`NetworkBehaviour`] internally using [`Gossipsub`] to learn which
 /// peer is able to resolve CIDs in different subnets.
-pub struct Behaviour {
+pub struct Behaviour<V> {
     /// [`gossipsub::Behaviour`] to spread the information about subnet membership.
     inner: gossipsub::Behaviour,
     /// Events to return when polled.
-    outbox: VecDeque<Event>,
+    outbox: VecDeque<Event<V>>,
     /// [`Keypair`] used to sign [`SignedProviderRecord`] instances.
     local_key: Keypair,
     /// Name of the P2P network, used to separate `Gossipsub` topics.
@@ -116,9 +119,13 @@ pub struct Behaviour {
     next_publish_timestamp: Timestamp,
     /// Maximum time a provider can be without an update before it's pruned from the cache.
     max_provider_age: Duration,
+    _phantom_vote: PhantomData<V>,
 }
 
-impl Behaviour {
+impl<V> Behaviour<V>
+where
+    V: Serialize + DeserializeOwned,
+{
     pub fn new(nc: NetworkConfig, mc: Config) -> Result<Self, ConfigError> {
         if nc.network_name.is_empty() {
             return Err(ConfigError::InvalidNetwork(nc.network_name));
@@ -175,6 +182,7 @@ impl Behaviour {
             last_publish_timestamp: Timestamp::default(),
             next_publish_timestamp: Timestamp::now() + mc.publish_interval,
             max_provider_age: mc.max_provider_age,
+            _phantom_vote: PhantomData,
         };
 
         for subnet_id in mc.static_subnets {
@@ -333,7 +341,7 @@ impl Behaviour {
     }
 
     /// Publish the vote of the validator running the agent about a CID to a subnet.
-    pub fn publish_vote(&mut self, vote: SignedVoteRecord) -> anyhow::Result<()> {
+    pub fn publish_vote(&mut self, vote: SignedVoteRecord<V>) -> anyhow::Result<()> {
         let topic = self.voting_topic(&vote.record().subnet_id);
         let data = vote.into_envelope().into_protobuf_encoding();
         match self.inner.publish(topic, data) {
@@ -457,7 +465,7 @@ impl Behaviour {
     }
 
     /// Raise an event to tell we received a new vote.
-    fn handle_vote_record(&mut self, record: VoteRecord) {
+    fn handle_vote_record(&mut self, record: VoteRecord<V>) {
         self.outbox.push_back(Event::ReceivedVote(Box::new(record)))
     }
 
@@ -512,9 +520,12 @@ impl Behaviour {
     }
 }
 
-impl NetworkBehaviour for Behaviour {
+impl<V> NetworkBehaviour for Behaviour<V>
+where
+    V: Serialize + DeserializeOwned + Send + 'static,
+{
     type ConnectionHandler = <gossipsub::Behaviour as NetworkBehaviour>::ConnectionHandler;
-    type ToSwarm = Event;
+    type ToSwarm = Event<V>;
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
         self.inner.on_swarm_event(event)

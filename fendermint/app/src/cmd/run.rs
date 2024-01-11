@@ -15,6 +15,7 @@ use fendermint_vm_interpreter::{
     signed::SignedMessageInterpreter,
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
+use fendermint_vm_resolver::voting::Vote;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
@@ -291,7 +292,7 @@ fn make_resolver_service(
     db: RocksDb,
     state_store: NamespaceBlockstore,
     bit_store_ns: String,
-) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams>> {
+) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams, Vote>> {
     // Blockstore for Bitswap.
     let bit_store = NamespaceBlockstore::new(db, bit_store_ns).context("error creating bit DB")?;
 

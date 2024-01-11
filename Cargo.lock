@@ -2962,6 +2962,7 @@ dependencies = [
  "im",
  "ipc-api",
  "ipc_ipld_resolver",
+ "serde",
  "tokio",
  "tracing",
 ]

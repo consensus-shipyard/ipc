@@ -3,3 +3,4 @@
 
 pub mod ipld;
 pub mod pool;
+pub mod voting;
