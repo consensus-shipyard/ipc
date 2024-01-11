@@ -67,8 +67,8 @@ contract GatewayDiamond {
         s.minCrossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.checkpointQuorumMap.retentionHeight = 1;
-        s.checkpointQuorumMap.quorumObjKind = QuorumObjKind.BottomUpMsgBatch;
         s.bottomUpMsgBatchQuorumMap.retentionHeight = 1;
+        s.bottomUpMsgBatchQuorumMap.quorumObjKind = QuorumObjKind.BottomUpMsgBatch;
 
         // BottomUpMsgBatch config parameters.
         // NOTE: Let's fix them for now, but we could make them configurable
