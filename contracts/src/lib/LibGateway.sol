@@ -398,8 +398,5 @@ library LibGateway {
         if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
             revert MaxMsgsPerBatchExceeded();
         }
-        if (batch.msgs.length == 0) {
-            revert BatchWithNoMessages();
-        }
     }
 }
