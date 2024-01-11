@@ -1234,6 +1234,7 @@ impl EthSubnetManager {
         height: ChainEpoch,
         quorum_kind: QuorumObjKind,
     ) -> Result<Vec<QuorumReachedEvent>> {
+        log::debug!("query quorum reached events for height {} and kind {:?}", height, quorum_kind);
         let contract = bottom_up_router_facet::BottomUpRouterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
@@ -1246,6 +1247,7 @@ impl EthSubnetManager {
 
         let mut events = vec![];
         for (event, _meta) in query_with_meta(ev, contract.client()).await? {
+            log::debug!("received raw event: {:?}", event);
             let kind = QuorumObjKind::try_from(event.obj_kind)?;
             if kind != quorum_kind {
                 continue;
