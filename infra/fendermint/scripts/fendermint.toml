@@ -7,8 +7,8 @@ condition = { env_not_set = [
   "FM_PULL_SKIP",
 ], fail_message = "Skipped pulling fendermint Docker image." }
 script = """
-  docker pull ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}
-  docker tag ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG} fendermint:${FM_DOCKER_TAG}
+  docker pull ghcr.io/consensus-shipyard/ipc:${FM_DOCKER_TAG}
+  docker tag ghcr.io/consensus-shipyard/ipc:${FM_DOCKER_TAG} ipc:${FM_DOCKER_TAG}
 """
 
 [tasks.fendermint-run]
@@ -140,11 +140,11 @@ dependencies = ["fendermint-deps"]
 script = """
 # Check if the image exists
 # TODO: Check the version or use a flag to always re-build?
-if docker images | awk '{print $1":"$2}' | grep fendermint; then
-    echo fendermint image already exists
-    docker images | grep fendermint
+if docker images | awk '{print $1":"$2}' | grep ipc; then
+    echo ipc image already exists
+    docker images | grep ipc
 else
-    cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
+    cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/ipc
     make docker-build
 fi
 """
