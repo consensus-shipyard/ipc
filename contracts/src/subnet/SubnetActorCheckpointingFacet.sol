@@ -18,7 +18,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
     using LibValidatorSet for ValidatorSet;
 
     /// @notice Submits a checkpoint commitment for execution.
-    ///  @dev   It triggers the commitment of the checkpoint and any other side-effects that
+    /// @dev    It triggers the commitment of the checkpoint and any other side-effects that
     ///         need to be triggered by the checkpoint such as relayer reward book keeping.
     /// @param checkpoint The executed bottom-up checkpoint.
     /// @param signatories The addresses of validators signing the checkpoint.

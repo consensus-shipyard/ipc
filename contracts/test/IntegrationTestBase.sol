@@ -24,7 +24,6 @@ import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
 import {CheckpointingFacet} from "../src/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../src/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../src/gateway/router/TopDownFinalityFacet.sol";
-import {BottomUpRouterFacet} from "../src/gateway/router/BottomUpRouterFacet.sol";
 
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
@@ -91,7 +90,6 @@ contract TestGatewayActor is Test, TestParams {
     bytes4[] gwCheckpointingFacetSelectors;
     bytes4[] gwXnetMessagingFacetSelectors;
     bytes4[] gwTopDownFinalityFacetSelectors;
-    bytes4[] gwBottomUpRouterFacetSelectors;
 
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
@@ -106,7 +104,6 @@ contract TestGatewayActor is Test, TestParams {
     CheckpointingFacet gwCheckpointingFacet;
     XnetMessagingFacet gwXnetMessagingFacet;
     TopDownFinalityFacet gwTopDownFinalityFacet;
-    BottomUpRouterFacet gwBottomUpRouterFacet;
     GatewayMessengerFacet gwMessenger;
     DiamondCutFacet gwCutter;
     DiamondLoupeFacet gwLouper;
@@ -115,7 +112,6 @@ contract TestGatewayActor is Test, TestParams {
         gwCheckpointingFacetSelectors = SelectorLibrary.resolveSelectors("CheckpointingFacet");
         gwXnetMessagingFacetSelectors = SelectorLibrary.resolveSelectors("XnetMessagingFacet");
         gwTopDownFinalityFacetSelectors = SelectorLibrary.resolveSelectors("TopDownFinalityFacet");
-        gwBottomUpRouterFacetSelectors = SelectorLibrary.resolveSelectors("BottomUpRouterFacet");
 
         gwGetterSelectors = SelectorLibrary.resolveSelectors("GatewayGetterFacet");
         gwManagerSelectors = SelectorLibrary.resolveSelectors("GatewayManagerFacet");
@@ -204,7 +200,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
         gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
         gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
         gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
         gwCutter = DiamondCutFacet(address(gatewayDiamond));
@@ -243,7 +238,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
         TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
-        BottomUpRouterFacet bottomUpRouterFacet = new BottomUpRouterFacet();
 
         GatewayManagerFacet manager = new GatewayManagerFacet();
         GatewayGetterFacet getter = new GatewayGetterFacet();
@@ -251,7 +245,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondCutFacet cutter = new DiamondCutFacet();
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](9);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](8);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -274,14 +268,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 facetAddress: address(topDownFinalityFacet),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: gwTopDownFinalityFacetSelectors
-            })
-        );
-
-        gwDiamondCut[8] = (
-            IDiamond.FacetCut({
-                facetAddress: address(bottomUpRouterFacet),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwBottomUpRouterFacetSelectors
             })
         );
 
@@ -833,13 +819,12 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         uint256 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
 
-        CrossMsg[] memory msgs = new CrossMsg[](0);
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: msgs
+            msgs: new CrossMsg[](0)
         });
 
         vm.deal(address(saDiamond), 100 ether);

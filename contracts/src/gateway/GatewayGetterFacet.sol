@@ -174,11 +174,6 @@ contract GatewayGetterFacet {
         return s.checkpointQuorumMap.quorumInfo[h].currentWeight;
     }
 
-    /// @notice Returns the batch current weight corresponding to the block height.
-    function getBottomUpMsgBatchCurrentWeight(uint256 h) external view returns (uint256) {
-        return s.bottomUpMsgBatchQuorumMap.quorumInfo[h].currentWeight;
-    }
-
     /// @notice Returns the incomplete checkpoint heights.
     function getIncompleteCheckpointHeights() external view returns (uint256[] memory) {
         return s.checkpointQuorumMap.incompleteQuorums.values();
@@ -202,11 +197,6 @@ contract GatewayGetterFacet {
     /// @notice Returns the bottom-up checkpoint retention index.
     function getCheckpointRetentionHeight() external view returns (uint256) {
         return s.checkpointQuorumMap.retentionHeight;
-    }
-
-    /// @notice Returns the bottom-up batch retention index.
-    function getBottomUpMsgRetentionHeight() external view returns (uint256) {
-        return s.bottomUpMsgBatchQuorumMap.retentionHeight;
     }
 
     /// @notice Returns the threshold required for quorum in this subnet,

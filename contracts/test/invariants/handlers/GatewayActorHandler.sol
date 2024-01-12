@@ -5,7 +5,6 @@ import "forge-std/StdUtils.sol";
 import "forge-std/StdCheats.sol";
 import {CommonBase} from "forge-std/Base.sol";
 import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
-import {BottomUpRouterFacet} from "../../../src/gateway/router/BottomUpRouterFacet.sol";
 import {GatewayManagerFacet} from "../../../src/gateway/GatewayManagerFacet.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 

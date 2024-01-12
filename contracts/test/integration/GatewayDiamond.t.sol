@@ -27,7 +27,6 @@ import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
 import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFacet.sol";
-import {BottomUpRouterFacet} from "../../src/gateway/router/BottomUpRouterFacet.sol";
 
 import {ERR_GENERAL_CROSS_MSG_DISABLED} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
@@ -73,7 +72,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(gwLouper.facets().length == 9, "unexpected length");
+        require(gwLouper.facets().length == 8, "unexpected length");
         require(gwLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
         require(gwLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
         require(gwLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
@@ -745,7 +744,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
         gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
 
         address callerAddress = address(100);
 
@@ -779,7 +777,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
         gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
 
         vm.roll(0);
         vm.warp(0);
@@ -811,7 +808,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
         gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
 
         address callerAddress = address(100);
 
@@ -845,7 +841,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
         gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
 
         address callerAddress = address(100);
 
@@ -1742,7 +1737,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
         gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
 
         uint256 d = gwGetter.bottomUpCheckPeriod();
 

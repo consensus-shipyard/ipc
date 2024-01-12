@@ -66,7 +66,6 @@ contract GatewayDiamond {
         s.minCrossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.checkpointQuorumMap.retentionHeight = 1;
-        s.bottomUpMsgBatchQuorumMap.retentionHeight = 1;
 
         // BottomUpMsgBatch config parameters.
         // NOTE: Let's fix them for now, but we could make them configurable

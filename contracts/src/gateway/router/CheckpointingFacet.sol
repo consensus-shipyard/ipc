@@ -88,6 +88,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         // a storage variable as an interface (so we can iterate and remove directly inside pruneQuorums)
         for (uint256 h = s.checkpointQuorumMap.retentionHeight; h < newRetentionHeight; ) {
             delete s.bottomUpCheckpoints[h];
+            delete s.bottomUpMsgBatches[h];
             unchecked {
                 ++h;
             }
