@@ -155,7 +155,7 @@ library LibMaxPQ {
 
             self.inner.exchange(childPos, pos);
             pos = childPos;
-            childPos = pos * 2;
+            childPos = pos << 1;
         }
     }
 
