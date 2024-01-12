@@ -58,9 +58,9 @@ interface IGateway {
     /// the amount of funds that can be released for a specific address.
     function release(FvmAddress calldata to) external payable;
 
-    /// @notice SendUserXnetMessage sends an arbitrary cross-message to other subnet in the hierarchy.
+    /// @notice sendContractXnetMessage sends an arbitrary cross-message to other subnet in the hierarchy.
     // TODO: add the right comment and function name here.
-    function sendUserXnetMessage(IpcEnvelope calldata msg) external payable;
+    function sendContractXnetMessage(IpcEnvelope calldata msg) external payable;
 
     /// @notice Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;

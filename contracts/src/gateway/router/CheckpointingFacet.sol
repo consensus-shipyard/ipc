@@ -10,7 +10,7 @@ import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {IRelayerRewardDistributor} from "../../interfaces/ISubnetActor.sol";
 
-import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
+import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCheckpointSource, InvalidCrossMsgNonce, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
 import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated} from "../../errors/IPCErrors.sol";
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 

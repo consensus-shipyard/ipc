@@ -35,7 +35,7 @@ struct BottomUpMsgBatch {
     SubnetID subnetID;
     /// @dev The height of the child subnet at which the batch was cut.
     uint256 blockHeight;
-    /// @dev Batch of envelope to execute.
+    /// @dev Batch of envelopes to execute.
     IpcEnvelope[] msgs;
 }
 

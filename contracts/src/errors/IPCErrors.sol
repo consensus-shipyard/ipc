@@ -27,6 +27,7 @@ error InvalidBatchSource();
 error InvalidSubnetActor();
 error InvalidCollateral();
 error InvalidConfigurationNumber();
+error InvalidCrossMsgSender();
 error InvalidCrossMsgDstSubnet();
 error InvalidCrossMsgFromSubnet();
 error InvalidCrossMsgNonce();

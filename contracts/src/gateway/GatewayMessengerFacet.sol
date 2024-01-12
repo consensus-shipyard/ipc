@@ -6,11 +6,12 @@ import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {IpcEnvelope, IpcMsg} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, SupplyKind} from "../structs/Subnet.sol";
-import {InvalidCrossMsgFromSubnet, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {InvalidCrossMsgFromSubnet, InvalidCrossMsgSender, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
+import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
 string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
@@ -19,33 +20,42 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
     using SupplySourceHelper for address;
+    using CrossMsgHelper for IpcEnvelope;
 
     /**
      * @dev sends a general-purpose cross-message from the local subnet to the destination subnet.
      *
      * IMPORTANT: `msg.value` is expected to equal to the value sent in `crossMsg.value` plus the cross-messaging fee.
+     * Only smart contracts are allowed to trigger these cross-net messages, users
+     * can always send funds from their address to the destination subnet and the run the transaction in the destination
+     * normally.
      *
      * @param crossMsg - a cross-message to send.
      */
-    function sendUserXnetMessage(IpcEnvelope calldata crossMsg) external payable {
+    function sendContractXnetMessage(IpcEnvelope calldata crossMsg) external payable {
         if (!s.generalPurposeCrossMsg) {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
         }
 
-        if (crossMsg.message.value != msg.value - crossMsg.message.fee) {
+        // we prevent the sender from being an EoA.
+        if (!(msg.sender.code.length > 0)) {
+            revert InvalidCrossMsgSender();
+        }
+
+        if (crossMsg.getValue() != msg.value - crossMsg.fee) {
             revert InvalidCrossMsgValue();
         }
 
         // We disregard the "to" of the message that will be verified in the _commitCrossMessage().
         // The caller is the one set as the "from" of the message
-        if (!crossMsg.message.from.subnetId.equals(s.networkName)) {
+        if (!crossMsg.from.subnetId.equals(s.networkName)) {
             revert InvalidCrossMsgFromSubnet();
         }
 
         // commit cross-message for propagation
         bool shouldBurn = _commitCrossMessage(crossMsg);
 
-        _crossMsgSideEffects({v: crossMsg.message.value, shouldBurn: shouldBurn});
+        _crossMsgSideEffects({v: crossMsg.getValue(), shouldBurn: shouldBurn});
     }
 
     /**
@@ -58,13 +68,13 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         }
 
         IpcEnvelope storage crossMsg = s.postbox[msgCid];
-        validateFee(crossMsg.message.fee);
+        validateFee(crossMsg.fee);
 
         bool shouldBurn = _commitCrossMessage(crossMsg);
         // We must delete the message first to prevent potential re-entrancies,
         // and as the message is deleted and we don't have a reference to the object
         // anymore, we need to pull the data from the message to trigger the side-effects.
-        uint256 v = crossMsg.message.value;
+        uint256 v = crossMsg.getValue();
         delete s.postbox[msgCid];
 
         _crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
@@ -88,7 +98,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
      */
     function _commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
-        SubnetID memory to = crossMessage.message.to.subnetId;
+        SubnetID memory to = crossMessage.to.subnetId;
         if (to.isEmpty()) {
             revert InvalidCrossMsgDstSubnet();
         }
@@ -97,8 +107,8 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert CannotSendCrossMsgToItself();
         }
 
-        SubnetID memory from = crossMessage.message.from.subnetId;
-        IPCMsgType applyType = crossMessage.message.applyType(s.networkName);
+        SubnetID memory from = crossMessage.from.subnetId;
+        IPCMsgType applyType = crossMessage.applyType(s.networkName);
 
         // Are we the LCA? (Lowest Common Ancestor)
         bool isLCA = to.commonParent(from).equals(s.networkName);
@@ -137,7 +147,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         // Else, commit a bottom up message.
         LibGateway.commitBottomUpMsg(crossMessage);
         // gas-opt: original check: value > 0
-        return (shouldBurn = crossMessage.message.value != 0);
+        return (shouldBurn = crossMessage.getValue() != 0);
     }
 
     /**

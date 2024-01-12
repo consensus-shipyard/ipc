@@ -5,7 +5,7 @@ import {IRelayerRewardDistributor} from "../../interfaces/ISubnetActor.sol";
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {BottomUpMsgBatch} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
-import {BatchNotCreated, BatchAlreadyExists, InvalidBatchEpoch, NotEnoughSubnetCircSupply, SubnetNotActive, SubnetNotFound, InvalidBatchSource, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCrossMsgDstSubnet, NotRegisteredSubnet, InvalidCrossMsgNonce} from "../../errors/IPCErrors.sol";
+import {BatchNotCreated, BatchAlreadyExists, InvalidBatchEpoch, NotEnoughSubnetCircSupply, SubnetNotActive, SubnetNotFound, InvalidBatchSource, MaxMsgsPerBatchExceeded, BatchWithNoMessages, NotRegisteredSubnet, InvalidCrossMsgNonce} from "../../errors/IPCErrors.sol";
 import {Subnet} from "../../structs/Subnet.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {QuorumObjKind} from "../../structs/Quorum.sol";
@@ -47,8 +47,8 @@ contract BottomUpRouterFacet is GatewayActorModifiers {
         uint256 totalFee;
         uint256 crossMsgLength = batch.msgs.length;
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += batch.msgs[i].message.value;
-            totalFee += batch.msgs[i].message.fee;
+            totalValue += batch.msgs[i].getValue();
+            totalFee += batch.msgs[i].fee;
             unchecked {
                 ++i;
             }

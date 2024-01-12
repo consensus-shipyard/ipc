@@ -101,7 +101,7 @@ contract ERC20TokenMessenger is ReentrancyGuard {
             wrapped: false
         });
 
-        return messenger.sendUserXnetMessage{value: msg.value}(crossMsg);
+        return messenger.sendContractXnetMessage{value: msg.value}(crossMsg);
     }
 
     receive() external payable {}

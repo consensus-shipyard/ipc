@@ -7,7 +7,7 @@ import "../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IpcEnvelope, BottomUpCheckpoint, IpcMsg, ParentFinality} from "../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, IpcMsg, IpcMsgKind, ParentFinality} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
@@ -692,22 +692,18 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, src);
 
         IpcEnvelope memory crossMsg = IpcEnvelope({
-            message: IpcMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName().createSubnetId(caller),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                to: IPCAddress({
-                    subnetId: gwGetter.getNetworkName().createSubnetId(src),
-                    rawAddress: FvmAddressHelper.from(src)
-                }),
-                value: DEFAULT_CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0),
-                fee: DEFAULT_CROSS_MSG_FEE
+            kind: IpcMsgKind.Transfer,
+            from: IPCAddress({
+                subnetId: gwGetter.getNetworkName().createSubnetId(caller),
+                rawAddress: FvmAddressHelper.from(caller)
             }),
-            wrapped: false
+            to: IPCAddress({
+                subnetId: gwGetter.getNetworkName().createSubnetId(src),
+                rawAddress: FvmAddressHelper.from(src)
+            }),
+            nonce: 0,
+            fee: DEFAULT_CROSS_MSG_FEE,
+            message: abi.encode(IpcMsg({value: DEFAULT_CROSS_MSG_FEE + 1, method: METHOD_SEND, params: new bytes(0)}))
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;

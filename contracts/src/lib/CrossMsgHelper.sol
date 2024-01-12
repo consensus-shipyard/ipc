@@ -16,7 +16,7 @@ import {SupplySourceHelper} from "./SupplySourceHelper.sol";
 // Interface that needs to be implemented by IPC-enabled contracts.
 // This is really convenient to call it from other contracts.
 interface IpcContract {
-    function IpcEntrypoint(IpcEnvelope calldata envelope) external returns (bytes memory);
+    function IpcEntrypoint(IpcEnvelope calldata envelope) external payable returns (bytes memory);
 }
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
@@ -25,6 +25,9 @@ library CrossMsgHelper {
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
     using SupplySourceHelper for SupplySource;
+
+    error InvalidCrossMsgKind();
+    error CannotExecuteEmptyEnvelope();
 
     function createTransferMsg(
         IPCAddress memory from,
@@ -42,6 +45,19 @@ library CrossMsgHelper {
                 nonce: 0,
                 fee: fee
             });
+    }
+
+    function createCallMsg(
+        IPCAddress memory from,
+        IPCAddress memory to,
+        uint256 value,
+        uint256 fee,
+        bytes4 method,
+        bytes memory params
+    ) public pure returns (IpcEnvelope memory) {
+        IpcMsg memory message = IpcMsg({value: value, method: method, params: params});
+        return
+            IpcEnvelope({kind: IpcMsgKind.Call, from: from, to: to, message: abi.encode(message), nonce: 0, fee: fee});
     }
 
     function createReleaseMsg(
@@ -100,10 +116,14 @@ library CrossMsgHelper {
     }
 
     function isEmpty(IpcEnvelope memory crossMsg) internal pure returns (bool) {
+        // envelopes need to necessarily include a message inside
         return crossMsg.message.length == 0;
     }
 
     function execute(IpcEnvelope calldata crossMsg, SupplySource memory supplySource) public returns (bytes memory) {
+        if (isEmpty(crossMsg)) {
+            revert CannotExecuteEmptyEnvelope();
+        }
         if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Call) {
             IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
             uint256 value = message.value;
@@ -124,15 +144,53 @@ library CrossMsgHelper {
             IpcContract ipcContract = IpcContract(recipient);
             return ipcContract.IpcEntrypoint(crossMsg);
         }
+
+        return EMPTY_BYTES;
     }
 
-    function getValue(IpcEnvelope calldata crossMsg) public returns (uint256) {
+    // This function requires deserializing the encoded message, if we are going
+    // to access several fields of the message we are better-off using `getIpcMsg`
+    // directly
+    function getValue(IpcEnvelope calldata crossMsg) public pure returns (uint256) {
+        // return 0 if empty, no need to decode anything
+        if (isEmpty(crossMsg)) {
+            return 0;
+        }
         if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Call) {
             IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
             return message.value;
         }
         // messages without value return 0
         return 0;
+    }
+
+    // get underlying IpcMsg from crossMsg
+    function getIpcMsg(IpcEnvelope calldata crossMsg) public pure returns (IpcMsg memory ret) {
+        if (isEmpty(crossMsg)) {
+            return ret;
+        }
+        if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Transfer) {
+            IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
+            return message;
+        }
+
+        // return empty IpcMsg otherwise
+        return ret;
+    }
+
+    // set underlying IpcMsg from crossMsg.
+    // This is a pure function, so the argument is not mutated
+    function setIpcMsg(
+        IpcEnvelope memory crossMsg,
+        IpcMsg memory message
+    ) public pure returns (IpcEnvelope memory ret) {
+        if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Transfer) {
+            crossMsg.message = abi.encode(message);
+            return crossMsg;
+        }
+
+        // Cannot set IPCMsg for the wrong kind
+        revert InvalidCrossMsgKind();
     }
 
     // checks whether the cross messages are sorted in ascending order or not

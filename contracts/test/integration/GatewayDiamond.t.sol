@@ -12,7 +12,7 @@ import {IDiamond} from "../../src/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../src/structs/Quorum.sol";
-import {CrossMsg, BottomUpMsgBatch, BottomUpCheckpoint, IpcMsgentFinality} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -38,7 +38,7 @@ import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
+    using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
 
     function setUp() public override {
@@ -56,10 +56,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         );
         require(gwGetter.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE, "unexpected majorityPercentage");
 
-        (IpcMsgry storableMsg, bool wrapped) = gwGetter.postbox(0);
-        IpcMsg memory msg1;
+        IpcEnvelope memory storableMsg = gwGetter.postbox(0);
+        IpcEnvelope memory msg1;
         require(msg1.toHash() == storableMsg.toHash(), "unexpected hash");
-        require(!wrapped, "unexpected wrapped message");
     }
 
     function testGatewayDiamond_NewGatewayWithDefaultParams() public view {
@@ -510,49 +509,39 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE - 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({
-                        subnetId: SubnetID({root: 0, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    value: 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE - 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: false
-            })
+                IPCAddress({
+                    subnetId: SubnetID({root: 0, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
+                }),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
 
         // vm.expectRevert(NotEnoughFee.selector);
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({
-                        subnetId: SubnetID({root: 0, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    value: 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE - 1
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: false
-            })
+                IPCAddress({
+                    subnetId: SubnetID({root: 0, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
+                }),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE - 1
+            )
         );
     }
 
@@ -565,25 +554,20 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         vm.expectRevert();
-        gwMessenger.sendUserXnetMessage{value: fee - 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({
-                        subnetId: SubnetID({root: 0, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    value: 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: fee - 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: false
-            })
+                IPCAddress({
+                    subnetId: SubnetID({root: 0, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
+                }),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -866,25 +850,20 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({
-                        subnetId: SubnetID({root: 0, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    value: 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: false
-            })
+                IPCAddress({
+                    subnetId: SubnetID({root: 0, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
+                }),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -898,22 +877,17 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // vm.expectRevert(CannotSendCrossMsgToItself.selector);
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                    value: 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: true
-            })
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -927,22 +901,17 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // vm.expectRevert(InvalidCrossMsgValue.selector);
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                    value: 5,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: true
-            })
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
+                5,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -958,22 +927,17 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                    value: 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: true
-            })
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -987,22 +951,17 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // vm.expectRevert(InvalidCrossMsgFromSubnet.selector);
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: 0, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                    value: 1,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: 0, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: true
-            })
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -1016,22 +975,17 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // vm.expectRevert(NotEnoughFee.selector);
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
-                    value: 0,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: 0
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: true
-            })
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
+                0,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -1045,22 +999,17 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // vm.expectRevert(NotEnoughFunds.selector);
         // General-purpose cross-net messages are currenlty disabled.
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendUserXnetMessage{value: 0}(
-            IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                        rawAddress: FvmAddressHelper.from(caller)
-                    }),
-                    to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
-                    value: 0,
-                    nonce: 0,
-                    method: METHOD_SEND,
-                    params: new bytes(0),
-                    fee: DEFAULT_CROSS_MSG_FEE
+        gwMessenger.sendContractXnetMessage{value: 0}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
                 }),
-                wrapped: true
-            })
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
+                0,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
         );
     }
 
@@ -2082,18 +2031,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](10);
         for (uint64 i = 0; i < 10; i++) {
-            msgs[i] = IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
-                    to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
-                    value: amount,
-                    nonce: i,
-                    method: METHOD_SEND,
-                    params: EMPTY_BYTES,
-                    fee: DEFAULT_CROSS_MSG_FEE
-                }),
-                wrapped: false
-            });
+            msgs[i] = TestUtils.newTransferCrossMsg(
+                IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
+                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
+                amount,
+                i,
+                DEFAULT_CROSS_MSG_FEE
+            );
         }
 
         uint256 d = gwGetter.bottomUpMsgBatchPeriod();
@@ -2132,18 +2076,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         uint64 size = gwGetter.maxMsgsPerBottomUpBatch() + 1;
         IpcEnvelope[] memory msgs = new IpcEnvelope[](size);
         for (uint64 i = 0; i < size; i++) {
-            msgs[i] = IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
-                    to: IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
-                    value: amount,
-                    nonce: i,
-                    method: METHOD_SEND,
-                    params: EMPTY_BYTES,
-                    fee: DEFAULT_CROSS_MSG_FEE
-                }),
-                wrapped: false
-            });
+            msgs[i] = TestUtils.newTransferCrossMsg(
+                IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(from)}),
+                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(from)}),
+                amount,
+                i,
+                DEFAULT_CROSS_MSG_FEE
+            );
         }
 
         // fail with exceeded messages
@@ -2220,24 +2159,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function newListOfMessages(uint64 size) internal view returns (IpcEnvelope[] memory msgs) {
         msgs = new IpcEnvelope[](size);
         for (uint64 i = 0; i < size; i++) {
-            msgs[i] = IpcEnvelope({
-                message: IpcMsg({
-                    from: IPCAddress({
-                        subnetId: gwGetter.getNetworkName(),
-                        rawAddress: FvmAddressHelper.from(address(this))
-                    }),
-                    to: IPCAddress({
-                        subnetId: gwGetter.getNetworkName(),
-                        rawAddress: FvmAddressHelper.from(address(this))
-                    }),
-                    value: 0,
-                    nonce: i,
-                    method: this.callback.selector,
-                    params: EMPTY_BYTES,
-                    fee: DEFAULT_CROSS_MSG_FEE
-                }),
-                wrapped: false
-            });
+            msgs[i] = TestUtils.newTransferCrossMsg(
+                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
+                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
+                0,
+                i,
+                DEFAULT_CROSS_MSG_FEE
+                // method: this.callback.selector,
+            );
         }
     }
 
