@@ -74,6 +74,13 @@ impl VoteTally {
             .map(|pt| pt.contains_key(validator_key))
     }
 
+    /// Calculate the minimum weight needed for a proposal to pass with the current membership.
+    pub fn quorum_threshold(&self) -> Stm<Weight> {
+        let total_weight: Weight = self.power_table.read().map(|pt| pt.values().sum())?;
+
+        Ok(total_weight * 2 / 3)
+    }
+
     /// Add the next final block observed on the parent blockchain.
     ///
     /// Returns an error unless it's exactly the next expected height.
@@ -145,5 +152,45 @@ impl VoteTally {
         self.votes.write(votes)?;
 
         Ok(true)
+    }
+
+    /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
+    pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, BlockHash)>> {
+        let quorum_threshold = self.quorum_threshold()?;
+        let chain = self.chain.read()?;
+
+        let Some((finalized_height, _)) = chain.get_min() else {
+            return Ok(None);
+        };
+
+        let votes = self.votes.read()?;
+        let power_table = self.power_table.read()?;
+
+        let mut weight = 0;
+        let mut voters = im::HashSet::new();
+
+        for (block_height, block_hash) in chain.iter().rev() {
+            if block_height == finalized_height {
+                break;
+            }
+            // Skipping null blocks
+            if let Some(block_hash) = block_hash {
+                if let Some(votes_at_height) = votes.get(block_height) {
+                    if let Some(votes_for_block) = votes_at_height.get(block_hash) {
+                        for vk in votes_for_block {
+                            if voters.insert(vk.clone()).is_none() {
+                                weight += power_table.get(vk).cloned().unwrap_or_default();
+                            }
+                        }
+                    }
+
+                    if weight > quorum_threshold {
+                        return Ok(Some((*block_height, block_hash.clone())));
+                    }
+                }
+            }
+        }
+
+        Ok(None)
     }
 }
