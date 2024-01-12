@@ -87,19 +87,9 @@ contract SubnetActorGetterFacet {
         return s.bottomUpCheckPeriod;
     }
 
-    /// @notice Returns the batch period for bottom-up messaging.
-    function bottomUpMsgBatchPeriod() external view returns (uint256) {
-        return s.bottomUpMsgBatchPeriod;
-    }
-
     /// @notice Returns the block height of the last bottom-up checkpoint.
     function lastBottomUpCheckpointHeight() external view returns (uint256) {
         return s.lastBottomUpCheckpointHeight;
-    }
-
-    /// @notice Returns the block height of the last bottom-up message batch.
-    function lastBottomUpMsgBatchHeight() external view returns (uint256) {
-        return s.lastBottomUpBatch.blockHeight;
     }
 
     /// @notice Returns the consensus protocol type used in the subnet.
@@ -174,13 +164,6 @@ contract SubnetActorGetterFacet {
     /// @param validator The address of the checked validator.
     function isWaitingValidator(address validator) external view returns (bool) {
         return LibStaking.isWaitingValidator(validator);
-    }
-
-    /// @notice Determines if a validator has submitted the most recent bottom-up message batch.
-    /// @param validator The address of the validator being checked for participation.
-    function hasSubmittedInLastBottomUpMsgBatchHeight(address validator) external view returns (bool) {
-        uint256 height = s.lastBottomUpBatch.blockHeight;
-        return s.relayerRewards.batchRewarded[height].contains(validator);
     }
 
     /// @notice Checks whether a validator has submitted the most recent bottom-up checkpoint message.

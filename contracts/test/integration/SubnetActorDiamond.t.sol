@@ -669,14 +669,16 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0
+            nextConfigurationNumber: 0,
+            msgs: new CrossMsg[](0)
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
             subnetID: saGetter.getParent(),
             blockHeight: 1,
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0
+            nextConfigurationNumber: 0,
+            msgs: new CrossMsg[](0)
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -759,7 +761,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0
+            nextConfigurationNumber: 0,
+            msgs: new CrossMsg[](0)
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -807,7 +810,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: 2 * saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
-            nextConfigurationNumber: 0
+            nextConfigurationNumber: 0,
+            msgs: msgs
         });
 
         hash = keccak256(abi.encode(checkpoint));
@@ -835,84 +839,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 require(b2 - b1 == validator0Reward, "reward received");
             }
         }
-    }
-
-    function testSubnetActorDiamond_submitBottomUpMsgBatch_basic() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](3);
-        uint256 amount = 1;
-
-        for (uint256 i = 0; i < 3; i++) {
-            vm.deal(validators[i], 10 gwei);
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.prank(validators[i]);
-            saManager.join{value: 10}(pubKeys[i]);
-        }
-
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: saGetter.getParent(),
-                    rawAddress: FvmAddressHelper.from(address(saDiamond))
-                }),
-                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-                value: DEFAULT_CROSS_MSG_FEE + amount,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0),
-                fee: DEFAULT_CROSS_MSG_FEE
-            }),
-            wrapped: false
-        });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
-        msgs[0] = crossMsg;
-
-        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
-            blockHeight: saGetter.bottomUpMsgBatchPeriod(),
-            msgs: msgs
-        });
-
-        BottomUpMsgBatch memory batchIncorrectHeight = BottomUpMsgBatch({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
-            blockHeight: 1,
-            msgs: msgs
-        });
-
-        vm.deal(address(saDiamond), 100 ether);
-        vm.prank(address(saDiamond));
-        // register with circulating supply
-        gwManager.register{value: 3 * DEFAULT_MIN_VALIDATOR_STAKE}(3 * amount + 3 * DEFAULT_CROSS_MSG_FEE);
-
-        bytes32 hash = keccak256(abi.encode(batch));
-
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-        }
-
-        vm.expectRevert(InvalidBatchEpoch.selector);
-        vm.prank(validators[0]);
-        saCheckpointer.submitBottomUpMsgBatch(batchIncorrectHeight, validators, signatures);
-
-        vm.prank(validators[0]);
-        batchIncorrectHeight.msgs = new CrossMsg[](0);
-        batchIncorrectHeight.blockHeight = saGetter.bottomUpMsgBatchPeriod();
-        vm.expectRevert(BatchWithNoMessages.selector);
-        saCheckpointer.submitBottomUpMsgBatch(batchIncorrectHeight, validators, signatures);
-
-        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.execBottomUpMsgBatch, (batch)), 1);
-        vm.prank(validators[0]);
-        saCheckpointer.submitBottomUpMsgBatch(batch, validators, signatures);
-
-        require(saGetter.hasSubmittedInLastBottomUpMsgBatchHeight(validators[0]), "validator rewarded");
-        require(saGetter.lastBottomUpMsgBatchHeight() == saGetter.bottomUpMsgBatchPeriod(), " batch height correct");
-
-        vm.prank(validators[1]);
-        saCheckpointer.submitBottomUpMsgBatch(batch, validators, signatures);
-        require(saGetter.hasSubmittedInLastBottomUpMsgBatchHeight(validators[0]), "validator rewarded");
-        require(saGetter.lastBottomUpMsgBatchHeight() == saGetter.bottomUpMsgBatchPeriod(), " batch height correct");
     }
 
     function testSubnetActorDiamond_DiamondCut() public {

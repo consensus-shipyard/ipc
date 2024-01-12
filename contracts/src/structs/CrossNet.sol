@@ -27,6 +27,8 @@ struct BottomUpCheckpoint {
     /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
     /// 0 could mean "no change".
     uint64 nextConfigurationNumber;
+    /// @dev Batch of messages to execute.
+    CrossMsg[] msgs;
 }
 
 /// @notice A batch of bottom-up messages for execution.

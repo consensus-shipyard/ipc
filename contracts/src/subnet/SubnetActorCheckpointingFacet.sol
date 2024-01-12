@@ -28,14 +28,8 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         address[] calldata signatories,
         bytes[] calldata signatures
     ) external whenNotPaused {
-        // the checkpoint height must be equal to the last bottom-up checkpoint height or
-        // the next one
-        if (
-            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod &&
-            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight
-        ) {
-            revert InvalidCheckpointEpoch();
-        }
+        ensureValidCheckpoint(checkpoint);
+
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
 
         if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
@@ -72,57 +66,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         }
     }
 
-    /// @notice Submits a batch of bottom-up messages for execution.
-    /// @dev It triggers the execution of a cross-net message batch.
-    /// @param batch The batch of bottom-up messages.
-    /// @param signatories The addresses of validators signing the batch.
-    /// @param signatures The signatures of validators on the batch.
-    function submitBottomUpMsgBatch(
-        BottomUpMsgBatch calldata batch,
-        address[] calldata signatories,
-        bytes[] calldata signatures
-    ) external {
-        // forbid the submission of batches from the past
-        if (batch.blockHeight < s.lastBottomUpBatch.blockHeight) {
-            revert InvalidBatchEpoch();
-        }
-        if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
-            revert MaxMsgsPerBatchExceeded();
-        }
-        // if the batch height is not max, we only supoprt batch submission in period epochs
-        if (batch.msgs.length != s.maxMsgsPerBottomUpBatch && batch.blockHeight % s.bottomUpMsgBatchPeriod != 0) {
-            revert InvalidBatchEpoch();
-        }
-        if (batch.msgs.length == 0) {
-            revert BatchWithNoMessages();
-        }
-
-        bytes32 batchHash = keccak256(abi.encode(batch));
-
-        if (batch.blockHeight == s.lastBottomUpBatch.blockHeight) {
-            // If the batch info is equal to the last batch info, then this is a repeated submission.
-            // We should store the relayer, but not to execute batch again following the same reward logic
-            // used for checkpoints.
-            if (batchHash == s.lastBottomUpBatch.hash) {
-                // slither-disable-next-line unused-return
-                s.relayerRewards.batchRewarded[batch.blockHeight].add(msg.sender);
-            }
-        } else {
-            // validate signatures and quorum threshold, revert if validation fails
-            validateActiveQuorumSignatures({signatories: signatories, hash: batchHash, signatures: signatures});
-
-            // If the checkpoint height is the next expected height then this is a new batch,
-            // and should be forwarded to the gateway for execution.
-            s.lastBottomUpBatch = BottomUpMsgBatchInfo({blockHeight: batch.blockHeight, hash: batchHash});
-
-            // slither-disable-next-line unused-return
-            s.relayerRewards.batchRewarded[batch.blockHeight].add(msg.sender);
-
-            // Execute messages.
-            IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(batch);
-        }
-    }
-
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
     ///         Reverts otherwise.
     /// @dev Signatories in `signatories` and their signatures in `signatures` must be provided in the same order.
@@ -151,6 +94,30 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         if (!valid) {
             revert InvalidSignatureErr(uint8(err));
+        }
+    }
+
+    /// @notice Ensures the checkpoint is valid.
+    /// @dev The checkpoint block height must be equal to the last bottom-up checkpoint height or
+    /// @dev the next one or the number of bottom up messages exceeds the max batch size.
+    function ensureValidCheckpoint(BottomUpCheckpoint calldata checkpoint) internal view {
+        uint64 maxMsgsPerBottomUpBatch = s.maxMsgsPerBottomUpBatch;
+        if (checkpoint.msgs.length > maxMsgsPerBottomUpBatch) {
+            revert MaxMsgsPerBatchExceeded();
+        }
+
+        // if the bottom up messages' length is max, we consider that epoch valid
+        if (checkpoint.msgs.length == s.maxMsgsPerBottomUpBatch) {
+            return;
+        }
+
+        // the max batch size not reached, we only support checkpoint period submission.
+        uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
+        if (
+            checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod &&
+            checkpoint.blockHeight != lastBottomUpCheckpointHeight
+        ) {
+            revert InvalidCheckpointEpoch();
         }
     }
 }

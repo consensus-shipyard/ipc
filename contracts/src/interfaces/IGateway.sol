@@ -82,8 +82,4 @@ interface IGateway {
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external;
-
-    /// @notice execBottomUpMsgBatch submits a batch of cross-net messages
-    /// from a subnet actor for their execution.
-    function execBottomUpMsgBatch(BottomUpMsgBatch calldata batch) external;
 }

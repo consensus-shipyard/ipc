@@ -833,11 +833,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         uint256 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
 
+        CrossMsg[] memory msgs = new CrossMsg[](0);
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
-            nextConfigurationNumber: nextConfigNum - 1
+            nextConfigurationNumber: nextConfigNum - 1,
+            msgs: msgs
         });
 
         vm.deal(address(saDiamond), 100 ether);

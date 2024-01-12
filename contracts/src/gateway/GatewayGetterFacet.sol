@@ -39,11 +39,6 @@ contract GatewayGetterFacet {
         return s.maxMsgsPerBottomUpBatch;
     }
 
-    /// @notice Returns the period for processing bottom-up message batches.
-    function bottomUpMsgBatchPeriod() external view returns (uint256) {
-        return s.bottomUpMsgBatchPeriod;
-    }
-
     /// @notice Returns the period for bottom-up checkpointing.
     function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
@@ -174,13 +169,6 @@ contract GatewayGetterFacet {
         return s.checkpointQuorumMap.quorumInfo[h];
     }
 
-    /// @notice Returns quorum information for a specific bottom-up message batch based on its height.
-    /// @param h The block height of the bottom-up message batch.
-    /// @return Quorum information associated with the given bottom-up message batch height.
-    function getBottomUpMsgBatchInfo(uint256 h) external view returns (QuorumInfo memory) {
-        return s.bottomUpMsgBatchQuorumMap.quorumInfo[h];
-    }
-
     /// @notice Returns the checkpoint current weight corresponding to the block height.
     function getCheckpointCurrentWeight(uint256 h) external view returns (uint256) {
         return s.checkpointQuorumMap.quorumInfo[h].currentWeight;
@@ -209,26 +197,6 @@ contract GatewayGetterFacet {
             }
         }
         return checkpoints;
-    }
-
-    /// @notice Returns the incomplete batches of messages.
-    function getIncompleteMsgBatches() external view returns (BottomUpMsgBatch[] memory) {
-        uint256[] memory heights = s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
-        uint256 size = heights.length;
-
-        BottomUpMsgBatch[] memory batches = new BottomUpMsgBatch[](size);
-        for (uint64 i; i < size; ) {
-            batches[i] = s.bottomUpMsgBatches[uint64(heights[i])];
-            unchecked {
-                ++i;
-            }
-        }
-        return batches;
-    }
-
-    /// @notice Returns the incomplete msd batches heights.
-    function getIncompleteMsgBatchHeights() external view returns (uint256[] memory) {
-        return s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
     }
 
     /// @notice Returns the bottom-up checkpoint retention index.
@@ -270,30 +238,6 @@ contract GatewayGetterFacet {
         (info, signatories, signatures) = LibQuorum.getSignatureBundle(s.checkpointQuorumMap, h);
 
         return (ch, info, signatories, signatures);
-    }
-
-    /// @notice Returns a bundle of information and signatures for a specified bottom-up message batch.
-    /// @param h The height of the message batch for which information is requested.
-    /// @return batch The bottom-up message batch information at the specified height.
-    /// @return info Quorum information related to the message batch.
-    /// @return signatories An array of addresses of signatories who have signed the message batch.
-    /// @return signatures An array of signatures corresponding to each signatory for the message batch.
-    function getBottomUpMsgBatchSignatureBundle(
-        uint256 h
-    )
-        external
-        view
-        returns (
-            BottomUpMsgBatch memory batch,
-            QuorumInfo memory info,
-            address[] memory signatories,
-            bytes[] memory signatures
-        )
-    {
-        batch = s.bottomUpMsgBatches[h];
-        (info, signatories, signatures) = LibQuorum.getSignatureBundle(s.bottomUpMsgBatchQuorumMap, h);
-
-        return (batch, info, signatories, signatures);
     }
 
     /// @notice Returns the current bottom-up checkpoint.

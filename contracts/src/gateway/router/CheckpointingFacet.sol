@@ -14,7 +14,7 @@ import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, BatchWith
 import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated} from "../../errors/IPCErrors.sol";
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
-import {SubnetID} from "../../structs/CrossNet.sol";
+import {CrossMsg, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
@@ -36,6 +36,8 @@ contract CheckpointingFacet is GatewayActorModifiers {
         if (!checkpoint.subnetID.equals(subnet.id)) {
             revert InvalidSubnet();
         }
+
+        execBottomUpMsgs(checkpoint.msgs, subnet);
 
         if (s.checkpointRelayerRewards) {
             // slither-disable-next-line unused-return
@@ -122,5 +124,32 @@ contract CheckpointingFacet is GatewayActorModifiers {
             weight: weight,
             signature: signature
         });
+    }
+
+    /// @notice submit a batch of cross-net messages for execution.
+    /// @param msgs The batch of bottom-up cross-network messages to be executed.
+    function execBottomUpMsgs(CrossMsg[] calldata msgs, Subnet storage subnet) internal {
+        uint256 totalValue;
+        uint256 totalFee;
+        uint256 crossMsgLength = msgs.length;
+
+        for (uint256 i; i < crossMsgLength; ) {
+            totalValue += msgs[i].message.value;
+            totalFee += msgs[i].message.fee;
+            unchecked {
+                ++i;
+            }
+        }
+
+        uint256 totalAmount = totalFee + totalValue;
+
+        if (subnet.circSupply < totalAmount) {
+            revert NotEnoughSubnetCircSupply();
+        }
+
+        subnet.circSupply -= totalAmount;
+
+        // execute cross-messages
+        LibGateway.applyMessages(subnet.id, msgs);
     }
 }
