@@ -12,7 +12,7 @@ use crate::{
 
 /// The basic idea is that validators, identified by their public key,
 /// vote about things regarding the subnet in which they participate.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ValidatorKey(PublicKey);
 
 impl Serialize for ValidatorKey {
