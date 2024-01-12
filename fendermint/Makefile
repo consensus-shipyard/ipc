@@ -28,7 +28,7 @@ BUILDX_TAG   ?= fendermint:latest
 all: test build diagrams
 
 diagrams:
-	make -C docs/diagrams diagrams
+	make -C  ../docs/fendermint/diagrams diagrams
 
 build: $(IPC_ACTORS_GEN) | protoc
 	cargo build --release
