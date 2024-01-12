@@ -41,7 +41,7 @@ library LibMaxPQ {
         swim({self: self, validators: validators, pos: size, value: power});
     }
 
-    /// @notice Pop the minimal value in the priority queue.
+    /// @notice Pop the maximum value in the priority queue.
     /// NOTE that caller should ensure the queue is not empty!
     function pop(MaxPQ storage self, ValidatorSet storage validators) internal {
         self.inner.requireNotEmpty();
@@ -137,7 +137,7 @@ library LibMaxPQ {
 
         while (childPos <= size) {
             if (childPos < size) {
-                // select the min of the two children
+                // select the max of the two children
                 (childPos, childPower) = largerPosition({
                     self: self,
                     validators: validators,
