@@ -1,6 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: MIT
 use anyhow::anyhow;
+use async_trait::async_trait;
 use ipc_api::subnet_id::SubnetID;
 use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
@@ -59,18 +60,6 @@ impl<V> Client<V> {
         self.send_request(req)
     }
 
-    /// Send a CID for resolution from a specific subnet, await its completion,
-    /// then return the result, to be inspected by the caller.
-    ///
-    /// Upon success, the data should be found in the store.
-    pub async fn resolve(&self, cid: Cid, subnet_id: SubnetID) -> anyhow::Result<ResolveResult> {
-        let (tx, rx) = oneshot::channel();
-        let req = Request::Resolve(cid, subnet_id, tx);
-        self.send_request(req)?;
-        let res = rx.await?;
-        Ok(res)
-    }
-
     /// Update the rate limit based on new projections for the same timeframe
     /// the `content::Behaviour` was originally configured with. This can be
     /// used if we can't come up with a good estimate for the amount of data
@@ -93,5 +82,33 @@ impl<V> Client<V> {
     pub fn publish_preemptive(&self, subnet_id: SubnetID, data: Vec<u8>) -> anyhow::Result<()> {
         let req = Request::PublishPreemptive(subnet_id, data);
         self.send_request(req)
+    }
+}
+
+/// Trait to limit the capabilities to resolving CIDs.
+#[async_trait]
+pub trait Resolver {
+    /// Send a CID for resolution from a specific subnet, await its completion,
+    /// then return the result, to be inspected by the caller.
+    ///
+    /// Upon success, the data should be found in the store.
+    async fn resolve(&self, cid: Cid, subnet_id: SubnetID) -> anyhow::Result<ResolveResult>;
+}
+
+#[async_trait]
+impl<V> Resolver for Client<V>
+where
+    V: Sync + Send + 'static,
+{
+    /// Send a CID for resolution from a specific subnet, await its completion,
+    /// then return the result, to be inspected by the caller.
+    ///
+    /// Upon success, the data should be found in the store.
+    async fn resolve(&self, cid: Cid, subnet_id: SubnetID) -> anyhow::Result<ResolveResult> {
+        let (tx, rx) = oneshot::channel();
+        let req = Request::Resolve(cid, subnet_id, tx);
+        self.send_request(req)?;
+        let res = rx.await?;
+        Ok(res)
     }
 }

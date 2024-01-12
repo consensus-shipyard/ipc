@@ -29,7 +29,7 @@ use fvm_shared::{address::Address, ActorID};
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{
     Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
-    NetworkConfig, Service, VoteRecord,
+    NetworkConfig, Resolver, Service, VoteRecord,
 };
 use libipld::{
     multihash::{Code, MultihashDigest},

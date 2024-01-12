@@ -5,25 +5,25 @@ use std::{future::Future, time::Duration};
 
 use async_stm::{atomically, queues::TQueueLike};
 use ipc_api::subnet_id::SubnetID;
-use ipc_ipld_resolver::Client as ResolverClient;
+use ipc_ipld_resolver::Resolver;
 
-use crate::{
-    pool::{ResolveQueue, ResolveTask},
-    voting::Vote,
-};
+use crate::pool::{ResolveQueue, ResolveTask};
 
 /// The IPLD Resolver takes resolution tasks from the [ResolvePool] and
 /// uses the [ipc_ipld_resolver] to fetch the content from subnets.
-pub struct IpldResolver {
-    client: ResolverClient<Vote>,
+pub struct IpldResolver<C> {
+    client: C,
     queue: ResolveQueue,
     retry_delay: Duration,
     own_subnet_id: SubnetID,
 }
 
-impl IpldResolver {
+impl<C> IpldResolver<C>
+where
+    C: Resolver + Clone + Send + 'static,
+{
     pub fn new(
-        client: ResolverClient<Vote>,
+        client: C,
         queue: ResolveQueue,
         retry_delay: Duration,
         own_subnet_id: SubnetID,
@@ -63,13 +63,15 @@ impl IpldResolver {
 
 /// Run task resolution in the background, so as not to block items from other
 /// subnets being tried.
-fn start_resolve(
+fn start_resolve<C>(
     task: ResolveTask,
-    client: ResolverClient<Vote>,
+    client: C,
     queue: ResolveQueue,
     retry_delay: Duration,
     own_subnet_id: Option<SubnetID>,
-) {
+) where
+    C: Resolver + Send + 'static,
+{
     tokio::spawn(async move {
         let from_theirs = client.resolve(task.cid(), task.subnet_id());
         let from_own = own_subnet_id.map(|subnet_id| client.resolve(task.cid(), subnet_id));
