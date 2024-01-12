@@ -18,6 +18,7 @@ paste = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }
 tracing = { workspace = true }
+multihash = { workspace = true, features = ["sha3"] }
 
 cid = { workspace = true }
 fvm_shared = { workspace = true }
