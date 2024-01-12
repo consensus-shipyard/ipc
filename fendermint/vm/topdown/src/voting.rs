@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use async_stm::{abort, Stm, StmResult, TVar};
+use async_stm::{abort, retry, Stm, StmResult, TVar};
 
 use crate::{BlockHash, BlockHeight};
 
@@ -51,6 +51,10 @@ pub struct VoteTally {
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
     votes: TVar<im::OrdMap<BlockHeight, im::HashMap<BlockHash, im::HashSet<ValidatorKey>>>>,
+
+    /// Adding votes can be paused if we observe that looking for a quorum takes too long
+    /// and is often retried due to votes being added.
+    pause_votes: TVar<bool>,
 }
 
 impl VoteTally {
@@ -64,6 +68,7 @@ impl VoteTally {
             power_table: TVar::new(im::HashMap::from_iter(power_table.into_iter())),
             chain: TVar::new(im::OrdMap::from_iter([last_finalized_block])),
             votes: TVar::default(),
+            pause_votes: TVar::new(false),
         }
     }
 
@@ -153,13 +158,25 @@ impl VoteTally {
             return Ok(false);
         }
 
+        if *self.pause_votes.read()? {
+            retry()?;
+        }
+
         self.votes.write(votes)?;
 
         Ok(true)
     }
 
+    /// Pause adding more votes until we are finished calling `find_quorum` which
+    /// automatically re-enables them.
+    pub fn pause_votes_until_find_quorum(&self) -> Stm<()> {
+        self.pause_votes.write(true)
+    }
+
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
     pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, BlockHash)>> {
+        self.pause_votes.write(false)?;
+
         let quorum_threshold = self.quorum_threshold()?;
         let chain = self.chain.read()?;
 
