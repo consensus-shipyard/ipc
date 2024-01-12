@@ -183,6 +183,7 @@ impl VoteTally {
                     if let Some(votes_for_block) = votes_at_height.get(block_hash) {
                         for vk in votes_for_block {
                             if voters.insert(vk.clone()).is_none() {
+                                // New voter, get their current weight; it might be 0 if they have been removed.
                                 weight += power_table.get(vk).cloned().unwrap_or_default();
                             }
                         }
@@ -211,5 +212,14 @@ impl VoteTally {
         self.votes.update(|votes| votes.split(&block_height).1)?;
 
         Ok(())
+    }
+
+    /// Update the power table after it has changed to a new snapshot, removing the votes of anyone
+    /// who is no longer a validator.
+    pub fn set_power_table(&self, power_table: Vec<(ValidatorKey, Weight)>) -> Stm<()> {
+        let power_table = im::HashMap::from_iter(power_table.into_iter());
+        // We don't actually have to remove the votes of anyone who is no longer a validator,
+        // we just have to make sure to handle the case when they are not in the power table.
+        self.power_table.write(power_table)
     }
 }
