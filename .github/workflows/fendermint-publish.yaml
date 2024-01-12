@@ -17,7 +17,8 @@ jobs:
   # Publish Docker image on the main branch
   publish:
     name: Publish artifacts
-    if: github.ref == 'refs/heads/main'
+    # This condition is managed in `ci.yaml` now.
+    # if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     permissions:
