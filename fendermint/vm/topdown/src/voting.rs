@@ -50,7 +50,7 @@ pub struct VoteTally {
     /// all the votes for a given block hash and also to verify that a validator
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
-    votes: TVar<im::HashMap<BlockHeight, im::HashMap<BlockHash, im::HashSet<ValidatorKey>>>>,
+    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<BlockHash, im::HashSet<ValidatorKey>>>>,
 }
 
 impl VoteTally {
@@ -79,6 +79,13 @@ impl VoteTally {
         let total_weight: Weight = self.power_table.read().map(|pt| pt.values().sum())?;
 
         Ok(total_weight * 2 / 3)
+    }
+
+    /// Return the height of the first entry in the chain.
+    pub fn last_finalized_height(&self) -> Stm<BlockHeight> {
+        self.chain
+            .read()
+            .map(|c| c.get_min().map(|(h, _)| *h).unwrap_or_default())
     }
 
     /// Add the next final block observed on the parent blockchain.
@@ -116,10 +123,7 @@ impl VoteTally {
         block_height: BlockHeight,
         block_hash: BlockHash,
     ) -> StmResult<bool, Error> {
-        let min_height = self
-            .chain
-            .read()
-            .map(|c| c.get_min().map(|(h, _)| *h).unwrap_or_default())?;
+        let min_height = self.last_finalized_height()?;
 
         if block_height < min_height {
             return Ok(false);
@@ -192,5 +196,20 @@ impl VoteTally {
         }
 
         Ok(None)
+    }
+
+    /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
+    ///
+    /// After this operation the minimum item in the chain will the new finalized block.
+    pub fn set_finalized(&self, block_height: BlockHeight, block_hash: BlockHash) -> Stm<()> {
+        self.chain.update(|chain| {
+            let (_, mut chain) = chain.split(&block_height);
+            chain.insert(block_height, Some(block_hash));
+            chain
+        })?;
+
+        self.votes.update(|votes| votes.split(&block_height).1)?;
+
+        Ok(())
     }
 }
