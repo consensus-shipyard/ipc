@@ -5,7 +5,7 @@ name = "ipc-types"
 version = "0.1.0"
 
 [dependencies]
-fvm_ipld_amt = { workspace = true, features = ["go-interop"]}
+fvm_ipld_amt = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
