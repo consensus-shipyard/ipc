@@ -10,6 +10,7 @@ license.workspace = true
 anyhow = { workspace = true }
 async-stm = { workspace = true }
 async-trait = { workspace = true }
+bytes = { workspace = true }
 cid = { workspace = true }
 ethers = { workspace = true }
 fvm_ipld_encoding = { workspace = true }

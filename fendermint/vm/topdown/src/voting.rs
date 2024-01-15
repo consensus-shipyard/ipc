@@ -11,29 +11,29 @@ use ipc_ipld_resolver::ValidatorKey;
 pub type Weight = u64;
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum Error<K = ValidatorKey> {
     #[error("failed to extend chain; expected block height {0}, got {1}")]
     UnexpectedBlock(BlockHeight, BlockHeight),
 
     #[error("unknown validator: {0:?}")]
-    UnknownValidator(ValidatorKey),
+    UnknownValidator(K),
 
     #[error(
         "equivocation by validator {0:?} at height {1}; {} != {}",
         hex::encode(.2),
         hex::encode(.3)
     )]
-    Equivocation(ValidatorKey, BlockHeight, BlockHash, BlockHash),
+    Equivocation(K, BlockHeight, BlockHash, BlockHash),
 }
 
 /// Keep track of votes beging gossiped about parent chain finality
 /// and tally up the weights of the validators on the child subnet,
 /// so that we can ask for proposals that are not going to be voted
 /// down.
-pub struct VoteTally {
+pub struct VoteTally<K = ValidatorKey> {
     /// Current validator weights. These are the ones who will vote on the blocks,
     /// so these are the weights which need to form a quorum.
-    power_table: TVar<im::HashMap<ValidatorKey, Weight>>,
+    power_table: TVar<im::HashMap<K, Weight>>,
 
     /// The *finalized mainchain* of the parent as observed by this node.
     ///
@@ -50,18 +50,21 @@ pub struct VoteTally {
     /// all the votes for a given block hash and also to verify that a validator
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
-    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<BlockHash, im::HashSet<ValidatorKey>>>>,
+    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<BlockHash, im::HashSet<K>>>>,
 
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
     pause_votes: TVar<bool>,
 }
 
-impl VoteTally {
+impl<K> VoteTally<K>
+where
+    K: std::fmt::Debug + Clone + std::hash::Hash + Eq + Sync + Send + 'static,
+{
     /// Initialize the vote tally from the current power table
     /// and the last finalized block from the ledger.
     pub fn new(
-        power_table: Vec<(ValidatorKey, Weight)>,
+        power_table: Vec<(K, Weight)>,
         last_finalized_block: (BlockHeight, BlockHash),
     ) -> Self {
         Self {
@@ -73,7 +76,7 @@ impl VoteTally {
     }
 
     /// Check that a validator key is currently part of the power table.
-    pub fn known_validator(&self, validator_key: &ValidatorKey) -> Stm<bool> {
+    pub fn known_validator(&self, validator_key: &K) -> Stm<bool> {
         let pt = self.power_table.read()?;
         // For consistency consider validators without power unknown.
         match pt.get(validator_key) {
@@ -103,7 +106,7 @@ impl VoteTally {
         &self,
         block_height: BlockHeight,
         block_hash: Option<BlockHash>,
-    ) -> StmResult<(), Error> {
+    ) -> StmResult<(), Error<K>> {
         let mut chain = self.chain.read_clone()?;
 
         // Check that we are extending the chain. We could also ignore existing heights.
@@ -127,10 +130,10 @@ impl VoteTally {
     /// equivocation or from a validator we don't know.
     pub fn add_vote(
         &self,
-        validator_key: ValidatorKey,
+        validator_key: K,
         block_height: BlockHeight,
         block_hash: BlockHash,
-    ) -> StmResult<bool, Error> {
+    ) -> StmResult<bool, Error<K>> {
         let min_height = self.last_finalized_height()?;
 
         if block_height < min_height {
@@ -236,7 +239,7 @@ impl VoteTally {
 
     /// Update the power table after it has changed to a new snapshot, removing the votes of anyone
     /// who is no longer a validator.
-    pub fn set_power_table(&self, power_table: Vec<(ValidatorKey, Weight)>) -> Stm<()> {
+    pub fn set_power_table(&self, power_table: Vec<(K, Weight)>) -> Stm<()> {
         let power_table = im::HashMap::from_iter(power_table.into_iter());
         // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
