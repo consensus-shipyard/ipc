@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
+import "forge-std/Test.sol";
 import {METHOD_SEND, EMPTY_BYTES} from "../constants/Constants.sol";
 import {IpcEnvelope, ReceiptMsg, IpcMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
@@ -135,8 +136,14 @@ library CrossMsgHelper {
                 return EMPTY_BYTES;
             } else {
                 // send the envelope directly to the entrypoint
-                IpcContract ipcContract = IpcContract(recipient);
-                return ipcContract.IpcEntrypoint(crossMsg);
+                // use supplySource so the tokens in the message are handled successfully
+                // and by the right supply source
+                return
+                    supplySource.performCall(
+                        payable(recipient),
+                        abi.encodeCall(IpcContract.IpcEntrypoint, (crossMsg)),
+                        value
+                    );
             }
         } else if (crossMsg.kind == IpcMsgKind.Receipt) {
             address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
