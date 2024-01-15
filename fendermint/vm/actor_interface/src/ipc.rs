@@ -320,15 +320,15 @@ pub mod gateway {
 
     /// Container type `ConstructorParameters`.
     ///
-    /// See [GatewayDiamond.sol](https://github.com/consensus-shipyard/ipc-solidity-actors/blob/255da67fd6ad885f0ab633311be276a4fa936d45/src/GatewayDiamond.sol#L21)
+    /// See [GatewayDiamond.sol](https://github.com/consensus-shipyard/ipc/blob/bc3512fc7c4b0dfcdaac89f297f99cafae68f097/contracts/src/GatewayDiamond.sol#L28-L36)
     #[derive(Clone, EthAbiType, EthAbiCodec, Default, Debug, PartialEq, Eq, Hash)]
     pub struct ConstructorParameters {
-        pub network_name: GatewaySubnetID,
-        pub bottom_up_check_period: U256,
         pub msg_fee: U256,
-        pub majority_percentage: u8,
-        pub validators: Vec<GatewayValidator>,
+        pub bottom_up_check_period: U256,
         pub active_validators_limit: u16,
+        pub majority_percentage: u8,
+        pub network_name: GatewaySubnetID,
+        pub validators: Vec<GatewayValidator>,
     }
 
     impl ConstructorParameters {
@@ -442,7 +442,7 @@ pub mod registry {
 
     /// Container type `ConstructorParameters`.
     ///
-    /// See [SubnetRegistry.sol](https://github.com/consensus-shipyard/ipc-solidity-actors/blob/a830a52b1362f3d2abf2e3cc3db62aa40ee45355/src/SubnetRegistryDiamond.sol#L17-L23)
+    /// See [SubnetRegistry.sol](https://github.com/consensus-shipyard/ipc/blob/62f0d64fea993196cd3f148498c25a108b0069c8/contracts/src/SubnetRegistryDiamond.sol#L16-L28)
     #[derive(Clone, EthAbiType, EthAbiCodec, Default, Debug, PartialEq, Eq, Hash)]
     pub struct ConstructorParameters {
         pub gateway: Address,
