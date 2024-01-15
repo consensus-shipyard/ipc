@@ -193,6 +193,12 @@ impl VotingMachine {
     }
 }
 
+impl Default for VotingMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl smt::StateMachine for VotingMachine {
     /// The System Under Test is the Vote Tally.
     type System = VoteTally<VotingKey>;

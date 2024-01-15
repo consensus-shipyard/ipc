@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use async_stm::{abort, retry, Stm, StmResult, TVar};
+use std::fmt::Debug;
+use std::hash::Hash;
 
 use crate::{BlockHash, BlockHeight};
 
@@ -59,15 +61,15 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
 
 impl<K, V> VoteTally<K, V>
 where
-    K: Clone + std::hash::Hash + Eq + Sync + Send + 'static,
-    V: Clone + std::hash::Hash + Eq + PartialEq + AsRef<[u8]> + Sync + Send + 'static,
+    K: Clone + Hash + Eq + Sync + Send + 'static,
+    V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
 {
     /// Initialize the vote tally from the current power table
     /// and the last finalized block from the ledger.
     pub fn new(power_table: Vec<(K, Weight)>, last_finalized_block: (BlockHeight, V)) -> Self {
         let (height, hash) = last_finalized_block;
         Self {
-            power_table: TVar::new(im::HashMap::from_iter(power_table.into_iter())),
+            power_table: TVar::new(im::HashMap::from_iter(power_table)),
             chain: TVar::new(im::OrdMap::from_iter([(height, Some(hash))])),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
@@ -239,7 +241,7 @@ where
     /// Update the power table after it has changed to a new snapshot, removing the votes of anyone
     /// who is no longer a validator.
     pub fn set_power_table(&self, power_table: Vec<(K, Weight)>) -> Stm<()> {
-        let power_table = im::HashMap::from_iter(power_table.into_iter());
+        let power_table = im::HashMap::from_iter(power_table);
         // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
         self.power_table.write(power_table)
