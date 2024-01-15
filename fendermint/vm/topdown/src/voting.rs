@@ -11,7 +11,7 @@ use ipc_ipld_resolver::ValidatorKey;
 pub type Weight = u64;
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error<K = ValidatorKey> {
+pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
     #[error("failed to extend chain; expected block height {0}, got {1}")]
     UnexpectedBlock(BlockHeight, BlockHeight),
 
@@ -23,14 +23,14 @@ pub enum Error<K = ValidatorKey> {
         hex::encode(.2),
         hex::encode(.3)
     )]
-    Equivocation(K, BlockHeight, BlockHash, BlockHash),
+    Equivocation(K, BlockHeight, V, V),
 }
 
 /// Keep track of votes beging gossiped about parent chain finality
 /// and tally up the weights of the validators on the child subnet,
 /// so that we can ask for proposals that are not going to be voted
 /// down.
-pub struct VoteTally<K = ValidatorKey> {
+pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// Current validator weights. These are the ones who will vote on the blocks,
     /// so these are the weights which need to form a quorum.
     power_table: TVar<im::HashMap<K, Weight>>,
@@ -44,32 +44,31 @@ pub struct VoteTally<K = ValidatorKey> {
     /// tally the votes we collected for the block hashes until we reach a quorum.
     ///
     /// The block hash is optional to allow for null blocks on Filecoin rootnet.
-    chain: TVar<im::OrdMap<BlockHeight, Option<BlockHash>>>,
+    chain: TVar<im::OrdMap<BlockHeight, Option<V>>>,
 
     /// Index votes received by height and hash, which makes it easy to look up
     /// all the votes for a given block hash and also to verify that a validator
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
-    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<BlockHash, im::HashSet<K>>>>,
+    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<V, im::HashSet<K>>>>,
 
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
     pause_votes: TVar<bool>,
 }
 
-impl<K> VoteTally<K>
+impl<K, V> VoteTally<K, V>
 where
-    K: std::fmt::Debug + Clone + std::hash::Hash + Eq + Sync + Send + 'static,
+    K: Clone + std::hash::Hash + Eq + Sync + Send + 'static,
+    V: Clone + std::hash::Hash + Eq + PartialEq + AsRef<[u8]> + Sync + Send + 'static,
 {
     /// Initialize the vote tally from the current power table
     /// and the last finalized block from the ledger.
-    pub fn new(
-        power_table: Vec<(K, Weight)>,
-        last_finalized_block: (BlockHeight, BlockHash),
-    ) -> Self {
+    pub fn new(power_table: Vec<(K, Weight)>, last_finalized_block: (BlockHeight, V)) -> Self {
+        let (height, hash) = last_finalized_block;
         Self {
             power_table: TVar::new(im::HashMap::from_iter(power_table.into_iter())),
-            chain: TVar::new(im::OrdMap::from_iter([last_finalized_block])),
+            chain: TVar::new(im::OrdMap::from_iter([(height, Some(hash))])),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
         }
@@ -105,7 +104,7 @@ where
     pub fn add_block(
         &self,
         block_height: BlockHeight,
-        block_hash: Option<BlockHash>,
+        block_hash: Option<V>,
     ) -> StmResult<(), Error<K>> {
         let mut chain = self.chain.read_clone()?;
 
@@ -132,8 +131,8 @@ where
         &self,
         validator_key: K,
         block_height: BlockHeight,
-        block_hash: BlockHash,
-    ) -> StmResult<bool, Error<K>> {
+        block_hash: V,
+    ) -> StmResult<bool, Error<K, V>> {
         let min_height = self.last_finalized_height()?;
 
         if block_height < min_height {
@@ -180,7 +179,7 @@ where
     }
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
-    pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, BlockHash)>> {
+    pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, V)>> {
         self.pause_votes.write(false)?;
 
         let quorum_threshold = self.quorum_threshold()?;
@@ -225,7 +224,7 @@ where
     /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
     ///
     /// After this operation the minimum item in the chain will the new finalized block.
-    pub fn set_finalized(&self, block_height: BlockHeight, block_hash: BlockHash) -> Stm<()> {
+    pub fn set_finalized(&self, block_height: BlockHeight, block_hash: V) -> Stm<()> {
         self.chain.update(|chain| {
             let (_, mut chain) = chain.split(&block_height);
             chain.insert(block_height, Some(block_hash));
