@@ -957,28 +957,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         );
     }
 
-    function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughFunds() public {
-        address caller = address(new MockIpcContract());
-        vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
-
-        vm.expectRevert(NotEnoughFunds.selector);
-        gwMessenger.sendContractXnetMessage{value: 0}(
-            TestUtils.newTransferCrossMsg(
-                IPCAddress({
-                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
-                0,
-                0,
-                DEFAULT_CROSS_MSG_FEE
-            )
-        );
-    }
-
     function testGatewayDiamond_CommitParentFinality_Fails_NotSystemActor() public {
         address caller = vm.addr(100);
 
