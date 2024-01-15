@@ -1,0 +1,12 @@
+[package]
+name = "fendermint_actors"
+version = "0.1.0"
+
+[build-dependencies]
+fil_actors_runtime = { workspace = true, features = ["test_utils"] }
+fil_actor_bundler = "6.1.0"
+num-traits = { workspace = true}
+
+[features]
+default=[]
+testing=[]

@@ -26,6 +26,8 @@ members = [
   "fendermint/testing",
   "fendermint/testing/*-test",
   "fendermint/vm/*",
+  "fendermint/actors",
+  "fendermint/actors/chainmetadata",
 ]
 
 [workspace.package]
@@ -206,3 +208,13 @@ tendermint-proto = { version = "0.31" }
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
 # Contains some API changes that the upstream has not merged.
 merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }
+
+[profile.wasm]
+inherits = "release"
+panic = "abort"
+overflow-checks = false
+lto = true
+opt-level = "z"
+strip = true
+codegen-units = 1
+incremental = false
