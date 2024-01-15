@@ -1,6 +1,6 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
-BUILTIN_ACTORS_TAG    ?= v11.0.0
+BUILTIN_ACTORS_TAG    ?= v12.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 
 IPC_ACTORS_DIR        := $(PWD)/../contracts
@@ -28,7 +28,7 @@ BUILDX_TAG   ?= fendermint:latest
 all: test build diagrams
 
 diagrams:
-	make -C docs/diagrams diagrams
+	make -C  ../docs/fendermint/diagrams diagrams
 
 build: $(IPC_ACTORS_GEN) | protoc
 	cargo build --release
