@@ -16,6 +16,7 @@ import {SupplySourceHelper} from "./SupplySourceHelper.sol";
 // Interface that needs to be implemented by IPC-enabled contracts.
 // This is really convenient to call it from other contracts.
 interface IpcContract {
+    // solhint-disable-next-line func-name-mixedcase
     function IpcEntrypoint(IpcEnvelope calldata envelope) external payable returns (bytes memory);
 }
 

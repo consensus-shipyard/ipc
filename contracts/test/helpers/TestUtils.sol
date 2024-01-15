@@ -175,7 +175,7 @@ library TestUtils {
 
 contract MockIpcContract is IpcContract {
     /* solhint-disable-next-line unused-vars */
-    function IpcEntrypoint(IpcEnvelope calldata _envelope) external payable returns (bytes memory) {
+    function IpcEntrypoint(IpcEnvelope calldata) external payable returns (bytes memory) {
         return EMPTY_BYTES;
     }
 }
