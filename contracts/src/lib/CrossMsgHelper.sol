@@ -16,6 +16,7 @@ import {SupplySourceHelper} from "./SupplySourceHelper.sol";
 // Interface that needs to be implemented by IPC-enabled contracts.
 // This is really convenient to call it from other contracts.
 interface IpcContract {
+    // solhint-disable-next-line func-name-mixedcase
     function IpcEntrypoint(IpcEnvelope calldata envelope) external payable returns (bytes memory);
 }
 
@@ -135,8 +136,14 @@ library CrossMsgHelper {
                 return EMPTY_BYTES;
             } else {
                 // send the envelope directly to the entrypoint
-                IpcContract ipcContract = IpcContract(recipient);
-                return ipcContract.IpcEntrypoint(crossMsg);
+                // use supplySource so the tokens in the message are handled successfully
+                // and by the right supply source
+                return
+                    supplySource.performCall(
+                        payable(recipient),
+                        abi.encodeCall(IpcContract.IpcEntrypoint, (crossMsg)),
+                        value
+                    );
             }
         } else if (crossMsg.kind == IpcMsgKind.Receipt) {
             address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();

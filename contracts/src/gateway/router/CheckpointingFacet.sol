@@ -39,6 +39,8 @@ contract CheckpointingFacet is GatewayActorModifiers {
             revert InvalidSubnet();
         }
 
+        LibGateway.checkMsgLength(checkpoint.msgs);
+
         execBottomUpMsgs(checkpoint.msgs, subnet);
 
         if (s.checkpointRelayerRewards) {

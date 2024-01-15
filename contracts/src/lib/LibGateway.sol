@@ -394,11 +394,11 @@ library LibGateway {
     }
 
     /// @notice Checks the length of a message batch, ensuring it is in (0, maxMsgsPerBottomUpBatch).
-    /// @param batch The batch of messages to check.
-    function checkMsgLength(BottomUpMsgBatch memory batch) internal view {
+    /// @param msgs The batch of messages to check.
+    function checkMsgLength(IpcEnvelope[] calldata msgs) internal view {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
+        if (msgs.length > s.maxMsgsPerBottomUpBatch) {
             revert MaxMsgsPerBatchExceeded();
         }
     }

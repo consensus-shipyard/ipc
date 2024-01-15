@@ -31,7 +31,7 @@ import {ERR_GENERAL_CROSS_MSG_DISABLED} from "../../src/gateway/GatewayMessenger
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {LibDiamond} from "../../src/lib/LibDiamond.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
-import {TestUtils} from "../helpers/TestUtils.sol";
+import {TestUtils, MockIpcContract} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
@@ -499,47 +499,24 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_NoFunds() public {
-        address caller = vm.addr(100);
+        address caller = address(new MockIpcContract());
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
-        // vm.expectRevert(NotEnoughFunds.selector);
+        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE - 1}(
+        vm.expectRevert(InvalidCrossMsgValue.selector);
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
                     rawAddress: FvmAddressHelper.from(caller)
                 }),
-                IPCAddress({
-                    subnetId: SubnetID({root: 0, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
                 0,
                 DEFAULT_CROSS_MSG_FEE
-            )
-        );
-
-        // vm.expectRevert(NotEnoughFee.selector);
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
-            TestUtils.newTransferCrossMsg(
-                IPCAddress({
-                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                IPCAddress({
-                    subnetId: SubnetID({root: 0, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                1,
-                0,
-                DEFAULT_CROSS_MSG_FEE - 1
             )
         );
     }
@@ -836,14 +813,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_NoDestination() public {
-        address caller = vm.addr(100);
+        address caller = address(new MockIpcContract());
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
-        // vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
+        vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
@@ -862,15 +837,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_NoCurrentNetwork() public {
-        address caller = vm.addr(100);
+        address caller = address(new MockIpcContract());
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName();
 
-        // vm.expectRevert(CannotSendCrossMsgToItself.selector);
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
+        vm.expectRevert(CannotSendCrossMsgToItself.selector);
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
@@ -886,15 +859,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_Failes_InvalidCrossMsgValue() public {
-        address caller = vm.addr(100);
+        address caller = address(new MockIpcContract());
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
-        // vm.expectRevert(InvalidCrossMsgValue.selector);
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
+        vm.expectRevert(InvalidCrossMsgValue.selector);
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
@@ -909,7 +880,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         );
     }
 
-    function testGatewayDiamond_SendCrossMessage_Fails_EmptyNetwork() public {
+    function testGatewayDiamond_SendCrossMessage_Fails_EoACaller() public {
         address caller = vm.addr(100);
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
@@ -917,10 +888,33 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
-        // vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
+        vm.expectRevert(InvalidCrossMsgSender.selector);
 
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+            TestUtils.newTransferCrossMsg(
+                IPCAddress({
+                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                    rawAddress: FvmAddressHelper.from(caller)
+                }),
+                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
+                1,
+                0,
+                DEFAULT_CROSS_MSG_FEE
+            )
+        );
+    }
+
+    function testGatewayDiamond_SendCrossMessage_Fails_EmptyNetwork() public {
+        // Caller of general-purpose messages must be a contract, not a EoA
+        address caller = address(new MockIpcContract());
+        vm.startPrank(caller);
+        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
+
+        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
+
+        SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
+        vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
+
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
@@ -936,15 +930,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_InvalidCrossMsgFromSubnet() public {
-        address caller = vm.addr(100);
+        address caller = address(new MockIpcContract());
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
-        // vm.expectRevert(InvalidCrossMsgFromSubnet.selector);
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
+        vm.expectRevert(InvalidCrossMsgFromSubnet.selector);
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
@@ -953,54 +945,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
-            )
-        );
-    }
-
-    function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughFee() public {
-        address caller = vm.addr(100);
-        vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
-
-        // vm.expectRevert(NotEnoughFee.selector);
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
-            TestUtils.newTransferCrossMsg(
-                IPCAddress({
-                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
-                0,
-                0,
-                DEFAULT_CROSS_MSG_FEE
-            )
-        );
-    }
-
-    function testGatewayDiamond_SendCrossMessage_Fails_NotEnoughFunds() public {
-        address caller = vm.addr(100);
-        vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
-
-        // vm.expectRevert(NotEnoughFunds.selector);
-        // General-purpose cross-net messages are currenlty disabled.
-        vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_GENERAL_CROSS_MSG_DISABLED));
-        gwMessenger.sendContractXnetMessage{value: 0}(
-            TestUtils.newTransferCrossMsg(
-                IPCAddress({
-                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(address(0))}),
-                0,
                 0,
                 DEFAULT_CROSS_MSG_FEE
             )
@@ -1613,7 +1557,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(heights.length == n, "index is not the same");
     }
 
-    function testGatewayDiamond_execMsgBatch_Fails_WrongNumberMessages() public {
+    function testGatewayDiamond_commitCheckpoint_Fails_WrongNumberMessages() public {
         address caller = address(saDiamond);
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);

@@ -184,6 +184,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         gwCheckpointingFacet.commitCheckpoint(batch);
     }
 
+    // Call a smart contract in the parent through a smart contract and with
+    // an ERC20 token supply.
     function test_childToParentCall() public {
         Subnet memory subnet = createTokenSubnet(address(token));
 
@@ -221,7 +223,6 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Verify that we received the call and that the recipient has the tokens.
         vm.prank(address(saDiamond));
-        vm.etch(recipient, bytes("foo")); // set some code at the destination address to trick Solidity into calling the contract.
         vm.expectCall(recipient, abi.encodeCall(IpcContract.IpcEntrypoint, (msgs[0])), 1);
         gwCheckpointingFacet.commitCheckpoint(batch);
         assertEq(token.balanceOf(recipient), 8);
