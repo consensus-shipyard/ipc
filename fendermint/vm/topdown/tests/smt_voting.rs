@@ -13,13 +13,10 @@
 //! cargo test --release -p fendermint_vm_topdown --test smt_voting
 //! ```
 
-use std::{
-    cmp::{max, min},
-    collections::BTreeMap,
-};
+use std::{cmp::min, collections::BTreeMap};
 
 use arbitrary::Unstructured;
-use async_stm::{atomically_or_err, StmError, StmResult};
+use async_stm::{atomically, atomically_or_err, Stm, StmResult};
 use fendermint_testing::{smt, state_machine_test};
 use fendermint_vm_topdown::{
     voting::{self, VoteTally, Weight},
@@ -97,6 +94,20 @@ impl VotingState {
     pub fn block_hash(&self, h: BlockHeight) -> Option<BlockHash> {
         self.chain[h as usize].clone()
     }
+
+    pub fn has_quorum(&self, h: BlockHeight) -> bool {
+        let mut total_weight: Weight = 0;
+        let mut vote_weight: Weight = 0;
+
+        for vs in self.validator_states.values() {
+            total_weight += vs.weight;
+            if vs.highest_vote >= h {
+                vote_weight += vs.weight;
+            }
+        }
+
+        vote_weight > total_weight * 2 / 3
+    }
 }
 
 #[derive(Clone)]
@@ -120,11 +131,26 @@ impl VotingMachine {
         }
     }
 
-    fn run<F, T>(&self, f: F) -> Result<T, voting::Error>
+    fn atomically_or_err<F, T>(&self, f: F) -> Result<T, voting::Error>
     where
         F: Fn() -> StmResult<T, voting::Error>,
     {
         self.runtime.block_on(atomically_or_err(f))
+    }
+
+    fn atomically<F, T>(&self, f: F) -> T
+    where
+        F: Fn() -> Stm<T>,
+    {
+        self.runtime.block_on(atomically(f))
+    }
+
+    // For convenience in the command handler.
+    fn atomically_ok<F, T>(&self, f: F) -> Result<T, voting::Error>
+    where
+        F: Fn() -> Stm<T>,
+    {
+        Ok(self.atomically(f))
     }
 }
 
@@ -221,7 +247,7 @@ impl smt::StateMachine for VotingMachine {
                 let high_vote = state.validator_states[vk].highest_vote;
                 let max_vote: BlockHeight =
                     min(state.max_chain_height(), high_vote + MAX_VOTE_DELTA);
-                let min_vote: BlockHeight = max(0, high_vote - MAX_VOTE_DELTA);
+                let min_vote: BlockHeight = high_vote.saturating_sub(MAX_VOTE_DELTA);
 
                 let mut vote_height = u.int_in_range(min_vote..=max_vote)?;
                 while state.block_hash(vote_height).is_none() {
@@ -278,39 +304,130 @@ impl smt::StateMachine for VotingMachine {
 
     /// Apply the command on the System Under Test.
     fn run_command(&self, system: &mut Self::System, cmd: &Self::Command) -> Self::Result {
-        self.run(|| match cmd {
-            VotingCommand::ExtendChain(block_height, block_hash) => system
-                .add_block(*block_height, block_hash.clone())
-                .map(|_| None),
-            VotingCommand::AddVote(vk, block_height, block_hash) => system
-                .add_vote(vk.clone(), *block_height, block_hash.clone())
-                .map(|_| None),
-            VotingCommand::UpdatePower(power_table) => system
-                .set_power_table(power_table.clone())
-                .map_err(|c| c.into())
-                .map(|_| None),
-            VotingCommand::BlockFinalized(block_height, block_hash) => system
-                .set_finalized(*block_height, block_hash.clone())
-                .map_err(|c| c.into())
-                .map(|_| None),
-            VotingCommand::FindQuorum => system.find_quorum().map_err(|c| c.into()),
-        })
+        match cmd {
+            VotingCommand::ExtendChain(block_height, block_hash) => self.atomically_or_err(|| {
+                system
+                    .add_block(*block_height, block_hash.clone())
+                    .map(|_| None)
+            }),
+            VotingCommand::AddVote(vk, block_height, block_hash) => self.atomically_or_err(|| {
+                system
+                    .add_vote(vk.clone(), *block_height, block_hash.clone())
+                    .map(|_| None)
+            }),
+
+            VotingCommand::UpdatePower(power_table) => {
+                self.atomically_ok(|| system.set_power_table(power_table.clone()).map(|_| None))
+            }
+
+            VotingCommand::BlockFinalized(block_height, block_hash) => self.atomically_ok(|| {
+                system
+                    .set_finalized(*block_height, block_hash.clone())
+                    .map(|_| None)
+            }),
+
+            VotingCommand::FindQuorum => self.atomically_ok(|| system.find_quorum()),
+        }
     }
 
+    /// Check that the result returned by the tally is correct.
     fn check_result(&self, cmd: &Self::Command, pre_state: &Self::State, result: Self::Result) {
-        todo!()
+        match cmd {
+            VotingCommand::ExtendChain(_, _) => {
+                assert!(
+                    result.is_ok(),
+                    "chain extension should succeed; not simulating unexpected heights"
+                )
+            }
+            VotingCommand::AddVote(vk, _, _) => {
+                if pre_state.validator_states[vk].weight == 0 {
+                    assert!(
+                        result.is_err(),
+                        "not accepting votes from validators with 0 power"
+                    )
+                } else {
+                    assert!(
+                        result.is_ok(),
+                        "vote should succeed; not simulating equivocations"
+                    )
+                }
+            }
+            VotingCommand::FindQuorum => {
+                let result = result.expect("finding quorum should succeed");
+
+                let height = match result {
+                    None => pre_state.last_finalized_block,
+                    Some((height, hash)) => {
+                        assert!(pre_state.has_quorum(height), "height should have quorum");
+                        assert_eq!(
+                            pre_state.block_hash(height),
+                            Some(hash),
+                            "correct hash is returned"
+                        );
+                        height
+                    }
+                };
+
+                // Check that the first non-null block after the finalized one has no quorum.
+                let mut next = height + 1;
+                if next > pre_state.max_chain_height() {
+                    return;
+                }
+                while pre_state.block_hash(next).is_none() && next <= pre_state.last_chain_block {
+                    next += 1;
+                }
+                assert!(
+                    !pre_state.has_quorum(next),
+                    "next block at {next} should not have quorum"
+                )
+            }
+            other => {
+                assert!(result.is_ok(), "{other:?} should succeed")
+            }
+        }
     }
 
-    fn next_state(&self, cmd: &Self::Command, state: Self::State) -> Self::State {
-        todo!()
+    /// Update the model state.
+    fn next_state(&self, cmd: &Self::Command, mut state: Self::State) -> Self::State {
+        match cmd {
+            VotingCommand::ExtendChain(h, _) => state.last_chain_block = *h,
+            VotingCommand::AddVote(vk, h, _) => {
+                state
+                    .validator_states
+                    .get_mut(vk)
+                    .expect("validator exists")
+                    .highest_vote = *h
+            }
+            VotingCommand::UpdatePower(pt) => {
+                for (vk, w) in pt {
+                    state
+                        .validator_states
+                        .get_mut(vk)
+                        .expect("validators exist")
+                        .weight = *w;
+                }
+            }
+            VotingCommand::BlockFinalized(h, _) => state.last_finalized_block = *h,
+            VotingCommand::FindQuorum => {}
+        }
+        state
     }
 
+    /// Compare the tally agains the updated model state.
     fn check_system(
         &self,
-        cmd: &Self::Command,
+        _cmd: &Self::Command,
         post_state: &Self::State,
         post_system: &Self::System,
     ) -> bool {
-        todo!()
+        let last_finalized_block = self.atomically(|| post_system.last_finalized_height());
+
+        assert_eq!(
+            last_finalized_block, post_state.last_finalized_block,
+            "last finalized blocks should match"
+        );
+
+        // Stop if we finalized everything.
+        last_finalized_block < post_state.max_chain_height()
     }
 }

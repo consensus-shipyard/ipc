@@ -74,9 +74,12 @@ impl VoteTally {
 
     /// Check that a validator key is currently part of the power table.
     pub fn known_validator(&self, validator_key: &ValidatorKey) -> Stm<bool> {
-        self.power_table
-            .read()
-            .map(|pt| pt.contains_key(validator_key))
+        let pt = self.power_table.read()?;
+        // For consistency consider validators without power unknown.
+        match pt.get(validator_key) {
+            None => Ok(false),
+            Some(weight) => Ok(*weight > 0),
+        }
     }
 
     /// Calculate the minimum weight needed for a proposal to pass with the current membership.
