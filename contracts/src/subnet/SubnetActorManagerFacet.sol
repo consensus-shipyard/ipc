@@ -110,9 +110,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     ///         then  subnet will be registered.
     /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant whenNotPaused notKilled {
-        // adding this check to prevent new validators from joining
-        // after the subnet has been bootstrapped. We will increase the
-        // functionality in the future to support explicit permissioning.
+        // Adding this check to prevent new validators from joining
+        // after the subnet has been bootstrapped, if the subnet mode is not Collateral.
+        // We will increase the functionality in the future to support explicit permissioning.
         if (s.bootstrapped) {
             LibSubnetActor.enforceCollateralValidation();
         }
@@ -179,7 +179,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     /// @notice method that allows a validator to unstake a part of its collateral from a subnet.
     /// @dev `leave` must be used to unstake the entire stake.
     /// @param amount The amount to unstake.
-    function unstake(uint256 amount) external whenNotPaused notKilled {
+    function unstake(uint256 amount) external nonReentrant whenNotPaused notKilled {
         // disbling validator changes for federated validation subnets (at least for now
         // until a more complex mechanism is implemented).
         LibSubnetActor.enforceCollateralValidation();
