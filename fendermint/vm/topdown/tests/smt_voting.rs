@@ -38,7 +38,7 @@ state_machine_test!(voting, 10000 ms, 65512 bytes, 200 steps, VotingMachine::new
 #[derive(Debug)]
 pub enum VotingCommand {
     /// The tally observes the next block fo the chain.
-    ExtendChain(BlockHeight, BlockHash),
+    ExtendChain(BlockHeight, Option<BlockHash>),
     /// One of the validators voted on a block.
     AddVote(ValidatorKey, BlockHeight, BlockHash),
     /// Update the power table.
@@ -58,8 +58,8 @@ pub struct VotingState {
     ///
     /// The tally is currently unable to handle reorgs and rejects equivocations anyway.
     ///
-    /// TODO: Null blocks.
-    chain: Vec<BlockHash>,
+    /// Null blocks are represented by `None`.
+    chain: Vec<Option<BlockHash>>,
     /// All the validator keys to help pic random ones.
     validator_keys: Vec<ValidatorKey>,
     /// All the validators with varying weights (can be zero).
@@ -81,7 +81,7 @@ impl VotingState {
         self.last_finalized_block < self.max_chain_height()
     }
 
-    pub fn next_chain_block(&self) -> Option<(BlockHeight, BlockHash)> {
+    pub fn next_chain_block(&self) -> Option<(BlockHeight, Option<BlockHash>)> {
         if self.can_extend() {
             let h = self.last_chain_block + 1;
             Some((h, self.block_hash(h)))
@@ -94,7 +94,7 @@ impl VotingState {
         self.chain.len() as BlockHeight - 1
     }
 
-    pub fn block_hash(&self, h: BlockHeight) -> BlockHash {
+    pub fn block_hash(&self, h: BlockHeight) -> Option<BlockHash> {
         self.chain[h as usize].clone()
     }
 }
@@ -144,9 +144,13 @@ impl smt::StateMachine for VotingMachine {
     fn gen_state(&self, u: &mut Unstructured) -> arbitrary::Result<Self::State> {
         let chain_length = u.int_in_range(40..=60)?;
         let mut chain = Vec::new();
-        for _ in 0..chain_length {
-            let block_hash = u.bytes(32)?;
-            chain.push(Vec::from(block_hash));
+        for i in 0..chain_length {
+            if i == 0 || u.ratio(9, 10)? {
+                let block_hash = u.bytes(32)?;
+                chain.push(Some(Vec::from(block_hash)));
+            } else {
+                chain.push(None);
+            }
         }
 
         let validator_count = u.int_in_range(1..=5)?;
@@ -194,7 +198,7 @@ impl smt::StateMachine for VotingMachine {
             .map(|(vk, vs)| (vk.clone(), vs.weight))
             .collect();
 
-        let last_finalized_block = (0, state.chain[0].clone());
+        let last_finalized_block = (0, state.block_hash(0).expect("first block is not null"));
 
         VoteTally::new(power_table, last_finalized_block)
     }
@@ -218,8 +222,15 @@ impl smt::StateMachine for VotingMachine {
                 let max_vote: BlockHeight =
                     min(state.max_chain_height(), high_vote + MAX_VOTE_DELTA);
                 let min_vote: BlockHeight = max(0, high_vote - MAX_VOTE_DELTA);
-                let vote_height = u.int_in_range(min_vote..=max_vote)?;
-                let vote_hash = state.block_hash(vote_height);
+
+                let mut vote_height = u.int_in_range(min_vote..=max_vote)?;
+                while state.block_hash(vote_height).is_none() {
+                    vote_height -= 1;
+                }
+                let vote_hash = state
+                    .block_hash(vote_height)
+                    .expect("the first block not null");
+
                 VotingCommand::AddVote(vk.clone(), vote_height, vote_hash)
             }
             // Update the power table
@@ -248,8 +259,16 @@ impl smt::StateMachine for VotingMachine {
                     state.max_chain_height(),
                     state.last_finalized_block + MAX_FINALIZED_DELTA,
                 );
-                let fin_height = u.int_in_range(min_fin..=max_fin)?;
-                let fin_hash = state.block_hash(fin_height);
+
+                let mut fin_height = u.int_in_range(min_fin..=max_fin)?;
+                while state.block_hash(fin_height).is_none() {
+                    fin_height -= 1;
+                }
+                let fin_hash = state
+                    .block_hash(fin_height)
+                    .expect("the first block not null");
+
+                // Might be a duplicate, which doesn't happen in the real ledger, but it's okay.
                 VotingCommand::BlockFinalized(fin_height, fin_hash)
             }
             _ => VotingCommand::FindQuorum,
@@ -261,7 +280,7 @@ impl smt::StateMachine for VotingMachine {
     fn run_command(&self, system: &mut Self::System, cmd: &Self::Command) -> Self::Result {
         self.run(|| match cmd {
             VotingCommand::ExtendChain(block_height, block_hash) => system
-                .add_block(*block_height, Some(block_hash.clone()))
+                .add_block(*block_height, block_hash.clone())
                 .map(|_| None),
             VotingCommand::AddVote(vk, block_height, block_hash) => system
                 .add_vote(vk.clone(), *block_height, block_hash.clone())
