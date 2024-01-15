@@ -31,7 +31,7 @@ echo "const GATEWAY =" | cat - scripts/${GATEWAY_OUTPUT}  > temp && mv temp scri
 echo "[*] Output gateway address in $PWD/scripts/${GATEWAY_OUTPUT}"
 
 echo "[*] Populating deploy-registry script"
-cat scripts/${LIB_OUTPUT} | sed '/StorableMsgHelper/d' | cat - scripts/deploy-registry.template.ts > temp && mv temp scripts/deploy-registry.ts
+cat scripts/${LIB_OUTPUT} | sed '/IpcMsgHelper/d' | cat - scripts/deploy-registry.template.ts > temp && mv temp scripts/deploy-registry.ts
 cat scripts/${GATEWAY_OUTPUT} |  cat - scripts/deploy-registry.ts > temp && mv temp scripts/deploy-registry.ts
 echo "[*] Registry script in $PWD/scripts/deploy-registry.ts"
 npx hardhat deploy-subnet-registry --network ${NETWORK}

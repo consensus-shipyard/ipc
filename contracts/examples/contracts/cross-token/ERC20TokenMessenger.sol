@@ -5,7 +5,7 @@ import {IPCAddress, SubnetID} from "../../../src/structs/Subnet.sol";
 import {FvmAddress} from "../../../src/structs/FvmAddress.sol";
 import {GatewayMessengerFacet} from "../../../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayGetterFacet} from "../../../src/gateway/GatewayGetterFacet.sol";
-import {CrossMsg, StorableMsg} from "../../../src/structs/Checkpoint.sol";
+import {CrossMsg, IpcMsg} from "../../../src/structs/Checkpoint.sol";
 import {GatewayCannotBeZero, NotEnoughFunds} from "../../../src/errors/IPCErrors.sol";
 import {IERC20} from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -89,8 +89,8 @@ contract ERC20TokenMessenger is ReentrancyGuard {
             revert NoTransfer();
         }
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            message: IpcMsg({
                 from: IPCAddress({subnetId: info.getNetworkName(), rawAddress: FvmAddressHelper.from(sourceContract)}),
                 to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)}),
                 value: 0,
@@ -101,7 +101,7 @@ contract ERC20TokenMessenger is ReentrancyGuard {
             wrapped: false
         });
 
-        return messenger.sendUserXnetMessage{value: msg.value}(crossMsg);
+        return messenger.sendContractXnetMessage{value: msg.value}(crossMsg);
     }
 
     receive() external payable {}

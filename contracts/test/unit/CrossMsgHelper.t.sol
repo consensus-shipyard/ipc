@@ -7,20 +7,21 @@ import "../../src/lib/SubnetIDHelper.sol";
 import "../../src/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SupplySource} from "../../src/structs/Subnet.sol";
+import {IpcMsgKind, IpcMsg} from "../../src/structs/CrossNet.sol";
 
 import "openzeppelin-contracts/utils/Address.sol";
 
 contract CrossMsgHelperTest is Test {
     using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
-    using CrossMsgHelper for CrossMsg[];
+    using CrossMsgHelper for IpcEnvelope;
+    using CrossMsgHelper for IpcEnvelope[];
     using FvmAddressHelper for FvmAddress;
 
     uint64 private constant ROOTNET_CHAINID = 123;
     uint256 CROSS_MESSAGE_FEE = 1 gwei;
 
-    CrossMsg public crossMsg;
-    CrossMsg[] public crossMsgs;
+    IpcEnvelope public crossMsg;
+    IpcEnvelope[] public crossMsgs;
 
     error NoParentForSubnet();
 
@@ -29,14 +30,14 @@ contract CrossMsgHelperTest is Test {
     }
 
     function test_ToHash_Works() public view {
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
         require(CrossMsgHelper.toHash(crossMsg) == CrossMsgHelper.toHash(msgs[0]));
         require(CrossMsgHelper.toHash(crossMsg) != CrossMsgHelper.toHash(msgs));
     }
 
     function test_IsEmpty_Works_NonEmptyCrossMsg() public {
-        crossMsg.message.nonce = 10;
+        crossMsg.message = bytes("hello");
 
         require(crossMsg.isEmpty() == false);
     }
@@ -49,7 +50,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory releaseMsg = CrossMsgHelper.createReleaseMsg(
+        IpcEnvelope memory releaseMsg = CrossMsgHelper.createReleaseMsg(
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
@@ -60,16 +61,17 @@ contract CrossMsgHelperTest is Test {
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
         SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
+        IpcMsg memory message = releaseMsg.getIpcMsg();
 
-        require(releaseMsg.message.from.subnetId.toHash() == subnetId.toHash());
-        require(releaseMsg.message.from.rawAddress.extractEvmAddress() == sender);
-        require(releaseMsg.message.to.subnetId.toHash() == parentSubnetId.toHash());
-        require(releaseMsg.message.to.rawAddress.extractEvmAddress() == sender);
-        require(releaseMsg.message.value == releaseAmount);
-        require(releaseMsg.message.nonce == 0);
-        require(releaseMsg.message.method == METHOD_SEND);
-        require(keccak256(releaseMsg.message.params) == keccak256(EMPTY_BYTES));
-        require(releaseMsg.wrapped == false);
+        require(releaseMsg.from.subnetId.toHash() == subnetId.toHash());
+        require(releaseMsg.from.rawAddress.extractEvmAddress() == sender);
+        require(releaseMsg.to.subnetId.toHash() == parentSubnetId.toHash());
+        require(releaseMsg.to.rawAddress.extractEvmAddress() == sender);
+        require(message.value == releaseAmount);
+        require(releaseMsg.nonce == 0);
+        require(message.method == METHOD_SEND);
+        require(keccak256(message.params) == keccak256(EMPTY_BYTES));
+        require(releaseMsg.kind == IpcMsgKind.Transfer);
     }
 
     function test_CreateReleaseMsg_Fails_SubnetNoParent(uint256 releaseAmount, address sender) public {
@@ -93,7 +95,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(
+        IpcEnvelope memory fundMsg = CrossMsgHelper.createFundMsg(
             parentSubnetId,
             sender,
             FvmAddressHelper.from(sender),
@@ -102,16 +104,17 @@ contract CrossMsgHelperTest is Test {
         );
 
         SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
+        IpcMsg memory message = fundMsg.getIpcMsg();
 
-        require(fundMsg.message.from.subnetId.toHash() == rootSubnetId.toHash());
-        require(fundMsg.message.from.rawAddress.extractEvmAddress() == sender);
-        require(fundMsg.message.to.subnetId.toHash() == parentSubnetId.toHash());
-        require(fundMsg.message.to.rawAddress.extractEvmAddress() == sender);
-        require(fundMsg.message.value == fundAmount);
-        require(fundMsg.message.nonce == 0);
-        require(fundMsg.message.method == METHOD_SEND);
-        require(keccak256(fundMsg.message.params) == keccak256(EMPTY_BYTES));
-        require(fundMsg.wrapped == false);
+        require(fundMsg.from.subnetId.toHash() == rootSubnetId.toHash());
+        require(fundMsg.from.rawAddress.extractEvmAddress() == sender);
+        require(fundMsg.to.subnetId.toHash() == parentSubnetId.toHash());
+        require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
+        require(message.value == fundAmount);
+        require(fundMsg.nonce == 0);
+        require(message.method == METHOD_SEND);
+        require(keccak256(message.params) == keccak256(EMPTY_BYTES));
+        require(fundMsg.kind == IpcMsgKind.Transfer);
     }
 
     function test_CreateFundMsg_Works(uint256 fundAmount, address sender) public {
@@ -122,7 +125,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.prank(sender);
 
-        CrossMsg memory fundMsg = CrossMsgHelper.createFundMsg(
+        IpcEnvelope memory fundMsg = CrossMsgHelper.createFundMsg(
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
@@ -133,16 +136,17 @@ contract CrossMsgHelperTest is Test {
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
         SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
+        IpcMsg memory message = fundMsg.getIpcMsg();
 
-        require(fundMsg.message.from.subnetId.toHash() == parentSubnetId.toHash());
-        require(fundMsg.message.from.rawAddress.extractEvmAddress() == sender);
-        require(fundMsg.message.to.subnetId.toHash() == subnetId.toHash());
-        require(fundMsg.message.to.rawAddress.extractEvmAddress() == sender);
-        require(fundMsg.message.value == fundAmount);
-        require(fundMsg.message.nonce == 0);
-        require(fundMsg.message.method == METHOD_SEND);
-        require(keccak256(fundMsg.message.params) == keccak256(EMPTY_BYTES));
-        require(fundMsg.wrapped == false);
+        require(fundMsg.from.subnetId.toHash() == parentSubnetId.toHash());
+        require(fundMsg.from.rawAddress.extractEvmAddress() == sender);
+        require(fundMsg.to.subnetId.toHash() == subnetId.toHash());
+        require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
+        require(message.value == fundAmount);
+        require(fundMsg.nonce == 0);
+        require(message.method == METHOD_SEND);
+        require(keccak256(message.params) == keccak256(EMPTY_BYTES));
+        require(fundMsg.kind == IpcMsgKind.Transfer);
     }
 
     function test_CreateFundMsg_Fails_SubnetNoParent(uint256 fundAmount, address sender) public {
@@ -157,9 +161,11 @@ contract CrossMsgHelperTest is Test {
         address sender = address(this);
         address recipient = address(100);
 
-        crossMsg.message.to.rawAddress = FvmAddressHelper.from(recipient);
-        crossMsg.message.method = METHOD_SEND;
-        crossMsg.message.value = 1;
+        crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
+        IpcMsg memory message = crossMsg.getIpcMsg();
+        message.method = METHOD_SEND;
+        message.value = 1;
+        crossMsg = crossMsg.setIpcMsg(message);
 
         vm.deal(sender, 1 ether);
 
@@ -172,68 +178,49 @@ contract CrossMsgHelperTest is Test {
 
     function test_Execute_Works_FunctionCallWithValue() public {
         address sender = address(this);
-        address recipient = address(this);
+        address recipient = address(100);
 
-        crossMsg.message.to.rawAddress = FvmAddressHelper.from(recipient);
-        crossMsg.message.method = this.callback.selector;
-        crossMsg.message.value = 1;
-        crossMsg.message.params = abi.encode(EMPTY_BYTES);
-        crossMsg.wrapped = false;
+        crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
+        IpcMsg memory message = crossMsg.getIpcMsg();
+        message.method = METHOD_SEND;
+        message.value = 1;
+        message.params = abi.encode(EMPTY_BYTES);
+        crossMsg = crossMsg.setIpcMsg(message);
 
         vm.deal(sender, 1 ether);
-        vm.expectCall(recipient, crossMsg.message.value, abi.encodeCall(this.callback, EMPTY_BYTES));
+        vm.expectCall(recipient, message.value, new bytes(0), 1);
 
         bytes memory result = crossMsg.execute(SupplySourceHelper.native());
-        bytes memory decoded = abi.decode(result, (bytes));
 
-        require(keccak256(decoded) == keccak256(EMPTY_BYTES));
+        require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
 
     function test_Execute_Works_FunctionCallWithoutValue() public {
         address sender = address(this);
-        address recipient = address(this);
+        address recipient = address(100);
 
-        crossMsg.message.to.rawAddress = FvmAddressHelper.from(recipient);
-        crossMsg.message.method = this.callback.selector;
-        crossMsg.message.value = 0;
-        crossMsg.message.params = abi.encode(EMPTY_BYTES);
-        crossMsg.wrapped = false;
-
-        vm.deal(sender, 1 ether);
-        vm.expectCall(recipient, crossMsg.message.value, abi.encodeCall(this.callback, EMPTY_BYTES));
-
-        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
-        bytes memory decoded = abi.decode(result, (bytes));
-
-        require(keccak256(decoded) == keccak256(EMPTY_BYTES));
-    }
-
-    function test_Execute_Works_FunctionCall_Wrapped() public {
-        address sender = address(this);
-        address recipient = address(this);
-
-        crossMsg.message.to.rawAddress = FvmAddressHelper.from(recipient);
-        crossMsg.message.method = this.callbackWrapped.selector;
-        crossMsg.message.value = 0;
-        crossMsg.message.params = abi.encode(EMPTY_BYTES);
-        crossMsg.wrapped = true;
+        crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
+        IpcMsg memory message = crossMsg.getIpcMsg();
+        message.method = METHOD_SEND;
+        message.value = 0;
+        message.params = abi.encode(EMPTY_BYTES);
+        crossMsg = crossMsg.setIpcMsg(message);
 
         vm.deal(sender, 1 ether);
+        vm.expectCall(recipient, message.value, new bytes(0), 1);
 
-        vm.expectCall(recipient, crossMsg.message.value, abi.encodeCall(this.callbackWrapped, crossMsg));
         bytes memory result = crossMsg.execute(SupplySourceHelper.native());
 
-        bytes memory decoded = abi.decode(result, (bytes));
-        CrossMsg memory decodedCrossMsg = abi.decode(decoded, (CrossMsg));
-
-        require(decodedCrossMsg.toHash() == crossMsg.toHash(), "decoded.toHash() == crossMsg.toHash()");
+        require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
 
     function test_Execute_Fails_InvalidMethod() public {
         SupplySource memory native = SupplySourceHelper.native();
 
-        crossMsg.message.to.rawAddress = FvmAddressHelper.from(address(this));
-        crossMsg.message.method = bytes4("1");
+        crossMsg.to.rawAddress = FvmAddressHelper.from(address(this));
+        IpcMsg memory message = crossMsg.getIpcMsg();
+        message.method = bytes4("1");
+        crossMsg = crossMsg.setIpcMsg(message);
 
         vm.expectRevert(Address.FailedInnerCall.selector);
         crossMsg.execute(native);
@@ -243,7 +230,7 @@ contract CrossMsgHelperTest is Test {
         return params;
     }
 
-    function callbackWrapped(CrossMsg memory w) public payable returns (bytes memory) {
+    function callbackWrapped(IpcEnvelope memory w) public payable returns (bytes memory) {
         return abi.encode(w);
     }
 
@@ -275,38 +262,112 @@ contract CrossMsgHelperTest is Test {
         require(CrossMsgHelper.isSorted(crossMsgs) == false);
     }
 
-    function createCrossMsg(uint64 nonce, uint256 fee) internal pure returns (CrossMsg memory) {
+    function test_applyType_TopDown() public view {
+        address[] memory from = new address[](1);
+        from[0] = address(1);
+        address[] memory to = new address[](4);
+        to[0] = address(1);
+        to[1] = address(2);
+        to[2] = address(3);
+        to[3] = address(4);
+
+        IPCAddress memory ifrom = IPCAddress({
+            subnetId: SubnetID({root: ROOTNET_CHAINID, route: from}),
+            rawAddress: FvmAddressHelper.from(address(3))
+        });
+        IPCAddress memory ito = IPCAddress({
+            subnetId: SubnetID({root: ROOTNET_CHAINID, route: to}),
+            rawAddress: FvmAddressHelper.from(address(3))
+        });
+
+        IpcEnvelope memory storableMsg = createCrossMsg(ifrom, ito, 0);
+
+        require(
+            storableMsg.applyType(SubnetID({root: ROOTNET_CHAINID, route: from})) == IPCMsgType.TopDown,
+            "Should be TopDown"
+        );
+
+        address[] memory current = new address[](2);
+        current[0] = address(1);
+        current[1] = address(2);
+        SubnetID memory subnetId = SubnetID({root: ROOTNET_CHAINID, route: current});
+
+        require(storableMsg.applyType(subnetId) == IPCMsgType.TopDown, "Should be TopDown");
+
+        address[] memory current2 = new address[](3);
+        current2[0] = address(1);
+        current2[1] = address(2);
+        current2[2] = address(3);
+
+        require(
+            storableMsg.applyType(SubnetID({root: ROOTNET_CHAINID, route: current2})) == IPCMsgType.TopDown,
+            "Should be TopDown"
+        );
+    }
+
+    function test_applyType_BottomUp() public view {
+        address[] memory from = new address[](2);
+        from[0] = address(1);
+        from[1] = address(2);
+        address[] memory to = new address[](1);
+        to[0] = address(1);
+
+        IPCAddress memory ifrom = IPCAddress({
+            subnetId: SubnetID({root: ROOTNET_CHAINID, route: from}),
+            rawAddress: FvmAddressHelper.from(address(3))
+        });
+        IPCAddress memory ito = IPCAddress({
+            subnetId: SubnetID({root: ROOTNET_CHAINID, route: to}),
+            rawAddress: FvmAddressHelper.from(address(3))
+        });
+
+        IpcEnvelope memory storableMsg = createCrossMsg(ifrom, ito, 0);
+
+        require(
+            storableMsg.applyType(SubnetID({root: ROOTNET_CHAINID, route: from})) == IPCMsgType.BottomUp,
+            "Should be BottomUp"
+        );
+        require(
+            storableMsg.applyType(SubnetID({root: ROOTNET_CHAINID, route: to})) == IPCMsgType.BottomUp,
+            "Should be BottomUp"
+        );
+    }
+
+    function createDefaultCrossMsg(uint64 nonce) internal view returns (IpcEnvelope memory) {
+        IPCAddress memory addr = IPCAddress({
+            subnetId: SubnetID(0, new address[](0)),
+            rawAddress: FvmAddressHelper.from(address(0))
+        });
+        return createCrossMsg(addr, addr, nonce);
+    }
+
+    function createCrossMsg(
+        IPCAddress memory from,
+        IPCAddress memory to,
+        uint64 nonce
+    ) internal view returns (IpcEnvelope memory) {
+        IpcMsg memory message = IpcMsg({value: 0, method: METHOD_SEND, params: EMPTY_BYTES});
         return
-            CrossMsg({
-                message: StorableMsg({
-                    from: IPCAddress({
-                        subnetId: SubnetID(0, new address[](0)),
-                        rawAddress: FvmAddressHelper.from(address(0))
-                    }),
-                    to: IPCAddress({
-                        subnetId: SubnetID(0, new address[](0)),
-                        rawAddress: FvmAddressHelper.from(address(0))
-                    }),
-                    value: 0,
-                    nonce: nonce,
-                    method: METHOD_SEND,
-                    params: EMPTY_BYTES,
-                    fee: fee
-                }),
-                wrapped: false
+            IpcEnvelope({
+                kind: IpcMsgKind.Transfer,
+                from: from,
+                to: to,
+                message: abi.encode(message),
+                nonce: nonce,
+                fee: CROSS_MESSAGE_FEE
             });
     }
 
-    function createCrossMsgs(uint256 length, uint64 nonce) internal view returns (CrossMsg[] memory _crossMsgs) {
-        _crossMsgs = new CrossMsg[](length);
+    function createCrossMsgs(uint256 length, uint64 nonce) internal view returns (IpcEnvelope[] memory _crossMsgs) {
+        _crossMsgs = new IpcEnvelope[](length);
 
         for (uint256 i = 0; i < length; i++) {
-            _crossMsgs[i] = createCrossMsg(nonce, CROSS_MESSAGE_FEE);
+            _crossMsgs[i] = createDefaultCrossMsg(nonce);
         }
     }
 
     function addCrossMsg(uint64 nonce) internal {
-        crossMsg.message.nonce = nonce;
+        crossMsg.nonce = nonce;
 
         crossMsgs.push(crossMsg);
     }

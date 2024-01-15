@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {NotEnoughFee, NotSystemActor, NotEnoughFunds} from "../errors/IPCErrors.sol";
 import {QuorumMap} from "../structs/Quorum.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatch, CrossMsg, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
@@ -20,7 +20,7 @@ struct GatewayActorStorage {
     /// @notice Postbox keeps track of all the cross-net messages triggered by
     /// an actor that need to be propagated further through the hierarchy.
     /// cross-net message id => CrossMsg
-    mapping(bytes32 => CrossMsg) postbox;
+    mapping(bytes32 => IpcEnvelope) postbox;
     /// @notice The current membership of the child subnet
     Membership currentMembership;
     /// @notice The last membership received from the parent and adopted

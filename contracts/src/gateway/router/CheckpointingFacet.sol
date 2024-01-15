@@ -10,15 +10,17 @@ import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {IRelayerRewardDistributor} from "../../interfaces/ISubnetActor.sol";
 
-import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
+import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, InvalidCheckpointSource, InvalidCrossMsgNonce, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
 import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated} from "../../errors/IPCErrors.sol";
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
-import {CrossMsg, SubnetID} from "../../structs/CrossNet.sol";
+import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
+import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
+    using CrossMsgHelper for IpcEnvelope;
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
@@ -129,14 +131,14 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
     /// @notice submit a batch of cross-net messages for execution.
     /// @param msgs The batch of bottom-up cross-network messages to be executed.
-    function execBottomUpMsgs(CrossMsg[] calldata msgs, Subnet storage subnet) internal {
+    function execBottomUpMsgs(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
         uint256 totalValue;
         uint256 totalFee;
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += msgs[i].message.value;
-            totalFee += msgs[i].message.fee;
+            totalValue += msgs[i].getValue();
+            totalFee += msgs[i].fee;
             unchecked {
                 ++i;
             }

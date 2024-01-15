@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";

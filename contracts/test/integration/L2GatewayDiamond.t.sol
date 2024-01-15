@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {CrossMsg, StorableMsg} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, IpcMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -20,16 +20,18 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond} from "../IntegrationTestPresets.sol";
+import {TestUtils} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
 contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
+    using CrossMsgHelper for IpcEnvelope;
 
     function testGatewayDiamond_CommitParentFinality_BigNumberOfMessages() public {
         uint256 n = 2000;
         FvmAddress[] memory validators = new FvmAddress[](1);
         validators[0] = FvmAddressHelper.from(vm.addr(100));
+        address receipient = vm.addr(102);
         vm.deal(vm.addr(100), 1);
 
         uint256[] memory weights = new uint[](1);
@@ -37,20 +39,15 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         SubnetID memory id = gwGetter.getNetworkName();
 
-        CrossMsg[] memory topDownMsgs = new CrossMsg[](n);
+        IpcEnvelope[] memory topDownMsgs = new IpcEnvelope[](n);
         for (uint64 i = 0; i < n; i++) {
-            topDownMsgs[i] = CrossMsg({
-                message: StorableMsg({
-                    from: IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
-                    to: IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
-                    value: 0,
-                    nonce: i,
-                    method: this.callback.selector,
-                    params: EMPTY_BYTES,
-                    fee: DEFAULT_CROSS_MSG_FEE
-                }),
-                wrapped: false
-            });
+            topDownMsgs[i] = TestUtils.newTransferCrossMsg(
+                IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
+                IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(receipient)}),
+                0,
+                i,
+                DEFAULT_CROSS_MSG_FEE
+            );
         }
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -117,25 +114,20 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     function setupWhiteListMethod(address caller) internal returns (bytes32) {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, address(this));
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName().createSubnetId(caller),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                to: IPCAddress({
-                    subnetId: gwGetter.getNetworkName().createSubnetId(address(this)),
-                    rawAddress: FvmAddressHelper.from(address(this))
-                }),
-                value: DEFAULT_CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0),
-                fee: DEFAULT_CROSS_MSG_FEE
+        IpcEnvelope memory crossMsg = TestUtils.newTransferCrossMsg(
+            IPCAddress({
+                subnetId: gwGetter.getNetworkName().createSubnetId(caller),
+                rawAddress: FvmAddressHelper.from(caller)
             }),
-            wrapped: false
-        });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+            IPCAddress({
+                subnetId: gwGetter.getNetworkName().createSubnetId(address(this)),
+                rawAddress: FvmAddressHelper.from(address(this))
+            }),
+            DEFAULT_CROSS_MSG_FEE + 1,
+            0,
+            DEFAULT_CROSS_MSG_FEE
+        );
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);

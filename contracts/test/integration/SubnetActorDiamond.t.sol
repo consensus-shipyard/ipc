@@ -10,7 +10,7 @@ import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol"
 import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
-import {BottomUpMsgBatch, CrossMsg, BottomUpCheckpoint, StorableMsg} from "../../src/structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, IpcMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo} from "../../src/structs/Subnet.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
@@ -20,7 +20,6 @@ import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {MultisignatureChecker} from "../../src/lib/LibMultisignatureChecker.sol";
-import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
@@ -468,19 +467,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_crossMsgGetter() public view {
-        CrossMsg[] memory msgs = new CrossMsg[](1);
-        msgs[0] = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
-                to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
-                value: DEFAULT_CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0),
-                fee: DEFAULT_CROSS_MSG_FEE
-            }),
-            wrapped: false
-        });
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = TestUtils.newTransferCrossMsg(
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
+            DEFAULT_CROSS_MSG_FEE + 1,
+            0,
+            DEFAULT_CROSS_MSG_FEE
+        );
         require(saGetter.crossMsgsHash(msgs) == keccak256(abi.encode(msgs)));
     }
 
@@ -635,207 +629,187 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saCheckpointer.validateActiveQuorumSignatures(validators, hash0, signatures);
     }
 
-    // function testSubnetActorDiamond_submitCheckpoint_basic() public {
-    //     (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-    //     bytes[] memory pubKeys = new bytes[](3);
-    //     bytes[] memory signatures = new bytes[](3);
+    function testSubnetActorDiamond_submitCheckpoint_basic() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
 
-    //     for (uint256 i = 0; i < 3; i++) {
-    //         vm.deal(validators[i], 10 gwei);
-    //         pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-    //         vm.prank(validators[i]);
-    //         saManager.join{value: 10}(pubKeys[i]);
-    //     }
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(validators[i], 10 gwei);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
 
-    //     CrossMsg memory crossMsg = CrossMsg({
-    //         message: StorableMsg({
-    //             from: IPCAddress({
-    //                 subnetId: saGetter.getParent(),
-    //                 rawAddress: FvmAddressHelper.from(address(saDiamond))
-    //             }),
-    //             to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-    //             value: DEFAULT_CROSS_MSG_FEE + 1,
-    //             nonce: 0,
-    //             method: METHOD_SEND,
-    //             params: new bytes(0),
-    //             fee: DEFAULT_CROSS_MSG_FEE
-    //         }),
-    //         wrapped: false
-    //     });
-    //     CrossMsg[] memory msgs = new CrossMsg[](1);
-    //     msgs[0] = crossMsg;
+        IpcEnvelope memory crossMsg = TestUtils.newTransferCrossMsg(
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            DEFAULT_CROSS_MSG_FEE + 1,
+            0,
+            DEFAULT_CROSS_MSG_FEE
+        );
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = crossMsg;
 
-    //     BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-    //         subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
-    //         blockHeight: saGetter.bottomUpCheckPeriod(),
-    //         blockHash: keccak256("block1"),
-    //         nextConfigurationNumber: 0
-    //     });
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            blockHeight: saGetter.bottomUpCheckPeriod(),
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: msgs
+        });
 
-    //     BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
-    //         subnetID: saGetter.getParent(),
-    //         blockHeight: 1,
-    //         blockHash: keccak256("block1"),
-    //         nextConfigurationNumber: 0
-    //     });
+        BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
+            subnetID: saGetter.getParent(),
+            blockHeight: 1,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: msgs
+        });
 
-    //     vm.deal(address(saDiamond), 100 ether);
-    //     vm.prank(address(saDiamond));
-    //     gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(3 * DEFAULT_CROSS_MSG_FEE);
+        vm.deal(address(saDiamond), 100 ether);
+        vm.prank(address(saDiamond));
+        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(3 * DEFAULT_CROSS_MSG_FEE);
 
-    //     bytes32 hash = keccak256(abi.encode(checkpoint));
+        bytes32 hash = keccak256(abi.encode(checkpoint));
 
-    //     for (uint256 i = 0; i < 3; i++) {
-    //         (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-    //         signatures[i] = abi.encodePacked(r, s, v);
-    //     }
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
 
-    //     vm.expectRevert(InvalidCheckpointEpoch.selector);
-    //     vm.prank(validators[0]);
-    //     saCheckpointer.submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
+        vm.expectRevert(InvalidCheckpointEpoch.selector);
+        vm.prank(validators[0]);
+        saCheckpointer.submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
 
-    //     vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
-    //     vm.prank(validators[0]);
-    //     saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
+        vm.prank(validators[0]);
+        saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
 
-    //     require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
-    //     require(
-    //         saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
-    //         " checkpoint height correct"
-    //     );
+        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
+        require(
+            saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
+            " checkpoint height correct"
+        );
 
-    //     vm.prank(validators[0]);
-    //     saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
-    //     require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
-    //     require(
-    //         saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
-    //         " checkpoint height correct"
-    //     );
+        vm.prank(validators[0]);
+        saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
+        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
+        require(
+            saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
+            " checkpoint height correct"
+        );
 
-    //     (bool exists, BottomUpCheckpoint memory recvCheckpoint) = saGetter.bottomUpCheckpointAtEpoch(
-    //         saGetter.bottomUpCheckPeriod()
-    //     );
-    //     require(exists, "checkpoint does not exist");
-    //     require(hash == keccak256(abi.encode(recvCheckpoint)), "checkpoint hashes are not the same");
+        (bool exists, BottomUpCheckpoint memory recvCheckpoint) = saGetter.bottomUpCheckpointAtEpoch(
+            saGetter.bottomUpCheckPeriod()
+        );
+        require(exists, "checkpoint does not exist");
+        require(hash == keccak256(abi.encode(recvCheckpoint)), "checkpoint hashes are not the same");
 
-    //     bytes32 recvHash;
-    //     (exists, recvHash) = saGetter.bottomUpCheckpointHashAtEpoch(saGetter.bottomUpCheckPeriod());
-    //     require(exists, "checkpoint does not exist");
-    //     require(hash == recvHash, "hashes are not the same");
-    // }
+        bytes32 recvHash;
+        (exists, recvHash) = saGetter.bottomUpCheckpointHashAtEpoch(saGetter.bottomUpCheckPeriod());
+        require(exists, "checkpoint does not exist");
+        require(hash == recvHash, "hashes are not the same");
+    }
 
-    // function testSubnetActorDiamond_submitCheckpointWithReward() public {
-    //     (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-    //     bytes[] memory pubKeys = new bytes[](3);
-    //     bytes[] memory signatures = new bytes[](3);
+    function testSubnetActorDiamond_submitCheckpointWithReward() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
 
-    //     for (uint256 i = 0; i < 3; i++) {
-    //         vm.deal(validators[i], 10 gwei);
-    //         pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-    //         vm.prank(validators[i]);
-    //         saManager.join{value: 10}(pubKeys[i]);
-    //     }
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(validators[i], 10 gwei);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.prank(validators[i]);
+            saManager.join{value: 10}(pubKeys[i]);
+        }
 
-    //     // send the first checkpoint
-    //     CrossMsg memory crossMsg = CrossMsg({
-    //         message: StorableMsg({
-    //             from: IPCAddress({
-    //                 subnetId: saGetter.getParent(),
-    //                 rawAddress: FvmAddressHelper.from(address(saDiamond))
-    //             }),
-    //             to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-    //             value: DEFAULT_CROSS_MSG_FEE + 1,
-    //             nonce: 0,
-    //             method: METHOD_SEND,
-    //             params: new bytes(0),
-    //             fee: DEFAULT_CROSS_MSG_FEE
-    //         }),
-    //         wrapped: false
-    //     });
-    //     CrossMsg[] memory msgs = new CrossMsg[](1);
-    //     msgs[0] = crossMsg;
+        // send the first checkpoint
+        IpcEnvelope memory crossMsg = TestUtils.newTransferCrossMsg(
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            DEFAULT_CROSS_MSG_FEE + 1,
+            0,
+            DEFAULT_CROSS_MSG_FEE
+        );
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = crossMsg;
 
-    //     BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-    //         subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
-    //         blockHeight: saGetter.bottomUpCheckPeriod(),
-    //         blockHash: keccak256("block1"),
-    //         nextConfigurationNumber: 0
-    //     });
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            blockHeight: saGetter.bottomUpCheckPeriod(),
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: msgs
+        });
 
-    //     vm.deal(address(saDiamond), 100 ether);
-    //     vm.prank(address(saDiamond));
-    //     gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * DEFAULT_CROSS_MSG_FEE}(6 * DEFAULT_CROSS_MSG_FEE);
+        vm.deal(address(saDiamond), 100 ether);
+        vm.prank(address(saDiamond));
+        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * DEFAULT_CROSS_MSG_FEE}(6 * DEFAULT_CROSS_MSG_FEE);
 
-    //     bytes32 hash = keccak256(abi.encode(checkpoint));
+        bytes32 hash = keccak256(abi.encode(checkpoint));
 
-    //     for (uint256 i = 0; i < 3; i++) {
-    //         (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-    //         signatures[i] = abi.encodePacked(r, s, v);
-    //     }
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
 
-    //     vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
-    //     vm.prank(validators[0]);
-    //     saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
+        vm.prank(validators[0]);
+        saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
 
-    //     require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
-    //     require(
-    //         saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
-    //         " checkpoint height correct"
-    //     );
+        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
+        require(
+            saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
+            " checkpoint height correct"
+        );
 
-    //     require(saGetter.getRelayerReward(validators[0]) == 0, "there is a reward");
+        require(saGetter.getRelayerReward(validators[0]) == 0, "there is a reward");
 
-    //     // send the second checkpoint
-    //     crossMsg = CrossMsg({
-    //         message: StorableMsg({
-    //             from: IPCAddress({
-    //                 subnetId: saGetter.getParent(),
-    //                 rawAddress: FvmAddressHelper.from(address(saDiamond))
-    //             }),
-    //             to: IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-    //             value: DEFAULT_CROSS_MSG_FEE + 1,
-    //             nonce: 1,
-    //             method: METHOD_SEND,
-    //             params: new bytes(0),
-    //             fee: DEFAULT_CROSS_MSG_FEE
-    //         }),
-    //         wrapped: false
-    //     });
-    //     msgs[0] = crossMsg;
+        // send the second checkpoint
+        crossMsg = TestUtils.newTransferCrossMsg(
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            DEFAULT_CROSS_MSG_FEE + 1,
+            1,
+            DEFAULT_CROSS_MSG_FEE
+        );
+        msgs[0] = crossMsg;
 
-    //     checkpoint = BottomUpCheckpoint({
-    //         subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
-    //         blockHeight: 2 * saGetter.bottomUpCheckPeriod(),
-    //         blockHash: keccak256("block2"),
-    //         nextConfigurationNumber: 0,
-    //     });
+        checkpoint = BottomUpCheckpoint({
+            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            blockHeight: 2 * saGetter.bottomUpCheckPeriod(),
+            blockHash: keccak256("block2"),
+            nextConfigurationNumber: 0,
+            msgs: msgs
+        });
 
-    //     hash = keccak256(abi.encode(checkpoint));
+        hash = keccak256(abi.encode(checkpoint));
 
-    //     for (uint256 i = 0; i < 3; i++) {
-    //         (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-    //         signatures[i] = abi.encodePacked(r, s, v);
-    //     }
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
 
-    //     vm.prank(validators[0]);
-    //     saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
+        vm.prank(validators[0]);
+        saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
 
-    //     require(saGetter.getRelayerReward(validators[1]) == 0, "unexpected reward");
-    //     require(saGetter.getRelayerReward(validators[2]) == 0, "unexpected reward");
-    //     uint256 validator0Reward = saGetter.getRelayerReward(validators[0]);
-    //     if (FEATURE_CHECKPOINT_RELAYER_REWARDS) {
-    //         require(validator0Reward == DEFAULT_CROSS_MSG_FEE, "there is no reward for validator");
+        require(saGetter.getRelayerReward(validators[1]) == 0, "unexpected reward");
+        require(saGetter.getRelayerReward(validators[2]) == 0, "unexpected reward");
+        uint256 validator0Reward = saGetter.getRelayerReward(validators[0]);
+        if (FEATURE_CHECKPOINT_RELAYER_REWARDS) {
+            require(validator0Reward == DEFAULT_CROSS_MSG_FEE, "there is no reward for validator");
 
-    //         uint256 b1 = validators[0].balance;
-    //         // disable the claim of rewards if the fee is zero
-    //         if (DEFAULT_CROSS_MSG_FEE != 0) {
-    //             vm.startPrank(validators[0]);
-    //             saRewarder.claimRewardForRelayer();
-    //             uint256 b2 = validators[0].balance;
-    //             require(b2 - b1 == validator0Reward, "reward received");
-    //         }
-    //     }
-    // }
+            uint256 b1 = validators[0].balance;
+            // disable the claim of rewards if the fee is zero
+            if (DEFAULT_CROSS_MSG_FEE != 0) {
+                vm.startPrank(validators[0]);
+                saRewarder.claimRewardForRelayer();
+                uint256 b2 = validators[0].balance;
+                require(b2 - b1 == validator0Reward, "reward received");
+            }
+        }
+    }
 
     function testSubnetActorDiamond_DiamondCut() public {
         // add method getNum to subnet actor diamond and assert it can be correctly called
