@@ -1,11 +1,8 @@
-name: Contracts Deployment Test
+name: Deployment Test
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-      - dev
-  pull_request:
+  workflow_call:
 
 jobs:
   build:

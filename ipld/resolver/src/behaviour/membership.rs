@@ -6,22 +6,19 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use ipc_api::subnet_id::SubnetID;
-use libp2p::core::connection::ConnectionId;
-use libp2p::gossipsub::error::SubscriptionError;
+use libp2p::core::Endpoint;
 use libp2p::gossipsub::{
-    GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, IdentTopic, MessageAuthenticity,
-    MessageId, Sha256Topic, Topic, TopicHash,
+    self, IdentTopic, MessageAuthenticity, MessageId, PublishError, Sha256Topic, SubscriptionError,
+    Topic, TopicHash,
 };
 use libp2p::identity::Keypair;
 use libp2p::swarm::derive_prelude::FromSwarm;
-use libp2p::swarm::{NetworkBehaviourAction, PollParameters};
-use libp2p::Multiaddr;
-use libp2p::{
-    gossipsub::Gossipsub,
-    swarm::{ConnectionHandler, IntoConnectionHandler, NetworkBehaviour},
-    PeerId,
+use libp2p::swarm::{
+    ConnectionDenied, ConnectionId, NetworkBehaviour, THandler, THandlerInEvent, THandlerOutEvent,
+    ToSwarm,
 };
-use log::{debug, error, warn};
+use libp2p::{Multiaddr, PeerId};
+use log::{debug, error, info, warn};
 use tokio::time::{Instant, Interval};
 
 use crate::hash::blake2b_256;
@@ -88,8 +85,8 @@ pub enum ConfigError {
 /// A [`NetworkBehaviour`] internally using [`Gossipsub`] to learn which
 /// peer is able to resolve CIDs in different subnets.
 pub struct Behaviour {
-    /// [`Gossipsub`] behaviour to spread the information about subnet membership.
-    inner: Gossipsub,
+    /// [`gossipsub::Behaviour`] to spread the information about subnet membership.
+    inner: gossipsub::Behaviour,
     /// Events to return when polled.
     outbox: VecDeque<Event>,
     /// [`Keypair`] used to sign [`SignedProviderRecord`] instances.
@@ -128,19 +125,19 @@ impl Behaviour {
         }
         let membership_topic = Topic::new(format!("{}/{}", PUBSUB_MEMBERSHIP, nc.network_name));
 
-        let mut gossipsub_config = GossipsubConfigBuilder::default();
+        let mut gossipsub_config = gossipsub::ConfigBuilder::default();
         // Set the maximum message size to 2MB.
         gossipsub_config.max_transmit_size(2 << 20);
-        gossipsub_config.message_id_fn(|msg: &GossipsubMessage| {
+        gossipsub_config.message_id_fn(|msg: &gossipsub::Message| {
             let s = blake2b_256(&msg.data);
             MessageId::from(s)
         });
 
         let gossipsub_config = gossipsub_config
             .build()
-            .map_err(|s| ConfigError::InvalidGossipsubConfig(s.into()))?;
+            .map_err(|s| ConfigError::InvalidGossipsubConfig(s.to_string()))?;
 
-        let mut gossipsub = Gossipsub::new(
+        let mut gossipsub = gossipsub::Behaviour::new(
             MessageAuthenticity::Signed(nc.local_key.clone()),
             gossipsub_config,
         )
@@ -187,6 +184,16 @@ impl Behaviour {
         Ok(membership)
     }
 
+    fn subscribe(&mut self, topic: &Sha256Topic) -> Result<bool, SubscriptionError> {
+        info!("subscribing to ${topic}");
+        self.inner.subscribe(topic)
+    }
+
+    fn unsubscribe(&mut self, topic: &Sha256Topic) -> Result<bool, PublishError> {
+        info!("unsubscribing from ${topic}");
+        self.inner.unsubscribe(topic)
+    }
+
     /// Construct the topic used to gossip about pre-emptively published data.
     ///
     /// Replaces "/" with "_" to avoid clashes from prefix/suffix overlap.
@@ -202,7 +209,7 @@ impl Behaviour {
     /// Subscribe to a preemptive topic.
     fn preemptive_subscribe(&mut self, subnet_id: SubnetID) -> Result<(), SubscriptionError> {
         let topic = self.preemptive_topic(&subnet_id);
-        self.inner.subscribe(&topic)?;
+        self.subscribe(&topic)?;
         self.preemptive_topics.insert(topic.hash(), subnet_id);
         Ok(())
     }
@@ -210,7 +217,7 @@ impl Behaviour {
     /// Subscribe to a preemptive topic.
     fn preemptive_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
         let topic = self.preemptive_topic(subnet_id);
-        self.inner.unsubscribe(&topic)?;
+        self.unsubscribe(&topic)?;
         self.preemptive_topics.remove(&topic.hash());
         Ok(())
     }
@@ -230,7 +237,7 @@ impl Behaviour {
     /// Subscribe to a voting topic.
     fn voting_subscribe(&mut self, subnet_id: &SubnetID) -> Result<(), SubscriptionError> {
         let topic = self.voting_topic(subnet_id);
-        self.inner.subscribe(&topic)?;
+        self.subscribe(&topic)?;
         self.voting_topics.insert(topic.hash());
         Ok(())
     }
@@ -238,7 +245,7 @@ impl Behaviour {
     /// Unsubscribe from a voting topic.
     fn voting_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
         let topic = self.voting_topic(subnet_id);
-        self.inner.unsubscribe(&topic)?;
+        self.unsubscribe(&topic)?;
         self.voting_topics.remove(&topic.hash());
         Ok(())
     }
@@ -305,6 +312,10 @@ impl Behaviour {
     fn publish_membership(&mut self) -> anyhow::Result<()> {
         let record = ProviderRecord::signed(&self.local_key, self.subnet_ids.clone())?;
         let data = record.into_envelope().into_protobuf_encoding();
+        debug!(
+            "publishing membership in {:?} to {}",
+            self.subnet_ids, self.membership_topic
+        );
         match self.inner.publish(self.membership_topic.clone(), data) {
             Err(e) => {
                 stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
@@ -379,11 +390,11 @@ impl Behaviour {
         self.provider_cache.providers_of_subnet(subnet_id)
     }
 
-    /// Parse and handle a [`GossipsubMessage`]. If it's from the expected topic,
+    /// Parse and handle a [`gossipsub::Message`]. If it's from the expected topic,
     /// then raise domain event to let the rest of the application know about a
     /// provider. Also update all the book keeping in the behaviour that we use
     /// to answer future queries about the topic.
-    fn handle_message(&mut self, msg: GossipsubMessage) {
+    fn handle_message(&mut self, msg: gossipsub::Message) {
         if msg.topic == self.membership_topic.hash() {
             match SignedProviderRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
                 Ok(record) => self.handle_provider_record(record),
@@ -422,6 +433,7 @@ impl Behaviour {
     /// If this is the first time we receive a record from the peer,
     /// reciprocate by publishing our own.
     fn handle_provider_record(&mut self, record: ProviderRecord) {
+        debug!("received provider record: {record:?}");
         let (event, publish) = match self.provider_cache.add_provider(&record) {
             None => {
                 stats::MEMBERSHIP_SKIPPED_PEERS.inc();
@@ -501,18 +513,10 @@ impl Behaviour {
 }
 
 impl NetworkBehaviour for Behaviour {
-    type ConnectionHandler = <Gossipsub as NetworkBehaviour>::ConnectionHandler;
-    type OutEvent = Event;
+    type ConnectionHandler = <gossipsub::Behaviour as NetworkBehaviour>::ConnectionHandler;
+    type ToSwarm = Event;
 
-    fn new_handler(&mut self) -> Self::ConnectionHandler {
-        self.inner.new_handler()
-    }
-
-    fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
-        self.inner.addresses_of_peer(peer_id)
-    }
-
-    fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
+    fn on_swarm_event(&mut self, event: FromSwarm) {
         self.inner.on_swarm_event(event)
     }
 
@@ -520,20 +524,70 @@ impl NetworkBehaviour for Behaviour {
         &mut self,
         peer_id: PeerId,
         connection_id: ConnectionId,
-        event: <<Self::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::OutEvent,
+        event: THandlerOutEvent<Self>,
     ) {
         self.inner
             .on_connection_handler_event(peer_id, connection_id, event)
     }
 
+    fn handle_pending_inbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        local_addr: &Multiaddr,
+        remote_addr: &Multiaddr,
+    ) -> Result<(), ConnectionDenied> {
+        self.inner
+            .handle_pending_inbound_connection(connection_id, local_addr, remote_addr)
+    }
+
+    fn handle_established_inbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        peer: PeerId,
+        local_addr: &Multiaddr,
+        remote_addr: &Multiaddr,
+    ) -> Result<THandler<Self>, ConnectionDenied> {
+        self.inner.handle_established_inbound_connection(
+            connection_id,
+            peer,
+            local_addr,
+            remote_addr,
+        )
+    }
+
+    fn handle_pending_outbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        maybe_peer: Option<PeerId>,
+        addresses: &[Multiaddr],
+        effective_role: Endpoint,
+    ) -> Result<Vec<Multiaddr>, ConnectionDenied> {
+        self.inner.handle_pending_outbound_connection(
+            connection_id,
+            maybe_peer,
+            addresses,
+            effective_role,
+        )
+    }
+
+    fn handle_established_outbound_connection(
+        &mut self,
+        connection_id: ConnectionId,
+        peer: PeerId,
+        addr: &Multiaddr,
+        role_override: Endpoint,
+    ) -> Result<THandler<Self>, ConnectionDenied> {
+        self.inner
+            .handle_established_outbound_connection(connection_id, peer, addr, role_override)
+    }
+
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
-        params: &mut impl PollParameters,
-    ) -> std::task::Poll<NetworkBehaviourAction<Self::OutEvent, Self::ConnectionHandler>> {
+    ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         // Emit own events first.
         if let Some(ev) = self.outbox.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(ev));
+            return Poll::Ready(ToSwarm::GenerateEvent(ev));
         }
 
         // Republish our current peer record snapshot and prune old records.
@@ -546,28 +600,28 @@ impl NetworkBehaviour for Behaviour {
 
         // Poll Gossipsub for events; this is where we can handle Gossipsub messages and
         // store the associations from peers to subnets.
-        while let Poll::Ready(ev) = self.inner.poll(cx, params) {
+        while let Poll::Ready(ev) = self.inner.poll(cx) {
             match ev {
-                NetworkBehaviourAction::GenerateEvent(ev) => {
+                ToSwarm::GenerateEvent(ev) => {
                     match ev {
                         // NOTE: We could (ab)use the Gossipsub mechanism itself to signal subnet membership,
                         // however I think the information would only spread to our nearest neighbours we are
                         // connected to. If we assume there are hundreds of agents in each subnet which may
                         // or may not overlap, and each agent is connected to ~50 other agents, then the chance
                         // that there are subnets from which there are no or just a few connections is not
-                        // insignificant. For this reason I oped to use messages instead, and let the content
+                        // insignificant. For this reason I opted to use messages instead, and let the content
                         // carry the information, spreading through the Gossipsub network regardless of the
                         // number of connected peers.
-                        GossipsubEvent::Subscribed { peer_id, topic } => {
+                        gossipsub::Event::Subscribed { peer_id, topic } => {
                             self.handle_subscriber(peer_id, topic)
                         }
 
-                        GossipsubEvent::Unsubscribed { .. } => {}
+                        gossipsub::Event::Unsubscribed { .. } => {}
                         // Log potential misconfiguration.
-                        GossipsubEvent::GossipsubNotSupported { peer_id } => {
+                        gossipsub::Event::GossipsubNotSupported { peer_id } => {
                             debug!("peer {peer_id} doesn't support gossipsub");
                         }
-                        GossipsubEvent::Message { message, .. } => {
+                        gossipsub::Event::Message { message, .. } => {
                             self.handle_message(message);
                         }
                     }

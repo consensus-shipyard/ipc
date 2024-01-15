@@ -1,4 +1,4 @@
-name: Contracts Static analysis
+name: Static analysis
 
 # This workflow is triggered from the main CI workflow.
 on:
