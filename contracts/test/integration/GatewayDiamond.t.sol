@@ -1167,17 +1167,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
         (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
         require(exist, "subnet does not exist");
-        require(
-            subnetInfo.circSupply == 0,
-            "unexpected initial circulation supply"
-        );
+        require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
 
         gwManager.fund{value: DEFAULT_COLLATERAL_AMOUNT}(subnetId, FvmAddressHelper.from(address(caller)));
         (, subnetInfo) = gwGetter.getSubnet(subnetId);
-        require(
-            subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT,
-            "unexpected circulation supply after funding"
-        );
+        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](10);
         for (uint64 i = 0; i < 10; i++) {
