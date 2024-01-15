@@ -38,6 +38,12 @@ impl<'de> Deserialize<'de> for ValidatorKey {
     }
 }
 
+impl From<PublicKey> for ValidatorKey {
+    fn from(value: PublicKey) -> Self {
+        Self(value)
+    }
+}
+
 /// Vote by a validator about the validity/availability/finality
 /// of something in a given subnet.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]

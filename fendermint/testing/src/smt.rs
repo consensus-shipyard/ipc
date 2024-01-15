@@ -83,7 +83,7 @@ pub fn run<T: StateMachine>(
 /// be zeroes, which is is not very realistic. Calling this method can highlight
 /// this and give us a chance to adjust the min/max size of the builder.
 pub fn ensure_has_randomness(u: &Unstructured) -> arbitrary::Result<()> {
-    // Any error returned by this method is actually ignored.
+    // Any error returned by this method is actually ignored by `arbtest`.
     // if u.is_empty() {
     //     return Err(arbitrary::Error::NotEnoughData);
     // }
@@ -102,9 +102,9 @@ pub fn default_builder() -> arbtest::Builder {
 /// Make a builder with a certain size of random byte vector.
 ///
 /// If the size is less than what is needed by the test,
-/// my experience is that it it becomes impossible to repeat
-/// tests by setting the seed, and also that it might generate
-/// a lot of zeroes.
+/// my experience is that it will generate a lot of zeroes
+/// or other default values for anything as it runs out of
+/// random bytes.
 ///
 /// The maximum is 4_294_967_295.
 pub fn fixed_size_builder(size: u32) -> arbtest::Builder {
