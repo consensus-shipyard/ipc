@@ -1,5 +1,4 @@
 # .github/workflows/prettier.yml
-
 name: Prettier
 
 # This workflow is triggered from the main CI workflow.

@@ -3,32 +3,29 @@ resolver = "2"
 members = [
   # contracts
   "contracts/binding",
-  # fvm-utils,
-  "fvm-utils/primitives",
-  # Runtime is no longer needed. `primitives` will be moved under `ipc`
-  # "fvm-utils/runtime",
   # ipc
-  "ipc/ipc/cli",
-  "ipc/ipc/identity",
-  "ipc/ipc/provider",
-  "ipc/ipc/sdk",
+  "ipc/cli",
+  "ipc/wallet",
+  "ipc/provider",
+  "ipc/api",
+  "ipc/types",
   # Tests seem to be obsolete (using IPC agent):
   # "ipc/ipc/testing/*",
-  # resolver
-  "ipld-resolver",
+  # ipld
+  "ipld/resolver",
   # fendermint
-  "fendermint/fendermint/abci",
-  "fendermint/fendermint/app",
-  "fendermint/fendermint/app/options",
-  "fendermint/fendermint/crypto",
-  "fendermint/fendermint/app/settings",
-  "fendermint/fendermint/eth/*",
-  "fendermint/fendermint/rocksdb",
-  "fendermint/fendermint/rpc",
-  "fendermint/fendermint/storage",
-  "fendermint/fendermint/testing",
-  "fendermint/fendermint/testing/*-test",
-  "fendermint/fendermint/vm/*",
+  "fendermint/abci",
+  "fendermint/app",
+  "fendermint/app/options",
+  "fendermint/crypto",
+  "fendermint/app/settings",
+  "fendermint/eth/*",
+  "fendermint/rocksdb",
+  "fendermint/rpc",
+  "fendermint/storage",
+  "fendermint/testing",
+  "fendermint/testing/*-test",
+  "fendermint/vm/*",
 ]
 
 [workspace.package]
@@ -55,9 +52,11 @@ clap = { version = "4.1", features = ["derive", "env"] }
 config = "0.13"
 dirs = "5.0"
 dircpy = "0.3"
+env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0" }
+ethers-contract = "2.0.8"
 fnv = "1.0"
 futures = "0.3"
 futures-core = "0.3"
@@ -65,11 +64,12 @@ futures-util = "0.3"
 gcra = "0.4"
 hex = "0.4"
 im = "15.1.0"
+integer-encoding = { version = "3.0.3", default-features = false }
 jsonrpc-v2 = { version = "0.11", default-features = false, features = ["bytes-v10"] }
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
-libipld = { version = "0.14", default-features = false, features = ["dag-cbor"] }
-libp2p = { version = "0.50", default-features = false, features = [
+libipld = { version = "0.16", default-features = false, features = ["dag-cbor"] }
+libp2p = { version = "0.53", default-features = false, features = [
   "gossipsub",
   "kad",
   "identify",
@@ -78,7 +78,6 @@ libp2p = { version = "0.50", default-features = false, features = [
   "yamux",
   "tcp",
   "dns",
-  "mplex",
   "request-response",
   "metrics",
   "tokio",
@@ -87,22 +86,29 @@ libp2p = { version = "0.50", default-features = false, features = [
   "secp256k1",
   "plaintext",
 ] }
-libp2p-bitswap = "0.25.1"
+libp2p-mplex = { version = "0.41" }
+# libp2p-bitswap = "0.25.1"
+libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap.git", branch = "chore-upgrade-libipld" } # Updated to libipld 0.16
+libsecp256k1 = "0.7"
+literally = "0.1.3"
+log = "0.4"
 lru_time_cache = "0.11"
 merkle-tree-rs = "0.1.0"
-multiaddr = "0.16"
-multihash = { version = "0.16.1", default-features = false }
+multiaddr = "0.18"
+multihash = { version = "0.18.1", default-features = false }
 num-bigint = "0.4"
 num-derive = "0.3"
 num-traits = "0.2"
 paste = "1"
 pin-project = "1.1.2"
+prometheus = "0.13"
 prost = { version = "0.11" }
 quickcheck = "1"
 quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
 regex = "1"
+reqwest = { version = "0.11.13", features = ["json"] }
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"
@@ -121,28 +127,20 @@ tokio = { version = "1", features = [
 ] }
 tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["compat"] }
+tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 toml = "0.7"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+trace4rs = "0.5.1"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
-trace4rs = "0.5.1"
-literally = "0.1.3"
-reqwest = { version = "0.11.13", features = ["json"] }
-log = "0.4"
-env_logger = "0.10"
-prometheus = "0.13"
-tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
-libsecp256k1 = "0.7"
-ethers-contract = "2.0.8"
-integer-encoding = {version = "3.0.3", default-features = false}
 
 # Workspace deps
-ipc-sdk = { path = "ipc/ipc/sdk" }
-ipc-provider = { path = "ipc/ipc/provider" }
-ipc-identity = { path = "ipc/ipc/identity", features = ["with-ethers"] }
-ipc_ipld_resolver = { path = "ipld-resolver" }
-primitives = { path = "fvm-utils/primitives" }
+ipc-api = { path = "ipc/api" }
+ipc-provider = { path = "ipc/provider" }
+ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
+ipc_ipld_resolver = { path = "ipld/resolver" }
+ipc-types = { path = "ipc/types" }
 ipc_actors_abis = { path = "contracts/binding" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
@@ -152,15 +150,15 @@ openssl = { version = "0.10", features = ["vendored"] }
 # Using the 3.3 version of the FVM because the newer ones update the IPLD dependencies
 # to version which are different than the ones in the builtin-actors project, and since
 # they are 0.x cargo cannot upgrade them automatically, which leads to version conflicts.
-fvm = { version = "~3.2", default-features = false }                     # no opencl feature or it fails on CI
-fvm_shared = { version = "~3.2", features = ["crypto"] }
-fvm_sdk = { version = "~3.2" }
+fvm = { version = "4.0.0", default-features = false }     # no opencl feature or it fails on CI
+fvm_shared = { version = "4.0.0", features = ["crypto"] }
+fvm_sdk = { version = "4.0.0" }
 
-fvm_ipld_blockstore = "0.1"
-fvm_ipld_car = "0.6"
-fvm_ipld_encoding = "0.3"
-fvm_ipld_hamt = "0.6.0"
-fvm_ipld_amt = "0.4.2"
+fvm_ipld_blockstore = "0.2.0"
+fvm_ipld_car = "0.7.1"
+fvm_ipld_encoding = "0.4.0"
+fvm_ipld_hamt = "0.9.0"
+fvm_ipld_amt = "0.6.2"
 
 # Local FVM debugging
 # fvm = { path = "../ref-fvm/fvm", default-features = false }
@@ -174,13 +172,13 @@ fvm_ipld_amt = "0.4.2"
 # to cut down the time it takes to compile everything. However, some projects have a "shared" part,
 # and this copy-paste is clunky, so at least for those that have it, we should use it.
 # Keep the version here in sync with the Makefile!
-fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v11.0.0" }
-fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v11.0.0" }
+fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
+fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 
 # Using 0.8 because of ref-fvm.
 # 0.9 would be better because of its updated quickcheck dependency.
 # 0.10 breaks some API.
-cid = { version = "0.8", default-features = false, features = ["serde-codec", "std"] }
+cid = { version = "0.10.1", default-features = false, features = ["serde-codec", "std"] }
 
 # Depending on the release cycle, this dependency might want an earlier version of the FVM.
 # We can work around it by hardcoding the method hashes; currently there is only one.

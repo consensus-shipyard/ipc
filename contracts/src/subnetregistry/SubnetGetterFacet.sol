@@ -51,22 +51,52 @@ contract SubnetGetterFacet {
 
     /// @notice Returns the address of the SUBNET_GETTER_FACET.
     function getSubnetActorGetterFacet() external view returns (address) {
-        return s.SUBNET_GETTER_FACET;
+        return s.SUBNET_ACTOR_GETTER_FACET;
     }
 
     /// @notice Returns the address of the SUBNET_MANAGER_FACET.
     function getSubnetActorManagerFacet() external view returns (address) {
-        return s.SUBNET_MANAGER_FACET;
+        return s.SUBNET_ACTOR_MANAGER_FACET;
     }
 
-    /// @notice Returns the subnet getter selectors.
+    /// @notice Returns the address of the SUBNET_ACTOR_REWARDER_FACET.
+    function getSubnetActorRewarderFacet() external view returns (address) {
+        return s.SUBNET_ACTOR_REWARD_FACET;
+    }
+
+    /// @notice Returns the address of the SUBNET_ACTOR_CHECKPOINTER_FACET.
+    function getSubnetActorCheckpointerFacet() external view returns (address) {
+        return s.SUBNET_ACTOR_CHECKPOINTING_FACET;
+    }
+
+    /// @notice Returns the address of the SUBNET_ACTOR_PAUSER_FACET.
+    function getSubnetActorPauserFacet() external view returns (address) {
+        return s.SUBNET_ACTOR_PAUSE_FACET;
+    }
+
+    /// @notice Returns the subnet actor getter selectors.
     function getSubnetActorGetterSelectors() external view returns (bytes4[] memory) {
-        return s.subnetGetterSelectors;
+        return s.subnetActorGetterSelectors;
     }
 
-    /// @notice Returns the subnet manager selectors.
+    /// @notice Returns the subnet actor manager selectors.
     function getSubnetActorManagerSelectors() external view returns (bytes4[] memory) {
-        return s.subnetManagerSelectors;
+        return s.subnetActorManagerSelectors;
+    }
+
+    /// @notice Returns the subnet actor rewarder selectors.
+    function getSubnetActorRewarderSelectors() external view returns (bytes4[] memory) {
+        return s.subnetActorRewarderSelectors;
+    }
+
+    /// @notice Returns the subnet actor checkpointer selectors.
+    function getSubnetActorCheckpointerSelectors() external view returns (bytes4[] memory) {
+        return s.subnetActorCheckpointerSelectors;
+    }
+
+    /// @notice Returns the subnet actor pauser selectors.
+    function getSubnetActorPauserSelectors() external view returns (bytes4[] memory) {
+        return s.subnetActorPauserSelectors;
     }
 
     /// @notice Updates references to the subnet contract components, including facets and selector sets.
@@ -92,9 +122,10 @@ contract SubnetGetterFacet {
         }
 
         // Update the storage variables
-        s.SUBNET_GETTER_FACET = newGetterFacet;
-        s.SUBNET_MANAGER_FACET = newManagerFacet;
-        s.subnetGetterSelectors = newSubnetGetterSelectors;
-        s.subnetManagerSelectors = newSubnetManagerSelectors;
+        s.SUBNET_ACTOR_GETTER_FACET = newGetterFacet;
+        s.SUBNET_ACTOR_MANAGER_FACET = newManagerFacet;
+
+        s.subnetActorGetterSelectors = newSubnetGetterSelectors;
+        s.subnetActorManagerSelectors = newSubnetManagerSelectors;
     }
 }

@@ -1,6 +1,6 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
-BUILTIN_ACTORS_TAG    ?= v11.0.0
+BUILTIN_ACTORS_TAG    ?= v12.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 
 IPC_ACTORS_DIR        := $(PWD)/../contracts
@@ -28,13 +28,13 @@ BUILDX_TAG   ?= fendermint:latest
 all: test build diagrams
 
 diagrams:
-	make -C docs/diagrams diagrams
+	make -C  ../docs/fendermint/diagrams diagrams
 
 build: $(IPC_ACTORS_GEN) | protoc
 	cargo build --release
 
 install: $(IPC_ACTORS_GEN)
-	cargo install --locked --path fendermint/app
+	cargo install --locked --path app
 
 # Using --release for testing because wasm can otherwise be slow.
 test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
@@ -43,9 +43,9 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	cargo test --release $(PACKAGE)
 
 e2e: docker-build | cargo-make
-	cd fendermint/testing/smoke-test    && cargo make --profile $(PROFILE)
-	cd fendermint/testing/snapshot-test && cargo make --profile $(PROFILE)
-	cd fendermint/testing/graph-test    && cargo make --profile $(PROFILE)
+	cd testing/smoke-test    && cargo make --profile $(PROFILE)
+	cd testing/snapshot-test && cargo make --profile $(PROFILE)
+	cd testing/graph-test    && cargo make --profile $(PROFILE)
 
 clean:
 	cargo clean
