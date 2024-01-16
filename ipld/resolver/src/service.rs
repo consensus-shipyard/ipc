@@ -21,6 +21,8 @@ use libp2p_mplex::MplexConfig;
 use log::{debug, error, info, trace, warn};
 use prometheus::Registry;
 use rand::seq::SliceRandom;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
@@ -83,11 +85,11 @@ pub struct Config {
 }
 
 /// Internal requests to enqueue to the [`Service`]
-pub(crate) enum Request {
+pub(crate) enum Request<V> {
     SetProvidedSubnets(Vec<SubnetID>),
     AddProvidedSubnet(SubnetID),
     RemoveProvidedSubnet(SubnetID),
-    PublishVote(Box<SignedVoteRecord>),
+    PublishVote(Box<SignedVoteRecord<V>>),
     PublishPreemptive(SubnetID, Vec<u8>),
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
@@ -99,33 +101,41 @@ pub(crate) enum Request {
 /// Events that arise from the subnets, pushed to the clients,
 /// not part of a request-response action.
 #[derive(Clone, Debug)]
-pub enum Event {
+pub enum Event<V> {
     /// Received a vote about in a subnet about a CID.
-    ReceivedVote(Box<VoteRecord>),
+    ReceivedVote(Box<VoteRecord<V>>),
     /// Received raw pre-emptive data published to a pinned subnet.
     ReceivedPreemptive(SubnetID, Vec<u8>),
 }
 
 /// The `Service` handles P2P communication to resolve IPLD content by wrapping and driving a number of `libp2p` behaviours.
-pub struct Service<P: StoreParams> {
+pub struct Service<P, V>
+where
+    P: StoreParams,
+    V: Serialize + DeserializeOwned + Send + 'static,
+{
     peer_id: PeerId,
     listen_addr: Multiaddr,
-    swarm: Swarm<Behaviour<P>>,
+    swarm: Swarm<Behaviour<P, V>>,
     /// To match finished queries to response channels.
     queries: QueryMap,
     /// For receiving requests from the clients and self.
-    request_rx: mpsc::UnboundedReceiver<Request>,
+    request_rx: mpsc::UnboundedReceiver<Request<V>>,
     /// For creating new clients and sending messages to self.
-    request_tx: mpsc::UnboundedSender<Request>,
+    request_tx: mpsc::UnboundedSender<Request<V>>,
     /// For broadcasting events to all clients.
-    event_tx: broadcast::Sender<Event>,
+    event_tx: broadcast::Sender<Event<V>>,
     /// To avoid looking up the same peer over and over.
     background_lookup_filter: BloomFilter,
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
 }
 
-impl<P: StoreParams> Service<P> {
+impl<P, V> Service<P, V>
+where
+    P: StoreParams,
+    V: Serialize + DeserializeOwned + Clone + Send + 'static,
+{
     /// Build a [`Service`] and a [`Client`] with the default `tokio` transport.
     pub fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
     where
@@ -204,7 +214,7 @@ impl<P: StoreParams> Service<P> {
     /// The [`Client`] is geared towards request-response interactions,
     /// while the `Receiver` returned by `subscribe` is used for events
     /// which weren't initiated by the `Client`.
-    pub fn client(&self) -> Client {
+    pub fn client(&self) -> Client<V> {
         Client::new(self.request_tx.clone())
     }
 
@@ -236,7 +246,7 @@ impl<P: StoreParams> Service<P> {
     ///
     /// One way to achieve this is for the consumer of the events to redistribute
     /// them into priorities event queues, some bounded, some unbounded.
-    pub fn subscribe(&self) -> broadcast::Receiver<Event> {
+    pub fn subscribe(&self) -> broadcast::Receiver<Event<V>> {
         self.event_tx.subscribe()
     }
 
@@ -277,8 +287,8 @@ impl<P: StoreParams> Service<P> {
         Ok(())
     }
 
-    /// Handle events that the [`NetworkBehaviour`] for our [`Behaviour`] macro generated, one for each field.
-    fn handle_behaviour_event(&mut self, event: BehaviourEvent<P>) {
+    /// Handle events that the [`NetworkBehaviour`] macro generated for our [`Behaviour`], one for each field.
+    fn handle_behaviour_event(&mut self, event: BehaviourEvent<P, V>) {
         match event {
             BehaviourEvent::Ping(e) => self.handle_ping_event(e),
             BehaviourEvent::Identify(e) => self.handle_identify_event(e),
@@ -347,7 +357,7 @@ impl<P: StoreParams> Service<P> {
         }
     }
 
-    fn handle_membership_event(&mut self, event: membership::Event) {
+    fn handle_membership_event(&mut self, event: membership::Event<V>) {
         match event {
             membership::Event::Skipped(peer_id) => {
                 debug!("skipped adding provider {peer_id} to {}", self.peer_id);
@@ -407,7 +417,7 @@ impl<P: StoreParams> Service<P> {
     }
 
     /// Handle an internal request coming from a [`Client`].
-    fn handle_request(&mut self, request: Request) {
+    fn handle_request(&mut self, request: Request<V>) {
         match request {
             Request::SetProvidedSubnets(ids) => {
                 if let Err(e) = self.membership_mut().set_provided_subnets(ids) {
@@ -540,7 +550,7 @@ impl<P: StoreParams> Service<P> {
     fn discovery_mut(&mut self) -> &mut behaviour::discovery::Behaviour {
         self.swarm.behaviour_mut().discovery_mut()
     }
-    fn membership_mut(&mut self) -> &mut behaviour::membership::Behaviour {
+    fn membership_mut(&mut self) -> &mut behaviour::membership::Behaviour<V> {
         self.swarm.behaviour_mut().membership_mut()
     }
     fn content_mut(&mut self) -> &mut behaviour::content::Behaviour<P> {
