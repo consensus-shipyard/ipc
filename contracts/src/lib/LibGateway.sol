@@ -221,7 +221,7 @@ library LibGateway {
 
         crossMessage.nonce = topDownNonce;
         subnet.topDownNonce = topDownNonce + 1;
-        subnet.circSupply += crossMessage.getValue();
+        subnet.circSupply += crossMessage.value;
 
         emit NewTopDownMessage({subnet: subnetId.getAddress(), message: crossMessage});
     }

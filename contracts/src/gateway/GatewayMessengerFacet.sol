@@ -42,7 +42,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidCrossMsgSender();
         }
 
-        if (crossMsg.getValue() != msg.value - crossMsg.fee) {
+        if (crossMsg.value != msg.value - crossMsg.fee) {
             revert InvalidCrossMsgValue();
         }
 
@@ -55,7 +55,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         // commit cross-message for propagation
         bool shouldBurn = _commitCrossMessage(crossMsg);
 
-        _crossMsgSideEffects({v: crossMsg.getValue(), shouldBurn: shouldBurn});
+        _crossMsgSideEffects({v: crossMsg.value, shouldBurn: shouldBurn});
     }
 
     /**
@@ -74,7 +74,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         // We must delete the message first to prevent potential re-entrancies,
         // and as the message is deleted and we don't have a reference to the object
         // anymore, we need to pull the data from the message to trigger the side-effects.
-        uint256 v = crossMsg.getValue();
+        uint256 v = crossMsg.value;
         delete s.postbox[msgCid];
 
         _crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
@@ -147,7 +147,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         // Else, commit a bottom up message.
         LibGateway.commitBottomUpMsg(crossMessage);
         // gas-opt: original check: value > 0
-        return (shouldBurn = crossMessage.getValue() != 0);
+        return (shouldBurn = crossMessage.value != 0);
     }
 
     /**

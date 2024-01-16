@@ -701,9 +701,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 subnetId: gwGetter.getNetworkName().createSubnetId(src),
                 rawAddress: FvmAddressHelper.from(src)
             }),
+            value: DEFAULT_CROSS_MSG_FEE + 1,
             nonce: 0,
             fee: DEFAULT_CROSS_MSG_FEE,
-            message: abi.encode(IpcMsg({value: DEFAULT_CROSS_MSG_FEE + 1, method: METHOD_SEND, params: new bytes(0)}))
+            message: abi.encode(IpcMsg({method: METHOD_SEND, params: new bytes(0)}))
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;

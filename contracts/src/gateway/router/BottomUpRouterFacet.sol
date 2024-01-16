@@ -47,7 +47,7 @@ contract BottomUpRouterFacet is GatewayActorModifiers {
         uint256 totalFee;
         uint256 crossMsgLength = batch.msgs.length;
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += batch.msgs[i].getValue();
+            totalValue += batch.msgs[i].value;
             totalFee += batch.msgs[i].fee;
             unchecked {
                 ++i;
