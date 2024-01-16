@@ -35,9 +35,11 @@ fvm_ipld_blockstore = { workspace = true, optional = true }
 ipc-api = { path = "../../ipc/api", default-features = false }
 
 [dev-dependencies]
-quickcheck_macros = { workspace = true }
+cid = { workspace = true }
 env_logger = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
+multihash = { workspace = true }
+quickcheck_macros = { workspace = true }
 
 ipc_ipld_resolver = { path = ".", features = ["arb"] }
 

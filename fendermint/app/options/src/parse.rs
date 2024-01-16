@@ -21,10 +21,10 @@ pub fn parse_network_version(s: &str) -> Result<NetworkVersion, String> {
     let nv: u32 = s
         .parse()
         .map_err(|_| format!("`{s}` isn't a network version"))?;
-    if nv >= 18 {
+    if nv >= 21 {
         Ok(NetworkVersion::from(nv))
     } else {
-        Err("the minimum network version is 18".to_owned())
+        Err("the minimum network version is 21".to_owned())
     }
 }
 
