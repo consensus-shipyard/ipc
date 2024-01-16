@@ -30,7 +30,7 @@ run_task = { name = [
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
 cargo run -p fendermint_eth_api --release --example greeter -- \
-  --secret-key fendermint/testing/graph-test/test-data/keys/veronica.sk \
+  --secret-key testing/graph-test/test-data/keys/veronica.sk \
   --out ${TEST_DATA_DIR}/greeter.json \
   ${VERBOSITY}
 """
