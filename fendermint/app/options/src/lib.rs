@@ -163,6 +163,6 @@ mod tests {
         let e = Options::try_parse_from(cmd.split_ascii_whitespace())
             .expect_err("--help is not Options");
 
-        assert!(e.to_string().contains("usage"))
+        assert!(e.to_string().contains("Usage:"), "unexpected help: {e}");
     }
 }
