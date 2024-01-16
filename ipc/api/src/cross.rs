@@ -11,6 +11,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 use fvm_shared::METHOD_SEND;
 use num_traits::Zero;
+use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
 /// StorableMsg stores all the relevant information required
@@ -31,10 +32,51 @@ pub struct StorableMsg {
     pub fee: TokenAmount,
 }
 
-#[derive(PartialEq, Eq, Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct CrossMsg {
-    pub msg: StorableMsg,
-    pub wrapped: bool,
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct IpcEnvelope {
+    /// ype of message being propagated.
+    pub kind: IpcMsgKind,
+    /// destination of the message
+    /// It makes sense to extract from the encoded message
+    /// all shared fields required by all message, so they
+    /// can be inspected without having to decode the message.
+    pub to: IPCAddress,
+    /// address sending the message
+    pub from: IPCAddress,
+    /// abi.encoded message
+    pub message: Vec<u8>,
+    /// outgoing nonce for the envelope.
+    /// This nonce is set by the gateway when committing the message for propagation
+    pub nonce: u64,
+    /// The fee for execution, currently not used.
+    pub fee: TokenAmount,
+}
+
+/// Type of cross-net messages currently supported
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum IpcMsgKind {
+    /// for cross-net messages that move native token, i.e. fund/release.
+    /// and in the future multi-level token transactions.
+    Transfer,
+    /// general-purpose cross-net transaction that call smart contracts.
+    Call,
+    /// receipt from the execution of cross-net messages
+    /// (currently limited to `Transfer` messages)
+    Receipt,
+}
+
+impl TryFrom<u8> for IpcMsgKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => IpcMsgKind::Transfer,
+            1 => IpcMsgKind::Call,
+            2 => IpcMsgKind::Receipt,
+            _ => return Err(anyhow!("invalid ipc msg kind")),
+        })
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -130,12 +172,12 @@ pub fn is_bottomup(from: &SubnetID, to: &SubnetID) -> bool {
 pub struct CrossMsgs {
     // FIXME: Consider to make this an AMT if we expect
     // a lot of cross-messages to be propagated.
-    pub msgs: Vec<CrossMsg>,
+    pub msgs: Vec<IpcEnvelope>,
 }
 
 #[derive(Serialize_tuple, Deserialize_tuple, Clone)]
 struct ApplyMsgParams {
-    pub cross_msg: CrossMsg,
+    pub cross_msg: IpcEnvelope,
 }
 
 impl CrossMsgs {
@@ -145,7 +187,7 @@ impl CrossMsgs {
 }
 
 #[cfg(feature = "fil-actor")]
-impl CrossMsg {
+impl IpcEnvelope {
     pub fn send(
         self,
         rt: &impl fil_actors_runtime::runtime::Runtime,

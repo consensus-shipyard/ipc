@@ -42,7 +42,7 @@ fn prop_cross_msgs_hash() {
 
             let mut exec_state = system.exec_state.borrow_mut();
 
-            let mut cross_msgs = Vec::<getter::CrossMsg>::new();
+            let mut cross_msgs = Vec::<getter::IpcEnvelope>::new();
 
             // Generate a few random messages.
             for _ in 0..u.int_in_range(0..=3)? {

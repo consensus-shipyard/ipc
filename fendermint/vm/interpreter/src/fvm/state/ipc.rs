@@ -8,7 +8,14 @@ use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::ActorID;
 
+use super::{
+    fevm::{ContractCaller, MockProvider, NoRevert},
+    FvmExecState,
+};
+use crate::fvm::FvmApplyRet;
+use ethers::abi::AbiDecode;
 use fendermint_crypto::SecretKey;
+use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
     init::builtin_actor_eth_addr,
@@ -17,22 +24,16 @@ use fendermint_vm_actor_interface::{
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
-use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
-use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
-use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
-use ipc_api::cross::CrossMsg;
-use ipc_api::staking::StakingChangeRequest;
-
-use super::{
-    fevm::{ContractCaller, MockProvider, NoRevert},
-    FvmExecState,
-};
-use crate::fvm::FvmApplyRet;
-use fendermint_vm_actor_interface::ipc;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
+use ipc_actors_abis::cross_msg_helper::IpcMsg;
+use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
+use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
+use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
+use ipc_api::cross::IpcEnvelope;
+use ipc_api::staking::StakingChangeRequest;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -113,7 +114,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         height: u64,
-    ) -> anyhow::Result<Vec<getter::CrossMsg>> {
+    ) -> anyhow::Result<Vec<getter::IpcEnvelope>> {
         let batch = self.getter.call(state, |c| {
             c.bottom_up_msg_batch(ethers::types::U256::from(height))
         })?;
@@ -263,11 +264,11 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     pub fn apply_cross_messages(
         &self,
         state: &mut FvmExecState<DB>,
-        cross_messages: Vec<CrossMsg>,
+        cross_messages: Vec<IpcEnvelope>,
     ) -> anyhow::Result<FvmApplyRet> {
         let messages = cross_messages
             .into_iter()
-            .map(xnet_messaging_facet::CrossMsg::try_from)
+            .map(xnet_messaging_facet::IpcEnvelope::try_from)
             .collect::<Result<Vec<_>, _>>()
             .context("failed to convert cross messages")?;
         let r = self
@@ -303,26 +304,63 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 }
 
 /// Total amount of tokens to mint as a result of top-down messages arriving at the subnet.
-pub fn tokens_to_mint(msgs: &[ipc_api::cross::CrossMsg]) -> TokenAmount {
-    msgs.iter()
-        .fold(TokenAmount::from_atto(0), |mut total, msg| {
-            // Both fees and value are considered to enter the ciruculating supply of the subnet.
-            // Fees might be distributed among subnet validators.
-            total += &msg.msg.value;
-            total += &msg.msg.fee;
-            total
-        })
+pub fn tokens_to_mint(msgs: &[IpcEnvelope]) -> anyhow::Result<TokenAmount> {
+    let mut total = TokenAmount::from_atto(0);
+
+    for msg in msgs {
+        // Both fees and value are considered to enter the ciruculating supply of the subnet.
+        // Fees might be distributed among subnet validators.
+        let val = decode_value(&msg.message)?;
+        total += &val;
+        total += &msg.fee;
+    }
+
+    Ok(total)
 }
 
 /// Total amount of tokens to burn as a result of bottom-up messages leaving the subnet.
-pub fn tokens_to_burn(msgs: &[gateway_getter_facet::CrossMsg]) -> TokenAmount {
-    msgs.iter()
-        .fold(TokenAmount::from_atto(0), |mut total, msg| {
-            // Both fees and value were taken from the sender, and both are going up to the parent subnet:
-            // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/e4ec0046e2e73e2f91d7ab8ae370af2c487ce526/src/gateway/GatewayManagerFacet.sol#L143-L150
-            // Fees might be distirbuted among relayers.
-            total += from_eth::to_fvm_tokens(&msg.message.value);
-            total += from_eth::to_fvm_tokens(&msg.message.fee);
-            total
-        })
+pub fn tokens_to_burn(msgs: &[gateway_getter_facet::IpcEnvelope]) -> anyhow::Result<TokenAmount> {
+    let mut total = TokenAmount::from_atto(0);
+
+    for msg in msgs {
+        // Both fees and value were taken from the sender, and both are going up to the parent subnet:
+        // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/e4ec0046e2e73e2f91d7ab8ae370af2c487ce526/src/gateway/GatewayManagerFacet.sol#L143-L150
+        // Fees might be distirbuted among relayers.
+        let val = decode_value(&msg.message)?;
+        total += &val;
+        total += from_eth::to_fvm_tokens(&msg.fee);
+    }
+
+    Ok(total)
+}
+
+pub fn decode_ipc_msg(bytes: &[u8]) -> anyhow::Result<IpcMsg> {
+    Ok(IpcMsg::decode(bytes)?)
+}
+
+pub fn decode_value(bytes: &[u8]) -> anyhow::Result<TokenAmount> {
+    let msg = decode_ipc_msg(bytes)?;
+    Ok(from_eth::to_fvm_tokens(&msg.value))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::fvm::state::ipc::decode_value;
+    use ethers::abi::AbiEncode;
+    use fvm_shared::econ::TokenAmount;
+    use ipc_actors_abis::cross_msg_helper::IpcMsg;
+
+    #[test]
+    fn test_decode_ipc_msg_value() {
+        let msg = IpcMsg {
+            value: ::ethers::types::U256::from(1000),
+            method: [0; 4],
+            params: Default::default(),
+        };
+
+        let bytes = msg.encode();
+
+        let v = decode_value(bytes.as_slice()).unwrap();
+        assert_eq!(v, TokenAmount::from_atto(1000))
+    }
 }

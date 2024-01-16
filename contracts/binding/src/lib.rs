@@ -14,8 +14,6 @@ pub mod gateway_manager_facet;
 #[allow(clippy::all)]
 pub mod gateway_getter_facet;
 #[allow(clippy::all)]
-pub mod bottom_up_router_facet;
-#[allow(clippy::all)]
 pub mod checkpointing_facet;
 #[allow(clippy::all)]
 pub mod top_down_finality_facet;
@@ -49,11 +47,12 @@ pub mod lib_staking_change_log;
 pub mod lib_gateway;
 #[allow(clippy::all)]
 pub mod lib_quorum;
+#[allow(clippy::all)]
+pub mod cross_msg_helper;
 
 // The list of contracts need to convert FvmAddress to fvm_shared::Address
 fvm_address_conversion!(gateway_manager_facet);
 fvm_address_conversion!(gateway_getter_facet);
-fvm_address_conversion!(bottom_up_router_facet);
 fvm_address_conversion!(xnet_messaging_facet);
 fvm_address_conversion!(gateway_messenger_facet);
 fvm_address_conversion!(subnet_actor_checkpointing_facet);
@@ -61,6 +60,5 @@ fvm_address_conversion!(subnet_actor_getter_facet);
 fvm_address_conversion!(lib_gateway);
 
 // The list of contracts that need to convert common types between each other
-common_type_conversion!(subnet_actor_getter_facet, bottom_up_router_facet);
 common_type_conversion!(subnet_actor_getter_facet, checkpointing_facet);
 common_type_conversion!(subnet_actor_getter_facet, xnet_messaging_facet);

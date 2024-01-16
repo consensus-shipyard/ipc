@@ -49,10 +49,6 @@ lazy_static! {
                             abi: ia::gateway_manager_facet::GATEWAYMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "BottomUpRouterFacet",
-                            abi: ia::bottom_up_router_facet::BOTTOMUPROUTERFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
                             name: "TopDownFinalityFacet",
                             abi: ia::top_down_finality_facet::TOPDOWNFINALITYFACET_ABI.to_owned(),
                         },
@@ -294,9 +290,9 @@ macro_rules! abi_hash {
 
 abi_hash!(struct ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint);
 abi_hash!(struct ipc_actors_abis::subnet_actor_checkpointing_facet::BottomUpCheckpoint);
-abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::CrossMsg>);
-abi_hash!(Vec<ipc_actors_abis::subnet_actor_checkpointing_facet::CrossMsg>);
-abi_hash!(Vec<ipc_actors_abis::subnet_actor_getter_facet::CrossMsg>);
+abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::IpcEnvelope>);
+abi_hash!(Vec<ipc_actors_abis::subnet_actor_checkpointing_facet::IpcEnvelope>);
+abi_hash!(Vec<ipc_actors_abis::subnet_actor_getter_facet::IpcEnvelope>);
 
 pub mod gateway {
     use super::subnet_id_to_eth;
@@ -461,7 +457,6 @@ pub mod registry {
 
 pub mod subnet {
     use crate::revert_errors;
-    use ipc_actors_abis::bottom_up_router_facet::BottomUpRouterFacetErrors;
     use ipc_actors_abis::checkpointing_facet::CheckpointingFacetErrors;
     use ipc_actors_abis::gateway_manager_facet::GatewayManagerFacetErrors;
     use ipc_actors_abis::subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacetErrors;
@@ -481,7 +476,6 @@ pub mod subnet {
             SubnetActorCheckpointingFacetErrors,
             GatewayManagerFacetErrors,
             CheckpointingFacetErrors,
-            BottomUpRouterFacetErrors,
             TopDownFinalityFacetErrors
         }
     }
@@ -512,6 +506,7 @@ pub mod subnet {
                     178, 232, 216, 34, 217, 96, 27, 0, 185, 215, 8, 155, 25, 15, 1,
                 ],
                 next_configuration_number: 1,
+                msgs: vec![],
             };
 
             let param_type = BottomUpCheckpoint::param_type();

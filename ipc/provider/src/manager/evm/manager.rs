@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
-    bottom_up_router_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
     subnet_actor_reward_facet,
@@ -39,9 +39,9 @@ use ethers::types::{Eip1559TransactionRequest, I256, U256};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, BottomUpMsgBatch, QuorumReachedEvent, Signature,
+    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
 };
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
@@ -113,7 +113,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-    ) -> Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+    ) -> Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
@@ -143,7 +143,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
                 hash = Some(meta.block_hash);
             }
 
-            messages.push(CrossMsg::try_from(event.message)?);
+            messages.push(IpcEnvelope::try_from(event.message)?);
         }
 
         let block_hash = if let Some(h) = hash {
@@ -1008,10 +1008,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .into_iter()
             .map(|addr| payload_to_evm_address(addr.payload()))
             .collect::<result::Result<Vec<_>, _>>()?;
-        // let cross_msgs = cross_msgs
-        //     .into_iter()
-        //     .map(subnet_actor_manager_facet::CrossMsg::try_from)
-        //     .collect::<result::Result<Vec<_>, _>>()?;
+
         let checkpoint =
             subnet_actor_checkpointing_facet::BottomUpCheckpoint::try_from(checkpoint)?;
 
@@ -1081,11 +1078,6 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .get_checkpoint_signature_bundle(U256::from(height))
             .call()
             .await?;
-        let bottom_up_msg_batch = contract
-            .bottom_up_msg_batch(U256::from(height))
-            .call()
-            .await?;
-
         let checkpoint = BottomUpCheckpoint::try_from(checkpoint)?;
         let signatories = signatories
             .into_iter()
@@ -1095,22 +1087,16 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .into_iter()
             .map(|s| s.to_vec())
             .collect::<Vec<_>>();
-        let cross_msgs = bottom_up_msg_batch
-            .msgs
-            .into_iter()
-            .map(CrossMsg::try_from)
-            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(BottomUpCheckpointBundle {
             checkpoint,
             signatures,
             signatories,
-            cross_msgs,
         })
     }
 
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>> {
-        let contract = bottom_up_router_facet::BottomUpRouterFacet::new(
+        let contract = checkpointing_facet::CheckpointingFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
@@ -1140,43 +1126,6 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .await?
             .as_u64();
         Ok(epoch as ChainEpoch)
-    }
-
-    async fn submit_bottom_up_msg_batch(
-        &self,
-        submitter: &Address,
-        subnet_id: &SubnetID,
-        batch: BottomUpMsgBatch,
-        signatories: &[Address],
-        signatures: &[Signature],
-    ) -> Result<ChainEpoch> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        log::debug!("submit bottom up checkpoint msg batch in evm subnet contract: {address:}");
-
-        let signatures = signatures
-            .iter()
-            .map(|b| ethers::types::Bytes::from(b.clone()))
-            .collect::<Vec<_>>();
-        let signatories = signatories
-            .iter()
-            .map(|addr| payload_to_evm_address(addr.payload()))
-            .collect::<result::Result<Vec<_>, _>>()?;
-
-        let signer = Arc::new(self.get_signer(submitter)?);
-        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
-            address,
-            signer.clone(),
-        );
-        let call = contract.submit_bottom_up_msg_batch(
-            subnet_actor_checkpointing_facet::BottomUpMsgBatch::try_from(batch)?,
-            signatories,
-            signatures,
-        );
-        let call = call_with_premium_estimation(signer, call).await?;
-
-        let pending_tx = call.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
     }
 }
 

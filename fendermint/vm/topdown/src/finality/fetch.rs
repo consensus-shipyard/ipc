@@ -9,7 +9,7 @@ use crate::{
     ParentFinalityProvider, ParentViewProvider,
 };
 use async_stm::{Stm, StmResult};
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::sync::Arc;
 
@@ -93,7 +93,7 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         &self,
         from: BlockHeight,
         to: BlockHeight,
-    ) -> anyhow::Result<Vec<CrossMsg>> {
+    ) -> anyhow::Result<Vec<IpcEnvelope>> {
         let mut v = vec![];
         for h in from..=to {
             let mut r = self.top_down_msgs(h).await?;
@@ -164,7 +164,7 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
 
     /// Should always return the top down messages, only when ipc parent_client is down after exponential
     /// retries
-    async fn top_down_msgs(&self, height: BlockHeight) -> anyhow::Result<Vec<CrossMsg>> {
+    async fn top_down_msgs(&self, height: BlockHeight) -> anyhow::Result<Vec<IpcEnvelope>> {
         let r = self.inner.top_down_msgs(height).await?;
 
         if let Some(v) = r {
@@ -247,7 +247,7 @@ mod tests {
     use async_trait::async_trait;
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
-    use ipc_api::cross::{CrossMsg, StorableMsg};
+    use ipc_api::cross::{IpcEnvelope, StorableMsg};
     use ipc_api::staking::{StakingChange, StakingChangeRequest, StakingOperation};
     use ipc_api::subnet_id::SubnetID;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
@@ -304,7 +304,7 @@ mod tests {
         async fn get_top_down_msgs(
             &self,
             height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+        ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
             let r = self.blocks.get_value(height).cloned().unwrap();
             if r.is_none() {
                 return Err(anyhow!(NULL_ROUND_ERR_MSG));
@@ -354,7 +354,7 @@ mod tests {
         CachedFinalityProvider::new(config, genesis_epoch, Some(committed_finality), proxy)
     }
 
-    fn new_cross_msg(nonce: u64) -> CrossMsg {
+    fn new_cross_msg(nonce: u64) -> IpcEnvelope {
         let subnet_id = SubnetID::new(10, vec![Address::new_id(1000)]);
         let mut msg = StorableMsg::new_fund_msg(
             &subnet_id,
@@ -365,7 +365,7 @@ mod tests {
         .unwrap();
         msg.nonce = nonce;
 
-        CrossMsg {
+        IpcEnvelope {
             msg,
             wrapped: false,
         }
