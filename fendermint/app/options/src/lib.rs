@@ -76,7 +76,7 @@ pub struct Options {
     pub home_dir: PathBuf,
 
     /// Set a custom directory for ipc log files.
-    #[arg(short = 'd', long, env = "FM_LOG_DIR")]
+    #[arg(long, env = "FM_LOG_DIR")]
     pub log_dir: Option<PathBuf>,
 
     /// Optionally override the default configuration.
