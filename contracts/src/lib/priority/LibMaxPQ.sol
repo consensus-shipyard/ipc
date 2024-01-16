@@ -119,7 +119,7 @@ library LibMaxPQ {
             parentPos = pos >> 1; // parentPos = pos / 2
             parentPower = self.inner.getPower(validators, parentPos);
 
-            // parent power is not larger than that of the current child, heap condition met.
+            // Parent power is not smaller than that of the current child, and the heap condition met.
             if (!firstValueSmaller(parentPower, value)) {
                 break;
             }
