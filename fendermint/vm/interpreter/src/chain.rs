@@ -321,7 +321,12 @@ where
 
                     atomically(|| {
                         env.parent_finality_provider
-                            .set_new_finality(finality.clone(), prev_finality.clone())
+                            .set_new_finality(finality.clone(), prev_finality.clone())?;
+
+                        env.parent_finality_votes
+                            .set_finalized(finality.height, finality.block_hash.clone())?;
+
+                        Ok(())
                     })
                     .await;
 
