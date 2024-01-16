@@ -7,10 +7,6 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_genesis::Collateral;
-use fendermint_vm_genesis::PowerScale;
-use fendermint_vm_message::conv::from_eth;
-use ipc_actors_abis::gateway_getter_facet::Membership;
 use ipc_api::staking::ConfigurationNumber;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::commit;
@@ -338,31 +334,10 @@ fn ipc_power_table<DB>(
 where
     DB: Blockstore + Sync + Send + 'static,
 {
-    let membership = gateway
-        .current_validator_set(state)
-        .context("failed to get current validator set")?;
-
-    let power_table = membership_to_power_table(&membership, state.power_scale());
-
-    Ok((membership.configuration_number, power_table))
-}
-
-/// Convert the collaterals and metadata in the membership to the public key and power expected by the system.
-fn membership_to_power_table(m: &Membership, power_scale: PowerScale) -> PowerTable {
-    let mut pt = Vec::new();
-
-    for v in m.validators.iter() {
-        // Ignoring any metadata that isn't a public key.
-        if let Ok(pk) = PublicKey::parse_slice(&v.metadata, None) {
-            let c = from_eth::to_fvm_tokens(&v.weight);
-            pt.push(Validator {
-                public_key: ValidatorKey(pk),
-                power: Collateral(c).into_power(power_scale),
-            })
-        }
-    }
-
-    PowerTable(pt)
+    gateway
+        .current_power_table(state)
+        .context("failed to get current power table")
+        .map(|(cn, pt)| (cn, PowerTable(pt)))
 }
 
 /// Calculate the difference between the current and the next power table, to return to CometBFT only what changed:

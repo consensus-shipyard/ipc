@@ -19,6 +19,7 @@ use fendermint_vm_message::{
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::{
     CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
 };
@@ -41,6 +42,7 @@ pub struct ChainEnv {
     pub checkpoint_pool: CheckpointPool,
     /// The parent finality provider for top down checkpoint
     pub parent_finality_provider: TopDownFinalityProvider,
+    pub parent_finality_votes: VoteTally,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]

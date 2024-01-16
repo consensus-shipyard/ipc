@@ -20,6 +20,7 @@ use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
+use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -32,35 +33,20 @@ use tracing::info;
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 
-fn create_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderProxy> {
-    let topdown_config = settings.ipc.topdown_config()?;
-    let subnet = ipc_provider::config::Subnet {
-        id: settings
-            .ipc
-            .subnet_id
-            .parent()
-            .ok_or_else(|| anyhow!("subnet has no parent"))?,
-        config: SubnetConfig::Fevm(EVMSubnet {
-            provider_http: topdown_config
-                .parent_http_endpoint
-                .to_string()
-                .parse()
-                .unwrap(),
-            auth_token: None,
-            registry_addr: topdown_config.parent_registry,
-            gateway_addr: topdown_config.parent_gateway,
-        }),
-    };
-    info!("init ipc provider with subnet: {}", subnet.id);
-
-    let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
-    IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
-}
-
 cmd! {
   RunArgs(self, settings) {
     run(settings).await
   }
+}
+
+// Database collection names.
+namespaces! {
+    Namespaces {
+        app,
+        state_hist,
+        state_store,
+        bit_store
+    }
 }
 
 /// Run the Fendermint ABCI Application.
@@ -130,6 +116,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
+    let parent_finality_votes = VoteTally::empty();
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver.enabled() {
@@ -175,7 +162,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         )
         .with_proposal_delay(topdown_config.proposal_delay)
         .with_max_proposal_range(topdown_config.max_proposal_range);
-        let ipc_provider = Arc::new(create_ipc_provider_proxy(&settings)?);
+        let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
         let p = Arc::new(Toggle::enabled(finality_provider));
@@ -224,6 +211,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ChainEnv {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
+            parent_finality_votes: parent_finality_votes.clone(),
         },
         snapshots,
     )?;
@@ -235,6 +223,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 app_parent_finality_query,
                 config,
                 parent_finality_provider,
+                parent_finality_votes,
                 agent_proxy,
                 tendermint_client,
             )
@@ -270,15 +259,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     Ok(())
 }
 
-namespaces! {
-    Namespaces {
-        app,
-        state_hist,
-        state_store,
-        bit_store
-    }
-}
-
 /// Open database with all
 fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     let path = settings.data_dir().join("rocksdb");
@@ -308,6 +288,31 @@ fn make_resolver_service(
         .context("error creating IPLD Resolver Service")?;
 
     Ok(service)
+}
+
+fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderProxy> {
+    let topdown_config = settings.ipc.topdown_config()?;
+    let subnet = ipc_provider::config::Subnet {
+        id: settings
+            .ipc
+            .subnet_id
+            .parent()
+            .ok_or_else(|| anyhow!("subnet has no parent"))?,
+        config: SubnetConfig::Fevm(EVMSubnet {
+            provider_http: topdown_config
+                .parent_http_endpoint
+                .to_string()
+                .parse()
+                .unwrap(),
+            auth_token: None,
+            registry_addr: topdown_config.parent_registry,
+            gateway_addr: topdown_config.parent_gateway,
+        }),
+    };
+    info!("init ipc provider with subnet: {}", subnet.id);
+
+    let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
+    IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
 }
 
 fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {
