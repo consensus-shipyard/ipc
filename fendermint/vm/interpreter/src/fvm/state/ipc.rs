@@ -109,16 +109,16 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .as_u64())
     }
 
-    /// Fetch the bottom-up messages enqueued for a given checkpoint height.
-    pub fn bottom_up_msgs(
+    /// Fetch the bottom-up message batch enqueued for a given checkpoint height.
+    pub fn bottom_up_msg_batch(
         &self,
         state: &mut FvmExecState<DB>,
         height: u64,
-    ) -> anyhow::Result<Vec<getter::IpcEnvelope>> {
+    ) -> anyhow::Result<getter::BottomUpMsgBatch> {
         let batch = self.getter.call(state, |c| {
             c.bottom_up_msg_batch(ethers::types::U256::from(height))
         })?;
-        Ok(batch.msgs)
+        Ok(batch)
     }
 
     /// Insert a new checkpoint at the period boundary.
