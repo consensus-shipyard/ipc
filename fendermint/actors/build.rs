@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("actor build failed".into());
     }
 
-    let dst = Path::new(&out_dir).join("bundle.car");
+    let dst = Path::new(&out_dir).join("actor_bundle.car");
     let mut bundler = Bundler::new(&dst);
     for (&pkg, id) in ACTORS.iter().zip(1u32..) {
         let bytecode_path = Path::new(&out_dir)

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, bail, Context};
 use cid::{multihash::Code, Cid};
 use ethers::{abi::Tokenize, core::abi::Abi};
+use fendermint_actors::Manifest as ActorManifest;
 use fendermint_vm_actor_interface::{
     account::{self, ACCOUNT_ACTOR_CODE_ID},
     eam::{self, EthAddress},
@@ -60,6 +61,7 @@ where
 {
     pub manifest_data_cid: Cid,
     pub manifest: Manifest,
+    pub actor_manifest: ActorManifest,
     store: DB,
     multi_engine: Arc<MultiEngine>,
     stage: Stage<DB>,
@@ -73,14 +75,15 @@ where
         store: DB,
         multi_engine: Arc<MultiEngine>,
         bundle: &[u8],
+        actor_bundle: &[u8],
     ) -> anyhow::Result<Self> {
-        // Load the actor bundle.
+        // Load the builtin actor bundle.
         let bundle_roots = load_car_unchecked(&store, bundle).await?;
         let bundle_root = match bundle_roots.as_slice() {
             [root] => root,
             roots => {
                 return Err(anyhow!(
-                    "expected one root in actor bundle; got {}",
+                    "expected one root in builtin actor bundle; got {}",
                     roots.len()
                 ))
             }
@@ -97,11 +100,38 @@ where
         };
         let manifest = Manifest::load(&store, &manifest_data_cid, manifest_version)?;
 
+        // Load the actor bundle
+        let actors_bundle_roots = load_car_unchecked(&store, actor_bundle).await?;
+        let actors_bundle_root = match actors_bundle_roots.as_slice() {
+            [root] => root,
+            roots => {
+                return Err(anyhow!(
+                    "expected one root in actor bundle; got {}",
+                    roots.len()
+                ))
+            }
+        };
+
+        let (actor_manifest_version, actor_manifest_data_cid): (u32, Cid) =
+            match store.get_cbor(actors_bundle_root)? {
+                Some(vd) => vd,
+                None => {
+                    return Err(anyhow!(
+                        "no manifest information in actor bundle root {}",
+                        bundle_root
+                    ))
+                }
+            };
+
+        let actor_manifest =
+            ActorManifest::load(&store, &actor_manifest_data_cid, actor_manifest_version)?;
+
         let state_tree = empty_state_tree(store.clone())?;
 
         let state = Self {
             manifest_data_cid,
             manifest,
+            actor_manifest,
             store,
             multi_engine,
             stage: Stage::Tree(state_tree),

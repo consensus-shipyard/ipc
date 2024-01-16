@@ -109,6 +109,7 @@ pub struct AppConfig<S: KVStore> {
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
     pub builtin_actors_bundle: PathBuf,
+    pub actors_bundle: PathBuf
 }
 
 /// Handle ABCI requests.
@@ -132,6 +133,7 @@ where
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
     builtin_actors_bundle: PathBuf,
+    actors_bundle: PathBuf,
     /// Namespace to store app state.
     namespace: S::Namespace,
     /// Collection of past state parameters.
@@ -187,6 +189,7 @@ where
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
             builtin_actors_bundle: config.builtin_actors_bundle,
+            actors_bundle: config.actors_bundle,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
@@ -450,10 +453,14 @@ where
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
         let bundle = &self.builtin_actors_bundle;
         let bundle = std::fs::read(bundle)
-            .map_err(|e| anyhow!("failed to load bundle CAR from {bundle:?}: {e}"))?;
+            .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
+
+        let actors_bundle = &self.actors_bundle;
+        let actors_bundle = std::fs::read(actors_bundle)
+            .map_err(|e| anyhow!("failed to load actor bundle CAR from {actors_bundle:?}: {e}"))?;
 
         let state =
-            FvmGenesisState::new(self.state_store_clone(), self.multi_engine.clone(), &bundle)
+            FvmGenesisState::new(self.state_store_clone(), self.multi_engine.clone(), &bundle, &actors_bundle)
                 .await
                 .context("failed to create genesis state")?;
 

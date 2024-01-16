@@ -7,7 +7,7 @@ use std::sync::Arc;
 use fendermint_vm_genesis::Genesis;
 use fendermint_vm_interpreter::{
     fvm::{
-        bundle::{bundle_path, contracts_path},
+        bundle::{actors_bundle_path, bundle_path, contracts_path},
         state::{FvmExecState, FvmGenesisState},
         store::memory::MemoryBlockstore,
         FvmGenesisOutput, FvmMessageInterpreter,
@@ -26,9 +26,17 @@ pub async fn init_exec_state(
     let bundle = std::fs::read(&bundle_path)
         .with_context(|| format!("failed to read bundle: {}", bundle_path.to_string_lossy()))?;
 
+    let actors_bundle_path = actors_bundle_path();
+    let actors_bundle = std::fs::read(&actors_bundle_path).with_context(|| {
+        format!(
+            "failed to read actors_bundle: {}",
+            actors_bundle_path.to_string_lossy()
+        )
+    })?;
+
     let store = MemoryBlockstore::new();
 
-    let state = FvmGenesisState::new(store, multi_engine, &bundle)
+    let state = FvmGenesisState::new(store, multi_engine, &bundle, &actors_bundle)
         .await
         .context("failed to create state")?;
 
