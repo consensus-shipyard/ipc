@@ -1,6 +1,15 @@
 [package]
 name = "fendermint_actors"
 version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cid = { workspace = true }
+anyhow = { workspace = true }
+fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
 
 [build-dependencies]
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }

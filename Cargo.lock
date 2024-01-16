@@ -2727,8 +2727,12 @@ dependencies = [
 name = "fendermint_actors"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "cid",
  "fil_actor_bundler",
  "fil_actors_runtime",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "num-traits",
 ]
 
@@ -3099,6 +3103,7 @@ dependencies = [
  "async-trait",
  "cid",
  "ethers",
+ "fendermint_actors",
  "fendermint_crypto",
  "fendermint_eth_hardhat",
  "fendermint_rpc",
