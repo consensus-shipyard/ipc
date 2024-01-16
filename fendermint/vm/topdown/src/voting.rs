@@ -8,7 +8,7 @@ use std::hash::Hash;
 use crate::{BlockHash, BlockHeight};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
-use ipc_ipld_resolver::ValidatorKey;
+pub use ipc_ipld_resolver::ValidatorKey;
 
 pub type Weight = u64;
 
@@ -278,6 +278,9 @@ where
     ///
     /// This method expects only the updated values, leaving everyone who isn't in it untouched
     pub fn update_power_table(&self, power_updates: Vec<(K, Weight)>) -> Stm<()> {
+        if power_updates.is_empty() {
+            return Ok(());
+        }
         // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
         self.power_table.update_mut(|pt| {
