@@ -23,6 +23,7 @@ use std::{
 };
 
 use anyhow::anyhow;
+use cid::Cid;
 use fvm_ipld_encoding::IPLD_RAW;
 use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID};
@@ -30,10 +31,6 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{
     Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
     NetworkConfig, Service, VoteRecord,
-};
-use libipld::{
-    multihash::{Code, MultihashDigest},
-    Cid,
 };
 use libp2p::{
     core::{
@@ -44,11 +41,14 @@ use libp2p::{
     multiaddr::Protocol,
     plaintext, yamux, Multiaddr, PeerId, Transport,
 };
+use multihash::{Code, MultihashDigest};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 mod store;
 use store::*;
 use tokio::{sync::broadcast, time::timeout};
+
+const BIT_WIDTH: u32 = 8;
 
 struct Agent {
     config: Config,
@@ -374,7 +374,7 @@ const KEY_COUNT: u32 = 500;
 
 /// Insert a HAMT into the block store of an agent.
 fn insert_test_data(agent: &mut Agent) -> anyhow::Result<Cid> {
-    let mut hamt: Hamt<_, String, u32> = Hamt::new(&agent.store);
+    let mut hamt: Hamt<_, String, u32> = Hamt::new_with_bit_width(&agent.store, BIT_WIDTH);
 
     // Insert enough data into the HAMT to make sure it grows from a single `Node`.
     for i in 0..KEY_COUNT {
@@ -386,7 +386,7 @@ fn insert_test_data(agent: &mut Agent) -> anyhow::Result<Cid> {
 }
 
 fn check_test_data(agent: &mut Agent, cid: &Cid) -> anyhow::Result<()> {
-    let hamt: Hamt<_, String, u32> = Hamt::load(cid, &agent.store)?;
+    let hamt: Hamt<_, String, u32> = Hamt::load_with_bit_width(cid, &agent.store, BIT_WIDTH)?;
 
     // Check all the data inserted by `insert_test_data`.
     for i in 0..KEY_COUNT {
