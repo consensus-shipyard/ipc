@@ -84,7 +84,13 @@ pub struct Options {
     pub mode: String,
 
     /// Set the logging level.
-    #[arg(short = 'l', long, default_value = "info", value_enum, env = "LOG_LEVEL")]
+    #[arg(
+        short = 'l',
+        long,
+        default_value = "info",
+        value_enum,
+        env = "LOG_LEVEL"
+    )]
     pub log_level: LogLevel,
 
     /// Global options repeated here for discoverability, so they show up in `--help` among the others.
@@ -142,12 +148,21 @@ mod tests {
     }
 
     #[test]
-    fn ignore_help() {
+    fn global_options_ignore_help() {
         let cmd = "fendermint --help";
         let _opts: GlobalOptions = GlobalOptions::parse_from(cmd.split_ascii_whitespace());
+    }
 
-        // The following would print the help in tests and quit.
-        // I'm not sure what's the best way to test that this is not happening, besides eyeballing the output.
-        // let _opts: Options = Options::parse_from(cmd.split_ascii_whitespace());
+    #[test]
+    fn options_handle_help() {
+        let cmd = "fendermint --help";
+        // This test would fail with a panic if we have a misconfiguration in our options.
+        // On successfully parsing `--help` with `parse_from` the library would `.exit()` the test framework itself,
+        // which is why we must use `try_parse_from`. An error results in a panic from `parse_from` and an `Err`
+        // from this, but `--help` is not an `Ok`, since we aren't getting `Options`; it's an `Err` with a help message.
+        let e = Options::try_parse_from(cmd.split_ascii_whitespace())
+            .expect_err("--help is not Options");
+
+        assert!(e.to_string().contains("usage"))
     }
 }
