@@ -76,7 +76,7 @@ pub struct Options {
     pub home_dir: PathBuf,
 
     /// Set a custom directory for ipc log files.
-    #[arg(short = 'l', long, env = "FM_LOG_DIR")]
+    #[arg(short = 'd', long, env = "FM_LOG_DIR")]
     pub log_dir: Option<PathBuf>,
 
     /// Optionally override the default configuration.
@@ -84,7 +84,7 @@ pub struct Options {
     pub mode: String,
 
     /// Set the logging level.
-    #[arg(short, long, default_value = "info", value_enum, env = "LOG_LEVEL")]
+    #[arg(short = 'l', long, default_value = "info", value_enum, env = "LOG_LEVEL")]
     pub log_level: LogLevel,
 
     /// Global options repeated here for discoverability, so they show up in `--help` among the others.
