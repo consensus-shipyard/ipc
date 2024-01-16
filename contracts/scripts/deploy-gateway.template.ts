@@ -68,12 +68,6 @@ export async function deploy(libs: { [key in string]: string }) {
         AccountHelper: libs['AccountHelper'],
     }
 
-    const bottomUpRouterFacetLibs: Libraries = {
-        CrossMsgHelper: libs['CrossMsgHelper'],
-        SubnetIDHelper: libs['SubnetIDHelper'],
-        AccountHelper: libs['AccountHelper'],
-    }
-
     const facets = [
         { name: 'GatewayGetterFacet', libs: getterFacetLibs },
         { name: 'DiamondLoupeFacet', libs: {} },
@@ -89,10 +83,6 @@ export async function deploy(libs: { [key in string]: string }) {
             libs: xnetMessagingFacetLibs,
         },
         { name: 'TopDownFinalityFacet', libs: topDownFinalityFacetLibs },
-        {
-            name: 'BottomUpRouterFacet',
-            libs: bottomUpRouterFacetLibs,
-        },
     ]
 
     for (const facet of facets) {
