@@ -17,6 +17,7 @@ pub mod membership;
 pub use content::Config as ContentConfig;
 pub use discovery::Config as DiscoveryConfig;
 pub use membership::Config as MembershipConfig;
+use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(Clone, Debug)]
 pub struct NetworkConfig {
@@ -49,14 +50,14 @@ pub enum ConfigError {
 /// * Gossipsub to advertise subnet membership
 /// * Bitswap to resolve CIDs
 #[derive(NetworkBehaviour)]
-pub struct Behaviour<P>
+pub struct Behaviour<P, V>
 where
     P: StoreParams,
 {
     ping: ping::Behaviour,
     identify: identify::Behaviour,
     discovery: discovery::Behaviour,
-    membership: membership::Behaviour,
+    membership: membership::Behaviour<V>,
     content: content::Behaviour<P>,
 }
 
@@ -66,7 +67,11 @@ where
 // where we manually implement `NetworkBehaviour`, or the outer service where we drive the
 // Swarm; there we are free to call any of the behaviours as well as the Swarm.
 
-impl<P: StoreParams> Behaviour<P> {
+impl<P, V> Behaviour<P, V>
+where
+    P: StoreParams,
+    V: Serialize + DeserializeOwned,
+{
     pub fn new<S>(
         nc: NetworkConfig,
         dc: DiscoveryConfig,
@@ -93,7 +98,7 @@ impl<P: StoreParams> Behaviour<P> {
         &mut self.discovery
     }
 
-    pub fn membership_mut(&mut self) -> &mut membership::Behaviour {
+    pub fn membership_mut(&mut self) -> &mut membership::Behaviour<V> {
         &mut self.membership
     }
 

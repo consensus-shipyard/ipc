@@ -13,6 +13,15 @@ use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
+/// All the things that can be voted on in a subnet.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AppVote {
+    /// The validator considers a certain block final on the parent chain.
+    ParentFinality(IPCParentFinality),
+}
+
 /// Queries the LATEST COMMITTED parent finality from the storage
 pub struct AppParentFinalityQuery<DB, SS, S, I>
 where

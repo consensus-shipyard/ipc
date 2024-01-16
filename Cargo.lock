@@ -2962,6 +2962,7 @@ dependencies = [
  "im",
  "ipc-api",
  "ipc_ipld_resolver",
+ "serde",
  "tokio",
  "tracing",
 ]
@@ -4541,6 +4542,7 @@ name = "ipc_ipld_resolver"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64 0.21.6",
  "blake2b_simd",
  "bloom",
