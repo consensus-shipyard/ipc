@@ -33,6 +33,16 @@ use std::sync::Arc;
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
 
+/// These are the extra state items that the chain interpreter needs,
+/// a sort of "environment" supporting IPC.
+#[derive(Clone)]
+pub struct ChainEnv {
+    /// CID resolution pool.
+    pub checkpoint_pool: CheckpointPool,
+    /// The parent finality provider for top down checkpoint
+    pub parent_finality_provider: TopDownFinalityProvider,
+}
+
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub enum CheckpointPoolItem {
     /// BottomUp checkpoints to be resolved from the originating subnet or the current one.
@@ -88,7 +98,7 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
 {
-    type State = (CheckpointPool, TopDownFinalityProvider);
+    type State = ChainEnv;
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
@@ -97,11 +107,11 @@ where
     /// account the transactions which are part of top-down or bottom-up checkpoints, to stay within gas limits.
     async fn prepare(
         &self,
-        (pool, finality_provider): Self::State,
+        state: Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
         // Collect resolved CIDs ready to be proposed from the pool.
-        let ckpts = atomically(|| pool.collect_resolved()).await;
+        let ckpts = atomically(|| state.checkpoint_pool.collect_resolved()).await;
 
         // Create transactions ready to be included on the chain.
         let ckpts = ckpts.into_iter().map(|ckpt| match ckpt {
@@ -109,7 +119,8 @@ where
         });
 
         // Prepare top down proposals
-        if let Some(proposal) = atomically(|| finality_provider.next_proposal()).await {
+        if let Some(proposal) = atomically(|| state.parent_finality_provider.next_proposal()).await
+        {
             msgs.push(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
                 height: proposal.height as ChainEpoch,
                 block_hash: proposal.block_hash,
@@ -122,11 +133,7 @@ where
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(
-        &self,
-        (pool, finality_provider): Self::State,
-        msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<bool> {
+    async fn process(&self, env: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -137,11 +144,12 @@ where
                     // We don't have to validate the checkpoint here, because
                     // 1) we validated it when it was relayed, and
                     // 2) if a validator proposes something invalid, we can make them pay during execution.
-                    let is_resolved = atomically(|| match pool.get_status(&item)? {
-                        None => Ok(false),
-                        Some(status) => status.is_resolved(),
-                    })
-                    .await;
+                    let is_resolved =
+                        atomically(|| match env.checkpoint_pool.get_status(&item)? {
+                            None => Ok(false),
+                            Some(status) => status.is_resolved(),
+                        })
+                        .await;
 
                     if !is_resolved {
                         return Ok(false);
@@ -155,7 +163,8 @@ where
                         height: height as u64,
                         block_hash,
                     };
-                    let is_final = atomically(|| finality_provider.check_proposal(&prop)).await;
+                    let is_final =
+                        atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
                     if !is_final {
                         return Ok(false);
                     }
@@ -181,7 +190,7 @@ where
     // state which the inner interpreter uses. This is a technical solution because the pool doesn't
     // fit with the state we use for execution messages further down the stack, which depend on block
     // height and are used in queries as well.
-    type State = (CheckpointPool, TopDownFinalityProvider, I::State);
+    type State = (ChainEnv, I::State);
     type Message = ChainMessage;
     type BeginOutput = I::BeginOutput;
     type DeliverOutput = ChainMessageApplyRet;
@@ -189,7 +198,7 @@ where
 
     async fn deliver(
         &self,
-        (pool, provider, mut state): Self::State,
+        (env, mut state): Self::State,
         msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         match msg {
@@ -198,7 +207,7 @@ where
                     .inner
                     .deliver(state, VerifiableMessage::Signed(msg))
                     .await?;
-                Ok(((pool, provider, state), ChainMessageApplyRet::Signed(ret)))
+                Ok(((env, state), ChainMessageApplyRet::Signed(ret)))
             }
             ChainMessage::Ipc(msg) => match msg {
                 IpcMessage::BottomUpResolve(msg) => {
@@ -221,7 +230,7 @@ where
                     if is_success {
                         // For now try to get it from the child subnet. If the same comes up for execution, include own.
                         atomically(|| {
-                            pool.add(
+                            env.checkpoint_pool.add(
                                 CheckpointPoolItem::BottomUp(msg.message.message.clone()),
                                 false,
                             )
@@ -230,13 +239,13 @@ where
                     }
 
                     // We can use the same result type for now, it's isomorphic.
-                    Ok(((pool, provider, state), ChainMessageApplyRet::Signed(ret)))
+                    Ok(((env, state), ChainMessageApplyRet::Signed(ret)))
                 }
                 IpcMessage::BottomUpExec(_) => {
                     todo!("#197: implement BottomUp checkpoint execution")
                 }
                 IpcMessage::TopDownExec(p) => {
-                    if !provider.is_enabled() {
+                    if !env.parent_finality_provider.is_enabled() {
                         bail!("cannot execute IPC top-down message: parent provider disabled");
                     }
 
@@ -251,7 +260,7 @@ where
                         &self.gateway_caller,
                         &mut state,
                         finality.clone(),
-                        &provider,
+                        &env.parent_finality_provider,
                     )
                     .await
                     .context("failed to commit finality")?;
@@ -272,7 +281,8 @@ where
                     let execution_to = finality.height - 1;
 
                     // error happens if we cannot get the validator set from ipc agent after retries
-                    let validator_changes = provider
+                    let validator_changes = env
+                        .parent_finality_provider
                         .validator_changes_from(execution_fr, execution_to)
                         .await
                         .context("failed to fetch validator changes")?;
@@ -288,10 +298,12 @@ where
                         .context("failed to store validator changes")?;
 
                     // error happens if we cannot get the cross messages from ipc agent after retries
-                    let msgs = provider
+                    let msgs = env
+                        .parent_finality_provider
                         .top_down_msgs_from(execution_fr, execution_to)
                         .await
                         .context("failed to fetch top down messages")?;
+
                     tracing::debug!(
                         number_of_messages = msgs.len(),
                         start = execution_fr,
@@ -302,10 +314,12 @@ where
                     let ret = topdown::execute_topdown_msgs(&self.gateway_caller, &mut state, msgs)
                         .await
                         .context("failed to execute top down messages")?;
+
                     tracing::debug!("chain interpreter applied topdown msgs");
 
                     atomically(|| {
-                        provider.set_new_finality(finality.clone(), prev_finality.clone())
+                        env.parent_finality_provider
+                            .set_new_finality(finality.clone(), prev_finality.clone())
                     })
                     .await;
 
@@ -314,7 +328,7 @@ where
                         "chain interpreter has set new"
                     );
 
-                    Ok(((pool, provider, state), ChainMessageApplyRet::Ipc(ret)))
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
             },
         }
@@ -322,18 +336,18 @@ where
 
     async fn begin(
         &self,
-        (pool, provider, state): Self::State,
+        (env, state): Self::State,
     ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         let (state, out) = self.inner.begin(state).await?;
-        Ok(((pool, provider, state), out))
+        Ok(((env, state), out))
     }
 
     async fn end(
         &self,
-        (pool, provider, state): Self::State,
+        (env, state): Self::State,
     ) -> anyhow::Result<(Self::State, Self::EndOutput)> {
         let (state, out) = self.inner.end(state).await?;
-        Ok(((pool, provider, state), out))
+        Ok(((env, state), out))
     }
 }
 

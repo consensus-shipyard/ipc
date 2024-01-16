@@ -9,6 +9,7 @@ use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
@@ -128,7 +129,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let state_store =
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
-    let resolve_pool = CheckpointPool::new();
+    let checkpoint_pool = CheckpointPool::new();
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver.enabled() {
@@ -145,7 +146,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         let resolver = IpldResolver::new(
             client,
-            resolve_pool.queue(),
+            checkpoint_pool.queue(),
             settings.resolver.retry_delay,
             own_subnet_id,
         );
@@ -220,8 +221,10 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         db,
         state_store,
         interpreter,
-        resolve_pool,
-        parent_finality_provider.clone(),
+        ChainEnv {
+            checkpoint_pool,
+            parent_finality_provider: parent_finality_provider.clone(),
+        },
         snapshots,
     )?;
 
