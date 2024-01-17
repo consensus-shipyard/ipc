@@ -170,6 +170,14 @@ Also:
 2. Use `make coverage` to get the test coverage report.
 3. Use `make rust-binding` to generate bindings in Rust.
 
+# Vulnerability Management
+
+## Node Dependencies
+
+[`resolve-audits`](https://github.com/naugtur/npm-audit-resolver) is used for vulnerability management.
+
+To resolve found vulnerabilities you should run `resolve-audits` command and follow the steps from the [guide](https://github.com/naugtur/npm-audit-resolver?tab=readme-ov-file#usage).
+
 # Bugs
 
 Please report any bugs using the [issue tracker](https://github.com/consensus-shipyard/ipc/issues).
