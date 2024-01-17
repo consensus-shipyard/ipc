@@ -2,6 +2,7 @@
 
 BUILTIN_ACTORS_TAG    ?= v12.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
+ACTORS_BUNDLE         := $(PWD)/actors/output/actors_bundle.car
 
 IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
@@ -39,6 +40,7 @@ install: $(IPC_ACTORS_GEN)
 # Using --release for testing because wasm can otherwise be slow.
 test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
+	FM_ACTORS_BUNDLE=$(ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release $(PACKAGE)
 
@@ -50,6 +52,7 @@ e2e: docker-build | cargo-make
 clean:
 	cargo clean
 	rm $(BUILTIN_ACTORS_BUNDLE)
+	rm $(ACTORS_BUNDLE)
 
 lint: \
 	check-fmt \
@@ -64,11 +67,12 @@ check-clippy: $(IPC_ACTORS_GEN)
 	@# We could have a separate top level job that does `fmt` and `clippy` check on the whole project.
 	cargo clippy $(PACKAGE) --no-deps --tests -- -D clippy::all
 
-docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
 	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
+	cp $(ACTORS_BUNDLE) docker/.artifacts
 
 # To use `buildx` locally to produce multiplatform images, one needs to run `docker buildx create --use`.
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully

@@ -6,30 +6,12 @@ use fil_actors_runtime::actor_dispatch;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorError;
-use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
-use fvm_shared::METHOD_CONSTRUCTOR;
-use num_derive::FromPrimitive;
 use std::collections::VecDeque;
 
-#[derive(Serialize_tuple, Deserialize_tuple)]
-struct State {
-    blockhashes: VecDeque<Cid>,
-    params: ConstructorParams,
-}
+use crate::{ConstructorParams, Method, State};
 
-#[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
-struct ConstructorParams {
-    lookback_len: u64,
-}
-
-#[derive(FromPrimitive)]
-#[repr(u64)]
-pub enum Method {
-    Constructor = METHOD_CONSTRUCTOR,
-    PushBlock = 2,
-    LookbackLen = 3,
-    BlockCID = 4,
-}
+#[cfg(feature = "fil-actor")]
+fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub struct Actor;
 

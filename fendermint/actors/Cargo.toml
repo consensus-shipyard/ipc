@@ -5,6 +5,11 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+fendermint_actor_chainmetadata = { path = "chainmetadata", features = [
+    "fil-actor",
+] }
+
 [dependencies]
 cid = { workspace = true }
 anyhow = { workspace = true }
@@ -14,8 +19,4 @@ fvm_ipld_encoding = { workspace = true }
 [build-dependencies]
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 fil_actor_bundler = "6.1.0"
-num-traits = { workspace = true}
-
-[features]
-default=[]
-testing=[]
+num-traits = { workspace = true }

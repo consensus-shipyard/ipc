@@ -189,8 +189,7 @@ where
         }
     }
 
-    /// Creates an actor using code specified in the manifest.
-    pub fn create_actor(
+    pub fn create_builtin_actor(
         &mut self,
         code_id: u32,
         id: ActorID,
@@ -204,6 +203,35 @@ where
             .code_by_id(code_id)
             .ok_or_else(|| anyhow!("can't find {code_id} in the manifest"))?;
 
+        self.create_actor_internal(code_cid, id, state, balance, delegated_address)
+    }
+
+    pub fn create_actor(
+        &mut self,
+        code_id: u32,
+        id: ActorID,
+        state: &impl Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> anyhow::Result<()> {
+        // Retrieve the CID of the actor code by the numeric ID.
+        let code_cid = *self
+            .actor_manifest
+            .code_by_id(code_id)
+            .ok_or_else(|| anyhow!("can't find {code_id} in the actor manifest"))?;
+
+        self.create_actor_internal(code_cid, id, state, balance, delegated_address)
+    }
+
+    /// Creates an actor using code specified in the manifest.
+    fn create_actor_internal(
+        &mut self,
+        code_cid: Cid,
+        id: ActorID,
+        state: &impl Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> anyhow::Result<()> {
         let state_cid = self.put_state(state)?;
 
         let actor_state = ActorState {
@@ -246,12 +274,18 @@ where
         match owner.payload() {
             Payload::Secp256k1(_) => {
                 let state = account::State { address: owner };
-                self.create_actor(ACCOUNT_ACTOR_CODE_ID, *id, &state, balance, None)
+                self.create_builtin_actor(ACCOUNT_ACTOR_CODE_ID, *id, &state, balance, None)
             }
             Payload::Delegated(d) if d.namespace() == eam::EAM_ACTOR_ID => {
                 let state = EMPTY_ARR;
                 // NOTE: Here we could use the placeholder code ID as well.
-                self.create_actor(ETHACCOUNT_ACTOR_CODE_ID, *id, &state, balance, Some(owner))
+                self.create_builtin_actor(
+                    ETHACCOUNT_ACTOR_CODE_ID,
+                    *id,
+                    &state,
+                    balance,
+                    Some(owner),
+                )
             }
             other => Err(anyhow!("unexpected actor owner: {other:?}")),
         }
@@ -292,7 +326,7 @@ where
             balance.clone(),
         )?;
 
-        self.create_actor(MULTISIG_ACTOR_CODE_ID, next_id, &state, balance, None)
+        self.create_builtin_actor(MULTISIG_ACTOR_CODE_ID, next_id, &state, balance, None)
     }
 
     /// Deploy an EVM contract with a fixed ID and some constructor arguments.
@@ -353,7 +387,7 @@ where
         };
 
         // Create an empty actor to receive the call.
-        self.create_actor(
+        self.create_builtin_actor(
             evm::EVM_ACTOR_CODE_ID,
             id,
             &EMPTY_ARR,

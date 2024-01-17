@@ -109,7 +109,7 @@ pub struct AppConfig<S: KVStore> {
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
     pub builtin_actors_bundle: PathBuf,
-    pub actors_bundle: PathBuf
+    pub actors_bundle: PathBuf,
 }
 
 /// Handle ABCI requests.
@@ -459,10 +459,14 @@ where
         let actors_bundle = std::fs::read(actors_bundle)
             .map_err(|e| anyhow!("failed to load actor bundle CAR from {actors_bundle:?}: {e}"))?;
 
-        let state =
-            FvmGenesisState::new(self.state_store_clone(), self.multi_engine.clone(), &bundle, &actors_bundle)
-                .await
-                .context("failed to create genesis state")?;
+        let state = FvmGenesisState::new(
+            self.state_store_clone(),
+            self.multi_engine.clone(),
+            &bundle,
+            &actors_bundle,
+        )
+        .await
+        .context("failed to create genesis state")?;
 
         tracing::info!(
             manifest_root = format!("{}", state.manifest_data_cid),

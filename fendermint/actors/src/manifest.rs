@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, Context};
 use cid::Cid;
-use std::collections::HashMap;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::CborStore;
+use std::collections::HashMap;
 
 const CHAINMETADATA_ACTOR_NAME: &str = "chainmetadata";
 
@@ -31,7 +31,6 @@ impl Manifest {
 
         Manifest::new(vec)
     }
-
 
     /// Construct a new manifest from actor name/cid tuples.
     pub fn new(iter: impl IntoIterator<Item = (impl Into<String>, Cid)>) -> anyhow::Result<Self> {

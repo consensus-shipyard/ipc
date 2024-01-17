@@ -1,8 +1,5 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-extern crate fil_actor_bundler;
-extern crate fil_actors_runtime;
-extern crate num_traits;
 
 use fil_actor_bundler::Bundler;
 use std::error::Error;
@@ -30,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR unset"))
             .join("Cargo.toml");
 
-    for file in FILES_TO_WATCH.to_vec() {
+    for file in FILES_TO_WATCH {
         println!("cargo:rerun-if-changed={}", file);
     }
 
@@ -44,6 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .arg("--target=wasm32-unknown-unknown")
         .arg("--profile=wasm")
+        .arg("--features=fil-actor")
         .arg("--manifest-path=".to_owned() + manifest_path.to_str().unwrap())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -83,9 +81,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !result.success() {
         return Err("actor build failed".into());
     }
-
-    let dst = Path::new(&out_dir).join("actor_bundle.car");
-    let mut bundler = Bundler::new(&dst);
+    let dst = Path::new("output/actors_bundle.car");
+    let mut bundler = Bundler::new(dst);
     for (&pkg, id) in ACTORS.iter().zip(1u32..) {
         let bytecode_path = Path::new(&out_dir)
             .join("wasm32-unknown-unknown/wasm")

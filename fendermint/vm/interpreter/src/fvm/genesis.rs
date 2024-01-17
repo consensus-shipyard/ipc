@@ -145,7 +145,7 @@ where
 
         // System actor
         state
-            .create_actor(
+            .create_builtin_actor(
                 system::SYSTEM_ACTOR_CODE_ID,
                 system::SYSTEM_ACTOR_ID,
                 &system::State {
@@ -167,7 +167,7 @@ where
         .context("failed to create init state")?;
 
         state
-            .create_actor(
+            .create_builtin_actor(
                 init::INIT_ACTOR_CODE_ID,
                 init::INIT_ACTOR_ID,
                 &init_state,
@@ -178,7 +178,7 @@ where
 
         // Cron actor
         state
-            .create_actor(
+            .create_builtin_actor(
                 cron::CRON_ACTOR_CODE_ID,
                 cron::CRON_ACTOR_ID,
                 &cron::State {
@@ -191,7 +191,7 @@ where
 
         // Ethereum Account Manager (EAM) actor
         state
-            .create_actor(
+            .create_builtin_actor(
                 eam::EAM_ACTOR_CODE_ID,
                 eam::EAM_ACTOR_ID,
                 &EMPTY_ARR,
@@ -202,7 +202,7 @@ where
 
         // Burnt funds actor (it's just an account).
         state
-            .create_actor(
+            .create_builtin_actor(
                 account::ACCOUNT_ACTOR_CODE_ID,
                 burntfunds::BURNT_FUNDS_ACTOR_ID,
                 &account::State {
@@ -217,7 +217,7 @@ where
         // using the one in the builtin actors library would be appropriate.
         // This effectively burns the miner rewards. Better than panicking.
         state
-            .create_actor(
+            .create_builtin_actor(
                 account::ACCOUNT_ACTOR_CODE_ID,
                 reward::REWARD_ACTOR_ID,
                 &account::State {
@@ -494,7 +494,7 @@ mod tests {
 
     use crate::{
         fvm::{
-            bundle::{bundle_path, contracts_path},
+            bundle::{actors_bundle_path, bundle_path, contracts_path},
             state::ipc::GatewayCaller,
             store::memory::MemoryBlockstore,
             FvmMessageInterpreter,
@@ -508,12 +508,13 @@ mod tests {
     async fn load_genesis() {
         let genesis = make_genesis();
         let bundle = read_bundle();
+        let actors_bundle = read_actors_bundle();
         let interpreter = make_interpreter();
 
         let multi_engine = Arc::new(MultiEngine::default());
         let store = MemoryBlockstore::new();
 
-        let state = FvmGenesisState::new(store, multi_engine, &bundle)
+        let state = FvmGenesisState::new(store, multi_engine, &bundle, &actors_bundle)
             .await
             .expect("failed to create state");
 
@@ -541,6 +542,7 @@ mod tests {
     async fn load_genesis_deterministic() {
         let genesis = make_genesis();
         let bundle = read_bundle();
+        let actors_bundle = read_actors_bundle();
         let interpreter = make_interpreter();
         let multi_engine = Arc::new(MultiEngine::default());
 
@@ -548,7 +550,7 @@ mod tests {
         let mut outputs = Vec::new();
         for _ in 0..3 {
             let store = MemoryBlockstore::new();
-            let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle)
+            let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle, &actors_bundle)
                 .await
                 .expect("failed to create state");
 
@@ -577,11 +579,12 @@ mod tests {
         let genesis: Genesis = serde_json::from_str(genesis_json).expect("failed to parse genesis");
 
         let bundle = read_bundle();
+        let actors_bundle = read_actors_bundle();
         let interpreter = make_interpreter();
         let multi_engine = Arc::new(MultiEngine::default());
 
         let store = MemoryBlockstore::new();
-        let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle)
+        let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle, &actors_bundle)
             .await
             .expect("failed to create state");
 
@@ -616,5 +619,9 @@ mod tests {
 
     fn read_bundle() -> Vec<u8> {
         std::fs::read(bundle_path()).expect("failed to read bundle")
+    }
+
+    fn read_actors_bundle() -> Vec<u8> {
+        std::fs::read(actors_bundle_path()).expect("failed to read actor bundle")
     }
 }

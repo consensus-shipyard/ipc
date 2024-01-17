@@ -31,11 +31,8 @@ pub fn bundle_path() -> PathBuf {
 /// Path to the in-repo actor bundle, indended to be used in tests.
 pub fn actors_bundle_path() -> PathBuf {
     let actors_bundle_path = std::env::var("FM_ACTORS_BUNDLE").unwrap_or_else(|_| {
-        std::env::var_os("OUT_DIR")
-            .as_ref()
-            .map(Path::new)
-            .map(|p| p.join("bundle/actor_bundle.car"))
-            .expect("no OUT_DIR env var")
+        workspace_dir()
+            .join("fendermint/actors/output/actors_bundle.car")
             .to_string_lossy()
             .into_owned()
     });
