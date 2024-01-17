@@ -165,6 +165,7 @@ make prepare
 ```
 
 Also:
+
 1. Use `make storage` to check that the storage layout has not been corrupted.
 2. Use `make coverage` to get the test coverage report.
 3. Use `make rust-binding` to generate bindings in Rust.
