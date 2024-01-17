@@ -24,6 +24,7 @@ jobs:
       pull-requests: read
     # Set job outputs to values from filter step
     outputs:
+      workspace:     ${{ steps.filter.outputs.workspace }}
       contracts:     ${{ steps.filter.outputs.contracts }}
       ipc:           ${{ steps.filter.outputs.ipc }}
       ipld-resolver: ${{ steps.filter.outputs.ipld-resolver }}
@@ -37,6 +38,8 @@ jobs:
         id: filter
         with:
           filters: |
+            workspace:
+              - 'Cargo.toml'
             contracts:
               - 'contracts/**'
             ipc:
@@ -84,6 +87,7 @@ jobs:
     uses: ./.github/workflows/ipc.yaml
     needs: [changes, license]
     if: >-
+      needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
       needs.changes.outputs.ipc == 'true' ||
       github.ref == 'refs/heads/main'
@@ -92,6 +96,7 @@ jobs:
     uses: ./.github/workflows/ipld-resolver.yaml
     needs: [changes, license]
     if: >-
+      needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.ipld-resolver == 'true' ||
       github.ref == 'refs/heads/main'
 
@@ -99,6 +104,7 @@ jobs:
     uses: ./.github/workflows/fendermint-test.yaml
     needs: [changes, license]
     if: >-
+      needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
       needs.changes.outputs.ipc == 'true' ||
       needs.changes.outputs.ipld-resolver == 'true' ||
