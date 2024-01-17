@@ -843,7 +843,7 @@ impl EthManager for EthSubnetManager {
         );
 
         let (exists, nonce) = gateway_contract
-            .get_applied_top_down_nonce(evm_subnet_id)
+            .get_top_down_nonce(evm_subnet_id)
             .call()
             .await
             .map_err(|e| anyhow!("cannot get applied top down nonce due to: {e:}"))?;
