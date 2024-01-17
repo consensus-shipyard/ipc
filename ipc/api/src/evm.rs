@@ -84,6 +84,7 @@ macro_rules! cross_msg_types {
 
             fn try_from(value: IpcEnvelope) -> Result<Self, Self::Error> {
                 let msg_fee = fil_to_eth_amount(&value.fee)?;
+                let val = fil_to_eth_amount(&value.value)?;
 
                 let c = $module::IpcEnvelope {
                     kind: value.kind as u8,
@@ -92,6 +93,7 @@ macro_rules! cross_msg_types {
                     })?,
                     to: $module::Ipcaddress::try_from(value.to)
                         .map_err(|e| anyhow!("cannot convert `to`` ipc address due to: {e:}"))?,
+                    value: val,
                     nonce: value.nonce,
                     message: ethers::core::types::Bytes::from(value.message),
                     fee: msg_fee,
@@ -107,6 +109,7 @@ macro_rules! cross_msg_types {
                 let s = IpcEnvelope {
                     from: IPCAddress::try_from(value.from)?,
                     to: IPCAddress::try_from(value.to)?,
+                    value: eth_to_fil_amount(&value.value)?,
                     kind: IpcMsgKind::try_from(value.kind)?,
                     message: value.message.to_vec(),
                     nonce: value.nonce,

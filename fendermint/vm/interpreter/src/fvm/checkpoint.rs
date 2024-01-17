@@ -81,7 +81,7 @@ where
                 .context("failed to retrieve bottom-up messages")?;
 
             // Sum up the value leaving the subnet as part of the bottom-up messages.
-            let burnt_tokens = tokens_to_burn(&cross_msgs)?;
+            let burnt_tokens = tokens_to_burn(&cross_msgs);
 
             // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
             // we don't have to burn them here, because it's already being done in
