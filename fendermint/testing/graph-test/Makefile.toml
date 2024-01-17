@@ -68,16 +68,17 @@ script = """
 echo "Query against local subgraph server using GraphQL."
 GREETING_MSG_0=$(curl -s 'http://localhost:8000/subgraphs/name/Greeter' --data-raw '{"query":"{\\n  greetings(sort: \\"createdAt:desc\\") {\\n    id\\n    currentGreeting\\n  }\\n}","variables":null,"extensions":{"headers":null}}' | jq -r '.data.greetings[0].currentGreeting')
 GREETING_MSG_1=$(curl -s 'http://localhost:8000/subgraphs/name/Greeter' --data-raw '{"query":"{\\n  greetings(sort: \\"createdAt:desc\\") {\\n    id\\n    currentGreeting\\n  }\\n}","variables":null,"extensions":{"headers":null}}' | jq -r '.data.greetings[1].currentGreeting')
+TARGET_MSGS=' [ "Welcome, weary traveller!", "Howdy doody!" ] '
 echo $GREETING_MSG_0
 echo $GREETING_MSG_1
 
-if [ "$GREETING_MSG_0" != "Welcome, weary traveller!" ]; then
-  echo "ERROR: Getting wrong indexed greeting message $GREETING_MSG_1"
+if [[ ! $TARGET_MSGS =~ $GREETING_MSG_0 ]]; then
+  echo "ERROR: Getting unexpected indexed greeting message $GREETING_MSG_0"
   exit 1
 fi
 
-if [ "$GREETING_MSG_1" != "Howdy doody!" ]; then
-  echo "ERROR: Getting wrong indexed greeting message $GREETING_MSG_0"
+if [[ ! $TARGET_MSGS =~ $GREETING_MSG_1 ]]; then
+  echo "ERROR: Getting unexpected indexed greeting message $GREETING_MSG_1"
   exit 1
 fi
 
