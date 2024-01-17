@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 
 /// The parent finality provider could have all functionalities disabled.
@@ -65,7 +65,7 @@ impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggl
         &self,
         from: BlockHeight,
         to: BlockHeight,
-    ) -> anyhow::Result<Vec<CrossMsg>> {
+    ) -> anyhow::Result<Vec<IpcEnvelope>> {
         match self.inner.as_ref() {
             Some(p) => p.top_down_msgs_from(from, to).await,
             None => Err(anyhow!("provider is toggled off")),

@@ -156,20 +156,23 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         let bundle = self.child_handler.checkpoint_bundle_at(height).await?;
         log::debug!("bottom up bundle: {bundle:?}");
 
-        todo!("implement submit checkpoint")
+        let epoch = self
+            .parent_handler
+            .submit_checkpoint(
+                submitter,
+                bundle.checkpoint,
+                bundle.signatures,
+                bundle.signatories,
+            )
+            .await
+            .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+        log::info!(
+            "submitted bottom up checkpoint({}) in parent at height {}",
+            height,
+            epoch
+        );
 
-        // let epoch = self
-        //     .parent_handler
-        //     .submit_checkpoint(submitter, bundle)
-        //     .await
-        //     .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
-        // log::info!(
-        //     "submitted bottom up checkpoint({}) in parent at height {}",
-        //     height,
-        //     epoch
-        // );
-        //
-        // Ok(())
+        Ok(())
     }
 
     /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.

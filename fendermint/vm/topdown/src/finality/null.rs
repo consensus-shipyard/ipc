@@ -6,7 +6,7 @@ use crate::finality::{
 };
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
 
@@ -51,7 +51,7 @@ impl FinalityWithNull {
     pub async fn top_down_msgs(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<Option<Vec<CrossMsg>>> {
+    ) -> anyhow::Result<Option<Vec<IpcEnvelope>>> {
         let r = atomically(|| self.handle_null_block(height, topdown_cross_msgs, Vec::new)).await;
         Ok(r)
     }
@@ -259,12 +259,12 @@ impl FinalityWithNull {
         height: BlockHeight,
         block_hash: BlockHash,
         validator_changes: Vec<StakingChangeRequest>,
-        top_down_msgs: Vec<CrossMsg>,
+        top_down_msgs: Vec<IpcEnvelope>,
     ) -> StmResult<(), Error> {
         if !top_down_msgs.is_empty() {
             // make sure incoming top down messages are ordered by nonce sequentially
             tracing::debug!(?top_down_msgs);
-            ensure_sequential(&top_down_msgs, |msg| msg.msg.nonce)?;
+            ensure_sequential(&top_down_msgs, |msg| msg.nonce)?;
         };
         if !validator_changes.is_empty() {
             tracing::debug!(?validator_changes, "validator changes");

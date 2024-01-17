@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Cross network messages related struct and utility functions.
 
-use crate::cross::CrossMsg;
+use crate::cross::IpcEnvelope;
 use crate::subnet_id::SubnetID;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
@@ -56,8 +56,6 @@ pub struct BottomUpCheckpointBundle {
     pub signatures: Vec<Signature>,
     /// The list of addresses that have signed the checkpoint hash
     pub signatories: Vec<Address>,
-    /// The list of cross network messages
-    pub cross_msgs: Vec<CrossMsg>,
 }
 
 /// The collection of items for the bottom up checkpoint submission
@@ -68,7 +66,7 @@ pub struct BottomUpMsgBatch {
     /// The height of the child subnet at which the batch was cut
     pub block_height: ChainEpoch,
     /// Batch of messages to execute
-    pub msgs: Vec<CrossMsg>,
+    pub msgs: Vec<IpcEnvelope>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
@@ -85,4 +83,6 @@ pub struct BottomUpCheckpoint {
     /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
     /// 0 could mean "no change".
     pub next_configuration_number: u64,
+    /// The list of messages for execution
+    pub msgs: Vec<IpcEnvelope>,
 }

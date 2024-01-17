@@ -42,39 +42,38 @@ fn prop_cross_msgs_hash() {
 
             let mut exec_state = system.exec_state.borrow_mut();
 
-            let mut cross_msgs = Vec::<getter::CrossMsg>::new();
+            let mut cross_msgs = Vec::<getter::IpcEnvelope>::new();
 
             // Generate a few random messages.
             for _ in 0..u.int_in_range(0..=3)? {
-                cross_msgs.push(getter::CrossMsg {
-                    message: getter::StorableMsg {
-                        from: getter::Ipcaddress {
-                            subnet_id: getter::SubnetID {
-                                root: u.arbitrary()?,
-                                route: Vec::new(),
-                            },
-                            raw_address: getter::FvmAddress {
-                                addr_type: u.arbitrary()?,
-                                payload: <[u8; 20]>::arbitrary(u)?.into(),
-                            },
+                cross_msgs.push(getter::IpcEnvelope {
+                    // FIXME: Add different types here?
+                    kind: 0,
+                    from: getter::Ipcaddress {
+                        subnet_id: getter::SubnetID {
+                            root: u.arbitrary()?,
+                            route: Vec::new(),
                         },
-                        to: getter::Ipcaddress {
-                            subnet_id: getter::SubnetID {
-                                root: u.arbitrary()?,
-                                route: Vec::new(),
-                            },
-                            raw_address: getter::FvmAddress {
-                                addr_type: u.arbitrary()?,
-                                payload: <[u8; 20]>::arbitrary(u)?.into(),
-                            },
+                        raw_address: getter::FvmAddress {
+                            addr_type: u.arbitrary()?,
+                            payload: <[u8; 20]>::arbitrary(u)?.into(),
                         },
-                        value: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
-                        nonce: u.arbitrary()?,
-                        method: u.arbitrary()?,
-                        params: <[u8; 4]>::arbitrary(u)?.into(), // Doesn't matter, just some bytes
-                        fee: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
                     },
-                    wrapped: bool::arbitrary(u)?,
+                    to: getter::Ipcaddress {
+                        subnet_id: getter::SubnetID {
+                            root: u.arbitrary()?,
+                            route: Vec::new(),
+                        },
+                        raw_address: getter::FvmAddress {
+                            addr_type: u.arbitrary()?,
+                            payload: <[u8; 20]>::arbitrary(u)?.into(),
+                        },
+                    },
+                    value: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
+                    nonce: u.arbitrary()?,
+                    // FIXME: Add arbitrary here?
+                    message: Vec::new().into(),
+                    fee: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
                 })
             }
 

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
+use ethers::abi::Tokenizable;
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_genesis::Collateral;
@@ -102,6 +103,7 @@ where
                 block_height: ethers::types::U256::from(height.value()),
                 block_hash,
                 next_configuration_number,
+                msgs: convert_tokenizables(cross_msgs)?,
             };
 
             // Save the checkpoint in the ledger.
@@ -235,6 +237,7 @@ where
                 block_height: cp.block_height,
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
+                msgs: convert_tokenizables(cp.msgs)?,
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.
@@ -283,6 +286,15 @@ where
     tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
 
     Ok(())
+}
+
+fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
+    tokenizables: Vec<Source>,
+) -> anyhow::Result<Vec<Target>> {
+    Ok(tokenizables
+        .into_iter()
+        .map(|t| Target::from_token(t.into_token()))
+        .collect::<Result<Vec<_>, _>>()?)
 }
 
 fn should_create_checkpoint<DB>(

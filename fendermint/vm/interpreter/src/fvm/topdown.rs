@@ -9,7 +9,7 @@ use crate::fvm::FvmApplyRet;
 use anyhow::Context;
 use fendermint_vm_topdown::{BlockHeight, IPCParentFinality, ParentViewProvider};
 use fvm_ipld_blockstore::Blockstore;
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 
 use super::state::ipc::tokens_to_mint;
 
@@ -43,7 +43,7 @@ where
 pub async fn execute_topdown_msgs<DB>(
     gateway_caller: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
-    messages: Vec<CrossMsg>,
+    messages: Vec<IpcEnvelope>,
 ) -> anyhow::Result<FvmApplyRet>
 where
     DB: Blockstore + Sync + Send + 'static,
