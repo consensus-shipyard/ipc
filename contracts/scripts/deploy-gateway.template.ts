@@ -57,6 +57,7 @@ export async function deploy(libs: { [key in string]: string }) {
     const checkpointingFacetLibs: Libraries = {
         AccountHelper: libs['AccountHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
+        CrossMsgHelper: libs['CrossMsgHelper'],
     }
 
     const xnetMessagingFacetLibs: Libraries = {
@@ -66,12 +67,6 @@ export async function deploy(libs: { [key in string]: string }) {
     }
 
     const topDownFinalityFacetLibs: Libraries = {
-        AccountHelper: libs['AccountHelper'],
-    }
-
-    const bottomUpRouterFacetLibs: Libraries = {
-        CrossMsgHelper: libs['CrossMsgHelper'],
-        SubnetIDHelper: libs['SubnetIDHelper'],
         AccountHelper: libs['AccountHelper'],
     }
 
@@ -90,10 +85,6 @@ export async function deploy(libs: { [key in string]: string }) {
             libs: xnetMessagingFacetLibs,
         },
         { name: 'TopDownFinalityFacet', libs: topDownFinalityFacetLibs },
-        {
-            name: 'BottomUpRouterFacet',
-            libs: bottomUpRouterFacetLibs,
-        },
     ]
 
     for (const facet of facets) {
