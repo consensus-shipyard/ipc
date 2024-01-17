@@ -85,10 +85,6 @@ lazy_static! {
                                 .to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorRewardFacet",
-                            abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
                             name: "SubnetActorCheckpointingFacet",
                             abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
                         },
@@ -147,10 +143,6 @@ lazy_static! {
                         EthFacet {
                             name: "SubnetActorManagerFacet",
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
-                            name: "SubnetActorRewardFacet",
-                            abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "SubnetActorCheckpointingFacet",
