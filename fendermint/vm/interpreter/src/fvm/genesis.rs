@@ -251,7 +251,22 @@ where
             }
         }
 
-        // STAGE 3: Initialize the FVM and create built-in FEVM actors.
+        // STAGE 3: Create the non-builtin actors
+
+        state
+            .create_actor(
+                fendermint_actors::CHAINMETADATA_ACTOR_CODE_ID,
+                next_id,
+                &fendermint_actor_chainmetadata::State {
+                    blockhashes: vec![].into(),
+                    params: fendermint_actor_chainmetadata::ConstructorParams { lookback_len: 256 },
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create chainmetadata actor")?;
+
+        // STAGE 4: Initialize the FVM and create built-in FEVM actors.
 
         state
             .init_exec_state(

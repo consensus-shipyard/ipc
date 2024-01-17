@@ -15,6 +15,8 @@ pub struct Manifest {
     by_code: HashMap<Cid, u32>,
 }
 
+pub const CHAINMETADATA_ACTOR_CODE_ID: u32 = 1;
+
 impl Manifest {
     /// Load a manifest from the blockstore.
     pub fn load<B: Blockstore>(bs: &B, root_cid: &Cid, ver: u32) -> anyhow::Result<Manifest> {
