@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use async_stm::{abort, atomically, retry, Stm, StmResult, TVar};
+use async_stm::{abort, atomically, retry, Stm, StmError, StmResult, TVar};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -340,6 +340,16 @@ pub async fn publish_vote_loop<V, F>(
             };
 
             let is_known = vote_tally.known_validator(&validator_key)?;
+
+            if is_known {
+                // Cast self-vote; I'm not sure we'd get our own gossip messages otherwise.
+                if let Err(StmError::Control(c)) =
+                    vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())
+                {
+                    // We should not see any other error from this as we just checked that the validator was bonded.
+                    return Err(c);
+                }
+            }
 
             Ok((next_height, next_hash, is_known))
         })
