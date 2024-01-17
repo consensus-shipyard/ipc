@@ -114,9 +114,7 @@ The purpose of the `SubnetActor` is to
 
 ## SubnetRegistry
 
-The purpose of the `SubnetRegistry` is to
-
-1. Deploy instances of the SubnetActor. Its role is to be the subnet actor factory in a subnet.
+The purpose of the `SubnetRegistry` is to deploy instances of the SubnetActor. Its role is to be the subnet actor factory in a subnet.
 
 # Building & Testing with Forge
 
