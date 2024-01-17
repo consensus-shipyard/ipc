@@ -66,12 +66,10 @@ contract GatewayDiamond {
         s.minCrossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.checkpointQuorumMap.retentionHeight = 1;
-        s.bottomUpMsgBatchQuorumMap.retentionHeight = 1;
 
         // BottomUpMsgBatch config parameters.
         // NOTE: Let's fix them for now, but we could make them configurable
         // through the gateway constructor in the future.
-        s.bottomUpMsgBatchPeriod = BATCH_PERIOD;
         s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;

@@ -33,8 +33,6 @@ struct GatewayActorStorage {
     mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;
     /// @notice Quorum information for checkpoints
     QuorumMap checkpointQuorumMap;
-    /// @notice Quorum information for bottom-up msg batches
-    QuorumMap bottomUpMsgBatchQuorumMap;
     /// @notice Keys of the registered subnets. Useful to iterate through them
     bytes32[] subnetKeys;
     /// @notice path to the current network
@@ -52,8 +50,6 @@ struct GatewayActorStorage {
     uint64 totalSubnets;
     /// @notice bottom-up period in number of epochs for the subnet
     uint256 bottomUpCheckPeriod;
-    /// @notice bottom-up message batch period in number of epochs for the subnet
-    uint256 bottomUpMsgBatchPeriod;
     /// @notice Maximum number of messages per batch
     uint64 maxMsgsPerBottomUpBatch;
     /// Tracking validator changes from parent in child subnet

@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, IpcMsg} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, IpcMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {IPCAddress, SubnetID, Subnet, SupplySource, SupplyKind, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -155,16 +155,18 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         uint256 value = 8;
         msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value, 0);
 
-        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+        BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,
-            blockHeight: gwGetter.bottomUpMsgBatchPeriod(),
+            blockHash: blockhash(block.number),
+            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            nextConfigurationNumber: 0,
             msgs: msgs
         });
 
         vm.prank(address(saDiamond));
         vm.expectEmit(true, true, true, true, address(token));
         emit Transfer(address(gatewayDiamond), recipient, value);
-        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
+        gwCheckpointingFacet.commitCheckpoint(batch);
 
         // Assert post-conditions.
         (, Subnet memory subnetAfter) = gwGetter.getSubnet(subnet.id);
@@ -179,7 +181,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // This reverts.
         vm.prank(address(saDiamond));
         vm.expectRevert();
-        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
+        gwCheckpointingFacet.commitCheckpoint(batch);
     }
 
     // Call a smart contract in the parent through a smart contract and with
@@ -211,16 +213,18 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         bytes memory params = bytes("hello");
         msgs[0] = CrossMsgHelper.createCallMsg(from, to, value, 0, method, params);
 
-        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+        BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,
-            blockHeight: gwGetter.bottomUpMsgBatchPeriod(),
+            blockHash: blockhash(block.number),
+            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            nextConfigurationNumber: 0,
             msgs: msgs
         });
 
         // Verify that we received the call and that the recipient has the tokens.
         vm.prank(address(saDiamond));
         vm.expectCall(recipient, abi.encodeCall(IpcContract.IpcEntrypoint, (msgs[0])), 1);
-        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
+        gwCheckpointingFacet.commitCheckpoint(batch);
         assertEq(token.balanceOf(recipient), 8);
     }
 

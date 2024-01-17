@@ -21,7 +21,6 @@ error GatewayCannotBeZero();
 error InvalidActorAddress();
 error InvalidCheckpointEpoch();
 error InvalidBatchEpoch();
-error BatchWithNoMessages();
 error InvalidCheckpointSource();
 error InvalidBatchSource();
 error InvalidSubnetActor();

@@ -7,7 +7,7 @@ import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {IpcMsg, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
+import {MaxMsgsPerBatchExceeded, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
@@ -71,7 +71,23 @@ library LibGateway {
     /// @notice stores checkpoint
     function storeBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        s.bottomUpCheckpoints[checkpoint.blockHeight] = checkpoint;
+
+        BottomUpCheckpoint storage b = s.bottomUpCheckpoints[checkpoint.blockHeight];
+        b.blockHash = checkpoint.blockHash;
+        b.subnetID = checkpoint.subnetID;
+        b.nextConfigurationNumber = checkpoint.nextConfigurationNumber;
+        b.blockHeight = checkpoint.blockHeight;
+
+        uint256 msgLength = checkpoint.msgs.length;
+        for (uint256 i; i < msgLength;) {
+            // We need to push because initializing an array with a static
+            // length will cause a copy from memory to storage, making
+            // the compiler unhappy.
+            b.msgs.push(checkpoint.msgs[i]);
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /// @notice stores bottom-up batch
@@ -230,7 +246,7 @@ library LibGateway {
     /// @param crossMessage - the cross message to be committed
     function commitBottomUpMsg(IpcEnvelope memory crossMessage) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        uint256 epoch = getNextEpoch(block.number, s.bottomUpMsgBatchPeriod);
+        uint256 epoch = getNextEpoch(block.number, s.bottomUpCheckPeriod);
 
         // assign nonce to the message.
         crossMessage.nonce = s.bottomUpNonce;
@@ -243,38 +259,41 @@ library LibGateway {
             batch.blockHeight = epoch;
             // we need to use push here to initialize the array.
             batch.msgs.push(crossMessage);
-        } else {
-            // if the maximum size was already achieved emit already the event
-            // and re-assign the batch to the current epoch.
-            if (batch.msgs.length == s.maxMsgsPerBottomUpBatch) {
-                // copy the batch with max messages into the new cut.
-                uint256 epochCut = block.number;
-                BottomUpMsgBatch memory newBatch = BottomUpMsgBatch({
-                    subnetID: s.networkName,
-                    blockHeight: epochCut,
-                    msgs: new IpcEnvelope[](batch.msgs.length)
-                });
-                uint256 msgLength = batch.msgs.length;
-                for (uint256 i; i < msgLength; ) {
-                    newBatch.msgs[i] = batch.msgs[i];
-                    unchecked {
-                        ++i;
-                    }
+            return;
+        }
+
+        // if the maximum size was already achieved emit already the event
+        // and re-assign the batch to the current epoch.
+        if (batch.msgs.length == s.maxMsgsPerBottomUpBatch) {
+            // copy the batch with max messages into the new cut.
+            uint256 epochCut = block.number;
+            BottomUpMsgBatch memory newBatch = BottomUpMsgBatch({
+                subnetID: s.networkName,
+                blockHeight: epochCut,
+                msgs: new IpcEnvelope[](batch.msgs.length)
+            });
+
+            uint256 msgLength = batch.msgs.length;
+            for (uint256 i; i < msgLength;) {
+                newBatch.msgs[i] = batch.msgs[i];
+                unchecked {
+                    ++i;
                 }
-                // emit event with the next batch ready to sign quorum over.
-                emit NewBottomUpMsgBatch(epochCut, newBatch);
-
-                // Empty the messages of existing batch with epoch and start populating with the new message.
-                delete batch.msgs;
-                // need to push here to avoid a copy from memory to storage
-                batch.msgs.push(crossMessage);
-
-                LibGateway.storeBottomUpMsgBatch(newBatch);
-            } else {
-                // we append the new message normally, and wait for the batch period
-                // to trigger the cutting of the batch.
-                batch.msgs.push(crossMessage);
             }
+            
+            // emit event with the next batch ready to sign quorum over.
+            emit NewBottomUpMsgBatch(epochCut, newBatch);
+
+            // Empty the messages of existing batch with epoch and start populating with the new message.
+            delete batch.msgs;
+            // need to push here to avoid a copy from memory to storage
+            batch.msgs.push(crossMessage);
+
+            LibGateway.storeBottomUpMsgBatch(newBatch);
+        } else {
+            // we append the new message normally, and wait for the batch period
+            // to trigger the cutting of the batch.
+            batch.msgs.push(crossMessage);
         }
     }
 
@@ -375,15 +394,12 @@ library LibGateway {
     }
 
     /// @notice Checks the length of a message batch, ensuring it is in (0, maxMsgsPerBottomUpBatch).
-    /// @param batch The batch of messages to check.
-    function checkMsgLength(BottomUpMsgBatch memory batch) internal view {
+    /// @param msgs The batch of messages to check.
+    function checkMsgLength(IpcEnvelope[] calldata msgs) internal view {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
+        if (msgs.length > s.maxMsgsPerBottomUpBatch) {
             revert MaxMsgsPerBatchExceeded();
-        }
-        if (batch.msgs.length == 0) {
-            revert BatchWithNoMessages();
         }
     }
 }
