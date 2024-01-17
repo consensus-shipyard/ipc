@@ -72,6 +72,8 @@ TARGET_MSGS=' [ "Welcome, weary traveller!", "Howdy doody!" ] '
 echo $GREETING_MSG_0
 echo $GREETING_MSG_1
 
+# It's hard to predict which message get indexed first because they always belong to the same block.
+
 if [[ ! $TARGET_MSGS =~ $GREETING_MSG_0 ]]; then
   echo "ERROR: Getting unexpected indexed greeting message $GREETING_MSG_0"
   exit 1
