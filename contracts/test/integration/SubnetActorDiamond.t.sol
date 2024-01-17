@@ -407,7 +407,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saManager.leave();
     }
 
-    function testSubnetActorDiamond_Leave() public {
+    function testSubnetActorDiamond_Leave_Subnet() public {
         (address validator1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(100);
         (address validator2, uint256 privKey2, bytes memory publicKey2) = TestUtils.newValidator(101);
         (address validator3, uint256 privKey3, bytes memory publicKey3) = TestUtils.newValidator(102);
@@ -446,6 +446,15 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(!saGetter.isActiveValidator(validator1), "validator 1 is active");
         require(saGetter.isActiveValidator(validator2), "validator 2 is not active");
         require(saGetter.isActiveValidator(validator3), "validator 3 is not active");
+    }
+
+    function testSubnetActorDiamond_Kill_NotBootstrappedSubnet() public {
+        (address validator1, , ) = TestUtils.newValidator(100);
+
+        // not bootstrapped subnet can't be killed
+        vm.expectRevert(SubnetNotBootstrapped.selector);
+        vm.prank(validator1);
+        saManager.kill();
     }
 
     function testSubnetActorDiamond_Stake() public {
