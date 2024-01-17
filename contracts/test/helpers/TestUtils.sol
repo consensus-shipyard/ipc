@@ -160,12 +160,13 @@ library TestUtils {
         uint64 nonce,
         uint256 fee
     ) internal pure returns (IpcEnvelope memory) {
-        IpcMsg memory message = IpcMsg({value: value, method: METHOD_SEND, params: EMPTY_BYTES});
+        IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
         return
             IpcEnvelope({
                 kind: IpcMsgKind.Transfer,
                 from: from,
                 to: to,
+                value: value,
                 message: abi.encode(message),
                 nonce: nonce,
                 fee: fee

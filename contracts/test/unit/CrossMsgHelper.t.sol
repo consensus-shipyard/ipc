@@ -67,7 +67,7 @@ contract CrossMsgHelperTest is Test {
         require(releaseMsg.from.rawAddress.extractEvmAddress() == sender);
         require(releaseMsg.to.subnetId.toHash() == parentSubnetId.toHash());
         require(releaseMsg.to.rawAddress.extractEvmAddress() == sender);
-        require(message.value == releaseAmount);
+        require(releaseMsg.value == releaseAmount);
         require(releaseMsg.nonce == 0);
         require(message.method == METHOD_SEND);
         require(keccak256(message.params) == keccak256(EMPTY_BYTES));
@@ -110,7 +110,7 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.from.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.to.subnetId.toHash() == parentSubnetId.toHash());
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
-        require(message.value == fundAmount);
+        require(fundMsg.value == fundAmount);
         require(fundMsg.nonce == 0);
         require(message.method == METHOD_SEND);
         require(keccak256(message.params) == keccak256(EMPTY_BYTES));
@@ -142,7 +142,7 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.from.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.to.subnetId.toHash() == subnetId.toHash());
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
-        require(message.value == fundAmount);
+        require(fundMsg.value == fundAmount);
         require(fundMsg.nonce == 0);
         require(message.method == METHOD_SEND);
         require(keccak256(message.params) == keccak256(EMPTY_BYTES));
@@ -164,7 +164,7 @@ contract CrossMsgHelperTest is Test {
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         IpcMsg memory message = crossMsg.getIpcMsg();
         message.method = METHOD_SEND;
-        message.value = 1;
+        crossMsg.value = 1;
         crossMsg = crossMsg.setIpcMsg(message);
 
         vm.deal(sender, 1 ether);
@@ -183,12 +183,12 @@ contract CrossMsgHelperTest is Test {
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         IpcMsg memory message = crossMsg.getIpcMsg();
         message.method = METHOD_SEND;
-        message.value = 1;
+        crossMsg.value = 1;
         message.params = abi.encode(EMPTY_BYTES);
         crossMsg = crossMsg.setIpcMsg(message);
 
         vm.deal(sender, 1 ether);
-        vm.expectCall(recipient, message.value, new bytes(0), 1);
+        vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
         bytes memory result = crossMsg.execute(SupplySourceHelper.native());
 
@@ -202,12 +202,12 @@ contract CrossMsgHelperTest is Test {
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         IpcMsg memory message = crossMsg.getIpcMsg();
         message.method = METHOD_SEND;
-        message.value = 0;
+        crossMsg.value = 0;
         message.params = abi.encode(EMPTY_BYTES);
         crossMsg = crossMsg.setIpcMsg(message);
 
         vm.deal(sender, 1 ether);
-        vm.expectCall(recipient, message.value, new bytes(0), 1);
+        vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
         bytes memory result = crossMsg.execute(SupplySourceHelper.native());
 
@@ -346,12 +346,13 @@ contract CrossMsgHelperTest is Test {
         IPCAddress memory to,
         uint64 nonce
     ) internal view returns (IpcEnvelope memory) {
-        IpcMsg memory message = IpcMsg({value: 0, method: METHOD_SEND, params: EMPTY_BYTES});
+        IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
         return
             IpcEnvelope({
                 kind: IpcMsgKind.Transfer,
                 from: from,
                 to: to,
+                value: 0,
                 message: abi.encode(message),
                 nonce: nonce,
                 fee: CROSS_MESSAGE_FEE

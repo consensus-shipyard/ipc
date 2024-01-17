@@ -88,6 +88,11 @@ library LibSubnetActor {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
         uint256 length = validators.length;
+
+        if (length <= s.minValidators) {
+            revert NotEnoughGenesisValidators();
+        }
+
         for (uint256 i; i < length; ) {
             // check addresses
             address convertedAddress = publicKeyToAddress(publicKeys[i]);
@@ -109,11 +114,6 @@ library LibSubnetActor {
             unchecked {
                 ++i;
             }
-        }
-
-        // check duplication first then check length
-        if (length <= s.minValidators) {
-            revert NotEnoughGenesisValidators();
         }
 
         s.bootstrapped = true;

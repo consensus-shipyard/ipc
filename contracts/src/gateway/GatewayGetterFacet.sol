@@ -101,7 +101,7 @@ contract GatewayGetterFacet {
     /// @notice Returns the current applied top-down nonce for a specified subnet, indicating whether it's registered.
     /// @param subnetId The identifier of the subnet for which the top-down nonce is queried.
     /// @return A tuple containing a boolean indicating if the subnet is registered and the current top-down nonce.
-    function getAppliedTopDownNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
+    function getTopDownNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
         if (!registered) {
             return (false, 0);
@@ -109,7 +109,18 @@ contract GatewayGetterFacet {
         return (true, subnet.topDownNonce);
     }
 
-    /// @notice Returns the current applied top-down nonce.
+    /// @notice Returns the current applied bottom-up nonce for a specified subnet, indicating whether it's registered.
+    /// @param subnetId The identifier of the subnet for which the bottom-up nonce is queried.
+    /// @return A tuple containing a boolean indicating if the subnet is registered and the current applied bottom-up nonce.
+    function getAppliedBottomUpNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
+        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
+        if (!registered) {
+            return (false, 0);
+        }
+        return (true, subnet.appliedBottomUpNonce);
+    }
+
+    /// @notice Returns the current applied top-down nonce of the gateway.
     function appliedTopDownNonce() external view returns (uint64) {
         return s.appliedTopDownNonce;
     }

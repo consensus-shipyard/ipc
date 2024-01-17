@@ -43,8 +43,9 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	cargo test --release $(PACKAGE)
 
 e2e: docker-build | cargo-make
-	cd testing/smoke-test && cargo make --profile $(PROFILE)
+	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
+	cd testing/graph-test    && cargo make --profile $(PROFILE)
 
 clean:
 	cargo clean
