@@ -1,5 +1,0 @@
-
-HBtype Greeting @entity {
-    id: ID!
-    currentGreeting: String!
-}B
