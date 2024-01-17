@@ -344,6 +344,7 @@ library LibGateway {
 
         if (crossMsg.to.subnetId.isEmpty()) {
             sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(InvalidCrossMsgDstSubnet.selector));
+            return;
         }
 
         // The first thing we do is to find out the directionality of this message and act accordingly,
@@ -356,9 +357,11 @@ library LibGateway {
             (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
             if (!registered) {
                 sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(NotRegisteredSubnet.selector));
+                return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
                 sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                return;
             }
             subnet.appliedBottomUpNonce += 1;
 
@@ -369,6 +372,7 @@ library LibGateway {
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
                 sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                return;
             }
             s.appliedTopDownNonce += 1;
 
