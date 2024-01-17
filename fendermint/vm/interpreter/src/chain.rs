@@ -121,6 +121,9 @@ where
         });
 
         // Prepare top down proposals.
+        // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
+        atomically(|| state.parent_finality_votes.pause_votes_until_find_quorum()).await;
+
         // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
         // The final proposal can be at most as high as the quorum, but can be less if we have already,
         // hit some limits such as how many blocks we can propose in a single step.
