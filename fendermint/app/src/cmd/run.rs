@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, bail, Context};
+use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
@@ -20,14 +21,16 @@ use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
-use fendermint_vm_topdown::voting::VoteTally;
+use fendermint_vm_topdown::voting::{Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
 use fvm_shared::address::Address;
+use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
+use tokio::sync::broadcast::error::RecvError;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
@@ -137,6 +140,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             settings.resolver.retry_delay,
             own_subnet_id,
         );
+
+        tracing::info!("subscribing to voting gossip...");
+        let rx = service.subscribe();
+        let parent_finality_votes = parent_finality_votes.clone();
+        tokio::spawn(async move {
+            dispatch_resolver_events(rx, parent_finality_votes).await;
+        });
 
         tracing::info!("starting the IPLD Resolver Service...");
         tokio::spawn(async move {
@@ -373,5 +383,53 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
     match kind {
         AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
         AccountKind::Ethereum => Ok(Address::from(EthAddress::new_secp256k1(&pk)?)),
+    }
+}
+
+async fn dispatch_resolver_events(
+    mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<AppVote>>,
+    parent_finality_votes: VoteTally,
+) {
+    loop {
+        match rx.recv().await {
+            Ok(event) => match event {
+                ResolverEvent::ReceivedPreemptive(_, _) => {}
+                ResolverEvent::ReceivedVote(vote) => {
+                    dispatch_vote(*vote, &parent_finality_votes).await;
+                }
+            },
+            Err(RecvError::Lagged(n)) => {
+                tracing::warn!("the resolver service skipped {n} gossip events")
+            }
+            Err(RecvError::Closed) => {
+                tracing::error!("the resolver service stopped receiving gossip");
+                return;
+            }
+        }
+    }
+}
+
+async fn dispatch_vote(vote: VoteRecord<AppVote>, parent_finality_votes: &VoteTally) {
+    match vote.content {
+        AppVote::ParentFinality(f) => {
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_vote(
+                    vote.public_key.clone(),
+                    f.height,
+                    f.block_hash.clone(),
+                )
+            })
+            .await;
+
+            match res {
+                Ok(_) => {}
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    tracing::warn!(error = e.to_string(), "failed to handle vote");
+                }
+                Err(e) => {
+                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                }
+            }
+        }
     }
 }
