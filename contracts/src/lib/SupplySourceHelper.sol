@@ -173,7 +173,6 @@ library SupplySourceHelper {
         } else if (supplySource.kind == SupplyKind.ERC20) {
             ret = IERC20(supplySource.tokenAddress).balanceOf(address(this));
         }
-        return ret;
     }
 
     function native() internal pure returns (SupplySource memory) {
