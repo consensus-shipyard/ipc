@@ -27,7 +27,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      *
      * IMPORTANT: `msg.value` is expected to equal to the value sent in `crossMsg.value` plus the cross-messaging fee.
      * Only smart contracts are allowed to trigger these cross-net messages, users
-     * can always send funds from their address to the destination subnet and the run the transaction in the destination
+     * can always send funds from their address to the destination subnet and then run the transaction in the destination
      * normally.
      *
      * @param crossMsg - a cross-message to send.
