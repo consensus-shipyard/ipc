@@ -21,8 +21,8 @@ use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
-use fendermint_vm_topdown::voting::{Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
+use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
+use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::Address;
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -81,6 +81,14 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         }
     };
 
+    let validator_keypair = validator.as_ref().map(|(sk, _)| {
+        let mut bz = sk.serialize();
+        let sk = libp2p::identity::secp256k1::SecretKey::try_from_bytes(&mut bz)
+            .expect("secp256k1 secret key");
+        let kp = libp2p::identity::secp256k1::Keypair::from(sk);
+        libp2p::identity::Keypair::from(kp)
+    });
+
     let validator_ctx = validator.map(|(sk, addr)| {
         // For now we are using the validator key for submitting transactions.
         // This allows us to identify transactions coming from bonded validators, to give priority to protocol related transactions.
@@ -137,11 +145,33 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             .context("error adding own provided subnet.")?;
 
         let resolver = IpldResolver::new(
-            client,
+            client.clone(),
             checkpoint_pool.queue(),
             settings.resolver.retry_delay,
-            own_subnet_id,
+            own_subnet_id.clone(),
         );
+
+        if topdown_enabled {
+            if let Some(key) = validator_keypair {
+                let parent_finality_votes = parent_finality_votes.clone();
+
+                tracing::info!("starting the parent finality vote gossip loop...");
+                tokio::spawn(async move {
+                    publish_vote_loop(
+                        parent_finality_votes,
+                        key,
+                        own_subnet_id,
+                        client,
+                        |height, block_hash| {
+                            AppVote::ParentFinality(IPCParentFinality { height, block_hash })
+                        },
+                    )
+                    .await
+                });
+            }
+        } else {
+            tracing::info!("parent finality vote gossip disabled");
+        }
 
         tracing::info!("subscribing to gossip...");
         let rx = service.subscribe();
