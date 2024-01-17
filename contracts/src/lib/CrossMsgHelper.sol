@@ -84,7 +84,7 @@ library CrossMsgHelper {
         address recipient = crossMsg.message.to.rawAddress.extractEvmAddress().normalize();
 
         if (crossMsg.message.method == METHOD_SEND) {
-            supplySource.transfer({recipient: payable(recipient), value: value});
+            supplySource.transferFundsFromSupplySource({recipient: payable(recipient), value: value});
             return EMPTY_BYTES;
         }
 
