@@ -80,6 +80,11 @@ struct IpcEnvelope {
     IPCAddress to;
     /// @dev address sending the message
     IPCAddress from;
+    /// @dev value being sent in the message.
+    /// If we want receipts to return value, and all messages to be able
+    /// to handle different supply sources we can expose the value
+    /// as a common field.
+    uint256 value;
     /// @dev abi.encoded message
     bytes message;
     /// @dev outgoing nonce for the envelope.
@@ -94,8 +99,6 @@ struct IpcEnvelope {
 
 /// @notice Message format used for `Transfer` and `Call` messages.
 struct IpcMsg {
-    /// @dev the gas limit is currently not used.
-    uint256 value;
     /// @dev abi.encoded method being called by the contract.
     bytes4 method;
     /// @dev arguments of the method being called.
@@ -107,8 +110,9 @@ struct ReceiptMsg {
     bool success;
     /// @dev Id of the message the receipt belongs to.
     bytes32 id;
-    /// @dev abi encoded reason for the failure (if any)
-    bytes reason;
+    /// @dev abi encoded return value, or the reason for the
+    /// failure (if any).
+    bytes ret;
     // TODO: In the future we may include here events and other
     // feedback information.
 }

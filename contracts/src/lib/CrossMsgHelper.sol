@@ -36,12 +36,13 @@ library CrossMsgHelper {
         uint256 value,
         uint256 fee
     ) public pure returns (IpcEnvelope memory) {
-        IpcMsg memory message = IpcMsg({value: value, method: METHOD_SEND, params: EMPTY_BYTES});
+        IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
         return
             IpcEnvelope({
                 kind: IpcMsgKind.Transfer,
                 from: from,
                 to: to,
+                value: value,
                 message: abi.encode(message),
                 nonce: 0,
                 fee: fee
@@ -56,9 +57,17 @@ library CrossMsgHelper {
         bytes4 method,
         bytes memory params
     ) public pure returns (IpcEnvelope memory) {
-        IpcMsg memory message = IpcMsg({value: value, method: method, params: params});
+        IpcMsg memory message = IpcMsg({method: method, params: params});
         return
-            IpcEnvelope({kind: IpcMsgKind.Call, from: from, to: to, message: abi.encode(message), nonce: 0, fee: fee});
+            IpcEnvelope({
+                kind: IpcMsgKind.Call,
+                from: from,
+                to: to,
+                value: value,
+                message: abi.encode(message),
+                nonce: 0,
+                fee: fee
+            });
     }
 
     function createReleaseMsg(
@@ -117,7 +126,11 @@ library CrossMsgHelper {
     }
 
     function isEmpty(IpcEnvelope memory crossMsg) internal pure returns (bool) {
-        // envelopes need to necessarily include a message inside
+        // envelopes need to necessarily include a message inside except
+        // if it is a plain `Transfer`.
+        if (crossMsg.kind == IpcMsgKind.Transfer) {
+            crossMsg.value == 0;
+        }
         return crossMsg.message.length == 0;
     }
 
@@ -125,50 +138,23 @@ library CrossMsgHelper {
         if (isEmpty(crossMsg)) {
             revert CannotExecuteEmptyEnvelope();
         }
-        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Call) {
-            IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
-            uint256 value = message.value;
-            address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
 
-            // if the message is of type transfer we can send it immediately
-            if (crossMsg.kind == IpcMsgKind.Transfer) {
-                supplySource.transfer({recipient: payable(recipient), value: value});
-                return EMPTY_BYTES;
-            } else {
-                // send the envelope directly to the entrypoint
-                // use supplySource so the tokens in the message are handled successfully
-                // and by the right supply source
-                return
-                    supplySource.performCall(
-                        payable(recipient),
-                        abi.encodeCall(IpcContract.IpcEntrypoint, (crossMsg)),
-                        value
-                    );
-            }
-        } else if (crossMsg.kind == IpcMsgKind.Receipt) {
-            address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
+        address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
+        if (crossMsg.kind == IpcMsgKind.Transfer) {
+            supplySource.transfer({recipient: payable(recipient), value: crossMsg.value});
+            return EMPTY_BYTES;
+        } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Receipt) {
             // send the envelope directly to the entrypoint
-            IpcContract ipcContract = IpcContract(recipient);
-            return ipcContract.IpcEntrypoint(crossMsg);
+            // use supplySource so the tokens in the message are handled successfully
+            // and by the right supply source
+            return
+                supplySource.performCall(
+                    payable(recipient),
+                    abi.encodeCall(IpcContract.IpcEntrypoint, (crossMsg)),
+                    crossMsg.value
+                );
         }
-
         return EMPTY_BYTES;
-    }
-
-    // This function requires deserializing the encoded message, if we are going
-    // to access several fields of the message we are better-off using `getIpcMsg`
-    // directly
-    function getValue(IpcEnvelope calldata crossMsg) public pure returns (uint256) {
-        // return 0 if empty, no need to decode anything
-        if (isEmpty(crossMsg)) {
-            return 0;
-        }
-        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Call) {
-            IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
-            return message.value;
-        }
-        // messages without value return 0
-        return 0;
     }
 
     // get underlying IpcMsg from crossMsg

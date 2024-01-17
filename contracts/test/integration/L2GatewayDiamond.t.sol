@@ -54,7 +54,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         gwXnetMessagingFacet.applyCrossMessages(topDownMsgs);
         require(gwGetter.getSubnetTopDownMsgsLength(id) == 0, "unexpected top-down message");
-        (bool ok, uint64 tdn) = gwGetter.getAppliedTopDownNonce(id);
+        (bool ok, uint64 tdn) = gwGetter.getTopDownNonce(id);
         require(!ok && tdn == 0, "unexpected nonce");
 
         vm.stopPrank();
