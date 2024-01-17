@@ -121,6 +121,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let checkpoint_pool = CheckpointPool::new();
     let parent_finality_votes = VoteTally::empty();
 
+    let topdown_enabled = settings.ipc.is_topdown_enabled();
+
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver.enabled() {
         let service =
@@ -141,11 +143,11 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             own_subnet_id,
         );
 
-        tracing::info!("subscribing to voting gossip...");
+        tracing::info!("subscribing to gossip...");
         let rx = service.subscribe();
         let parent_finality_votes = parent_finality_votes.clone();
         tokio::spawn(async move {
-            dispatch_resolver_events(rx, parent_finality_votes).await;
+            dispatch_resolver_events(rx, parent_finality_votes, topdown_enabled).await;
         });
 
         tracing::info!("starting the IPLD Resolver Service...");
@@ -161,7 +163,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tracing::info!("IPLD Resolver disabled.")
     }
 
-    let (parent_finality_provider, ipc_tuple) = if settings.ipc.is_topdown_enabled() {
+    let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
         info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
         let config = fendermint_vm_topdown::Config::new(
@@ -389,13 +391,14 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
 async fn dispatch_resolver_events(
     mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<AppVote>>,
     parent_finality_votes: VoteTally,
+    topdown_enabled: bool,
 ) {
     loop {
         match rx.recv().await {
             Ok(event) => match event {
                 ResolverEvent::ReceivedPreemptive(_, _) => {}
                 ResolverEvent::ReceivedVote(vote) => {
-                    dispatch_vote(*vote, &parent_finality_votes).await;
+                    dispatch_vote(*vote, &parent_finality_votes, topdown_enabled).await;
                 }
             },
             Err(RecvError::Lagged(n)) => {
@@ -409,9 +412,17 @@ async fn dispatch_resolver_events(
     }
 }
 
-async fn dispatch_vote(vote: VoteRecord<AppVote>, parent_finality_votes: &VoteTally) {
+async fn dispatch_vote(
+    vote: VoteRecord<AppVote>,
+    parent_finality_votes: &VoteTally,
+    topdown_enabled: bool,
+) {
     match vote.content {
         AppVote::ParentFinality(f) => {
+            if !topdown_enabled {
+                tracing::debug!("ignoring vote; topdown disabled");
+                return;
+            }
             let res = atomically_or_err(|| {
                 parent_finality_votes.add_vote(
                     vote.public_key.clone(),
