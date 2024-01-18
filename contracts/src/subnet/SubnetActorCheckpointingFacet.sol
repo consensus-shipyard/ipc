@@ -40,9 +40,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
             // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
             s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
 
-            // slither-disable-next-line unused-return
-            s.relayerRewards.checkpointRewarded[checkpoint.blockHeight].add(msg.sender);
-
             s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
             // Commit in gateway to distribute rewards
@@ -50,19 +47,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
             // confirming the changes in membership in the child
             LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
-        } else if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight) {
-            // If the checkpoint height is equal to the last checkpoint height, then this is a repeated submission.
-            // We should store the relayer, but not to execute checkpoint again.
-            // In this case, we do not verify the signatures for this checkpoint again,
-            // but we add the relayer to the list of all relayers for this checkpoint to be rewarded later.
-            // The reason for comparing hashes instead of verifying signatures is the following:
-            // once the checkpoint is executed, the active validator set changes
-            // and can only be used to validate the next checkpoint, not another instance of the last one.
-            bytes32 lastCheckpointHash = keccak256(abi.encode(s.committedCheckpoints[checkpoint.blockHeight]));
-            if (checkpointHash == lastCheckpointHash) {
-                // slither-disable-next-line unused-return
-                s.relayerRewards.checkpointRewarded[checkpoint.blockHeight].add(msg.sender);
-            }
         }
     }
 

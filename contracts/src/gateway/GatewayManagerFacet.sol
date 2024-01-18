@@ -94,24 +94,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         payable(subnet.id.getActor()).sendValue(amount);
     }
 
-    /// @notice Releases a reward to the relayer.
-    /// @dev This function sends the specified reward amount to the actor associated with the sender's subnet.
-    ///     It checks for subnet registration and also ensures the reward amount is non-zero.
-    ///     This function is protected against re-entrancy attack.
-    /// @param amount The amount of the reward to be released.
-    function releaseRewardForRelayer(uint256 amount) external nonReentrant {
-        if (amount == 0) {
-            revert CannotReleaseZero();
-        }
-
-        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
-        if (!registered) {
-            revert NotRegisteredSubnet();
-        }
-
-        payable(subnet.id.getActor()).sendValue(amount);
-    }
-
     /// @notice kill an existing subnet.
     /// @dev The subnet's balance must be empty.
     function kill() external {

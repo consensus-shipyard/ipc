@@ -41,7 +41,6 @@ error InvalidPublicKeyLength();
 error InvalidSubmissionPeriod();
 error InvalidSubnet();
 error NoCollateralToWithdraw();
-error NoRewardToWithdraw();
 error NoValidatorsInSubnet();
 error NotAllValidatorsHaveLeft();
 error NotAuthorized(address);

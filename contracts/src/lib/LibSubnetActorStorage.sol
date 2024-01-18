@@ -56,8 +56,6 @@ struct SubnetActorStorage {
     /// (e.g. Fil = 0, miliFil = 3; microFIL = 6, attoFil = 18, etc.)
     /// We allow negative values to also allow 10 FIL = 1 unit of power for power_scale = -1.
     int8 powerScale;
-    /// @notice relayers rewards
-    RelayerRewardsInfo relayerRewards;
     /// =============
     /// mapping of bootstrap owner to its bootstrap node address
     mapping(address => string) bootstrapNodes;

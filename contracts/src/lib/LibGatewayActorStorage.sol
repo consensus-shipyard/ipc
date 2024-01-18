@@ -65,8 +65,6 @@ struct GatewayActorStorage {
     bool generalPurposeCrossMsg;
     /// @notice Determines if multi-level cross-net messages are enbaled.
     bool multiLevelCrossMsg;
-    /// @notice Determines if relayers should be rewarded for checkpoint submissions
-    bool checkpointRelayerRewards;
     /// @notice Determines if relayers should be rewarded for cross-net message execution
     bool crossMsgRelayerRewards;
 }

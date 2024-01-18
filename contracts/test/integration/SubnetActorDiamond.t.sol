@@ -22,7 +22,6 @@ import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {MultisignatureChecker} from "../../src/lib/LibMultisignatureChecker.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
-import {FEATURE_CHECKPOINT_RELAYER_REWARDS} from "../../src/GatewayDiamond.sol";
 import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
@@ -686,7 +685,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(validators[0]);
         saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
 
-        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
         require(
             saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
             " checkpoint height correct"
@@ -694,7 +692,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.prank(validators[0]);
         saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
-        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
         require(
             saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
             " checkpoint height correct"
@@ -758,13 +755,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(validators[0]);
         saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
 
-        require(saGetter.hasSubmittedInLastBottomUpCheckpointHeight(validators[0]), "validator rewarded");
         require(
             saGetter.lastBottomUpCheckpointHeight() == saGetter.bottomUpCheckPeriod(),
             " checkpoint height correct"
         );
-
-        require(saGetter.getRelayerReward(validators[0]) == 0, "there is a reward");
 
         // send the second checkpoint
         crossMsg = TestUtils.newTransferCrossMsg(
@@ -793,22 +787,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.prank(validators[0]);
         saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
-
-        require(saGetter.getRelayerReward(validators[1]) == 0, "unexpected reward");
-        require(saGetter.getRelayerReward(validators[2]) == 0, "unexpected reward");
-        uint256 validator0Reward = saGetter.getRelayerReward(validators[0]);
-        if (FEATURE_CHECKPOINT_RELAYER_REWARDS) {
-            require(validator0Reward == DEFAULT_CROSS_MSG_FEE, "there is no reward for validator");
-
-            uint256 b1 = validators[0].balance;
-            // disable the claim of rewards if the fee is zero
-            if (DEFAULT_CROSS_MSG_FEE != 0) {
-                vm.startPrank(validators[0]);
-                saRewarder.claimRewardForRelayer();
-                uint256 b2 = validators[0].balance;
-                require(b2 - b1 == validator0Reward, "reward received");
-            }
-        }
     }
 
     function testSubnetActorDiamond_DiamondCut() public {

@@ -166,13 +166,6 @@ contract SubnetActorGetterFacet {
         return LibStaking.isWaitingValidator(validator);
     }
 
-    /// @notice Checks whether a validator has submitted the most recent bottom-up checkpoint message.
-    /// @param validator The address of the validator being checked for inclusion in the last checkpoint.
-    function hasSubmittedInLastBottomUpCheckpointHeight(address validator) external view returns (bool) {
-        uint256 height = s.lastBottomUpCheckpointHeight;
-        return s.relayerRewards.checkpointRewarded[height].contains(validator);
-    }
-
     /// @notice returns the committed bottom-up checkpoint at specific epoch.
     /// @param epoch - the epoch to check.
     /// @return exists - whether the checkpoint exists.
@@ -222,13 +215,6 @@ contract SubnetActorGetterFacet {
     /// @return The keccak256 hash of the encoded cross-chain messages.
     function crossMsgsHash(IpcEnvelope[] calldata messages) external pure returns (bytes32) {
         return keccak256(abi.encode(messages));
-    }
-
-    /// @notice Retrieves the total reward amount allocated to a specific relayer.
-    /// @param relayer The address of the relayer whose reward amount is to be queried.
-    /// @return The total reward amount accrued by the specified relayer.
-    function getRelayerReward(address relayer) external view returns (uint256) {
-        return s.relayerRewards.rewards[relayer];
     }
 
     /// @notice Returns the supply strategy for the subnet.

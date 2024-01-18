@@ -8,7 +8,6 @@ import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
 import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
-import {IRelayerRewardDistributor} from "../../interfaces/ISubnetActor.sol";
 
 import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, InvalidCheckpointSource, InvalidCrossMsgNonce, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
 import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated} from "../../errors/IPCErrors.sol";
@@ -42,18 +41,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
         LibGateway.checkMsgLength(checkpoint.msgs);
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
-
-        if (s.checkpointRelayerRewards) {
-            // slither-disable-next-line unused-return
-            Address.functionCallWithValue({
-                target: msg.sender,
-                data: abi.encodeCall(
-                    IRelayerRewardDistributor.distributeRewardToRelayers,
-                    (checkpoint.blockHeight, 0, QuorumObjKind.Checkpoint)
-                ),
-                value: 0
-            });
-        }
     }
 
     /// @notice creates a new bottom-up checkpoint
