@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "forge-std/Test.sol";
-
 import {SupplySource, SupplyKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
@@ -106,9 +104,6 @@ library SupplySourceHelper {
         if (supplySource.kind == SupplyKind.Native) {
             // Use the optimized path to send value along with the call.
             (success, ret) = functionCallWithValue({target: target, data: data, value: value});
-            console.log(1);
-            console.logBytes(ret);
-            console.logBytes(abi.decode(ret, (bytes)));
         } else if (supplySource.kind == SupplyKind.ERC20) {
             // Transfer the tokens first, _then_ perform the call.
             (success, ret) = ierc20Transfer(supplySource, target, value);

@@ -59,6 +59,59 @@ contract LibGatewayTest is Test {
         t.applyMsg(subnetId, envelope);
     }
 
+    function test_applyMsg_bottomUpSuccess() public {
+        LibGatewayMock t = new LibGatewayMock();
+
+        address childSubnetActor = address(new SubnetActorGetterFacet());
+
+        address[] memory parentRoute = new address[](1);
+        parentRoute[0] = address(1);
+
+        address[] memory childRoute = new address[](2);
+        childRoute[0] = address(1);
+        childRoute[1] = childSubnetActor;
+
+        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
+        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
+
+        t.setSubnet(parentSubnet, 1);
+        t.registerSubnet(childSubnet);
+
+        address fromRaw = address(1000);
+        address toRaw = address(new MockIpcContract());
+
+        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
+        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+
+        vm.deal(address(t), 1000);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
+            from: from,
+            to: to,
+            value: 1000,
+            fee: 0, // injecting funds into a subnet is free
+            method: GatewayDummyContract.reverts.selector,
+            params: new bytes(0)
+        });
+        crossMsg.nonce = 0;
+
+        ReceiptMsg memory message = ReceiptMsg({id: crossMsg.toHash(), success: true, ret: abi.encode(EMPTY_BYTES)});
+        IpcEnvelope memory expected = IpcEnvelope({
+            kind: IpcMsgKind.Receipt,
+            from: crossMsg.to,
+            to: crossMsg.from,
+            value: 0, // it succeeded
+            fee: LibGateway.RECEIPT_FEE,
+            message: abi.encode(message),
+            nonce: 0
+        });
+
+        vm.expectEmit(address(t));
+        emit LibGateway.NewTopDownMessage(childSubnetActor, expected);
+
+        t.applyMsg(childSubnet, crossMsg);
+    }
+
     function test_applyMsg_topDownSuccess() public {
         LibGatewayMock t = new LibGatewayMock();
 
@@ -110,15 +163,8 @@ contract LibGatewayTest is Test {
         BottomUpMsgBatch memory batch = t.getNextBottomUpMsgBatch();
         require(batch.msgs.length == 1, "should have bottom up messages");
         IpcEnvelope memory stored = batch.msgs[0];
-        ReceiptMsg memory ex = abi.decode(expected.message, (ReceiptMsg));
-        ReceiptMsg memory st = abi.decode(stored.message, (ReceiptMsg));
-        require(ex.success == st.success, "receipt success not matching");
-        require(ex.id == st.id, "receipt id not matching");
-        console.log(ex.ret.length);
-        console.log(st.ret.length);
-        require(ex.ret.length == st.ret.length, "receipt ret not matching");
-        // require(keccak256(stored.message) == keccak256(expected.message), "receipt message not matching");
-        // require(stored.toHash() == expected.toHash(), "receipt hash not matching");
+        require(keccak256(stored.message) == keccak256(expected.message), "receipt message not matching");
+        require(stored.toHash() == expected.toHash(), "receipt hash not matching");
     }
 
     function test_applyMsg_topdownInvalidNonce() public {
