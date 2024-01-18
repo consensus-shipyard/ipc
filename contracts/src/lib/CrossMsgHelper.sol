@@ -91,7 +91,7 @@ library CrossMsgHelper {
                 kind: IpcMsgKind.Receipt,
                 from: crossMsg.to,
                 to: crossMsg.from,
-                value: crossMsg.value,
+                value: value,
                 message: abi.encode(message),
                 nonce: 0,
                 fee: fee
