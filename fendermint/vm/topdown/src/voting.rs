@@ -355,7 +355,7 @@ pub async fn publish_vote_loop<V, F>(
         })
         .await;
 
-        if is_known {
+        if is_known && prev_height > 0 {
             tracing::debug!(block_height = next_height, "publishing finality vote");
             match VoteRecord::signed(&key, subnet_id.clone(), to_vote(next_height, next_hash)) {
                 Ok(vote) => {
