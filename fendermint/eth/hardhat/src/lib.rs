@@ -344,6 +344,7 @@ mod tests {
             "GatewayMessengerFacet",
             "SubnetActorGetterFacet",
             "SubnetActorManagerFacet",
+            "SubnetActorRewardFacet",
             "SubnetActorCheckpointingFacet",
             "SubnetActorPauseFacet",
         ]
