@@ -47,16 +47,6 @@ struct BottomUpMsgBatchInfo {
     bytes32 hash;
 }
 
-/// @notice Tracks information about relayer rewards.
-struct RelayerRewardsInfo {
-    /// @dev user rewards
-    mapping(address => uint256) rewards;
-    /// @dev tracks the addresses rewarded for checkpoint submission on a specific epoch
-    mapping(uint256 => EnumerableSet.AddressSet) checkpointRewarded;
-    /// @dev tracks the addresses rewarded for batch submission on a specific epoch
-    mapping(uint256 => EnumerableSet.AddressSet) batchRewarded;
-}
-
 /// @notice Type of cross-net messages currently supported
 enum IpcMsgKind {
     /// @dev for cross-net messages that move native token, i.e. fund/release.
