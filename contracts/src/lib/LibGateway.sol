@@ -22,7 +22,7 @@ library LibGateway {
     using FilAddress for address payable;
     using SupplySourceHelper for SupplySource;
 
-    uint256 private constant RECEIPT_FEE = 0;
+    uint256 public constant RECEIPT_FEE = 0;
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
@@ -356,7 +356,9 @@ library LibGateway {
             // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
             (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
             if (!registered) {
-                sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(NotRegisteredSubnet.selector));
+                // this means the subnet that sent the bottom up message is not registered,
+                // we cannot send the receipt back as top down because the subnet is not registered
+                // we ignore this message for now as it's not valid
                 return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
