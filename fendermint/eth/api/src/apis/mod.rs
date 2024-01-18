@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 // See https://ethereum.org/en/developers/docs/apis/json-rpc/#json-rpc-methods

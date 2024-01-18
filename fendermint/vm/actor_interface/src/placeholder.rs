@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Placeholders can be used for delegated address types.
 //! The FVM automatically creates one if the recipient of a transaction
