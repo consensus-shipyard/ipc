@@ -46,6 +46,8 @@ echo "\n"
 
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
 cp -r testing/graph-test/subgraph testing/graph-test/test-data
+mkdir testing/graph-test/test-data/subgraph/config
+mkdir testing/graph-test/test-data/subgraph/abis
 cp testing/graph-test/test-data/greeter.json testing/graph-test/test-data/subgraph/config/testnet.json
 cp testing/contracts/Greeter.abi testing/graph-test/test-data/subgraph/abis/IGreeter.json
 cd testing/graph-test/test-data/subgraph
@@ -90,7 +92,10 @@ echo "GraphQL query test PASS."
 [tasks.graph-teardown]
 script = """
 set -x
-cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/graph-test/subgraph/graph-node
+cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/graph-test/test-data/subgraph/graph-node
 echo "Tearing down subgraph..."
 docker-compose down -v
+cd ..
+rm -rf node_modules
+rm -rf config abis generated
 """
