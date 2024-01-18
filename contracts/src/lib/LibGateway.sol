@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
+import "forge-std/Test.sol";
+
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
@@ -358,7 +360,7 @@ library LibGateway {
             if (!registered) {
                 // this means the subnet that sent the bottom up message is not registered,
                 // we cannot send the receipt back as top down because the subnet is not registered
-                // we ignore this message for now as it's not valid
+                // we ignore this message for as it's not valid, and it may be someone trying to forge it.
                 return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
@@ -396,6 +398,8 @@ library LibGateway {
 
         // execute the message and get the receipt.
         (bool success, bytes memory ret) = crossMsg.execute(supplySource);
+        console.log(success);
+        console.logBytes(ret);
         sendReceipt(crossMsg, RECEIPT_FEE, success, ret);
     }
 

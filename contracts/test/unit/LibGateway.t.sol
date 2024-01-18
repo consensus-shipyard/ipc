@@ -12,6 +12,7 @@ import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {InvalidCrossMsgNonce} from "../../src/errors/IPCErrors.sol";
 import {MockIpcContract} from "../helpers/TestUtils.sol";
+import {EMPTY_BYTES} from "../../src/constants/Constants.sol";
 
 contract GatewayDummyContract {
     function reverts() public pure {
@@ -29,14 +30,8 @@ contract LibGatewayTest is Test {
 
         IpcEnvelope memory envelope = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({
-                subnetId: subnetId,
-                rawAddress: FvmAddressHelper.from(address(1))
-            }),
-            to: IPCAddress({
-                subnetId: subnetId,
-                rawAddress: FvmAddressHelper.from(address(2))
-            }),
+            from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(address(1))}),
+            to: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(address(2))}),
             value: 0,
             message: new bytes(0),
             nonce: 0,
@@ -53,14 +48,8 @@ contract LibGatewayTest is Test {
 
         IpcEnvelope memory envelope = IpcEnvelope({
             kind: IpcMsgKind.Transfer,
-            from: IPCAddress({
-                subnetId: subnetId,
-                rawAddress: FvmAddressHelper.from(address(1))
-            }),
-            to: IPCAddress({
-                subnetId: subnetId,
-                rawAddress: FvmAddressHelper.from(address(2))
-            }),
+            from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(address(1))}),
+            to: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(address(2))}),
             value: 0,
             message: new bytes(0),
             nonce: 0,
@@ -68,6 +57,68 @@ contract LibGatewayTest is Test {
         });
 
         t.applyMsg(subnetId, envelope);
+    }
+
+    function test_applyMsg_topDownSuccess() public {
+        LibGatewayMock t = new LibGatewayMock();
+
+        address childSubnetActor = address(new SubnetActorGetterFacet());
+
+        address[] memory parentRoute = new address[](1);
+        parentRoute[0] = address(1);
+
+        address[] memory childRoute = new address[](2);
+        childRoute[0] = address(1);
+        childRoute[1] = childSubnetActor;
+
+        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
+        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
+
+        t.setSubnet(childSubnet, 1);
+
+        address fromRaw = address(1000);
+        // use mock IpcContract so it succeeds.
+        address toRaw = address(new MockIpcContract());
+
+        IPCAddress memory from = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
+        IPCAddress memory to = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+
+        vm.deal(address(t), 1000);
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
+            from: from,
+            to: to,
+            value: 1000,
+            fee: 0, // injecting funds into a subnet is free
+            method: bytes4(0),
+            params: new bytes(0)
+        });
+        crossMsg.nonce = 0;
+
+        ReceiptMsg memory message = ReceiptMsg({id: crossMsg.toHash(), success: true, ret: EMPTY_BYTES});
+        IpcEnvelope memory expected = IpcEnvelope({
+            kind: IpcMsgKind.Receipt,
+            from: crossMsg.to,
+            to: crossMsg.from,
+            value: 0, // it succeeded
+            fee: LibGateway.RECEIPT_FEE,
+            message: abi.encode(message),
+            nonce: 0
+        });
+
+        t.applyMsg(parentSubnet, crossMsg);
+
+        BottomUpMsgBatch memory batch = t.getNextBottomUpMsgBatch();
+        require(batch.msgs.length == 1, "should have bottom up messages");
+        IpcEnvelope memory stored = batch.msgs[0];
+        ReceiptMsg memory ex = abi.decode(expected.message, (ReceiptMsg));
+        ReceiptMsg memory st = abi.decode(stored.message, (ReceiptMsg));
+        require(ex.success == st.success, "receipt success not matching");
+        require(ex.id == st.id, "receipt id not matching");
+        console.log(ex.ret.length);
+        console.log(st.ret.length);
+        require(ex.ret.length == st.ret.length, "receipt ret not matching");
+        // require(keccak256(stored.message) == keccak256(expected.message), "receipt message not matching");
+        // require(stored.toHash() == expected.toHash(), "receipt hash not matching");
     }
 
     function test_applyMsg_topdownInvalidNonce() public {
@@ -82,24 +133,17 @@ contract LibGatewayTest is Test {
         childRoute[0] = address(1);
         childRoute[1] = childSubnetActor;
 
-        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute });
-        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute });
+        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
+        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
 
         t.setSubnet(childSubnet, 1);
-        // registerSubnet(childSubnet);
 
         address fromRaw = address(1000);
         address toRaw = address(1001);
 
-        IPCAddress memory from = IPCAddress({
-            subnetId: parentSubnet,
-            rawAddress: FvmAddressHelper.from(fromRaw)
-        });
-        IPCAddress memory to = IPCAddress({
-            subnetId: childSubnet,
-            rawAddress: FvmAddressHelper.from(toRaw)
-        });
-    
+        IPCAddress memory from = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
+        IPCAddress memory to = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
             from: from,
             to: to,
@@ -147,24 +191,17 @@ contract LibGatewayTest is Test {
         childRoute[0] = address(1);
         childRoute[1] = childSubnetActor;
 
-        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute });
-        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute });
+        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
+        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
 
         t.setSubnet(childSubnet, 1);
-        // registerSubnet(childSubnet);
 
         address fromRaw = address(1000);
         address toRaw = callingContract;
 
-        IPCAddress memory from = IPCAddress({
-            subnetId: parentSubnet,
-            rawAddress: FvmAddressHelper.from(fromRaw)
-        });
-        IPCAddress memory to = IPCAddress({
-            subnetId: childSubnet,
-            rawAddress: FvmAddressHelper.from(toRaw)
-        });
-    
+        IPCAddress memory from = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
+        IPCAddress memory to = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
             from: from,
             to: to,
@@ -175,11 +212,7 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ReceiptMsg memory message = ReceiptMsg({
-            id: crossMsg.toHash(),
-            success: false,
-            ret: new bytes(0)
-        });
+        ReceiptMsg memory message = ReceiptMsg({id: crossMsg.toHash(), success: false, ret: new bytes(0)});
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Receipt,
             from: crossMsg.to,
@@ -213,23 +246,17 @@ contract LibGatewayTest is Test {
         childRoute[0] = address(1);
         childRoute[1] = childSubnetActor;
 
-        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute });
-        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute });
+        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
+        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
 
         t.setSubnet(parentSubnet, 1);
 
         address fromRaw = address(1000);
         address toRaw = callingContract;
 
-        IPCAddress memory from = IPCAddress({
-            subnetId: childSubnet,
-            rawAddress: FvmAddressHelper.from(fromRaw)
-        });
-        IPCAddress memory to = IPCAddress({
-            subnetId: parentSubnet,
-            rawAddress: FvmAddressHelper.from(toRaw)
-        });
-    
+        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
+        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
             from: from,
             to: to,
@@ -256,8 +283,8 @@ contract LibGatewayTest is Test {
         childRoute[0] = address(1);
         childRoute[1] = childSubnetActor;
 
-        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute });
-        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute });
+        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
+        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
 
         t.setSubnet(parentSubnet, 1);
         t.registerSubnet(childSubnet);
@@ -265,15 +292,9 @@ contract LibGatewayTest is Test {
         address fromRaw = address(1000);
         address toRaw = callingContract;
 
-        IPCAddress memory from = IPCAddress({
-            subnetId: childSubnet,
-            rawAddress: FvmAddressHelper.from(fromRaw)
-        });
-        IPCAddress memory to = IPCAddress({
-            subnetId: parentSubnet,
-            rawAddress: FvmAddressHelper.from(toRaw)
-        });
-    
+        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
+        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
             from: from,
             to: to,
@@ -318,8 +339,8 @@ contract LibGatewayTest is Test {
         childRoute[0] = address(1);
         childRoute[1] = childSubnetActor;
 
-        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute });
-        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute });
+        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
+        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
 
         t.setSubnet(parentSubnet, 1);
         t.registerSubnet(childSubnet);
@@ -327,15 +348,9 @@ contract LibGatewayTest is Test {
         address fromRaw = address(1000);
         address toRaw = callingContract;
 
-        IPCAddress memory from = IPCAddress({
-            subnetId: childSubnet,
-            rawAddress: FvmAddressHelper.from(fromRaw)
-        });
-        IPCAddress memory to = IPCAddress({
-            subnetId: parentSubnet,
-            rawAddress: FvmAddressHelper.from(toRaw)
-        });
-    
+        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
+        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
             from: from,
             to: to,
@@ -346,11 +361,7 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ReceiptMsg memory message = ReceiptMsg({
-            id: crossMsg.toHash(),
-            success: false,
-            ret: new bytes(0)
-        });
+        ReceiptMsg memory message = ReceiptMsg({id: crossMsg.toHash(), success: false, ret: new bytes(0)});
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Receipt,
             from: crossMsg.to,
