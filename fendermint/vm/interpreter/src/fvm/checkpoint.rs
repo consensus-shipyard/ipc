@@ -63,70 +63,85 @@ where
         .block_hash()
         .ok_or_else(|| anyhow!("block hash not set"))?;
 
-    match should_create_checkpoint(gateway, state, height)? {
-        None => Ok(None),
-        Some(subnet_id) => {
-            // Get the current power table from the ledger, not CometBFT.
-            let (_, curr_power_table) =
-                ipc_power_table(gateway, state).context("failed to get the current power table")?;
+    let batch = gateway.bottom_up_msg_batch(state, height.into())?;
 
-            // Apply any validator set transitions.
-            let next_configuration_number = gateway
-                .apply_validator_changes(state)
-                .context("failed to apply validator changes")?;
+    if batch.block_height.as_u64() == 0 {
+        tracing::debug!(height = height.value(), "no bottom up msg batch at height");
 
-            // Retrieve the bottom-up messages so we can put their hash into the checkpoint.
-            let cross_msgs = gateway
-                .bottom_up_msgs(state, height.value())
-                .context("failed to retrieve bottom-up messages")?;
-
-            // Sum up the value leaving the subnet as part of the bottom-up messages.
-            let burnt_tokens = tokens_to_burn(&cross_msgs);
-
-            // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
-            // we don't have to burn them here, because it's already being done in
-            // https://github.com/consensus-shipyard/ipc-solidity-actors/pull/263
-            // by sending the funds to the BURNTFUNDS_ACTOR.
-            // Ostensibly we could opt _not_ to decrease the circ supply here, but rather
-            // look up the burnt funds balance at the beginning of each block and subtract
-            // it from the monotonically increasing supply, in which case it could reflect
-            // a wider range of burning activity than just IPC.
-            // It might still be inconsistent if someone uses another address for burning tokens.
-            // By decreasing here, at least `circ_supply` is consistent with IPC.
-            state.update_circ_supply(|circ_supply| {
-                *circ_supply -= burnt_tokens;
-            });
-
-            // Construct checkpoint.
-            let checkpoint = BottomUpCheckpoint {
-                subnet_id,
-                block_height: ethers::types::U256::from(height.value()),
-                block_hash,
-                next_configuration_number,
-                msgs: convert_tokenizables(cross_msgs)?,
-            };
-
-            // Save the checkpoint in the ledger.
-            // Pass in the current power table, because these are the validators who can sign this checkpoint.
-            gateway
-                .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
-                .context("failed to store checkpoint")?;
-
-            // Figure out the power updates if there was some change in the configuration.
-            let power_updates = if next_configuration_number == 0 {
-                PowerUpdates(Vec::new())
-            } else {
-                let (next_power_configuration_number, next_power_table) =
-                    ipc_power_table(gateway, state).context("failed to get next power table")?;
-
-                debug_assert_eq!(next_power_configuration_number, next_configuration_number);
-
-                power_diff(curr_power_table, next_power_table)
-            };
-
-            Ok(Some((checkpoint, power_updates)))
+        // we need to check if the checkpoint period has reached
+        if should_create_checkpoint(gateway, state, height)?.is_none() {
+            tracing::debug!(
+                height = height.value(),
+                "not bottom up checkpoint period height"
+            );
+            return Ok(None);
         }
+
+        tracing::debug!(
+            height = height.value(),
+            "bottom up checkpoint period height reached"
+        );
+    } else {
+        tracing::debug!(
+            height = height.value(),
+            "bottom up msg batch found at height"
+        );
     }
+
+    // Get the current power table from the ledger, not CometBFT.
+    let (_, curr_power_table) =
+        ipc_power_table(gateway, state).context("failed to get the current power table")?;
+
+    // Apply any validator set transitions.
+    let next_configuration_number = gateway
+        .apply_validator_changes(state)
+        .context("failed to apply validator changes")?;
+
+    // Sum up the value leaving the subnet as part of the bottom-up messages.
+    let burnt_tokens = tokens_to_burn(&batch.msgs);
+
+    // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
+    // we don't have to burn them here, because it's already being done in
+    // https://github.com/consensus-shipyard/ipc-solidity-actors/pull/263
+    // by sending the funds to the BURNTFUNDS_ACTOR.
+    // Ostensibly we could opt _not_ to decrease the circ supply here, but rather
+    // look up the burnt funds balance at the beginning of each block and subtract
+    // it from the monotonically increasing supply, in which case it could reflect
+    // a wider range of burning activity than just IPC.
+    // It might still be inconsistent if someone uses another address for burning tokens.
+    // By decreasing here, at least `circ_supply` is consistent with IPC.
+    state.update_circ_supply(|circ_supply| {
+        *circ_supply -= burnt_tokens;
+    });
+
+    // Construct checkpoint.
+    let checkpoint = BottomUpCheckpoint {
+        subnet_id: convert_tokenizable(batch.subnet_id)?,
+        block_height: ethers::types::U256::from(height.value()),
+        block_hash,
+        next_configuration_number,
+        msgs: convert_tokenizables(batch.msgs)?,
+    };
+
+    // Save the checkpoint in the ledger.
+    // Pass in the current power table, because these are the validators who can sign this checkpoint.
+    gateway
+        .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
+        .context("failed to store checkpoint")?;
+
+    // Figure out the power updates if there was some change in the configuration.
+    let power_updates = if next_configuration_number == 0 {
+        PowerUpdates(Vec::new())
+    } else {
+        let (next_power_configuration_number, next_power_table) =
+            ipc_power_table(gateway, state).context("failed to get next power table")?;
+
+        debug_assert_eq!(next_power_configuration_number, next_configuration_number);
+
+        power_diff(curr_power_table, next_power_table)
+    };
+
+    Ok(Some((checkpoint, power_updates)))
 }
 
 /// Wait until CometBFT has reached a specific block height.
@@ -286,6 +301,12 @@ where
     tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
 
     Ok(())
+}
+
+fn convert_tokenizable<Source: Tokenizable, Target: Tokenizable>(
+    s: Source,
+) -> anyhow::Result<Target> {
+    Ok(Target::from_token(s.into_token())?)
 }
 
 fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
