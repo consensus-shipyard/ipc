@@ -70,6 +70,34 @@ library CrossMsgHelper {
             });
     }
 
+    /// @notice Creates a receipt message for the given envelope.
+    /// It reverts the from and to to return to the original sender
+    /// and identifies the receipt through the hash of the original message.
+    function createReceiptMsg(
+        IpcEnvelope calldata crossMsg,
+        uint256 fee,
+        bool success,
+        bytes memory ret
+    ) public pure returns (IpcEnvelope memory) {
+        ReceiptMsg memory message = ReceiptMsg({id: toHash(crossMsg), success: success, ret: ret});
+        uint256 value = crossMsg.value;
+        if (success) {
+            // if the message was executed successfully, the value stayed
+            // in the subnet and there's no need to return it.
+            value = 0;
+        }
+        return
+            IpcEnvelope({
+                kind: IpcMsgKind.Receipt,
+                from: crossMsg.to,
+                to: crossMsg.from,
+                value: value,
+                message: abi.encode(message),
+                nonce: 0,
+                fee: fee
+            });
+    }
+
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
@@ -134,15 +162,25 @@ library CrossMsgHelper {
         return crossMsg.message.length == 0;
     }
 
-    function execute(IpcEnvelope calldata crossMsg, SupplySource memory supplySource) public returns (bytes memory) {
+    /// @notice Executes a cross message envelope.
+    ///
+    /// This function doesn't revert except if the envelope is empty.
+    /// It returns a success flag and the return data for the success or
+    /// the error so it can be returned to the sender through a cross-message receipt.
+    /// NOTE: Execute assumes that the fund it is handling have already been
+    /// released for their use so they can be conveniently included in the
+    /// forwarded message, or the receipt in the case of failure.
+    function execute(
+        IpcEnvelope calldata crossMsg,
+        SupplySource memory supplySource
+    ) public returns (bool success, bytes memory ret) {
         if (isEmpty(crossMsg)) {
             revert CannotExecuteEmptyEnvelope();
         }
 
         address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
         if (crossMsg.kind == IpcMsgKind.Transfer) {
-            supplySource.transfer({recipient: payable(recipient), value: crossMsg.value});
-            return EMPTY_BYTES;
+            return supplySource.transfer({recipient: payable(recipient), value: crossMsg.value});
         } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Receipt) {
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully
@@ -154,7 +192,7 @@ library CrossMsgHelper {
                     crossMsg.value
                 );
         }
-        return EMPTY_BYTES;
+        return (false, EMPTY_BYTES);
     }
 
     // get underlying IpcMsg from crossMsg

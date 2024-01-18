@@ -169,7 +169,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.deal(sender, 1 ether);
 
-        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
         require(recipient.balance == 1);
@@ -190,7 +190,7 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
-        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
@@ -209,7 +209,7 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
-        bytes memory result = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
@@ -222,8 +222,8 @@ contract CrossMsgHelperTest is Test {
         message.method = bytes4("1");
         crossMsg = crossMsg.setIpcMsg(message);
 
-        vm.expectRevert(Address.FailedInnerCall.selector);
-        crossMsg.execute(native);
+        (bool success, ) = crossMsg.execute(native);
+        require(!success);
     }
 
     function callback(bytes calldata params) public payable returns (bytes memory) {

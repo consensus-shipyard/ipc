@@ -3,25 +3,34 @@ pragma solidity 0.8.19;
 
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
-import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
+import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
+import {SubnetID, Subnet, SupplyKind, SupplySource} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
-import {IpcMsg, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {IpcMsg, IpcMsgKind, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {MaxMsgsPerBatchExceeded, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
+import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
+import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
+    using SupplySourceHelper for address;
+    using SubnetIDHelper for SubnetID;
+    using FilAddress for address payable;
     using SupplySourceHelper for SupplySource;
+
+    uint256 public constant RECEIPT_FEE = 0;
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch, BottomUpMsgBatch batch);
+
+    error CannotCreateIpcReceipt();
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -79,7 +88,7 @@ library LibGateway {
         b.blockHeight = checkpoint.blockHeight;
 
         uint256 msgLength = checkpoint.msgs.length;
-        for (uint256 i; i < msgLength;) {
+        for (uint256 i; i < msgLength; ) {
             // We need to push because initializing an array with a static
             // length will cause a copy from memory to storage, making
             // the compiler unhappy.
@@ -274,13 +283,13 @@ library LibGateway {
             });
 
             uint256 msgLength = batch.msgs.length;
-            for (uint256 i; i < msgLength;) {
+            for (uint256 i; i < msgLength; ) {
                 newBatch.msgs[i] = batch.msgs[i];
                 unchecked {
                     ++i;
                 }
             }
-            
+
             // emit event with the next batch ready to sign quorum over.
             emit NewBottomUpMsgBatch(epochCut, newBatch);
 
@@ -342,24 +351,23 @@ library LibGateway {
     }
 
     /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
+    /// This function assumes that the relevant funds have been already minted or burnt
+    /// when the top-down or bottom-up messages have been queued for execution.
+    /// This function is not expected to revert. If a controlled failure happens, a new
+    /// cross-message receipt is propagated for execution to inform the sending contract.
+    /// `Call` cross-messages also trigger receipts if they are successful.
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsg - the cross message to be executed
     function applyMsg(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
-            revert InvalidCrossMsgDstSubnet();
-        }
-
-        // If the crossnet destination is NOT the current network (network where the gateway is running),
-        // we add it to the postbox for further propagation.
-        if (!crossMsg.to.subnetId.equals(s.networkName)) {
-            bytes32 cid = crossMsg.toHash();
-            s.postbox[cid] = crossMsg;
+            sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(InvalidCrossMsgDstSubnet.selector));
             return;
         }
 
-        // Now, let's find out the directionality of this message and act accordingly.
+        // The first thing we do is to find out the directionality of this message and act accordingly,
+        // incrasing the applied nonces conveniently.
         // slither-disable-next-line uninitialized-local
         SupplySource memory supplySource;
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
@@ -367,10 +375,14 @@ library LibGateway {
             // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
             (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
             if (!registered) {
-                revert NotRegisteredSubnet();
+                // this means the subnet that sent the bottom up message is not registered,
+                // we cannot send the receipt back as top down because the subnet is not registered
+                // we ignore this message for as it's not valid, and it may be someone trying to forge it.
+                return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
-                revert InvalidCrossMsgNonce();
+                sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                return;
             }
             subnet.appliedBottomUpNonce += 1;
 
@@ -380,7 +392,8 @@ library LibGateway {
         } else if (applyType == IPCMsgType.TopDown) {
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
-                revert InvalidCrossMsgNonce();
+                sendReceipt(crossMsg, RECEIPT_FEE, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                return;
             }
             s.appliedTopDownNonce += 1;
 
@@ -389,8 +402,121 @@ library LibGateway {
             supplySource = SupplySourceHelper.native();
         }
 
+        // If the crossnet destination is NOT the current network (network where the gateway is running),
+        // we add it to the postbox for further propagation.
+        // Even if we send for propagation, the execution of every message
+        // should increase the appliedNonce to allow the execution of the next message
+        // of the batch (this is way we have this after the nonce logic).
+        if (!crossMsg.to.subnetId.equals(s.networkName)) {
+            bytes32 cid = crossMsg.toHash();
+            s.postbox[cid] = crossMsg;
+            return;
+        }
+
+        // execute the message and get the receipt.
+        (bool success, bytes memory ret) = crossMsg.execute(supplySource);
+        sendReceipt(crossMsg, RECEIPT_FEE, success, ret);
+    }
+
+    /// @notice Sends a receipt from the execution of a cross-message.
+    /// Only `Call` messages trigger a receipt. Transfer messages should be directly
+    /// handled by the peer client to return the funds to the from address in the
+    /// failing network.
+    /// (we could optionally trigger a receipt from `Transfer`s to, but without
+    /// multi-level execution it would be adding unnecessary overhead).
+    function sendReceipt(IpcEnvelope memory crossMsg, uint256 fee, bool success, bytes memory ret) internal {
+        if (crossMsg.isEmpty()) {
+            revert CannotCreateIpcReceipt();
+        }
+
+        // if we get a `Transfer` or a `Receipt` do nothing, no need to send receipts.
+        // - Transfers don't need to be acknowledged.
+        // - And sending a `Receipt` to a `Receipt` could lead to amplification loops.
+        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Receipt) {
+            return;
+        }
+
+        // commmit the receipt for propagation
         // slither-disable-next-line unused-return
-        crossMsg.execute(supplySource);
+        commitCrossMessage(crossMsg.createReceiptMsg(fee, success, ret));
+    }
+
+    /**
+     * @notice Commit the cross message to storage.
+     *
+     * @dev It also validates that destination subnet ID is not empty
+     *      and not equal to the current network.
+     *      This function assumes that the funds inside `value` have been
+     *      conveniently minted or burnt already and the message is free to
+     *      use them (see execBottomUpMsgBatch for reference).
+     *  @param crossMessage The cross-network message to commit.
+     *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
+     */
+    function commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        SubnetID memory to = crossMessage.to.subnetId;
+        if (to.isEmpty()) {
+            revert InvalidCrossMsgDstSubnet();
+        }
+        // destination is the current network, you are better off with a good old message, no cross needed
+        if (to.equals(s.networkName)) {
+            revert CannotSendCrossMsgToItself();
+        }
+
+        SubnetID memory from = crossMessage.from.subnetId;
+        IPCMsgType applyType = crossMessage.applyType(s.networkName);
+
+        // Are we the LCA? (Lowest Common Ancestor)
+        bool isLCA = to.commonParent(from).equals(s.networkName);
+
+        // Even if multi-level messaging is enabled, we reject the xnet message
+        // as soon as we learn that one of the networks involved use an ERC20 supply source.
+        // This will block propagation on the first step, or the last step.
+        //
+        // TODO IPC does not implement fault handling yet, so if the message fails
+        //  to propagate, the user won't be able to reclaim funds. That's one of the
+        //  reasons xnet messages are disabled by default.
+
+        bool reject = false;
+        if (applyType == IPCMsgType.BottomUp) {
+            // We're traversing up, so if we're the first hop, we reject if the subnet was ERC20.
+            // If we're not the first hop, a child propagated this to us, they made a mistake and
+            // and we don't have enough info to evaluate.
+            reject = from.getParentSubnet().equals(s.networkName) && from.getActor().hasSupplyOfKind(SupplyKind.ERC20);
+        } else if (applyType == IPCMsgType.TopDown) {
+            // We're traversing down.
+            // Check the next subnet (which can may be the destination subnet).
+            reject = to.down(s.networkName).getActor().hasSupplyOfKind(SupplyKind.ERC20);
+        }
+        if (reject && crossMessage.kind == IpcMsgKind.Transfer) {
+            revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
+        }
+
+        // If the directionality is top-down, or if we're inverting the direction
+        // because we're the LCA, commit a top-down message.
+        if (applyType == IPCMsgType.TopDown || isLCA) {
+            ++s.appliedTopDownNonce;
+            LibGateway.commitTopDownMsg(crossMessage);
+            return (shouldBurn = false);
+        }
+
+        // Else, commit a bottom up message.
+        LibGateway.commitBottomUpMsg(crossMessage);
+        // gas-opt: original check: value > 0
+        return (shouldBurn = crossMessage.value != 0);
+    }
+
+    /**
+     * @dev Performs transaction side-effects from the commitment of a cross-net message. Like
+     * burning funds when bottom-up messages are propagated.
+     *
+     * @param v - the value of the committed cross-net message
+     * @param shouldBurn - flag if the message should burn funds
+     */
+    function crossMsgSideEffects(uint256 v, bool shouldBurn) internal {
+        if (shouldBurn) {
+            payable(BURNT_FUNDS_ACTOR).sendValue(v);
+        }
     }
 
     /// @notice Checks the length of a message batch, ensuring it is in (0, maxMsgsPerBottomUpBatch).
