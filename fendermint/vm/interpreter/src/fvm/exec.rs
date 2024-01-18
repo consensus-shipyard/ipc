@@ -83,6 +83,27 @@ where
             anyhow::bail!("failed to apply block cron message: {}", err);
         }
 
+        // Push the current block hash to the chainmetadata actor
+        //
+        let block_cid = fendermint_vm_message::cid(&state.block_hash().unwrap()).unwrap();
+        let params = fvm_ipld_encoding::RawBytes::serialize(block_cid)?;
+        let msg = FvmMessage {
+            from: system::SYSTEM_ACTOR_ADDR,
+            to: fvm_shared::address::Address::new_id(fendermint_actors::CHAINMETADATA_ACTOR_ID),
+            sequence: height as u64,
+            gas_limit,
+            method_num: fendermint_actor_chainmetadata::Method::PushBlock as u64,
+            params,
+            value: Default::default(),
+            version: Default::default(),
+            gas_fee_cap: Default::default(),
+            gas_premium: Default::default(),
+        };
+        let (apply_ret, _) = state.execute_implicit(msg)?;
+        if let Some(err) = apply_ret.failure_info {
+            anyhow::bail!("failed to apply chainmetadata message: {}", err);
+        }
+
         let ret = FvmApplyRet {
             apply_ret,
             from,

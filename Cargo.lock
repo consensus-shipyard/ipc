@@ -2710,6 +2710,7 @@ version = "0.1.0"
 dependencies = [
  "cid",
  "fil_actors_runtime",
+ "frc42_dispatch",
  "fvm_ipld_encoding",
  "fvm_shared",
  "num-derive 0.3.3",
@@ -3111,6 +3112,7 @@ dependencies = [
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
+ "fil_actors_runtime",
  "futures-core",
  "futures-util",
  "fvm",
@@ -3513,6 +3515,44 @@ dependencies = [
  "byteorder",
  "ff 0.13.0",
  "thiserror",
+]
+
+[[package]]
+name = "frc42_dispatch"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe63cf3ff3e332ef15fd19d95cffcb3fd2af14ccb3cb04abc730271c1362c4f"
+dependencies = [
+ "frc42_hasher",
+ "frc42_macros",
+ "fvm_ipld_encoding",
+ "fvm_sdk",
+ "fvm_shared",
+ "thiserror",
+]
+
+[[package]]
+name = "frc42_hasher"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08a35e7214108f81cefc17b0466be01279f384faf913918a12dbc8528bb758a4"
+dependencies = [
+ "fvm_sdk",
+ "fvm_shared",
+ "thiserror",
+]
+
+[[package]]
+name = "frc42_macros"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f50cd62b077775194bde67eef8076b31f915b9c099f3a7fd1a760363d65f145"
+dependencies = [
+ "blake2b_simd",
+ "frc42_hasher",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

@@ -3,4 +3,4 @@
 mod actor;
 mod shared;
 
-pub use shared::{ConstructorParams, Method, State};
+pub use shared::*;

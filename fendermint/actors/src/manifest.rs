@@ -16,6 +16,7 @@ pub struct Manifest {
 }
 
 pub const CHAINMETADATA_ACTOR_CODE_ID: u32 = 1;
+pub const CHAINMETADATA_ACTOR_ID: u64 = 48;
 
 impl Manifest {
     /// Load a manifest from the blockstore.

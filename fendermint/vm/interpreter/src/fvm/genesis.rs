@@ -9,6 +9,7 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
+use fendermint_actor_chainmetadata::BLOCKHASHES_AMT_BITWIDTH;
 use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -18,6 +19,7 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
+use fil_actors_runtime::Array;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
@@ -228,6 +230,26 @@ where
             )
             .context("failed to create reward actor")?;
 
+        // STAGE 1b: Then we initialize the in-repo actors.
+        //
+
+        // Initialize the chain metadata actor which handles saving metadata about the chain
+        // (e.g. block hashes) which we can query.
+        let empty_blockhashes_cid =
+            Array::<(), _>::new_with_bit_width(state.store(), BLOCKHASHES_AMT_BITWIDTH).flush()?;
+        state
+            .create_actor(
+                fendermint_actors::CHAINMETADATA_ACTOR_CODE_ID,
+                fendermint_actors::CHAINMETADATA_ACTOR_ID,
+                &fendermint_actor_chainmetadata::State {
+                    blockhashes: empty_blockhashes_cid,
+                    lookback_len: fendermint_actor_chainmetadata::DEFAULT_LOOKBACK_LEN,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create chainmetadata actor")?;
+
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
         // The next ID is going to be _after_ the accounts, which have already been assigned an ID by the `Init` actor.
@@ -251,22 +273,7 @@ where
             }
         }
 
-        // STAGE 3: Create the non-builtin actors
-
-        state
-            .create_actor(
-                fendermint_actors::CHAINMETADATA_ACTOR_CODE_ID,
-                next_id,
-                &fendermint_actor_chainmetadata::State {
-                    blockhashes: vec![].into(),
-                    params: fendermint_actor_chainmetadata::ConstructorParams { lookback_len: 256 },
-                },
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create chainmetadata actor")?;
-
-        // STAGE 4: Initialize the FVM and create built-in FEVM actors.
+        // STAGE 3: Initialize the FVM and create built-in FEVM actors.
 
         state
             .init_exec_state(

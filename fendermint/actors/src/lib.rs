@@ -2,4 +2,4 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 mod manifest;
 
-pub use manifest::{Manifest, CHAINMETADATA_ACTOR_CODE_ID};
+pub use manifest::{Manifest, CHAINMETADATA_ACTOR_CODE_ID, CHAINMETADATA_ACTOR_ID};

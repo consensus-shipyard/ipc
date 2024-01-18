@@ -107,6 +107,10 @@ $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
 	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
 
+# Build a bundle CAR for the actors in this repo.
+$(ACTORS_BUNDLE):
+	cargo build --release -p fendermint_actors
+
 # Regenerate the ABI artifacts if we don't have them already, or they changed.
 $(IPC_ACTORS_GEN): $(IPC_ACTORS_CODE)
 		cd $(IPC_ACTORS_DIR) && make compile-abi

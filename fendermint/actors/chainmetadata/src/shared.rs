@@ -5,13 +5,23 @@ use cid::Cid;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
-use std::collections::VecDeque;
 
+// The state is a stores `blockhashes` in an AMT containing the blockhashes of the
+// last `lookback_len` epochs
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
-    pub blockhashes: VecDeque<Cid>,
-    pub params: ConstructorParams,
+    // the AMT root cid of blockhashes
+    pub blockhashes: Cid,
+
+    // the maximum size of blockhashes before removing the oldest epoch
+    pub lookback_len: u64,
 }
+
+// the default lookback length is 256 epochs
+pub const DEFAULT_LOOKBACK_LEN: u64 = 256;
+
+// the default bitwidth of the blockhashes AMT
+pub const BLOCKHASHES_AMT_BITWIDTH: u32 = 3;
 
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
@@ -23,6 +33,6 @@ pub struct ConstructorParams {
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     PushBlock = 2,
-    LookbackLen = 3,
-    BlockCID = 4,
+    LookbackLen = frc42_dispatch::method_hash!("LookbackLen"),
+    BlockCID = frc42_dispatch::method_hash!("BlockCID"),
 }
