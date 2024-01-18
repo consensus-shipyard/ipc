@@ -42,7 +42,6 @@ fn main() {
         "GatewayDiamond",
         "GatewayManagerFacet",
         "GatewayGetterFacet",
-        "BottomUpRouterFacet",
         "CheckpointingFacet",
         "TopDownFinalityFacet",
         "XnetMessagingFacet",
@@ -60,6 +59,7 @@ fn main() {
         "LibStakingChangeLog",
         "LibGateway",
         "LibQuorum",
+        "CrossMsgHelper",
     ] {
         let module_name = camel_to_snake(contract_name);
         let input_path =
@@ -86,7 +86,6 @@ fn main() {
     let fvm_address_conversion = vec![
         "GatewayManagerFacet",
         "GatewayGetterFacet",
-        "BottomUpRouterFacet",
         "XnetMessagingFacet",
         "GatewayMessengerFacet",
         "SubnetActorCheckpointingFacet",
@@ -105,7 +104,6 @@ fn main() {
     )
     .unwrap();
     let common_type_conversion = vec![
-        ("SubnetActorGetterFacet", "BottomUpRouterFacet"),
         ("SubnetActorGetterFacet", "CheckpointingFacet"),
         ("SubnetActorGetterFacet", "XnetMessagingFacet"),
     ];

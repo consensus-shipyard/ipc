@@ -88,7 +88,6 @@ contract SubnetActorDiamond {
         // BottomUpMsgBatch config parameters.
         // NOTE: Let's fix them for now, but we could make them configurable
         // through the gateway constructor in the future.
-        s.bottomUpMsgBatchPeriod = BATCH_PERIOD;
         s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;

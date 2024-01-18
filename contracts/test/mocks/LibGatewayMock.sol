@@ -14,7 +14,7 @@ contract LibGatewayMock {
     function setSubnet(SubnetID memory subnet, uint256 bottomUpPeriod) public {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         s.networkName = subnet;
-        s.bottomUpMsgBatchPeriod = bottomUpPeriod;
+        s.bottomUpCheckPeriod = bottomUpPeriod;
 
         s.subnets[subnet.toHash()].id = subnet;
     }
@@ -26,7 +26,7 @@ contract LibGatewayMock {
 
     function getNextBottomUpMsgBatch() public view returns (BottomUpMsgBatch memory batch) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        uint256 epoch = LibGateway.getNextEpoch(block.number, s.bottomUpMsgBatchPeriod);
+        uint256 epoch = LibGateway.getNextEpoch(block.number, s.bottomUpCheckPeriod);
 
         batch = s.bottomUpMsgBatches[epoch];
     }

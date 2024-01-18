@@ -8,9 +8,9 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, BottomUpMsgBatch, QuorumReachedEvent, Signature,
+    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
 };
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{ConstructParams, PermissionMode, SupplySource};
 use ipc_api::subnet_id::SubnetID;
@@ -201,7 +201,7 @@ pub trait TopDownFinalityQuery: Send + Sync {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-    ) -> Result<TopDownQueryPayload<Vec<CrossMsg>>>;
+    ) -> Result<TopDownQueryPayload<Vec<IpcEnvelope>>>;
     /// Get the block hash
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult>;
     /// Get the validator change set from start to end block.
@@ -244,13 +244,4 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
     /// Get the current epoch in the current subnet
     async fn current_epoch(&self) -> Result<ChainEpoch>;
-    /// Submits a batch of bottom-up messages for execution.
-    async fn submit_bottom_up_msg_batch(
-        &self,
-        submitter: &Address,
-        subnet_id: &SubnetID,
-        batch: BottomUpMsgBatch,
-        signatories: &[Address],
-        signatures: &[Signature],
-    ) -> Result<ChainEpoch>;
 }

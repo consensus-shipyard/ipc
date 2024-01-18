@@ -13,7 +13,7 @@ use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{PermissionMode, SupplySource};
 use ipc_api::{
-    cross::CrossMsg,
+    cross::IpcEnvelope,
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
@@ -654,7 +654,7 @@ impl IpcProvider {
         &self,
         subnet: &SubnetID,
         epoch: ChainEpoch,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),

@@ -5,7 +5,7 @@ use crate::BlockHeight;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
@@ -28,7 +28,7 @@ pub trait ParentQueryProxy {
     async fn get_top_down_msgs(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>>;
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>>;
 
     /// Get the validator set at the specified height
     async fn get_validator_changes(
@@ -85,13 +85,13 @@ impl ParentQueryProxy for IPCProviderProxy {
     async fn get_top_down_msgs(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
         self.ipc_provider
             .get_top_down_msgs(&self.child_subnet, height as ChainEpoch)
             .await
             .map(|mut v| {
                 // sort ascending, we dont assume the changes are ordered
-                v.value.sort_by(|a, b| a.msg.nonce.cmp(&b.msg.nonce));
+                v.value.sort_by(|a, b| a.nonce.cmp(&b.nonce));
                 v
             })
     }

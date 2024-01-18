@@ -76,7 +76,6 @@ def main():
          'src/gateway/GatewayManagerFacet.sol',
          'src/gateway/GatewayMessengerFacet.sol',
          'src/gateway/router/CheckpointingFacet.sol',
-         'src/gateway/router/BottomUpRouterFacet.sol',
          'src/gateway/router/TopDownFinalityFacet.sol',
          'src/gateway/router/XnetMessagingFacet.sol',
          'src/subnet/SubnetActorGetterFacet.sol',
