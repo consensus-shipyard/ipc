@@ -51,11 +51,13 @@ export async function deploy(libs: { [key in string]: string }) {
     }
     const messengerFacetLibs: Libraries = {
         SubnetIDHelper: libs['SubnetIDHelper'],
+        CrossMsgHelper: libs['CrossMsgHelper'],
     }
 
     const checkpointingFacetLibs: Libraries = {
         AccountHelper: libs['AccountHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
+        CrossMsgHelper: libs['CrossMsgHelper'],
     }
 
     const xnetMessagingFacetLibs: Libraries = {

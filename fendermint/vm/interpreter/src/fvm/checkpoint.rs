@@ -70,13 +70,22 @@ where
 
         // we need to check if the checkpoint period has reached
         if should_create_checkpoint(gateway, state, height)?.is_none() {
-            tracing::debug!(height = height.value(), "not bottom up checkpoint period height");
+            tracing::debug!(
+                height = height.value(),
+                "not bottom up checkpoint period height"
+            );
             return Ok(None);
         }
 
-        tracing::debug!(height = height.value(), "bottom up checkpoint period height reached");
+        tracing::debug!(
+            height = height.value(),
+            "bottom up checkpoint period height reached"
+        );
     } else {
-        tracing::debug!(height = height.value(), "bottom up msg batch found at height");
+        tracing::debug!(
+            height = height.value(),
+            "bottom up msg batch found at height"
+        );
     }
 
     // Get the current power table from the ledger, not CometBFT.
@@ -89,7 +98,7 @@ where
         .context("failed to apply validator changes")?;
 
     // Sum up the value leaving the subnet as part of the bottom-up messages.
-    let burnt_tokens = tokens_to_burn(&batch.msgs)?;
+    let burnt_tokens = tokens_to_burn(&batch.msgs);
 
     // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
     // we don't have to burn them here, because it's already being done in

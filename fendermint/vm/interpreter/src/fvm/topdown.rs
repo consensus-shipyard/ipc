@@ -48,7 +48,7 @@ pub async fn execute_topdown_msgs<DB>(
 where
     DB: Blockstore + Sync + Send + 'static,
 {
-    let minted_tokens = tokens_to_mint(&messages)?;
+    let minted_tokens = tokens_to_mint(&messages);
     tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");
 
     if !minted_tokens.is_zero() {

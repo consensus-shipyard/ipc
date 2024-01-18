@@ -5,42 +5,25 @@
 use crate::address::IPCAddress;
 use crate::subnet_id::SubnetID;
 use anyhow::anyhow;
-use fvm_ipld_encoding::RawBytes;
+use ethers::abi::AbiEncode;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
-use fvm_shared::MethodNum;
-use fvm_shared::METHOD_SEND;
+use ipc_actors_abis::cross_msg_helper::IpcMsg;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
-/// StorableMsg stores all the relevant information required
-/// to execute cross-messages.
-///
-/// We follow this approach because we can't directly store types.Message
-/// as we did in the actor's Go counter-part. Instead we just persist the
-/// information required to create the cross-messages and execute in the
-/// corresponding node implementation.
-#[derive(PartialEq, Eq, Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct StorableMsg {
-    pub from: IPCAddress,
-    pub to: IPCAddress,
-    pub method: MethodNum,
-    pub params: RawBytes,
-    pub value: TokenAmount,
-    pub nonce: u64,
-    pub fee: TokenAmount,
-}
-
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct IpcEnvelope {
-    /// ype of message being propagated.
+    /// Type of message being propagated.
     pub kind: IpcMsgKind,
     /// destination of the message
     /// It makes sense to extract from the encoded message
     /// all shared fields required by all message, so they
     /// can be inspected without having to decode the message.
     pub to: IPCAddress,
+    /// Value included in the envelope
+    pub value: TokenAmount,
     /// address sending the message
     pub from: IPCAddress,
     /// abi.encoded message
@@ -50,6 +33,82 @@ pub struct IpcEnvelope {
     pub nonce: u64,
     /// The fee for execution, currently not used.
     pub fee: TokenAmount,
+}
+
+impl IpcEnvelope {
+    pub fn new_release_msg(
+        sub_id: &SubnetID,
+        from: &Address,
+        to: &Address,
+        value: TokenAmount,
+        fee: TokenAmount,
+    ) -> anyhow::Result<Self> {
+        let to = IPCAddress::new(
+            &match sub_id.parent() {
+                Some(s) => s,
+                None => return Err(anyhow!("error getting parent for subnet addr")),
+            },
+            to,
+        )?;
+
+        let from = IPCAddress::new(sub_id, from)?;
+        Ok(Self {
+            kind: IpcMsgKind::Transfer,
+            from,
+            to,
+            value,
+            nonce: 0,
+            message: default_ipc_msg().encode(),
+            fee,
+        })
+    }
+
+    pub fn new_fund_msg(
+        sub_id: &SubnetID,
+        from: &Address,
+        to: &Address,
+        value: TokenAmount,
+    ) -> anyhow::Result<Self> {
+        let from = IPCAddress::new(
+            &match sub_id.parent() {
+                Some(s) => s,
+                None => return Err(anyhow!("error getting parent for subnet addr")),
+            },
+            from,
+        )?;
+        let to = IPCAddress::new(sub_id, to)?;
+
+        // the nonce and the rest of message fields are set when the message is committed.
+        Ok(Self {
+            kind: IpcMsgKind::Transfer,
+            from,
+            to,
+            value,
+            nonce: 0,
+            message: default_ipc_msg().encode(),
+            fee: TokenAmount::zero(), // fund messages are currently free
+        })
+    }
+
+    pub fn ipc_type(&self) -> anyhow::Result<IPCMsgType> {
+        let sto = self.to.subnet()?;
+        let sfrom = self.from.subnet()?;
+        if is_bottomup(&sfrom, &sto) {
+            return Ok(IPCMsgType::BottomUp);
+        }
+        Ok(IPCMsgType::TopDown)
+    }
+
+    pub fn apply_type(&self, curr: &SubnetID) -> anyhow::Result<IPCMsgType> {
+        let sto = self.to.subnet()?;
+        let sfrom = self.from.subnet()?;
+        if curr.common_parent(&sto) == sfrom.common_parent(&sto)
+            && self.ipc_type()? == IPCMsgType::BottomUp
+        {
+            return Ok(IPCMsgType::BottomUp);
+        }
+        Ok(IPCMsgType::TopDown)
+    }
 }
 
 /// Type of cross-net messages currently supported
@@ -85,77 +144,10 @@ pub enum IPCMsgType {
     TopDown,
 }
 
-impl StorableMsg {
-    pub fn new_release_msg(
-        sub_id: &SubnetID,
-        from: &Address,
-        to: &Address,
-        value: TokenAmount,
-        fee: TokenAmount,
-    ) -> anyhow::Result<Self> {
-        let to = IPCAddress::new(
-            &match sub_id.parent() {
-                Some(s) => s,
-                None => return Err(anyhow!("error getting parent for subnet addr")),
-            },
-            to,
-        )?;
-        let from = IPCAddress::new(sub_id, from)?;
-        Ok(Self {
-            from,
-            to,
-            method: METHOD_SEND,
-            params: RawBytes::default(),
-            value,
-            nonce: 0,
-            fee,
-        })
-    }
-
-    pub fn new_fund_msg(
-        sub_id: &SubnetID,
-        from: &Address,
-        to: &Address,
-        value: TokenAmount,
-    ) -> anyhow::Result<Self> {
-        let from = IPCAddress::new(
-            &match sub_id.parent() {
-                Some(s) => s,
-                None => return Err(anyhow!("error getting parent for subnet addr")),
-            },
-            from,
-        )?;
-        let to = IPCAddress::new(sub_id, to)?;
-        // the nonce and the rest of message fields are set when the message is committed.
-        Ok(Self {
-            from,
-            to,
-            method: METHOD_SEND,
-            params: RawBytes::default(),
-            value,
-            nonce: 0,
-            fee: TokenAmount::zero(), // fund messages are currently free
-        })
-    }
-
-    pub fn ipc_type(&self) -> anyhow::Result<IPCMsgType> {
-        let sto = self.to.subnet()?;
-        let sfrom = self.from.subnet()?;
-        if is_bottomup(&sfrom, &sto) {
-            return Ok(IPCMsgType::BottomUp);
-        }
-        Ok(IPCMsgType::TopDown)
-    }
-
-    pub fn apply_type(&self, curr: &SubnetID) -> anyhow::Result<IPCMsgType> {
-        let sto = self.to.subnet()?;
-        let sfrom = self.from.subnet()?;
-        if curr.common_parent(&sto) == sfrom.common_parent(&sto)
-            && self.ipc_type()? == IPCMsgType::BottomUp
-        {
-            return Ok(IPCMsgType::BottomUp);
-        }
-        Ok(IPCMsgType::TopDown)
+fn default_ipc_msg() -> IpcMsg {
+    IpcMsg {
+        method: [0; 4],
+        params: Default::default(),
     }
 }
 

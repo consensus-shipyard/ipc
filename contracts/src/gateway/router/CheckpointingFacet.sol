@@ -139,7 +139,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += msgs[i].getValue();
+            totalValue += msgs[i].value;
             totalFee += msgs[i].fee;
             unchecked {
                 ++i;

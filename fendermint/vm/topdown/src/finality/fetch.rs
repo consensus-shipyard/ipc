@@ -247,7 +247,7 @@ mod tests {
     use async_trait::async_trait;
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
-    use ipc_api::cross::{IpcEnvelope, StorableMsg};
+    use ipc_api::cross::IpcEnvelope;
     use ipc_api::staking::{StakingChange, StakingChangeRequest, StakingOperation};
     use ipc_api::subnet_id::SubnetID;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
@@ -356,7 +356,7 @@ mod tests {
 
     fn new_cross_msg(nonce: u64) -> IpcEnvelope {
         let subnet_id = SubnetID::new(10, vec![Address::new_id(1000)]);
-        let mut msg = StorableMsg::new_fund_msg(
+        let mut msg = IpcEnvelope::new_fund_msg(
             &subnet_id,
             &Address::new_id(1),
             &Address::new_id(2),
@@ -364,11 +364,7 @@ mod tests {
         )
         .unwrap();
         msg.nonce = nonce;
-
-        IpcEnvelope {
-            msg,
-            wrapped: false,
-        }
+        msg
     }
 
     fn new_validator_changes(configuration_number: u64) -> StakingChangeRequest {
