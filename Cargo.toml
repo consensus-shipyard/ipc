@@ -147,9 +147,6 @@ ipc_actors_abis = { path = "contracts/binding" }
 openssl = { version = "0.10", features = ["vendored"] }
 
 # Stable FVM dependencies from crates.io
-# Using the 3.3 version of the FVM because the newer ones update the IPLD dependencies
-# to version which are different than the ones in the builtin-actors project, and since
-# they are 0.x cargo cannot upgrade them automatically, which leads to version conflicts.
 fvm = { version = "4.0.0", default-features = false }     # no opencl feature or it fails on CI
 fvm_shared = { version = "4.0.0", features = ["crypto"] }
 fvm_sdk = { version = "4.0.0" }

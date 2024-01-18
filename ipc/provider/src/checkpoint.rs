@@ -206,7 +206,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await?;
                 log::debug!("bottom up bundle: {bundle:?}");
 
-                todo!("implement submiet checkpoint")
+                todo!("implement submit checkpoint")
                 // let epoch = self
                 //     .parent_handler
                 //     .submit_checkpoint(submitter, bundle)
