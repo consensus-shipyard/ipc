@@ -94,7 +94,7 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ReceiptMsg memory message = ReceiptMsg({id: crossMsg.toHash(), success: true, ret: EMPTY_BYTES});
+        ReceiptMsg memory message = ReceiptMsg({id: crossMsg.toHash(), success: true, ret: abi.encode(EMPTY_BYTES)});
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Receipt,
             from: crossMsg.to,

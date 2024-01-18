@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import "forge-std/Test.sol";
-
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
@@ -398,8 +396,6 @@ library LibGateway {
 
         // execute the message and get the receipt.
         (bool success, bytes memory ret) = crossMsg.execute(supplySource);
-        console.log(success);
-        console.logBytes(ret);
         sendReceipt(crossMsg, RECEIPT_FEE, success, ret);
     }
 
