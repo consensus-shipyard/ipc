@@ -67,6 +67,7 @@ echo "Subgraph is running now."
 
 [tasks.graph-test]
 script = """
+#!/bin/bash
 echo "Query against local subgraph server using GraphQL."
 GREETING_MSG_0=$(curl -s 'http://localhost:8000/subgraphs/name/Greeter' --data-raw '{"query":"{\\n  greetings(sort: \\"createdAt:desc\\") {\\n    id\\n    currentGreeting\\n  }\\n}","variables":null,"extensions":{"headers":null}}' | jq -r '.data.greetings[0].currentGreeting')
 GREETING_MSG_1=$(curl -s 'http://localhost:8000/subgraphs/name/Greeter' --data-raw '{"query":"{\\n  greetings(sort: \\"createdAt:desc\\") {\\n    id\\n    currentGreeting\\n  }\\n}","variables":null,"extensions":{"headers":null}}' | jq -r '.data.greetings[1].currentGreeting')
