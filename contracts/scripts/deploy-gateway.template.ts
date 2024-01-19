@@ -106,7 +106,6 @@ export async function deploy(libs: { [key in string]: string }) {
     }
 
     const gatewayConstructorParams = {
-        msgFee: ethers.utils.parseUnits('10', 'gwei'),
         bottomUpCheckPeriod: 10,
         activeValidatorsLimit: 100,
         majorityPercentage: 66,
