@@ -37,7 +37,7 @@ impl IpcEnvelope {
         sub_id: &SubnetID,
         from: &Address,
         to: &Address,
-        value: TokenAmount
+        value: TokenAmount,
     ) -> anyhow::Result<Self> {
         let to = IPCAddress::new(
             &match sub_id.parent() {
@@ -54,7 +54,7 @@ impl IpcEnvelope {
             to,
             value,
             nonce: 0,
-            message: default_ipc_msg().encode()
+            message: default_ipc_msg().encode(),
         })
     }
 
@@ -80,7 +80,7 @@ impl IpcEnvelope {
             to,
             value,
             nonce: 0,
-            message: default_ipc_msg().encode()
+            message: default_ipc_msg().encode(),
         })
     }
 
