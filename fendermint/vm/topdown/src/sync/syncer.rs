@@ -6,11 +6,12 @@ use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::sync::pointers::SyncPointers;
 use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
+use crate::voting::{self, VoteTally};
 use crate::{
     is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Toggle,
 };
 use anyhow::anyhow;
-use async_stm::{atomically, atomically_or_err};
+use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
 use std::sync::Arc;
 
@@ -20,6 +21,7 @@ pub(crate) struct LotusParentSyncer<T, P> {
     config: Config,
     parent_proxy: Arc<P>,
     provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    vote_tally: VoteTally,
     query: Arc<T>,
 
     /// The pointers that indicate which height to poll parent next
@@ -35,6 +37,7 @@ where
         config: Config,
         parent_proxy: Arc<P>,
         provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+        vote_tally: VoteTally,
         query: Arc<T>,
     ) -> anyhow::Result<Self> {
         let last_committed_finality = atomically(|| provider.last_committed_finality())
@@ -45,6 +48,7 @@ where
             config,
             parent_proxy,
             provider,
+            vote_tally,
             query,
             sync_pointers: SyncPointers::new(last_committed_finality.height),
         })
@@ -77,6 +81,7 @@ where
         } else {
             return Ok(());
         };
+
         tracing::debug!(
             chain_head,
             pointers = self.sync_pointers.to_string(),
@@ -162,6 +167,7 @@ where
             );
 
             let data = self.fetch_data(to_confirm_height, to_confirm_hash).await?;
+
             atomically_or_err::<_, Error, _>(|| {
                 // we only push the null block in cache when we confirmed a block so that in cache
                 // the latest height is always a confirmed non null block.
@@ -169,13 +175,22 @@ where
                     .provider
                     .latest_height()?
                     .expect("provider contains data at this point");
+
                 for h in (latest_height + 1)..to_confirm_height {
                     self.provider.new_parent_view(h, None)?;
+                    self.vote_tally.add_block(h, None).map_err(map_voting_err)?;
                     tracing::debug!(height = h, "found null block pushed to cache");
                 }
+
                 self.provider
                     .new_parent_view(to_confirm_height, Some(data.clone()))?;
+
+                self.vote_tally
+                    .add_block(to_confirm_height, Some(data.0.clone()))
+                    .map_err(map_voting_err)?;
+
                 tracing::debug!(height = to_confirm_height, "non-null block pushed to cache");
+
                 Ok(())
             })
             .await?;
@@ -200,6 +215,7 @@ where
             .get_validator_changes(height)
             .await
             .map_err(|e| Error::CannotQueryParent(e.to_string(), height))?;
+
         if changes_res.block_hash != block_hash {
             tracing::warn!(
                 height,
@@ -215,6 +231,7 @@ where
             .get_top_down_msgs(height)
             .await
             .map_err(|e| Error::CannotQueryParent(e.to_string(), height))?;
+
         if topdown_msgs_res.block_hash != block_hash {
             tracing::warn!(
                 height,
@@ -291,11 +308,25 @@ where
     }
 }
 
+fn map_voting_err(e: StmError<voting::Error>) -> StmError<Error> {
+    match e {
+        StmError::Abort(e) => {
+            tracing::error!(
+                error = e.to_string(),
+                "failed to append block to voting tally"
+            );
+            StmError::Abort(Error::NotSequential)
+        }
+        StmError::Control(c) => StmError::Control(c),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::proxy::ParentQueryProxy;
     use crate::sync::syncer::LotusParentSyncer;
     use crate::sync::ParentFinalityStateQuery;
+    use crate::voting::VoteTally;
     use crate::{
         BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
         SequentialKeyCache, Toggle, NULL_ROUND_ERR_MSG,
@@ -401,10 +432,20 @@ mod tests {
             Some(committed_finality.clone()),
             proxy.clone(),
         );
+
+        let vote_tally = VoteTally::new(
+            vec![],
+            (
+                committed_finality.height,
+                committed_finality.block_hash.clone(),
+            ),
+        );
+
         LotusParentSyncer::new(
             config,
             proxy,
             Arc::new(Toggle::enabled(provider)),
+            vote_tally,
             Arc::new(TestParentFinalityStateQuery {
                 latest_finality: committed_finality,
             }),
