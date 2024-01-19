@@ -45,8 +45,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
                 IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                 IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(receipient)}),
                 0,
-                i,
-                DEFAULT_CROSS_MSG_FEE
+                i
             );
         }
 
@@ -124,8 +123,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
                 rawAddress: FvmAddressHelper.from(address(this))
             }),
             DEFAULT_CROSS_MSG_FEE + 1,
-            0,
-            DEFAULT_CROSS_MSG_FEE
+            0
         );
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;

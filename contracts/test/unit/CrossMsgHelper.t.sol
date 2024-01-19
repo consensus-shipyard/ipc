@@ -54,8 +54,7 @@ contract CrossMsgHelperTest is Test {
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
-            releaseAmount,
-            CROSS_MESSAGE_FEE
+            releaseAmount
         );
 
         address[] memory parentRoute = new address[](1);
@@ -79,13 +78,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createReleaseMsg(
-            subnetId,
-            sender,
-            FvmAddressHelper.from(sender),
-            releaseAmount,
-            CROSS_MESSAGE_FEE
-        );
+        CrossMsgHelper.createReleaseMsg(subnetId, sender, FvmAddressHelper.from(sender), releaseAmount);
     }
 
     function test_CreateFundMsg_Works_Root(uint256 fundAmount, address sender) public {
@@ -99,8 +92,7 @@ contract CrossMsgHelperTest is Test {
             parentSubnetId,
             sender,
             FvmAddressHelper.from(sender),
-            fundAmount,
-            CROSS_MESSAGE_FEE
+            fundAmount
         );
 
         SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
@@ -129,8 +121,7 @@ contract CrossMsgHelperTest is Test {
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
-            fundAmount,
-            CROSS_MESSAGE_FEE
+            fundAmount
         );
 
         address[] memory parentRoute = new address[](1);
@@ -154,7 +145,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createFundMsg(subnetId, sender, FvmAddressHelper.from(sender), fundAmount, CROSS_MESSAGE_FEE);
+        CrossMsgHelper.createFundMsg(subnetId, sender, FvmAddressHelper.from(sender), fundAmount);
     }
 
     function test_Execute_Works_SendValue() public {
@@ -354,8 +345,7 @@ contract CrossMsgHelperTest is Test {
                 to: to,
                 value: 0,
                 message: abi.encode(message),
-                nonce: nonce,
-                fee: CROSS_MESSAGE_FEE
+                nonce: nonce
             });
     }
 

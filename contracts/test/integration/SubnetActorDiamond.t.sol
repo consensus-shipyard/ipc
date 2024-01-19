@@ -471,8 +471,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            0,
-            DEFAULT_CROSS_MSG_FEE
+            0
         );
         require(saGetter.crossMsgsHash(msgs) == keccak256(abi.encode(msgs)));
     }
@@ -644,8 +643,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            0,
-            DEFAULT_CROSS_MSG_FEE
+            0
         );
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
@@ -726,8 +724,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            0,
-            DEFAULT_CROSS_MSG_FEE
+            0
         );
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
@@ -765,8 +762,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            1,
-            DEFAULT_CROSS_MSG_FEE
+            1
         );
         msgs[0] = crossMsg;
 
