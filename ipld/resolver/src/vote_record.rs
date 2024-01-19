@@ -44,6 +44,16 @@ impl From<PublicKey> for ValidatorKey {
     }
 }
 
+impl From<libsecp256k1::PublicKey> for ValidatorKey {
+    fn from(value: libsecp256k1::PublicKey) -> Self {
+        let public_key =
+            libp2p::identity::secp256k1::PublicKey::try_from_bytes(&value.serialize_compressed())
+                .expect("secp256k1 public key");
+
+        Self::from(PublicKey::from(public_key))
+    }
+}
+
 /// Vote by a validator about the validity/availability/finality
 /// of something in a given subnet.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -64,7 +74,7 @@ impl<C> Record for VoteRecord<C> {
         "/ipc/vote-record"
     }
 
-    fn check_signing_key(&self, key: &libp2p::identity::PublicKey) -> bool {
+    fn check_signing_key(&self, key: &PublicKey) -> bool {
         self.public_key.0 == *key
     }
 }

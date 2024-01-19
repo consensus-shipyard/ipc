@@ -29,6 +29,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 
+fendermint_vm_genesis = { path = "../genesis" }
+
 [dev-dependencies]
 arbitrary = { workspace = true }
 clap = { workspace = true }
