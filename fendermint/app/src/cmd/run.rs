@@ -91,7 +91,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     let validator_ctx = validator.map(|(sk, addr)| {
         // For now we are using the validator key for submitting transactions.
-        // This allows us to identify transactions coming from bonded validators, to give priority to protocol related transactions.
+        // This allows us to identify transactions coming from empowered validators, to give priority to protocol related transactions.
         let broadcaster = Broadcaster::new(
             tendermint_client.clone(),
             addr,
