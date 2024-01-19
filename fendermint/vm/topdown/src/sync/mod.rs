@@ -30,15 +30,6 @@ pub trait ParentFinalityStateQuery {
     fn get_power_table(&self) -> anyhow::Result<Option<Vec<Validator<Power>>>>;
 }
 
-/// Constantly syncing with parent through polling
-struct PollingParentSyncer<T, C, P> {
-    config: Config,
-    parent_view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
-    parent_client: Arc<P>,
-    committed_state_query: Arc<T>,
-    tendermint_client: C,
-}
-
 /// Queries the starting finality for polling. First checks the committed finality, if none, that
 /// means the chain has just started, then query from the parent to get the genesis epoch.
 async fn query_starting_finality<T, P>(
@@ -157,65 +148,47 @@ where
         "launching parent syncer with last committed finality"
     );
 
-    let poll = PollingParentSyncer::new(
+    start_syncing(
         config,
         view_provider,
+        vote_tally,
         parent_client,
         query,
         tendermint_client,
     );
-    poll.start();
 
     Ok(())
 }
 
-impl<T, C, P> PollingParentSyncer<T, C, P> {
-    pub fn new(
-        config: Config,
-        parent_view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
-        parent_client: Arc<P>,
-        query: Arc<T>,
-        tendermint_client: C,
-    ) -> Self {
-        Self {
-            config,
-            parent_view_provider,
-            parent_client,
-            committed_state_query: query,
-            tendermint_client,
-        }
-    }
-}
-
-impl<T, C, P> PollingParentSyncer<T, C, P>
-where
+/// Start the parent finality listener in the background
+fn start_syncing<T, C, P>(
+    config: Config,
+    view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    vote_tally: VoteTally,
+    parent_proxy: Arc<P>,
+    query: Arc<T>,
+    tendermint_client: C,
+) where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
-    /// Start the parent finality listener in the background
-    pub fn start(self) {
-        let config = self.config;
-        let provider = self.parent_view_provider;
-        let parent_client = self.parent_client;
-        let query = self.committed_state_query;
-        let tendermint_client = self.tendermint_client;
+    let mut interval = tokio::time::interval(config.polling_interval);
 
-        let mut interval = tokio::time::interval(config.polling_interval);
-
-        tokio::spawn(async move {
-            let lotus_syncer = LotusParentSyncer::new(config, parent_client, provider, query)
+    tokio::spawn(async move {
+        let lotus_syncer =
+            LotusParentSyncer::new(config, parent_proxy, view_provider, vote_tally, query)
                 .await
                 .expect("");
-            let mut tendermint_syncer = TendermintAwareSyncer::new(lotus_syncer, tendermint_client);
 
-            loop {
-                interval.tick().await;
+        let mut tendermint_syncer = TendermintAwareSyncer::new(lotus_syncer, tendermint_client);
 
-                if let Err(e) = tendermint_syncer.sync().await {
-                    tracing::error!(error = e.to_string(), "sync with parent encountered error");
-                }
+        loop {
+            interval.tick().await;
+
+            if let Err(e) = tendermint_syncer.sync().await {
+                tracing::error!(error = e.to_string(), "sync with parent encountered error");
             }
-        });
-    }
+        }
+    });
 }
