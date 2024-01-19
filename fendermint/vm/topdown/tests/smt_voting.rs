@@ -314,19 +314,13 @@ impl smt::StateMachine for VotingMachine {
                 // Move power from one validator to another (so we never have everyone be zero).
                 let vk1 = u.choose(&state.validator_keys)?;
                 let vk2 = u.choose(&state.validator_keys)?;
-                let weight = state.validator_states[vk1].weight;
-                let delta = u.int_in_range(0..=weight)?;
+                let w1 = state.validator_states[vk1].weight;
+                let w2 = state.validator_states[vk2].weight;
+                let delta = u.int_in_range(0..=w1)?;
 
-                let mut validator_states = state.validator_states.clone();
-                validator_states.get_mut(vk1).unwrap().weight -= delta;
-                validator_states.get_mut(vk2).unwrap().weight += delta;
+                let updates = vec![(vk1.clone(), w1 - delta), (vk2.clone(), w2 + delta)];
 
-                let power_table = validator_states
-                    .into_iter()
-                    .map(|(vk, vs)| (vk, vs.weight))
-                    .collect();
-
-                VotingCommand::UpdatePower(power_table)
+                VotingCommand::UpdatePower(updates)
             }
             // Finalize a block
             i if i < 90 && state.can_finalize() => {
@@ -368,7 +362,7 @@ impl smt::StateMachine for VotingMachine {
             }),
 
             VotingCommand::UpdatePower(power_table) => {
-                self.atomically_ok(|| system.set_power_table(power_table.clone()).map(|_| None))
+                self.atomically_ok(|| system.update_power_table(power_table.clone()).map(|_| None))
             }
 
             VotingCommand::BlockFinalized(block_height, block_hash) => self.atomically_ok(|| {
