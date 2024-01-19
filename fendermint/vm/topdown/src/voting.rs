@@ -1,7 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use async_stm::{abort, retry, Stm, StmResult, TVar};
+use async_stm::{abort, atomically, retry, Stm, StmError, StmResult, TVar};
+use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -9,6 +10,7 @@ use crate::{BlockHash, BlockHeight};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
 pub use ipc_ipld_resolver::ValidatorKey;
+use ipc_ipld_resolver::VoteRecord;
 
 pub type Weight = u64;
 
@@ -20,8 +22,8 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
     #[error("failed to extend chain; expected block height {0}, got {1}")]
     UnexpectedBlock(BlockHeight, BlockHeight),
 
-    #[error("unknown validator: {0:?}")]
-    UnknownValidator(K),
+    #[error("validator unknown or has no power: {0:?}")]
+    UnpoweredValidator(K),
 
     #[error(
         "equivocation by validator {0:?} at height {1}; {} != {}",
@@ -95,7 +97,7 @@ where
     }
 
     /// Check that a validator key is currently part of the power table.
-    pub fn known_validator(&self, validator_key: &K) -> Stm<bool> {
+    pub fn has_power(&self, validator_key: &K) -> Stm<bool> {
         let pt = self.power_table.read()?;
         // For consistency consider validators without power unknown.
         match pt.get(validator_key) {
@@ -112,10 +114,26 @@ where
     }
 
     /// Return the height of the first entry in the chain.
+    ///
+    /// This is the block that was finalized *in the ledger*.
     pub fn last_finalized_height(&self) -> Stm<BlockHeight> {
         self.chain
             .read()
             .map(|c| c.get_min().map(|(h, _)| *h).unwrap_or_default())
+    }
+
+    /// Return the height of the last entry in the chain.
+    ///
+    /// This is the block that we can cast our vote on as final.
+    pub fn latest_height(&self) -> Stm<BlockHeight> {
+        self.chain
+            .read()
+            .map(|c| c.get_max().map(|(h, _)| *h).unwrap_or_default())
+    }
+
+    /// Get the hash of a block at the given height, if known.
+    pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<V>> {
+        self.chain.read().map(|c| c.get(&height).cloned().flatten())
     }
 
     /// Add the next final block observed on the parent blockchain.
@@ -168,8 +186,8 @@ where
             return Ok(false);
         }
 
-        if !self.known_validator(&validator_key)? {
-            return abort(Error::UnknownValidator(validator_key));
+        if !self.has_power(&validator_key)? {
+            return abort(Error::UnpoweredValidator(validator_key));
         }
 
         let mut votes = self.votes.read_clone()?;
@@ -292,5 +310,66 @@ where
                 }
             }
         })
+    }
+}
+
+/// Poll the vote tally for new finalized blocks and publish a vote about them if the validator is part of the power table.
+pub async fn publish_vote_loop<V, F>(
+    vote_tally: VoteTally,
+    key: libp2p::identity::Keypair,
+    subnet_id: ipc_api::subnet_id::SubnetID,
+    client: ipc_ipld_resolver::Client<V>,
+    to_vote: F,
+) where
+    F: Fn(BlockHeight, BlockHash) -> V,
+    V: Serialize + DeserializeOwned,
+{
+    let validator_key = ValidatorKey::from(key.public());
+    let mut prev_height = 0;
+    loop {
+        let (next_height, next_hash, has_power) = atomically(|| {
+            let next_height = vote_tally.latest_height()?;
+
+            if next_height == prev_height {
+                retry()?;
+            }
+
+            let next_hash = match vote_tally.block_hash(next_height)? {
+                Some(next_hash) => next_hash,
+                None => retry()?,
+            };
+
+            let has_power = vote_tally.has_power(&validator_key)?;
+
+            if has_power {
+                // Add our own vote to the tally directly rather than expecting a message from the gossip channel.
+                // (I'm not messages published by this node would be delivered to it, so this might be the only way).
+                if let Err(StmError::Control(c)) =
+                    vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())
+                {
+                    // We should not see any other error from this as we just checked that the validator had power.
+                    return Err(c);
+                }
+            }
+
+            Ok((next_height, next_hash, has_power))
+        })
+        .await;
+
+        if has_power && prev_height > 0 {
+            tracing::debug!(block_height = next_height, "publishing finality vote");
+            match VoteRecord::signed(&key, subnet_id.clone(), to_vote(next_height, next_hash)) {
+                Ok(vote) => {
+                    if let Err(e) = client.publish_vote(vote) {
+                        tracing::error!(error = e.to_string(), "failed to publish vote");
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(error = e.to_string(), "failed to sign vote");
+                }
+            }
+        }
+
+        prev_height = next_height;
     }
 }
