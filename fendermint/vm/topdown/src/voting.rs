@@ -28,7 +28,7 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
     Equivocation(K, BlockHeight, V, V),
 }
 
-/// Keep track of votes beging gossiped about parent chain finality
+/// Keep track of votes being gossiped about parent chain finality
 /// and tally up the weights of the validators on the child subnet,
 /// so that we can ask for proposals that are not going to be voted
 /// down.
