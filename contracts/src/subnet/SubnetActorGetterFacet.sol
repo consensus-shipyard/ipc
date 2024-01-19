@@ -112,11 +112,6 @@ contract SubnetActorGetterFacet {
         return s.minActivationCollateral;
     }
 
-    /// @notice Returns the minimum fee for cross-messaging.
-    function minCrossMsgFee() external view returns (uint256) {
-        return s.minCrossMsgFee;
-    }
-
     /// @notice Returns detailed information about a specific validator.
     /// @param validatorAddress The address of the validator to query information for.
     function getValidator(address validatorAddress) external view returns (ValidatorInfo memory validator) {

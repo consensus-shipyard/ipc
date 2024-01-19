@@ -17,8 +17,6 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
         uint256 minActivationCollateral;
         /// @notice number of blocks in a bottom-up epoch
         uint256 bottomUpCheckPeriod;
-        /// @notice minimum fee amount charged per cross message by the subnet
-        uint256 minCrossMsgFee;
         // @notice Hash of the current subnet id
         bytes32 currentSubnetHash;
         /// @notice Address of the IPC gateway for the subnet

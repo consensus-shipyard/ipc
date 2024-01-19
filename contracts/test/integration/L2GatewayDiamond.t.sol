@@ -71,11 +71,11 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         vm.deal(caller, 1 ether);
 
-        vm.expectCall(caller, 1 ether - gwGetter.crossMsgFee(), new bytes(0), 1);
+        vm.expectCall(caller, 1 ether, new bytes(0), 1);
         vm.prank(caller);
         gwMessenger.propagate{value: 1 ether}(postboxId);
 
-        require(caller.balance == 1 ether - gwGetter.crossMsgFee(), "unexpected balance");
+        require(caller.balance == 1 ether, "unexpected balance");
     }
 
     function testGatewayDiamond_Propagate_Works_NoFeeReminder() external {
@@ -86,28 +86,12 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
         (, address[] memory validators) = setupValidators();
         address caller = validators[0];
 
-        uint256 fee = gwGetter.crossMsgFee();
-
         bytes32 postboxId = setupWhiteListMethod(caller);
-
-        vm.deal(caller, fee);
 
         vm.prank(caller);
         vm.expectCall(caller, 0, EMPTY_BYTES, 0);
-        gwMessenger.propagate{value: fee}(postboxId);
+        gwMessenger.propagate{value: 0}(postboxId);
         require(caller.balance == 0, "unexpected balance");
-    }
-
-    function testGatewayDiamond_Propagate_Fails_NotEnoughFee() public {
-        if (!FEATURE_MULTILEVEL_CROSSMSG) {
-            // skip
-            return;
-        }
-        address caller = vm.addr(100);
-        vm.deal(caller, 1 ether);
-
-        vm.expectRevert(NotEnoughFee.selector);
-        gwMessenger.propagate(bytes32(""));
     }
 
     function setupWhiteListMethod(address caller) internal returns (bytes32) {

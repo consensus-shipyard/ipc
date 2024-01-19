@@ -24,8 +24,6 @@ contract GatewayDiamond {
     GatewayActorStorage internal s;
 
     struct ConstructorParams {
-        // deprecated (for now): no `msgFee` currenlty charged for cross-net messages
-        uint256 msgFee;
         uint256 bottomUpCheckPeriod;
         uint16 activeValidatorsLimit;
         uint8 majorityPercentage;
@@ -59,7 +57,6 @@ contract GatewayDiamond {
 
         s.networkName = params.networkName;
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
-        s.minCrossMsgFee = params.msgFee;
         s.majorityPercentage = params.majorityPercentage;
         s.checkpointQuorumMap.retentionHeight = 1;
 

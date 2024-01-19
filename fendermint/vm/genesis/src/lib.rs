@@ -202,7 +202,6 @@ impl<A> Validator<A> {
 /// IPC related data structures.
 pub mod ipc {
     use fendermint_vm_encoding::IsHumanReadable;
-    use fvm_shared::econ::TokenAmount;
     use ipc_api::subnet_id::SubnetID;
     use serde::{Deserialize, Serialize};
     use serde_with::serde_as;
@@ -218,8 +217,6 @@ pub mod ipc {
         #[serde_as(as = "IsHumanReadable")]
         pub subnet_id: SubnetID,
         pub bottom_up_check_period: u64,
-        #[serde_as(as = "IsHumanReadable")]
-        pub msg_fee: TokenAmount,
         pub majority_percentage: u8,
         pub active_validators_limit: u16,
     }

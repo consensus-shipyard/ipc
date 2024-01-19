@@ -349,7 +349,7 @@ contract CrossMsgHelperTest is Test {
             });
     }
 
-    function createCrossMsgs(uint256 length, uint64 nonce) internal view returns (IpcEnvelope[] memory _crossMsgs) {
+    function createCrossMsgs(uint256 length, uint64 nonce) internal pure returns (IpcEnvelope[] memory _crossMsgs) {
         _crossMsgs = new IpcEnvelope[](length);
 
         for (uint256 i = 0; i < length; i++) {

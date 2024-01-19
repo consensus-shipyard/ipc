@@ -62,7 +62,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saGetter.getParent().equals(_parentId), "unexpected parent");
         require(saGetter.activeValidatorsLimit() == 100, "unexpected activeValidatorsLimit");
         require(saGetter.powerScale() == params.powerScale, "unexpected powerscale");
-        require(saGetter.minCrossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected cross-msg fee");
         require(saGetter.bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
         require(saGetter.majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
         require(saGetter.getParent().toHash() == _parentId.toHash(), "unexpected parent subnetID hash");
@@ -319,7 +318,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 activeValidatorsLimit: 100,
                 powerScale: 12,
                 permissionMode: PermissionMode.Collateral,
-                minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
                 supplySource: native
             }),
             address(saDupGetterFaucet),

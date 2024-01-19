@@ -74,12 +74,5 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         delete s.postbox[msgCid];
 
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
-
-        uint256 feeRemainder = msg.value - s.minCrossMsgFee;
-
-        // gas-opt: original check: feeRemainder > 0
-        if (feeRemainder != 0) {
-            payable(msg.sender).sendValue(feeRemainder);
-        }
     }
 }

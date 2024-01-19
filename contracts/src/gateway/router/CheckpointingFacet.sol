@@ -122,7 +122,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param msgs The batch of bottom-up cross-network messages to be executed.
     function execBottomUpMsgs(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
         uint256 totalValue;
-        uint256 totalFee;
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
@@ -132,7 +131,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
             }
         }
 
-        uint256 totalAmount = totalFee + totalValue;
+        uint256 totalAmount = totalValue;
 
         if (subnet.circSupply < totalAmount) {
             revert NotEnoughSubnetCircSupply();

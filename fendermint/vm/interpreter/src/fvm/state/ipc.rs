@@ -308,7 +308,6 @@ pub fn tokens_to_mint(msgs: &[ipc_api::cross::IpcEnvelope]) -> TokenAmount {
             // Both fees and value are considered to enter the ciruculating supply of the subnet.
             // Fees might be distributed among subnet validators.
             total += &msg.value;
-            total += &msg.fee;
             total
         })
 }
@@ -321,7 +320,6 @@ pub fn tokens_to_burn(msgs: &[gateway_getter_facet::IpcEnvelope]) -> TokenAmount
             // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/e4ec0046e2e73e2f91d7ab8ae370af2c487ce526/src/gateway/GatewayManagerFacet.sol#L143-L150
             // Fees might be distirbuted among relayers.
             total += from_eth::to_fvm_tokens(&msg.value);
-            total += from_eth::to_fvm_tokens(&msg.fee);
             total
         })
 }

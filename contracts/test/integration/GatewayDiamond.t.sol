@@ -47,7 +47,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_Constructor() public view {
         require(gwGetter.totalSubnets() == 0, "unexpected totalSubnets");
         require(gwGetter.bottomUpNonce() == 0, "unexpected bottomUpNonce");
-        require(gwGetter.crossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected crossMsgFee");
         require(gwGetter.bottomUpCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD, "unexpected bottomUpCheckPeriod");
         require(
             gwGetter.getNetworkName().equals(SubnetID({root: ROOTNET_CHAINID, route: new address[](0)})),
@@ -63,7 +62,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_NewGatewayWithDefaultParams() public view {
         GatewayDiamond.ConstructorParams memory params = defaultGatewayParams();
 
-        require(gwGetter.crossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected cross-msg fee");
         require(gwGetter.bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
         require(gwGetter.majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
     }
@@ -155,7 +153,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -189,7 +186,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: 100,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -691,7 +687,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -725,7 +720,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: crossMsgFee,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -756,7 +750,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: crossMsgFee,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -789,7 +782,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: crossMsgFee,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -1594,7 +1586,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100

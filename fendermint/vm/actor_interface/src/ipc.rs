@@ -319,7 +319,6 @@ pub mod gateway {
     /// See [GatewayDiamond.sol](https://github.com/consensus-shipyard/ipc/blob/bc3512fc7c4b0dfcdaac89f297f99cafae68f097/contracts/src/GatewayDiamond.sol#L28-L36)
     #[derive(Clone, EthAbiType, EthAbiCodec, Default, Debug, PartialEq, Eq, Hash)]
     pub struct ConstructorParameters {
-        pub msg_fee: U256,
         pub bottom_up_check_period: U256,
         pub active_validators_limit: u16,
         pub majority_percentage: u8,
@@ -350,12 +349,11 @@ pub mod gateway {
             let (root, route) = subnet_id_to_eth(&params.subnet_id)?;
 
             Ok(Self {
-                network_name: GatewaySubnetID { root, route },
                 bottom_up_check_period: U256::from(params.bottom_up_check_period),
-                msg_fee: tokens_to_u256(params.msg_fee),
-                majority_percentage: params.majority_percentage,
-                validators,
                 active_validators_limit: params.active_validators_limit,
+                majority_percentage: params.majority_percentage,
+                network_name: GatewaySubnetID { root, route },
+                validators,
             })
         }
     }
@@ -389,7 +387,6 @@ pub mod gateway {
                     route: Vec::new(),
                 },
                 bottom_up_check_period: U256::from(100),
-                msg_fee: U256::from(0),
                 majority_percentage: 67,
                 validators: vec![GatewayValidator {
                     addr: H160::zero(),

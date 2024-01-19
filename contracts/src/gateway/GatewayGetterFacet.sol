@@ -20,11 +20,6 @@ contract GatewayGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    /// @notice Returns the minimum fee required for cross-net messages.
-    function crossMsgFee() external view returns (uint256) {
-        return s.minCrossMsgFee;
-    }
-
     /// @notice Returns the current nonce for bottom-up message processing.
     function bottomUpNonce() external view returns (uint64) {
         return s.bottomUpNonce;

@@ -72,8 +72,7 @@ fn prop_cross_msgs_hash() {
                     value: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
                     nonce: u.arbitrary()?,
                     // FIXME: Add arbitrary here?
-                    message: Vec::new().into(),
-                    fee: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
+                    message: Vec::new().into()
                 })
             }
 

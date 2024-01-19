@@ -22,8 +22,6 @@ library LibGateway {
     using FilAddress for address payable;
     using SupplySourceHelper for SupplySource;
 
-    uint256 public constant RECEIPT_FEE = 0;
-
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
