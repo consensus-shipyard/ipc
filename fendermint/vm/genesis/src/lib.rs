@@ -189,7 +189,7 @@ pub struct Validator<P> {
     pub power: P,
 }
 
-impl<A> Validator<A> {
+impl<A> Validator<A> {g
     /// Convert the power.
     pub fn map_power<F: FnOnce(A) -> B, B>(self, f: F) -> Validator<B> {
         Validator {
