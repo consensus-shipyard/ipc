@@ -34,8 +34,7 @@ contract LibGatewayTest is Test {
             to: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(address(2))}),
             value: 0,
             message: new bytes(0),
-            nonce: 0,
-            fee: 0
+            nonce: 0
         });
 
         vm.expectRevert(LibGateway.CannotCreateIpcReceipt.selector);
@@ -52,8 +51,7 @@ contract LibGatewayTest is Test {
             to: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(address(2))}),
             value: 0,
             message: new bytes(0),
-            nonce: 0,
-            fee: 0
+            nonce: 0
         });
 
         t.applyMsg(subnetId, envelope);
@@ -89,7 +87,6 @@ contract LibGatewayTest is Test {
             from: from,
             to: to,
             value: 1000,
-            fee: 0, // injecting funds into a subnet is free
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
@@ -101,7 +98,6 @@ contract LibGatewayTest is Test {
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0, // it succeeded
-            fee: LibGateway.RECEIPT_FEE,
             message: abi.encode(message),
             nonce: 0
         });
@@ -141,7 +137,6 @@ contract LibGatewayTest is Test {
             from: from,
             to: to,
             value: 1000,
-            fee: 0, // injecting funds into a subnet is free
             method: bytes4(0),
             params: new bytes(0)
         });
@@ -153,7 +148,6 @@ contract LibGatewayTest is Test {
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0, // it succeeded
-            fee: LibGateway.RECEIPT_FEE,
             message: abi.encode(message),
             nonce: 0
         });
@@ -194,7 +188,6 @@ contract LibGatewayTest is Test {
             from: from,
             to: to,
             value: 1000,
-            fee: 0, // injecting funds into a subnet is free
             method: bytes4(0),
             params: new bytes(0)
         });
@@ -210,7 +203,6 @@ contract LibGatewayTest is Test {
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
-            fee: LibGateway.RECEIPT_FEE,
             message: abi.encode(message),
             nonce: 0
         });
@@ -252,7 +244,6 @@ contract LibGatewayTest is Test {
             from: from,
             to: to,
             value: 0,
-            fee: 0, // injecting funds into a subnet is free
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
@@ -264,7 +255,6 @@ contract LibGatewayTest is Test {
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0,
-            fee: LibGateway.RECEIPT_FEE,
             message: abi.encode(message),
             nonce: 0
         });
@@ -307,7 +297,6 @@ contract LibGatewayTest is Test {
             from: from,
             to: to,
             value: 0,
-            fee: 0, // injecting funds into a subnet is free
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
@@ -345,7 +334,6 @@ contract LibGatewayTest is Test {
             from: from,
             to: to,
             value: 1000,
-            fee: 0, // injecting funds into a subnet is free
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
@@ -361,7 +349,6 @@ contract LibGatewayTest is Test {
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
-            fee: LibGateway.RECEIPT_FEE,
             message: abi.encode(message),
             nonce: 0
         });
@@ -401,7 +388,6 @@ contract LibGatewayTest is Test {
             from: from,
             to: to,
             value: 1000,
-            fee: 0, // injecting funds into a subnet is free
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
@@ -413,7 +399,6 @@ contract LibGatewayTest is Test {
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
-            fee: LibGateway.RECEIPT_FEE,
             message: abi.encode(message),
             nonce: 0
         });

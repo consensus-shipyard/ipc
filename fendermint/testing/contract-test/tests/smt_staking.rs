@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //#![allow(unused)]
 //! State Machine Test for the Staking contracts.
@@ -73,7 +73,6 @@ fn prop_cross_msgs_hash() {
                     nonce: u.arbitrary()?,
                     // FIXME: Add arbitrary here?
                     message: Vec::new().into(),
-                    fee: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
                 })
             }
 

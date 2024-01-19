@@ -1,11 +1,8 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 use crate::commands::checkpoint::bottomup_bundles::{GetBottomUpBundles, GetBottomUpBundlesArgs};
 use crate::commands::checkpoint::bottomup_height::{
     LastBottomUpCheckpointHeight, LastBottomUpCheckpointHeightArgs,
-};
-use crate::commands::checkpoint::bottomup_submitted::{
-    SubmittedInBottomUpHeight, SubmittedInBottomUpHeightArgs,
 };
 use crate::commands::checkpoint::list_checkpoints::{
     ListBottomUpCheckpoints, ListBottomUpCheckpointsArgs,
@@ -22,7 +19,6 @@ use clap::{Args, Subcommand};
 
 mod bottomup_bundles;
 mod bottomup_height;
-mod bottomup_submitted;
 mod list_checkpoints;
 mod list_validator_changes;
 mod quorum_reached;
@@ -51,9 +47,6 @@ impl CheckpointCommandsArgs {
             Commands::LastBottomupCheckpointHeight(args) => {
                 LastBottomUpCheckpointHeight::handle(global, args).await
             }
-            Commands::HasSubmittedBottomupHeight(args) => {
-                SubmittedInBottomUpHeight::handle(global, args).await
-            }
         }
     }
 }
@@ -66,5 +59,4 @@ pub(crate) enum Commands {
     ListBottomupBundle(GetBottomUpBundlesArgs),
     QuorumReachedEvents(GetQuorumReachedEventsArgs),
     LastBottomupCheckpointHeight(LastBottomUpCheckpointHeightArgs),
-    HasSubmittedBottomupHeight(SubmittedInBottomUpHeightArgs),
 }

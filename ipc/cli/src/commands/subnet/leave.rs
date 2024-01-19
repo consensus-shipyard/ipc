@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! Leave subnet cli command handler.
 
@@ -54,11 +54,7 @@ impl CommandLineHandler for Claim {
             Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
-        if !&arguments.rewards {
-            provider.claim_collateral(subnet, from).await
-        } else {
-            provider.claim_relayer_reward(subnet, from).await
-        }
+        provider.claim_collateral(subnet, from).await
     }
 }
 

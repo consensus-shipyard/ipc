@@ -157,8 +157,7 @@ library TestUtils {
         IPCAddress memory from,
         IPCAddress memory to,
         uint256 value,
-        uint64 nonce,
-        uint256 fee
+        uint64 nonce
     ) internal pure returns (IpcEnvelope memory) {
         IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
         return
@@ -168,8 +167,7 @@ library TestUtils {
                 to: to,
                 value: value,
                 message: abi.encode(message),
-                nonce: nonce,
-                fee: fee
+                nonce: nonce
             });
     }
 }

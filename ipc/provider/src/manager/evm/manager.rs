@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
 use std::borrow::Borrow;
@@ -240,12 +240,6 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid min validator stake"))?;
 
-        let min_cross_msg_fee = params
-            .min_cross_msg_fee
-            .atto()
-            .to_u128()
-            .ok_or_else(|| anyhow!("invalid min message fee"))?;
-
         log::debug!("calling create subnet for EVM manager");
 
         let route = subnet_id_to_evm_addresses(&params.parent)?;
@@ -264,7 +258,6 @@ impl SubnetManager for EthSubnetManager {
             majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
             active_validators_limit: params.active_validators_limit,
             power_scale: 3,
-            min_cross_msg_fee: ethers::types::U256::from(min_cross_msg_fee),
             permission_mode: params.permission_mode as u8,
             supply_source: register_subnet_facet::SupplySource::try_from(params.supply_source)?,
         };
@@ -516,23 +509,6 @@ impl SubnetManager for EthSubnetManager {
         Ok(())
     }
 
-    async fn claim_relayer_reward(&self, subnet: SubnetID, from: Address) -> Result<()> {
-        let address = contract_address_from_subnet(&subnet)?;
-        log::info!("claim relayer reward evm subnet: {subnet:} at contract: {address:}");
-
-        let signer = Arc::new(self.get_signer(&from)?);
-        let contract =
-            subnet_actor_reward_facet::SubnetActorRewardFacet::new(address, signer.clone());
-
-        call_with_premium_estimation(signer, contract.claim_reward_for_relayer())
-            .await?
-            .send()
-            .await?
-            .await?;
-
-        Ok(())
-    }
-
     async fn fund(
         &self,
         subnet: SubnetID,
@@ -728,7 +704,6 @@ impl SubnetManager for EthSubnetManager {
             // Minimum collateral required for subnets to register into the subnet
             min_collateral: eth_to_fil_amount(&contract.min_activation_collateral().call().await?)?,
             // Custom message fee that the child subnet wants to set for cross-net messages
-            msg_fee: eth_to_fil_amount(&contract.min_cross_msg_fee().call().await?)?,
             validators: from_contract_validators(contract.genesis_validators().call().await?)?,
             genesis_balances: into_genesis_balance_map(genesis_balances.0, genesis_balances.1)?,
             // TODO: fixme https://github.com/consensus-shipyard/ipc-monorepo/issues/496
@@ -1036,23 +1011,6 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         );
         let epoch = contract.last_bottom_up_checkpoint_height().call().await?;
         Ok(epoch.as_u64() as ChainEpoch)
-    }
-
-    async fn has_submitted_in_last_checkpoint_height(
-        &self,
-        subnet_id: &SubnetID,
-        submitter: &Address,
-    ) -> Result<bool> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let addr = payload_to_evm_address(submitter.payload())?;
-        Ok(contract
-            .has_submitted_in_last_bottom_up_checkpoint_height(addr)
-            .call()
-            .await?)
     }
 
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {

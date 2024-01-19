@@ -27,8 +27,7 @@ library CrossMsgHelper {
     function createTransferMsg(
         IPCAddress memory from,
         IPCAddress memory to,
-        uint256 value,
-        uint256 fee
+        uint256 value
     ) public pure returns (IpcEnvelope memory) {
         IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
         return
@@ -38,8 +37,7 @@ library CrossMsgHelper {
                 to: to,
                 value: value,
                 message: abi.encode(message),
-                nonce: 0,
-                fee: fee
+                nonce: 0
             });
     }
 
@@ -47,7 +45,6 @@ library CrossMsgHelper {
         IPCAddress memory from,
         IPCAddress memory to,
         uint256 value,
-        uint256 fee,
         bytes4 method,
         bytes memory params
     ) public pure returns (IpcEnvelope memory) {
@@ -59,8 +56,7 @@ library CrossMsgHelper {
                 to: to,
                 value: value,
                 message: abi.encode(message),
-                nonce: 0,
-                fee: fee
+                nonce: 0
             });
     }
 
@@ -69,7 +65,6 @@ library CrossMsgHelper {
     /// and identifies the receipt through the hash of the original message.
     function createReceiptMsg(
         IpcEnvelope calldata crossMsg,
-        uint256 fee,
         bool success,
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
@@ -87,8 +82,7 @@ library CrossMsgHelper {
                 to: crossMsg.from,
                 value: value,
                 message: abi.encode(message),
-                nonce: 0,
-                fee: fee
+                nonce: 0
             });
     }
 
@@ -96,15 +90,13 @@ library CrossMsgHelper {
         SubnetID calldata subnet,
         address signer,
         FvmAddress calldata to,
-        uint256 value,
-        uint256 fee
+        uint256 value
     ) public pure returns (IpcEnvelope memory) {
         return
             createTransferMsg(
                 IPCAddress({subnetId: subnet, rawAddress: FvmAddressHelper.from(signer)}),
                 IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: to}),
-                value,
-                fee
+                value
             );
     }
 
@@ -112,15 +104,13 @@ library CrossMsgHelper {
         SubnetID calldata subnet,
         address signer,
         FvmAddress calldata to,
-        uint256 value,
-        uint256 fee
+        uint256 value
     ) public pure returns (IpcEnvelope memory) {
         return
             createTransferMsg(
                 IPCAddress({subnetId: subnet.getParentSubnet(), rawAddress: FvmAddressHelper.from(signer)}),
                 IPCAddress({subnetId: subnet, rawAddress: to}),
-                value,
-                fee
+                value
             );
     }
 
@@ -174,7 +164,7 @@ library CrossMsgHelper {
 
         address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
         if (crossMsg.kind == IpcMsgKind.Transfer) {
-            return supplySource.transfer({recipient: payable(recipient), value: crossMsg.value});
+            return supplySource.transferFundsFromSupplySource({recipient: payable(recipient), value: crossMsg.value});
         } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Receipt) {
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully

@@ -1,9 +1,8 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
 
 use arbitrary::{Arbitrary, Unstructured};
-use ethers::types as et;
 use fendermint_contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_testing::smt::StateMachine;
@@ -115,7 +114,6 @@ impl StateMachine for StakingMachine {
             power_scale: state.child_genesis.power_scale,
             min_activation_collateral: to_eth_tokens(&state.min_collateral()).unwrap(),
             min_validators: state.min_validators() as u64,
-            min_cross_msg_fee: et::U256::zero(),
             permission_mode: 0, // collateral based
             supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
                 kind: 0, // native token

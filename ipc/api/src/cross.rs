@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! Cross network messages related struct and utility functions.
 
@@ -9,7 +9,6 @@ use ethers::abi::AbiEncode;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::cross_msg_helper::IpcMsg;
-use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
@@ -31,8 +30,6 @@ pub struct IpcEnvelope {
     /// outgoing nonce for the envelope.
     /// This nonce is set by the gateway when committing the message for propagation
     pub nonce: u64,
-    /// The fee for execution, currently not used.
-    pub fee: TokenAmount,
 }
 
 impl IpcEnvelope {
@@ -41,7 +38,6 @@ impl IpcEnvelope {
         from: &Address,
         to: &Address,
         value: TokenAmount,
-        fee: TokenAmount,
     ) -> anyhow::Result<Self> {
         let to = IPCAddress::new(
             &match sub_id.parent() {
@@ -59,7 +55,6 @@ impl IpcEnvelope {
             value,
             nonce: 0,
             message: default_ipc_msg().encode(),
-            fee,
         })
     }
 
@@ -86,7 +81,6 @@ impl IpcEnvelope {
             value,
             nonce: 0,
             message: default_ipc_msg().encode(),
-            fee: TokenAmount::zero(), // fund messages are currently free
         })
     }
 

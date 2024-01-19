@@ -80,8 +80,6 @@ struct IpcEnvelope {
     /// @dev outgoing nonce for the envelope.
     /// This nonce is set by the gateway when committing the message for propagation
     uint64 nonce;
-    /// @dev fee is currently not used.
-    uint256 fee;
     /// @dev the gas limit is currently not used.
     // FIXME: currently not used and no code uses it, so keeping it out.
     // uint256 gasLimit;

@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
 use std::collections::{BTreeMap, HashMap};
@@ -71,11 +71,6 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     /// Claims any collateral that may be available to claim by validators that
     /// have left the subnet.
     async fn claim_collateral(&self, subnet: SubnetID, from: Address) -> Result<()>;
-
-    /// Claims any reward that may be available for a relayer. Relayer rewards
-    /// are obtained by submitting bottom-up checkpoints to the parent of a child
-    /// subnet.
-    async fn claim_relayer_reward(&self, subnet: SubnetID, from: Address) -> Result<()>;
 
     /// Fund injects new funds from an account of the parent chain to a subnet.
     /// Returns the epoch that the fund is executed in the parent.
@@ -164,7 +159,6 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
 #[derive(Debug)]
 pub struct SubnetGenesisInfo {
     pub bottom_up_checkpoint_period: u64,
-    pub msg_fee: TokenAmount,
     pub majority_percentage: u8,
     pub active_validators_limit: u16,
     pub min_collateral: TokenAmount,
@@ -230,12 +224,6 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     ) -> Result<ChainEpoch>;
     /// The last confirmed/submitted checkpoint height.
     async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
-    /// Check if the submitter has already submitted in the `last_bottom_up_checkpoint_height`
-    async fn has_submitted_in_last_checkpoint_height(
-        &self,
-        subnet_id: &SubnetID,
-        submitter: &Address,
-    ) -> Result<bool>;
     /// Get the checkpoint period, i.e the number of blocks to submit bottom up checkpoints.
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
     /// Get the checkpoint bundle at a specific height. If it does not exist, it will through error.

@@ -104,8 +104,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             subnet.id,
             caller,
             FvmAddressHelper.from(caller),
-            10,
-            0
+            10
         );
         vm.expectEmit(true, true, true, true, address(gatewayDiamond));
         emit LibGateway.NewTopDownMessage(address(saDiamond), expected);
@@ -154,7 +153,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // Commit the withdrawal message on the parent.
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         uint256 value = 8;
-        msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value, 0);
+        msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value);
 
         BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,
@@ -177,7 +176,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Now attempt to withdraw beyond the circulating supply.
         // This would be a malicious message.
-        batch.msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), 10, 0);
+        batch.msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), 10);
 
         // This reverts.
         vm.prank(address(saDiamond));
@@ -212,7 +211,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         });
         bytes4 method = bytes4(0x11223344);
         bytes memory params = bytes("hello");
-        msgs[0] = CrossMsgHelper.createCallMsg(from, to, value, 0, method, params);
+        msgs[0] = CrossMsgHelper.createCallMsg(from, to, value, method, params);
 
         BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,

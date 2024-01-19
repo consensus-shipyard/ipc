@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! A Genesis data structure similar to [genesis.Template](https://github.com/filecoin-project/lotus/blob/v1.20.4/genesis/types.go)
 //! in Lotus, which is used to [initialize](https://github.com/filecoin-project/lotus/blob/v1.20.4/chain/gen/genesis/genesis.go) the state tree.
@@ -202,7 +202,6 @@ impl<A> Validator<A> {
 /// IPC related data structures.
 pub mod ipc {
     use fendermint_vm_encoding::IsHumanReadable;
-    use fvm_shared::econ::TokenAmount;
     use ipc_api::subnet_id::SubnetID;
     use serde::{Deserialize, Serialize};
     use serde_with::serde_as;
@@ -218,8 +217,6 @@ pub mod ipc {
         #[serde_as(as = "IsHumanReadable")]
         pub subnet_id: SubnetID,
         pub bottom_up_check_period: u64,
-        #[serde_as(as = "IsHumanReadable")]
-        pub msg_fee: TokenAmount,
         pub majority_percentage: u8,
         pub active_validators_limit: u16,
     }

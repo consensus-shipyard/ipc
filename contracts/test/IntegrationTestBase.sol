@@ -166,7 +166,6 @@ contract TestSubnetActor is Test, TestParams {
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
-            minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
             permissionMode: PermissionMode.Collateral,
             supplySource: native
         });
@@ -223,7 +222,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
@@ -552,7 +550,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 activeValidatorsLimit: _activeValidatorsLimit,
                 powerScale: 12,
                 permissionMode: _permissionMode,
-                minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
                 supplySource: SupplySourceHelper.native()
             })
         );
@@ -689,7 +686,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
             nonce: 0,
-            fee: DEFAULT_CROSS_MSG_FEE,
             message: abi.encode(IpcMsg({method: METHOD_SEND, params: new bytes(0)}))
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -739,8 +735,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
         uint256 expectedNonce = nonceBefore + 1;
         uint256 expectedCircSupply = circSupplyBefore + fundAmount;
-
-        require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
 
         if (mode == SupplyKind.Native) {
             gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
