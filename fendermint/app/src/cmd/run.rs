@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, bail, Context};
+use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
@@ -20,14 +21,16 @@ use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
-use fendermint_vm_topdown::voting::VoteTally;
+use fendermint_vm_topdown::voting::{Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
 use fvm_shared::address::Address;
+use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
+use tokio::sync::broadcast::error::RecvError;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
@@ -118,6 +121,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let checkpoint_pool = CheckpointPool::new();
     let parent_finality_votes = VoteTally::empty();
 
+    let topdown_enabled = settings.ipc.is_topdown_enabled();
+
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver.enabled() {
         let service =
@@ -138,6 +143,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             own_subnet_id,
         );
 
+        tracing::info!("subscribing to gossip...");
+        let rx = service.subscribe();
+        let parent_finality_votes = parent_finality_votes.clone();
+        tokio::spawn(async move {
+            dispatch_resolver_events(rx, parent_finality_votes, topdown_enabled).await;
+        });
+
         tracing::info!("starting the IPLD Resolver Service...");
         tokio::spawn(async move {
             if let Err(e) = service.run().await {
@@ -151,7 +163,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tracing::info!("IPLD Resolver disabled.")
     }
 
-    let (parent_finality_provider, ipc_tuple) = if settings.ipc.is_topdown_enabled() {
+    let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
         info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
         let config = fendermint_vm_topdown::Config::new(
@@ -374,5 +386,62 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
     match kind {
         AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
         AccountKind::Ethereum => Ok(Address::from(EthAddress::new_secp256k1(&pk)?)),
+    }
+}
+
+async fn dispatch_resolver_events(
+    mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<AppVote>>,
+    parent_finality_votes: VoteTally,
+    topdown_enabled: bool,
+) {
+    loop {
+        match rx.recv().await {
+            Ok(event) => match event {
+                ResolverEvent::ReceivedPreemptive(_, _) => {}
+                ResolverEvent::ReceivedVote(vote) => {
+                    dispatch_vote(*vote, &parent_finality_votes, topdown_enabled).await;
+                }
+            },
+            Err(RecvError::Lagged(n)) => {
+                tracing::warn!("the resolver service skipped {n} gossip events")
+            }
+            Err(RecvError::Closed) => {
+                tracing::error!("the resolver service stopped receiving gossip");
+                return;
+            }
+        }
+    }
+}
+
+async fn dispatch_vote(
+    vote: VoteRecord<AppVote>,
+    parent_finality_votes: &VoteTally,
+    topdown_enabled: bool,
+) {
+    match vote.content {
+        AppVote::ParentFinality(f) => {
+            if !topdown_enabled {
+                tracing::debug!("ignoring vote; topdown disabled");
+                return;
+            }
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_vote(
+                    vote.public_key.clone(),
+                    f.height,
+                    f.block_hash.clone(),
+                )
+            })
+            .await;
+
+            match res {
+                Ok(_) => {}
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    tracing::warn!(error = e.to_string(), "failed to handle vote");
+                }
+                Err(e) => {
+                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                }
+            }
+        }
     }
 }
