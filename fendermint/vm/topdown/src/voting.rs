@@ -342,7 +342,8 @@ pub async fn publish_vote_loop<V, F>(
             let is_known = vote_tally.known_validator(&validator_key)?;
 
             if is_known {
-                // Cast self-vote; I'm not sure we'd get our own gossip messages otherwise.
+                // Add our own vote to the tally directly rather than expecting a message from the gossip channel.
+                // (I'm not messages published by this node would be delivered to it, so this might be the only way).
                 if let Err(StmError::Control(c)) =
                     vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())
                 {
