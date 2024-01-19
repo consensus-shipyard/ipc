@@ -8,7 +8,7 @@ use std::hash::Hash;
 use crate::{BlockHash, BlockHeight};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
-use ipc_ipld_resolver::ValidatorKey;
+pub use ipc_ipld_resolver::ValidatorKey;
 
 pub type Weight = u64;
 
@@ -264,12 +264,33 @@ where
         Ok(())
     }
 
-    /// Update the power table after it has changed to a new snapshot, removing the votes of anyone
-    /// who is no longer a validator.
+    /// Overwrite the power table after it has changed to a new snapshot.
+    ///
+    /// This method expects absolute values, it completely replaces the existing powers.
     pub fn set_power_table(&self, power_table: Vec<(K, Weight)>) -> Stm<()> {
         let power_table = im::HashMap::from_iter(power_table);
         // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
         self.power_table.write(power_table)
+    }
+
+    /// Update the power table after it has changed with changes.
+    ///
+    /// This method expects only the updated values, leaving everyone who isn't in it untouched
+    pub fn update_power_table(&self, power_updates: Vec<(K, Weight)>) -> Stm<()> {
+        if power_updates.is_empty() {
+            return Ok(());
+        }
+        // We don't actually have to remove the votes of anyone who is no longer a validator,
+        // we just have to make sure to handle the case when they are not in the power table.
+        self.power_table.update_mut(|pt| {
+            for (vk, w) in power_updates {
+                if w == 0 {
+                    pt.remove(&vk);
+                } else {
+                    *pt.entry(vk).or_default() = w;
+                }
+            }
+        })
     }
 }

@@ -1,7 +1,7 @@
 // Copyright 2022-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet};
+use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
 use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
@@ -19,7 +19,7 @@ use fendermint_vm_message::{
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
-use fendermint_vm_topdown::voting::VoteTally;
+use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
     CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
 };
@@ -186,6 +186,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
+        EndOutput = PowerUpdates,
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -354,6 +355,26 @@ where
         (env, state): Self::State,
     ) -> anyhow::Result<(Self::State, Self::EndOutput)> {
         let (state, out) = self.inner.end(state).await?;
+
+        // Update any component that needs to know about changes in the power table.
+        if !out.0.is_empty() {
+            let power_updates = out
+                .0
+                .iter()
+                .map(|v| {
+                    let vk = ValidatorKey::from(v.public_key.0);
+                    let w = v.power.0;
+                    (vk, w)
+                })
+                .collect::<Vec<_>>();
+
+            atomically(|| {
+                env.parent_finality_votes
+                    .update_power_table(power_updates.clone())
+            })
+            .await;
+        }
+
         Ok(((env, state), out))
     }
 }

@@ -14,7 +14,6 @@ use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
@@ -24,7 +23,7 @@ use fendermint_vm_interpreter::fvm::state::{
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
@@ -402,7 +401,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = Vec<Validator<Power>>,
+        EndOutput = PowerUpdates,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
