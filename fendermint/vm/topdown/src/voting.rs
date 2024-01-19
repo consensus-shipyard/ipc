@@ -135,6 +135,10 @@ where
         block_height: BlockHeight,
         block_hash: V,
     ) -> StmResult<bool, Error<K, V>> {
+        if *self.pause_votes.read()? {
+            retry()?;
+        }
+
         let min_height = self.last_finalized_height()?;
 
         if block_height < min_height {
@@ -163,10 +167,6 @@ where
 
         if votes_for_block.insert(validator_key).is_some() {
             return Ok(false);
-        }
-
-        if *self.pause_votes.read()? {
-            retry()?;
         }
 
         self.votes.write(votes)?;
