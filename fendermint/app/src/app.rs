@@ -18,9 +18,7 @@ use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
-use fendermint_vm_interpreter::chain::{
-    ChainMessageApplyRet, CheckpointPool, IllegalMessage, TopDownFinalityProvider,
-};
+use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
@@ -151,10 +149,8 @@ where
     state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
-    /// CID resolution pool.
-    resolve_pool: CheckpointPool,
-    /// The parent finality provider for top down checkpoint
-    parent_finality_provider: TopDownFinalityProvider,
+    /// Environment-like dependencies for the interpreter.
+    chain_env: ChainEnv,
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
@@ -182,8 +178,7 @@ where
         db: DB,
         state_store: SS,
         interpreter: I,
-        resolve_pool: CheckpointPool,
-        parent_finality_provider: TopDownFinalityProvider,
+        chain_env: ChainEnv,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
@@ -196,8 +191,7 @@ where
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
             interpreter: Arc::new(interpreter),
-            resolve_pool,
-            parent_finality_provider,
+            chain_env,
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
@@ -306,23 +300,14 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce((CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>)) -> R,
-        R: Future<
-            Output = Result<(
-                (CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>),
-                T,
-            )>,
-        >,
+        F: FnOnce((ChainEnv, FvmExecState<SS>)) -> R,
+        R: Future<Output = Result<((ChainEnv, FvmExecState<SS>), T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
 
-        let ((_pool, _provider, state), ret) = f((
-            self.resolve_pool.clone(),
-            self.parent_finality_provider.clone(),
-            state,
-        ))
-        .await?;
+        // NOTE: There is no need to save the `ChainEnv`; it's shared with other, meant for cloning.
+        let ((_env, state), ret) = f((self.chain_env.clone(), state)).await?;
 
         *guard = Some(state);
 
@@ -416,9 +401,9 @@ where
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<State = (CheckpointPool, TopDownFinalityProvider), Message = Vec<u8>>,
+    I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
     I: ExecInterpreter<
-        State = (CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>),
+        State = (ChainEnv, FvmExecState<SS>),
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
@@ -649,13 +634,7 @@ where
 
         let txs = self
             .interpreter
-            .prepare(
-                (
-                    self.resolve_pool.clone(),
-                    self.parent_finality_provider.clone(),
-                ),
-                txs,
-            )
+            .prepare(self.chain_env.clone(), txs)
             .await
             .context("failed to prepare proposal")?;
 
@@ -679,13 +658,7 @@ where
 
         let accept = self
             .interpreter
-            .process(
-                (
-                    self.resolve_pool.clone(),
-                    self.parent_finality_provider.clone(),
-                ),
-                txs,
-            )
+            .process(self.chain_env.clone(), txs)
             .await
             .context("failed to process proposal")?;
 
@@ -739,9 +712,9 @@ where
         let msg = request.tx.to_vec();
         let (result, block_hash) = self
             .modify_exec_state(|s| async {
-                let ((pool, provider, state), res) = self.interpreter.deliver(s, msg).await?;
+                let ((env, state), res) = self.interpreter.deliver(s, msg).await?;
                 let block_hash = state.block_hash();
-                Ok(((pool, provider, state), (res, block_hash)))
+                Ok(((env, state), (res, block_hash)))
             })
             .await
             .context("deliver failed")?;

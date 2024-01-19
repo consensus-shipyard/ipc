@@ -9,17 +9,25 @@ mod tendermint;
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::tendermint::TendermintAwareSyncer;
+use crate::voting::VoteTally;
 use crate::{CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider, Toggle};
 use anyhow::anyhow;
 use async_stm::atomically;
 use ethers::utils::hex;
+use ipc_ipld_resolver::ValidatorKey;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Query the parent finality from the block chain state
+use fendermint_vm_genesis::{Power, Validator};
+
+/// Query the parent finality from the block chain state.
+///
+/// It returns `None` from queries until the ledger has been initialized.
 pub trait ParentFinalityStateQuery {
     /// Get the latest committed finality from the state
     fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>>;
+    /// Get the current committee voting powers.
+    fn get_power_table(&self) -> anyhow::Result<Option<Vec<Validator<Power>>>>;
 }
 
 /// Constantly syncing with parent through polling
@@ -82,11 +90,35 @@ where
     }
 }
 
+/// Queries the starting finality for polling. First checks the committed finality, if none, that
+/// means the chain has just started, then query from the parent to get the genesis epoch.
+async fn query_starting_comittee<T>(query: &Arc<T>) -> anyhow::Result<Vec<Validator<Power>>>
+where
+    T: ParentFinalityStateQuery + Send + Sync + 'static,
+{
+    loop {
+        match query.get_power_table() {
+            Ok(Some(power_table)) => return Ok(power_table),
+            Ok(None) => {
+                tracing::debug!("app not ready for query yet");
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+            Err(e) => {
+                tracing::warn!(error = e.to_string(), "cannot get comittee");
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+        }
+    }
+}
+
 /// Start the polling parent syncer in the background
 pub async fn launch_polling_syncer<T, C, P>(
     query: T,
     config: Config,
     view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    vote_tally: VoteTally,
     parent_client: Arc<P>,
     tendermint_client: C,
 ) -> anyhow::Result<()>
@@ -101,7 +133,24 @@ where
 
     let query = Arc::new(query);
     let finality = query_starting_finality(&query, &parent_client).await?;
-    atomically(|| view_provider.set_new_finality(finality.clone(), None)).await;
+
+    let power_table = query_starting_comittee(&query).await?;
+    let power_table = power_table
+        .into_iter()
+        .map(|v| {
+            let vk = ValidatorKey::from(v.public_key.0);
+            let w = v.power.0;
+            (vk, w)
+        })
+        .collect::<Vec<_>>();
+
+    atomically(|| {
+        view_provider.set_new_finality(finality.clone(), None)?;
+        vote_tally.set_finalized(finality.height, finality.block_hash.clone())?;
+        vote_tally.set_power_table(power_table.clone())?;
+        Ok(())
+    })
+    .await;
 
     tracing::info!(
         finality = finality.to_string(),
