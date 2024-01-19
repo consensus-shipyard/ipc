@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 import {IPCAddress} from "../../src/structs/Subnet.sol";
 import {IpcMsg, IpcMsgKind, IpcEnvelope} from "../../src/structs/CrossNet.sol";
-import {IpcContract} from "../../src/lib/CrossMsgHelper.sol";
+import {IfaceIpcContract} from "../../sdk/IpcContract.sol";
 import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
 
 library TestUtils {
@@ -174,7 +174,7 @@ library TestUtils {
     }
 }
 
-contract MockIpcContract is IpcContract {
+contract MockIpcContract is IfaceIpcContract {
     /* solhint-disable-next-line unused-vars */
     function IpcEntrypoint(IpcEnvelope calldata) external payable returns (bytes memory) {
         return EMPTY_BYTES;

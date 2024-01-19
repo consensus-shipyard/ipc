@@ -12,13 +12,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySource} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "./SupplySourceHelper.sol";
-
-// Interface that needs to be implemented by IPC-enabled contracts.
-// This is really convenient to call it from other contracts.
-interface IpcContract {
-    // solhint-disable-next-line func-name-mixedcase
-    function IpcEntrypoint(IpcEnvelope calldata envelope) external payable returns (bytes memory);
-}
+import {IfaceIpcContract} from "../../sdk/IpcContract.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {
@@ -188,7 +182,7 @@ library CrossMsgHelper {
             return
                 supplySource.performCall(
                     payable(recipient),
-                    abi.encodeCall(IpcContract.IpcEntrypoint, (crossMsg)),
+                    abi.encodeCall(IfaceIpcContract.IpcEntrypoint, (crossMsg)),
                     crossMsg.value
                 );
         }
