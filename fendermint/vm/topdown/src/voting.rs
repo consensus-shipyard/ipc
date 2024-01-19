@@ -14,6 +14,9 @@ pub type Weight = u64;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
+    #[error("the last finalized block has not been set")]
+    Uninitialized,
+
     #[error("failed to extend chain; expected block height {0}, got {1}")]
     UnexpectedBlock(BlockHeight, BlockHeight),
 
@@ -32,6 +35,7 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
 /// and tally up the weights of the validators on the child subnet,
 /// so that we can ask for proposals that are not going to be voted
 /// down.
+#[derive(Clone)]
 pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// Current validator weights. These are the ones who will vote on the blocks,
     /// so these are the weights which need to form a quorum.
@@ -64,6 +68,20 @@ where
     K: Clone + Hash + Eq + Sync + Send + 'static,
     V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
 {
+    /// Create an uninitialized instance. Before blocks can be added to it
+    /// we will have to set the last finalized block.
+    ///
+    /// The reason this exists is so that we can delay initialization until
+    /// after the genesis block has been executed.
+    pub fn empty() -> Self {
+        Self {
+            power_table: TVar::default(),
+            chain: TVar::default(),
+            votes: TVar::default(),
+            pause_votes: TVar::new(false),
+        }
+    }
+
     /// Initialize the vote tally from the current power table
     /// and the last finalized block from the ledger.
     pub fn new(power_table: Vec<(K, Weight)>, last_finalized_block: (BlockHeight, V)) -> Self {
@@ -111,9 +129,14 @@ where
         let mut chain = self.chain.read_clone()?;
 
         // Check that we are extending the chain. We could also ignore existing heights.
-        if let Some((prev, _)) = chain.get_max() {
-            if block_height != prev + 1 {
-                return abort(Error::UnexpectedBlock(prev + 1, block_height));
+        match chain.get_max() {
+            None => {
+                return abort(Error::Uninitialized);
+            }
+            Some((parent_height, _)) => {
+                if block_height != parent_height + 1 {
+                    return abort(Error::UnexpectedBlock(parent_height + 1, block_height));
+                }
             }
         }
 
