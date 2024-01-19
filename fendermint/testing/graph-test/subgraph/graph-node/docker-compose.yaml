@@ -26,8 +26,6 @@ services:
     image: ipfs/go-ipfs:v0.10.0
     ports:
       - '5001:5001'
-    volumes:
-      - ./data/ipfs:/data/ipfs
   postgres:
     image: postgres
     ports:
@@ -42,5 +40,3 @@ services:
       POSTGRES_PASSWORD: 'let-me-in'
       POSTGRES_DB: 'graph-node'
       PGDATA: "/data/postgres"
-    volumes:
-      - ./data/postgres:/var/lib/postgresql/data
