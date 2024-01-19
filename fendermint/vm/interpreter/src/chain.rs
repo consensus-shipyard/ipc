@@ -120,12 +120,35 @@ where
             CheckpointPoolItem::BottomUp(ckpt) => ChainMessage::Ipc(IpcMessage::BottomUpExec(ckpt)),
         });
 
-        // Prepare top down proposals
-        if let Some(proposal) = atomically(|| state.parent_finality_provider.next_proposal()).await
-        {
+        // Prepare top down proposals.
+        // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
+        atomically(|| state.parent_finality_votes.pause_votes_until_find_quorum()).await;
+
+        // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
+        // The final proposal can be at most as high as the quorum, but can be less if we have already,
+        // hit some limits such as how many blocks we can propose in a single step.
+        let maybe_finality = atomically(|| {
+            if let Some((quorum_height, quorum_hash)) = state.parent_finality_votes.find_quorum()? {
+                if let Some(finality) = state.parent_finality_provider.next_proposal()? {
+                    let finality = if finality.height <= quorum_height {
+                        finality
+                    } else {
+                        IPCParentFinality {
+                            height: quorum_height,
+                            block_hash: quorum_hash,
+                        }
+                    };
+                    return Ok(Some(finality));
+                }
+            }
+            Ok(None)
+        })
+        .await;
+
+        if let Some(finality) = maybe_finality {
             msgs.push(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
-                height: proposal.height as ChainEpoch,
-                block_hash: proposal.block_hash,
+                height: finality.height as ChainEpoch,
+                block_hash: finality.block_hash,
             })))
         }
 
@@ -267,6 +290,7 @@ where
                     )
                     .await
                     .context("failed to commit finality")?;
+
                     tracing::debug!(
                         previous_committed_height = prev_height,
                         previous_committed_finality = prev_finality
@@ -289,6 +313,7 @@ where
                         .validator_changes_from(execution_fr, execution_to)
                         .await
                         .context("failed to fetch validator changes")?;
+
                     tracing::debug!(
                         from = execution_fr,
                         to = execution_to,
