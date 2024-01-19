@@ -9,6 +9,7 @@ pub mod sync;
 pub mod convert;
 pub mod proxy;
 mod toggle;
+pub mod voting;
 
 use async_stm::Stm;
 use async_trait::async_trait;
