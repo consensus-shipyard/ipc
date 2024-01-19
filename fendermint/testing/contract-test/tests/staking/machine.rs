@@ -85,7 +85,8 @@ impl StateMachine for StakingMachine {
     }
 
     fn new_system(&self, state: &Self::State) -> Self::System {
-        let rt = tokio::runtime::Runtime::new().expect("create tokio runtime for init");
+        let rt: tokio::runtime::Runtime =
+            tokio::runtime::Runtime::new().expect("create tokio runtime for init");
 
         let (mut exec_state, _) = rt
             .block_on(fendermint_contract_test::init_exec_state(
