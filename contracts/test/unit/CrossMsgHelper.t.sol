@@ -253,7 +253,7 @@ contract CrossMsgHelperTest is Test {
         require(CrossMsgHelper.isSorted(crossMsgs) == false);
     }
 
-    function test_applyType_TopDown() public view {
+    function test_applyType_TopDown() public pure {
         address[] memory from = new address[](1);
         from[0] = address(1);
         address[] memory to = new address[](4);
@@ -296,7 +296,7 @@ contract CrossMsgHelperTest is Test {
         );
     }
 
-    function test_applyType_BottomUp() public view {
+    function test_applyType_BottomUp() public pure {
         address[] memory from = new address[](2);
         from[0] = address(1);
         from[1] = address(2);
@@ -324,7 +324,7 @@ contract CrossMsgHelperTest is Test {
         );
     }
 
-    function createDefaultCrossMsg(uint64 nonce) internal view returns (IpcEnvelope memory) {
+    function createDefaultCrossMsg(uint64 nonce) internal pure returns (IpcEnvelope memory) {
         IPCAddress memory addr = IPCAddress({
             subnetId: SubnetID(0, new address[](0)),
             rawAddress: FvmAddressHelper.from(address(0))
@@ -336,7 +336,7 @@ contract CrossMsgHelperTest is Test {
         IPCAddress memory from,
         IPCAddress memory to,
         uint64 nonce
-    ) internal view returns (IpcEnvelope memory) {
+    ) internal pure returns (IpcEnvelope memory) {
         IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
         return
             IpcEnvelope({

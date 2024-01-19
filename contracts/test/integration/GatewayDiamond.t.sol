@@ -490,6 +490,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(circSupply == 0, "unexpected circSupply");
         require(gwGetter.totalSubnets() == 0, "unexpected total subnets");
         require(subnetAddress.balance == DEFAULT_COLLATERAL_AMOUNT, "unexpected balance");
+        require(gwGetter.listSubnets().length == 0, "unexpected number of subnets");
+        require(gwGetter.getSubnetKeys().length == 0, "unexpected number of subnet keys");
     }
 
     function testGatewayDiamond_Kill_Fail_SubnetNotExists() public {

@@ -17,6 +17,7 @@ import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 string constant ERR_CHILD_SUBNET_NOT_ALLOWED = "Subnet does not allow child subnets";
 
@@ -24,6 +25,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
     using SupplySourceHelper for SupplySource;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
@@ -52,7 +54,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         subnet.genesisEpoch = block.number;
         subnet.circSupply = genesisCircSupply;
 
-        s.subnetKeys.push(subnetId.toHash());
+        s.subnetKeys.add(subnetId.toHash());
 
         s.totalSubnets += 1;
     }
@@ -108,10 +110,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
 
         uint256 stake = subnet.stake;
+        bytes32 id = subnet.id.toHash();
 
         s.totalSubnets -= 1;
-
-        delete s.subnets[subnet.id.toHash()];
+        delete s.subnets[id];
+        s.subnetKeys.remove(id);
 
         payable(msg.sender).sendValue(stake);
     }

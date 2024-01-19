@@ -106,16 +106,15 @@ export async function deploy(libs: { [key in string]: string }) {
     }
 
     const gatewayConstructorParams = {
+        msgFee: ethers.utils.parseUnits('10', 'gwei'),
+        bottomUpCheckPeriod: 10,
+        activeValidatorsLimit: 100,
+        majorityPercentage: 66,
         networkName: {
             root: chainId,
             route: [],
         },
-        bottomUpCheckPeriod: 10,
-        minCollateral: 1000,
-        msgFee: ethers.utils.parseUnits('10', 'gwei'),
-        majorityPercentage: 66,
         genesisValidators: [],
-        activeValidatorsLimit: 100,
     }
 
     const diamondLibs: Libraries = {}
