@@ -201,22 +201,25 @@ where
             if block_height == finalized_height {
                 break;
             }
-            // Skipping null blocks
-            if let Some(block_hash) = block_hash {
-                if let Some(votes_at_height) = votes.get(block_height) {
-                    if let Some(votes_for_block) = votes_at_height.get(block_hash) {
-                        for vk in votes_for_block {
-                            if voters.insert(vk.clone()).is_none() {
-                                // New voter, get their current weight; it might be 0 if they have been removed.
-                                weight += power_table.get(vk).cloned().unwrap_or_default();
-                            }
-                        }
-                    }
+            let Some(block_hash) = block_hash else {
+                continue; // Skip null blocks
+            };
+            let Some(votes_at_height) = votes.get(block_height) else {
+                continue;
+            };
+            let Some(votes_for_block) = votes_at_height.get(block_hash) else {
+                continue; // We could detect equovicating voters here.
+            };
 
-                    if weight > quorum_threshold {
-                        return Ok(Some((*block_height, block_hash.clone())));
-                    }
+            for vk in votes_for_block {
+                if voters.insert(vk.clone()).is_none() {
+                    // New voter, get their current weight; it might be 0 if they have been removed.
+                    weight += power_table.get(vk).cloned().unwrap_or_default();
                 }
+            }
+
+            if weight > quorum_threshold {
+                return Ok(Some((*block_height, block_hash.clone())));
             }
         }
 
