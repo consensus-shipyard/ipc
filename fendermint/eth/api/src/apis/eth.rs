@@ -290,7 +290,6 @@ where
         hist.base_fee_per_gas.push(original_value);
     }
 
-
     Ok(hist)
 }
 
