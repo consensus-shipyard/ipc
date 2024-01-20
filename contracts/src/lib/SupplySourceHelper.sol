@@ -54,7 +54,7 @@ library SupplySourceHelper {
     }
 
     /// @notice Transfers the specified amount out of our treasury to the recipient address.
-    function transfer(SupplySource memory supplySource, address payable recipient, uint256 value) internal {
+    function transferFundsFromSupplySource(SupplySource memory supplySource, address payable recipient, uint256 value) internal {
         if (supplySource.kind == SupplyKind.Native) {
             Address.sendValue(payable(recipient), value);
         } else if (supplySource.kind == SupplyKind.ERC20) {

@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use cid::{multihash, multihash::MultihashDigest, Cid};
 use fvm_ipld_encoding::{to_vec, Error as IpldError, DAG_CBOR};

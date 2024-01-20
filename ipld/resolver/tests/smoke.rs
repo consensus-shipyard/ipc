@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! Test that a cluster of IPLD resolver can be started in memory,
 //! that they bootstrap from  each other and are able to resolve CIDs.

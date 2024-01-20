@@ -27,7 +27,7 @@ These commands will pull various Docker images from remote repositories, includi
 To run IPC in the local rootnet just perform the following:
 
 ```bash
-cargo make --makefile ./infra/Makefile.toml testnode
+cargo make --makefile ./infra/fendermint/Makefile.toml testnode
 ```
 
 It will create three docker containers (cometbft, fendermint, and eth-api).

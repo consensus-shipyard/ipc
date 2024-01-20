@@ -26,13 +26,13 @@ contract GatewayDiamond {
     GatewayActorStorage internal s;
 
     struct ConstructorParams {
-        SubnetID networkName;
-        uint256 bottomUpCheckPeriod;
         // deprecated (for now): no `msgFee` currenlty charged for cross-net messages
         uint256 msgFee;
-        uint8 majorityPercentage;
-        Validator[] genesisValidators;
+        uint256 bottomUpCheckPeriod;
         uint16 activeValidatorsLimit;
+        uint8 majorityPercentage;
+        SubnetID networkName;
+        Validator[] genesisValidators;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
