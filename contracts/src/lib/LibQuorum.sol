@@ -126,12 +126,11 @@ library LibQuorum {
         self.quorumInfo[objHeight] = info;
     }
 
-    /// @notice Set a new  retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
+    /// @notice Sets a new  retention height and garbage collects all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
     /// @dev `retentionHeight` is the height of the first incomplete checkpointswe must keep to implement checkpointing.
     /// All checkpoints with a height less than `retentionHeight` are removed from the history, assuming they are committed to the parent.
     /// @param newRetentionHeight - the height of the oldest checkpoint to keep
     function pruneQuorums(QuorumMap storage self, uint256 newRetentionHeight) internal {
-
         uint256 oldRetentionHeight = self.retentionHeight;
 
         if (newRetentionHeight <= oldRetentionHeight) {
@@ -139,9 +138,6 @@ library LibQuorum {
         }
 
         for (uint256 h = oldRetentionHeight; h < newRetentionHeight; ) {
-            delete self.quorumInfo[h];
-            delete self.quorumSignatureSenders[h];
-
             address[] memory validators = self.quorumSignatureSenders[h].values();
             uint256 n = validators.length;
 
@@ -151,6 +147,9 @@ library LibQuorum {
                     ++i;
                 }
             }
+
+            delete self.quorumInfo[h];
+            delete self.quorumSignatureSenders[h];
 
             unchecked {
                 ++h;
