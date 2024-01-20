@@ -283,6 +283,14 @@ where
     hist.gas_used_ratio.reverse();
     hist.reward.reverse();
 
+    // Check if base_fee_per_gas has only one element, and if so, duplicate it
+    // This is to support ethereum clients like hardhat which assume 2 elements in the array
+    if hist.base_fee_per_gas.len() == 1 {
+        let original_value = hist.base_fee_per_gas[0];
+        hist.base_fee_per_gas.push(original_value);
+    }
+
+
     Ok(hist)
 }
 
