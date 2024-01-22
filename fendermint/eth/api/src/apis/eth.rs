@@ -272,9 +272,9 @@ where
             hist.gas_used_ratio
                 .push(total_gas_used as f64 / block_gas_limit as f64);
             hist.reward.push(rewards?);
+            block_count -= 1;
         }
 
-        block_count -= 1;
         block_number = et::BlockNumber::Number(et::U64::from(height.value() - 1));
     }
 
