@@ -110,8 +110,6 @@ struct ApplyMsgRet {
     bytes ret;
     /// Whether the execution is successful
     bool success;
-    /// The receipt fee
-    uint256 fee;
     /// The cross net message executed
     IpcEnvelope crossMsg;
 }

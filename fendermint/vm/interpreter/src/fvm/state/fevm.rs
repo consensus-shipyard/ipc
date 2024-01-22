@@ -64,6 +64,10 @@ pub struct ContractCallerReturn<T> {
 
 impl<T: Detokenize> ContractCallerReturn<T> {
     pub fn into_decoded(self) -> anyhow::Result<T> {
+        self.decoded_ret()
+    }
+
+    pub fn decoded_ret(&self) -> anyhow::Result<T> {
         let data = self
             .ret
             .apply_ret

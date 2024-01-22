@@ -1,6 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::state::ipc::{GatewayCaller, TopDownApplyRetAggregator};
 use crate::fvm::{topdown, FvmApplyRet};
 use crate::{
     fvm::state::FvmExecState,
@@ -247,7 +247,7 @@ where
                         "chain interpreter received topdown exec proposal",
                     );
 
-                    let (prev_height, prev_finality) = topdown::commit_finality(
+                    let (fvm_apply_ret, prev_height, prev_finality) = topdown::commit_finality(
                         &self.gateway_caller,
                         &mut state,
                         finality.clone(),
@@ -255,6 +255,9 @@ where
                     )
                     .await
                     .context("failed to commit finality")?;
+
+                    let mut ret_agg = TopDownApplyRetAggregator::default(fvm_apply_ret);
+
                     tracing::debug!(
                         previous_committed_height = prev_height,
                         previous_committed_finality = prev_finality
@@ -284,7 +287,7 @@ where
                     );
 
                     self.gateway_caller
-                        .store_validator_changes(&mut state, validator_changes)
+                        .store_validator_changes(&mut state, validator_changes, &mut ret_agg)
                         .context("failed to store validator changes")?;
 
                     // error happens if we cannot get the cross messages from ipc agent after retries
@@ -299,9 +302,14 @@ where
                         "chain interpreter received topdown msgs",
                     );
 
-                    let ret = topdown::execute_topdown_msgs(&self.gateway_caller, &mut state, msgs)
-                        .await
-                        .context("failed to execute top down messages")?;
+                    topdown::execute_topdown_msgs(
+                        &self.gateway_caller,
+                        &mut state,
+                        msgs,
+                        &mut ret_agg,
+                    )
+                    .await
+                    .context("failed to execute top down messages")?;
                     tracing::debug!("chain interpreter applied topdown msgs");
 
                     atomically(|| {
@@ -314,7 +322,10 @@ where
                         "chain interpreter has set new"
                     );
 
-                    Ok(((pool, provider, state), ChainMessageApplyRet::Ipc(ret)))
+                    Ok((
+                        (pool, provider, state),
+                        ChainMessageApplyRet::Ipc(ret_agg.into_return()),
+                    ))
                 }
             },
         }

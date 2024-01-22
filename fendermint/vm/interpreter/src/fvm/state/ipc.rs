@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
+use ethers::abi::Token;
 use ethers::types as et;
+use ethers::types::Bytes;
 
 use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
@@ -32,7 +34,6 @@ use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
-use crate::fvm::state::fevm::CallError;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -214,17 +215,22 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         finality: IPCParentFinality,
-    ) -> anyhow::Result<Option<IPCParentFinality>> {
+    ) -> anyhow::Result<(FvmApplyRet, Option<IPCParentFinality>)> {
         let evm_finality = top_down_finality_facet::ParentFinality::try_from(finality)?;
 
-        let (has_committed, prev_finality) = self
+        let ret = self
             .topdown
-            .call(state, |c| c.commit_parent_finality(evm_finality))?;
+            .call_with_return(state, |c| c.commit_parent_finality(evm_finality))?;
+
+        let (has_committed, prev_finality) = ret.decoded_ret()?;
 
         Ok(if !has_committed {
-            None
+            (ret.into_return(), None)
         } else {
-            Some(IPCParentFinality::from(prev_finality))
+            (
+                ret.into_return(),
+                Some(IPCParentFinality::from(prev_finality)),
+            )
         })
     }
 
@@ -232,6 +238,7 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         changes: Vec<StakingChangeRequest>,
+        final_ret: &mut TopDownApplyRetAggregator,
     ) -> anyhow::Result<()> {
         if changes.is_empty() {
             return Ok(());
@@ -242,8 +249,12 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             change_requests.push(top_down_finality_facet::StakingChangeRequest::try_from(c)?);
         }
 
-        self.topdown
-            .call(state, |c| c.store_validator_changes(change_requests))
+        let v = self
+            .topdown
+            .call_with_return(state, |c| c.store_validator_changes(change_requests))?;
+        final_ret.agg_return(v.into_return());
+
+        Ok(())
     }
 
     /// Call this function to mint some FIL to the gateway contract
@@ -264,33 +275,50 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         cross_messages: Vec<IpcEnvelope>,
-    ) -> anyhow::Result<FvmApplyRet> {
+        final_ret: &mut TopDownApplyRetAggregator,
+    ) -> anyhow::Result<()> {
         for msg in cross_messages {
             let msg = xnet_messaging_facet::IpcEnvelope::try_from(msg)
                 .context("failed to convert cross messages")?;
-
-            match self
-                .xnet
-                .call_with_return(state, |c| c.apply_msg_with_ret(messages))
-            {
-                Ok((has_return, ret)) => {
-
-                }
-                Err(e) => {
-
-                }
-            }
+            self.apply_cross_msg(state, msg, final_ret)?;
         }
-        // let messages = cross_messages
-        //     .into_iter()
-        //     .map()
-        //     .collect::<Result<Vec<_>, _>>()
-        //     .context("failed to convert cross messages")?;
-        // let r = self
-        //     .xnet
-        //     .call_with_return(state, |c| c.apply_cross_messages(messages))?;
-        // Ok(r.into_return())
-        todo!()
+
+        Ok(())
+    }
+
+    fn apply_cross_msg(
+        &self,
+        state: &mut FvmExecState<DB>,
+        msg: xnet_messaging_facet::IpcEnvelope,
+        final_ret: &mut TopDownApplyRetAggregator,
+    ) -> anyhow::Result<()> {
+        let (msg, success, ret) = match self
+            .xnet
+            .call_with_return(state, |c| c.apply_msg_with_ret(msg.clone()))
+        {
+            Ok(v) => {
+                let (has_return, apply_ret) = v.decoded_ret()?;
+
+                final_ret.agg_return(v.into_return());
+
+                if !has_return {
+                    return Ok(());
+                }
+
+                (apply_ret.cross_msg, apply_ret.success, apply_ret.ret)
+            }
+            Err(e) => {
+                let ret = ethers::abi::encode(&[Token::String(e.to_string())]);
+                (msg, false, Bytes::from(ret))
+            }
+        };
+
+        let v = self
+            .xnet
+            .call_with_return(state, |c| c.send_receipt(msg, success, ret))?;
+        final_ret.agg_return(v.into_return());
+
+        Ok(())
     }
 
     pub fn get_latest_parent_finality(
@@ -340,4 +368,52 @@ pub fn tokens_to_burn(msgs: &[gateway_getter_facet::IpcEnvelope]) -> TokenAmount
             total += from_eth::to_fvm_tokens(&msg.value);
             total
         })
+}
+
+/// Aggregates the return data from different contract calls in top down message execution.
+/// This struct only aggregates the gas, fee and events
+pub struct TopDownApplyRetAggregator {
+    final_return: FvmApplyRet,
+
+    is_appending_events: bool,
+    is_adding_gas: bool,
+}
+
+impl TopDownApplyRetAggregator {
+    pub fn default(ret: FvmApplyRet) -> Self {
+        Self {
+            final_return: ret,
+            is_appending_events: false,
+            is_adding_gas: true,
+        }
+    }
+
+    pub fn into_return(self) -> FvmApplyRet {
+        self.final_return
+    }
+
+    pub fn agg_return(&mut self, ret: FvmApplyRet) {
+        debug_assert_eq!(self.final_return.from, ret.from);
+        debug_assert_eq!(self.final_return.to, ret.to);
+        debug_assert_eq!(self.final_return.method_num, ret.method_num);
+
+        self.final_return.emitters.extend(&ret.emitters);
+
+        if self.is_appending_events {
+            self.final_return
+                .apply_ret
+                .events
+                .extend(ret.apply_ret.events);
+        }
+
+        if self.is_adding_gas {
+            self.final_return.apply_ret.gas_burned += ret.apply_ret.gas_burned;
+            self.final_return.apply_ret.gas_refund += ret.apply_ret.gas_refund;
+            self.final_return.apply_ret.base_fee_burn += ret.apply_ret.base_fee_burn;
+            self.final_return.apply_ret.miner_tip += ret.apply_ret.miner_tip;
+            self.final_return.apply_ret.over_estimation_burn += ret.apply_ret.over_estimation_burn;
+            self.final_return.apply_ret.penalty += ret.apply_ret.penalty;
+            self.final_return.apply_ret.refund += ret.apply_ret.refund;
+        }
+    }
 }

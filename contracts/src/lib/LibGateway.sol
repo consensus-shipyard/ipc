@@ -435,7 +435,6 @@ library LibGateway {
         if (crossMsg.to.subnetId.isEmpty()) {
             applyRet = ApplyMsgRet({
                 crossMsg: crossMsg,
-                fee: RECEIPT_FEE,
                 success: false,
                 ret: abi.encodeWithSelector(InvalidCrossMsgDstSubnet.selector)
             });
@@ -459,7 +458,6 @@ library LibGateway {
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
                 return (true, ApplyMsgRet({
                     crossMsg: crossMsg,
-                    fee: RECEIPT_FEE,
                     success: false,
                     ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
                 }));
@@ -474,7 +472,6 @@ library LibGateway {
             if (s.appliedTopDownNonce != crossMsg.nonce) {
                 return (true, ApplyMsgRet({
                     crossMsg: crossMsg,
-                    fee: RECEIPT_FEE,
                     success: false,
                     ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
                 }));
@@ -498,7 +495,6 @@ library LibGateway {
                 false,
                 ApplyMsgRet({
                     crossMsg: crossMsg,
-                    fee: 0,
                     success: false,
                     ret: new bytes(0)
                 })
@@ -509,7 +505,6 @@ library LibGateway {
         (bool success, bytes memory ret) = crossMsg.execute(supplySource);
         return (true, ApplyMsgRet({
             crossMsg: crossMsg,
-            fee: RECEIPT_FEE,
             success: success,
             ret: ret
         }));

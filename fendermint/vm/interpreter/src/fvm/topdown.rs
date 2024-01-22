@@ -3,7 +3,7 @@
 //! Topdown finality related util functions
 
 use crate::chain::TopDownFinalityProvider;
-use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::state::ipc::{GatewayCaller, TopDownApplyRetAggregator};
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmApplyRet;
 use anyhow::Context;
@@ -20,22 +20,22 @@ pub async fn commit_finality<DB>(
     state: &mut FvmExecState<DB>,
     finality: IPCParentFinality,
     provider: &TopDownFinalityProvider,
-) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)>
+) -> anyhow::Result<(FvmApplyRet, BlockHeight, Option<IPCParentFinality>)>
 where
     DB: Blockstore + Sync + Send + 'static,
 {
-    let (prev_height, prev_finality) =
-        if let Some(prev_finality) = gateway_caller.commit_parent_finality(state, finality)? {
-            (prev_finality.height, Some(prev_finality))
-        } else {
-            (provider.genesis_epoch()?, None)
-        };
+    let (fvm_apply_ret, res) = gateway_caller.commit_parent_finality(state, finality)?;
+    let (prev_height, prev_finality) = if let Some(prev_finality) = res {
+        (prev_finality.height, Some(prev_finality))
+    } else {
+        (provider.genesis_epoch()?, None)
+    };
 
     tracing::debug!(
         "commit finality parsed: prev_height {prev_height}, prev_finality: {prev_finality:?}"
     );
 
-    Ok((prev_height, prev_finality))
+    Ok((fvm_apply_ret, prev_height, prev_finality))
 }
 
 /// Execute the top down messages implicitly. Before the execution, mint to the gateway of the funds
@@ -44,7 +44,8 @@ pub async fn execute_topdown_msgs<DB>(
     gateway_caller: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
     messages: Vec<IpcEnvelope>,
-) -> anyhow::Result<FvmApplyRet>
+    final_ret: &mut TopDownApplyRetAggregator,
+) -> anyhow::Result<()>
 where
     DB: Blockstore + Sync + Send + 'static,
 {
@@ -61,5 +62,5 @@ where
         });
     }
 
-    gateway_caller.apply_cross_messages(state, messages)
+    gateway_caller.apply_cross_messages(state, messages, final_ret)
 }

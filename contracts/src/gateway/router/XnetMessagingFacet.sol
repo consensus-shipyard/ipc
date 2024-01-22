@@ -46,10 +46,9 @@ contract XnetMessagingFacet is GatewayActorModifiers {
     /// failing network. This should be only called for top-down message execution.
     function sendReceipt(
         IpcEnvelope calldata originalCrossMsg,
-        uint256 fee,
         bool success,
         bytes memory ret
     ) external systemActorOnly {
-        LibGateway.sendReceipt(originalCrossMsg, fee, success, ret);
+        LibGateway.sendReceipt(originalCrossMsg, success, ret);
     }
 }
