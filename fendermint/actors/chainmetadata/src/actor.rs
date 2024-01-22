@@ -11,10 +11,11 @@ use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorDowncast;
 use fil_actors_runtime::ActorError;
 use fil_actors_runtime::Array;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::error::ExitCode;
 
 use crate::shared::BLOCKHASHES_AMT_BITWIDTH;
-use crate::{ConstructorParams, Method, State};
+use crate::{ConstructorParams, Method, PushBlockParams, State};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -42,7 +43,7 @@ impl Actor {
         Ok(())
     }
 
-    fn push_block(rt: &impl Runtime, block: Cid) -> Result<(), ActorError> {
+    fn push_block(rt: &impl Runtime, params: PushBlockParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -56,7 +57,7 @@ impl Actor {
 
             // push the block to the AMT
             blockhashes
-                .set(rt.curr_epoch().try_into().unwrap(), block.to_string())
+                .set(params.epoch as u64, params.block.to_string())
                 .unwrap();
 
             // remove the oldest block if the AMT is full
@@ -87,7 +88,7 @@ impl Actor {
         Ok(state.lookback_len)
     }
 
-    fn block_cid(rt: &impl Runtime, rewind: u64) -> Result<Cid, ActorError> {
+    fn block_cid(rt: &impl Runtime, epoch: ChainEpoch) -> Result<Option<Cid>, ActorError> {
         let st: State = rt.state()?;
 
         // load the blockhashes AMT
@@ -98,20 +99,25 @@ impl Actor {
             )
         })?;
 
-        let blockhash: &String = blockhashes
-            .get(blockhashes.count() - rewind - 1)
-            .unwrap()
-            .unwrap();
+        // get the block cid from the AMT, if it does not exist return None
+        let blockhash: &String = match blockhashes.get(epoch as u64).unwrap() {
+            Some(v) => v,
+            None => {
+                return Ok(None);
+            }
+        };
 
-        Cid::from_str(blockhash.as_str()).map_err(|_| {
-            ActorError::unchecked(
+        // return the blockhash as a cid, or an error if the cid is invalid
+        match Cid::from_str(blockhash.as_str()) {
+            Ok(cid) => Ok(Some(cid)),
+            Err(_) => Err(ActorError::unchecked(
                 ExitCode::USR_ILLEGAL_STATE,
                 format!(
-                    "failed to parse cid, hash: {}, rewind: {}",
-                    blockhash, rewind
+                    "failed to parse cid, blockhash: {}, epoch: {}",
+                    blockhash, epoch
                 ),
-            )
-        })
+            )),
+        }
     }
 }
 

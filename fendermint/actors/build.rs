@@ -81,6 +81,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !result.success() {
         return Err("actor build failed".into());
     }
+
+    // make sure the output dir exists
+    std::fs::create_dir_all("output")
+        .expect("failed to create output dir for the actors_bundle.car file");
+
     let dst = Path::new("output/actors_bundle.car");
     let mut bundler = Bundler::new(dst);
     for (&pkg, id) in ACTORS.iter().zip(1u32..) {

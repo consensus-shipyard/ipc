@@ -85,8 +85,12 @@ where
 
         // Push the current block hash to the chainmetadata actor
         //
-        let block_cid = fendermint_vm_message::cid(&state.block_hash().unwrap()).unwrap();
-        let params = fvm_ipld_encoding::RawBytes::serialize(block_cid)?;
+        let params = fvm_ipld_encoding::RawBytes::serialize(
+            fendermint_actor_chainmetadata::PushBlockParams {
+                epoch: height,
+                block: fendermint_vm_message::cid(&state.block_hash().unwrap()).unwrap(),
+            },
+        )?;
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
             to: fvm_shared::address::Address::new_id(fendermint_actors::CHAINMETADATA_ACTOR_ID),

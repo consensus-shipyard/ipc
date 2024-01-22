@@ -3,7 +3,7 @@
 
 use cid::Cid;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
-use fvm_shared::METHOD_CONSTRUCTOR;
+use fvm_shared::{clock::ChainEpoch, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
 // The state is a stores `blockhashes` in an AMT containing the blockhashes of the
@@ -26,6 +26,12 @@ pub const BLOCKHASHES_AMT_BITWIDTH: u32 = 3;
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
     pub lookback_len: u64,
+}
+
+#[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct PushBlockParams {
+    pub epoch: ChainEpoch,
+    pub block: Cid,
 }
 
 #[derive(FromPrimitive)]
