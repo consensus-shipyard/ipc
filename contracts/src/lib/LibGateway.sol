@@ -442,7 +442,7 @@ library LibGateway {
         }
 
         // The first thing we do is to find out the directionality of this message and act accordingly,
-        // incrasing the applied nonces conveniently.
+        // increasing the applied nonces conveniently.
         // slither-disable-next-line uninitialized-local
         SupplySource memory supplySource;
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
