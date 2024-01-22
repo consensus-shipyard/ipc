@@ -32,6 +32,7 @@ use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
+use crate::fvm::state::fevm::CallError;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -264,15 +265,32 @@ impl<DB: Blockstore> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         cross_messages: Vec<IpcEnvelope>,
     ) -> anyhow::Result<FvmApplyRet> {
-        let messages = cross_messages
-            .into_iter()
-            .map(xnet_messaging_facet::IpcEnvelope::try_from)
-            .collect::<Result<Vec<_>, _>>()
-            .context("failed to convert cross messages")?;
-        let r = self
-            .xnet
-            .call_with_return(state, |c| c.apply_cross_messages(messages))?;
-        Ok(r.into_return())
+        for msg in cross_messages {
+            let msg = xnet_messaging_facet::IpcEnvelope::try_from(msg)
+                .context("failed to convert cross messages")?;
+
+            match self
+                .xnet
+                .call_with_return(state, |c| c.apply_msg_with_ret(messages))
+            {
+                Ok((has_return, ret)) => {
+
+                }
+                Err(e) => {
+
+                }
+            }
+        }
+        // let messages = cross_messages
+        //     .into_iter()
+        //     .map()
+        //     .collect::<Result<Vec<_>, _>>()
+        //     .context("failed to convert cross messages")?;
+        // let r = self
+        //     .xnet
+        //     .call_with_return(state, |c| c.apply_cross_messages(messages))?;
+        // Ok(r.into_return())
+        todo!()
     }
 
     pub fn get_latest_parent_finality(

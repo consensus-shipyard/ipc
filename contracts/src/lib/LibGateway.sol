@@ -6,7 +6,7 @@ import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActo
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {SubnetID, Subnet, SupplyKind, SupplySource} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
-import {IpcMsg, IpcMsgKind, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {IpcMsg, IpcMsgKind, IpcEnvelope, ApplyMsgRet, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -416,6 +416,105 @@ library LibGateway {
         // execute the message and get the receipt.
         (bool success, bytes memory ret) = crossMsg.execute(supplySource);
         sendReceipt(crossMsg, RECEIPT_FEE, success, ret);
+    }
+
+    /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
+    /// This function assumes that the relevant funds have been already minted or burnt
+    /// when the top-down or bottom-up messages have been queued for execution.
+    /// This function is not expected to revert. If a controlled failure happens, a new
+    /// cross-message receipt is propagated for execution to inform the sending contract.
+    /// `Call` cross-messages also trigger receipts if they are successful.
+    /// @dev this method differs from `applyMsg` as it returns the return data to the caller
+    ///      instead of saving it. The vm will insert the ret back into the contract.
+    ///      At the current stage, we only call this method in top-down
+    ///      message execution. In bottom-up, the execution of cross net messages happens in 
+    ///      the parent, which most likely, we have no access to its vm execution 
+    /// @param arrivingFrom - the immediate subnet from which this message is arriving
+    /// @param crossMsg - the cross message to be executed
+    function applyMsgWithRet(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg) internal returns(bool hasReturn, ApplyMsgRet memory applyRet) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        if (crossMsg.to.subnetId.isEmpty()) {
+            applyRet = ApplyMsgRet({
+                crossMsg: crossMsg,
+                fee: RECEIPT_FEE,
+                success: false,
+                ret: abi.encodeWithSelector(InvalidCrossMsgDstSubnet.selector)
+            });
+            return (true, applyRet);
+        }
+
+        // The first thing we do is to find out the directionality of this message and act accordingly,
+        // incrasing the applied nonces conveniently.
+        // slither-disable-next-line uninitialized-local
+        SupplySource memory supplySource;
+        IPCMsgType applyType = crossMsg.applyType(s.networkName);
+        if (applyType == IPCMsgType.BottomUp) {
+            // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
+            (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
+            if (!registered) {
+                // this means the subnet that sent the bottom up message is not registered,
+                // we cannot send the receipt back as top down because the subnet is not registered
+                // we ignore this message for as it's not valid, and it may be someone trying to forge it.
+                return (false, applyRet);
+            }
+            if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
+                return (true, ApplyMsgRet({
+                    crossMsg: crossMsg,
+                    fee: RECEIPT_FEE,
+                    success: false,
+                    ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
+                }));
+            }
+            subnet.appliedBottomUpNonce += 1;
+
+            // The value carried in bottom-up messages needs to be treated according to the supply source
+            // configuration of the subnet.
+            supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
+        } else if (applyType == IPCMsgType.TopDown) {
+            // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
+            if (s.appliedTopDownNonce != crossMsg.nonce) {
+                return (true, ApplyMsgRet({
+                    crossMsg: crossMsg,
+                    fee: RECEIPT_FEE,
+                    success: false,
+                    ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
+                }));
+            }
+            s.appliedTopDownNonce += 1;
+
+            // The value carried in top-down messages locally maps to the native coin, so we pass over the
+            // native supply source.
+            supplySource = SupplySourceHelper.native();
+        }
+
+        // If the crossnet destination is NOT the current network (network where the gateway is running),
+        // we add it to the postbox for further propagation.
+        // Even if we send for propagation, the execution of every message
+        // should increase the appliedNonce to allow the execution of the next message
+        // of the batch (this is way we have this after the nonce logic).
+        if (!crossMsg.to.subnetId.equals(s.networkName)) {
+            bytes32 cid = crossMsg.toHash();
+            s.postbox[cid] = crossMsg;
+            return (
+                false,
+                ApplyMsgRet({
+                    crossMsg: crossMsg,
+                    fee: 0,
+                    success: false,
+                    ret: new bytes(0)
+                })
+            );
+        }
+
+        // execute the message and get the receipt.
+        (bool success, bytes memory ret) = crossMsg.execute(supplySource);
+        return (true, ApplyMsgRet({
+            crossMsg: crossMsg,
+            fee: RECEIPT_FEE,
+            success: success,
+            ret: ret
+        }));
     }
 
     /// @notice Sends a receipt from the execution of a cross-message.

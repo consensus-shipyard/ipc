@@ -106,3 +106,14 @@ struct ReceiptMsg {
     // TODO: In the future we may include here events and other
     // feedback information.
 }
+
+struct ApplyMsgRet {
+    /// The ret bytes from message execution
+    bytes ret;
+    /// Whether the execution is successful
+    bool success;
+    /// The receipt fee
+    uint256 fee;
+    /// The cross net message executed
+    IpcEnvelope crossMsg;
+}
