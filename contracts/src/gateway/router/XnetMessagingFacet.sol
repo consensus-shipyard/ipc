@@ -36,7 +36,9 @@ contract XnetMessagingFacet is GatewayActorModifiers {
     ///         because this method is implicitly invoked by the node during block production.
     /// @dev It requires the caller to be the system actor.
     /// @param crossMsg The cross-network message to be applied.
-    function applyMsgWithRet(IpcEnvelope calldata crossMsg) external systemActorOnly returns(bool hasReturn, ApplyMsgRet memory) {
+    function applyMsgWithRet(
+        IpcEnvelope calldata crossMsg
+    ) external systemActorOnly returns (bool hasReturn, ApplyMsgRet memory) {
         return LibGateway.applyMsgWithRet(s.networkName.getParentSubnet(), crossMsg);
     }
 
