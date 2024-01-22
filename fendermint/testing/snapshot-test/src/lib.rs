@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Run tests against multiple Fendermint+CometBFT docker container pairs locally:
 //! 0. The default `snapshot-fendermint` and `snapshot-cometbft` pair
@@ -24,9 +24,9 @@
 //! ```text
 //! cd fendermint/testing/snapshot-test
 //! cargo make setup
-//! cargo make node-1 setup
-//! cargo make node-2 setup
-//! cargo make node-3 setup
+//! cargo make node-1-setup
+//! cargo make node-2-setup
+//! cargo make node-3-setup
 //! docker logs snapshot-cometbft-3
 //! cargo make snapshot-teardown
 //! cargo make teardown

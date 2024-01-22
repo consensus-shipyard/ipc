@@ -61,9 +61,9 @@ library SubnetIDHelper {
 
     function createSubnetId(SubnetID calldata subnet, address actor) public pure returns (SubnetID memory newSubnet) {
         newSubnet.root = subnet.root;
-        newSubnet.route = new address[](subnet.route.length + 1);
-        uint256 routeLength = subnet.route.length;
-        for (uint256 i; i < routeLength; ) {
+        uint256 subnetRouteLength = subnet.route.length;
+        newSubnet.route = new address[](subnetRouteLength + 1);
+        for (uint256 i; i < subnetRouteLength; ) {
             newSubnet.route[i] = subnet.route[i];
             unchecked {
                 ++i;

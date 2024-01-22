@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Examples of passing CLI options. Some are tricky and require some values to be parsed first.
 //! These examples are here so we have an easier way to test them than having to compile the app.

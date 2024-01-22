@@ -18,6 +18,7 @@ contract GatewayGetterFacet {
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice Returns the minimum fee required for cross-net messages.
     function crossMsgFee() external view returns (uint256) {
@@ -106,7 +107,7 @@ contract GatewayGetterFacet {
     /// @notice Returns the current applied top-down nonce for a specified subnet, indicating whether it's registered.
     /// @param subnetId The identifier of the subnet for which the top-down nonce is queried.
     /// @return A tuple containing a boolean indicating if the subnet is registered and the current top-down nonce.
-    function getAppliedTopDownNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
+    function getTopDownNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
         if (!registered) {
             return (false, 0);
@@ -114,7 +115,18 @@ contract GatewayGetterFacet {
         return (true, subnet.topDownNonce);
     }
 
-    /// @notice Returns the current applied top-down nonce.
+    /// @notice Returns the current applied bottom-up nonce for a specified subnet, indicating whether it's registered.
+    /// @param subnetId The identifier of the subnet for which the bottom-up nonce is queried.
+    /// @return A tuple containing a boolean indicating if the subnet is registered and the current applied bottom-up nonce.
+    function getAppliedBottomUpNonce(SubnetID calldata subnetId) external view returns (bool, uint64) {
+        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
+        if (!registered) {
+            return (false, 0);
+        }
+        return (true, subnet.appliedBottomUpNonce);
+    }
+
+    /// @notice Returns the current applied top-down nonce of the gateway.
     function appliedTopDownNonce() external view returns (uint64) {
         return s.appliedTopDownNonce;
     }
@@ -135,16 +147,21 @@ contract GatewayGetterFacet {
     /// @notice Returns the list of registered subnets.
     /// @return The list of the registered subnets.
     function listSubnets() external view returns (Subnet[] memory) {
-        uint256 size = s.subnetKeys.length;
+        uint256 size = s.subnetKeys.length();
         Subnet[] memory out = new Subnet[](size);
         for (uint256 i; i < size; ) {
-            bytes32 key = s.subnetKeys[i];
+            bytes32 key = s.subnetKeys.at(i);
             out[i] = s.subnets[key];
             unchecked {
                 ++i;
             }
         }
         return out;
+    }
+
+    /// @notice Returns the subnet keys.
+    function getSubnetKeys() external view returns (bytes32[] memory) {
+        return s.subnetKeys.values();
     }
 
     /// @notice Returns the last membership received from the parent.

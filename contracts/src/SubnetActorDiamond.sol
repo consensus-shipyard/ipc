@@ -25,18 +25,18 @@ contract SubnetActorDiamond {
     using SupplySourceHelper for SupplySource;
 
     struct ConstructorParams {
-        SubnetID parentId;
-        address ipcGatewayAddr;
-        ConsensusType consensus;
         uint256 minActivationCollateral;
+        uint256 minCrossMsgFee;
         uint64 minValidators;
         uint64 bottomUpCheckPeriod;
-        uint8 majorityPercentage;
+        address ipcGatewayAddr;
         uint16 activeValidatorsLimit;
-        uint256 minCrossMsgFee;
+        uint8 majorityPercentage;
+        ConsensusType consensus;
         int8 powerScale;
         PermissionMode permissionMode;
         SupplySource supplySource;
+        SubnetID parentId;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
