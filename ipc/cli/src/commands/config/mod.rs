@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! This mod triggers a config reload in the IPC-Agent Json RPC server.
 

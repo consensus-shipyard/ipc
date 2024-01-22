@@ -18,11 +18,7 @@ contract GatewayGetterFacet {
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    /// @notice Returns the minimum fee required for cross-net messages.
-    function crossMsgFee() external view returns (uint256) {
-        return s.minCrossMsgFee;
-    }
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice Returns the current nonce for bottom-up message processing.
     function bottomUpNonce() external view returns (uint64) {
@@ -139,16 +135,21 @@ contract GatewayGetterFacet {
     /// @notice Returns the list of registered subnets.
     /// @return The list of the registered subnets.
     function listSubnets() external view returns (Subnet[] memory) {
-        uint256 size = s.subnetKeys.length;
+        uint256 size = s.subnetKeys.length();
         Subnet[] memory out = new Subnet[](size);
         for (uint256 i; i < size; ) {
-            bytes32 key = s.subnetKeys[i];
+            bytes32 key = s.subnetKeys.at(i);
             out[i] = s.subnets[key];
             unchecked {
                 ++i;
             }
         }
         return out;
+    }
+
+    /// @notice Returns the subnet keys.
+    function getSubnetKeys() external view returns (bytes32[] memory) {
+        return s.subnetKeys.values();
     }
 
     /// @notice Returns the last membership received from the parent.

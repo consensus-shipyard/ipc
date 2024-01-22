@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! List top down cross messages
 
@@ -36,12 +36,11 @@ impl CommandLineHandler for ListTopdownMsgs {
             );
             for msg in result.value {
                 println!(
-                    "from: {}, to: {}, message: {}, nonce: {}, fee: {} ",
+                    "from: {}, to: {}, message: {}, nonce: {} ",
                     msg.from.to_string()?,
                     msg.to.to_string()?,
                     hex::encode(msg.message),
-                    msg.nonce,
-                    msg.fee
+                    msg.nonce
                 );
             }
         }

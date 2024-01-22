@@ -47,7 +47,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_Constructor() public view {
         require(gwGetter.totalSubnets() == 0, "unexpected totalSubnets");
         require(gwGetter.bottomUpNonce() == 0, "unexpected bottomUpNonce");
-        require(gwGetter.crossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected crossMsgFee");
         require(gwGetter.bottomUpCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD, "unexpected bottomUpCheckPeriod");
         require(
             gwGetter.getNetworkName().equals(SubnetID({root: ROOTNET_CHAINID, route: new address[](0)})),
@@ -63,7 +62,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_NewGatewayWithDefaultParams() public view {
         GatewayDiamond.ConstructorParams memory params = defaultGatewayParams();
 
-        require(gwGetter.crossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected cross-msg fee");
         require(gwGetter.bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
         require(gwGetter.majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
     }
@@ -155,7 +153,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -189,7 +186,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: 100,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -490,6 +486,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(circSupply == 0, "unexpected circSupply");
         require(gwGetter.totalSubnets() == 0, "unexpected total subnets");
         require(subnetAddress.balance == DEFAULT_COLLATERAL_AMOUNT, "unexpected balance");
+        require(gwGetter.listSubnets().length == 0, "unexpected number of subnets");
+        require(gwGetter.getSubnetKeys().length == 0, "unexpected number of subnet keys");
     }
 
     function testGatewayDiamond_Kill_Fail_SubnetNotExists() public {
@@ -515,8 +513,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -541,8 +538,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                     rawAddress: FvmAddressHelper.from(caller)
                 }),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -691,7 +687,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -725,7 +720,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: crossMsgFee,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -756,7 +750,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: crossMsgFee,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -789,7 +782,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: crossMsgFee,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -819,7 +811,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+        gwMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -830,8 +822,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                     rawAddress: FvmAddressHelper.from(caller)
                 }),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -844,7 +835,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory destinationSubnet = gwGetter.getNetworkName();
 
         vm.expectRevert(CannotSendCrossMsgToItself.selector);
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+        gwMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -852,8 +843,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -866,7 +856,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
         vm.expectRevert(InvalidCrossMsgValue.selector);
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -874,8 +864,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 5,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -890,7 +879,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
         vm.expectRevert(InvalidCrossMsgSender.selector);
 
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -898,8 +887,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -915,7 +903,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
         vm.expectRevert(InvalidCrossMsgDstSubnet.selector);
 
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+        gwMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -923,8 +911,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -937,7 +924,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
         vm.expectRevert(InvalidCrossMsgFromSubnet.selector);
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE + 1}(
+        gwMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newTransferCrossMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: 0, route: new address[](0)}),
@@ -945,8 +932,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
-                0,
-                DEFAULT_CROSS_MSG_FEE
+                0
             )
         );
     }
@@ -1179,8 +1165,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(caller)}),
                 IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(caller)}),
                 amount,
-                i,
-                DEFAULT_CROSS_MSG_FEE
+                i
             );
         }
 
@@ -1196,10 +1181,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         gwCheckpointingFacet.commitCheckpoint(checkpoint);
 
         (, subnetInfo) = gwGetter.getSubnet(subnetId);
-        require(
-            subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * DEFAULT_CROSS_MSG_FEE - 10 * amount,
-            "unexpected circulation supply"
-        );
+        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * amount, "unexpected circulation supply");
     }
 
     function testGatewayDiamond_listIncompleteCheckpoints() public {
@@ -1576,8 +1558,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(caller)}),
                 IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(caller)}),
                 amount,
-                i,
-                DEFAULT_CROSS_MSG_FEE
+                i
             );
         }
 
@@ -1605,7 +1586,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
@@ -1654,8 +1634,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
                 IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
                 0,
-                i,
-                DEFAULT_CROSS_MSG_FEE
+                i
                 // method: this.callback.selector,
             );
         }

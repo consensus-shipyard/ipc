@@ -62,7 +62,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saGetter.getParent().equals(_parentId), "unexpected parent");
         require(saGetter.activeValidatorsLimit() == 100, "unexpected activeValidatorsLimit");
         require(saGetter.powerScale() == params.powerScale, "unexpected powerscale");
-        require(saGetter.minCrossMsgFee() == DEFAULT_CROSS_MSG_FEE, "unexpected cross-msg fee");
         require(saGetter.bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
         require(saGetter.majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
         require(saGetter.getParent().toHash() == _parentId.toHash(), "unexpected parent subnetID hash");
@@ -319,7 +318,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 activeValidatorsLimit: 100,
                 powerScale: 12,
                 permissionMode: PermissionMode.Collateral,
-                minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
                 supplySource: native
             }),
             address(saDupGetterFaucet),
@@ -471,8 +469,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            0,
-            DEFAULT_CROSS_MSG_FEE
+            0
         );
         require(saGetter.crossMsgsHash(msgs) == keccak256(abi.encode(msgs)));
     }
@@ -644,8 +641,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            0,
-            DEFAULT_CROSS_MSG_FEE
+            0
         );
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
@@ -707,6 +703,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         (exists, recvHash) = saGetter.bottomUpCheckpointHashAtEpoch(saGetter.bottomUpCheckPeriod());
         require(exists, "checkpoint does not exist");
         require(hash == recvHash, "hashes are not the same");
+
+        saPauser.pause();
+        vm.prank(validators[0]);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
     }
 
     function testSubnetActorDiamond_submitCheckpointWithReward() public {
@@ -726,8 +727,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            0,
-            DEFAULT_CROSS_MSG_FEE
+            0
         );
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
@@ -765,8 +765,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
-            1,
-            DEFAULT_CROSS_MSG_FEE
+            1
         );
         msgs[0] = crossMsg;
 
@@ -1413,33 +1412,71 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saGetter.isActiveValidator(validators[2]), "not active validator 2");
     }
 
-    function testSubnetActorDiamond_Pausable_SetPaused() public {
+    // -----------------------------------------------------------------------------------------------------------------
+    // Tests for pausable
+    // -----------------------------------------------------------------------------------------------------------------
+
+    function testSubnetActorDiamond_Pausable_PauseUnpause() public {
+        require(!saPauser.paused(), "paused");
+
         saPauser.pause();
-        require(saPauser.paused());
+        require(saPauser.paused(), "not paused");
 
         saPauser.unpause();
-        require(!saPauser.paused());
+        require(!saPauser.paused(), "paused");
     }
 
     function testSubnetActorDiamond_Pausable_EnforcedPause() public {
         saPauser.pause();
+        require(saPauser.paused(), "not paused");
+
         uint256 n = 1;
         (address[] memory validators, , bytes[] memory publicKeys) = TestUtils.newValidators(n);
+        vm.deal(validators[0], 20);
 
         vm.prank(validators[0]);
-        vm.deal(validators[0], 20);
         vm.expectRevert(Pausable.EnforcedPause.selector);
         saManager.join{value: 10}(publicKeys[0]);
+
+        vm.prank(validators[0]);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        saManager.stake{value: 10}();
+
+        vm.prank(validators[0]);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        saManager.unstake(1);
+
+        vm.prank(validators[0]);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        saManager.leave();
+
+        vm.prank(validators[0]);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        saManager.addBootstrapNode("1.1.1.1");
+
+        // Test on submitCheckpoint() reverts if the contract is paused
+        // is in testSubnetActorDiamond_submitCheckpoint_basic.
     }
 
-    function testSubnetActorDiamond_Pausable_NotOwner() public {
-        vm.startPrank(address(1));
+    function testSubnetActorDiamond_PauseUnpause_NotOwner() public {
+        vm.prank(vm.addr(1));
         vm.expectRevert(LibDiamond.NotOwner.selector);
         saPauser.pause();
+
+        saPauser.pause();
+        require(saPauser.paused(), "not paused");
+
+        vm.prank(vm.addr(1));
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        saPauser.unpause();
+
+        saPauser.unpause();
+        require(!saPauser.paused(), "not paused");
     }
 
     function testSubnetActorDiamond_Pausable_CannotPauseAgain() public {
         saPauser.pause();
+        require(saPauser.paused(), "not paused");
 
         vm.expectRevert(Pausable.EnforcedPause.selector);
         saPauser.pause();
@@ -1448,5 +1485,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     function testSubnetActorDiamond_Pausable_CannotUnpauseAgain() public {
         vm.expectRevert(Pausable.ExpectedPause.selector);
         saPauser.unpause();
+        require(!saPauser.paused(), "paused");
     }
 }

@@ -186,7 +186,6 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         uint64 _bottomUpCheckPeriod,
         uint16 _activeValidatorsLimit,
         uint8 _majorityPercentage,
-        uint256 _minCrossMsgFee,
         uint8 _pathSize,
         int8 _powerScale
     ) public {
@@ -212,7 +211,6 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
-            minCrossMsgFee: _minCrossMsgFee,
             supplySource: SupplySourceHelper.native()
         });
 

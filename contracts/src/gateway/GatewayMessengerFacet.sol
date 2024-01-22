@@ -39,7 +39,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidCrossMsgSender();
         }
 
-        if (crossMsg.value != msg.value - crossMsg.fee) {
+        if (crossMsg.value != msg.value) {
             revert InvalidCrossMsgValue();
         }
 
@@ -65,7 +65,6 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         }
 
         IpcEnvelope storage crossMsg = s.postbox[msgCid];
-        validateFee(crossMsg.fee);
 
         bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
         // We must delete the message first to prevent potential re-entrancies,
@@ -75,12 +74,5 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         delete s.postbox[msgCid];
 
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
-
-        uint256 feeRemainder = msg.value - s.minCrossMsgFee;
-
-        // gas-opt: original check: feeRemainder > 0
-        if (feeRemainder != 0) {
-            payable(msg.sender).sendValue(feeRemainder);
-        }
     }
 }

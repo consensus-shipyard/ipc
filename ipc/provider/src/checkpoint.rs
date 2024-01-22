@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! Bottom up checkpoint manager
 
@@ -135,13 +135,6 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
     /// Checks if the relayer has already submitted at the `last_checkpoint_height`, if not it submits it.
     async fn submit_last_epoch(&self, submitter: &Address) -> Result<()> {
         let subnet = &self.metadata.child.id;
-        if self
-            .parent_handler
-            .has_submitted_in_last_checkpoint_height(subnet, submitter)
-            .await?
-        {
-            return Ok(());
-        }
 
         let height = self
             .parent_handler

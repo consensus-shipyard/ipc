@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::{BTreeMap, VecDeque};
@@ -563,7 +563,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             gateway: GatewayParams {
                 subnet_id,
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
-                msg_fee: ArbTokenAmount::arbitrary(u)?.0,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,
                 active_validators_limit: 1 + u.choose_index(100)? as u16,
             },
@@ -591,7 +590,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             gateway: GatewayParams {
                 subnet_id: child_subnet_id,
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
-                msg_fee: ArbTokenAmount::arbitrary(u)?.0,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,
                 active_validators_limit: num_max_validators as u16,
             },

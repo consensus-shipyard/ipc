@@ -54,8 +54,7 @@ contract CrossMsgHelperTest is Test {
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
-            releaseAmount,
-            CROSS_MESSAGE_FEE
+            releaseAmount
         );
 
         address[] memory parentRoute = new address[](1);
@@ -79,13 +78,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createReleaseMsg(
-            subnetId,
-            sender,
-            FvmAddressHelper.from(sender),
-            releaseAmount,
-            CROSS_MESSAGE_FEE
-        );
+        CrossMsgHelper.createReleaseMsg(subnetId, sender, FvmAddressHelper.from(sender), releaseAmount);
     }
 
     function test_CreateFundMsg_Works_Root(uint256 fundAmount, address sender) public {
@@ -99,8 +92,7 @@ contract CrossMsgHelperTest is Test {
             parentSubnetId,
             sender,
             FvmAddressHelper.from(sender),
-            fundAmount,
-            CROSS_MESSAGE_FEE
+            fundAmount
         );
 
         SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
@@ -129,8 +121,7 @@ contract CrossMsgHelperTest is Test {
             subnetId,
             sender,
             FvmAddressHelper.from(sender),
-            fundAmount,
-            CROSS_MESSAGE_FEE
+            fundAmount
         );
 
         address[] memory parentRoute = new address[](1);
@@ -154,7 +145,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.expectRevert(NoParentForSubnet.selector);
 
-        CrossMsgHelper.createFundMsg(subnetId, sender, FvmAddressHelper.from(sender), fundAmount, CROSS_MESSAGE_FEE);
+        CrossMsgHelper.createFundMsg(subnetId, sender, FvmAddressHelper.from(sender), fundAmount);
     }
 
     function test_Execute_Works_SendValue() public {
@@ -262,7 +253,7 @@ contract CrossMsgHelperTest is Test {
         require(CrossMsgHelper.isSorted(crossMsgs) == false);
     }
 
-    function test_applyType_TopDown() public view {
+    function test_applyType_TopDown() public pure {
         address[] memory from = new address[](1);
         from[0] = address(1);
         address[] memory to = new address[](4);
@@ -305,7 +296,7 @@ contract CrossMsgHelperTest is Test {
         );
     }
 
-    function test_applyType_BottomUp() public view {
+    function test_applyType_BottomUp() public pure {
         address[] memory from = new address[](2);
         from[0] = address(1);
         from[1] = address(2);
@@ -333,7 +324,7 @@ contract CrossMsgHelperTest is Test {
         );
     }
 
-    function createDefaultCrossMsg(uint64 nonce) internal view returns (IpcEnvelope memory) {
+    function createDefaultCrossMsg(uint64 nonce) internal pure returns (IpcEnvelope memory) {
         IPCAddress memory addr = IPCAddress({
             subnetId: SubnetID(0, new address[](0)),
             rawAddress: FvmAddressHelper.from(address(0))
@@ -345,7 +336,7 @@ contract CrossMsgHelperTest is Test {
         IPCAddress memory from,
         IPCAddress memory to,
         uint64 nonce
-    ) internal view returns (IpcEnvelope memory) {
+    ) internal pure returns (IpcEnvelope memory) {
         IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
         return
             IpcEnvelope({
@@ -354,12 +345,11 @@ contract CrossMsgHelperTest is Test {
                 to: to,
                 value: 0,
                 message: abi.encode(message),
-                nonce: nonce,
-                fee: CROSS_MESSAGE_FEE
+                nonce: nonce
             });
     }
 
-    function createCrossMsgs(uint256 length, uint64 nonce) internal view returns (IpcEnvelope[] memory _crossMsgs) {
+    function createCrossMsgs(uint256 length, uint64 nonce) internal pure returns (IpcEnvelope[] memory _crossMsgs) {
         _crossMsgs = new IpcEnvelope[](length);
 
         for (uint256 i = 0; i < length; i++) {

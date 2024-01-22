@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Protocol Labs
+// Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, Power, SignerAddr, Validator,
@@ -123,7 +123,6 @@ impl Arbitrary for ipc::GatewayParams {
             subnet_id: ArbSubnetID::arbitrary(g).0,
             // Gateway constructor would reject 0.
             bottom_up_check_period: u64::arbitrary(g).max(1),
-            msg_fee: ArbTokenAmount::arbitrary(g).0,
             majority_percentage: u8::arbitrary(g) % 50 + 51,
             active_validators_limit: u16::arbitrary(g) % 100 + 1,
         }

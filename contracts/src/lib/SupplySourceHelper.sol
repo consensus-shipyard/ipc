@@ -54,11 +54,7 @@ library SupplySourceHelper {
     }
 
     /// @notice Transfers the specified amount out of our treasury to the recipient address.
-    /// It bubbles-up information about the success of the call and the return value
-    /// instead of immediately reverting so they can be used to send
-    /// a cross-message receipt.
-    function transfer(
-        SupplySource memory supplySource,
+    function transferFundsFromSupplySource(SupplySource memory supplySource,
         address payable recipient,
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
