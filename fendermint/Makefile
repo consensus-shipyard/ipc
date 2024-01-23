@@ -2,7 +2,7 @@
 
 BUILTIN_ACTORS_TAG    ?= v12.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
-ACTORS_BUNDLE         := $(PWD)/actors/output/actors_bundle.car
+CUSTOM_ACTORS_BUNDLE  := $(PWD)/actors/output/custom_actors_bundle.car
 
 IPC_ACTORS_DIR        := $(PWD)/../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
@@ -40,7 +40,7 @@ install: $(IPC_ACTORS_GEN)
 # Using --release for testing because wasm can otherwise be slow.
 test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
-	FM_ACTORS_BUNDLE=$(ACTORS_BUNDLE) \
+	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --release $(PACKAGE)
 
@@ -52,7 +52,7 @@ e2e: docker-build | cargo-make
 clean:
 	cargo clean
 	rm $(BUILTIN_ACTORS_BUNDLE)
-	rm $(ACTORS_BUNDLE)
+	rm $(CUSTOM_ACTORS_BUNDLE)
 
 lint: \
 	check-fmt \
@@ -67,12 +67,12 @@ check-clippy: $(IPC_ACTORS_GEN)
 	@# We could have a separate top level job that does `fmt` and `clippy` check on the whole project.
 	cargo clippy $(PACKAGE) --no-deps --tests -- -D clippy::all
 
-docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
+docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
 	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
-	cp $(ACTORS_BUNDLE) docker/.artifacts
+	cp $(CUSTOM_ACTORS_BUNDLE) docker/.artifacts
 
 # To use `buildx` locally to produce multiplatform images, one needs to run `docker buildx create --use`.
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
@@ -98,7 +98,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;
 # so long as they work together.
-actor-bundle: $(BUILTIN_ACTORS_BUNDLE) $(ACTORS_BUNDLE)
+actor-bundle: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE)
 
 compile-abi: $(IPC_ACTORS_GEN)
 
@@ -107,8 +107,8 @@ $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
 	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
 
-# Build a bundle CAR for the actors in this repo.
-$(ACTORS_BUNDLE):
+# Build a bundle CAR for the custom actors in this repo.
+$(CUSTOM_ACTORS_BUNDLE):
 	cargo build --release -p fendermint_actors
 
 # Regenerate the ABI artifacts if we don't have them already, or they changed.

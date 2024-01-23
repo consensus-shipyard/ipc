@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, bail, Context};
 use cid::{multihash::Code, Cid};
 use ethers::{abi::Tokenize, core::abi::Abi};
-use fendermint_actors::Manifest as ActorManifest;
+use fendermint_actors::Manifest as CustomActorManifest;
 use fendermint_vm_actor_interface::{
     account::{self, ACCOUNT_ACTOR_CODE_ID},
     eam::{self, EthAddress},
@@ -61,7 +61,7 @@ where
 {
     pub manifest_data_cid: Cid,
     pub manifest: Manifest,
-    pub actor_manifest: ActorManifest,
+    pub custom_actor_manifest: CustomActorManifest,
     store: DB,
     multi_engine: Arc<MultiEngine>,
     stage: Stage<DB>,
@@ -75,7 +75,7 @@ where
         store: DB,
         multi_engine: Arc<MultiEngine>,
         bundle: &[u8],
-        actor_bundle: &[u8],
+        custom_actor_bundle: &[u8],
     ) -> anyhow::Result<Self> {
         // Load the builtin actor bundle.
         let bundle_roots = load_car_unchecked(&store, bundle).await?;
@@ -100,9 +100,9 @@ where
         };
         let manifest = Manifest::load(&store, &manifest_data_cid, manifest_version)?;
 
-        // Load the actor bundle
-        let actors_bundle_roots = load_car_unchecked(&store, actor_bundle).await?;
-        let actors_bundle_root = match actors_bundle_roots.as_slice() {
+        // Load the custom actors bundle
+        let custom_actors_bundle_roots = load_car_unchecked(&store, custom_actor_bundle).await?;
+        let custom_actors_bundle_root = match custom_actors_bundle_roots.as_slice() {
             [root] => root,
             roots => {
                 return Err(anyhow!(
@@ -112,26 +112,29 @@ where
             }
         };
 
-        let (actor_manifest_version, actor_manifest_data_cid): (u32, Cid) =
-            match store.get_cbor(actors_bundle_root)? {
+        let (custom_actor_manifest_version, custom_actor_manifest_data_cid): (u32, Cid) =
+            match store.get_cbor(custom_actors_bundle_root)? {
                 Some(vd) => vd,
                 None => {
                     return Err(anyhow!(
-                        "no manifest information in actor bundle root {}",
+                        "no manifest information in custom actor bundle root {}",
                         bundle_root
                     ))
                 }
             };
 
-        let actor_manifest =
-            ActorManifest::load(&store, &actor_manifest_data_cid, actor_manifest_version)?;
+        let custom_actor_manifest = CustomActorManifest::load(
+            &store,
+            &custom_actor_manifest_data_cid,
+            custom_actor_manifest_version,
+        )?;
 
         let state_tree = empty_state_tree(store.clone())?;
 
         let state = Self {
             manifest_data_cid,
             manifest,
-            actor_manifest,
+            custom_actor_manifest,
             store,
             multi_engine,
             stage: Stage::Tree(state_tree),
@@ -206,7 +209,7 @@ where
         self.create_actor_internal(code_cid, id, state, balance, delegated_address)
     }
 
-    pub fn create_actor(
+    pub fn create_custom_actor(
         &mut self,
         code_id: u32,
         id: ActorID,
@@ -216,7 +219,7 @@ where
     ) -> anyhow::Result<()> {
         // Retrieve the CID of the actor code by the numeric ID.
         let code_cid = *self
-            .actor_manifest
+            .custom_actor_manifest
             .code_by_id(code_id)
             .ok_or_else(|| anyhow!("can't find {code_id} in the actor manifest"))?;
 

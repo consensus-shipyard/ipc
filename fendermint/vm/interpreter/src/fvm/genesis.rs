@@ -228,7 +228,7 @@ where
             )
             .context("failed to create reward actor")?;
 
-        // STAGE 1b: Then we initialize the in-repo actors.
+        // STAGE 1b: Then we initialize the in-repo custom actors.
         //
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
@@ -237,7 +237,7 @@ where
         let chainmetadata_state =
             fendermint_actor_chainmetadata::State::new(&state.store(), LOOKBACK_LEN)?;
         state
-            .create_actor(
+            .create_custom_actor(
                 fendermint_actors::CHAINMETADATA_ACTOR_CODE_ID,
                 fendermint_actors::CHAINMETADATA_ACTOR_ID,
                 &chainmetadata_state,
@@ -512,7 +512,7 @@ mod tests {
 
     use crate::{
         fvm::{
-            bundle::{actors_bundle_path, bundle_path, contracts_path},
+            bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::ipc::GatewayCaller,
             store::memory::MemoryBlockstore,
             FvmMessageInterpreter,
@@ -526,13 +526,13 @@ mod tests {
     async fn load_genesis() {
         let genesis = make_genesis();
         let bundle = read_bundle();
-        let actors_bundle = read_actors_bundle();
+        let custom_actors_bundle = read_custom_actors_bundle();
         let interpreter = make_interpreter();
 
         let multi_engine = Arc::new(MultiEngine::default());
         let store = MemoryBlockstore::new();
 
-        let state = FvmGenesisState::new(store, multi_engine, &bundle, &actors_bundle)
+        let state = FvmGenesisState::new(store, multi_engine, &bundle, &custom_actors_bundle)
             .await
             .expect("failed to create state");
 
@@ -560,7 +560,7 @@ mod tests {
     async fn load_genesis_deterministic() {
         let genesis = make_genesis();
         let bundle = read_bundle();
-        let actors_bundle = read_actors_bundle();
+        let custom_actors_bundle = read_custom_actors_bundle();
         let interpreter = make_interpreter();
         let multi_engine = Arc::new(MultiEngine::default());
 
@@ -568,9 +568,10 @@ mod tests {
         let mut outputs = Vec::new();
         for _ in 0..3 {
             let store = MemoryBlockstore::new();
-            let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle, &actors_bundle)
-                .await
-                .expect("failed to create state");
+            let state =
+                FvmGenesisState::new(store, multi_engine.clone(), &bundle, &custom_actors_bundle)
+                    .await
+                    .expect("failed to create state");
 
             let (state, out) = interpreter
                 .init(state, genesis.clone())
@@ -597,14 +598,15 @@ mod tests {
         let genesis: Genesis = serde_json::from_str(genesis_json).expect("failed to parse genesis");
 
         let bundle = read_bundle();
-        let actors_bundle = read_actors_bundle();
+        let custom_actors_bundle = read_custom_actors_bundle();
         let interpreter = make_interpreter();
         let multi_engine = Arc::new(MultiEngine::default());
 
         let store = MemoryBlockstore::new();
-        let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle, &actors_bundle)
-            .await
-            .expect("failed to create state");
+        let state =
+            FvmGenesisState::new(store, multi_engine.clone(), &bundle, &custom_actors_bundle)
+                .await
+                .expect("failed to create state");
 
         let (state, _) = interpreter
             .init(state, genesis.clone())
@@ -639,7 +641,7 @@ mod tests {
         std::fs::read(bundle_path()).expect("failed to read bundle")
     }
 
-    fn read_actors_bundle() -> Vec<u8> {
-        std::fs::read(actors_bundle_path()).expect("failed to read actor bundle")
+    fn read_custom_actors_bundle() -> Vec<u8> {
+        std::fs::read(custom_actors_bundle_path()).expect("failed to read custom actor bundle")
     }
 }

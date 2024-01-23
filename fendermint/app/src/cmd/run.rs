@@ -215,7 +215,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             state_hist_namespace: ns.state_hist,
             state_hist_size: settings.db.state_hist_size,
             builtin_actors_bundle: settings.builtin_actors_bundle(),
-            actors_bundle: settings.actors_bundle(),
+            custom_actors_bundle: settings.custom_actors_bundle(),
         },
         db,
         state_store,

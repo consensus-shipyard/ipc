@@ -28,16 +28,16 @@ pub fn bundle_path() -> PathBuf {
     PathBuf::from_str(&bundle_path).expect("malformed bundle path")
 }
 
-/// Path to the in-repo actor bundle, indended to be used in tests.
-pub fn actors_bundle_path() -> PathBuf {
-    let actors_bundle_path = std::env::var("FM_ACTORS_BUNDLE").unwrap_or_else(|_| {
+/// Path to the in-repo custom actor bundle, intended to be used in tests.
+pub fn custom_actors_bundle_path() -> PathBuf {
+    let custom_actors_bundle_path = std::env::var("FM_CUSTOM_ACTORS_BUNDLE").unwrap_or_else(|_| {
         workspace_dir()
-            .join("fendermint/actors/output/actors_bundle.car")
+            .join("fendermint/actors/output/custom_actors_bundle.car")
             .to_string_lossy()
             .into_owned()
     });
 
-    PathBuf::from_str(&actors_bundle_path).expect("malformed actors bundle path")
+    PathBuf::from_str(&custom_actors_bundle_path).expect("malformed custom actors bundle path")
 }
 
 /// Path to the Solidity contracts, intended to be used in tests.

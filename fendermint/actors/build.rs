@@ -84,9 +84,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // make sure the output dir exists
     std::fs::create_dir_all("output")
-        .expect("failed to create output dir for the actors_bundle.car file");
+        .expect("failed to create output dir for the custom_actors_bundle.car file");
 
-    let dst = Path::new("output/actors_bundle.car");
+    let dst = Path::new("output/custom_actors_bundle.car");
     let mut bundler = Bundler::new(dst);
     for (&pkg, id) in ACTORS.iter().zip(1u32..) {
         let bytecode_path = Path::new(&out_dir)

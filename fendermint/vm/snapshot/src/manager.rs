@@ -315,7 +315,7 @@ mod tests {
     use fendermint_vm_genesis::Genesis;
     use fendermint_vm_interpreter::{
         fvm::{
-            bundle::{actors_bundle_path, bundle_path, contracts_path},
+            bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::{snapshot::Snapshot, FvmGenesisState, FvmStateParams},
             store::memory::MemoryBlockstore,
             FvmMessageInterpreter,
@@ -446,14 +446,15 @@ mod tests {
         let genesis = Genesis::arbitrary(&mut g);
 
         let bundle = std::fs::read(bundle_path()).expect("failed to read bundle");
-        let actors_bundle =
-            std::fs::read(actors_bundle_path()).expect("failed to read actors bundle");
+        let custom_actors_bundle = std::fs::read(custom_actors_bundle_path())
+            .expect("failed to read custom actors bundle");
         let multi_engine = Arc::new(MultiEngine::default());
 
         let store = MemoryBlockstore::new();
-        let state = FvmGenesisState::new(store.clone(), multi_engine, &bundle, &actors_bundle)
-            .await
-            .expect("failed to create state");
+        let state =
+            FvmGenesisState::new(store.clone(), multi_engine, &bundle, &custom_actors_bundle)
+                .await
+                .expect("failed to create state");
 
         let interpreter =
             FvmMessageInterpreter::new(mock_client(), None, contracts_path(), 1.05, 1.05, false);

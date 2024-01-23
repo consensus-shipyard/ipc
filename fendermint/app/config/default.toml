@@ -11,8 +11,8 @@ snapshots_dir = "snapshots"
 contracts_dir = "contracts"
 # Builtin actor bundle CAR file.
 builtin_actors_bundle = "bundle.car"
-# In-repo actor bundle CAR file.
-actors_bundle = "actors_bundle.car"
+# Custom actor bundle CAR file.
+custom_actors_bundle = "custom_actors_bundle.car"
 # Where to reach CometBFT for queries or broadcasting transactions.
 tendermint_rpc_url = "http://127.0.0.1:26657"
 
