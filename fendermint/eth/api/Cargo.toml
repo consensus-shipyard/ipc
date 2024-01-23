@@ -27,6 +27,7 @@ tendermint-rpc = { workspace = true }
 tokio = { workspace = true }
 
 cid = { workspace = true }
+fil_actors_evm_shared = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 

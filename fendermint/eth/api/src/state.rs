@@ -36,7 +36,6 @@ use crate::filters::{
     FilterRecords,
 };
 use crate::handlers::ws::MethodNotification;
-use crate::state::ActorType::Unknown;
 use crate::GasOpt;
 use crate::{
     conv::from_tm::{map_rpc_block_txs, to_chain_message, to_eth_block, to_eth_transaction},
@@ -414,7 +413,7 @@ where
         address: &et::H160,
         height: FvmQueryHeight,
     ) -> JsonRpcResult<ActorType> {
-        let addr = to_fvm_address(address.clone());
+        let addr = to_fvm_address(*address);
         let Some((
             _,
             ActorState {
@@ -425,9 +424,11 @@ where
         else {
             return Ok(ActorType::Inexistent);
         };
+        println!("jiejie: before calling builtin_actors()");
         let registry = self.client.builtin_actors(height).await?.value.registry;
-        let ret = match registry.iter().find(|(typ, cid)| cid == &actor_type_cid) {
-            Some((typ, _)) => ActorType::Known(typ.clone()),
+        println!("jiejie: after calling builtin_actors()");
+        let ret = match registry.into_iter().find(|(_, cid)| cid == &actor_type_cid) {
+            Some((typ, _)) => ActorType::Known(typ),
             None => ActorType::Unknown(actor_type_cid),
         };
         Ok(ret)

@@ -249,11 +249,13 @@ async fn perform_query<C>(
 where
     C: Client + Sync + Send,
 {
+    println!("jiejie: in perform_query...");
     tracing::debug!(?query, ?height, "perform ABCI query");
     let data = fvm_ipld_encoding::to_vec(&query).context("failed to encode query")?;
     let height: u64 = height.into();
     let height = Height::try_from(height).context("failed to conver to Height")?;
 
+    println!("jiejie: before client.abci_query");
     let res = client.abci_query(None, data, Some(height), false).await?;
 
     Ok(res)

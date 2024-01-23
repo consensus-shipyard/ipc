@@ -18,14 +18,14 @@ use fendermint_rpc::response::{decode_fevm_invoke, decode_fevm_return_data};
 use fendermint_vm_actor_interface::eam::{EthAddress, EAM_ACTOR_ADDR};
 use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::query::{ActorState, FvmQuery, FvmQueryHeight};
+use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
 use futures::FutureExt;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::crypto::signature::Signature;
-use fvm_shared::{chainid::ChainID, error::ExitCode, ActorID};
+use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
 use rand::Rng;
 use tendermint::block::Height;
@@ -35,6 +35,8 @@ use tendermint_rpc::{
     endpoint::{block, block_results, broadcast::tx_sync, consensus_params, header},
     Client,
 };
+
+use fil_actors_evm_shared::uints;
 
 use crate::conv::from_eth::to_fvm_message;
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
@@ -738,13 +740,21 @@ pub async fn get_storage_at<C>(
 where
     C: Client + Sync + Send,
 {
-    let mut bz = [0u8; 32];
+    let encode = |data: Option<uints::U256>| {
+        let mut bz = [0u8; 32];
+        if let Some(data) = data {
+            data.to_big_endian(&mut bz);
+        }
+        // The client library expects hex encoded string.
+        Ok(hex::encode(bz))
+    };
+
     let height = data.query_height(block_id).await?;
 
     // If not an EVM actor, return empty.
     if data.get_actor_type(&address, height).await? != ActorType::Known("evm".to_string()) {
         // The client library expects hex encoded string.
-        return Ok(hex::encode(bz));
+        return encode(None)
     }
 
     let params = evm::GetStorageAtParams {
@@ -765,11 +775,11 @@ where
         .await?;
 
     if let Some(ret) = ret {
-        ret.storage.to_big_endian(&mut bz);
+        // ret.storage.to_big_endian(&mut bz);
+        return encode(Some(ret.storage))
     }
 
-    // The client library expects hex encoded string.
-    Ok(hex::encode(bz))
+    return encode(None)
 }
 
 /// Returns code at a given address.
@@ -784,6 +794,8 @@ where
 
     // Return empty if not an EVM actor.
     if data.get_actor_type(&address, height).await? != ActorType::Known("evm".to_string()) {
+        tracing::info!("jiejie: SHIT SHIT");
+        tracing::info!("jiejie: in get_code(), actor type for add {:} is {:?}", address, data.get_actor_type(&address, height).await?);
         return Ok(Default::default());
     }
 
