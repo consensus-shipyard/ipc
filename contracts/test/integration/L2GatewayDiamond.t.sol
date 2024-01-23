@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, IpcMsg} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -41,7 +41,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         IpcEnvelope[] memory topDownMsgs = new IpcEnvelope[](n);
         for (uint64 i = 0; i < n; i++) {
-            topDownMsgs[i] = TestUtils.newTransferCrossMsg(
+            topDownMsgs[i] = TestUtils.newXnetCallMsg(
                 IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                 IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(receipient)}),
                 0,
@@ -97,7 +97,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     function setupWhiteListMethod(address caller) internal returns (bytes32) {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, address(this));
 
-        IpcEnvelope memory crossMsg = TestUtils.newTransferCrossMsg(
+        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
             IPCAddress({
                 subnetId: gwGetter.getNetworkName().createSubnetId(caller),
                 rawAddress: FvmAddressHelper.from(caller)

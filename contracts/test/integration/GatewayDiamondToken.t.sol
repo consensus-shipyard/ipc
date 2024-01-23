@@ -5,13 +5,13 @@ import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, IpcMsg} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {IPCAddress, SubnetID, Subnet, SupplySource, SupplyKind, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {IfaceIpcContract} from "../../sdk/IpcContract.sol";
+import {IpcHandler} from "../../sdk/IpcContract.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
@@ -223,7 +223,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Verify that we received the call and that the recipient has the tokens.
         vm.prank(address(saDiamond));
-        vm.expectCall(recipient, abi.encodeCall(IfaceIpcContract.IpcEntrypoint, (msgs[0])), 1);
+        vm.expectCall(recipient, abi.encodeCall(IpcHandler.handleIpcMessage, (msgs[0])), 1);
         gwCheckpointingFacet.commitCheckpoint(batch);
         assertEq(token.balanceOf(recipient), 8);
     }

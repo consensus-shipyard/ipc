@@ -7,7 +7,7 @@ import "../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IpcEnvelope, BottomUpCheckpoint, IpcMsg, IpcMsgKind, ParentFinality} from "../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
@@ -686,7 +686,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
             nonce: 0,
-            message: abi.encode(IpcMsg({method: METHOD_SEND, params: new bytes(0)}))
+            message: abi.encode(CallMsg({method: abi.encodePacked(METHOD_SEND), params: new bytes(0)}))
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;

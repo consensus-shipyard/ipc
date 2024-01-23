@@ -10,7 +10,7 @@ import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol"
 import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
-import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, IpcMsg} from "../../src/structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo} from "../../src/structs/Subnet.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
@@ -465,7 +465,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function testSubnetActorDiamond_crossMsgGetter() public view {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = TestUtils.newTransferCrossMsg(
+        msgs[0] = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(this))}),
             DEFAULT_CROSS_MSG_FEE + 1,
@@ -637,7 +637,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saManager.join{value: 10}(pubKeys[i]);
         }
 
-        IpcEnvelope memory crossMsg = TestUtils.newTransferCrossMsg(
+        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
@@ -723,7 +723,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         // send the first checkpoint
-        IpcEnvelope memory crossMsg = TestUtils.newTransferCrossMsg(
+        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
@@ -761,7 +761,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         );
 
         // send the second checkpoint
-        crossMsg = TestUtils.newTransferCrossMsg(
+        crossMsg = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,

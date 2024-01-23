@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {METHOD_SEND, EMPTY_BYTES} from "../constants/Constants.sol";
-import {IpcEnvelope, ReceiptMsg, IpcMsg, IpcMsgKind} from "../structs/CrossNet.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -12,7 +12,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySource} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "./SupplySourceHelper.sol";
-import {IfaceIpcContract} from "../../sdk/IpcContract.sol";
+import {IpcHandler} from "../../sdk/IpcContract.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {
@@ -21,7 +21,6 @@ library CrossMsgHelper {
     using FvmAddressHelper for FvmAddress;
     using SupplySourceHelper for SupplySource;
 
-    error InvalidCrossMsgKind();
     error CannotExecuteEmptyEnvelope();
 
     function createTransferMsg(
@@ -29,7 +28,7 @@ library CrossMsgHelper {
         IPCAddress memory to,
         uint256 value
     ) public pure returns (IpcEnvelope memory) {
-        IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
+        CallMsg memory message = CallMsg({method: abi.encodePacked(METHOD_SEND), params: EMPTY_BYTES});
         return
             IpcEnvelope({
                 kind: IpcMsgKind.Transfer,
@@ -48,7 +47,7 @@ library CrossMsgHelper {
         bytes4 method,
         bytes memory params
     ) public pure returns (IpcEnvelope memory) {
-        IpcMsg memory message = IpcMsg({method: method, params: params});
+        CallMsg memory message = CallMsg({method: abi.encodePacked(method), params: params});
         return
             IpcEnvelope({
                 kind: IpcMsgKind.Call,
@@ -63,12 +62,12 @@ library CrossMsgHelper {
     /// @notice Creates a receipt message for the given envelope.
     /// It reverts the from and to to return to the original sender
     /// and identifies the receipt through the hash of the original message.
-    function createReceiptMsg(
+    function createResultMsg(
         IpcEnvelope calldata crossMsg,
         bool success,
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
-        ReceiptMsg memory message = ReceiptMsg({id: toHash(crossMsg), success: success, ret: ret});
+        ResultMsg memory message = ResultMsg({id: toHash(crossMsg), success: success, ret: ret});
         uint256 value = crossMsg.value;
         if (success) {
             // if the message was executed successfully, the value stayed
@@ -141,7 +140,7 @@ library CrossMsgHelper {
         // envelopes need to necessarily include a message inside except
         // if it is a plain `Transfer`.
         if (crossMsg.kind == IpcMsgKind.Transfer) {
-            crossMsg.value == 0;
+            return crossMsg.value == 0;
         }
         return crossMsg.message.length == 0;
     }
@@ -172,40 +171,11 @@ library CrossMsgHelper {
             return
                 supplySource.performCall(
                     payable(recipient),
-                    abi.encodeCall(IfaceIpcContract.IpcEntrypoint, (crossMsg)),
+                    abi.encodeCall(IpcHandler.handleIpcMessage, (crossMsg)),
                     crossMsg.value
                 );
         }
         return (false, EMPTY_BYTES);
-    }
-
-    // get underlying IpcMsg from crossMsg
-    function getIpcMsg(IpcEnvelope calldata crossMsg) public pure returns (IpcMsg memory ret) {
-        if (isEmpty(crossMsg)) {
-            return ret;
-        }
-        if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Transfer) {
-            IpcMsg memory message = abi.decode(crossMsg.message, (IpcMsg));
-            return message;
-        }
-
-        // return empty IpcMsg otherwise
-        return ret;
-    }
-
-    // set underlying IpcMsg from crossMsg.
-    // This is a pure function, so the argument is not mutated
-    function setIpcMsg(
-        IpcEnvelope memory crossMsg,
-        IpcMsg memory message
-    ) public pure returns (IpcEnvelope memory ret) {
-        if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Transfer) {
-            crossMsg.message = abi.encode(message);
-            return crossMsg;
-        }
-
-        // Cannot set IPCMsg for the wrong kind
-        revert InvalidCrossMsgKind();
     }
 
     // checks whether the cross messages are sorted in ascending order or not
