@@ -28,7 +28,6 @@ error InvalidCollateral();
 error InvalidConfigurationNumber();
 error InvalidCrossMsgSender();
 error InvalidCrossMsgDstSubnet();
-error InvalidCrossMsgFromSubnet();
 error InvalidCrossMsgNonce();
 error InvalidCrossMsgValue();
 error InvalidCrossMsgKind();

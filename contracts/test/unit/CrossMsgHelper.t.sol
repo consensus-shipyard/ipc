@@ -38,6 +38,7 @@ contract CrossMsgHelperTest is Test {
     }
 
     function test_IsEmpty_Works_NonEmptyCrossMsg() public {
+        crossMsg.kind = IpcMsgKind.Call;
         crossMsg.message = bytes("hello");
 
         require(crossMsg.isEmpty() == false);
@@ -191,6 +192,7 @@ contract CrossMsgHelperTest is Test {
         address sender = address(this);
         address recipient = address(100);
 
+        crossMsg.kind = IpcMsgKind.Call;
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         CallMsg memory message = crossMsg.getCallMsg();
         message.method = abi.encodePacked(METHOD_SEND);
@@ -209,6 +211,7 @@ contract CrossMsgHelperTest is Test {
     function test_Execute_Fails_InvalidMethod() public {
         SupplySource memory native = SupplySourceHelper.native();
 
+        crossMsg.kind = IpcMsgKind.Call;
         crossMsg.to.rawAddress = FvmAddressHelper.from(address(this));
         CallMsg memory message = crossMsg.getCallMsg();
         message.method = bytes("1");

@@ -43,7 +43,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
         for (uint64 i = 0; i < n; i++) {
             topDownMsgs[i] = TestUtils.newXnetCallMsg(
                 IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
-                IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(receipient)}),
+                IPCAddress({subnetId: gwGetter.getNetworkName().getParentSubnet(), rawAddress: FvmAddressHelper.from(receipient)}),
                 0,
                 i
             );

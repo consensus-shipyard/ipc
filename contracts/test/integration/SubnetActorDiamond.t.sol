@@ -637,8 +637,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saManager.join{value: 10}(pubKeys[i]);
         }
 
+        SubnetID memory localSubnetID = saGetter.getParent().createSubnetId(address(saDiamond));
+
         IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
-            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            IPCAddress({subnetId: localSubnetID, rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
             0
@@ -647,7 +649,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         msgs[0] = crossMsg;
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            subnetID: localSubnetID,
             blockHeight: saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
@@ -722,9 +724,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saManager.join{value: 10}(pubKeys[i]);
         }
 
+        SubnetID memory localSubnetID = saGetter.getParent().createSubnetId(address(saDiamond));
+
         // send the first checkpoint
         IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
-            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            IPCAddress({subnetId: localSubnetID, rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
             0
@@ -733,7 +737,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         msgs[0] = crossMsg;
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            subnetID: localSubnetID,
             blockHeight: saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
@@ -762,7 +766,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // send the second checkpoint
         crossMsg = TestUtils.newXnetCallMsg(
-            IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+            IPCAddress({subnetId: localSubnetID, rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             IPCAddress({subnetId: saGetter.getParent(), rawAddress: FvmAddressHelper.from(address(saDiamond))}),
             DEFAULT_CROSS_MSG_FEE + 1,
             1
@@ -770,7 +774,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         msgs[0] = crossMsg;
 
         checkpoint = BottomUpCheckpoint({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            subnetID: localSubnetID,
             blockHeight: 2 * saGetter.bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
