@@ -49,10 +49,12 @@ pub struct ConstructorParams {
     pub lookback_len: u64,
 }
 
+pub type BlockHash = [u8; 32];
+
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct PushBlockParams {
     pub epoch: ChainEpoch,
-    pub block: Cid,
+    pub block: BlockHash,
 }
 
 #[derive(FromPrimitive)]

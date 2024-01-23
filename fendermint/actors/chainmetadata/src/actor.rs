@@ -1,8 +1,8 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::str::FromStr;
-
+use cid::multihash::Code;
+use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fil_actors_runtime::actor_dispatch;
 use fil_actors_runtime::actor_error;
@@ -11,9 +11,11 @@ use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorDowncast;
 use fil_actors_runtime::ActorError;
 use fil_actors_runtime::Array;
+use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::error::ExitCode;
 
+use crate::BlockHash;
 use crate::{ConstructorParams, Method, PushBlockParams, State};
 
 #[cfg(feature = "fil-actor")]
@@ -47,16 +49,14 @@ impl Actor {
             })?;
 
             // push the block to the AMT
-            blockhashes
-                .set(params.epoch as u64, params.block.to_string())
-                .unwrap();
+            blockhashes.set(params.epoch as u64, params.block).unwrap();
 
             // remove the oldest block if the AMT is full (note that this assume the
             // for_each_while iterates in order, which it seems to do)
             if blockhashes.count() > st.lookback_len {
                 let mut first_idx = 0;
                 blockhashes
-                    .for_each_while(|i, _: &String| {
+                    .for_each_while(|i, _: &BlockHash| {
                         first_idx = i;
                         Ok(false)
                     })
@@ -92,24 +92,17 @@ impl Actor {
         })?;
 
         // get the block cid from the AMT, if it does not exist return None
-        let blockhash: &String = match blockhashes.get(epoch as u64).unwrap() {
+        let blockhash: &BlockHash = match blockhashes.get(epoch as u64).unwrap() {
             Some(v) => v,
             None => {
                 return Ok(None);
             }
         };
 
-        // return the blockhash as a cid, or an error if the cid is invalid
-        match Cid::from_str(blockhash.as_str()) {
-            Ok(cid) => Ok(Some(cid)),
-            Err(_) => Err(ActorError::unchecked(
-                ExitCode::USR_ILLEGAL_STATE,
-                format!(
-                    "failed to parse cid, blockhash: {}, epoch: {}",
-                    blockhash, epoch
-                ),
-            )),
-        }
+        Ok(Some(Cid::new_v1(
+            DAG_CBOR,
+            Code::Blake2b256.digest(blockhash),
+        )))
     }
 }
 

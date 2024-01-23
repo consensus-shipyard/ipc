@@ -1,7 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::anyhow;
-use cid::Cid;
+use cid::{
+    multihash::{Code, MultihashDigest},
+    Cid,
+};
+use fendermint_actor_chainmetadata::BlockHash;
 use fendermint_actors::CHAINMETADATA_ACTOR_ID;
 use fil_actors_runtime::Array;
 use fvm::{
@@ -9,9 +13,8 @@ use fvm::{
     state_tree::StateTree,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::CborStore;
+use fvm_ipld_encoding::{CborStore, DAG_CBOR};
 use fvm_shared::clock::ChainEpoch;
-use std::str::FromStr;
 
 use super::store::ReadOnlyBlockstore;
 
@@ -114,22 +117,18 @@ where
         let blockhashes = Array::load(&actor_state.blockhashes, &bstore)?;
 
         // get the block hash at the given epoch
-        let blockhash: &String = match blockhashes.get(epoch as u64).unwrap() {
+        let blockhash: &BlockHash = match blockhashes.get(epoch as u64).unwrap() {
             Some(v) => v,
             None => {
                 return Ok(Cid::default());
             }
         };
 
-        // return the blockhash as a cid, or an error if the cid is invalid
-        match Cid::from_str(blockhash.as_str()) {
-            Ok(cid) => Ok(cid),
-            Err(_) => Err(anyhow!(
-                "failed to parse cid, blockhash: {}, epoch: {}",
-                blockhash,
-                epoch
-            )),
-        }
+        let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(blockhash));
+
+        tracing::info!("get_tipset_cid returned cid: {} at epoch: {}", cid, epoch);
+
+        Ok(cid)
     }
 }
 
