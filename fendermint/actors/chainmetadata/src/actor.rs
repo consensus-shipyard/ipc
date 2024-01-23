@@ -14,7 +14,6 @@ use fil_actors_runtime::Array;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::error::ExitCode;
 
-use crate::shared::BLOCKHASHES_AMT_BITWIDTH;
 use crate::{ConstructorParams, Method, PushBlockParams, State};
 
 #[cfg(feature = "fil-actor")]
@@ -26,17 +25,9 @@ impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
-        let empty_arr_cid =
-            Array::<(), _>::new_with_bit_width(rt.store(), BLOCKHASHES_AMT_BITWIDTH)
-                .flush()
-                .map_err(|e| {
-                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to create empty AMT")
-                })?;
-
-        let state = State {
-            blockhashes: empty_arr_cid,
-            lookback_len: params.lookback_len,
-        };
+        let state = State::new(rt.store(), params.lookback_len).map_err(|e| {
+            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to create empty AMT")
+        })?;
 
         rt.create(&state)?;
 
@@ -60,7 +51,8 @@ impl Actor {
                 .set(params.epoch as u64, params.block.to_string())
                 .unwrap();
 
-            // remove the oldest block if the AMT is full
+            // remove the oldest block if the AMT is full (note that this assume the
+            // for_each_while iterates in order, which it seems to do)
             if blockhashes.count() > st.lookback_len {
                 let mut first_idx = 0;
                 blockhashes

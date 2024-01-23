@@ -9,7 +9,6 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
-use fendermint_actor_chainmetadata::BLOCKHASHES_AMT_BITWIDTH;
 use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -19,7 +18,6 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
-use fil_actors_runtime::Array;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
@@ -235,16 +233,14 @@ where
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
         // (e.g. block hashes) which we can query.
-        let empty_blockhashes_cid =
-            Array::<(), _>::new_with_bit_width(state.store(), BLOCKHASHES_AMT_BITWIDTH).flush()?;
+        const LOOKBACK_LEN: u64 = 256;
+        let chainmetadata_state =
+            fendermint_actor_chainmetadata::State::new(&state.store(), LOOKBACK_LEN)?;
         state
             .create_actor(
                 fendermint_actors::CHAINMETADATA_ACTOR_CODE_ID,
                 fendermint_actors::CHAINMETADATA_ACTOR_ID,
-                &fendermint_actor_chainmetadata::State {
-                    blockhashes: empty_blockhashes_cid,
-                    lookback_len: fendermint_actor_chainmetadata::DEFAULT_LOOKBACK_LEN,
-                },
+                &chainmetadata_state,
                 TokenAmount::zero(),
                 None,
             )

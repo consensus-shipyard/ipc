@@ -620,7 +620,7 @@ fn choose_account<'a>(
     Ok(a)
 }
 
-fn get_actor_balance<DB: Blockstore>(
+fn get_actor_balance<DB: Blockstore + Clone>(
     exec_state: &mut FvmExecState<DB>,
     addr: EthAddress,
 ) -> TokenAmount {

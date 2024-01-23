@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .arg("--target=wasm32-unknown-unknown")
         .arg("--profile=wasm")
         .arg("--features=fil-actor")
-        .arg("--manifest-path=".to_owned() + manifest_path.to_str().unwrap())
+        .arg(format!("--manifest-path={}", manifest_path.display()))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         // We are supposed to only generate artifacts under OUT_DIR,

@@ -24,7 +24,7 @@ use super::{CheckStateRef, FvmExecState, FvmStateParams};
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
     /// A read-only wrapper around the blockstore, to make sure we aren't
     /// accidentally committing any state. Any writes by the FVM will be
@@ -215,7 +215,7 @@ where
 
 impl<DB> HasChainID for FvmQueryState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
     fn chain_id(&self) -> ChainID {
         ChainID::from(self.state_params.chain_id)

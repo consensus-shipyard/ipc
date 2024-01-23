@@ -17,7 +17,7 @@ impl<DB> ReadOnlyBlockstore<DB> {
 
 impl<DB> Blockstore for ReadOnlyBlockstore<DB>
 where
-    DB: Blockstore,
+    DB: Blockstore + Clone,
 {
     fn get(&self, k: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
         self.0.get(k)

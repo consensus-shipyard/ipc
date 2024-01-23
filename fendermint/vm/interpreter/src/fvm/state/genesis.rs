@@ -49,7 +49,7 @@ pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<D
 /// Initially we can only set up an empty state tree.
 /// Then we have to create the built-in actors' state that the FVM relies on.
 /// Then we can instantiate an FVM execution engine, which we can use to construct FEVM based actors.
-enum Stage<DB: Blockstore + 'static> {
+enum Stage<DB: Blockstore + Clone + 'static> {
     Tree(StateTree<DB>),
     Exec(FvmExecState<DB>),
 }
@@ -57,7 +57,7 @@ enum Stage<DB: Blockstore + 'static> {
 /// A state we create for the execution of genesis initialisation.
 pub struct FvmGenesisState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
     pub manifest_data_cid: Cid,
     pub manifest: Manifest,

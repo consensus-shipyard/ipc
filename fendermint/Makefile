@@ -98,7 +98,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;
 # so long as they work together.
-actor-bundle: $(BUILTIN_ACTORS_BUNDLE)
+actor-bundle: $(BUILTIN_ACTORS_BUNDLE) $(ACTORS_BUNDLE)
 
 compile-abi: $(IPC_ACTORS_GEN)
 

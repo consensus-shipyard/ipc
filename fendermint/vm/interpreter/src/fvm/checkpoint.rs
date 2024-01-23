@@ -50,7 +50,7 @@ pub fn maybe_create_checkpoint<DB>(
     state: &mut FvmExecState<DB>,
 ) -> anyhow::Result<Option<(checkpoint::BottomUpCheckpoint, PowerUpdates)>>
 where
-    DB: Blockstore + Sync + Send + 'static,
+    DB: Blockstore + Sync + Send + Clone + 'static,
 {
     // Epoch transitions for checkpointing.
     let height: tendermint::block::Height = state
@@ -164,7 +164,7 @@ pub fn unsigned_checkpoints<DB>(
     validator_key: PublicKey,
 ) -> anyhow::Result<Vec<getter::BottomUpCheckpoint>>
 where
-    DB: Blockstore + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + Clone + 'static,
 {
     let mut unsigned_checkpoints = Vec::new();
     let validator_addr = EthAddress::from(validator_key);
@@ -196,7 +196,7 @@ pub async fn broadcast_incomplete_signatures<C, DB>(
 ) -> anyhow::Result<()>
 where
     C: Client + Clone + Send + Sync + 'static,
-    DB: Blockstore + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + Clone + 'static,
 {
     // Make sure that these had time to be added to the ledger.
     if let Some(highest) = incomplete_checkpoints
@@ -268,7 +268,7 @@ pub async fn broadcast_signature<C, DB>(
 ) -> anyhow::Result<()>
 where
     C: Client + Clone + Send + Sync + 'static,
-    DB: Blockstore + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + Clone + 'static,
 {
     let calldata = gateway
         .add_checkpoint_signature_calldata(checkpoint, &power_table.0, validator, secret_key)
@@ -291,7 +291,7 @@ fn should_create_checkpoint<DB>(
     height: Height,
 ) -> anyhow::Result<Option<checkpoint::SubnetID>>
 where
-    DB: Blockstore,
+    DB: Blockstore + Clone,
 {
     if gateway.enabled(state)? {
         let id = gateway.subnet_id(state)?;
@@ -336,7 +336,7 @@ fn ipc_power_table<DB>(
     state: &mut FvmExecState<DB>,
 ) -> anyhow::Result<(ConfigurationNumber, PowerTable)>
 where
-    DB: Blockstore + Sync + Send + 'static,
+    DB: Blockstore + Sync + Send + Clone + 'static,
 {
     let membership = gateway
         .current_validator_set(state)

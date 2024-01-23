@@ -116,7 +116,7 @@ pub struct AppConfig<S: KVStore> {
 #[derive(Clone)]
 pub struct App<DB, SS, S, I>
 where
-    SS: Blockstore + 'static,
+    SS: Blockstore + Clone + 'static,
     S: KVStore,
 {
     /// Database backing all key-value operations.
