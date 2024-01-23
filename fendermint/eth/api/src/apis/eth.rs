@@ -20,6 +20,7 @@ use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
+use futures::FutureExt;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
@@ -27,6 +28,7 @@ use fvm_shared::crypto::signature::Signature;
 use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
 use rand::Rng;
+use tendermint::block::Height;
 use tendermint_rpc::endpoint::{self, status};
 use tendermint_rpc::SubscriptionClient;
 use tendermint_rpc::{
@@ -198,6 +200,12 @@ where
     let mut block_number = last_block;
     let mut block_count = block_count.as_usize();
 
+    let get_base_fee = |height: Height| {
+        data.client
+            .state_params(FvmQueryHeight::Height(height.value()))
+            .map(|result| result.map(|state_params| state_params.value.base_fee))
+    };
+
     while block_count > 0 {
         let block = data
             .block_by_height(block_number)
@@ -206,17 +214,19 @@ where
 
         let height = block.header().height;
 
-        // Genesis has height 1, but no relevant fees.
-        if height.value() <= 1 {
-            break;
+        // Apparently the base fees have to include the next fee after the newest block.
+        // See https://github.com/filecoin-project/lotus/blob/v1.25.2/node/impl/full/eth.go#L721-L725
+        if hist.base_fee_per_gas.is_empty() {
+            let base_fee = get_base_fee(height.increment())
+                .await
+                .context("failed to get next base fee")?;
+
+            hist.base_fee_per_gas.push(to_eth_tokens(&base_fee)?);
         }
 
-        let state_params = data
-            .client
-            .state_params(FvmQueryHeight::Height(height.value()))
-            .await?;
-
-        let base_fee = &state_params.value.base_fee;
+        let base_fee = get_base_fee(height)
+            .await
+            .context("failed to get block base fee")?;
 
         let consensus_params: consensus_params::Response = data
             .tm()
@@ -241,7 +251,7 @@ where
                     .context("failed to decode tx as ChainMessage")?;
 
                 if let ChainMessage::Signed(msg) = msg {
-                    let premium = crate::gas::effective_gas_premium(&msg.message, base_fee);
+                    let premium = crate::gas::effective_gas_premium(&msg.message, &base_fee);
                     premiums.push((premium, txres.gas_used));
                 }
             }
@@ -268,13 +278,19 @@ where
                 .collect();
 
             hist.oldest_block = et::U256::from(height.value());
-            hist.base_fee_per_gas.push(to_eth_tokens(base_fee)?);
+            hist.base_fee_per_gas.push(to_eth_tokens(&base_fee)?);
             hist.gas_used_ratio
                 .push(total_gas_used as f64 / block_gas_limit as f64);
             hist.reward.push(rewards?);
+
+            block_count -= 1;
         }
 
-        block_count -= 1;
+        // Genesis has height 1.
+        if height.value() <= 1 {
+            break;
+        }
+
         block_number = et::BlockNumber::Number(et::U64::from(height.value() - 1));
     }
 
