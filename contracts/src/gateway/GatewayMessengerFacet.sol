@@ -2,15 +2,16 @@
 pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
-import {IpcEnvelope, IpcMsg} from "../structs/CrossNet.sol";
+import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {SubnetID, SupplyKind} from "../structs/Subnet.sol";
-import {InvalidCrossMsgFromSubnet, InvalidCrossMsgSender, InvalidCrossMsgDstSubnet, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {SubnetID, SupplyKind, IPCAddress} from "../structs/Subnet.sol";
+import {InvalidCrossMsgSender, InvalidCrossMsgDstSubnet, InvalidCrossMsgKind, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
+import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
 string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
@@ -20,39 +21,57 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
 
     /**
-     * @dev sends a general-purpose cross-message from the local subnet to the destination subnet.
+     * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
+     * Any value in msg.value will be forwarded in the call.
      *
-     * IMPORTANT: `msg.value` is expected to equal to the value sent in `crossMsg.value` plus the cross-messaging fee.
-     * Only smart contracts are allowed to trigger these cross-net messages, users
-     * can always send funds from their address to the destination subnet and then run the transaction in the destination
-     * normally.
+     * IMPORTANT: Only smart contracts are allowed to trigger these cross-net messages. User wallets can send funds
+     * from their address to the destination subnet and then run the transaction in the destination normally.
      *
-     * @param crossMsg - a cross-message to send.
+     * @param envelope - the original envelope, which will be validated, stamped and committed during the send.
+     * @return committed envelope.
      */
-    function sendContractXnetMessage(IpcEnvelope calldata crossMsg) external payable {
+    function sendContractXnetMessage(IpcEnvelope calldata envelope) external payable returns (IpcEnvelope memory committed) {
         if (!s.generalPurposeCrossMsg) {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
         }
 
-        // we prevent the sender from being an EoA.
+        // TODO: consolidate all these error types into an error InvalidXnetMsg(string reason).
+        //
+        // We prevent the sender from being an EoA.
         if (!(msg.sender.code.length > 0)) {
             revert InvalidCrossMsgSender();
         }
 
-        if (crossMsg.value != msg.value) {
+        if (envelope.value != msg.value) {
             revert InvalidCrossMsgValue();
         }
 
-        // We disregard the "to" of the message that will be verified in the _commitCrossMessage().
-        // The caller is the one set as the "from" of the message
-        if (!crossMsg.from.subnetId.equals(s.networkName)) {
-            revert InvalidCrossMsgFromSubnet();
+        if (envelope.kind != IpcMsgKind.Call) {
+            revert InvalidCrossMsgKind();
         }
 
-        // commit cross-message for propagation
-        bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
+        // Will revert if the message won't deserialize into a CallMsg.
+        abi.decode(envelope.message, (CallMsg));
 
-        LibGateway.crossMsgSideEffects({v: crossMsg.value, shouldBurn: shouldBurn});
+        committed = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({subnetId: s.networkName, rawAddress: FvmAddressHelper.from(msg.sender)}),
+            to: envelope.to,
+            value: msg.value,
+            message: envelope.message,
+            nonce: 0
+        });
+
+        // Commit xnet message for dispatch.
+        bool shouldBurn = LibGateway.commitCrossMessage(committed);
+
+        // Apply side effects, such as burning funds.
+        LibGateway.crossMsgSideEffects({v: committed.value, shouldBurn: shouldBurn});
+
+        // Return a copy of the envelope, which was updated when it was committed.
+        // Updates are visible to us because commitCrossMessage takes the envelope with memory scope,
+        // which passes the struct by reference.
+        return committed;
     }
 
     /**
