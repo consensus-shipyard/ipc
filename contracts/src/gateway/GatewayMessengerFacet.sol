@@ -30,7 +30,9 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      * @param envelope - the original envelope, which will be validated, stamped and committed during the send.
      * @return committed envelope.
      */
-    function sendContractXnetMessage(IpcEnvelope calldata envelope) external payable returns (IpcEnvelope memory committed) {
+    function sendContractXnetMessage(
+        IpcEnvelope calldata envelope
+    ) external payable returns (IpcEnvelope memory committed) {
         if (!s.generalPurposeCrossMsg) {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
         }

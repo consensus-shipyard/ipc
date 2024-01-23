@@ -7,3 +7,7 @@ out/
 scripts/deploy-registry.ts
 scripts/deploy-gateway.ts
 .out/
+artifacts/
+cache/
+cache_hardhat/
+typechain/
