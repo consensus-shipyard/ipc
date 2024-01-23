@@ -31,6 +31,7 @@ error InvalidCrossMsgDstSubnet();
 error InvalidCrossMsgFromSubnet();
 error InvalidCrossMsgNonce();
 error InvalidCrossMsgValue();
+error InvalidCrossMsgKind();
 error InvalidMajorityPercentage();
 error InvalidPowerScale();
 error InvalidRetentionHeight();
