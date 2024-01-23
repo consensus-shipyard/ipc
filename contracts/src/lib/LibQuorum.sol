@@ -138,11 +138,12 @@ library LibQuorum {
         }
 
         for (uint256 h = oldRetentionHeight; h < newRetentionHeight; ) {
-            address[] memory validators = self.quorumSignatureSenders[h].values();
-            uint256 n = validators.length;
+            address[] memory oldValidators = self.quorumSignatureSenders[h].values();
+            uint256 n = oldValidators.length;
 
             for (uint256 i; i < n; ) {
-                delete self.quorumSignatures[h][validators[i]];
+                delete self.quorumSignatures[h][oldValidators[i]];
+                self.quorumSignatureSenders[h].remove(oldValidators[i]);
                 unchecked {
                     ++i;
                 }

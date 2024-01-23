@@ -72,6 +72,7 @@ error SubnetNotFound();
 error WithdrawExceedingCollateral();
 error ZeroMembershipWeight();
 error SubnetAlreadyBootstrapped();
+error SubnetNotBootstrapped();
 error FacetCannotBeZero();
 error WrongGateway();
 error CannotFindSubnet();
