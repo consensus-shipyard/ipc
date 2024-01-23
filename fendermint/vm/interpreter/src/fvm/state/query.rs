@@ -7,7 +7,7 @@ use std::{cell::RefCell, sync::Arc};
 use anyhow::{anyhow, Context};
 
 use cid::Cid;
-use fendermint_vm_actor_interface::system::{is_system_addr, State, SYSTEM_ACTOR_ADDR};
+use fendermint_vm_actor_interface::system::{is_system_addr, State as SystemState, SYSTEM_ACTOR_ADDR};
 use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::query::ActorState;
 use fvm::engine::MultiEngine;
@@ -211,9 +211,9 @@ where
             let (s, state) = self.actor_state(&SYSTEM_ACTOR_ADDR).await?;
             (s, state.ok_or(anyhow!("no system actor"))?.1)
         };
-        let state: State = s
+        let state: SystemState = s
             .store
-            .get_cbor(&sys_state.code)
+            .get_cbor(&sys_state.state)
             .context("failed to get system state")?
             .ok_or(anyhow!("system actor state not found"))?;
         let ret = s
