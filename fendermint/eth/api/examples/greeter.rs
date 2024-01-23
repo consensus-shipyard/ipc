@@ -172,7 +172,7 @@ where
 
     if let Some(ref out) = opts.out {
         // Print some metadata so that we can configure The Graph:
-        // `subgraph.yaml` requires the `address` and `startBlock` to be configured.
+        // `subgraph.template.yaml` requires the `address` and `startBlock` to be configured.
         let output = json!({
             "address": format!("{:?}", contract.address()),
             "deploy_height": deploy_height.as_u64(),
