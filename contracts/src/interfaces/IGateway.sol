@@ -57,7 +57,7 @@ interface IGateway {
 
     /// @notice sendContractXnetMessage sends an arbitrary cross-message to other subnet in the hierarchy.
     // TODO: add the right comment and function name here.
-    function sendContractXnetMessage(IpcEnvelope calldata msg) external payable;
+    function sendContractXnetMessage(IpcEnvelope calldata envelope) external payable returns (IpcEnvelope memory committed);
 
     /// @notice Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;
