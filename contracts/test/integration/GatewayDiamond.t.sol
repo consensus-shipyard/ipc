@@ -1149,6 +1149,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         weights[1] = 150;
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        // increase the block number so that current block number is 
+        // not the same as init committed parent finality height
+        vm.roll(10);
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 

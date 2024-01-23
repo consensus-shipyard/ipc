@@ -130,7 +130,7 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         uint256 lastHeight = s.latestParentHeight;
-        if (lastHeight > finality.height) {
+        if (lastHeight >= finality.height) {
             revert ParentFinalityAlreadyCommitted();
         }
         lastFinality = s.finalitiesMap[lastHeight];
