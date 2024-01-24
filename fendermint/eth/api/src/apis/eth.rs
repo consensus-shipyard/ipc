@@ -754,7 +754,7 @@ where
     // If not an EVM actor, return empty.
     if data.get_actor_type(&address, height).await? != ActorType::Known("evm".to_string()) {
         // The client library expects hex encoded string.
-        return encode(None)
+        return encode(None);
     }
 
     let params = evm::GetStorageAtParams {
@@ -776,10 +776,10 @@ where
 
     if let Some(ret) = ret {
         // ret.storage.to_big_endian(&mut bz);
-        return encode(Some(ret.storage))
+        return encode(Some(ret.storage));
     }
 
-    return encode(None)
+    return encode(None);
 }
 
 /// Returns code at a given address.

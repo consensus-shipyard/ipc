@@ -7,7 +7,9 @@ use std::{cell::RefCell, sync::Arc};
 use anyhow::{anyhow, Context};
 
 use cid::Cid;
-use fendermint_vm_actor_interface::system::{is_system_addr, State as SystemState, SYSTEM_ACTOR_ADDR};
+use fendermint_vm_actor_interface::system::{
+    is_system_addr, State as SystemState, SYSTEM_ACTOR_ADDR,
+};
 use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::query::ActorState;
 use fvm::engine::MultiEngine;
