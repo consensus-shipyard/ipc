@@ -5,7 +5,7 @@ use cid::{
     multihash::{Code, MultihashDigest},
     Cid,
 };
-use fil_actors_runtime::Array;
+use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{
     tuple::{Deserialize_tuple, Serialize_tuple},
@@ -27,7 +27,7 @@ pub struct State {
 impl State {
     pub fn new<BS: Blockstore>(store: &BS, lookback_len: u64) -> anyhow::Result<Self> {
         let empty_blockhashes_cid =
-            match Array::<(), _>::new_with_bit_width(store, BLOCKHASHES_AMT_BITWIDTH).flush() {
+            match Amt::<(), _>::new_with_bit_width(store, BLOCKHASHES_AMT_BITWIDTH).flush() {
                 Ok(cid) => cid,
                 Err(e) => {
                     return Err(anyhow::anyhow!(
@@ -50,8 +50,8 @@ impl State {
         store: &BS,
         epoch: ChainEpoch,
     ) -> anyhow::Result<Option<Cid>> {
-        // load the blockhashes Array from the AMT root cid
-        let blockhashes = match Array::load(&self.blockhashes, &store) {
+        // load the blockhashes array from the AMT root cid
+        let blockhashes = match Amt::load(&self.blockhashes, &store) {
             Ok(v) => v,
             Err(e) => {
                 return Err(anyhow::anyhow!(

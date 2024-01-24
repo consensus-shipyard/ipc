@@ -45,7 +45,6 @@ fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_car = { workspace = true }
-fil_actors_runtime = { workspace = true }
 
 futures-core = { workspace = true }
 futures-util = { workspace = true }

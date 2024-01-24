@@ -15,7 +15,6 @@ use fvm_shared::error::ExitCode;
 use crate::BlockHash;
 use crate::{ConstructorParams, Method, PushBlockParams, State};
 
-#[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub struct Actor;
