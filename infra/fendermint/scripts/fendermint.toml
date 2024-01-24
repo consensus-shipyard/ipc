@@ -63,8 +63,7 @@ docker run \
   --env FM_IPC__TOPDOWN__POLLING_INTERVAL=10 \
   --env FM_IPC__TOPDOWN__PROPOSAL_DELAY=${TOPDOWN_PROPOSAL_DELAY} \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
-  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
-  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
+  --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
@@ -106,8 +105,7 @@ docker run \
   --env FM_IPC__TOPDOWN__POLLING_INTERVAL=10 \
   --env FM_IPC__TOPDOWN__PROPOSAL_DELAY=${TOPDOWN_PROPOSAL_DELAY} \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
-  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
-  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
+  --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=${LOG_LEVEL} \
@@ -132,6 +130,13 @@ docker run \
   ${CMD}
 """
 dependencies = ["fendermint-deps"]
+
+
+[tasks.fendermint-new-network-key]
+extend = "fendermint-tool"
+env = { "CMD" = "key gen --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR} --name ${NETWORK_KEY_NAME}" }
+script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}"
+script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
 
 
 [tasks.fendermint-deps]

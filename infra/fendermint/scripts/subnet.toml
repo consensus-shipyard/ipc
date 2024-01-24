@@ -99,6 +99,7 @@ dependencies = [
 dependencies = [
     "subnet-fetch-genesis",
     "genesis-write",
+    "fendermint-new-network-key",
 ]
 
 [tasks.validator-config]
@@ -110,12 +111,12 @@ dependencies = [
 
 [tasks.subnet-convert-eth-key]
 extend = "fendermint-tool"
-env = { "ENTRY" = "fendermint", "CMD" = "key eth-to-fendermint --secret-key /data/${NODE_NAME}/${KEYS_SUBDIR}/eth.sk --name validator_key --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR}" }
+env = { "CMD" = "key eth-to-fendermint --secret-key /data/${NODE_NAME}/${KEYS_SUBDIR}/eth.sk --name ${VALIDATOR_KEY_NAME} --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR}" }
 script.pre = "mkdir ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}; cp ${PRIVATE_KEY_PATH} ${BASE_DIR}/${NODE_NAME}/keys/eth.sk"
 
 [tasks.subnet-fetch-genesis]
 extend = "fendermint-tool"
-env = { "ENTRY" = "fendermint", "CMD" = "genesis --genesis-file /data/genesis.json ipc from-parent --subnet-id ${SUBNET_ID} -p ${PARENT_ENDPOINT}  --parent-gateway ${PARENT_GATEWAY}  --parent-registry ${PARENT_REGISTRY} --base-fee ${BASE_FEE} --power-scale ${POWER_SCALE}" }
+env = { "CMD" = "genesis --genesis-file /data/genesis.json ipc from-parent --subnet-id ${SUBNET_ID} -p ${PARENT_ENDPOINT}  --parent-gateway ${PARENT_GATEWAY}  --parent-registry ${PARENT_REGISTRY} --base-fee ${BASE_FEE} --power-scale ${POWER_SCALE}" }
 
 [tasks.node-report]
 script = """cat << EOF
