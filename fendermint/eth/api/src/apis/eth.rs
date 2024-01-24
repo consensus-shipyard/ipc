@@ -779,7 +779,7 @@ where
         return encode(Some(ret.storage));
     }
 
-    return encode(None);
+    encode(None)
 }
 
 /// Returns code at a given address.
