@@ -67,6 +67,31 @@ where
     stage: Stage<DB>,
 }
 
+async fn parse_bundle<DB: Blockstore>(store: &DB, bundle: &[u8]) -> anyhow::Result<(u32, Cid)> {
+    let bundle_roots = load_car_unchecked(&store, bundle).await?;
+    let bundle_root = match bundle_roots.as_slice() {
+        [root] => root,
+        roots => {
+            return Err(anyhow!(
+                "expected one root in builtin actor bundle; got {}",
+                roots.len()
+            ))
+        }
+    };
+
+    let (manifest_version, manifest_data_cid): (u32, Cid) = match store.get_cbor(bundle_root)? {
+        Some(vd) => vd,
+        None => {
+            return Err(anyhow!(
+                "no manifest information in bundle root {}",
+                bundle_root
+            ))
+        }
+    };
+
+    Ok((manifest_version, manifest_data_cid))
+}
+
 impl<DB> FvmGenesisState<DB>
 where
     DB: Blockstore + Clone + 'static,
@@ -78,56 +103,15 @@ where
         custom_actor_bundle: &[u8],
     ) -> anyhow::Result<Self> {
         // Load the builtin actor bundle.
-        let bundle_roots = load_car_unchecked(&store, bundle).await?;
-        let bundle_root = match bundle_roots.as_slice() {
-            [root] => root,
-            roots => {
-                return Err(anyhow!(
-                    "expected one root in builtin actor bundle; got {}",
-                    roots.len()
-                ))
-            }
-        };
-
-        let (manifest_version, manifest_data_cid): (u32, Cid) = match store.get_cbor(bundle_root)? {
-            Some(vd) => vd,
-            None => {
-                return Err(anyhow!(
-                    "no manifest information in bundle root {}",
-                    bundle_root
-                ))
-            }
-        };
+        let (manifest_version, manifest_data_cid): (u32, Cid) =
+            parse_bundle(&store, bundle).await?;
         let manifest = Manifest::load(&store, &manifest_data_cid, manifest_version)?;
 
-        // Load the custom actors bundle
-        let custom_actors_bundle_roots = load_car_unchecked(&store, custom_actor_bundle).await?;
-        let custom_actors_bundle_root = match custom_actors_bundle_roots.as_slice() {
-            [root] => root,
-            roots => {
-                return Err(anyhow!(
-                    "expected one root in actor bundle; got {}",
-                    roots.len()
-                ))
-            }
-        };
-
-        let (custom_actor_manifest_version, custom_actor_manifest_data_cid): (u32, Cid) =
-            match store.get_cbor(custom_actors_bundle_root)? {
-                Some(vd) => vd,
-                None => {
-                    return Err(anyhow!(
-                        "no manifest information in custom actor bundle root {}",
-                        bundle_root
-                    ))
-                }
-            };
-
-        let custom_actor_manifest = CustomActorManifest::load(
-            &store,
-            &custom_actor_manifest_data_cid,
-            custom_actor_manifest_version,
-        )?;
+        // Load the custom actor bundle.
+        let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) =
+            parse_bundle(&store, custom_actor_bundle).await?;
+        let custom_actor_manifest =
+            CustomActorManifest::load(&store, &custom_manifest_data_cid, custom_manifest_version)?;
 
         let state_tree = empty_state_tree(store.clone())?;
 

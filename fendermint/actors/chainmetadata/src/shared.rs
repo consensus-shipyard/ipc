@@ -18,6 +18,10 @@ use num_derive::FromPrimitive;
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
     // the AMT root cid of blockhashes
+    //
+    // TODO: consider using kamt instead due to appending larger and
+    // larger keys to the AMT makes it unbalanced requiring more space
+    // to store (see https://github.com/filecoin-project/go-amt-ipld/issues/17)
     pub blockhashes: Cid,
 
     // the maximum size of blockhashes before removing the oldest epoch
@@ -84,7 +88,7 @@ impl State {
     }
 }
 
-pub const CHAINMETADATA_ACTOR_NAME: &'static str = "chainmetadata";
+pub const CHAINMETADATA_ACTOR_NAME: &str = "chainmetadata";
 
 // the default lookback length is 256 epochs
 pub const DEFAULT_LOOKBACK_LEN: u64 = 256;
