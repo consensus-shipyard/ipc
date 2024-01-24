@@ -14,7 +14,7 @@ import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {IpcHandler, IpcExchange} from "../../sdk/IpcContract.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
-import { CrossMsgHelper } from "../../src/lib/CrossMsgHelper.sol";
+import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 
 interface Foo {
     function foo(string calldata) external returns (string memory);
@@ -26,9 +26,12 @@ contract RecorderIpcExchange is IpcExchange {
     ResultMsg private lastResultMsg;
     bool private shouldRevert;
 
-    constructor(address gatewayAddr_) IpcExchange(gatewayAddr_) { }
+    constructor(address gatewayAddr_) IpcExchange(gatewayAddr_) {}
 
-    function _handleIpcCall(IpcEnvelope memory envelope, CallMsg memory callMsg) internal override returns (bytes memory) {
+    function _handleIpcCall(
+        IpcEnvelope memory envelope,
+        CallMsg memory callMsg
+    ) internal override returns (bytes memory) {
         require(!shouldRevert, "revert requested");
         console.log("handling ipc call");
         lastEnvelope = envelope;
@@ -36,7 +39,11 @@ contract RecorderIpcExchange is IpcExchange {
         return bytes("");
     }
 
-    function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal override {
+    function _handleIpcResult(
+        IpcEnvelope storage original,
+        IpcEnvelope memory result,
+        ResultMsg memory resultMsg
+    ) internal override {
         require(!shouldRevert, "revert requested");
         console.log("handling ipc result");
         require(keccak256(abi.encode(original)) == keccak256(abi.encode(lastEnvelope)));
@@ -76,7 +83,6 @@ contract RecorderIpcExchange is IpcExchange {
     function getInflight(bytes32 id) public view returns (IpcEnvelope memory) {
         return inflightMsgs[id];
     }
-
 }
 
 contract IpcExchangeTest is Test {
@@ -132,7 +138,7 @@ contract IpcExchangeTest is Test {
 
         // an unrecognized result
         envelope.kind = IpcMsgKind.Result;
-        envelope.message = abi.encode(ResultMsg({ id: keccak256("foo"), success: true, ret: bytes("") }));
+        envelope.message = abi.encode(ResultMsg({id: keccak256("foo"), success: true, ret: bytes("")}));
 
         IPCAddress memory from = envelope.from;
         envelope.from = envelope.to;
@@ -152,8 +158,5 @@ contract IpcExchangeTest is Test {
         // TODO test receipt correlation
 
         // TODO test dropMessages
-
     }
-
-
 }
