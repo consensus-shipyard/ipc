@@ -49,6 +49,7 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
+  --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -64,6 +65,7 @@ docker run \
   --env FM_IPC__TOPDOWN__PROPOSAL_DELAY=${TOPDOWN_PROPOSAL_DELAY} \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
   --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
+  --env FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
@@ -91,6 +93,7 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
+  --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -106,6 +109,7 @@ docker run \
   --env FM_IPC__TOPDOWN__PROPOSAL_DELAY=${TOPDOWN_PROPOSAL_DELAY} \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
   --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
+  --env FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=${LOG_LEVEL} \
