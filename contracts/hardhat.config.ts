@@ -1,15 +1,12 @@
 import '@nomicfoundation/hardhat-foundry'
 import '@nomiclabs/hardhat-ethers'
 import '@typechain/hardhat'
-import dotenv from 'dotenv'
-import fs from 'fs'
+import * as fs from 'fs'
 import 'hardhat-contract-sizer'
 import 'hardhat-deploy'
 import 'hardhat-storage-layout-changes'
 import { HardhatUserConfig, task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
-
-dotenv.config()
 
 const lazyImport = async (module: any) => {
     return await import(module)
