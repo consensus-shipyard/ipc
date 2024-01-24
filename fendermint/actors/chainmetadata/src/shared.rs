@@ -1,10 +1,16 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::Cid;
+use cid::{
+    multihash::{Code, MultihashDigest},
+    Cid,
+};
 use fil_actors_runtime::Array;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
+use fvm_ipld_encoding::{
+    tuple::{Deserialize_tuple, Serialize_tuple},
+    DAG_CBOR,
+};
 use fvm_shared::{clock::ChainEpoch, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
@@ -35,6 +41,46 @@ impl State {
             blockhashes: empty_blockhashes_cid,
             lookback_len,
         })
+    }
+
+    // loads the blockhashes array from the AMT root cid and returns the blockhash
+    // at the given epoch
+    pub fn get_block_cid<BS: Blockstore>(
+        &self,
+        store: &BS,
+        epoch: ChainEpoch,
+    ) -> anyhow::Result<Option<Cid>> {
+        // load the blockhashes Array from the AMT root cid
+        let blockhashes = match Array::load(&self.blockhashes, &store) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "failed to load blockhashes from AMT cid {}, error: {}",
+                    self.blockhashes,
+                    e
+                ));
+            }
+        };
+
+        // get the block hash at the given epoch
+        let blockhash: &BlockHash = match blockhashes.get(epoch as u64) {
+            Ok(Some(v)) => v,
+            Ok(None) => {
+                return Ok(None);
+            }
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "failed to get blockhash at epoch {}, error: {}",
+                    epoch,
+                    err
+                ));
+            }
+        };
+
+        Ok(Some(Cid::new_v1(
+            DAG_CBOR,
+            Code::Blake2b256.digest(blockhash),
+        )))
     }
 }
 

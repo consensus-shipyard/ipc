@@ -1,8 +1,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::multihash::Code;
-use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fil_actors_runtime::actor_dispatch;
 use fil_actors_runtime::actor_error;
@@ -11,7 +9,6 @@ use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorDowncast;
 use fil_actors_runtime::ActorError;
 use fil_actors_runtime::Array;
-use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::error::ExitCode;
 
@@ -83,26 +80,13 @@ impl Actor {
     fn block_cid(rt: &impl Runtime, epoch: ChainEpoch) -> Result<Option<Cid>, ActorError> {
         let st: State = rt.state()?;
 
-        // load the blockhashes AMT
-        let blockhashes = Array::load(&st.blockhashes, rt.store()).map_err(|e| {
-            e.downcast_default(
-                ExitCode::USR_ILLEGAL_STATE,
-                "failed to load blockhashes states",
-            )
-        })?;
-
-        // get the block cid from the AMT, if it does not exist return None
-        let blockhash: &BlockHash = match blockhashes.get(epoch as u64).unwrap() {
-            Some(v) => v,
-            None => {
-                return Ok(None);
+        match st.get_block_cid(rt.store(), epoch) {
+            Ok(Some(cid)) => Ok(Some(cid)),
+            Ok(None) => Ok(None),
+            Err(err) => {
+                Err(err.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get blockhash"))
             }
-        };
-
-        Ok(Some(Cid::new_v1(
-            DAG_CBOR,
-            Code::Blake2b256.digest(blockhash),
-        )))
+        }
     }
 }
 

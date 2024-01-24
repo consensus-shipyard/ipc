@@ -1,19 +1,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::anyhow;
-use cid::{
-    multihash::{Code, MultihashDigest},
-    Cid,
-};
-use fendermint_actor_chainmetadata::BlockHash;
+use cid::Cid;
 use fendermint_actors::CHAINMETADATA_ACTOR_ID;
-use fil_actors_runtime::Array;
 use fvm::{
     externs::{Chain, Consensus, Externs, Rand},
     state_tree::StateTree,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{CborStore, DAG_CBOR};
+use fvm_ipld_encoding::CborStore;
 use fvm_shared::clock::ChainEpoch;
 
 use super::store::ReadOnlyBlockstore;
@@ -113,22 +108,11 @@ where
                 }
             };
 
-        // load the blockhashe Array from the AMT root cid
-        let blockhashes = Array::load(&actor_state.blockhashes, &bstore)?;
-
-        // get the block hash at the given epoch
-        let blockhash: &BlockHash = match blockhashes.get(epoch as u64).unwrap() {
-            Some(v) => v,
-            None => {
-                return Ok(Cid::default());
-            }
-        };
-
-        let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(blockhash));
-
-        tracing::info!("get_tipset_cid returned cid: {} at epoch: {}", cid, epoch);
-
-        Ok(cid)
+        match actor_state.get_block_cid(&bstore, epoch) {
+            Ok(Some(cid)) => Ok(cid),
+            Ok(None) => Ok(Cid::default()),
+            Err(err) => Err(err),
+        }
     }
 }
 
