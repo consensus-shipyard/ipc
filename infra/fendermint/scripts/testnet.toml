@@ -94,7 +94,7 @@ env = { "CMD" = "init", "NETWORK_NAME" = "${NETWORK_NAME}", "CMT_DIR" = "${BASE_
 
 [tasks.testnet-add-peer]
 extend = "fendermint-tool"
-env = { "ENTRY" = "fendermint", "CMD" = """key add-peer \
+env = { "CMD" = """key add-peer \
         --node-key-file /data/${NODE_NAME}/${COMETBFT_SUBDIR}/config/node_key.json \
         --network-addr ${NETWORK_ADDR} \
         --local-peers-file /data/peers \

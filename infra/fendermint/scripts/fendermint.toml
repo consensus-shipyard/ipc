@@ -38,7 +38,7 @@ dependencies = ["docker-network-create", "fendermint-deps"]
 
 [tasks.fendermint-start-validator]
 extend = "fendermint-run-validator"
-env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+env = { "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-run-validator]
 script = """
@@ -71,7 +71,6 @@ docker run \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
-  --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
   ${CMD}
@@ -82,7 +81,7 @@ dependencies = ["docker-network-create", "fendermint-deps"]
 # They don't configure any validator private key.
 [tasks.fendermint-start-subnet]
 extend = "fendermint-run-subnet"
-env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+env = { "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-run-subnet]
 script = """
@@ -113,7 +112,6 @@ docker run \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
-  --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
   ${CMD}
@@ -129,7 +127,6 @@ docker run \
   --volume ${BASE_DIR}:/data \
   --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
-  --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
   ${CMD}

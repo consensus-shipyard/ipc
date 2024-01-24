@@ -74,7 +74,7 @@ dependencies = [
 
 [tasks.testnode-export-keys]
 extend = "fendermint-tool"
-env = { "ENTRY" = "fendermint", "CMD" = "key into-tendermint --secret-key /data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} --out /data/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json" }
+env = { "CMD" = "key into-tendermint --secret-key /data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} --out /data/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json" }
 script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json"
 
 [tasks.testnode-report]
