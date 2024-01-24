@@ -59,7 +59,6 @@ fn main() {
         "LibStakingChangeLog",
         "LibGateway",
         "LibQuorum",
-        "CrossMsgHelper",
     ] {
         let module_name = camel_to_snake(contract_name);
         let input_path =

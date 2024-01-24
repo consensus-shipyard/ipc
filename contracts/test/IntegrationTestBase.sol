@@ -686,7 +686,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
             nonce: 0,
-            message: abi.encode(CallMsg({method: abi.encodePacked(METHOD_SEND), params: new bytes(0)}))
+            message: EMPTY_BYTES
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
