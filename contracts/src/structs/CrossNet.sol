@@ -56,7 +56,7 @@ enum IpcMsgKind {
     Call,
     /// @dev receipt from the execution of cross-net messages
     /// (currently limited to `Transfer` messages)
-    Receipt
+    Result
 }
 
 /// @notice Envelope used to propagate IPC cross-net messages

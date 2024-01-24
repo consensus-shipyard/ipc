@@ -430,7 +430,7 @@ library LibGateway {
         // if we get a `Transfer` or a `Receipt` do nothing, no need to send receipts.
         // - Transfers don't need to be acknowledged.
         // - And sending a `Receipt` to a `Receipt` could lead to amplification loops.
-        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Receipt) {
+        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Result) {
             return;
         }
 

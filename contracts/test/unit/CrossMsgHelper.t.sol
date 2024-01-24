@@ -270,7 +270,7 @@ contract CrossMsgHelperTest is Test {
             rawAddress: FvmAddressHelper.from(address(3))
         });
 
-        IpcEnvelope memory storableMsg = createCrossMsg(ifrom, ito, 0);
+        IpcEnvelope memory storableMsg = createTransferMsg(ifrom, ito, 0);
 
         require(
             storableMsg.applyType(SubnetID({root: ROOTNET_CHAINID, route: from})) == IPCMsgType.TopDown,
@@ -311,7 +311,7 @@ contract CrossMsgHelperTest is Test {
             rawAddress: FvmAddressHelper.from(address(3))
         });
 
-        IpcEnvelope memory storableMsg = createCrossMsg(ifrom, ito, 0);
+        IpcEnvelope memory storableMsg = createTransferMsg(ifrom, ito, 0);
 
         require(
             storableMsg.applyType(SubnetID({root: ROOTNET_CHAINID, route: from})) == IPCMsgType.BottomUp,
@@ -323,20 +323,19 @@ contract CrossMsgHelperTest is Test {
         );
     }
 
-    function createDefaultCrossMsg(uint64 nonce) internal pure returns (IpcEnvelope memory) {
+    function createDefaultTransferMsg(uint64 nonce) internal pure returns (IpcEnvelope memory) {
         IPCAddress memory addr = IPCAddress({
             subnetId: SubnetID(0, new address[](0)),
             rawAddress: FvmAddressHelper.from(address(0))
         });
-        return createCrossMsg(addr, addr, nonce);
+        return createTransferMsg(addr, addr, nonce);
     }
 
-    function createCrossMsg(
+    function createTransferMsg(
         IPCAddress memory from,
         IPCAddress memory to,
         uint64 nonce
     ) internal pure returns (IpcEnvelope memory) {
-        CallMsg memory message = CallMsg({method: abi.encodePacked(METHOD_SEND), params: EMPTY_BYTES});
         return
             IpcEnvelope({kind: IpcMsgKind.Transfer, from: from, to: to, value: 0, message: EMPTY_BYTES, nonce: nonce});
     }
@@ -345,7 +344,7 @@ contract CrossMsgHelperTest is Test {
         _crossMsgs = new IpcEnvelope[](length);
 
         for (uint256 i = 0; i < length; i++) {
-            _crossMsgs[i] = createDefaultCrossMsg(nonce);
+            _crossMsgs[i] = createDefaultTransferMsg(nonce);
         }
     }
 
