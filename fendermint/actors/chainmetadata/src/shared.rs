@@ -84,6 +84,8 @@ impl State {
     }
 }
 
+pub const CHAINMETADATA_ACTOR_NAME: &'static str = "chainmetadata";
+
 // the default lookback length is 256 epochs
 pub const DEFAULT_LOOKBACK_LEN: u64 = 256;
 

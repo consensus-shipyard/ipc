@@ -12,8 +12,9 @@ use fil_actors_runtime::Array;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::error::ExitCode;
 
-use crate::BlockHash;
-use crate::{ConstructorParams, Method, PushBlockParams, State};
+use crate::{
+    BlockHash, ConstructorParams, Method, PushBlockParams, State, CHAINMETADATA_ACTOR_NAME,
+};
 
 fil_actors_runtime::wasm_trampoline!(Actor);
 
@@ -93,7 +94,7 @@ impl ActorCode for Actor {
     type Methods = Method;
 
     fn name() -> &'static str {
-        "ChainMetadata"
+        CHAINMETADATA_ACTOR_NAME
     }
 
     actor_dispatch! {

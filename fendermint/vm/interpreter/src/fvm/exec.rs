@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use fendermint_vm_genesis::{Power, Validator};
 use std::collections::HashMap;
 
-use fendermint_vm_actor_interface::{cron, system};
+use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
@@ -95,7 +95,7 @@ where
 
             let msg = FvmMessage {
                 from: system::SYSTEM_ACTOR_ADDR,
-                to: fvm_shared::address::Address::new_id(fendermint_actors::CHAINMETADATA_ACTOR_ID),
+                to: chainmetadata::CHAINMETADATA_ACTOR_ADDR,
                 sequence: height as u64,
                 gas_limit,
                 method_num: fendermint_actor_chainmetadata::Method::PushBlock as u64,

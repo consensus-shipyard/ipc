@@ -211,7 +211,7 @@ where
 
     pub fn create_custom_actor(
         &mut self,
-        code_id: u32,
+        name: &str,
         id: ActorID,
         state: &impl Serialize,
         balance: TokenAmount,
@@ -220,8 +220,8 @@ where
         // Retrieve the CID of the actor code by the numeric ID.
         let code_cid = *self
             .custom_actor_manifest
-            .code_by_id(code_id)
-            .ok_or_else(|| anyhow!("can't find {code_id} in the actor manifest"))?;
+            .code_by_name(name)
+            .ok_or_else(|| anyhow!("can't find actor: {name} in the custom actor manifest"))?;
 
         self.create_actor_internal(code_cid, id, state, balance, delegated_address)
     }

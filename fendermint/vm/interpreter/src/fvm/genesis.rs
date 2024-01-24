@@ -14,7 +14,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -233,13 +233,14 @@ where
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
         // (e.g. block hashes) which we can query.
-        const LOOKBACK_LEN: u64 = 256;
-        let chainmetadata_state =
-            fendermint_actor_chainmetadata::State::new(&state.store(), LOOKBACK_LEN)?;
+        let chainmetadata_state = fendermint_actor_chainmetadata::State::new(
+            &state.store(),
+            fendermint_actor_chainmetadata::DEFAULT_LOOKBACK_LEN,
+        )?;
         state
             .create_custom_actor(
-                fendermint_actors::CHAINMETADATA_ACTOR_CODE_ID,
-                fendermint_actors::CHAINMETADATA_ACTOR_ID,
+                fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME,
+                chainmetadata::CHAINMETADATA_ACTOR_ID,
                 &chainmetadata_state,
                 TokenAmount::zero(),
                 None,

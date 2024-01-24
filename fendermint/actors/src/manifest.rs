@@ -2,21 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, Context};
 use cid::Cid;
+use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::CborStore;
 use std::collections::HashMap;
 
-const CHAINMETADATA_ACTOR_NAME: &str = "chainmetadata";
+// array of required actors
+pub const REQUIRED_ACTORS: &[&str] = &[CHAINMETADATA_ACTOR_NAME];
 
 /// A mapping of internal actor CIDs to their respective types.
 pub struct Manifest {
-    pub chainmetadata_code: Cid,
-    by_id: HashMap<u32, Cid>,
-    by_code: HashMap<Cid, u32>,
+    code_by_name: HashMap<String, Cid>,
 }
-
-pub const CHAINMETADATA_ACTOR_CODE_ID: u32 = 1;
-pub const CHAINMETADATA_ACTOR_ID: u64 = 48;
 
 impl Manifest {
     /// Load a manifest from the blockstore.
@@ -37,42 +34,22 @@ impl Manifest {
 
     /// Construct a new manifest from actor name/cid tuples.
     pub fn new(iter: impl IntoIterator<Item = (impl Into<String>, Cid)>) -> anyhow::Result<Self> {
-        let mut by_name = HashMap::new();
-        let mut by_id = HashMap::new();
-        let mut by_code = HashMap::new();
-
-        // Actors are indexed sequentially, starting at 1, in the order in which they appear in the
-        // manifest. 0 is reserved for "everything else" (i.e., not a builtin actor).
-        for ((name, code_cid), id) in iter.into_iter().zip(1u32..) {
-            let name = name.into();
-            by_id.insert(id, code_cid);
-            by_code.insert(code_cid, id);
-            by_name.insert(name, code_cid);
+        let mut code_by_name = HashMap::new();
+        for (name, code_cid) in iter.into_iter() {
+            code_by_name.insert(name.into(), code_cid);
         }
 
-        let chainmetadata_code = *by_name
-            .get(CHAINMETADATA_ACTOR_NAME)
-            .context("manifest missing chainmetadata actor")?;
+        // loop over required actors and ensure they are present
+        for &name in REQUIRED_ACTORS.iter() {
+            let _ = code_by_name
+                .get(name)
+                .context(format!("manifest missing required actor {}", name))?;
+        }
 
-        Ok(Self {
-            chainmetadata_code,
-            by_id,
-            by_code,
-        })
+        Ok(Self { code_by_name })
     }
 
-    /// Returns the code CID for an actor, given the actor's ID.
-    pub fn code_by_id(&self, id: u32) -> Option<&Cid> {
-        self.by_id.get(&id)
-    }
-
-    /// Returns the the actor code's "id" if it exists. Otherwise, returns 0.
-    pub fn id_by_code(&self, code: &Cid) -> u32 {
-        self.by_code.get(code).copied().unwrap_or(0)
-    }
-
-    /// Returns true id the passed code CID is the chainmetadata actor.
-    pub fn is_chainmetadata_actor(&self, cid: &Cid) -> bool {
-        &self.chainmetadata_code == cid
+    pub fn code_by_name(&self, str: &str) -> Option<&Cid> {
+        self.code_by_name.get(str)
     }
 }
