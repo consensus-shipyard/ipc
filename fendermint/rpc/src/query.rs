@@ -102,9 +102,7 @@ pub trait QueryClient: Sync {
         &self,
         height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<BuiltinActors>> {
-        println!("jiejie: before calling perform() against FmvQuery::BuiltinActors");
         let res = self.perform(FvmQuery::BuiltinActors, height).await?;
-        println!("jiejie: after calling perform() against FmvQuery::BuiltinActors");
         let height = res.height;
         let value = {
             let registry: Vec<(String, Cid)> = extract(res, |res| {

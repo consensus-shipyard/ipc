@@ -794,8 +794,6 @@ where
 
     // Return empty if not an EVM actor.
     if data.get_actor_type(&address, height).await? != ActorType::Known("evm".to_string()) {
-        tracing::info!("jiejie: SHIT SHIT");
-        tracing::info!("jiejie: in get_code(), actor type for add {:} is {:?}", address, data.get_actor_type(&address, height).await?);
         return Ok(Default::default());
     }
 

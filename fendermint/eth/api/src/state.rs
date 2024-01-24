@@ -424,9 +424,7 @@ where
         else {
             return Ok(ActorType::Inexistent);
         };
-        println!("jiejie: before calling builtin_actors()");
         let registry = self.client.builtin_actors(height).await?.value.registry;
-        println!("jiejie: after calling builtin_actors()");
         let ret = match registry.into_iter().find(|(_, cid)| cid == &actor_type_cid) {
             Some((typ, _)) => ActorType::Known(typ),
             None => ActorType::Unknown(actor_type_cid),
