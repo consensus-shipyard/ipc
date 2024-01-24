@@ -376,7 +376,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "https://github.com/consensus-shipyard/ipc/issues/303"]
     fn parse_empty_subnet_id() {
         assert!(SubnetID::from_str("").is_err())
     }
