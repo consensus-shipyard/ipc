@@ -249,6 +249,12 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         saLouper = DiamondLoupeFacet(address(saDiamond));
         saCutter = DiamondCutFacet(address(saDiamond));
 
+        // increment the block number by 5 (could be other number as well) so that commit
+        // parent finality called down stream will work we need this because in setUp,
+        // parent finality is committed at the block height, without
+        // incrementing the block number, test won't pass
+        vm.roll(5);
+
         addValidator(TOPDOWN_VALIDATOR_1, 100);
 
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
