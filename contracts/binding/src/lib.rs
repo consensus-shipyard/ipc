@@ -48,7 +48,7 @@ pub mod lib_gateway;
 #[allow(clippy::all)]
 pub mod lib_quorum;
 #[allow(clippy::all)]
-pub mod cross_msg_helper;
+pub mod cross_net;
 
 // The list of contracts need to convert FvmAddress to fvm_shared::Address
 fvm_address_conversion!(gateway_manager_facet);

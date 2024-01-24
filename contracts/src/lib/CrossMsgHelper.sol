@@ -28,14 +28,13 @@ library CrossMsgHelper {
         IPCAddress memory to,
         uint256 value
     ) public pure returns (IpcEnvelope memory) {
-        CallMsg memory message = CallMsg({method: abi.encodePacked(METHOD_SEND), params: EMPTY_BYTES});
         return
             IpcEnvelope({
                 kind: IpcMsgKind.Transfer,
                 from: from,
                 to: to,
                 value: value,
-                message: abi.encode(message),
+                message: EMPTY_BYTES,
                 nonce: 0
             });
     }

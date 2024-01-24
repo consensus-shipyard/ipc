@@ -62,7 +62,6 @@ contract CrossMsgHelperTest is Test {
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
         SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
-        CallMsg memory message = releaseMsg.getCallMsg();
 
         require(releaseMsg.from.subnetId.toHash() == subnetId.toHash());
         require(releaseMsg.from.rawAddress.extractEvmAddress() == sender);
@@ -70,8 +69,7 @@ contract CrossMsgHelperTest is Test {
         require(releaseMsg.to.rawAddress.extractEvmAddress() == sender);
         require(releaseMsg.value == releaseAmount);
         require(releaseMsg.nonce == 0);
-        require(bytes4(message.method) == METHOD_SEND);
-        require(keccak256(message.params) == keccak256(EMPTY_BYTES));
+        require(releaseMsg.message.length == 0);
         require(releaseMsg.kind == IpcMsgKind.Transfer);
     }
 
@@ -98,7 +96,6 @@ contract CrossMsgHelperTest is Test {
         );
 
         SubnetID memory rootSubnetId = SubnetID(ROOTNET_CHAINID, new address[](0));
-        CallMsg memory message = fundMsg.getCallMsg();
 
         require(fundMsg.from.subnetId.toHash() == rootSubnetId.toHash());
         require(fundMsg.from.rawAddress.extractEvmAddress() == sender);
@@ -106,8 +103,7 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.value == fundAmount);
         require(fundMsg.nonce == 0);
-        require(bytes4(message.method) == METHOD_SEND);
-        require(keccak256(message.params) == keccak256(EMPTY_BYTES));
+        require(fundMsg.message.length == 0);
         require(fundMsg.kind == IpcMsgKind.Transfer);
     }
 
@@ -129,7 +125,6 @@ contract CrossMsgHelperTest is Test {
         address[] memory parentRoute = new address[](1);
         parentRoute[0] = route[0];
         SubnetID memory parentSubnetId = SubnetID(ROOTNET_CHAINID, parentRoute);
-        CallMsg memory message = fundMsg.getCallMsg();
 
         require(fundMsg.from.subnetId.toHash() == parentSubnetId.toHash());
         require(fundMsg.from.rawAddress.extractEvmAddress() == sender);
@@ -137,8 +132,6 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.value == fundAmount);
         require(fundMsg.nonce == 0);
-        require(bytes4(message.method) == METHOD_SEND);
-        require(keccak256(message.params) == keccak256(EMPTY_BYTES));
         require(fundMsg.kind == IpcMsgKind.Transfer);
     }
 
@@ -155,6 +148,7 @@ contract CrossMsgHelperTest is Test {
         address recipient = address(100);
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
+        crossMsg.kind = IpcMsgKind.Call;
         CallMsg memory message = crossMsg.getCallMsg();
         message.method = abi.encodePacked(METHOD_SEND);
         crossMsg.value = 1;
@@ -174,6 +168,7 @@ contract CrossMsgHelperTest is Test {
         address recipient = address(100);
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
+        crossMsg.kind = IpcMsgKind.Call;
         CallMsg memory message = crossMsg.getCallMsg();
         message.method = abi.encodePacked(METHOD_SEND);
         crossMsg.value = 1;
@@ -343,14 +338,7 @@ contract CrossMsgHelperTest is Test {
     ) internal pure returns (IpcEnvelope memory) {
         CallMsg memory message = CallMsg({method: abi.encodePacked(METHOD_SEND), params: EMPTY_BYTES});
         return
-            IpcEnvelope({
-                kind: IpcMsgKind.Transfer,
-                from: from,
-                to: to,
-                value: 0,
-                message: abi.encode(message),
-                nonce: nonce
-            });
+            IpcEnvelope({kind: IpcMsgKind.Transfer, from: from, to: to, value: 0, message: EMPTY_BYTES, nonce: nonce});
     }
 
     function createCrossMsgs(uint256 length, uint64 nonce) internal pure returns (IpcEnvelope[] memory _crossMsgs) {
@@ -376,7 +364,7 @@ library CallMsgTestHelper {
         if (CrossMsgHelper.isEmpty(envelope)) {
             return ret;
         }
-        if (envelope.kind == IpcMsgKind.Call || envelope.kind == IpcMsgKind.Transfer) {
+        if (envelope.kind == IpcMsgKind.Call) {
             CallMsg memory message = abi.decode(envelope.message, (CallMsg));
             return message;
         }
@@ -391,7 +379,7 @@ library CallMsgTestHelper {
         IpcEnvelope memory envelope,
         CallMsg memory message
     ) internal pure returns (IpcEnvelope memory ret) {
-        if (envelope.kind == IpcMsgKind.Call || envelope.kind == IpcMsgKind.Transfer) {
+        if (envelope.kind == IpcMsgKind.Call) {
             envelope.message = abi.encode(message);
             return envelope;
         }
