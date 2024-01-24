@@ -147,10 +147,6 @@ pub struct IpcSettings {
 }
 
 impl IpcSettings {
-    pub fn is_topdown_enabled(&self) -> bool {
-        !self.subnet_id.is_root() && self.topdown.is_some()
-    }
-
     pub fn topdown_config(&self) -> anyhow::Result<&TopDownSettings> {
         self.topdown
             .as_ref()
@@ -286,6 +282,17 @@ impl Settings {
             None => Ok(self.tendermint_rpc_url.clone()),
         }
     }
+
+    /// Indicate whether we have configured the top-down syncer to run.
+    pub fn topdown_enabled(&self) -> bool {
+        !self.ipc.subnet_id.is_root() && self.ipc.topdown.is_some()
+    }
+
+    /// Indicate whether we have configured the IPLD Resolver to run.
+    pub fn resolver_enabled(&self) -> bool {
+        !self.resolver.connection.listen_addr.is_empty()
+            && self.ipc.subnet_id != *ipc_api::subnet_id::UNDEF
+    }
 }
 
 /// Expand a path which can either be :
@@ -343,13 +350,13 @@ mod tests {
     #[test]
     fn parse_default_config() {
         let settings = parse_config("");
-        assert!(!settings.resolver.enabled());
+        assert!(!settings.resolver_enabled());
     }
 
     #[test]
     fn parse_test_config() {
         let settings = parse_config("test");
-        assert!(settings.resolver.enabled());
+        assert!(settings.resolver_enabled());
     }
 
     #[test]

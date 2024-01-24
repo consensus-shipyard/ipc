@@ -129,16 +129,16 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let checkpoint_pool = CheckpointPool::new();
     let parent_finality_votes = VoteTally::empty();
 
-    let topdown_enabled = settings.ipc.is_topdown_enabled();
+    let topdown_enabled = settings.topdown_enabled();
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
-    if settings.resolver.enabled() {
+    if settings.resolver_enabled() {
         let service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
 
         let client = service.client();
 
-        let own_subnet_id = settings.resolver.subnet_id.clone();
+        let own_subnet_id = settings.ipc.subnet_id.clone();
 
         client
             .add_provided_subnet(own_subnet_id.clone())
@@ -373,7 +373,7 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
 
     let network_name = format!(
         "ipld-resolver-{}-{}",
-        r.subnet_id.root_id(),
+        settings.ipc.subnet_id.root_id(),
         r.network.network_name
     );
 
