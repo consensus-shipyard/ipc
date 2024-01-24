@@ -74,7 +74,7 @@ dependencies = [
 
 [tasks.testnode-export-keys]
 extend = "fendermint-tool"
-env = { "ENTRY" = "fendermint", "CMD" = "key into-tendermint --secret-key /data/${NODE_NAME}/${PRIV_KEY_PATH} --out /data/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json" }
+env = { "ENTRY" = "fendermint", "CMD" = "key into-tendermint --secret-key /data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} --out /data/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json" }
 script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${COMETBFT_SUBDIR}/config/priv_validator_key.json"
 
 [tasks.testnode-report]
@@ -92,9 +92,9 @@ Accounts:
 $(jq -r '.accounts[] | "\t\\(.meta.Account.owner): \\(.balance) coin units"' ${BASE_DIR}/genesis.json)
 
 Private key (hex ready to import in MetaMask):
-\t$(cat ${BASE_DIR}/${NODE_NAME}/${PRIV_KEY_PATH} | base64 -d | xxd -p -c 1000000)
+\t$(cat ${BASE_DIR}/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} | base64 -d | xxd -p -c 1000000)
 
-Note: both accounts use the same private key @ ${BASE_DIR}/${PRIV_KEY_PATH}
+Note: both accounts use the same private key @ ${BASE_DIR}/${VALIDATOR_PRIV_KEY_PATH}
 
 Chain ID:
 \t$(curl -s --location --request POST 'http://localhost:8545/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")

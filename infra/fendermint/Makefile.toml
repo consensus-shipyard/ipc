@@ -63,9 +63,9 @@ ENV_FILE = "${BASE_DIR}/.env"
 
 GENESIS_FILE = "${BASE_DIR}/genesis.json"
 KEYS_SUBDIR = "keys"
-KEY_NAME = "validator_key"
-PUB_KEY_PATH = "${KEYS_SUBDIR}/${KEY_NAME}.pk"
-PRIV_KEY_PATH = "${KEYS_SUBDIR}/${KEY_NAME}.sk"
+VALIDATOR_KEY_NAME = "validator_key"
+VALIDATOR_PUB_KEY_PATH = "${KEYS_SUBDIR}/${VALIDATOR_KEY_NAME}.pk"
+VALIDATOR_PRIV_KEY_PATH = "${KEYS_SUBDIR}/${VALIDATOR_KEY_NAME}.sk"
 
 COMETBFT_SUBDIR = "cometbft"
 
@@ -103,7 +103,7 @@ echo - CometBFT directory: ${CMT_DIR}
 echo - Fendermint directory: ${FM_DIR}
 echo - Keys directory: ${KEYS_DIR}
 echo - Genesis file: ${GENESIS_FILE}
-echo - Private key: ${PRIV_KEY_PATH}
+echo - Validator Private key: ${VALIDATOR_PRIV_KEY_PATH}
 echo - Network: ${NETWORK_NAME}
 echo - CometBFT container: ${CMT_CONTAINER_NAME}
 echo - Fendermint container: ${FM_CONTAINER_NAME}
