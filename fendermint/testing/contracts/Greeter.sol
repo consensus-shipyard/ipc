@@ -15,7 +15,10 @@ contract Greeter {
 
     //This function returns the current value stored in greeting variable
     function greet() public view returns (string memory) {
-        return greeting;
+        //uint256 number = uint256(blockhash(block.number - 1));
+        bytes32 myHash = blockhash(block.number - 1);
+
+        return string(abi.encodePacked(myHash));
     }
 
     //This function sets the new greeting msg from the one passed down as parameter and emit event
