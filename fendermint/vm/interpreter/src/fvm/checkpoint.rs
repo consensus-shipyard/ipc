@@ -63,9 +63,7 @@ where
         .block_hash()
         .ok_or_else(|| anyhow!("block hash not set"))?;
 
-    let (msgs, subnet_id) = if let Some(v) = should_create_checkpoint(gateway, state, height)? {
-        v
-    } else {
+    let Some((msgs, subnet_id)) = should_create_checkpoint(gateway, state, height)? else {
         return Ok(None);
     };
 
@@ -325,10 +323,6 @@ where
             "bottom up checkpoint period reached height"
         );
     } else {
-        tracing::debug!(
-            height = height.value(),
-            "height has no message batch nor reached checkpoint period "
-        );
         return Ok(None);
     }
 
