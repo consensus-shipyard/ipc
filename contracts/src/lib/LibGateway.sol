@@ -453,11 +453,6 @@ library LibGateway {
             return;
         }
 
-        // if we get a `Transfer` and the execution is ok, we dont send the receipt.
-        if (crossMsg.kind == IpcMsgKind.Transfer && outcomeType == OutcomeType.Ok) {
-            return;
-        }
-
         // commmit the receipt for propagation
         // slither-disable-next-line unused-return
         commitCrossMessage(crossMsg.createResultMsg(outcomeType, ret));
