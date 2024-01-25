@@ -138,7 +138,9 @@ contract IpcExchangeTest is Test {
 
         // an unrecognized result
         envelope.kind = IpcMsgKind.Result;
-        envelope.message = abi.encode(ResultMsg({receiptType: ReceiptType.InvokedContract, id: keccak256("foo"), success: true, ret: bytes("")}));
+        envelope.message = abi.encode(
+            ResultMsg({receiptType: ReceiptType.InvokedContract, id: keccak256("foo"), success: true, ret: bytes("")})
+        );
 
         IPCAddress memory from = envelope.from;
         envelope.from = envelope.to;
