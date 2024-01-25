@@ -98,7 +98,7 @@ struct CallMsg {
 enum OutcomeType {
     /// @dev The execution is successful, parse the return bytes according to the contract logic
     Ok,
-    /// @dev The receipt is from IPC contract, parse the return bytes as error selector
+    /// @dev The result is an IPC system error, parse the return bytes as an IPC error type.
     SystemErr,
     /// @dev The error is coming from the invoked contract, parse the return bytes according to
     /// the contract logic
