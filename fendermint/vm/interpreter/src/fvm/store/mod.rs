@@ -1,8 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use cid::Cid;
-use fvm::EMPTY_ARR_CID;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::EMPTY_ARR_CID;
 
 pub mod memory;
 
@@ -25,7 +25,7 @@ where
 
     fn put_keyed(&self, k: &Cid, block: &[u8]) -> anyhow::Result<()> {
         // The FVM inserts this each time to make sure it exists.
-        if *k == *EMPTY_ARR_CID {
+        if *k == EMPTY_ARR_CID {
             return self.0.put_keyed(k, block);
         }
         panic!("never intended to use put on the read-only blockstore")
