@@ -16,6 +16,7 @@ import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetC
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
+import "hardhat/console.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -27,6 +28,10 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param checkpoint The bottom-up checkpoint to be committed.
     function commitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
         // checkpoint is used to implement access control
+        console.log(msg.sender);
+        console.log(checkpoint.subnetID.getActor());
+        console.log(checkpoint.subnetID.toString());
+
         if (checkpoint.subnetID.getActor() != msg.sender) {
             revert InvalidCheckpointSource();
         }

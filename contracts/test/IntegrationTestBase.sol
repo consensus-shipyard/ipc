@@ -907,12 +907,11 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         address subnetAddress,
         GatewayDiamond gw
     ) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
-        gwManager = GatewayManagerFacet(address(gw));
-        gwGetter = GatewayGetterFacet(address(gw));
+        GatewayGetterFacet getter = GatewayGetterFacet(address(gw));
 
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
+        SubnetID memory subnetId = getter.getNetworkName().createSubnetId(subnetAddress);
 
-        Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
+        Subnet memory subnet = getter.subnets(subnetId.toHash());
 
         return (subnet.id, subnet.stake, subnet.topDownNonce, subnet.appliedBottomUpNonce, subnet.circSupply);
     }
