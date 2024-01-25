@@ -152,6 +152,28 @@ contract TestSubnetActor is Test, TestParams {
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
     }
 
+    function subnetActorWithParams(
+        address gw,
+        SubnetID memory parentID
+    ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
+        SupplySource memory native = SupplySourceHelper.native();
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: parentID,
+            ipcGatewayAddr: gw,
+            consensus: ConsensusType.Fendermint,
+            minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            powerScale: DEFAULT_POWER_SCALE,
+            permissionMode: PermissionMode.Collateral,
+            supplySource: native
+        });
+
+        return params;
+    }
+
     function defaultSubnetActorParamsWithGateway(
         address gw
     ) internal pure virtual returns (SubnetActorDiamond.ConstructorParams memory) {
@@ -229,6 +251,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         return params;
     }
+
+    function getterFacet() public returns (GatewayGetterFacet) {
+        return gwGetter;
+}
 
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
@@ -853,6 +879,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
     function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) public {
         GatewayManagerFacet manager = GatewayManagerFacet(address(gw));
+        GatewayGetterFacet getter = GatewayGetterFacet(address(gw));
 
         manager.register{value: collateral}(0);
 
@@ -861,7 +888,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             gw
         );
 
-        SubnetID memory parentNetwork = gwGetter.getNetworkName();
+        SubnetID memory parentNetwork = getter.getNetworkName();
 
         require(
             id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
