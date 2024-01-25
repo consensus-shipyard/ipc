@@ -20,11 +20,15 @@ dependencies = [
     "cometbft-start",
     # "cometbft-wait",
     "cometbft-node-id",
+    "bootstrap-node-id",
     "node-report",
 ]
 
 [tasks.bootstrap-node-id]
 run_task = "cometbft-node-id"
+
+[tasks.bootstrap-peer-id]
+run_task = "fendermint-network-peer-id"
 
 [tasks.bootstrap-down]
 dependencies = [
