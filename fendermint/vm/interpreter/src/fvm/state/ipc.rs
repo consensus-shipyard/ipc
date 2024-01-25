@@ -26,7 +26,7 @@ use fendermint_vm_topdown::IPCParentFinality;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
-use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
+use ipc_actors_abis::gateway_getter_facet::{self as getter};
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
@@ -313,7 +313,7 @@ pub fn tokens_to_mint(msgs: &[ipc_api::cross::IpcEnvelope]) -> TokenAmount {
 }
 
 /// Total amount of tokens to burn as a result of bottom-up messages leaving the subnet.
-pub fn tokens_to_burn(msgs: &[gateway_getter_facet::IpcEnvelope]) -> TokenAmount {
+pub fn tokens_to_burn(msgs: &[checkpointing_facet::IpcEnvelope]) -> TokenAmount {
     msgs.iter()
         .fold(TokenAmount::from_atto(0), |mut total, msg| {
             // Both fees and value were taken from the sender, and both are going up to the parent subnet:

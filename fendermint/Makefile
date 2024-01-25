@@ -30,7 +30,7 @@ all: test build diagrams
 diagrams:
 	make -C  ../docs/fendermint/diagrams diagrams
 
-build: $(IPC_ACTORS_GEN) | protoc
+build: $(IPC_ACTORS_GEN) | protoc npm
 	cargo build --release
 
 install: $(IPC_ACTORS_GEN)
@@ -112,6 +112,13 @@ $(IPC_ACTORS_GEN): $(IPC_ACTORS_CODE)
 protoc:
 	@if [ -z "$(shell which protoc)" ]; then \
 		echo "Please install the Protobuf Compiler. See https://grpc.io/docs/protoc-installation/"; \
+		exit 1; \
+	fi
+
+.PHONY: npm
+npm:
+	@if [ -z "$(shell which npm)" ]; then \
+		echo "Please install npm. See https://docs.npmjs.com/downloading-and-installing-node-js-and-npm"; \
 		exit 1; \
 	fi
 

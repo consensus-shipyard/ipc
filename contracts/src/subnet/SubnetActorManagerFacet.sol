@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol";
 import {ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
-import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed, SubnetNotBootstrapped} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
@@ -248,7 +248,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (LibStaking.totalValidators() != 0) {
             revert NotAllValidatorsHaveLeft();
         }
-
+        if (!s.bootstrapped) {
+            revert SubnetNotBootstrapped();
+        }
         s.killed = true;
         IGateway(s.ipcGatewayAddr).kill();
     }
