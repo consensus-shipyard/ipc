@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {METHOD_SEND, EMPTY_BYTES} from "../constants/Constants.sol";
-import {IpcEnvelope, ReceiptMsg, IpcMsg, IpcMsgKind} from "../structs/CrossNet.sol";
+import {IpcEnvelope, ReceiptMsg, IpcMsg, IpcMsgKind, ReceiptType} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -71,10 +71,11 @@ library CrossMsgHelper {
     /// and identifies the receipt through the hash of the original message.
     function createReceiptMsg(
         IpcEnvelope calldata crossMsg,
+        ReceiptType receiptType,
         bool success,
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
-        ReceiptMsg memory message = ReceiptMsg({id: toHash(crossMsg), success: success, ret: ret});
+        ReceiptMsg memory message = ReceiptMsg({receiptType: receiptType, id: toHash(crossMsg), success: success, ret: ret});
         uint256 value = crossMsg.value;
         if (success) {
             // if the message was executed successfully, the value stayed

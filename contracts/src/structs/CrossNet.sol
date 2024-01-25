@@ -93,7 +93,19 @@ struct IpcMsg {
     bytes params;
 }
 
+/// @notice This struct indicates if the receipt is coming from IPC contract or from the invoked
+/// @notice contract
+enum ReceiptType {
+    /// @dev The receipt is from IPC contract, parse the return bytes as error selector
+    IPC,
+    /// @dev The receipt is coming from the invoked contract, parse the return bytes according to
+    /// @dev the contract logic
+    InvokedContract
+}
+
 struct ReceiptMsg {
+    /// @dev The receipt type that helps determine how to parse `ret`.
+    ReceiptType receiptType;
     /// @dev Flag to signal if the call succeeded or failed.
     bool success;
     /// @dev Id of the message the receipt belongs to.

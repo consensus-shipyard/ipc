@@ -6,7 +6,7 @@ import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActo
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {SubnetID, Subnet, SupplyKind, SupplySource} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
-import {IpcMsg, IpcMsgKind, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {IpcMsg, IpcMsgKind, IpcEnvelope, ReceiptType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -360,7 +360,7 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
-            sendReceipt(crossMsg, false, abi.encodeWithSelector(InvalidCrossMsgDstSubnet.selector));
+            sendReceipt(crossMsg, ReceiptType.IPC, false, abi.encodeWithSelector(InvalidCrossMsgDstSubnet.selector));
             return;
         }
 
@@ -379,7 +379,7 @@ library LibGateway {
                 return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
-                sendReceipt(crossMsg, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                sendReceipt(crossMsg, ReceiptType.IPC, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
                 return;
             }
             subnet.appliedBottomUpNonce += 1;
@@ -390,7 +390,7 @@ library LibGateway {
         } else if (applyType == IPCMsgType.TopDown) {
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
-                sendReceipt(crossMsg, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                sendReceipt(crossMsg, ReceiptType.IPC, false, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
                 return;
             }
             s.appliedTopDownNonce += 1;
@@ -412,8 +412,22 @@ library LibGateway {
         }
 
         // execute the message and get the receipt.
-        (bool success, bytes memory ret) = crossMsg.execute(supplySource);
-        sendReceipt(crossMsg, success, ret);
+        (bool success, bytes memory ret) = executeCrossMsg(crossMsg, supplySource);
+        sendReceipt(crossMsg, ReceiptType.InvokedContract, success, ret);
+    }
+
+    /// @dev Execute the cross message using low level `call` method. This way ipc will
+    /// @dev catch contract revert messages as well
+    function executeCrossMsg(IpcEnvelope memory crossMsg, SupplySource memory supplySource) internal returns (bool success, bytes memory result) {
+        (success, result) = address(CrossMsgHelper).delegatecall(   // solhint-disable-line avoid-low-level-calls
+            abi.encodeWithSelector(CrossMsgHelper.execute.selector, crossMsg, supplySource)
+        );
+
+        if (success) {
+            return abi.decode(result, (bool, bytes));
+        }
+
+        return (success, result);
     }
 
     /// @notice Sends a receipt from the execution of a cross-message.
@@ -422,7 +436,7 @@ library LibGateway {
     /// failing network.
     /// (we could optionally trigger a receipt from `Transfer`s to, but without
     /// multi-level execution it would be adding unnecessary overhead).
-    function sendReceipt(IpcEnvelope memory crossMsg, bool success, bytes memory ret) internal {
+    function sendReceipt(IpcEnvelope memory crossMsg, ReceiptType receiptType,  bool success, bytes memory ret) internal {
         if (crossMsg.isEmpty()) {
             revert CannotCreateIpcReceipt();
         }
@@ -436,7 +450,7 @@ library LibGateway {
 
         // commmit the receipt for propagation
         // slither-disable-next-line unused-return
-        commitCrossMessage(crossMsg.createReceiptMsg(success, ret));
+        commitCrossMessage(crossMsg.createReceiptMsg(receiptType, success, ret));
     }
 
     /**
