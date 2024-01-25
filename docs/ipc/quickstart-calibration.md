@@ -89,6 +89,8 @@ ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
 ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
 ```
 
+This will output your subnet ID, which you will use below.
+
 * Make a note of the address of the subnet you created.
 
 ## Step 5: Join the subnet
@@ -118,15 +120,10 @@ Before running our validators, at least one bootstrap needs to be deployed and a
 * We can deploy a new bootstrap node in the subnet by running:
 ```bash
 cargo make --makefile infra/fendermint/Makefile.toml \
-    -e PRIVATE_KEY_PATH=<VALIDATOR_PRIV_KEY> \
     -e SUBNET_ID=<SUBNET_ID> \
-    -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT> \
-    -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
-    -e ETHAPI_HOST_PORT=<ETH_RPC_PORT> \
-    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
+    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \  # optional if you have additional bootstrapps and want to interconnect them
     -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
     -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
-    -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
     bootstrap
 ```
 
