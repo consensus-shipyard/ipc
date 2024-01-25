@@ -1,16 +1,10 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::{
-    multihash::{Code, MultihashDigest},
-    Cid,
-};
+use cid::Cid;
 use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{
-    tuple::{Deserialize_tuple, Serialize_tuple},
-    DAG_CBOR,
-};
+use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::{clock::ChainEpoch, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
@@ -49,11 +43,11 @@ impl State {
 
     // loads the blockhashes array from the AMT root cid and returns the blockhash
     // at the given epoch
-    pub fn get_block_cid<BS: Blockstore>(
+    pub fn get_block_hash<BS: Blockstore>(
         &self,
         store: &BS,
         epoch: ChainEpoch,
-    ) -> anyhow::Result<Option<Cid>> {
+    ) -> anyhow::Result<Option<BlockHash>> {
         // load the blockhashes array from the AMT root cid
         let blockhashes = match Amt::load(&self.blockhashes, &store) {
             Ok(v) => v,
@@ -67,24 +61,15 @@ impl State {
         };
 
         // get the block hash at the given epoch
-        let blockhash: &BlockHash = match blockhashes.get(epoch as u64) {
-            Ok(Some(v)) => v,
-            Ok(None) => {
-                return Ok(None);
-            }
-            Err(err) => {
-                return Err(anyhow::anyhow!(
-                    "failed to get blockhash at epoch {}, error: {}",
-                    epoch,
-                    err
-                ));
-            }
-        };
-
-        Ok(Some(Cid::new_v1(
-            DAG_CBOR,
-            Code::Blake2b256.digest(blockhash),
-        )))
+        match blockhashes.get(epoch as u64) {
+            Ok(Some(v)) => Ok(Some(*v)),
+            Ok(None) => Ok(None),
+            Err(err) => Err(anyhow::anyhow!(
+                "failed to get blockhash at epoch {}, error: {}",
+                epoch,
+                err
+            )),
+        }
     }
 }
 
@@ -113,7 +98,7 @@ pub struct PushBlockParams {
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    PushBlock = frc42_dispatch::method_hash!("PushBlock"),
+    PushBlockHash = frc42_dispatch::method_hash!("PushBlockHash"),
     LookbackLen = frc42_dispatch::method_hash!("LookbackLen"),
-    BlockCID = frc42_dispatch::method_hash!("BlockCID"),
+    GetBlockHash = frc42_dispatch::method_hash!("GetBlockHash"),
 }

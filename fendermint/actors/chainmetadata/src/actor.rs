@@ -1,7 +1,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::Cid;
 use fil_actors_runtime::actor_dispatch;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
@@ -33,7 +32,7 @@ impl Actor {
         Ok(())
     }
 
-    fn push_block(rt: &impl Runtime, params: PushBlockParams) -> Result<(), ActorError> {
+    fn push_block_hash(rt: &impl Runtime, params: PushBlockParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -77,16 +76,14 @@ impl Actor {
         Ok(state.lookback_len)
     }
 
-    fn block_cid(rt: &impl Runtime, epoch: ChainEpoch) -> Result<Option<Cid>, ActorError> {
+    fn get_block_hash(
+        rt: &impl Runtime,
+        epoch: ChainEpoch,
+    ) -> Result<Option<BlockHash>, ActorError> {
         let st: State = rt.state()?;
 
-        match st.get_block_cid(rt.store(), epoch) {
-            Ok(Some(cid)) => Ok(Some(cid)),
-            Ok(None) => Ok(None),
-            Err(err) => {
-                Err(err.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get blockhash"))
-            }
-        }
+        st.get_block_hash(rt.store(), epoch)
+            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get blockhash"))
     }
 }
 
@@ -99,8 +96,8 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
-        PushBlock => push_block,
+        PushBlockHash => push_block_hash,
         LookbackLen => lookback_len,
-        BlockCID => block_cid,
+        GetBlockHash => get_block_hash,
     }
 }

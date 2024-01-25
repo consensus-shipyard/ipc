@@ -1,14 +1,17 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::anyhow;
-use cid::Cid;
+use cid::{
+    multihash::{Code, MultihashDigest},
+    Cid,
+};
 use fendermint_vm_actor_interface::chainmetadata::CHAINMETADATA_ACTOR_ID;
 use fvm::{
     externs::{Chain, Consensus, Externs, Rand},
     state_tree::StateTree,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::CborStore;
+use fvm_ipld_encoding::{CborStore, DAG_CBOR};
 use fvm_shared::clock::ChainEpoch;
 
 use super::store::ReadOnlyBlockstore;
@@ -108,8 +111,8 @@ where
                 }
             };
 
-        match actor_state.get_block_cid(&bstore, epoch) {
-            Ok(Some(cid)) => Ok(cid),
+        match actor_state.get_block_hash(&bstore, epoch) {
+            Ok(Some(v)) => Ok(Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&v))),
             Ok(None) => Ok(Cid::default()),
             Err(err) => Err(err),
         }

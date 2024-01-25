@@ -98,7 +98,7 @@ where
                 to: chainmetadata::CHAINMETADATA_ACTOR_ADDR,
                 sequence: height as u64,
                 gas_limit,
-                method_num: fendermint_actor_chainmetadata::Method::PushBlock as u64,
+                method_num: fendermint_actor_chainmetadata::Method::PushBlockHash as u64,
                 params,
                 value: Default::default(),
                 version: Default::default(),
