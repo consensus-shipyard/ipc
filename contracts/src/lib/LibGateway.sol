@@ -6,7 +6,7 @@ import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActo
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {SubnetID, Subnet, SupplyKind, SupplySource} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
-import {IpcMsg, IpcMsgKind, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {CallMsg, IpcMsgKind, IpcEnvelope, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -430,13 +430,13 @@ library LibGateway {
         // if we get a `Transfer` or a `Receipt` do nothing, no need to send receipts.
         // - Transfers don't need to be acknowledged.
         // - And sending a `Receipt` to a `Receipt` could lead to amplification loops.
-        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Receipt) {
+        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Result) {
             return;
         }
 
         // commmit the receipt for propagation
         // slither-disable-next-line unused-return
-        commitCrossMessage(crossMsg.createReceiptMsg(success, ret));
+        commitCrossMessage(crossMsg.createResultMsg(success, ret));
     }
 
     /**
