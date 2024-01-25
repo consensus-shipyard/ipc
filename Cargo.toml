@@ -101,6 +101,7 @@ merkle-tree-rs = "0.1.0"
 multiaddr = "0.18"
 multihash = { version = "0.18.1", default-features = false, features = [
   "sha2",
+  "sha3",
 ] }
 num-bigint = "0.4"
 num-derive = "0.3"

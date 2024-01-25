@@ -2918,6 +2918,7 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-api",
+ "multihash 0.18.1",
  "num-traits",
  "quickcheck",
  "quickcheck_macros",
