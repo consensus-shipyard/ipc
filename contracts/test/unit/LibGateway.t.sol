@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import {LibGatewayMock} from "../mocks/LibGatewayMock.sol";
 import {LibGateway} from "../../src/lib/LibGateway.sol";
-import {IpcEnvelope, IpcMsgKind, ReceiptMsg, ReceiptType, BottomUpMsgBatch} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, IpcMsgKind, ResultMsg, ReceiptType, BottomUpMsgBatch} from "../../src/structs/CrossNet.sol";
 import {SubnetID, IPCAddress} from "../../src/structs/Subnet.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
@@ -92,14 +92,14 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ReceiptMsg memory message = ReceiptMsg({
+        ResultMsg memory message = ResultMsg({
             receiptType: ReceiptType.InvokedContract,
             id: crossMsg.toHash(),
             success: true,
             ret: abi.encode(EMPTY_BYTES)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0, // it succeeded
@@ -147,14 +147,14 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ReceiptMsg memory message = ReceiptMsg({
+        ResultMsg memory message = ResultMsg({
             receiptType: ReceiptType.InvokedContract,
             id: crossMsg.toHash(),
             success: true,
             ret: abi.encode(EMPTY_BYTES)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0, // it succeeded
@@ -203,14 +203,14 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 10; // a wrong nonce
 
-        ReceiptMsg memory message = ReceiptMsg({
+        ResultMsg memory message = ResultMsg({
             receiptType: ReceiptType.IPC,
             id: crossMsg.toHash(),
             success: false,
             ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
@@ -260,14 +260,14 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ReceiptMsg memory message = ReceiptMsg({
+        ResultMsg memory message = ResultMsg({
             receiptType: ReceiptType.InvokedContract,
             id: crossMsg.toHash(),
             success: false,
             ret: new bytes(0)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0,
@@ -355,14 +355,14 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 10;
 
-        ReceiptMsg memory message = ReceiptMsg({
+        ResultMsg memory message = ResultMsg({
             receiptType: ReceiptType.IPC,
             id: crossMsg.toHash(),
             success: false,
             ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
@@ -410,14 +410,14 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ReceiptMsg memory message = ReceiptMsg({
+        ResultMsg memory message = ResultMsg({
             receiptType: ReceiptType.InvokedContract,
             id: crossMsg.toHash(),
             success: false,
             ret: new bytes(0)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,

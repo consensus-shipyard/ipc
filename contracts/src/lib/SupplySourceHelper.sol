@@ -114,14 +114,13 @@ library SupplySourceHelper {
     }
 
     /// @dev Adaptation from implementation `openzeppelin-contracts/utils/Address.sol`
-    /// that it doesn't revert immediately and bubbles up the succeess of the call
+    /// that doesn't revert immediately in case of failure and merely notifies of the outcome.
     function functionCallWithValue(
         address target,
         bytes memory data,
         uint256 value
     ) internal returns (bool success, bytes memory) {
         require(address(this).balance >= value, "insufficient balance for call");
-        require(isContract(target), "call to non-contract");
 
         return target.call{value: value}(data);
     }
@@ -151,15 +150,6 @@ library SupplySourceHelper {
 
         (bool success, ) = recipient.call{value: amount}("");
         return success;
-    }
-
-    /// @notice Checks if the corresponding address is a contract.
-    function isContract(address account) internal view returns (bool) {
-        // This method relies on extcodesize/address.code.length, which returns 0
-        // for contracts in construction, since the code is only stored at the end
-        // of the constructor execution.
-
-        return account.code.length > 0;
     }
 
     /// @notice Gets the balance in our treasury.
