@@ -162,7 +162,7 @@ library CrossMsgHelper {
 
         address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
         if (crossMsg.kind == IpcMsgKind.Transfer) {
-            return supplySource.transferFundsFromSupplySource({recipient: payable(recipient), value: crossMsg.value});
+            return supplySource.transferFunds({recipient: payable(recipient), value: crossMsg.value});
         } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Result) {
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully
