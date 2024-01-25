@@ -447,10 +447,14 @@ library LibGateway {
             revert CannotCreateIpcReceipt();
         }
 
-        // if we get a `Transfer` or a `Receipt` do nothing, no need to send receipts.
-        // - Transfers don't need to be acknowledged.
+        // if we get a `Receipt` do nothing, no need to send receipts.
         // - And sending a `Receipt` to a `Receipt` could lead to amplification loops.
-        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Result) {
+        if (crossMsg.kind == IpcMsgKind.Result) {
+            return;
+        }
+
+        // if we get a `Transfer` and the execution is ok, we dont send the receipt.
+        if (crossMsg.kind == IpcMsgKind.Transfer && outcomeType == OutcomeType.Ok) {
             return;
         }
 
