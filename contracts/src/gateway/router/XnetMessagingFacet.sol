@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {IpcEnvelope, SubnetID, IpcMsg} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 import {IPCMsgType} from "../../enums/IPCMsgType.sol";
 import {SubnetActorGetterFacet} from "../../subnet/SubnetActorGetterFacet.sol";

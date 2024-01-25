@@ -5,10 +5,8 @@
 use crate::address::IPCAddress;
 use crate::subnet_id::SubnetID;
 use anyhow::anyhow;
-use ethers::abi::AbiEncode;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
-use ipc_actors_abis::cross_msg_helper::IpcMsg;
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 
@@ -54,7 +52,7 @@ impl IpcEnvelope {
             to,
             value,
             nonce: 0,
-            message: default_ipc_msg().encode(),
+            message: Default::default(),
         })
     }
 
@@ -80,7 +78,7 @@ impl IpcEnvelope {
             to,
             value,
             nonce: 0,
-            message: default_ipc_msg().encode(),
+            message: Default::default(),
         })
     }
 
@@ -136,13 +134,6 @@ impl TryFrom<u8> for IpcMsgKind {
 pub enum IPCMsgType {
     BottomUp,
     TopDown,
-}
-
-fn default_ipc_msg() -> IpcMsg {
-    IpcMsg {
-        method: [0; 4],
-        params: Default::default(),
-    }
 }
 
 pub fn is_bottomup(from: &SubnetID, to: &SubnetID) -> bool {

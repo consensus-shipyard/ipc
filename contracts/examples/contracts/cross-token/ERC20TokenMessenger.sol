@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
+import {IpcEnvelope, CallMsg, IpcMsgKind} from "../../../src/structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../../src/structs/Subnet.sol";
 import {FvmAddress} from "../../../src/structs/FvmAddress.sol";
 import {GatewayMessengerFacet} from "../../../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayGetterFacet} from "../../../src/gateway/GatewayGetterFacet.sol";
-import {CrossMsg, IpcMsg} from "../../../src/structs/Checkpoint.sol";
+import {CrossMsg} from "../../../src/structs/Checkpoint.sol";
 import {GatewayCannotBeZero, NotEnoughFunds} from "../../../src/errors/IPCErrors.sol";
 import {IERC20} from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -90,15 +91,15 @@ contract ERC20TokenMessenger is ReentrancyGuard {
         }
 
         IpcEnvelope memory crossMsg = IpcEnvelope({
-            message: IpcMsg({
-                from: IPCAddress({subnetId: info.getNetworkName(), rawAddress: FvmAddressHelper.from(sourceContract)}),
-                to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)}),
-                value: 0,
-                nonce: lastNonce,
+            kind: IpcMsgKind.CallMsg,
+            from: IPCAddress({subnetId: info.getNetworkName(), rawAddress: FvmAddressHelper.from(sourceContract)}),
+            to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)}),
+            value: 0,
+            nonce: lastNonce,
+            message: CallMsg({
                 method: bytes4(keccak256("transfer(address,uint256)")),
                 params: abi.encode(receiver, amount)
-            }),
-            wrapped: false
+            })
         });
 
         return messenger.sendContractXnetMessage{value: msg.value}(crossMsg);

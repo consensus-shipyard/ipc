@@ -4,8 +4,8 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 import {IPCAddress} from "../../src/structs/Subnet.sol";
-import {IpcMsg, IpcMsgKind, IpcEnvelope} from "../../src/structs/CrossNet.sol";
-import {IpcContract} from "../../src/lib/CrossMsgHelper.sol";
+import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../src/structs/CrossNet.sol";
+import {IpcHandler} from "../../sdk/IpcContract.sol";
 import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
 
 library TestUtils {
@@ -153,16 +153,16 @@ library TestUtils {
         }
     }
 
-    function newTransferCrossMsg(
+    function newXnetCallMsg(
         IPCAddress memory from,
         IPCAddress memory to,
         uint256 value,
         uint64 nonce
     ) internal pure returns (IpcEnvelope memory) {
-        IpcMsg memory message = IpcMsg({method: METHOD_SEND, params: EMPTY_BYTES});
+        CallMsg memory message = CallMsg({method: abi.encodePacked(METHOD_SEND), params: EMPTY_BYTES});
         return
             IpcEnvelope({
-                kind: IpcMsgKind.Transfer,
+                kind: IpcMsgKind.Call,
                 from: from,
                 to: to,
                 value: value,
@@ -172,9 +172,9 @@ library TestUtils {
     }
 }
 
-contract MockIpcContract is IpcContract {
+contract MockIpcContract is IpcHandler {
     /* solhint-disable-next-line unused-vars */
-    function IpcEntrypoint(IpcEnvelope calldata) external payable returns (bytes memory) {
+    function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
         return EMPTY_BYTES;
     }
 }

@@ -56,7 +56,7 @@ enum IpcMsgKind {
     Call,
     /// @dev receipt from the execution of cross-net messages
     /// (currently limited to `Transfer` messages)
-    Receipt
+    Result
 }
 
 /// @notice Envelope used to propagate IPC cross-net messages
@@ -70,6 +70,9 @@ struct IpcEnvelope {
     IPCAddress to;
     /// @dev address sending the message
     IPCAddress from;
+    /// @dev outgoing nonce for the envelope.
+    /// This nonce is set by the gateway when committing the message for propagation
+    uint64 nonce;
     /// @dev value being sent in the message.
     /// If we want receipts to return value, and all messages to be able
     /// to handle different supply sources we can expose the value
@@ -77,30 +80,27 @@ struct IpcEnvelope {
     uint256 value;
     /// @dev abi.encoded message
     bytes message;
-    /// @dev outgoing nonce for the envelope.
-    /// This nonce is set by the gateway when committing the message for propagation
-    uint64 nonce;
     /// @dev the gas limit is currently not used.
-    // FIXME: currently not used and no code uses it, so keeping it out.
+    // FIXME: currently not used.
     // uint256 gasLimit;
 }
 
 /// @notice Message format used for `Transfer` and `Call` messages.
-struct IpcMsg {
-    /// @dev abi.encoded method being called by the contract.
-    bytes4 method;
+struct CallMsg {
+    /// @dev Target method. A bytes4 function selector for EVM/Solidity targets, or a uint64 for Wasm actors.
+    bytes method;
     /// @dev arguments of the method being called.
     bytes params;
 }
 
-struct ReceiptMsg {
+struct ResultMsg {
+    /// @dev Id of the envelope the result belongs to.
+    bytes32 id;
     /// @dev Flag to signal if the call succeeded or failed.
     bool success;
-    /// @dev Id of the message the receipt belongs to.
-    bytes32 id;
     /// @dev abi encoded return value, or the reason for the
     /// failure (if any).
     bytes ret;
-    // TODO: In the future we may include here events and other
-    // feedback information.
+    //
+    // NOTE: In the future we may include events and other result information.
 }
