@@ -7,6 +7,7 @@ import { EMPTY_BYTES } from "../src/constants/Constants.sol";
 import { IGateway } from "../src/interfaces/IGateway.sol";
 import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
+import { CrossMsgHelper } from "../src/lib/CrossMsgHelper.sol";
 
 // Interface that needs to be implemented by IPC-aware contracts.
 //
@@ -15,20 +16,22 @@ import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
 interface IpcHandler {
     error CallerIsNotGateway();
     error UnsupportedMsgKind();
-    error UnrecognizedReceipt();
+    error UnrecognizedResult();
 
     /// @notice Entrypoint for handling xnet messages in IPC-aware contracts.
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret);
 }
 
 abstract contract IpcExchange is IpcHandler, Ownable {
+    using CrossMsgHelper for IpcEnvelope;
+
     // The address of the gateway in the network.
     address public immutable gatewayAddr;
 
     // List of messages in-flight for which the contract hasn't received a receipt yet.
     mapping(bytes32 => IpcEnvelope) public inflightMsgs;
 
-    constructor(address gatewayAddr_) {
+    constructor(address gatewayAddr_) Ownable(msg.sender) {
         gatewayAddr = gatewayAddr_;
     }
 
@@ -40,7 +43,7 @@ abstract contract IpcExchange is IpcHandler, Ownable {
         if (envelope.kind == IpcMsgKind.Call) {
             CallMsg memory call = abi.decode(envelope.message, (CallMsg));
             return _handleIpcCall(envelope, call);
-        } else if (envelope.kind == IpcMsgKind.Receipt) {
+        } else if (envelope.kind == IpcMsgKind.Result) {
             ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
 
             // Recover the original message.
@@ -50,7 +53,7 @@ abstract contract IpcExchange is IpcHandler, Ownable {
                 orig.message.length == 0 ||
                 keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))
             ) {
-                revert IpcHandler.UnrecognizedReceipt();
+                revert IpcHandler.UnrecognizedResult();
             }
 
             /// Note: if the result handler reverts, we will
@@ -73,7 +76,7 @@ abstract contract IpcExchange is IpcHandler, Ownable {
     function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal virtual;
 
     /// @notice Method the implementation of this contract can invoke to perform an IPC call.
-    function performIpcCall(IPCAddress calldata to, CallMsg calldata callMsg, uint256 value) internal virtual {
+    function performIpcCall(IPCAddress calldata to, CallMsg calldata callMsg, uint256 value) internal {
         // Queue the cross-net message for dispatch.
         IpcEnvelope memory envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(IpcEnvelope({
             kind: IpcMsgKind.Call,
@@ -84,7 +87,7 @@ abstract contract IpcExchange is IpcHandler, Ownable {
             message: abi.encode(callMsg)
         }));
         // Add the message to the list of inflights
-        bytes32 id = keccak256(abi.encode(envelope));
+        bytes32 id = envelope.toHash();
         inflightMsgs[id] = envelope;
     }
 

@@ -94,7 +94,7 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({id: crossMsg.toHash(), success: true, ret: abi.encode(EMPTY_BYTES)});
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0, // it succeeded
@@ -144,7 +144,7 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({id: crossMsg.toHash(), success: true, ret: abi.encode(EMPTY_BYTES)});
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0, // it succeeded
@@ -199,7 +199,7 @@ contract LibGatewayTest is Test {
             ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
@@ -251,7 +251,7 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({id: crossMsg.toHash(), success: false, ret: new bytes(0)});
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: 0,
@@ -345,7 +345,7 @@ contract LibGatewayTest is Test {
             ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
         });
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
@@ -395,7 +395,7 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({id: crossMsg.toHash(), success: false, ret: new bytes(0)});
         IpcEnvelope memory expected = IpcEnvelope({
-            kind: IpcMsgKind.Receipt,
+            kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
             value: crossMsg.value,
