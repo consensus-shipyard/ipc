@@ -61,7 +61,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             to: envelope.to,
             value: msg.value,
             message: envelope.message,
-            nonce: 0   // nonce will be updated by LibGateway.commitCrossMessage
+            nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
 
         // Commit xnet message for dispatch.
