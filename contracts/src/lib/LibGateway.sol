@@ -421,7 +421,9 @@ library LibGateway {
     }
 
     /// @dev Execute the cross message using low level `call` method. This way ipc will
-    /// @dev catch contract revert messages as well
+    ///      catch contract revert messages as well. We need this because in `CrossMsgHelper.execute`
+    ///      there are `require` and `revert` calls, without reflexive call, the execution will
+    ///      revert and block the checkpoint submission process.
     function executeCrossMsg(IpcEnvelope memory crossMsg, SupplySource memory supplySource) internal returns (bool success, bytes memory result) {
         (success, result) = address(CrossMsgHelper).delegatecall(   // solhint-disable-line avoid-low-level-calls
             abi.encodeWithSelector(CrossMsgHelper.execute.selector, crossMsg, supplySource)
