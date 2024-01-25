@@ -52,6 +52,12 @@ TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = [
 ] } }
 # Comma-separated list of bootstrap nodes to be used by the CometBFT node.
 BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }
+
+# Comma-separated list of multiaddresses for the IPLD resolver to connect to.
+# This should have the form of "/ip4/198.51.100.2/tcp/26655/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"
+# where the `/p2p/<peer-id>` can for example be obtained by the `fendermint key show-peer-id` command.
+RESOLVER_BOOTSTRAPS = { value = "", condition = { env_not_set = ["RESOLVER_BOOTSTRAPS"] } }
+
 PRIVATE_KEY_PATH = { value = "", condition = { env_not_set = ["PRIVATE_KEY_PATH"] } }
 
 # Deployment-related
@@ -70,6 +76,7 @@ VALIDATOR_PUB_KEY_PATH = "${KEYS_SUBDIR}/${VALIDATOR_KEY_NAME}.pk"
 VALIDATOR_PRIV_KEY_PATH = "${KEYS_SUBDIR}/${VALIDATOR_KEY_NAME}.sk"
 
 NETWORK_KEY_NAME = "network_key"
+NETWORK_PUB_KEY_PATH = "${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.pk"
 NETWORK_PRIV_KEY_PATH = "${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
 
 COMETBFT_SUBDIR = "cometbft"

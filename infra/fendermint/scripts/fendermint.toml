@@ -66,6 +66,7 @@ docker run \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
   --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
   --env FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT} \
+  --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
@@ -110,6 +111,7 @@ docker run \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
   --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
   --env FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT} \
+  --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=${LOG_LEVEL} \
@@ -141,6 +143,11 @@ extend = "fendermint-tool"
 env = { "CMD" = "key gen --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR} --name ${NETWORK_KEY_NAME}" }
 script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}"
 script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
+
+
+[tasks.fendermint-network-peer-id]
+extend = "fendermint-tool"
+env = { "CMD" = "key show-peer-id --public-key /data/${NODE_NAME}/${NETWORK_PUB_KEY_PATH}" }
 
 
 [tasks.fendermint-deps]
