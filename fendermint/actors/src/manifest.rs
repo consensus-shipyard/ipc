@@ -43,7 +43,7 @@ impl Manifest {
         for &name in REQUIRED_ACTORS.iter() {
             let _ = code_by_name
                 .get(name)
-                .context(format!("manifest missing required actor {}", name))?;
+                .with_context(|| format!("manifest missing required actor {}", name))?;
         }
 
         Ok(Self { code_by_name })

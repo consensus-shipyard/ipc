@@ -112,7 +112,10 @@ where
             };
 
         match actor_state.get_block_hash(&bstore, epoch) {
-            Ok(Some(v)) => Ok(Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&v))),
+            Ok(Some(v)) => match Code::Blake2b256.wrap(&v) {
+                Ok(w) => Ok(Cid::new_v1(DAG_CBOR, w)),
+                Err(err) => Err(anyhow!("failed to wrap block hash, error: {}", err)),
+            },
             Ok(None) => Ok(Cid::default()),
             Err(err) => Err(err),
         }
