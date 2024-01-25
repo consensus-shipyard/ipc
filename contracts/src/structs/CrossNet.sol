@@ -93,11 +93,23 @@ struct CallMsg {
     bytes params;
 }
 
+/// @notice This struct indicates if the cross message execution is sucess, IPC system error or from the invoked
+///         contract
+enum OutcomeType {
+    /// @dev The execution is successful, parse the return bytes according to the contract logic
+    Ok,
+    /// @dev The result is an IPC system error, parse the return bytes as an IPC error type.
+    SystemErr,
+    /// @dev The error is coming from the invoked contract, parse the return bytes according to
+    /// the contract logic
+    ActorErr
+}
+
 struct ResultMsg {
     /// @dev Id of the envelope the result belongs to.
     bytes32 id;
-    /// @dev Flag to signal if the call succeeded or failed.
-    bool success;
+    /// @dev Flag to signal if the call succeeded or the type of the error
+    OutcomeType outcome;
     /// @dev abi encoded return value, or the reason for the
     /// failure (if any).
     bytes ret;

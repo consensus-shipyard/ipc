@@ -54,7 +54,7 @@ library SupplySourceHelper {
     }
 
     /// @notice Transfers the specified amount out of our treasury to the recipient address.
-    function transferFundsFromSupplySource(SupplySource memory supplySource,
+    function transferFunds(SupplySource memory supplySource,
         address payable recipient,
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
