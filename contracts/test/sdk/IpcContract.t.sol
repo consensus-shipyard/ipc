@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import "../../src/errors/IPCErrors.sol";
-import {IpcEnvelope, CallMsg, ResultMsg, IpcMsgKind, ReceiptType} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, CallMsg, ResultMsg, IpcMsgKind, OutcomeType} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -138,9 +138,7 @@ contract IpcExchangeTest is Test {
 
         // an unrecognized result
         envelope.kind = IpcMsgKind.Result;
-        envelope.message = abi.encode(
-            ResultMsg({receiptType: ReceiptType.InvokedContract, id: keccak256("foo"), success: true, ret: bytes("")})
-        );
+        envelope.message = abi.encode(ResultMsg({outcome: OutcomeType.Ok, id: keccak256("foo"), ret: bytes("")}));
 
         IPCAddress memory from = envelope.from;
         envelope.from = envelope.to;
