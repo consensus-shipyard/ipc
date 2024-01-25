@@ -752,7 +752,7 @@ where
     let height = data.query_height(block_id).await?;
 
     // If not an EVM actor, return empty.
-    if data.get_actor_type(&address, height).await? != ActorType::Known("evm".to_string()) {
+    if data.get_actor_type(&address, height).await? != ActorType::Evm {
         // The client library expects hex encoded string.
         return encode(None);
     }

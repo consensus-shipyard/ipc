@@ -118,10 +118,15 @@ impl<C> JsonRpcState<C> {
 pub enum ActorType {
     /// The queried actor does not exist in the state tree.
     Inexistent,
-    /// The queried actor exists, and its type is identified by the supplied manifest key.
+    /// The queried actor exists, and it's one of the built-in actor types.
     Known(String),
     /// The queried actor exists, but it's not a built-in actor and therefore it cannot be identified.
     Unknown(Cid),
+}
+
+impl ActorType {
+    pub const Evm: ActorType = ActorType::Known("evm".into());
+    pub const EthAccount: ActorType = ActorType::Known("ethaccount".into());
 }
 
 impl<C> JsonRpcState<C>
