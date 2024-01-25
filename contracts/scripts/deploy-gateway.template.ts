@@ -2,7 +2,7 @@
 
 /* eslint prefer-const: "off" */
 import { deployContractWithDeployer, getTransactionFees } from './util'
-import hre, { ethers } from 'hardhat'
+import { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
