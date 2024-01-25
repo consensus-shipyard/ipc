@@ -63,30 +63,9 @@ where
         .block_hash()
         .ok_or_else(|| anyhow!("block hash not set"))?;
 
-    let batch = gateway.bottom_up_msg_batch(state, height.into())?;
-
-    if batch.block_height.as_u64() == 0 {
-        tracing::debug!(height = height.value(), "no bottom up msg batch at height");
-
-        // we need to check if the checkpoint period has reached
-        if should_create_checkpoint(gateway, state, height)?.is_none() {
-            tracing::debug!(
-                height = height.value(),
-                "not bottom up checkpoint period height"
-            );
-            return Ok(None);
-        }
-
-        tracing::debug!(
-            height = height.value(),
-            "bottom up checkpoint period height reached"
-        );
-    } else {
-        tracing::debug!(
-            height = height.value(),
-            "bottom up msg batch found at height"
-        );
-    }
+    let Some((msgs, subnet_id)) = should_create_checkpoint(gateway, state, height)? else {
+        return Ok(None);
+    };
 
     // Get the current power table from the ledger, not CometBFT.
     let (_, curr_power_table) =
@@ -98,7 +77,7 @@ where
         .context("failed to apply validator changes")?;
 
     // Sum up the value leaving the subnet as part of the bottom-up messages.
-    let burnt_tokens = tokens_to_burn(&batch.msgs);
+    let burnt_tokens = tokens_to_burn(&msgs);
 
     // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
     // we don't have to burn them here, because it's already being done in
@@ -116,11 +95,11 @@ where
 
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
-        subnet_id: convert_tokenizable(batch.subnet_id)?,
+        subnet_id,
         block_height: ethers::types::U256::from(height.value()),
         block_hash,
         next_configuration_number,
-        msgs: convert_tokenizables(batch.msgs)?,
+        msgs,
     };
 
     // Save the checkpoint in the ledger.
@@ -303,12 +282,6 @@ where
     Ok(())
 }
 
-fn convert_tokenizable<Source: Tokenizable, Target: Tokenizable>(
-    s: Source,
-) -> anyhow::Result<Target> {
-    Ok(Target::from_token(s.into_token())?)
-}
-
 fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
     tokenizables: Vec<Source>,
 ) -> anyhow::Result<Vec<Target>> {
@@ -322,23 +295,43 @@ fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
     height: Height,
-) -> anyhow::Result<Option<checkpoint::SubnetID>>
+) -> anyhow::Result<Option<(Vec<checkpoint::IpcEnvelope>, checkpoint::SubnetID)>>
 where
     DB: Blockstore,
 {
-    if gateway.enabled(state)? {
-        let id = gateway.subnet_id(state)?;
-        let is_root = id.route.is_empty();
-
-        if !is_root && height.value() % gateway.bottom_up_check_period(state)? == 0 {
-            let id = checkpoint::SubnetID {
-                root: id.root,
-                route: id.route,
-            };
-            return Ok(Some(id));
-        }
+    if !gateway.enabled(state)? {
+        return Ok(None);
     }
-    Ok(None)
+
+    let id = gateway.subnet_id(state)?;
+    let is_root = id.route.is_empty();
+
+    if is_root {
+        return Ok(None);
+    }
+
+    let batch = gateway.bottom_up_msg_batch(state, height.into())?;
+
+    if batch.block_height.as_u64() != 0 {
+        tracing::debug!(
+            height = height.value(),
+            "bottom up msg batch exists at height"
+        );
+    } else if height.value() % gateway.bottom_up_check_period(state)? == 0 {
+        tracing::debug!(
+            height = height.value(),
+            "bottom up checkpoint period reached height"
+        );
+    } else {
+        return Ok(None);
+    }
+
+    let id = checkpoint::SubnetID {
+        root: id.root,
+        route: id.route,
+    };
+    let msgs = convert_tokenizables(batch.msgs)?;
+    Ok(Some((msgs, id)))
 }
 
 /// Get the power table from CometBFT.
