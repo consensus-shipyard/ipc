@@ -44,9 +44,9 @@ impl From<PublicKey> for ValidatorKey {
     }
 }
 
-impl Into<PublicKey> for ValidatorKey {
-    fn into(self) -> PublicKey {
-        self.0
+impl From<ValidatorKey> for PublicKey {
+    fn from(value: ValidatorKey) -> Self {
+        value.0
     }
 }
 
