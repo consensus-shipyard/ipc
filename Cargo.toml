@@ -94,19 +94,17 @@ libp2p = { version = "0.53", default-features = false, features = [
 ] }
 libp2p-mplex = { version = "0.41" }
 # libp2p-bitswap = "0.25.1"
-multihash = { version = "0.18.1", default-features = false, features = [
-  "sha2",
-<<<<<<< HEAD
-  "sha3",
-=======
->>>>>>> d3664c63 (Integrate chainmetadata actor in begin callback + use amt)
-] }libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap.git", branch = "chore-upgrade-libipld" } # Updated to libipld 0.16
+libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap.git", branch = "chore-upgrade-libipld" } # Updated to libipld 0.16
 libsecp256k1 = "0.7"
 literally = "0.1.3"
 log = "0.4"
 lru_time_cache = "0.11"
 merkle-tree-rs = "0.1.0"
 multiaddr = "0.18"
+multihash = { version = "0.18.1", default-features = false, features = [
+  "sha2",
+  "sha3",
+] }
 num-bigint = "0.4"
 num-derive = "0.3"
 num-traits = "0.2"
