@@ -43,8 +43,8 @@
     "dependencies": {
         "@solidity-parser/parser": "^0.16.2",
         "diamond-util": "^1.1.1",
-        "ganache": "^7.9.1",
-        "hardhat": "^2.19.2",
+        "ganache": "^7.9.2",
+        "hardhat": "^2.19.4",
         "hardhat-storage-layout-changes": "^0.1.2"
     },
     "lint-staged": {
