@@ -171,7 +171,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // Assert post-conditions.
         (, Subnet memory subnetAfter) = gwGetter.getSubnet(subnet.id);
         assertEq(subnetAfter.circSupply, 7);
-        assertEq(subnetAfter.topDownNonce, 1);
+        assertEq(subnetAfter.topDownNonce, 2); // 2 because the result msg is also another td message
         assertEq(subnetAfter.appliedBottomUpNonce, 1);
 
         // Now attempt to withdraw beyond the circulating supply.
