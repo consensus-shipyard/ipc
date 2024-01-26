@@ -232,7 +232,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
 #[async_trait]
 impl SubnetManager for EthSubnetManager {
     async fn subnet_bootstrapped(&self, subnet_id: &SubnetID) -> Result<bool> {
-        let address = contract_address_from_subnet(&subnet_id)?;
+        let address = contract_address_from_subnet(subnet_id)?;
         log::debug!("checking subnet bootstrap status at contract: {address:}");
 
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
