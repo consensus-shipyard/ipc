@@ -274,6 +274,18 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         return params;
     }
 
+    function gatewayParams(SubnetID memory id) internal pure returns (GatewayDiamond.ConstructorParams memory) {
+        GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
+            networkName: id,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+        });
+
+        return params;
+    }
+
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
