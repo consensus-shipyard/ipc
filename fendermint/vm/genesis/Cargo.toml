@@ -37,6 +37,7 @@ serde_json = { workspace = true }
 fendermint_vm_genesis = { path = ".", features = ["arb"] }
 fendermint_testing = { path = "../../testing", features = ["golden"] }
 fvm_ipld_encoding = { workspace = true }
+multihash = { workspace = true }
 
 [features]
 default = []
