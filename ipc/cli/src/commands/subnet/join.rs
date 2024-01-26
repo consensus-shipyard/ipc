@@ -29,11 +29,16 @@ impl CommandLineHandler for JoinSubnet {
             None => None,
         };
         let public_key = hex::decode(&arguments.public_key)?;
+
         if let Some(initial_balance) = arguments.initial_balance {
-            log::info!("pre-funding address with {initial_balance}");
-            provider
-                .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)
-                .await?;
+            if !provider.bootstrapped(&subnet).await? {
+                log::info!("pre-funding address with {initial_balance}");
+                provider
+                    .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)
+                    .await?;
+            } else {
+                log::info!("subnet already initialized, no need pre-funding");
+            }
         }
         let epoch = provider
             .join_subnet(

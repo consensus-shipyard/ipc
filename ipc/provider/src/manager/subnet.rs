@@ -21,6 +21,9 @@ use crate::lotus::message::ipc::SubnetInfo;
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
 pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer {
+    /// Checks if the subnet has already been bootstrapped
+    async fn subnet_bootstrapped(&self, subnet_id: &SubnetID) -> Result<bool>;
+
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
     /// The result of the function is the ID address for the subnet actor from which the final

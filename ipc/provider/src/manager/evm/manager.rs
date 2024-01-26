@@ -231,6 +231,18 @@ impl TopDownFinalityQuery for EthSubnetManager {
 
 #[async_trait]
 impl SubnetManager for EthSubnetManager {
+    async fn subnet_bootstrapped(&self, subnet_id: &SubnetID) -> Result<bool> {
+        let address = contract_address_from_subnet(&subnet_id)?;
+        log::debug!("checking subnet bootstrap status at contract: {address:}");
+
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone())
+        );
+
+        Ok(contract.bootstrapped().call().await?)
+    }
+
     async fn create_subnet(&self, from: Address, params: ConstructParams) -> Result<Address> {
         self.ensure_same_gateway(&params.ipc_gateway_addr)?;
 

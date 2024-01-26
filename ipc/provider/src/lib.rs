@@ -290,6 +290,20 @@ impl IpcProvider {
             .await
     }
 
+    pub async fn bootstrapped(
+        &mut self,
+        subnet: &SubnetID,
+    ) -> anyhow::Result<bool> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet config not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager()
+            .subnet_bootstrapped(subnet)
+            .await
+    }
+
     pub async fn pre_fund(
         &mut self,
         subnet: SubnetID,
