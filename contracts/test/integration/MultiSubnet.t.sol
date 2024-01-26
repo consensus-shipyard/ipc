@@ -115,7 +115,6 @@ contract MultiSubnet is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_MultiSubnet_SendCrossMessageFromChildToParent() public {
-
         address caller = address(new MockIpcContract());
 
         vm.deal(address(rootSubnetActor), DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 1);
@@ -134,10 +133,7 @@ contract MultiSubnet is Test, IntegrationTestBase {
         vm.prank(address(caller));
         childGatewayMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
-                IPCAddress({
-                    subnetId: childName,
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
+                IPCAddress({subnetId: childName, rawAddress: FvmAddressHelper.from(caller)}),
                 IPCAddress({subnetId: rootName, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
                 0
@@ -153,7 +149,7 @@ contract MultiSubnet is Test, IntegrationTestBase {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
         BottomUpMsgBatch memory batch = childGatewayGetter.bottomUpMsgBatch(e);
-        require(batch.msgs.length==1, "batch length incorrect");
+        require(batch.msgs.length == 1, "batch length incorrect");
 
         (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
 
@@ -169,7 +165,11 @@ contract MultiSubnet is Test, IntegrationTestBase {
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        childGatewayCheckpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        childGatewayCheckpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
         return checkpoint;
@@ -194,7 +194,6 @@ contract MultiSubnet is Test, IntegrationTestBase {
             parentSignatures[i] = abi.encodePacked(r, s, v);
         }
 
-
         vm.startPrank(address(rootSubnetActor));
         rootSubnetActorCheckpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
@@ -203,5 +202,4 @@ contract MultiSubnet is Test, IntegrationTestBase {
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
-
 }

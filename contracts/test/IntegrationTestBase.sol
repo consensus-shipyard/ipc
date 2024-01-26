@@ -41,8 +41,6 @@ import {SupplySourceHelper} from "../src/lib/SupplySourceHelper.sol";
 import {TestUtils} from "./helpers/TestUtils.sol";
 import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
 
-import "forge-std/console.sol";
-
 contract TestParams {
     uint64 constant MAX_NONCE = type(uint64).max;
     address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
@@ -253,10 +251,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         return params;
     }
-
-    function getterFacet() public returns (GatewayGetterFacet) {
-        return gwGetter;
-}
 
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
@@ -889,11 +883,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             subnetAddress,
             gw
         );
-
-        SubnetID memory parentNetwork = getter.getNetworkName();
-
-        console.log("registered subnet name: %s", id.toString());
-        console.log("registered subnet name 2: %s", parentNetwork.createSubnetId(subnetAddress).toString());
 
         require(
             id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
