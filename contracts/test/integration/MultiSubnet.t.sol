@@ -34,62 +34,56 @@ contract MultiSubnet is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
 
-    GatewayDiamond public parentGateway;
+    GatewayDiamond public rootGateway;
+    GatewayGetterFacet public rootGatewayGetter;
+    GatewayManagerFacet public rootGatewayManager;
+    GatewayMessengerFacet public rootGatewayMessenger;
+
+    SubnetActorDiamond public rootSubnetActor;
+    SubnetActorGetterFacet public rootSubnetActorGetter;
+    SubnetActorCheckpointingFacet public rootSubnetActorCheckpointer;
+    SubnetActorManagerFacet public rootSubnetActorManager;
+
     GatewayDiamond public childGateway;
-    SubnetActorDiamond public parentSubnetActor;
-    SubnetActorDiamond public childSubnetActor;
-
-    SubnetActorGetterFacet public parentSubnetActorGetter;
-    SubnetActorGetterFacet public childSubnetActorGetter;
-
-    GatewayGetterFacet public parentGatewayGetter;
-    GatewayManagerFacet public parentGatewayManager;
     GatewayGetterFacet public childGatewayGetter;
     CheckpointingFacet public childGatewayCheckpointer;
-
-    GatewayMessengerFacet public parentGatewayMessenger;
     GatewayMessengerFacet public childGatewayMessenger;
 
-    SubnetActorCheckpointingFacet public parentSubnetActorCheckpointer;
-    SubnetActorManagerFacet public parentSubnetActorManager;
+    SubnetActorDiamond public childSubnetActor;
 
-    address[] public parentPath;
     address[] public childPath;
 
-    SubnetID parentId;
-    SubnetID childId;
+    SubnetID rootName;
+    SubnetID childName;
 
     function setUp() public override {
-        parentPath = new address[](1);
-        parentPath[0] = vm.addr(10);
+        rootName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
+        require(rootName.isRoot(), "not root");
 
-        parentId = SubnetID({root: ROOTNET_CHAINID, route: parentPath});
+        rootGateway = createGatewayDiamond(gatewayParams(rootName));
+        rootSubnetActor = createSubnetActor(subnetActorWithParams(address(rootGateway), rootName));
+        rootGatewayGetter = GatewayGetterFacet(address(rootGateway));
+        rootGatewayMessenger = GatewayMessengerFacet(address(rootGateway));
+        rootGatewayManager = GatewayManagerFacet(address(rootGateway));
+        rootSubnetActorGetter = SubnetActorGetterFacet(address(rootSubnetActor));
+        rootSubnetActorCheckpointer = SubnetActorCheckpointingFacet(address(rootSubnetActor));
+        rootSubnetActorManager = SubnetActorManagerFacet(address(rootSubnetActor));
 
-        parentGateway = createGatewayDiamond(gatewayParams(parentId));
-        parentSubnetActor = createSubnetActor(subnetActorWithParams(address(parentGateway), parentId));
-        parentGatewayGetter = GatewayGetterFacet(address(parentGateway));
-        parentGatewayMessenger = GatewayMessengerFacet(address(parentGateway));
-        parentGatewayManager = GatewayManagerFacet(address(parentGateway));
-        parentSubnetActorGetter = SubnetActorGetterFacet(address(parentSubnetActor));
-        parentSubnetActorCheckpointer = SubnetActorCheckpointingFacet(address(parentSubnetActor));
-        parentSubnetActorManager = SubnetActorManagerFacet(address(parentSubnetActor));
+        childPath = new address[](1);
+        childPath[0] = address(rootSubnetActor);
 
-        childPath = new address[](2);
-        childPath[0] = vm.addr(10);
-        childPath[1] = address(parentSubnetActor);
-
-        childId = SubnetID({root: ROOTNET_CHAINID, route: childPath});
-        childGateway = createGatewayDiamond(gatewayParams(childId));
-        childSubnetActor = createSubnetActor(subnetActorWithParams(address(childGateway), childId));
+        childName = SubnetID({root: ROOTNET_CHAINID, route: childPath});
+        childGateway = createGatewayDiamond(gatewayParams(childName));
+        childSubnetActor = createSubnetActor(subnetActorWithParams(address(childGateway), childName));
         childGatewayGetter = GatewayGetterFacet(address(childGateway));
         childGatewayMessenger = GatewayMessengerFacet(address(childGateway));
-        childSubnetActorGetter = SubnetActorGetterFacet(address(childSubnetActor));
         childGatewayCheckpointer = CheckpointingFacet(address(childGateway));
 
-
-        console.logAddress(childId.getActor());
-        console.logAddress(parentId.getActor());
-        console.logAddress((address(parentSubnetActor)));
+        console.log("root actor: %s", rootName.getActor());
+        console.log("child network actor: %s", childName.getActor());
+        console.log("root subnet actor: %s", (address(rootSubnetActor)));
+        console.log("root name: %s", rootName.toString());
+        console.log("child name: %s", childName.toString());
     }
 
     function gatewayParams(SubnetID memory id) internal pure returns (GatewayDiamond.ConstructorParams memory) {
@@ -120,58 +114,42 @@ contract MultiSubnet is Test, IntegrationTestBase {
         return params;
     }
 
-
-    function testGatewayDiamond_MultiSubnet_Baseline() public {
-        console.logString(parentGatewayGetter.getNetworkName().toString());
-        console.logString(childGatewayGetter.getNetworkName().toString());
-
-        //console.logInt(parentSubnetActorGetter.consensus());
-        console.logString(parentSubnetActorGetter.getParent().toString());
-
-        //console.logInt(childSubnetActorGetter.consensus());
-        console.logString(childSubnetActorGetter.getParent().toString());
-
-    }
-
     function testGatewayDiamond_MultiSubnet_SendCrossMessageFromChildToParent() public {
-        // Caller of general-purpose messages must be a contract, not a EoA
 
         address caller = address(new MockIpcContract());
 
-        //vm.deal(address(parentSubnetActor), 2*DEFAULT_COLLATERAL_AMOUNT +2*DEFAULT_CROSS_MSG_FEE + 2);
-        vm.deal(address(parentSubnetActor), 2*DEFAULT_COLLATERAL_AMOUNT +2*DEFAULT_CROSS_MSG_FEE + 2);
-        vm.deal(caller, 2*DEFAULT_COLLATERAL_AMOUNT +2*DEFAULT_CROSS_MSG_FEE + 2);
+        vm.deal(address(rootSubnetActor), DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 1);
+        vm.deal(caller, 1);
 
-        vm.prank(address(parentSubnetActor));
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(parentSubnetActor), childGateway);
-
-        vm.prank(address(parentSubnetActor));
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(parentSubnetActor), parentGateway);
-
+        vm.prank(address(rootSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootSubnetActor), rootGateway);
 
         address funderAddress = address(567);
-        uint256 fundAmount = 1 ether;
-
-        vm.deal(funderAddress, fundAmount + 1);
-
-        SubnetID memory fundedSubnetId = parentSubnetActorGetter.getParent().createSubnetId(address(parentSubnetActor));
-
+        vm.deal(funderAddress, 1 ether);
+        SubnetID memory fundedSubnetId = rootName.createSubnetId((address(rootSubnetActor)));
         vm.startPrank(funderAddress);
-        parentGatewayManager.fund{value: 100000}(fundedSubnetId, FvmAddressHelper.from(address(funderAddress)));
+        rootGatewayManager.fund{value: 100000}(fundedSubnetId, FvmAddressHelper.from(address(funderAddress)));
         vm.stopPrank();
 
+        vm.prank(address(caller));
         childGatewayMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
-                    subnetId: parentId,
+                    subnetId: childName,
                     rawAddress: FvmAddressHelper.from(caller)
                 }),
-                IPCAddress({subnetId: parentId, rawAddress: FvmAddressHelper.from(caller)}),
+                IPCAddress({subnetId: rootName, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
                 0
             )
         );
 
+        BottomUpCheckpoint memory checkpoint = createBottomUpCheckpointInChildSubnet();
+
+        submitCheckpointInParentSubnet(checkpoint);
+    }
+
+    function createBottomUpCheckpointInChildSubnet() internal returns (BottomUpCheckpoint memory checkpoint) {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
         BottomUpMsgBatch memory batch = childGatewayGetter.bottomUpMsgBatch(e);
@@ -182,8 +160,8 @@ contract MultiSubnet is Test, IntegrationTestBase {
         (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
             .createMerkleProofsForValidators(addrs, weights);
 
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: childId,
+        checkpoint = BottomUpCheckpoint({
+            subnetID: childName,
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
@@ -194,35 +172,10 @@ contract MultiSubnet is Test, IntegrationTestBase {
         childGatewayCheckpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
         vm.stopPrank();
 
-        // adds signatures
-
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-        bytes[] memory signatures = new bytes[](4);
-
-        for (uint64 i = 0; i < 4; i++) {
-            (v, r, s) = vm.sign(privKeys[i], keccak256(abi.encode(checkpoint)));
-            signatures[i] = abi.encodePacked(r, s, v);
-
-            vm.startPrank(vm.addr(privKeys[i]));
-            childGatewayCheckpointer.addCheckpointSignature(
-                checkpoint.blockHeight,
-                membershipProofs[i],
-                weights[i],
-                signatures[i]
-            );
-            vm.stopPrank();
-        }
-
-        require(childGatewayGetter.getCheckpointInfo(checkpoint.blockHeight).reached == true, "threshold not reached");
-
-        // parent
-
-        submitCheckpointInParent(checkpoint);
+        return checkpoint;
     }
 
-    function submitCheckpointInParent(BottomUpCheckpoint memory checkpoint) internal {
+    function submitCheckpointInParentSubnet(BottomUpCheckpoint memory checkpoint) internal {
         (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory parentPubKeys = new bytes[](3);
         bytes[] memory parentSignatures = new bytes[](3);
@@ -231,7 +184,7 @@ contract MultiSubnet is Test, IntegrationTestBase {
             vm.deal(parentValidators[i], 10 gwei);
             parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(parentKeys[i]);
             vm.prank(parentValidators[i]);
-            parentSubnetActorManager.join{value: 10}(parentPubKeys[i]);
+            rootSubnetActorManager.join{value: 10}(parentPubKeys[i]);
         }
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
@@ -242,15 +195,13 @@ contract MultiSubnet is Test, IntegrationTestBase {
         }
 
 
-        vm.startPrank(address(parentSubnetActor));
-        parentSubnetActorCheckpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        vm.startPrank(address(rootSubnetActor));
+        rootSubnetActorCheckpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
     }
 
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
-
-
 
 }
