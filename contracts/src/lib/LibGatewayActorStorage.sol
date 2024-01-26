@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {NotEnoughFee, NotSystemActor, NotEnoughFunds} from "../errors/IPCErrors.sol";
+import {NotSystemActor, NotEnoughFunds} from "../errors/IPCErrors.sol";
 import {QuorumMap} from "../structs/Quorum.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatch, CrossMsg, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
@@ -13,8 +13,6 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
 struct GatewayActorStorage {
     /// @notice The latest parent height committed.
     uint256 latestParentHeight;
-    /// @notice minimum fee amount charged per cross message
-    uint256 minCrossMsgFee;
     /// @notice bottom-up period in number of epochs for the subnet
     uint256 bottomUpCheckPeriod;
     /// @notice bottom-up message batch period in number of epochs for the subnet
@@ -42,10 +40,6 @@ struct GatewayActorStorage {
     bool generalPurposeCrossMsg;
     /// @notice Determines if multi-level cross-net messages are enbaled.
     bool multiLevelCrossMsg;
-    /// @notice Determines if relayers should be rewarded for checkpoint submissions
-    bool checkpointRelayerRewards;
-    /// @notice Determines if relayers should be rewarded for cross-net message execution
-    bool crossMsgRelayerRewards;
     // == Structs ==
     /// @notice The current membership of the child subnet
     Membership currentMembership;
@@ -53,8 +47,6 @@ struct GatewayActorStorage {
     Membership lastMembership;
     /// @notice Quorum information for checkpoints
     QuorumMap checkpointQuorumMap;
-    /// @notice Quorum information for bottom-up msg batches
-    QuorumMap bottomUpMsgBatchQuorumMap;
     /// @notice path to the current network
     SubnetID networkName;
     /// Tracking validator changes from parent in child subnet
@@ -70,7 +62,7 @@ struct GatewayActorStorage {
     /// @notice Postbox keeps track of all the cross-net messages triggered by
     /// an actor that need to be propagated further through the hierarchy.
     /// cross-net message id => CrossMsg
-    mapping(bytes32 => CrossMsg) postbox;
+    mapping(bytes32 => IpcEnvelope) postbox;
     /// @notice A mapping of block numbers to bottom-up checkpoints
     // slither-disable-next-line uninitialized-state
     mapping(uint256 => BottomUpCheckpoint) bottomUpCheckpoints;
@@ -96,15 +88,6 @@ contract GatewayActorModifiers {
     using FilAddress for address;
     using FilAddress for address payable;
     using AccountHelper for address;
-
-    function validateFee(uint256 fee) internal view {
-        if (fee < s.minCrossMsgFee) {
-            revert NotEnoughFee();
-        }
-        if (msg.value < fee) {
-            revert NotEnoughFunds();
-        }
-    }
 
     function _systemActorOnly() private view {
         if (!msg.sender.isSystemActor()) {

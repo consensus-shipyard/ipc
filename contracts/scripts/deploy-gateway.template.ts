@@ -51,30 +51,23 @@ export async function deploy(libs: { [key in string]: string }) {
     }
     const messengerFacetLibs: Libraries = {
         SubnetIDHelper: libs['SubnetIDHelper'],
-        StorableMsgHelper: libs['StorableMsgHelper'],
+        CrossMsgHelper: libs['CrossMsgHelper'],
     }
 
     const checkpointingFacetLibs: Libraries = {
         AccountHelper: libs['AccountHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
+        CrossMsgHelper: libs['CrossMsgHelper'],
     }
 
     const xnetMessagingFacetLibs: Libraries = {
         AccountHelper: libs['AccountHelper'],
         CrossMsgHelper: libs['CrossMsgHelper'],
         SubnetIDHelper: libs['SubnetIDHelper'],
-        StorableMsgHelper: libs['StorableMsgHelper'],
     }
 
     const topDownFinalityFacetLibs: Libraries = {
         AccountHelper: libs['AccountHelper'],
-    }
-
-    const bottomUpRouterFacetLibs: Libraries = {
-        CrossMsgHelper: libs['CrossMsgHelper'],
-        SubnetIDHelper: libs['SubnetIDHelper'],
-        AccountHelper: libs['AccountHelper'],
-        StorableMsgHelper: libs['StorableMsgHelper'],
     }
 
     const facets = [
@@ -92,10 +85,6 @@ export async function deploy(libs: { [key in string]: string }) {
             libs: xnetMessagingFacetLibs,
         },
         { name: 'TopDownFinalityFacet', libs: topDownFinalityFacetLibs },
-        {
-            name: 'BottomUpRouterFacet',
-            libs: bottomUpRouterFacetLibs,
-        },
     ]
 
     for (const facet of facets) {
@@ -117,7 +106,6 @@ export async function deploy(libs: { [key in string]: string }) {
     }
 
     const gatewayConstructorParams = {
-        msgFee: ethers.utils.parseUnits('10', 'gwei'),
         bottomUpCheckPeriod: 10,
         activeValidatorsLimit: 100,
         majorityPercentage: 66,

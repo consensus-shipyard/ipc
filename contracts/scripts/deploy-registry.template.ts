@@ -46,7 +46,7 @@ export async function deploy() {
     const rewarderFacet = await deployContractWithDeployer(
         deployer,
         'SubnetActorRewardFacet',
-        { LibStaking: LIBMAP['LibStaking'] },
+        {},
         txArgs,
     )
     const rewarderSelectors = getSelectors(rewarderFacet)

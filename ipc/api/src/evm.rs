@@ -6,7 +6,7 @@
 use crate::address::IPCAddress;
 use crate::checkpoint::BottomUpCheckpoint;
 use crate::checkpoint::BottomUpMsgBatch;
-use crate::cross::{CrossMsg, StorableMsg};
+use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
 use crate::subnet::SupplySource;
@@ -14,14 +14,12 @@ use crate::subnet_id::SubnetID;
 use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
 use ethers::types::U256;
-use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::{Address, Payload};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use fvm_shared::MethodNum;
 use ipc_actors_abis::{
-    bottom_up_router_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
-    lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
+    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, lib_gateway,
+    register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
     subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
 };
 
@@ -81,99 +79,48 @@ macro_rules! cross_msg_types {
             }
         }
 
-        impl TryFrom<StorableMsg> for $module::StorableMsg {
+        impl TryFrom<IpcEnvelope> for $module::IpcEnvelope {
             type Error = anyhow::Error;
 
-            fn try_from(value: StorableMsg) -> Result<Self, Self::Error> {
-                let msg_value = fil_to_eth_amount(&value.value)?;
-                let msg_fee = fil_to_eth_amount(&value.fee)?;
+            fn try_from(value: IpcEnvelope) -> Result<Self, Self::Error> {
+                let val = fil_to_eth_amount(&value.value)?;
 
-                log::info!(
-                    "storable message token amount: {:}, converted: {:?}",
-                    value.value.atto().to_string(),
-                    msg_value
-                );
-
-                let c = $module::StorableMsg {
+                let c = $module::IpcEnvelope {
+                    kind: value.kind as u8,
                     from: $module::Ipcaddress::try_from(value.from).map_err(|e| {
                         anyhow!("cannot convert `from` ipc address msg due to: {e:}")
                     })?,
                     to: $module::Ipcaddress::try_from(value.to)
                         .map_err(|e| anyhow!("cannot convert `to`` ipc address due to: {e:}"))?,
-                    value: msg_value,
+                    value: val,
                     nonce: value.nonce,
-                    // FIXME: we might a better way to handle the encoding of methods and params according to the type of message the cross-net message is targetting.
-                    method: (value.method as u32).to_be_bytes(),
-                    params: ethers::core::types::Bytes::from(value.params.to_vec()),
-                    fee: msg_fee,
+                    message: ethers::core::types::Bytes::from(value.message),
                 };
                 Ok(c)
             }
         }
 
-        impl TryFrom<$module::StorableMsg> for StorableMsg {
+        impl TryFrom<$module::IpcEnvelope> for IpcEnvelope {
             type Error = anyhow::Error;
 
-            fn try_from(value: $module::StorableMsg) -> Result<Self, Self::Error> {
-                let s = StorableMsg {
+            fn try_from(value: $module::IpcEnvelope) -> Result<Self, Self::Error> {
+                let s = IpcEnvelope {
                     from: IPCAddress::try_from(value.from)?,
                     to: IPCAddress::try_from(value.to)?,
-                    method: u32::from_be_bytes(value.method) as MethodNum,
-                    params: RawBytes::from(value.params.to_vec()),
                     value: eth_to_fil_amount(&value.value)?,
+                    kind: IpcMsgKind::try_from(value.kind)?,
+                    message: value.message.to_vec(),
                     nonce: value.nonce,
-                    fee: eth_to_fil_amount(&value.fee)?,
                 };
                 Ok(s)
-            }
-        }
-
-        impl TryFrom<CrossMsg> for $module::CrossMsg {
-            type Error = anyhow::Error;
-
-            fn try_from(value: CrossMsg) -> Result<Self, Self::Error> {
-                let c = $module::CrossMsg {
-                    wrapped: value.wrapped,
-                    message: $module::StorableMsg::try_from(value.msg)
-                        .map_err(|e| anyhow!("cannot convert storable msg due to: {e:}"))?,
-                };
-                Ok(c)
-            }
-        }
-
-        impl TryFrom<$module::CrossMsg> for CrossMsg {
-            type Error = anyhow::Error;
-
-            fn try_from(value: $module::CrossMsg) -> Result<Self, Self::Error> {
-                let c = CrossMsg {
-                    wrapped: value.wrapped,
-                    msg: StorableMsg::try_from(value.message)?,
-                };
-                Ok(c)
             }
         }
     };
 }
 
 /// The type conversion between different bottom up checkpoint definition in ethers and sdk
-macro_rules! bottom_up_type_conversion {
+macro_rules! bottom_up_checkpoint_conversion {
     ($module:ident) => {
-        impl TryFrom<BottomUpMsgBatch> for $module::BottomUpMsgBatch {
-            type Error = anyhow::Error;
-
-            fn try_from(batch: BottomUpMsgBatch) -> Result<Self, Self::Error> {
-                Ok($module::BottomUpMsgBatch {
-                    subnet_id: $module::SubnetID::try_from(&batch.subnet_id)?,
-                    block_height: ethers::core::types::U256::from(batch.block_height),
-                    msgs: batch
-                        .msgs
-                        .into_iter()
-                        .map($module::CrossMsg::try_from)
-                        .collect::<Result<Vec<_>, _>>()?,
-                })
-            }
-        }
-
         impl TryFrom<BottomUpCheckpoint> for $module::BottomUpCheckpoint {
             type Error = anyhow::Error;
 
@@ -183,6 +130,11 @@ macro_rules! bottom_up_type_conversion {
                     block_height: ethers::core::types::U256::from(checkpoint.block_height),
                     block_hash: vec_to_bytes32(checkpoint.block_hash)?,
                     next_configuration_number: checkpoint.next_configuration_number,
+                    msgs: checkpoint
+                        .msgs
+                        .into_iter()
+                        .map($module::IpcEnvelope::try_from)
+                        .collect::<Result<Vec<_>, _>>()?,
                 })
             }
         }
@@ -196,13 +148,38 @@ macro_rules! bottom_up_type_conversion {
                     block_height: value.block_height.as_u128() as ChainEpoch,
                     block_hash: value.block_hash.to_vec(),
                     next_configuration_number: value.next_configuration_number,
+                    msgs: value
+                        .msgs
+                        .into_iter()
+                        .map(IpcEnvelope::try_from)
+                        .collect::<Result<Vec<_>, _>>()?,
                 })
             }
         }
     };
 }
 
-base_type_conversion!(bottom_up_router_facet);
+/// The type conversion between different bottom up message batch definition in ethers and sdk
+macro_rules! bottom_up_msg_batch_conversion {
+    ($module:ident) => {
+        impl TryFrom<BottomUpMsgBatch> for $module::BottomUpMsgBatch {
+            type Error = anyhow::Error;
+
+            fn try_from(batch: BottomUpMsgBatch) -> Result<Self, Self::Error> {
+                Ok($module::BottomUpMsgBatch {
+                    subnet_id: $module::SubnetID::try_from(&batch.subnet_id)?,
+                    block_height: ethers::core::types::U256::from(batch.block_height),
+                    msgs: batch
+                        .msgs
+                        .into_iter()
+                        .map($module::IpcEnvelope::try_from)
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
+            }
+        }
+    };
+}
+
 base_type_conversion!(xnet_messaging_facet);
 base_type_conversion!(subnet_actor_getter_facet);
 base_type_conversion!(gateway_manager_facet);
@@ -212,14 +189,14 @@ base_type_conversion!(gateway_messenger_facet);
 base_type_conversion!(lib_gateway);
 
 cross_msg_types!(gateway_getter_facet);
-cross_msg_types!(bottom_up_router_facet);
 cross_msg_types!(xnet_messaging_facet);
 cross_msg_types!(gateway_messenger_facet);
-cross_msg_types!(subnet_actor_checkpointing_facet);
 cross_msg_types!(lib_gateway);
+cross_msg_types!(subnet_actor_checkpointing_facet);
 
-bottom_up_type_conversion!(gateway_getter_facet);
-bottom_up_type_conversion!(subnet_actor_checkpointing_facet);
+bottom_up_checkpoint_conversion!(gateway_getter_facet);
+bottom_up_checkpoint_conversion!(subnet_actor_checkpointing_facet);
+bottom_up_msg_batch_conversion!(gateway_getter_facet);
 
 impl TryFrom<SupplySource> for subnet_actor_diamond::SupplySource {
     type Error = anyhow::Error;

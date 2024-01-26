@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {RelayerRewardsInfo, BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, SupplySource, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
@@ -13,14 +13,10 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
         uint256 genesisCircSupply;
         /// @notice The height of the last committed bottom-up checkpoint.
         uint256 lastBottomUpCheckpointHeight;
-        /// @notice bottom-up message batch period in number of epochs for the subnet
-        uint256 bottomUpMsgBatchPeriod;
         /// @notice Minimal activation collateral
         uint256 minActivationCollateral;
         /// @notice number of blocks in a bottom-up epoch
         uint256 bottomUpCheckPeriod;
-        /// @notice minimum fee amount charged per cross message by the subnet
-        uint256 minCrossMsgFee;
         // @notice Hash of the current subnet id
         bytes32 currentSubnetHash;
         /// @notice Address of the IPC gateway for the subnet
@@ -41,8 +37,6 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
         uint64 minValidators;
         /// @notice Determines if the subnet has been successfully killed
         bool killed;
-        /// @notice Info of the last executed bottom-up batch.
-        BottomUpMsgBatchInfo lastBottomUpBatch;
         /// @notice subnet supply strategy.
         SupplySource supplySource;
         /// @notice ID of the parent subnet
@@ -54,8 +48,6 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
         StakingChangeLog changeSet;
         /// @notice The staking release queue that only allow transfer of collateral after certain locking period.
         StakingReleaseQueue releaseQueue;
-        /// @notice relayers rewards
-        RelayerRewardsInfo relayerRewards;
         /// =============
         /// mapping of bootstrap owner to its bootstrap node address
         mapping(address => string) bootstrapNodes;

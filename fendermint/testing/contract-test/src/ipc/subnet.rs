@@ -119,7 +119,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         checkpoint: checkpointer::BottomUpCheckpoint,
-        _messages: Vec<checkpointer::CrossMsg>,
+        _messages: Vec<checkpointer::IpcEnvelope>,
         signatures: Vec<(EthAddress, [u8; SECP_SIG_LEN])>,
     ) -> TryCallResult<()> {
         let mut addrs = Vec::new();
@@ -201,7 +201,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
     pub fn cross_msgs_hash(
         &self,
         state: &mut FvmExecState<DB>,
-        cross_msgs: Vec<getter::CrossMsg>,
+        cross_msgs: Vec<getter::IpcEnvelope>,
     ) -> anyhow::Result<[u8; 32]> {
         self.getter.call(state, |c| c.cross_msgs_hash(cross_msgs))
     }

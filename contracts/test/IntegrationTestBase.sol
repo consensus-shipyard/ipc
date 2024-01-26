@@ -7,13 +7,12 @@ import "../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
 import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {CrossMsg, BottomUpCheckpoint, StorableMsg, ParentFinality} from "../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
 import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
-import {StorableMsgHelper} from "../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond} from "../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
@@ -24,7 +23,6 @@ import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
 import {CheckpointingFacet} from "../src/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../src/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../src/gateway/router/TopDownFinalityFacet.sol";
-import {BottomUpRouterFacet} from "../src/gateway/router/BottomUpRouterFacet.sol";
 
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
 import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
@@ -91,7 +89,6 @@ contract TestGatewayActor is Test, TestParams {
     bytes4[] gwCheckpointingFacetSelectors;
     bytes4[] gwXnetMessagingFacetSelectors;
     bytes4[] gwTopDownFinalityFacetSelectors;
-    bytes4[] gwBottomUpRouterFacetSelectors;
 
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
@@ -106,7 +103,6 @@ contract TestGatewayActor is Test, TestParams {
     CheckpointingFacet gwCheckpointingFacet;
     XnetMessagingFacet gwXnetMessagingFacet;
     TopDownFinalityFacet gwTopDownFinalityFacet;
-    BottomUpRouterFacet gwBottomUpRouterFacet;
     GatewayMessengerFacet gwMessenger;
     DiamondCutFacet gwCutter;
     DiamondLoupeFacet gwLouper;
@@ -115,7 +111,6 @@ contract TestGatewayActor is Test, TestParams {
         gwCheckpointingFacetSelectors = SelectorLibrary.resolveSelectors("CheckpointingFacet");
         gwXnetMessagingFacetSelectors = SelectorLibrary.resolveSelectors("XnetMessagingFacet");
         gwTopDownFinalityFacetSelectors = SelectorLibrary.resolveSelectors("TopDownFinalityFacet");
-        gwBottomUpRouterFacetSelectors = SelectorLibrary.resolveSelectors("BottomUpRouterFacet");
 
         gwGetterSelectors = SelectorLibrary.resolveSelectors("GatewayGetterFacet");
         gwManagerSelectors = SelectorLibrary.resolveSelectors("GatewayManagerFacet");
@@ -171,7 +166,6 @@ contract TestSubnetActor is Test, TestParams {
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
-            minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
             permissionMode: PermissionMode.Collateral,
             supplySource: native
         });
@@ -183,8 +177,7 @@ contract TestSubnetActor is Test, TestParams {
 contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor, TestGatewayActor {
     using SubnetIDHelper for SubnetID;
     using SupplySourceHelper for SupplySource;
-    using CrossMsgHelper for CrossMsg;
-    using StorableMsgHelper for StorableMsg;
+    using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
 
     event SubnetRegistryCreated(address indexed subnetRegistryAddress);
@@ -204,7 +197,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
         gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
         gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwBottomUpRouterFacet = BottomUpRouterFacet(address(gatewayDiamond));
         gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
         gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
         gwCutter = DiamondCutFacet(address(gatewayDiamond));
@@ -230,7 +222,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            msgFee: DEFAULT_CROSS_MSG_FEE,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
@@ -243,7 +234,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
         TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
-        BottomUpRouterFacet bottomUpRouterFacet = new BottomUpRouterFacet();
 
         GatewayManagerFacet manager = new GatewayManagerFacet();
         GatewayGetterFacet getter = new GatewayGetterFacet();
@@ -251,7 +241,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondCutFacet cutter = new DiamondCutFacet();
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](9);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](8);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -274,14 +264,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 facetAddress: address(topDownFinalityFacet),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: gwTopDownFinalityFacetSelectors
-            })
-        );
-
-        gwDiamondCut[8] = (
-            IDiamond.FacetCut({
-                facetAddress: address(bottomUpRouterFacet),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwBottomUpRouterFacetSelectors
             })
         );
 
@@ -568,7 +550,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 activeValidatorsLimit: _activeValidatorsLimit,
                 powerScale: 12,
                 permissionMode: _permissionMode,
-                minCrossMsgFee: DEFAULT_CROSS_MSG_FEE,
                 supplySource: SupplySourceHelper.native()
             })
         );
@@ -693,25 +674,21 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function setupWhiteListMethod(address caller, address src) public returns (bytes32) {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, src);
 
-        CrossMsg memory crossMsg = CrossMsg({
-            message: StorableMsg({
-                from: IPCAddress({
-                    subnetId: gwGetter.getNetworkName().createSubnetId(caller),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                to: IPCAddress({
-                    subnetId: gwGetter.getNetworkName().createSubnetId(src),
-                    rawAddress: FvmAddressHelper.from(src)
-                }),
-                value: DEFAULT_CROSS_MSG_FEE + 1,
-                nonce: 0,
-                method: METHOD_SEND,
-                params: new bytes(0),
-                fee: DEFAULT_CROSS_MSG_FEE
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            kind: IpcMsgKind.Transfer,
+            from: IPCAddress({
+                subnetId: gwGetter.getNetworkName().createSubnetId(caller),
+                rawAddress: FvmAddressHelper.from(caller)
             }),
-            wrapped: false
+            to: IPCAddress({
+                subnetId: gwGetter.getNetworkName().createSubnetId(src),
+                rawAddress: FvmAddressHelper.from(src)
+            }),
+            value: DEFAULT_CROSS_MSG_FEE + 1,
+            nonce: 0,
+            message: EMPTY_BYTES
         });
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
         // we add a validator with 10 times as much weight as the default validator.
@@ -758,8 +735,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
         uint256 expectedNonce = nonceBefore + 1;
         uint256 expectedCircSupply = circSupplyBefore + fundAmount;
-
-        require(gwGetter.crossMsgFee() > 0, "crossMsgFee is 0");
 
         if (mode == SupplyKind.Native) {
             gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
@@ -837,7 +812,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
-            nextConfigurationNumber: nextConfigNum - 1
+            nextConfigurationNumber: nextConfigNum - 1,
+            msgs: new IpcEnvelope[](0)
         });
 
         vm.deal(address(saDiamond), 100 ether);

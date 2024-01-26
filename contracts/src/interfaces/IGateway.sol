@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, BottomUpMsgBatch, CrossMsg, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
@@ -17,9 +17,6 @@ interface IGateway {
 
     /// @notice Release stake recovers some collateral of the subnet
     function releaseStake(uint256 amount) external;
-
-    /// @notice Release reward for relayer
-    function releaseRewardForRelayer(uint256 amount) external;
 
     /// @notice Kill propagates the kill signal from a subnet actor to unregister it from th
     /// hierarchy.
@@ -58,17 +55,11 @@ interface IGateway {
     /// the amount of funds that can be released for a specific address.
     function release(FvmAddress calldata to) external payable;
 
-    /// @notice SendUserXnetMessage sends an arbitrary cross-message to other subnet in the hierarchy.
-    ///
-    /// If the message includes any funds they need to be burnt (like in Release)
-    /// before being propagated to the corresponding subnet.
-    /// The circulating supply in each subnet needs to be updated as the message passes through them.
-    ///
-    /// Params expect a raw message without any subnet context (the IPC address is
-    /// included in the message by the actor). Only actors are allowed to send arbitrary
-    /// cross-messages as a side-effect of their execution. For plain token exchanges
-    /// fund and release have to be used.
-    function sendUserXnetMessage(CrossMsg memory crossMsg) external payable;
+    /// @notice sendContractXnetMessage sends an arbitrary cross-message to other subnet in the hierarchy.
+    // TODO: add the right comment and function name here.
+    function sendContractXnetMessage(
+        IpcEnvelope calldata envelope
+    ) external payable returns (IpcEnvelope memory committed);
 
     /// @notice Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;
@@ -82,8 +73,4 @@ interface IGateway {
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external;
-
-    /// @notice execBottomUpMsgBatch submits a batch of cross-net messages
-    /// from a subnet actor for their execution.
-    function execBottomUpMsgBatch(BottomUpMsgBatch calldata batch) external;
 }

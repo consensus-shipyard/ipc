@@ -56,16 +56,6 @@ library LibSubnetActor {
         }
     }
 
-    /// @notice Retrieves the addresses of relayers who were rewarded for a specific checkpoint at a given height.
-    /// @param height The height of the checkpoint for which to find rewarded relayers.
-    /// @return relayers An array of addresses of the relayers who were rewarded at the specified checkpoint.
-    function checkpointRewardedAddrs(uint256 height) internal view returns (address[] memory relayers) {
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-
-        uint256 previousHeight = height - s.bottomUpCheckPeriod;
-        relayers = s.relayerRewards.checkpointRewarded[previousHeight].values();
-    }
-
     /// @notice Converts a 65-byte public key to its corresponding address.
     /// @param publicKey The 65-byte public key to be converted.
     /// @return The address derived from the given public key.

@@ -72,16 +72,6 @@ quickcheck_macros = { workspace = true }
 fendermint_vm_genesis = { path = "../vm/genesis", features = ["arb"] }
 fendermint_vm_snapshot = { path = "../vm/snapshot", features = ["arb"] }
 
-
-# Load the same built-in actor bundle as the ref-fvm integration tests. We'll probably need built-in actors,
-# for example to deploy Solidity code. We can compile Wasm actors and deploy them too, but certain functions
-# in `ref-fvm` like looking up actor addresses depend on built-in actors like the `InitActor` maintaining state.
-# NOTE: The following would add this as a dependency. The problem is that this makes it more difficult to compile
-# the project because now when there is a new version of the FVM released, we also need a new version of the
-# actor project to be released. In prod, we'd just load it from a file, so let's see if that works.
-# We can build a bundle CAR with the Makefile.
-# actors-v10 = { package = "fil_builtin_actors_bundle", git = "https://github.com/filecoin-project/builtin-actors", branch = "next" }
-
 # Using a single binary to run the application as well as to execute client commands.
 [[bin]]
 name = "fendermint"

@@ -63,10 +63,6 @@ jobs:
     uses: ./.github/workflows/contracts-deployment-test.yaml
     needs: [ contracts-prettier ]
 
-  contracts-build-and-test:
-    uses: ./.github/workflows/contracts-build-and-test.yaml
-    needs: [contracts-prettier]
-
   contracts-test:
     uses: ./.github/workflows/contracts-test.yaml
     needs: [contracts-prettier]
