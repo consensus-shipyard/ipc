@@ -291,8 +291,9 @@ impl IpcProvider {
     }
 
     pub async fn bootstrapped(&mut self, subnet: &SubnetID) -> anyhow::Result<bool> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet config not found")),
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
 
