@@ -29,9 +29,9 @@ esac
 
 if [ "$1" == "start" ]; then
   # we need to remove the network with the same name
-  # because that network might me created without subnet with necessary IP address space
+  # because that network might be created without subnet with necessary IP address space
   docker network rm -f ${NETWORK_NAME}
-  docker network create --subnet 192.167.10.0/16 ${NETWORK_NAME}
+  docker network create --subnet 192.167.0.0/16 ${NETWORK_NAME}
 fi
 
 for i in $(seq 0 3); do
