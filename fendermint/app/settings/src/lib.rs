@@ -342,6 +342,7 @@ mod tests {
     use std::str::FromStr;
 
     use ipc_api::subnet_id::SubnetID;
+    use serial_test::serial;
 
     use super::expand_tilde;
     use super::Settings;
@@ -356,22 +357,6 @@ mod tests {
         try_parse_config(run_mode).expect("failed to parse Settings")
     }
 
-    /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
-    fn with_env_vars<F, T, E>(vars: Vec<(&str, &str)>, f: F) -> Result<T, E>
-    where
-        F: FnOnce() -> Result<T, E>,
-    {
-        for (k, v) in vars.iter() {
-            std::env::set_var(k, v);
-        }
-        let result = f();
-        for (k, _) in vars {
-            eprintln!("removing {k}");
-            std::env::remove_var(k);
-        }
-        result
-    }
-
     #[test]
     fn parse_default_config() {
         let settings = parse_config("");
@@ -384,30 +369,50 @@ mod tests {
         assert!(settings.resolver_enabled());
     }
 
-    #[test]
-    fn parse_comma_separated() {
-        let settings = with_env_vars(vec![
+    #[serial]
+    mod env {
+        use crate::tests::try_parse_config;
+
+        /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
+        fn with_env_vars<F, T, E>(vars: Vec<(&str, &str)>, f: F) -> Result<T, E>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
+            for (k, v) in vars.iter() {
+                std::env::set_var(k, v);
+            }
+            let result = f();
+            for (k, _) in vars {
+                std::env::remove_var(k);
+            }
+            result
+        }
+
+        #[test]
+        fn parse_comma_separated() {
+            let settings = with_env_vars(vec![
             ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
             // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
             ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
         ], || try_parse_config("")).unwrap();
 
-        assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
-    }
+            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+        }
 
-    #[test]
-    fn parse_empty_comma_separated() {
-        let settings = with_env_vars(
-            vec![
-                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
-                ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
-            ],
-            || try_parse_config(""),
-        )
-        .unwrap();
+        #[test]
+        fn parse_empty_comma_separated() {
+            let settings = with_env_vars(
+                vec![
+                    ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
+                    ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
+                ],
+                || try_parse_config(""),
+            )
+            .unwrap();
 
-        assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
-        assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
+            assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
+            assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
+        }
     }
 
     #[test]

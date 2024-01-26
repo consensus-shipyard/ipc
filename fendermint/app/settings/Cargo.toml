@@ -16,6 +16,7 @@ dirs = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
+serial_test = { workspace = true }
 tendermint-rpc = { workspace = true }
 
 fvm_shared = { workspace = true }
