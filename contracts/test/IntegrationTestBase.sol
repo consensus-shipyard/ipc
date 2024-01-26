@@ -884,6 +884,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             gw
         );
 
+        SubnetID memory parentNetwork = getter.getNetworkName();
+
         require(
             id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
             "id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash()"
@@ -900,7 +902,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function getSubnetGW(
         address subnetAddress,
         GatewayDiamond gw
-    ) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
+    ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         GatewayGetterFacet getter = GatewayGetterFacet(address(gw));
 
         SubnetID memory subnetId = getter.getNetworkName().createSubnetId(subnetAddress);

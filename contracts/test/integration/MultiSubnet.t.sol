@@ -98,22 +98,6 @@ contract MultiSubnet is Test, IntegrationTestBase {
         return params;
     }
 
-    function defaultL2GatewayParams() internal pure returns (GatewayDiamond.ConstructorParams memory) {
-        address[] memory path = new address[](2);
-        path[0] = vm.addr(10);
-        path[1] = vm.addr(20);
-
-        GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
-            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
-        });
-
-        return params;
-    }
-
     function testGatewayDiamond_MultiSubnet_SendCrossMessageFromChildToParent() public {
         address caller = address(new MockIpcContract());
 
@@ -151,9 +135,9 @@ contract MultiSubnet is Test, IntegrationTestBase {
         BottomUpMsgBatch memory batch = childGatewayGetter.bottomUpMsgBatch(e);
         require(batch.msgs.length == 1, "batch length incorrect");
 
-        (uint256[] memory privKeys, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
 
-        (bytes32 membershipRoot, bytes32[][] memory membershipProofs) = MerkleTreeHelper
+        (bytes32 membershipRoot, ) = MerkleTreeHelper
             .createMerkleProofsForValidators(addrs, weights);
 
         checkpoint = BottomUpCheckpoint({
