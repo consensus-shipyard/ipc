@@ -112,6 +112,8 @@ where
             };
 
         match actor_state.get_block_hash(&bstore, epoch) {
+            // the block hash retrieved from state was saved raw from how we received it
+            // from Tendermint (which is Sha2_256) and we simply wrap it here in a cid
             Ok(Some(v)) => match Code::Blake2b256.wrap(&v) {
                 Ok(w) => Ok(Cid::new_v1(DAG_CBOR, w)),
                 Err(err) => Err(anyhow!("failed to wrap block hash, error: {}", err)),
