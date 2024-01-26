@@ -137,8 +137,7 @@ contract MultiSubnet is Test, IntegrationTestBase {
 
         (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
 
-        (bytes32 membershipRoot, ) = MerkleTreeHelper
-            .createMerkleProofsForValidators(addrs, weights);
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
         checkpoint = BottomUpCheckpoint({
             subnetID: childName,
