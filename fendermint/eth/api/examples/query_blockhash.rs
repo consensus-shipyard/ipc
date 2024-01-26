@@ -13,7 +13,7 @@
 //! cargo run -p fendermint_eth_api --release --example query_blockhash --
 //! ```
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use clap::Parser;
 use ethers::{
     prelude::{abigen, ContractFactory},
@@ -24,10 +24,10 @@ use ethers_core::{
     types::{BlockId, BlockNumber, Bytes, TransactionReceipt, H256, U256, U64},
 };
 use hex;
-use std::{fmt::Debug, fmt::Display, path::PathBuf, sync::Arc};
+use std::{fmt::Debug, path::PathBuf, sync::Arc};
 use tracing::Level;
 
-use crate::common::{adjust_provider, make_middleware, TestAccount};
+use crate::common::{adjust_provider, make_middleware, request, TestAccount};
 
 #[allow(dead_code)]
 mod common;
@@ -74,37 +74,6 @@ impl Options {
 
     pub fn http_endpoint(&self) -> String {
         format!("http://{}:{}", self.http_host, self.http_port)
-    }
-}
-
-trait CheckResult {
-    fn check_result(&self) -> anyhow::Result<()>;
-}
-
-impl CheckResult for bool {
-    fn check_result(&self) -> anyhow::Result<()> {
-        if *self {
-            Ok(())
-        } else {
-            Err(anyhow!("expected true; got false"))
-        }
-    }
-}
-
-fn request<T, E, F, C>(method: &str, res: Result<T, E>, check: F) -> anyhow::Result<T>
-where
-    T: Debug,
-    F: FnOnce(&T) -> C,
-    C: CheckResult,
-    E: Display,
-{
-    tracing::debug!("checking request {method}...");
-    match res {
-        Ok(value) => match check(&value).check_result() {
-            Ok(()) => Ok(value),
-            Err(e) => Err(anyhow!("failed to check {method}: {e}:\n{value:?}")),
-        },
-        Err(e) => Err(anyhow!("failed to call {method}: {e:#}")),
     }
 }
 
