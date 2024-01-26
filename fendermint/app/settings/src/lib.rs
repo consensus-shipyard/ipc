@@ -257,6 +257,7 @@ impl Settings {
                 Environment::with_prefix("fm")
                     .prefix_separator("_")
                     .separator("__")
+                    .ignore_empty(true) // otherwise "" will be parsed as a list item
                     .try_parsing(true) // required for list separator
                     .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
                     .with_list_parse_key("resolver.discovery.static_addresses")
@@ -365,6 +366,7 @@ mod tests {
         }
         let result = f();
         for (k, _) in vars {
+            eprintln!("removing {k}");
             std::env::remove_var(k);
         }
         result
@@ -391,6 +393,21 @@ mod tests {
         ], || try_parse_config("")).unwrap();
 
         assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+    }
+
+    #[test]
+    fn parse_empty_comma_separated() {
+        let settings = with_env_vars(
+            vec![
+                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
+                ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
+            ],
+            || try_parse_config(""),
+        )
+        .unwrap();
+
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
+        assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
     }
 
     #[test]
