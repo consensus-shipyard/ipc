@@ -14,7 +14,7 @@ use crate::fvm::store::ReadOnlyBlockstore;
 /// A state we create for the execution of all the messages in a block.
 pub struct FvmCheckState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
     state_tree: StateTree<ReadOnlyBlockstore<DB>>,
     chain_id: ChainID,
@@ -22,7 +22,7 @@ where
 
 impl<DB> FvmCheckState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
     pub fn new(blockstore: DB, state_root: Cid, chain_id: ChainID) -> anyhow::Result<Self> {
         // Sanity check that the blockstore contains the supplied state root.
@@ -57,7 +57,7 @@ where
 
 impl<DB> HasChainID for FvmCheckState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
     fn chain_id(&self) -> ChainID {
         self.chain_id

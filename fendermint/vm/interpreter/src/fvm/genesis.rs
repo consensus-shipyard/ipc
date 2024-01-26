@@ -14,7 +14,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -145,7 +145,7 @@ where
 
         // System actor
         state
-            .create_actor(
+            .create_builtin_actor(
                 system::SYSTEM_ACTOR_CODE_ID,
                 system::SYSTEM_ACTOR_ID,
                 &system::State {
@@ -167,7 +167,7 @@ where
         .context("failed to create init state")?;
 
         state
-            .create_actor(
+            .create_builtin_actor(
                 init::INIT_ACTOR_CODE_ID,
                 init::INIT_ACTOR_ID,
                 &init_state,
@@ -178,7 +178,7 @@ where
 
         // Cron actor
         state
-            .create_actor(
+            .create_builtin_actor(
                 cron::CRON_ACTOR_CODE_ID,
                 cron::CRON_ACTOR_ID,
                 &cron::State {
@@ -191,7 +191,7 @@ where
 
         // Ethereum Account Manager (EAM) actor
         state
-            .create_actor(
+            .create_builtin_actor(
                 eam::EAM_ACTOR_CODE_ID,
                 eam::EAM_ACTOR_ID,
                 &EMPTY_ARR,
@@ -202,7 +202,7 @@ where
 
         // Burnt funds actor (it's just an account).
         state
-            .create_actor(
+            .create_builtin_actor(
                 account::ACCOUNT_ACTOR_CODE_ID,
                 burntfunds::BURNT_FUNDS_ACTOR_ID,
                 &account::State {
@@ -217,7 +217,7 @@ where
         // using the one in the builtin actors library would be appropriate.
         // This effectively burns the miner rewards. Better than panicking.
         state
-            .create_actor(
+            .create_builtin_actor(
                 account::ACCOUNT_ACTOR_CODE_ID,
                 reward::REWARD_ACTOR_ID,
                 &account::State {
@@ -227,6 +227,25 @@ where
                 None,
             )
             .context("failed to create reward actor")?;
+
+        // STAGE 1b: Then we initialize the in-repo custom actors.
+        //
+
+        // Initialize the chain metadata actor which handles saving metadata about the chain
+        // (e.g. block hashes) which we can query.
+        let chainmetadata_state = fendermint_actor_chainmetadata::State::new(
+            &state.store(),
+            fendermint_actor_chainmetadata::DEFAULT_LOOKBACK_LEN,
+        )?;
+        state
+            .create_custom_actor(
+                fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME,
+                chainmetadata::CHAINMETADATA_ACTOR_ID,
+                &chainmetadata_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create chainmetadata actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
@@ -494,7 +513,7 @@ mod tests {
 
     use crate::{
         fvm::{
-            bundle::{bundle_path, contracts_path},
+            bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::ipc::GatewayCaller,
             store::memory::MemoryBlockstore,
             FvmMessageInterpreter,
@@ -508,12 +527,13 @@ mod tests {
     async fn load_genesis() {
         let genesis = make_genesis();
         let bundle = read_bundle();
+        let custom_actors_bundle = read_custom_actors_bundle();
         let interpreter = make_interpreter();
 
         let multi_engine = Arc::new(MultiEngine::default());
         let store = MemoryBlockstore::new();
 
-        let state = FvmGenesisState::new(store, multi_engine, &bundle)
+        let state = FvmGenesisState::new(store, multi_engine, &bundle, &custom_actors_bundle)
             .await
             .expect("failed to create state");
 
@@ -541,6 +561,7 @@ mod tests {
     async fn load_genesis_deterministic() {
         let genesis = make_genesis();
         let bundle = read_bundle();
+        let custom_actors_bundle = read_custom_actors_bundle();
         let interpreter = make_interpreter();
         let multi_engine = Arc::new(MultiEngine::default());
 
@@ -548,9 +569,10 @@ mod tests {
         let mut outputs = Vec::new();
         for _ in 0..3 {
             let store = MemoryBlockstore::new();
-            let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle)
-                .await
-                .expect("failed to create state");
+            let state =
+                FvmGenesisState::new(store, multi_engine.clone(), &bundle, &custom_actors_bundle)
+                    .await
+                    .expect("failed to create state");
 
             let (state, out) = interpreter
                 .init(state, genesis.clone())
@@ -577,13 +599,15 @@ mod tests {
         let genesis: Genesis = serde_json::from_str(genesis_json).expect("failed to parse genesis");
 
         let bundle = read_bundle();
+        let custom_actors_bundle = read_custom_actors_bundle();
         let interpreter = make_interpreter();
         let multi_engine = Arc::new(MultiEngine::default());
 
         let store = MemoryBlockstore::new();
-        let state = FvmGenesisState::new(store, multi_engine.clone(), &bundle)
-            .await
-            .expect("failed to create state");
+        let state =
+            FvmGenesisState::new(store, multi_engine.clone(), &bundle, &custom_actors_bundle)
+                .await
+                .expect("failed to create state");
 
         let (state, _) = interpreter
             .init(state, genesis.clone())
@@ -616,5 +640,9 @@ mod tests {
 
     fn read_bundle() -> Vec<u8> {
         std::fs::read(bundle_path()).expect("failed to read bundle")
+    }
+
+    fn read_custom_actors_bundle() -> Vec<u8> {
+        std::fs::read(custom_actors_bundle_path()).expect("failed to read custom actor bundle")
     }
 }

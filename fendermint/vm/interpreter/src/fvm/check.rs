@@ -22,7 +22,7 @@ pub struct FvmCheckRet {
 #[async_trait]
 impl<DB, TC> CheckInterpreter for FvmMessageInterpreter<DB, TC>
 where
-    DB: Blockstore + 'static + Send + Sync,
+    DB: Blockstore + 'static + Send + Sync + Clone,
     TC: Send + Sync + 'static,
 {
     // We simulate the full pending state so that client can call methods on
