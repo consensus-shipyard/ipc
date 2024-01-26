@@ -18,7 +18,7 @@ services:
   cometbft-node:
     container_name: cometbft-node${NODE_ID}
     user: ${UID}:${GID}
-    image: "cometbft/cometbft:${COMETBFT_VERSION}"
+    image: ${CMT_DOCKER_IMAGE}
     ports:
       - "${PORT1}-${PORT2}:26656-26657"
     environment:
