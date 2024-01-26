@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Join subnet cli command handler.
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::Args;
 use ipc_api::subnet_id::SubnetID;
@@ -35,7 +36,8 @@ impl CommandLineHandler for JoinSubnet {
                 log::info!("pre-funding address with {initial_balance}");
                 provider
                     .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)
-                    .await?;
+                    .await
+                    .map_err(|e| anyhow!("cannot perform prefund due to {e}, probably subnet is already initialized."))?;
             } else {
                 log::info!("subnet already initialized, no need pre-funding");
             }

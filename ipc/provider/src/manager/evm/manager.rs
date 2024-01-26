@@ -237,7 +237,7 @@ impl SubnetManager for EthSubnetManager {
 
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
-            Arc::new(self.ipc_contract_info.provider.clone())
+            Arc::new(self.ipc_contract_info.provider.clone()),
         );
 
         Ok(contract.bootstrapped().call().await?)
