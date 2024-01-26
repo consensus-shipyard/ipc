@@ -54,10 +54,6 @@ pub struct Options {
     #[arg(long, short)]
     pub secret_key: PathBuf,
 
-    /// Path to write the contract metadata to.
-    #[arg(long, short)]
-    pub out: Option<PathBuf>,
-
     /// Enable DEBUG logs.
     #[arg(long, short)]
     pub verbose: bool,
@@ -150,7 +146,7 @@ where
             |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(U64::from(epoch)),
         )?;
         let bh = b.unwrap().hash.expect("hash should be set");
-        tracing::info!("blockhash from actor:    {:?}", bh);
+        tracing::info!("blockhash from API:      {:?}", bh);
 
         assert_eq!(blockhash, bh);
     }

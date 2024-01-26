@@ -31,7 +31,7 @@ clear = true
 dependencies = [
   "simplecoin-example",
   "ethers-example",
-  "query_blockhash-example",
+  "query-blockhash-example",
 ]
 
 [tasks.simplecoin-example]
@@ -52,7 +52,7 @@ cargo run -p fendermint_eth_api --release --example ethers -- \
   --secret-key-to   testing/smoke-test/test-data/keys/eric.sk
 """
 
-[tasks.query_blockhash-example]
+[tasks.query-blockhash-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
 cargo run -p fendermint_eth_api --release --example query_blockhash -- \
