@@ -27,7 +27,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param checkpoint The bottom-up checkpoint to be committed.
     function commitCheckpoint(BottomUpCheckpoint calldata checkpoint) external {
         // checkpoint is used to implement access control
-
         if (checkpoint.subnetID.getActor() != msg.sender) {
             revert InvalidCheckpointSource();
         }

@@ -174,6 +174,28 @@ contract TestSubnetActor is Test, TestParams {
         return params;
     }
 
+    function subnetActorWithParams(
+        address gw,
+        SubnetID memory parentID,
+        address tokenAddress
+    ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: parentID,
+            ipcGatewayAddr: gw,
+            consensus: ConsensusType.Fendermint,
+            minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            powerScale: DEFAULT_POWER_SCALE,
+            permissionMode: PermissionMode.Collateral,
+            supplySource: SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress})
+        });
+
+        return params;
+    }
+
     function defaultSubnetActorParamsWithGateway(
         address gw
     ) internal pure virtual returns (SubnetActorDiamond.ConstructorParams memory) {
