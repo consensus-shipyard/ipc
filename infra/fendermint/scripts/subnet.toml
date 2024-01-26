@@ -116,7 +116,7 @@ dependencies = [
 [tasks.subnet-convert-eth-key]
 extend = "fendermint-tool"
 env = { "CMD" = "key eth-to-fendermint --secret-key /data/${NODE_NAME}/${KEYS_SUBDIR}/eth.sk --name ${VALIDATOR_KEY_NAME} --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR}" }
-script.pre = "mkdir ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}; cp ${PRIVATE_KEY_PATH} ${BASE_DIR}/${NODE_NAME}/keys/eth.sk"
+script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}; cp ${PRIVATE_KEY_PATH} ${BASE_DIR}/${NODE_NAME}/keys/eth.sk"
 
 [tasks.subnet-fetch-genesis]
 extend = "fendermint-tool"
@@ -150,5 +150,8 @@ CometBFT node ID:
 
 CometBFT P2P:
 \thttp://0.0.0.0:${CMT_P2P_HOST_PORT}
+
+IPLD Resolver Multiaddress:
+\t/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT}/p2p/$(docker exec ${FM_CONTAINER_NAME} fendermint key show-peer-id --public-key /data/${NODE_NAME}/${NETWORK_PUB_KEY_PATH})
 EOF
 """
