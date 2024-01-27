@@ -112,18 +112,34 @@ where
     let factory = ContractFactory::new(abi, bytecode.clone(), mw.clone());
     let deployer = factory.deploy(())?;
 
-    let (contract, _deploy_receipt): (_, TransactionReceipt) =
-        deployer
-            .send_with_receipt()
-            .await
-            .context("failed to send deployment")?;
+    let (contract, deploy_receipt): (_, TransactionReceipt) = deployer
+        .send_with_receipt()
+        .await
+        .context("failed to send deployment")?;
 
     tracing::info!(addr = ?contract.address(), "QueryBlockhash deployed");
 
     let contract = QueryBlockhash::new(contract.address(), contract.client());
 
+    // check the deploy_height so we don't risk asking for blocks that had
+    // been removed from the chainmetadata state (it has a relatively short
+    // lookback length of 256)
+    let deploy_height = deploy_receipt
+        .block_number
+        .expect("deploy height should be set")
+        .as_u64();
+    tracing::info!("deploy_height: {:?}", deploy_height);
+
+    // we want check the get the blockhash for the last 5 blocks
+    const NR_CHECKS: u64 = 5;
+    let start_block = if deploy_height >= NR_CHECKS {
+        deploy_height - NR_CHECKS
+    } else {
+        0
+    };
+
     // check that the blockhash returned by the contract matches the one returned by tendermint
-    for epoch in 1..=5 {
+    for epoch in start_block..deploy_height {
         tracing::info!("Checking blockhashes at epoch: {}", epoch);
 
         // get the blockhash from the contract, which results in call to get_tipset_cid in fendermint
