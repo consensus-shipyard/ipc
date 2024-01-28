@@ -40,6 +40,7 @@ license-file = "LICENSE-APACHE"
 
 [workspace.dependencies]
 anyhow = "1"
+ambassador = "0.3.5"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
 async-stm = "0.4"
@@ -202,6 +203,8 @@ tendermint-rpc = { version = "0.31", features = [
   "websocket-client",
 ] }
 tendermint-proto = { version = "0.31" }
+
+fluence-fvm-syscall = { path = "../fluence-fvm/fluence-fvm-syscall" }
 
 [patch.crates-io]
 # Use stable-only features.
