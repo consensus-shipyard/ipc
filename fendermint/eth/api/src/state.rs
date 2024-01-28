@@ -3,6 +3,7 @@
 
 //! Tendermint RPC helper methods for the implementation of the APIs.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -119,14 +120,14 @@ pub enum ActorType {
     /// The queried actor does not exist in the state tree.
     Inexistent,
     /// The queried actor exists, and it's one of the built-in actor types.
-    Known(String),
+    Known(Cow<'static, str>),
     /// The queried actor exists, but it's not a built-in actor and therefore it cannot be identified.
     Unknown(Cid),
 }
 
 impl ActorType {
-    pub const Evm: ActorType = ActorType::Known("evm".into());
-    pub const EthAccount: ActorType = ActorType::Known("ethaccount".into());
+    pub const EVM: ActorType = ActorType::Known(Cow::Borrowed("evm"));
+    pub const ETH_ACCOUNT: ActorType = ActorType::Known(Cow::Borrowed("ethaccount"));
 }
 
 impl<C> JsonRpcState<C>
@@ -431,7 +432,7 @@ where
         };
         let registry = self.client.builtin_actors(height).await?.value.registry;
         let ret = match registry.into_iter().find(|(_, cid)| cid == &actor_type_cid) {
-            Some((typ, _)) => ActorType::Known(typ),
+            Some((typ, _)) => ActorType::Known(Cow::Owned(typ)),
             None => ActorType::Unknown(actor_type_cid),
         };
         Ok(ret)
