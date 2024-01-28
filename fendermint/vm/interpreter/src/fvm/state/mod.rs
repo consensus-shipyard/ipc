@@ -4,6 +4,7 @@
 mod check;
 mod exec;
 pub mod fevm;
+pub mod fluence_kernel;
 mod genesis;
 pub mod ipc;
 mod query;
