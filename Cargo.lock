@@ -2889,6 +2889,7 @@ dependencies = [
  "fendermint_testing",
  "fendermint_vm_actor_interface",
  "fendermint_vm_message",
+ "fil_actors_evm_shared",
  "futures",
  "fvm_ipld_encoding",
  "fvm_shared",
