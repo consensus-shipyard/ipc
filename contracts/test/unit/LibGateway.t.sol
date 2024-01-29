@@ -10,7 +10,7 @@ import {SubnetID, IPCAddress} from "../../src/structs/Subnet.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {InvalidCrossMsgNonce} from "../../src/errors/IPCErrors.sol";
+import {InvalidXnetMessage} from "../../src/errors/IPCErrors.sol";
 import {MockIpcContract} from "../helpers/TestUtils.sol";
 import {EMPTY_BYTES} from "../../src/constants/Constants.sol";
 
@@ -201,10 +201,11 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 10; // a wrong nonce
 
+        string memory errorMessage = "Invalid Cross Msg Nonce";
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.SystemErr,
             id: crossMsg.toHash(),
-            ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
+            ret: abi.encodeWithSelector(InvalidXnetMessage.selector, errorMessage)
         });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
@@ -347,10 +348,11 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 10;
 
+        string memory errorMessage = "Invalid Cross Msg Nonce";
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.SystemErr,
             id: crossMsg.toHash(),
-            ret: abi.encodeWithSelector(InvalidCrossMsgNonce.selector)
+            ret: abi.encodeWithSelector(InvalidXnetMessage.selector, errorMessage)
         });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
