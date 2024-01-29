@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
+use fendermint_app_options::key::KeyShowPeerIdArgs;
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fvm_shared::address::Address;
@@ -28,6 +29,7 @@ cmd! {
             KeyCommands::Address(args) => args.exec(()).await,
             KeyCommands::FromEth(args) => args.exec(()).await,
             KeyCommands::IntoEth(args) => args.exec(()).await,
+            KeyCommands::ShowPeerId(args) => args.exec(()).await,
         }
     }
 }
@@ -122,6 +124,18 @@ cmd! {
         let pk = read_public_key(&self.public_key)?;
         let addr = Address::new_secp256k1(&pk.serialize())?;
         println!("{}", addr);
+        Ok(())
+    }
+}
+
+cmd! {
+    KeyShowPeerIdArgs(self) {
+        let pk = read_public_key(&self.public_key)?;
+        // Just using this type because it does the conversion we need.
+        let vk = ipc_ipld_resolver::ValidatorKey::from(pk);
+        let pk: libp2p::identity::PublicKey = vk.into();
+        let id = pk.to_peer_id();
+        println!("{}", id);
         Ok(())
     }
 }

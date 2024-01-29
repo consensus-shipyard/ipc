@@ -214,13 +214,29 @@ impl Default for SubnetID {
 impl FromStr for SubnetID {
     type Err = Error;
     fn from_str(id: &str) -> Result<Self, Error> {
-        let l: Vec<&str> = id.split('/').filter(|&elem| !elem.is_empty()).collect();
-        let root = l[0][1..].parse::<u64>().map_err(|_| Error::InvalidID)?;
-        let children: Result<Vec<_>, _> = l[1..].iter().map(|s| Address::from_str(s)).collect();
-        if let Ok(children) = children {
-            return Ok(Self { root, children });
+        if !id.starts_with("/r") {
+            return Err(Error::InvalidID(
+                id.into(),
+                "expected to start with '/r'".into(),
+            ));
         }
-        Err(Error::InvalidID)
+
+        let segments: Vec<&str> = id.split('/').skip(1).collect();
+
+        let root = segments[0][1..]
+            .parse::<u64>()
+            .map_err(|_| Error::InvalidID(id.into(), "invalid root ID".into()))?;
+
+        let mut children = Vec::new();
+
+        for addr in segments[1..].iter() {
+            let addr = Address::from_str(addr).map_err(|e| {
+                Error::InvalidID(id.into(), format!("invalid child address {addr}: {e}"))
+            })?;
+            children.push(addr);
+        }
+
+        Ok(Self { root, children })
     }
 }
 
