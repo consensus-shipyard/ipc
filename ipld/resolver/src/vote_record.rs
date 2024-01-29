@@ -44,6 +44,12 @@ impl From<PublicKey> for ValidatorKey {
     }
 }
 
+impl From<ValidatorKey> for PublicKey {
+    fn from(value: ValidatorKey) -> Self {
+        value.0
+    }
+}
+
 impl From<libsecp256k1::PublicKey> for ValidatorKey {
     fn from(value: libsecp256k1::PublicKey) -> Self {
         let public_key =
