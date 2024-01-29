@@ -7,7 +7,7 @@ import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
 import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator} from "../structs/Subnet.sol";
-import {NoRewardToWithdraw, WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
+import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
 library LibAddressStakingReleases {
@@ -547,21 +547,6 @@ library LibStaking {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
         uint256 amount = s.releaseQueue.claim(validator);
         emit CollateralClaimed(validator, amount);
-    }
-
-    /// @notice method that allows a relayer to withdraw it's accumulated rewards using pull-based transfer
-    function claimRewardForRelayer(address relayer) external {
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        uint256 amount = s.relayerRewards.rewards[relayer];
-
-        if (amount == 0) {
-            revert NoRewardToWithdraw();
-        }
-
-        s.relayerRewards.rewards[relayer] = 0;
-        IGateway(s.ipcGatewayAddr).releaseRewardForRelayer(amount);
-
-        payable(relayer).sendValue(amount);
     }
 
     function getConfigurationNumbers() internal view returns(uint64, uint64) {

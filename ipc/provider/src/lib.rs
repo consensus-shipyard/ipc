@@ -13,7 +13,7 @@ use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{PermissionMode, SupplySource};
 use ipc_api::{
-    cross::CrossMsg,
+    cross::IpcEnvelope,
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
@@ -406,23 +406,6 @@ impl IpcProvider {
         conn.manager().claim_collateral(subnet, sender).await
     }
 
-    pub async fn claim_relayer_reward(
-        &mut self,
-        subnet: SubnetID,
-        from: Option<Address>,
-    ) -> anyhow::Result<()> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
-
-        let subnet_config = conn.subnet();
-        let sender = self.check_sender(subnet_config, from)?;
-
-        conn.manager().claim_relayer_reward(subnet, sender).await
-    }
-
     pub async fn kill_subnet(
         &mut self,
         subnet: SubnetID,
@@ -664,7 +647,7 @@ impl IpcProvider {
         &self,
         subnet: &SubnetID,
         epoch: ChainEpoch,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -716,22 +699,6 @@ impl IpcProvider {
         };
 
         conn.manager().checkpoint_bundle_at(height).await
-    }
-
-    pub async fn has_submitted_in_last_checkpoint_height(
-        &self,
-        subnet: &SubnetID,
-        addr: &Address,
-    ) -> anyhow::Result<bool> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("parent subnet not found")),
-            Some(conn) => conn,
-        };
-
-        conn.manager()
-            .has_submitted_in_last_checkpoint_height(subnet, addr)
-            .await
     }
 
     pub async fn last_bottom_up_checkpoint_height(

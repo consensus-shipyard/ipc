@@ -8,9 +8,9 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, BottomUpMsgBatch, QuorumReachedEvent, Signature,
+    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
 };
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{ConstructParams, PermissionMode, SupplySource};
 use ipc_api::subnet_id::SubnetID;
@@ -74,11 +74,6 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     /// Claims any collateral that may be available to claim by validators that
     /// have left the subnet.
     async fn claim_collateral(&self, subnet: SubnetID, from: Address) -> Result<()>;
-
-    /// Claims any reward that may be available for a relayer. Relayer rewards
-    /// are obtained by submitting bottom-up checkpoints to the parent of a child
-    /// subnet.
-    async fn claim_relayer_reward(&self, subnet: SubnetID, from: Address) -> Result<()>;
 
     /// Fund injects new funds from an account of the parent chain to a subnet.
     /// Returns the epoch that the fund is executed in the parent.
@@ -167,7 +162,6 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
 #[derive(Debug)]
 pub struct SubnetGenesisInfo {
     pub bottom_up_checkpoint_period: u64,
-    pub msg_fee: TokenAmount,
     pub majority_percentage: u8,
     pub active_validators_limit: u16,
     pub min_collateral: TokenAmount,
@@ -204,7 +198,7 @@ pub trait TopDownFinalityQuery: Send + Sync {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-    ) -> Result<TopDownQueryPayload<Vec<CrossMsg>>>;
+    ) -> Result<TopDownQueryPayload<Vec<IpcEnvelope>>>;
     /// Get the block hash
     async fn get_block_hash(&self, height: ChainEpoch) -> Result<GetBlockHashResult>;
     /// Get the validator change set from start to end block.
@@ -233,12 +227,6 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     ) -> Result<ChainEpoch>;
     /// The last confirmed/submitted checkpoint height.
     async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
-    /// Check if the submitter has already submitted in the `last_bottom_up_checkpoint_height`
-    async fn has_submitted_in_last_checkpoint_height(
-        &self,
-        subnet_id: &SubnetID,
-        submitter: &Address,
-    ) -> Result<bool>;
     /// Get the checkpoint period, i.e the number of blocks to submit bottom up checkpoints.
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
     /// Get the checkpoint bundle at a specific height. If it does not exist, it will through error.
@@ -247,13 +235,4 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
     /// Get the current epoch in the current subnet
     async fn current_epoch(&self) -> Result<ChainEpoch>;
-    /// Submits a batch of bottom-up messages for execution.
-    async fn submit_bottom_up_msg_batch(
-        &self,
-        submitter: &Address,
-        subnet_id: &SubnetID,
-        batch: BottomUpMsgBatch,
-        signatories: &[Address],
-        signatures: &[Signature],
-    ) -> Result<ChainEpoch>;
 }

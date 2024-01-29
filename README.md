@@ -60,6 +60,9 @@ For further documentation, see:
 - [docs/usage.md](./docs/ipc/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
 - [docs/deploying-hierarchy.md](./docs/ipc/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
 
+If you are a developer, see:
+- [docs/developers.md](./docs/ipc/developers.md) for useful tips and guides targeted for IPC developers.
+
 ## Connecting to a rootnet
 
 You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also deploy your own.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
@@ -18,7 +18,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
     using LibValidatorSet for ValidatorSet;
 
     /// @notice Submits a checkpoint commitment for execution.
-    ///  @dev   It triggers the commitment of the checkpoint and any other side-effects that
+    /// @dev    It triggers the commitment of the checkpoint and any other side-effects that
     ///         need to be triggered by the checkpoint such as relayer reward book keeping.
     /// @param checkpoint The executed bottom-up checkpoint.
     /// @param signatories The addresses of validators signing the checkpoint.
@@ -28,14 +28,8 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         address[] calldata signatories,
         bytes[] calldata signatures
     ) external whenNotPaused {
-        // the checkpoint height must be equal to the last bottom-up checkpoint height or
-        // the next one
-        if (
-            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod &&
-            checkpoint.blockHeight != s.lastBottomUpCheckpointHeight
-        ) {
-            revert InvalidCheckpointEpoch();
-        }
+        ensureValidCheckpoint(checkpoint);
+
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
 
         if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
@@ -46,9 +40,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
             // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
             s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
 
-            // slither-disable-next-line unused-return
-            s.relayerRewards.checkpointRewarded[checkpoint.blockHeight].add(msg.sender);
-
             s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
             // Commit in gateway to distribute rewards
@@ -56,70 +47,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
             // confirming the changes in membership in the child
             LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
-        } else if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight) {
-            // If the checkpoint height is equal to the last checkpoint height, then this is a repeated submission.
-            // We should store the relayer, but not to execute checkpoint again.
-            // In this case, we do not verify the signatures for this checkpoint again,
-            // but we add the relayer to the list of all relayers for this checkpoint to be rewarded later.
-            // The reason for comparing hashes instead of verifying signatures is the following:
-            // once the checkpoint is executed, the active validator set changes
-            // and can only be used to validate the next checkpoint, not another instance of the last one.
-            bytes32 lastCheckpointHash = keccak256(abi.encode(s.committedCheckpoints[checkpoint.blockHeight]));
-            if (checkpointHash == lastCheckpointHash) {
-                // slither-disable-next-line unused-return
-                s.relayerRewards.checkpointRewarded[checkpoint.blockHeight].add(msg.sender);
-            }
-        }
-    }
-
-    /// @notice Submits a batch of bottom-up messages for execution.
-    /// @dev It triggers the execution of a cross-net message batch.
-    /// @param batch The batch of bottom-up messages.
-    /// @param signatories The addresses of validators signing the batch.
-    /// @param signatures The signatures of validators on the batch.
-    function submitBottomUpMsgBatch(
-        BottomUpMsgBatch calldata batch,
-        address[] calldata signatories,
-        bytes[] calldata signatures
-    ) external {
-        // forbid the submission of batches from the past
-        if (batch.blockHeight < s.lastBottomUpBatch.blockHeight) {
-            revert InvalidBatchEpoch();
-        }
-        if (batch.msgs.length > s.maxMsgsPerBottomUpBatch) {
-            revert MaxMsgsPerBatchExceeded();
-        }
-        // if the batch height is not max, we only supoprt batch submission in period epochs
-        if (batch.msgs.length != s.maxMsgsPerBottomUpBatch && batch.blockHeight % s.bottomUpMsgBatchPeriod != 0) {
-            revert InvalidBatchEpoch();
-        }
-        if (batch.msgs.length == 0) {
-            revert BatchWithNoMessages();
-        }
-
-        bytes32 batchHash = keccak256(abi.encode(batch));
-
-        if (batch.blockHeight == s.lastBottomUpBatch.blockHeight) {
-            // If the batch info is equal to the last batch info, then this is a repeated submission.
-            // We should store the relayer, but not to execute batch again following the same reward logic
-            // used for checkpoints.
-            if (batchHash == s.lastBottomUpBatch.hash) {
-                // slither-disable-next-line unused-return
-                s.relayerRewards.batchRewarded[batch.blockHeight].add(msg.sender);
-            }
-        } else {
-            // validate signatures and quorum threshold, revert if validation fails
-            validateActiveQuorumSignatures({signatories: signatories, hash: batchHash, signatures: signatures});
-
-            // If the checkpoint height is the next expected height then this is a new batch,
-            // and should be forwarded to the gateway for execution.
-            s.lastBottomUpBatch = BottomUpMsgBatchInfo({blockHeight: batch.blockHeight, hash: batchHash});
-
-            // slither-disable-next-line unused-return
-            s.relayerRewards.batchRewarded[batch.blockHeight].add(msg.sender);
-
-            // Execute messages.
-            IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(batch);
         }
     }
 
@@ -151,6 +78,30 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         if (!valid) {
             revert InvalidSignatureErr(uint8(err));
+        }
+    }
+
+    /// @notice Ensures the checkpoint is valid.
+    /// @dev The checkpoint block height must be equal to the last bottom-up checkpoint height or
+    /// @dev the next one or the number of bottom up messages exceeds the max batch size.
+    function ensureValidCheckpoint(BottomUpCheckpoint calldata checkpoint) internal view {
+        uint64 maxMsgsPerBottomUpBatch = s.maxMsgsPerBottomUpBatch;
+        if (checkpoint.msgs.length > maxMsgsPerBottomUpBatch) {
+            revert MaxMsgsPerBatchExceeded();
+        }
+
+        // if the bottom up messages' length is max, we consider that epoch valid
+        if (checkpoint.msgs.length == s.maxMsgsPerBottomUpBatch) {
+            return;
+        }
+
+        // the max batch size not reached, we only support checkpoint period submission.
+        uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
+        if (
+            checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod &&
+            checkpoint.blockHeight != lastBottomUpCheckpointHeight
+        ) {
+            revert InvalidCheckpointEpoch();
         }
     }
 }

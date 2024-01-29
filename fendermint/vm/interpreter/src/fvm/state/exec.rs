@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use anyhow::Ok;
 use cid::Cid;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
@@ -76,15 +77,17 @@ pub struct FvmUpdatableParams {
     pub power_scale: PowerScale,
 }
 
-pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns> as Machine>::Blockstore;
+pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
 
 /// A state we create for the execution of all the messages in a block.
 pub struct FvmExecState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
-    executor:
-        DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns>>>>,
+    #[allow(clippy::type_complexity)]
+    executor: DefaultExecutor<
+        DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+    >,
 
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
@@ -101,7 +104,7 @@ where
 
 impl<DB> FvmExecState<DB>
 where
-    DB: Blockstore + 'static,
+    DB: Blockstore + Clone + 'static,
 {
     /// Create a new FVM execution environment.
     ///
@@ -128,7 +131,8 @@ where
         // let engine = EnginePool::new_default(ec)?;
 
         let engine = multi_engine.get(&nc)?;
-        let machine = DefaultMachine::new(&mc, blockstore, FendermintExterns)?;
+        let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
+        let machine = DefaultMachine::new(&mc, blockstore, externs)?;
         let executor = DefaultExecutor::new(engine, machine)?;
 
         Ok(Self {
@@ -258,7 +262,7 @@ where
 
 impl<DB> HasChainID for FvmExecState<DB>
 where
-    DB: Blockstore,
+    DB: Blockstore + Clone,
 {
     fn chain_id(&self) -> ChainID {
         self.executor.context().network.chain_id

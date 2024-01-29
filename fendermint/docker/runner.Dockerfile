@@ -25,6 +25,7 @@ ENV FM_ABCI__LISTEN__HOST=0.0.0.0
 ENV FM_ETH__LISTEN__HOST=0.0.0.0
 
 COPY fendermint/docker/.artifacts/bundle.car $FM_HOME_DIR/bundle.car
+COPY fendermint/docker/.artifacts/custom_actors_bundle.car $FM_HOME_DIR/custom_actors_bundle.car
 COPY fendermint/docker/.artifacts/contracts $FM_HOME_DIR/contracts
 COPY --from=builder /app/fendermint/app/config $FM_HOME_DIR/config
 COPY --from=builder /app/output/bin/fendermint /usr/local/bin/fendermint

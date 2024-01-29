@@ -16,7 +16,7 @@ use std::sync::Arc;
 /// Queries the LATEST COMMITTED parent finality from the storage
 pub struct AppParentFinalityQuery<DB, SS, S, I>
 where
-    SS: Blockstore + 'static,
+    SS: Blockstore + Clone + 'static,
     S: KVStore,
 {
     /// The app to get state
