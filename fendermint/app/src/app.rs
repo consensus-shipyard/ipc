@@ -109,13 +109,15 @@ pub struct AppConfig<S: KVStore> {
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
     pub builtin_actors_bundle: PathBuf,
+    /// Path to the custom actor WASM bundle.
+    pub custom_actors_bundle: PathBuf,
 }
 
 /// Handle ABCI requests.
 #[derive(Clone)]
 pub struct App<DB, SS, S, I>
 where
-    SS: Blockstore + 'static,
+    SS: Blockstore + Clone + 'static,
     S: KVStore,
 {
     /// Database backing all key-value operations.
@@ -132,6 +134,8 @@ where
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
     builtin_actors_bundle: PathBuf,
+    /// Path to the custom actor WASM bundle.
+    custom_actors_bundle: PathBuf,
     /// Namespace to store app state.
     namespace: S::Namespace,
     /// Collection of past state parameters.
@@ -187,6 +191,7 @@ where
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
             builtin_actors_bundle: config.builtin_actors_bundle,
+            custom_actors_bundle: config.custom_actors_bundle,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
@@ -450,12 +455,21 @@ where
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
         let bundle = &self.builtin_actors_bundle;
         let bundle = std::fs::read(bundle)
-            .map_err(|e| anyhow!("failed to load bundle CAR from {bundle:?}: {e}"))?;
+            .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
 
-        let state =
-            FvmGenesisState::new(self.state_store_clone(), self.multi_engine.clone(), &bundle)
-                .await
-                .context("failed to create genesis state")?;
+        let custom_actors_bundle = &self.custom_actors_bundle;
+        let custom_actors_bundle = std::fs::read(custom_actors_bundle).map_err(|e| {
+            anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
+        })?;
+
+        let state = FvmGenesisState::new(
+            self.state_store_clone(),
+            self.multi_engine.clone(),
+            &bundle,
+            &custom_actors_bundle,
+        )
+        .await
+        .context("failed to create genesis state")?;
 
         tracing::info!(
             manifest_root = format!("{}", state.manifest_data_cid),

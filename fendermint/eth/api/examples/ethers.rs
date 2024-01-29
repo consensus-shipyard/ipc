@@ -26,13 +26,9 @@
 // and https://coinsbench.com/ethereum-with-rust-tutorial-part-2-compile-and-deploy-solidity-contract-with-rust-c3cd16fce8ee
 // and https://coinsbench.com/ethers-rust-power-or-ethers-abigen-rundown-89ab5e47875d
 
-use std::{
-    fmt::{Debug, Display},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use clap::Parser;
 use common::TestMiddleware;
 use ethers::providers::StreamExt;
@@ -52,7 +48,8 @@ use ethers_core::{
 use tracing::Level;
 
 use crate::common::{
-    adjust_provider, make_middleware, prepare_call, send_transaction, TestAccount, TestContractCall,
+    adjust_provider, make_middleware, prepare_call, request, send_transaction, TestAccount,
+    TestContractCall,
 };
 
 mod common;
@@ -131,37 +128,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_ws(provider, &opts).await?;
 
     Ok(())
-}
-
-trait CheckResult {
-    fn check_result(&self) -> anyhow::Result<()>;
-}
-
-impl CheckResult for bool {
-    fn check_result(&self) -> anyhow::Result<()> {
-        if *self {
-            Ok(())
-        } else {
-            Err(anyhow!("expected true; got false"))
-        }
-    }
-}
-
-fn request<T, E, F, C>(method: &str, res: Result<T, E>, check: F) -> anyhow::Result<T>
-where
-    T: Debug,
-    F: FnOnce(&T) -> C,
-    C: CheckResult,
-    E: Display,
-{
-    tracing::debug!("checking request {method}...");
-    match res {
-        Ok(value) => match check(&value).check_result() {
-            Ok(()) => Ok(value),
-            Err(e) => Err(anyhow!("failed to check {method}: {e}:\n{value:?}")),
-        },
-        Err(e) => Err(anyhow!("failed to call {method}: {e:#}")),
-    }
 }
 
 // The following methods are called by the [`Provider`].

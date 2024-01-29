@@ -22,7 +22,7 @@ libsecp256k1 = { workspace = true }
 log = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
-serde_ipld_dagcbor = "0.2"
+serde_ipld_dagcbor = "0.4.2"
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 xsalsa20poly1305 = "0.9"

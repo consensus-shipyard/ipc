@@ -13,9 +13,10 @@
 //! cargo run -p fendermint_eth_api --release --example GREETER --
 //! ```
 
+use std::{fmt::Debug, fmt::Display};
 use std::{path::Path, time::Duration};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use ethers::{
     prelude::{ContractCall, SignerMiddleware},
     providers::{JsonRpcClient, Middleware, Provider},
@@ -115,4 +116,35 @@ where
         .context("failed to fill transaction")?;
 
     Ok(call)
+}
+
+pub trait CheckResult {
+    fn check_result(&self) -> anyhow::Result<()>;
+}
+
+impl CheckResult for bool {
+    fn check_result(&self) -> anyhow::Result<()> {
+        if *self {
+            Ok(())
+        } else {
+            Err(anyhow!("expected true; got false"))
+        }
+    }
+}
+
+pub fn request<T, E, F, C>(method: &str, res: Result<T, E>, check: F) -> anyhow::Result<T>
+where
+    T: Debug,
+    F: FnOnce(&T) -> C,
+    C: CheckResult,
+    E: Display,
+{
+    tracing::debug!("checking request {method}...");
+    match res {
+        Ok(value) => match check(&value).check_result() {
+            Ok(()) => Ok(value),
+            Err(e) => Err(anyhow!("failed to check {method}: {e}:\n{value:?}")),
+        },
+        Err(e) => Err(anyhow!("failed to call {method}: {e:#}")),
+    }
 }

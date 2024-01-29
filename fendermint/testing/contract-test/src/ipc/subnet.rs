@@ -49,7 +49,7 @@ impl<DB> SubnetCaller<DB> {
 
 type TryCallResult<T> = anyhow::Result<ContractResult<T, SubnetActorErrors>>;
 
-impl<DB: Blockstore> SubnetCaller<DB> {
+impl<DB: Blockstore + Clone> SubnetCaller<DB> {
     /// Join a subnet as a validator.
     pub fn join(
         &self,

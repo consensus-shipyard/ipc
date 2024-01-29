@@ -73,6 +73,7 @@ rm -rf ~/.fendermint/data
 mkdir -p ~/.fendermint/data
 cp -r ./fendermint/app/config ~/.fendermint/config
 cp ./builtin-actors/output/bundle.car ~/.fendermint/bundle.car
+cp ./actors/output/custom_actors_bundle.car ~/.fendermint/custom_actors_bundle.car
 
 #17
 fendermint run

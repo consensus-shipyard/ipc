@@ -80,7 +80,7 @@ impl<DB> GatewayCaller<DB> {
     }
 }
 
-impl<DB: Blockstore> GatewayCaller<DB> {
+impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     /// Check that IPC is configured in this deployment.
     pub fn enabled(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
         match state.state_tree_mut().get_actor(GATEWAY_ACTOR_ID)? {

@@ -164,7 +164,7 @@ impl<DB, C, E> ContractCaller<DB, C, E> {
 
 impl<DB, C, E> ContractCaller<DB, C, E>
 where
-    DB: Blockstore,
+    DB: Blockstore + Clone,
     E: ContractRevert + Debug,
 {
     /// Call an EVM method implicitly to read its return value.
