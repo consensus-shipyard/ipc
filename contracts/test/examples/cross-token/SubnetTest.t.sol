@@ -29,7 +29,6 @@ contract SubnetTest is Test {
         assertEq(bridge.getParentSubnet().route, parentSubnet.route, "parentSubnet.route does not match");
     }
 
-
     function testMint() public {
         // Example: Test mint function of SubnetUSDCProxy
         address to = address(0x2);

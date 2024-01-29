@@ -10,20 +10,21 @@ async function main() {
     }
 
     // Parent SubnetID value
-    const parentSubnet = [0, [] ]
-
+    const parentSubnet = [0, []]
 
     // Child SubnetID value
-    const subnetID = [1, [] ] 
-
+    const subnetID = [1, []]
 
     // Deploy ERC20 token
     const ERC20 = await hre.ethers.getContractFactory('USDCMock')
     const erc20Token = await ERC20.deploy('USDC', 'USDC')
     await erc20Token.deployed()
 
-    const subnetTokenBridge = await createSubnetTokenBridge(gateway, erc20Token.address, parentSubnet);
-
+    const subnetTokenBridge = await createSubnetTokenBridge(
+        gateway,
+        erc20Token.address,
+        parentSubnet,
+    )
 
     // Mint tokens
     const mintAmount = hre.ethers.utils.parseUnits('1000', 18) // 1000 tokens
@@ -56,7 +57,10 @@ async function main() {
     )
 
     console.log(`Simulate call to onXNetMessageReceived`)
-    await subnetTokenBridge.onXNetMessageReceived(accountAddress, transferAmount)
+    await subnetTokenBridge.onXNetMessageReceived(
+        accountAddress,
+        transferAmount,
+    )
 
     const proxyTokenAddress = await subnetTokenBridge.getProxyTokenAddress()
     const SubnetUSDCProxy = await ethers.getContractAt(
@@ -66,39 +70,52 @@ async function main() {
     const balance = await SubnetUSDCProxy.balanceOf(accountAddress)
     console.log('balance is ', balance)
 
-
     //transfer up subnets
     console.log(1)
 
-    //Approve subnet contract 
+    //Approve subnet contract
     await SubnetUSDCProxy.approve(subnetTokenBridge.address, transferAmount)
     console.log(2)
 
     //transfer
-    await subnetTokenBridge.depositTokens(accountAddress,transferAmount, { value: DEFAULT_CROSS_MSG_FEE });
+    await subnetTokenBridge.depositTokens(accountAddress, transferAmount, {
+        value: DEFAULT_CROSS_MSG_FEE,
+    })
     console.log(3)
 
     // todo
 
     // simulate xnetmessage on parent net to release original tokens back to the account
-    await tokenTransferAndMint.onXNetMessageReceived(accountAddress, transferAmount);
+    await tokenTransferAndMint.onXNetMessageReceived(
+        accountAddress,
+        transferAmount,
+    )
 
     // verify that account currently has correct number of original tokens and 0 subnet tokens
 
-    const finalBalance = await erc20Token.balanceOf(accountAddress);
-    console.log("Final USDC Token balance on parent chain: ", finalBalance)
+    const finalBalance = await erc20Token.balanceOf(accountAddress)
+    console.log('Final USDC Token balance on parent chain: ', finalBalance)
 
-    const subnetFinalBalance = await SubnetUSDCProxy.balanceOf(accountAddress);
-    console.log("Final USDC Token balance on subnet chain: ", subnetFinalBalance)
-
-
+    const subnetFinalBalance = await SubnetUSDCProxy.balanceOf(accountAddress)
+    console.log(
+        'Final USDC Token balance on subnet chain: ',
+        subnetFinalBalance,
+    )
 }
 
-async function createSubnetTokenBridge(gateway, parentSubnetUSDC, parentSubnet) {
+async function createSubnetTokenBridge(
+    gateway,
+    parentSubnetUSDC,
+    parentSubnet,
+) {
     const SubnetTokenBridge = await ethers.getContractFactory(
         'SubnetTokenBridge',
     )
-    const subnetTokenBridge = await SubnetTokenBridge.deploy(gateway, parentSubnetUSDC, parentSubnet);
+    const subnetTokenBridge = await SubnetTokenBridge.deploy(
+        gateway,
+        parentSubnetUSDC,
+        parentSubnet,
+    )
     console.log('SubnetTokenBridge deployed to:', subnetTokenBridge.address)
     return subnetTokenBridge
 }

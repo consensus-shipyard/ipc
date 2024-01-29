@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
-import { SubnetID} from "../../structs/Subnet.sol";
+import {SubnetID} from "../../structs/Subnet.sol";
 
 import "./SubnetUSDCProxy.sol";
 import "./ERC20TokenMessenger.sol";
@@ -12,7 +12,11 @@ contract SubnetTokenBridge is ERC20TokenMessenger, Ownable {
     address public parentSubnetUSDC;
     SubnetID public parentSubnet;
 
-    constructor(address _gateway, address _parentSubnetUSDC, SubnetID memory _parentSubnet) ERC20TokenMessenger(_gateway) Ownable(msg.sender){
+    constructor(
+        address _gateway,
+        address _parentSubnetUSDC,
+        SubnetID memory _parentSubnet
+    ) ERC20TokenMessenger(_gateway) Ownable(msg.sender) {
         proxyToken = new SubnetUSDCProxy();
         parentSubnetUSDC = _parentSubnetUSDC;
         parentSubnet = _parentSubnet;
@@ -35,16 +39,16 @@ contract SubnetTokenBridge is ERC20TokenMessenger, Ownable {
         // Logic to handle IPC xnet message and mint tokens
         address to;
         uint256 amount;
-        (to, amount) = extractParameters /* parameters */(_to, _amount);
+        (to, amount) = extractParameters(/* parameters */ _to, _amount);
         _mint(to, amount);
     }
 
     /* TODO Change code below to parse parameters */
-    function extractParameters( /* parameters */ address _to, uint256 _amount ) internal view returns ( address, uint256) {
+    function extractParameters(/* parameters */ address _to, uint256 _amount) internal view returns (address, uint256) {
         return (_to, _amount);
     }
 
-    function depositTokens(address receiver, uint256 amount) payable public {
-        _sendToken(getProxyTokenAddress(), parentSubnet, parentSubnetUSDC , receiver, amount);
+    function depositTokens(address receiver, uint256 amount) public payable {
+        _sendToken(getProxyTokenAddress(), parentSubnet, parentSubnetUSDC, receiver, amount);
     }
 }
