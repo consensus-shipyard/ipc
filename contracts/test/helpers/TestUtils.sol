@@ -177,4 +177,6 @@ contract MockIpcContract is IpcHandler {
     function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
         return EMPTY_BYTES;
     }
+
+    receive() external payable {}
 }

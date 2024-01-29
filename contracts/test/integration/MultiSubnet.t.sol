@@ -17,6 +17,7 @@ import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.
 import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
+import {LibGateway} from "../../src/lib/LibGateway.sol";
 import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
@@ -35,7 +36,7 @@ import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol
 
 import "forge-std/console.sol";
 
-contract MultiSubnet is Test, IntegrationTestBase {
+contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
 
@@ -164,6 +165,61 @@ contract MultiSubnet is Test, IntegrationTestBase {
         callSubmitCheckpointFromParentSubnet(checkpoint, address(rootTokenSubnetActor));
 
         assertEq(token.balanceOf(recipient), amount);
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContract());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, amount);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
+            nativeSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+
+        //vm.expectEmit(true, true, true, true, address(rootGateway));
+        //emit LibGateway.NewTopDownMessage(address(nativeSubnetName.getActor()), expected);
+        vm.prank(caller);
+        rootGatewayManager.fund{value: amount}(nativeSubnetName, FvmAddressHelper.from(address(recipient)));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = expected;
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+
+        assertEq(recipient.balance, amount);
+    }
+
+    function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory subnet, address gateway) internal {
+        XnetMessagingFacet xnet = XnetMessagingFacet(address(gateway));
+
+        uint256 minted_tokens;
+
+        for (uint256 i; i < msgs.length; ) {
+            minted_tokens += msgs[i].value;
+            unchecked {
+                ++i;
+            }
+        }
+
+        // The implementation of the function in fendermint is in
+        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/src/fvm/topdown.rs#L43
+
+        // This emulates minting tokens.
+        vm.deal(address(gateway), minted_tokens);
+
+        // TODO: how to emulate increasing of circulation supply?
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        xnet.applyCrossMessages(msgs);
+        vm.stopPrank();
     }
 
     function callCreateBottomUpCheckpointFromChildSubnet(
