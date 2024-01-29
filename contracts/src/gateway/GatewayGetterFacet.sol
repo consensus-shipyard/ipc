@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {BottomUpCheckpoint, BottomUpMsgBatch, StorableMsg, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {QuorumInfo} from "../structs/Quorum.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
@@ -20,11 +20,6 @@ contract GatewayGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    /// @notice Returns the minimum fee required for cross-net messages.
-    function crossMsgFee() external view returns (uint256) {
-        return s.minCrossMsgFee;
-    }
-
     /// @notice Returns the current nonce for bottom-up message processing.
     function bottomUpNonce() external view returns (uint64) {
         return s.bottomUpNonce;
@@ -38,11 +33,6 @@ contract GatewayGetterFacet {
     /// @notice Returns the maximum number of messages per bottom-up batch.
     function maxMsgsPerBottomUpBatch() external view returns (uint64) {
         return s.maxMsgsPerBottomUpBatch;
-    }
-
-    /// @notice Returns the period for processing bottom-up message batches.
-    function bottomUpMsgBatchPeriod() external view returns (uint256) {
-        return s.bottomUpMsgBatchPeriod;
     }
 
     /// @notice Returns the period for bottom-up checkpointing.
@@ -133,10 +123,8 @@ contract GatewayGetterFacet {
 
     /// @notice Returns the storable message and its wrapped status from the postbox by a given identifier.
     /// @param id The unique identifier of the message in the postbox.
-    /// @return storableMsg The storable message associated with the given id.
-    /// @return wrapped A boolean indicating whether the message is wrapped.
-    function postbox(bytes32 id) external view returns (StorableMsg memory storableMsg, bool wrapped) {
-        return (s.postbox[id].message, s.postbox[id].wrapped);
+    function postbox(bytes32 id) external view returns (IpcEnvelope memory storableMsg) {
+        return (s.postbox[id]);
     }
 
     /// @notice Returns the majority percentage required for certain consensus or decision-making processes.
@@ -191,21 +179,9 @@ contract GatewayGetterFacet {
         return s.checkpointQuorumMap.quorumInfo[h];
     }
 
-    /// @notice Returns quorum information for a specific bottom-up message batch based on its height.
-    /// @param h The block height of the bottom-up message batch.
-    /// @return Quorum information associated with the given bottom-up message batch height.
-    function getBottomUpMsgBatchInfo(uint256 h) external view returns (QuorumInfo memory) {
-        return s.bottomUpMsgBatchQuorumMap.quorumInfo[h];
-    }
-
     /// @notice Returns the checkpoint current weight corresponding to the block height.
     function getCheckpointCurrentWeight(uint256 h) external view returns (uint256) {
         return s.checkpointQuorumMap.quorumInfo[h].currentWeight;
-    }
-
-    /// @notice Returns the batch current weight corresponding to the block height.
-    function getBottomUpMsgBatchCurrentWeight(uint256 h) external view returns (uint256) {
-        return s.bottomUpMsgBatchQuorumMap.quorumInfo[h].currentWeight;
     }
 
     /// @notice Returns the incomplete checkpoint heights.
@@ -228,34 +204,9 @@ contract GatewayGetterFacet {
         return checkpoints;
     }
 
-    /// @notice Returns the incomplete batches of messages.
-    function getIncompleteMsgBatches() external view returns (BottomUpMsgBatch[] memory) {
-        uint256[] memory heights = s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
-        uint256 size = heights.length;
-
-        BottomUpMsgBatch[] memory batches = new BottomUpMsgBatch[](size);
-        for (uint64 i; i < size; ) {
-            batches[i] = s.bottomUpMsgBatches[uint64(heights[i])];
-            unchecked {
-                ++i;
-            }
-        }
-        return batches;
-    }
-
-    /// @notice Returns the incomplete msd batches heights.
-    function getIncompleteMsgBatchHeights() external view returns (uint256[] memory) {
-        return s.bottomUpMsgBatchQuorumMap.incompleteQuorums.values();
-    }
-
     /// @notice Returns the bottom-up checkpoint retention index.
     function getCheckpointRetentionHeight() external view returns (uint256) {
         return s.checkpointQuorumMap.retentionHeight;
-    }
-
-    /// @notice Returns the bottom-up batch retention index.
-    function getBottomUpMsgRetentionHeight() external view returns (uint256) {
-        return s.bottomUpMsgBatchQuorumMap.retentionHeight;
     }
 
     /// @notice Returns the threshold required for quorum in this subnet,
@@ -287,30 +238,6 @@ contract GatewayGetterFacet {
         (info, signatories, signatures) = LibQuorum.getSignatureBundle(s.checkpointQuorumMap, h);
 
         return (ch, info, signatories, signatures);
-    }
-
-    /// @notice Returns a bundle of information and signatures for a specified bottom-up message batch.
-    /// @param h The height of the message batch for which information is requested.
-    /// @return batch The bottom-up message batch information at the specified height.
-    /// @return info Quorum information related to the message batch.
-    /// @return signatories An array of addresses of signatories who have signed the message batch.
-    /// @return signatures An array of signatures corresponding to each signatory for the message batch.
-    function getBottomUpMsgBatchSignatureBundle(
-        uint256 h
-    )
-        external
-        view
-        returns (
-            BottomUpMsgBatch memory batch,
-            QuorumInfo memory info,
-            address[] memory signatories,
-            bytes[] memory signatures
-        )
-    {
-        batch = s.bottomUpMsgBatches[h];
-        (info, signatories, signatures) = LibQuorum.getSignatureBundle(s.bottomUpMsgBatchQuorumMap, h);
-
-        return (batch, info, signatories, signatures);
     }
 
     /// @notice Returns the current bottom-up checkpoint.

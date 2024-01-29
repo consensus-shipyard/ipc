@@ -204,7 +204,7 @@ where
 #[async_trait]
 impl<I, DB> ExecInterpreter for ChainMessageInterpreter<I, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
+    DB: Blockstore + Clone + 'static + Send + Sync + Clone,
     I: ExecInterpreter<
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,

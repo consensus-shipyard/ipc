@@ -26,7 +26,6 @@ contract SubnetActorDiamond {
 
     struct ConstructorParams {
         uint256 minActivationCollateral;
-        uint256 minCrossMsgFee;
         uint64 minValidators;
         uint64 bottomUpCheckPeriod;
         address ipcGatewayAddr;
@@ -81,14 +80,12 @@ contract SubnetActorDiamond {
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.majorityPercentage = params.majorityPercentage;
         s.powerScale = params.powerScale;
-        s.minCrossMsgFee = params.minCrossMsgFee;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
         s.validatorSet.permissionMode = params.permissionMode;
 
         // BottomUpMsgBatch config parameters.
         // NOTE: Let's fix them for now, but we could make them configurable
         // through the gateway constructor in the future.
-        s.bottomUpMsgBatchPeriod = BATCH_PERIOD;
         s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
+use ethers::abi::Tokenizable;
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use ipc_api::staking::ConfigurationNumber;
@@ -46,7 +47,7 @@ pub fn maybe_create_checkpoint<DB>(
     state: &mut FvmExecState<DB>,
 ) -> anyhow::Result<Option<(checkpoint::BottomUpCheckpoint, PowerUpdates)>>
 where
-    DB: Blockstore + Sync + Send + 'static,
+    DB: Blockstore + Sync + Send + Clone + 'static,
 {
     // Epoch transitions for checkpointing.
     let height: tendermint::block::Height = state
@@ -58,69 +59,64 @@ where
         .block_hash()
         .ok_or_else(|| anyhow!("block hash not set"))?;
 
-    match should_create_checkpoint(gateway, state, height)? {
-        None => Ok(None),
-        Some(subnet_id) => {
-            // Get the current power table from the ledger, not CometBFT.
-            let (_, curr_power_table) =
-                ipc_power_table(gateway, state).context("failed to get the current power table")?;
+    let Some((msgs, subnet_id)) = should_create_checkpoint(gateway, state, height)? else {
+        return Ok(None);
+    };
 
-            // Apply any validator set transitions.
-            let next_configuration_number = gateway
-                .apply_validator_changes(state)
-                .context("failed to apply validator changes")?;
+    // Get the current power table from the ledger, not CometBFT.
+    let (_, curr_power_table) =
+        ipc_power_table(gateway, state).context("failed to get the current power table")?;
 
-            // Retrieve the bottom-up messages so we can put their hash into the checkpoint.
-            let cross_msgs = gateway
-                .bottom_up_msgs(state, height.value())
-                .context("failed to retrieve bottom-up messages")?;
+    // Apply any validator set transitions.
+    let next_configuration_number = gateway
+        .apply_validator_changes(state)
+        .context("failed to apply validator changes")?;
 
-            // Sum up the value leaving the subnet as part of the bottom-up messages.
-            let burnt_tokens = tokens_to_burn(&cross_msgs);
+    // Sum up the value leaving the subnet as part of the bottom-up messages.
+    let burnt_tokens = tokens_to_burn(&msgs);
 
-            // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
-            // we don't have to burn them here, because it's already being done in
-            // https://github.com/consensus-shipyard/ipc-solidity-actors/pull/263
-            // by sending the funds to the BURNTFUNDS_ACTOR.
-            // Ostensibly we could opt _not_ to decrease the circ supply here, but rather
-            // look up the burnt funds balance at the beginning of each block and subtract
-            // it from the monotonically increasing supply, in which case it could reflect
-            // a wider range of burning activity than just IPC.
-            // It might still be inconsistent if someone uses another address for burning tokens.
-            // By decreasing here, at least `circ_supply` is consistent with IPC.
-            state.update_circ_supply(|circ_supply| {
-                *circ_supply -= burnt_tokens;
-            });
+    // NOTE: Unlike when we minted tokens for the gateway by modifying its balance,
+    // we don't have to burn them here, because it's already being done in
+    // https://github.com/consensus-shipyard/ipc-solidity-actors/pull/263
+    // by sending the funds to the BURNTFUNDS_ACTOR.
+    // Ostensibly we could opt _not_ to decrease the circ supply here, but rather
+    // look up the burnt funds balance at the beginning of each block and subtract
+    // it from the monotonically increasing supply, in which case it could reflect
+    // a wider range of burning activity than just IPC.
+    // It might still be inconsistent if someone uses another address for burning tokens.
+    // By decreasing here, at least `circ_supply` is consistent with IPC.
+    state.update_circ_supply(|circ_supply| {
+        *circ_supply -= burnt_tokens;
+    });
 
-            // Construct checkpoint.
-            let checkpoint = BottomUpCheckpoint {
-                subnet_id,
-                block_height: ethers::types::U256::from(height.value()),
-                block_hash,
-                next_configuration_number,
-            };
+    // Construct checkpoint.
+    let checkpoint = BottomUpCheckpoint {
+        subnet_id,
+        block_height: ethers::types::U256::from(height.value()),
+        block_hash,
+        next_configuration_number,
+        msgs,
+    };
 
-            // Save the checkpoint in the ledger.
-            // Pass in the current power table, because these are the validators who can sign this checkpoint.
-            gateway
-                .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
-                .context("failed to store checkpoint")?;
+    // Save the checkpoint in the ledger.
+    // Pass in the current power table, because these are the validators who can sign this checkpoint.
+    gateway
+        .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
+        .context("failed to store checkpoint")?;
 
-            // Figure out the power updates if there was some change in the configuration.
-            let power_updates = if next_configuration_number == 0 {
-                PowerUpdates(Vec::new())
-            } else {
-                let (next_power_configuration_number, next_power_table) =
-                    ipc_power_table(gateway, state).context("failed to get next power table")?;
+    // Figure out the power updates if there was some change in the configuration.
+    let power_updates = if next_configuration_number == 0 {
+        PowerUpdates(Vec::new())
+    } else {
+        let (next_power_configuration_number, next_power_table) =
+            ipc_power_table(gateway, state).context("failed to get next power table")?;
 
-                debug_assert_eq!(next_power_configuration_number, next_configuration_number);
+        debug_assert_eq!(next_power_configuration_number, next_configuration_number);
 
-                power_diff(curr_power_table, next_power_table)
-            };
+        power_diff(curr_power_table, next_power_table)
+    };
 
-            Ok(Some((checkpoint, power_updates)))
-        }
-    }
+    Ok(Some((checkpoint, power_updates)))
 }
 
 /// Wait until CometBFT has reached a specific block height.
@@ -160,7 +156,7 @@ pub fn unsigned_checkpoints<DB>(
     validator_key: PublicKey,
 ) -> anyhow::Result<Vec<getter::BottomUpCheckpoint>>
 where
-    DB: Blockstore + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + Clone + 'static,
 {
     let mut unsigned_checkpoints = Vec::new();
     let validator_addr = EthAddress::from(validator_key);
@@ -192,7 +188,7 @@ pub async fn broadcast_incomplete_signatures<C, DB>(
 ) -> anyhow::Result<()>
 where
     C: Client + Clone + Send + Sync + 'static,
-    DB: Blockstore + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + Clone + 'static,
 {
     // Make sure that these had time to be added to the ledger.
     if let Some(highest) = incomplete_checkpoints
@@ -231,6 +227,7 @@ where
                 block_height: cp.block_height,
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
+                msgs: convert_tokenizables(cp.msgs)?,
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.
@@ -264,7 +261,7 @@ pub async fn broadcast_signature<C, DB>(
 ) -> anyhow::Result<()>
 where
     C: Client + Clone + Send + Sync + 'static,
-    DB: Blockstore + Send + Sync + 'static,
+    DB: Blockstore + Send + Sync + Clone + 'static,
 {
     let calldata = gateway
         .add_checkpoint_signature_calldata(checkpoint, &power_table.0, validator, secret_key)
@@ -281,27 +278,56 @@ where
     Ok(())
 }
 
+fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
+    tokenizables: Vec<Source>,
+) -> anyhow::Result<Vec<Target>> {
+    Ok(tokenizables
+        .into_iter()
+        .map(|t| Target::from_token(t.into_token()))
+        .collect::<Result<Vec<_>, _>>()?)
+}
+
 fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
     height: Height,
-) -> anyhow::Result<Option<checkpoint::SubnetID>>
+) -> anyhow::Result<Option<(Vec<checkpoint::IpcEnvelope>, checkpoint::SubnetID)>>
 where
-    DB: Blockstore,
+    DB: Blockstore + Clone,
 {
-    if gateway.enabled(state)? {
-        let id = gateway.subnet_id(state)?;
-        let is_root = id.route.is_empty();
-
-        if !is_root && height.value() % gateway.bottom_up_check_period(state)? == 0 {
-            let id = checkpoint::SubnetID {
-                root: id.root,
-                route: id.route,
-            };
-            return Ok(Some(id));
-        }
+    if !gateway.enabled(state)? {
+        return Ok(None);
     }
-    Ok(None)
+
+    let id = gateway.subnet_id(state)?;
+    let is_root = id.route.is_empty();
+
+    if is_root {
+        return Ok(None);
+    }
+
+    let batch = gateway.bottom_up_msg_batch(state, height.into())?;
+
+    if batch.block_height.as_u64() != 0 {
+        tracing::debug!(
+            height = height.value(),
+            "bottom up msg batch exists at height"
+        );
+    } else if height.value() % gateway.bottom_up_check_period(state)? == 0 {
+        tracing::debug!(
+            height = height.value(),
+            "bottom up checkpoint period reached height"
+        );
+    } else {
+        return Ok(None);
+    }
+
+    let id = checkpoint::SubnetID {
+        root: id.root,
+        route: id.route,
+    };
+    let msgs = convert_tokenizables(batch.msgs)?;
+    Ok(Some((msgs, id)))
 }
 
 /// Get the power table from CometBFT.
@@ -332,7 +358,7 @@ fn ipc_power_table<DB>(
     state: &mut FvmExecState<DB>,
 ) -> anyhow::Result<(ConfigurationNumber, PowerTable)>
 where
-    DB: Blockstore + Sync + Send + 'static,
+    DB: Blockstore + Sync + Send + Clone + 'static,
 {
     gateway
         .current_power_table(state)

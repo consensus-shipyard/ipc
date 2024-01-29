@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
-import {CrossMsg} from "../structs/CrossNet.sol";
+import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {Membership, SupplyKind} from "../structs/Subnet.sol";
@@ -96,24 +96,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         payable(subnet.id.getActor()).sendValue(amount);
     }
 
-    /// @notice Releases a reward to the relayer.
-    /// @dev This function sends the specified reward amount to the actor associated with the sender's subnet.
-    ///     It checks for subnet registration and also ensures the reward amount is non-zero.
-    ///     This function is protected against re-entrancy attack.
-    /// @param amount The amount of the reward to be released.
-    function releaseRewardForRelayer(uint256 amount) external nonReentrant {
-        if (amount == 0) {
-            revert CannotReleaseZero();
-        }
-
-        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
-        if (!registered) {
-            revert NotRegisteredSubnet();
-        }
-
-        payable(subnet.id.getActor()).sendValue(amount);
-    }
-
     /// @notice kill an existing subnet.
     /// @dev The subnet's balance must be empty.
     function kill() external {
@@ -159,12 +141,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SupplySource memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
         supplySource.expect(SupplyKind.Native);
 
-        CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg({
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
             signer: msg.sender,
             to: to,
-            value: msg.value,
-            fee: 0 // injecting funds into a subnet is free
+            value: msg.value
         });
 
         // commit top-down message.
@@ -189,12 +170,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         supplySource.lock({value: amount});
 
         // Create the top-down message to mint the supply in the subnet.
-        CrossMsg memory crossMsg = CrossMsgHelper.createFundMsg({
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
             signer: msg.sender,
             to: to,
-            value: amount,
-            fee: 0 // injecting funds into a subnet is free
+            value: amount
         });
 
         // Commit top-down message.
@@ -210,12 +190,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             // prevent spamming if there's no value to release.
             revert InvalidCrossMsgValue();
         }
-        CrossMsg memory crossMsg = CrossMsgHelper.createReleaseMsg({
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg({
             subnet: s.networkName,
             signer: msg.sender,
             to: to,
-            value: msg.value,
-            fee: 0 // making releases free of fee (at least for now)
+            value: msg.value
         });
 
         LibGateway.commitBottomUpMsg(crossMsg);

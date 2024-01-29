@@ -8,6 +8,11 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
 
+use super::{
+    fevm::{ContractCaller, MockProvider, NoRevert},
+    FvmExecState,
+};
+use crate::fvm::FvmApplyRet;
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
@@ -26,14 +31,8 @@ use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
-use ipc_api::staking::StakingChangeRequest;
-use ipc_api::{cross::CrossMsg, staking::ConfigurationNumber};
-
-use super::{
-    fevm::{ContractCaller, MockProvider, NoRevert},
-    FvmExecState,
-};
-use crate::fvm::FvmApplyRet;
+use ipc_api::cross::IpcEnvelope;
+use ipc_api::staking::{ConfigurationNumber, StakingChangeRequest};
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -82,7 +81,7 @@ impl<DB> GatewayCaller<DB> {
     }
 }
 
-impl<DB: Blockstore> GatewayCaller<DB> {
+impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     /// Check that IPC is configured in this deployment.
     pub fn enabled(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
         match state.state_tree_mut().get_actor(GATEWAY_ACTOR_ID)? {
@@ -109,16 +108,16 @@ impl<DB: Blockstore> GatewayCaller<DB> {
             .as_u64())
     }
 
-    /// Fetch the bottom-up messages enqueued for a given checkpoint height.
-    pub fn bottom_up_msgs(
+    /// Fetch the bottom-up message batch enqueued for a given checkpoint height.
+    pub fn bottom_up_msg_batch(
         &self,
         state: &mut FvmExecState<DB>,
         height: u64,
-    ) -> anyhow::Result<Vec<getter::CrossMsg>> {
+    ) -> anyhow::Result<getter::BottomUpMsgBatch> {
         let batch = self.getter.call(state, |c| {
             c.bottom_up_msg_batch(ethers::types::U256::from(height))
         })?;
-        Ok(batch.msgs)
+        Ok(batch)
     }
 
     /// Insert a new checkpoint at the period boundary.
@@ -278,11 +277,11 @@ impl<DB: Blockstore> GatewayCaller<DB> {
     pub fn apply_cross_messages(
         &self,
         state: &mut FvmExecState<DB>,
-        cross_messages: Vec<CrossMsg>,
+        cross_messages: Vec<IpcEnvelope>,
     ) -> anyhow::Result<FvmApplyRet> {
         let messages = cross_messages
             .into_iter()
-            .map(xnet_messaging_facet::CrossMsg::try_from)
+            .map(xnet_messaging_facet::IpcEnvelope::try_from)
             .collect::<Result<Vec<_>, _>>()
             .context("failed to convert cross messages")?;
         let r = self
@@ -318,26 +317,24 @@ impl<DB: Blockstore> GatewayCaller<DB> {
 }
 
 /// Total amount of tokens to mint as a result of top-down messages arriving at the subnet.
-pub fn tokens_to_mint(msgs: &[ipc_api::cross::CrossMsg]) -> TokenAmount {
+pub fn tokens_to_mint(msgs: &[ipc_api::cross::IpcEnvelope]) -> TokenAmount {
     msgs.iter()
         .fold(TokenAmount::from_atto(0), |mut total, msg| {
             // Both fees and value are considered to enter the ciruculating supply of the subnet.
             // Fees might be distributed among subnet validators.
-            total += &msg.msg.value;
-            total += &msg.msg.fee;
+            total += &msg.value;
             total
         })
 }
 
 /// Total amount of tokens to burn as a result of bottom-up messages leaving the subnet.
-pub fn tokens_to_burn(msgs: &[gateway_getter_facet::CrossMsg]) -> TokenAmount {
+pub fn tokens_to_burn(msgs: &[checkpointing_facet::IpcEnvelope]) -> TokenAmount {
     msgs.iter()
         .fold(TokenAmount::from_atto(0), |mut total, msg| {
             // Both fees and value were taken from the sender, and both are going up to the parent subnet:
             // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/e4ec0046e2e73e2f91d7ab8ae370af2c487ce526/src/gateway/GatewayManagerFacet.sol#L143-L150
             // Fees might be distirbuted among relayers.
-            total += from_eth::to_fvm_tokens(&msg.message.value);
-            total += from_eth::to_fvm_tokens(&msg.message.fee);
+            total += from_eth::to_fvm_tokens(&msg.value);
             total
         })
 }

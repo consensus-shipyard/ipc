@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
-import {BottomUpCheckpoint, CrossMsg} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, IpcEnvelope} from "../structs/CrossNet.sol";
 import {SubnetID, SupplySource} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
@@ -87,19 +87,9 @@ contract SubnetActorGetterFacet {
         return s.bottomUpCheckPeriod;
     }
 
-    /// @notice Returns the batch period for bottom-up messaging.
-    function bottomUpMsgBatchPeriod() external view returns (uint256) {
-        return s.bottomUpMsgBatchPeriod;
-    }
-
     /// @notice Returns the block height of the last bottom-up checkpoint.
     function lastBottomUpCheckpointHeight() external view returns (uint256) {
         return s.lastBottomUpCheckpointHeight;
-    }
-
-    /// @notice Returns the block height of the last bottom-up message batch.
-    function lastBottomUpMsgBatchHeight() external view returns (uint256) {
-        return s.lastBottomUpBatch.blockHeight;
     }
 
     /// @notice Returns the consensus protocol type used in the subnet.
@@ -120,11 +110,6 @@ contract SubnetActorGetterFacet {
     /// @notice Returns the minimum collateral required for subnet activation.
     function minActivationCollateral() external view returns (uint256) {
         return s.minActivationCollateral;
-    }
-
-    /// @notice Returns the minimum fee for cross-messaging.
-    function minCrossMsgFee() external view returns (uint256) {
-        return s.minCrossMsgFee;
     }
 
     /// @notice Returns detailed information about a specific validator.
@@ -176,20 +161,6 @@ contract SubnetActorGetterFacet {
         return LibStaking.isWaitingValidator(validator);
     }
 
-    /// @notice Determines if a validator has submitted the most recent bottom-up message batch.
-    /// @param validator The address of the validator being checked for participation.
-    function hasSubmittedInLastBottomUpMsgBatchHeight(address validator) external view returns (bool) {
-        uint256 height = s.lastBottomUpBatch.blockHeight;
-        return s.relayerRewards.batchRewarded[height].contains(validator);
-    }
-
-    /// @notice Checks whether a validator has submitted the most recent bottom-up checkpoint message.
-    /// @param validator The address of the validator being checked for inclusion in the last checkpoint.
-    function hasSubmittedInLastBottomUpCheckpointHeight(address validator) external view returns (bool) {
-        uint256 height = s.lastBottomUpCheckpointHeight;
-        return s.relayerRewards.checkpointRewarded[height].contains(validator);
-    }
-
     /// @notice returns the committed bottom-up checkpoint at specific epoch.
     /// @param epoch - the epoch to check.
     /// @return exists - whether the checkpoint exists.
@@ -233,19 +204,12 @@ contract SubnetActorGetterFacet {
         return nodes;
     }
 
-    /// @notice Computes a hash of an array of cross-chain messages.
+    /// @notice Computes a hash of an array of IpcEnvelopes.
     /// @dev This exists for testing purposes.
-    /// @param messages An array of cross-chain messages to be hashed.
+    /// @param messages An array of cross-chain envelopes to be hashed.
     /// @return The keccak256 hash of the encoded cross-chain messages.
-    function crossMsgsHash(CrossMsg[] calldata messages) external pure returns (bytes32) {
+    function crossMsgsHash(IpcEnvelope[] calldata messages) external pure returns (bytes32) {
         return keccak256(abi.encode(messages));
-    }
-
-    /// @notice Retrieves the total reward amount allocated to a specific relayer.
-    /// @param relayer The address of the relayer whose reward amount is to be queried.
-    /// @return The total reward amount accrued by the specified relayer.
-    function getRelayerReward(address relayer) external view returns (uint256) {
-        return s.relayerRewards.rewards[relayer];
     }
 
     /// @notice Returns the supply strategy for the subnet.

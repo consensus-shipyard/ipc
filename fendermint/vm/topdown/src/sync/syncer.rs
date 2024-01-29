@@ -335,7 +335,7 @@ mod tests {
     use async_stm::atomically;
     use async_trait::async_trait;
     use fendermint_vm_genesis::{Power, Validator};
-    use ipc_api::cross::CrossMsg;
+    use ipc_api::cross::IpcEnvelope;
     use ipc_api::staking::StakingChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
@@ -389,7 +389,7 @@ mod tests {
         async fn get_top_down_msgs(
             &self,
             height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+        ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
             Ok(TopDownQueryPayload {
                 value: vec![],
                 block_hash: self.blocks.get_value(height).cloned().unwrap().unwrap(),

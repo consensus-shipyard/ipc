@@ -193,6 +193,8 @@ pub struct Settings {
     contracts_dir: PathBuf,
     /// Builtin-actors CAR file.
     builtin_actors_bundle: PathBuf,
+    /// Custom actors CAR file.
+    custom_actors_bundle: PathBuf,
 
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
@@ -238,7 +240,8 @@ impl Settings {
         data_dir,
         snapshots_dir,
         contracts_dir,
-        builtin_actors_bundle
+        builtin_actors_bundle,
+        custom_actors_bundle
     );
 
     /// Load the default configuration from a directory,

@@ -8,17 +8,18 @@ import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
 import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
-import {IRelayerRewardDistributor} from "../../interfaces/ISubnetActor.sol";
 
-import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, BatchWithNoMessages, InvalidCheckpointSource, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
+import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, InvalidCheckpointSource, InvalidCrossMsgNonce, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
 import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated} from "../../errors/IPCErrors.sol";
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
-import {SubnetID} from "../../structs/CrossNet.sol";
+import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
+import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
+    using CrossMsgHelper for IpcEnvelope;
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
@@ -37,17 +38,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
             revert InvalidSubnet();
         }
 
-        if (s.checkpointRelayerRewards) {
-            // slither-disable-next-line unused-return
-            Address.functionCallWithValue({
-                target: msg.sender,
-                data: abi.encodeCall(
-                    IRelayerRewardDistributor.distributeRewardToRelayers,
-                    (checkpoint.blockHeight, 0, QuorumObjKind.Checkpoint)
-                ),
-                value: 0
-            });
-        }
+        LibGateway.checkMsgLength(checkpoint.msgs);
+
+        execBottomUpMsgs(checkpoint.msgs, subnet);
     }
 
     /// @notice creates a new bottom-up checkpoint
@@ -86,6 +79,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         // a storage variable as an interface (so we can iterate and remove directly inside pruneQuorums)
         for (uint256 h = s.checkpointQuorumMap.retentionHeight; h < newRetentionHeight; ) {
             delete s.bottomUpCheckpoints[h];
+            delete s.bottomUpMsgBatches[h];
             unchecked {
                 ++h;
             }
@@ -122,5 +116,30 @@ contract CheckpointingFacet is GatewayActorModifiers {
             weight: weight,
             signature: signature
         });
+    }
+
+    /// @notice submit a batch of cross-net messages for execution.
+    /// @param msgs The batch of bottom-up cross-network messages to be executed.
+    function execBottomUpMsgs(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
+        uint256 totalValue;
+        uint256 crossMsgLength = msgs.length;
+
+        for (uint256 i; i < crossMsgLength; ) {
+            totalValue += msgs[i].value;
+            unchecked {
+                ++i;
+            }
+        }
+
+        uint256 totalAmount = totalValue;
+
+        if (subnet.circSupply < totalAmount) {
+            revert NotEnoughSubnetCircSupply();
+        }
+
+        subnet.circSupply -= totalAmount;
+
+        // execute cross-messages
+        LibGateway.applyMessages(subnet.id, msgs);
     }
 }

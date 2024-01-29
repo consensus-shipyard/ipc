@@ -7,12 +7,12 @@ mod null;
 use crate::error::Error;
 use crate::BlockHash;
 use async_stm::{abort, StmResult};
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 
 pub use fetch::CachedFinalityProvider;
 
-pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<CrossMsg>);
+pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
 
 fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Error> {
     if msgs.is_empty() {
@@ -35,7 +35,7 @@ pub(crate) fn validator_changes(p: &ParentViewPayload) -> Vec<StakingChangeReque
     p.1.clone()
 }
 
-pub(crate) fn topdown_cross_msgs(p: &ParentViewPayload) -> Vec<CrossMsg> {
+pub(crate) fn topdown_cross_msgs(p: &ParentViewPayload) -> Vec<IpcEnvelope> {
     p.2.clone()
 }
 
@@ -47,7 +47,7 @@ mod tests {
     };
     use async_stm::atomically_or_err;
     use async_trait::async_trait;
-    use ipc_api::cross::CrossMsg;
+    use ipc_api::cross::IpcEnvelope;
     use ipc_api::staking::StakingChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
@@ -72,7 +72,7 @@ mod tests {
         async fn get_top_down_msgs(
             &self,
             _height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<CrossMsg>>> {
+        ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
             Ok(TopDownQueryPayload {
                 value: vec![],
                 block_hash: vec![],

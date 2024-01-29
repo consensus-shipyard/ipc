@@ -83,7 +83,7 @@ impl SnapshotItem {
     /// Import a snapshot into the blockstore.
     pub async fn import<BS>(&self, store: BS, validate: bool) -> anyhow::Result<Snapshot<BS>>
     where
-        BS: Blockstore + Send + 'static,
+        BS: Blockstore + Send + Clone + 'static,
     {
         let parts =
             manifest::list_parts(self.parts_dir()).context("failed to list snapshot parts")?;

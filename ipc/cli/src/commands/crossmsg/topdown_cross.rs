@@ -36,12 +36,11 @@ impl CommandLineHandler for ListTopdownMsgs {
             );
             for msg in result.value {
                 println!(
-                    "from: {}, to: {}, value: {}, nonce: {}, fee: {} ",
-                    msg.msg.from.to_string()?,
-                    msg.msg.to.to_string()?,
-                    msg.msg.value,
-                    msg.msg.nonce,
-                    msg.msg.fee
+                    "from: {}, to: {}, message: {}, nonce: {} ",
+                    msg.from.to_string()?,
+                    msg.to.to_string()?,
+                    hex::encode(msg.message),
+                    msg.nonce
                 );
             }
         }

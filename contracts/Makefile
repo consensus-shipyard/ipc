@@ -113,7 +113,7 @@ coverage-for-mac: | forge
 prepare: build-selector-library fmt lint test slither
 
 build-selector-library: | forge
-	python scripts/python/build_selector_library.py
+	python3 scripts/python/build_selector_library.py
 	npx prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
