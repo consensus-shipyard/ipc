@@ -23,6 +23,11 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+
+import {SubnetTokenBridge} from "../../src/examples/cross-token/SubnetTokenBridge.sol";
+import {SubnetUSDCProxy} from "../../src/examples/cross-token/SubnetUSDCProxy.sol";
+import {TokenTransferAndMint} from "../../src//examples/cross-token/TokenTransferAndMint.sol";
+
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils, MockIpcContract} from "../helpers/TestUtils.sol";
@@ -58,6 +63,11 @@ contract MultiSubnet is Test, IntegrationTestBase {
 
     IERC20 public token;
 
+    SubnetTokenBridge subnetTokenBridge;
+    TokenTransferAndMint rootTokenBridge;
+
+    SubnetUSDCProxy subnetUSDCProxy;
+
     function setUp() public override {
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
 
@@ -85,6 +95,15 @@ contract MultiSubnet is Test, IntegrationTestBase {
         nativeSubnetGateway = createGatewayDiamond(gatewayParams(nativeSubnetName));
 
         printActors();
+
+        subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(token), rootSubnetName);
+        rootTokenBridge = new TokenTransferAndMint(
+            address(rootGateway),
+            address(token),
+            rootSubnetName,
+            address(subnetTokenBridge)
+        );
+        subnetUSDCProxy = SubnetUSDCProxy(subnetTokenBridge.getProxyTokenAddress());
     }
 
     function testMultiSubnet_Native_SendCrossMessageFromChildToParent() public {
