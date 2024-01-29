@@ -185,16 +185,12 @@ fvm_ipld_amt = "0.6.2"
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 
-# Using 0.8 because of ref-fvm.
-# 0.9 would be better because of its updated quickcheck dependency.
-# 0.10 breaks some API.
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",
   "std",
 ] }
 
-# We need a version of frc42_dispatch that has been updated to use FVM 4.1
-frc42_dispatch = { git = "https://github.com/fridrik01/filecoin.git", branch = "update-fvm-4.1" }
+frc42_dispatch = "6.0.0"
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }

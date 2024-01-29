@@ -3546,7 +3546,8 @@ dependencies = [
 [[package]]
 name = "frc42_dispatch"
 version = "6.0.0"
-source = "git+https://github.com/fridrik01/filecoin.git?branch=update-fvm-4.1#4402a4f854f0608bad65344f7c54cb0ca159c119"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a1704e27193af21e58435974ff20f2be25cc59338afb89920abdb540ad3182b"
 dependencies = [
  "frc42_hasher",
  "frc42_macros",
@@ -3559,7 +3560,8 @@ dependencies = [
 [[package]]
 name = "frc42_hasher"
 version = "4.0.0"
-source = "git+https://github.com/fridrik01/filecoin.git?branch=update-fvm-4.1#4402a4f854f0608bad65344f7c54cb0ca159c119"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63f58bb50d36d90f5d0fee8391d6e1ed1a2b15ab8da6417dc42d7c78b587479d"
 dependencies = [
  "fvm_sdk",
  "fvm_shared",
@@ -3569,7 +3571,8 @@ dependencies = [
 [[package]]
 name = "frc42_macros"
 version = "4.0.0"
-source = "git+https://github.com/fridrik01/filecoin.git?branch=update-fvm-4.1#4402a4f854f0608bad65344f7c54cb0ca159c119"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a9ce38a981bab5e0d3c0835baa86f83066afe9afaf0aec23cee421f6d8c628e"
 dependencies = [
  "blake2b_simd",
  "frc42_hasher",
