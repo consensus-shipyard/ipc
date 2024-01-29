@@ -66,7 +66,7 @@ contract ERC20TokenMessenger is ReentrancyGuard {
         address destinationContract,
         address receiver,
         uint256 amount
-    ) internal {
+    ) internal returns (IpcEnvelope memory committed) {
         if (destinationContract == address(0)) {
             revert ZeroAddress();
         }
@@ -97,22 +97,20 @@ contract ERC20TokenMessenger is ReentrancyGuard {
         if (endingBalance <= startingBalance) {
             revert NoTransfer();
         }
-        /* 
-### FIXME
+        CallMsg memory message = CallMsg({
+            method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
+            params: abi.encode(receiver, amount)
+        });
         IpcEnvelope memory crossMsg = IpcEnvelope({
             kind: IpcMsgKind.Call,
             from: IPCAddress({subnetId: info.getNetworkName(), rawAddress: FvmAddressHelper.from(sourceContract)}),
             to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)}),
             value: 0,
             nonce: lastNonce,
-            message: CallMsg({
-                method: bytes4(keccak256("transfer(address,uint256)")),
-                params: abi.encode(receiver, amount)
-            })
+            message: abi.encode(message)
         });
 
         return messenger.sendContractXnetMessage{value: msg.value}(crossMsg);
-        */
     }
 
     receive() external payable {}
