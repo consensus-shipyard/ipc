@@ -5,7 +5,7 @@ import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, SupplyKind, IPCAddress} from "../structs/Subnet.sol";
-import {InvalidXnetMessage,   CannotSendCrossMsgToItself,  MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {InvalidXnetMessage, CannotSendCrossMsgToItself, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
