@@ -4,8 +4,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
-    #[error("invalid subnet id")]
-    InvalidID,
+    #[error("invalid subnet id {0}: {1}")]
+    InvalidID(String, String),
     #[error("invalid IPC address")]
     InvalidIPCAddr,
     #[error("fvm shared address error")]

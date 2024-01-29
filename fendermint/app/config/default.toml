@@ -116,10 +116,6 @@ port = 8545
 # Time to wait between attempts to resolve a CID after an error.
 retry_delay = 10
 
-# The current subnet ID for which this node can serve data.
-# TODO #231: Remove this and unify handling with the IPC settings.
-subnet_id = "/r0"
-
 # Network Identity
 [resolver.network]
 # Secp256k1 private key used for signing network messages.
