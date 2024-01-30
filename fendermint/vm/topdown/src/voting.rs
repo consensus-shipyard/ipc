@@ -138,7 +138,10 @@ where
 
     /// Add the next final block observed on the parent blockchain.
     ///
-    /// Returns an error unless it's exactly the next expected height.
+    /// Returns an error unless it's exactly the next expected height,
+    /// so the caller has to call this in every epoch. If the parent
+    /// chain produced no blocks in that epoch then pass `None` to
+    /// represent that null-round in the tally.
     pub fn add_block(
         &self,
         block_height: BlockHeight,
