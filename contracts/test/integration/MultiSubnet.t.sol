@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -18,6 +18,7 @@ import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpo
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
 import {LibGateway} from "../../src/lib/LibGateway.sol";
+import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFacet.sol";
 import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
@@ -185,16 +186,30 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             amount
         );
 
-        //vm.expectEmit(true, true, true, true, address(rootGateway));
-        //emit LibGateway.NewTopDownMessage(address(nativeSubnetName.getActor()), expected);
         vm.prank(caller);
+        vm.expectEmit(true, true, true, true, address(rootGateway));
+        emit LibGateway.NewTopDownMessage(address(rootNativeSubnetActor), expected);
         rootGatewayManager.fund{value: amount}(nativeSubnetName, FvmAddressHelper.from(address(recipient)));
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
+
+        // TODO: commitParentFinality doesn not affect anything in this test.
+        commitParentFinality(address(nativeSubnetGateway));
+
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         assertEq(recipient.balance, amount);
+    }
+
+    function commitParentFinality(address gateway) internal {
+        vm.roll(10);
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+
+        TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gwTopDownFinalityFacet.commitParentFinality(finality);
     }
 
     function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory subnet, address gateway) internal {
@@ -215,7 +230,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         // This emulates minting tokens.
         vm.deal(address(gateway), minted_tokens);
 
-        // TODO: how to emulate increasing of circulation supply?
+        // TODO: how to emulate increase of circulation supply?
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         xnet.applyCrossMessages(msgs);
@@ -292,6 +307,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("root name: %s", rootSubnetName.toString());
         console.log("native subnet name: %s", nativeSubnetName.toString());
         console.log("token subnet name: %s", tokenSubnetName.toString());
+        console.log("native subnet getActor(): %s", address(nativeSubnetName.getActor()));
     }
 
     function printEnvelope(IpcEnvelope memory envelope) internal {
