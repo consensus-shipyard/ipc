@@ -468,7 +468,11 @@ async fn dispatch_vote(
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
                 }
-                Err(e) => {
+                Err(e @ (
+                      VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _) // won't happen here
+                )) => {
                     tracing::debug!(error = e.to_string(), "failed to handle vote")
                 }
             }
