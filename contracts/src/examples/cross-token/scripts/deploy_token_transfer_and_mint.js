@@ -9,11 +9,10 @@ async function main() {
         throw new Error('All required environment variables must be provided')
     }
 
-    // Parent SubnetID value
-    const parentSubnet = [0, []]
+    parentSubnetChainId = 1337
 
-    // Child SubnetID value
-    const subnetID = [1, []]
+    // Parent SubnetID value
+    const parentSubnet = [parentSubnetChainId, []]
 
     // Deploy ERC20 token
     const ERC20 = await hre.ethers.getContractFactory('USDCMock')
@@ -25,6 +24,8 @@ async function main() {
         erc20Token.address,
         parentSubnet,
     )
+    // Child SubnetID value
+    const subnetID = [parentSubnetChainId, [subnetTokenBridge.address]]
 
     // Mint tokens
     const mintAmount = hre.ethers.utils.parseUnits('1000', 18) // 1000 tokens
