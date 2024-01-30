@@ -28,25 +28,28 @@
     #       - gnupg
 
     - name: Check if rustc/cargo is installed
-      # shell: source ~/.bashrc && command -v cargo
       shell: bash -ilc 'which cargo'
       register: cargo_exists
       ignore_errors: yes
 
-    - name: Download rustc/cargo Installer
+    - name: Install rust/cargo
       when: cargo_exists is failed
-      get_url:
-        url: https://sh.rustup.rs
-        dest: /tmp/sh.rustup.rs
-        mode: '0755'
-        force: 'yes'
+      shell: curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+    - name: Check if foundry is installed
+      shell: bash -ilc 'which foundryup'
+      register: foundry_exists
+      ignore_errors: yes
 
     - debug:
         var: cargo_exists
 
-    - name: Install rust/cargo
-      when: cargo_exists is failed
-      shell: /tmp/sh.rustup.rs -y
+    - debug:
+        var: foundry_exists
+
+    - name: Install foundry
+      when: foundry_exists is failed
+      shell: curl -L https://foundry.paradigm.xyz -sSf | bash
 
     - name: Get current date in yyyy-mm-dd format
       command: date +%F
@@ -55,6 +58,7 @@
     - name: Set ipc folder name as variable
       set_fact:
         ipc_folder_path: ~/ipc-{{ current_date.stdout }}
+        ipc_cli_path: ~/ipc-{{ current_date.stdout }}/target/release/ipc-cli
 
     - debug:
         var: ipc_folder_path
@@ -65,7 +69,15 @@
     #     repo: https://github.com/consensus-shipyard/ipc.git
     #     dest: ipc_folder_path
 
-    - name: Build ipc-cli
-      command: bash -ilc 'make build'
-      args:
-        chdir: "{{ ipc_folder_path }}/ipc"
+#    - name: Build contracts
+#      command: bash -ilc 'make build'
+#      args:
+#        chdir: "{{ ipc_folder_path }}/contracts"
+
+#    - name: Build ipc-cli
+#      command: bash -ilc 'make build'
+#      args:
+#        chdir: "{{ ipc_folder_path }}/ipc"
+
+    - name: Initialize IPC config
+      command: "{{ ipc_cli_path }} config init"
