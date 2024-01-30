@@ -4,6 +4,7 @@
 pub use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
 use crate::commands::subnet::genesis_epoch::{GenesisEpoch, GenesisEpochArgs};
 pub use crate::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
+use crate::commands::subnet::join::{PrefundArgs, PrefundSubnet};
 pub use crate::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
 pub use crate::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
 use crate::commands::subnet::list_subnets::{ListSubnets, ListSubnetsArgs};
@@ -45,6 +46,7 @@ impl SubnetCommandsArgs {
         match &self.command {
             Commands::Create(args) => CreateSubnet::handle(global, args).await,
             Commands::List(args) => ListSubnets::handle(global, args).await,
+            Commands::PreFund(args) => PrefundSubnet::handle(global, args).await,
             Commands::Join(args) => JoinSubnet::handle(global, args).await,
             Commands::Rpc(args) => RPCSubnet::handle(global, args).await,
             Commands::ChainId(args) => ChainIdSubnet::handle(global, args).await,
@@ -66,6 +68,7 @@ impl SubnetCommandsArgs {
 pub(crate) enum Commands {
     Create(CreateSubnetArgs),
     List(ListSubnetsArgs),
+    PreFund(PrefundArgs),
     Join(JoinSubnetArgs),
     Rpc(RPCSubnetArgs),
     ChainId(ChainIdSubnetArgs),
