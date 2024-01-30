@@ -27,7 +27,7 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
-import {TestUtils, MockIpcContract, MockIpcContractPayable} from "../helpers/TestUtils.sol";
+import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractFallback} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
@@ -240,6 +240,42 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         assertEq(recipient.balance, amount);
     }
 
+    function testMultiSubnet_Erc20NonPayable_FundFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractFallback());
+        uint256 amount = 3;
+
+        token.transfer(caller, 100);
+        vm.prank(caller);
+        token.approve(address(rootGateway), 100);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, amount);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+
+        vm.prank(caller);
+        vm.expectEmit(true, true, true, true, address(rootGateway));
+        emit LibGateway.NewTopDownMessage(address(rootTokenSubnetActor), expected);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(recipient)), amount);
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = expected;
+
+        commitParentFinality(address(tokenSubnetGateway));
+
+        vm.expectRevert();
+        executeTopDownMsgsRevert(msgs, tokenSubnetName, address(tokenSubnetGateway));
+    }
+
     function commitParentFinality(address gateway) internal {
         vm.roll(10);
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
@@ -270,9 +306,13 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         // TODO: how to emulate increase of circulation supply?
 
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.prank(FilAddress.SYSTEM_ACTOR);
         xnet.applyCrossMessages(msgs);
-        vm.stopPrank();
+    }
+
+    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, SubnetID memory subnet, address gateway) internal {
+        vm.expectRevert();
+        executeTopDownMsgs(msgs, subnet, gateway);
     }
 
     function callCreateBottomUpCheckpointFromChildSubnet(
