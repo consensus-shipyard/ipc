@@ -247,6 +247,40 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
+    fn test_parse_root_net() {
+        let subnet_id = SubnetID::from_str("/r123").unwrap();
+        assert_eq!(subnet_id.root, 123);
+    }
+
+    #[test]
+    fn test_parse_subnet_id() {
+        // NOTE: It would not work with `t` prefix addresses unless the current network is changed.
+        let id = "/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq";
+        let subnet_id = SubnetID::from_str(id).unwrap();
+        assert_eq!(subnet_id.root, 31415926);
+        assert!(!subnet_id.children.is_empty());
+    }
+
+    #[test]
+    fn test_cannot_parse_subnet_id_with_wrong_prefix() {
+        // NOTE: The default network prefix is `f`.
+        let id = "/r31415926/t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq";
+        match SubnetID::from_str(id) {
+            Err(crate::error::Error::InvalidID(_, msg)) => {
+                assert!(msg.contains("invalid child"));
+                assert!(msg.contains("t2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq"));
+                assert!(msg.contains("network"));
+            }
+            other => panic!("unexpected parse result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_empty_subnet_id() {
+        assert!(SubnetID::from_str("").is_err())
+    }
+
+    #[test]
     fn test_subnet_id() {
         let act = Address::new_id(1001);
         let sub_id = SubnetID::new(123, vec![act]);
