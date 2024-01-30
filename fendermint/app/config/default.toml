@@ -193,4 +193,10 @@ rate_limit_period = 0
 
 # IPC related configuration parameters
 [ipc]
+# Default subnet ID, which basically means IPC is disabled.
 subnet_id = "/r0"
+# Voting interval about things such as the top-down finality, in seconds.
+# It's limited to avoid GossipSub throttling or banning the node for over production.
+# The minimum is 1 seconds which is about the minimum target block time as well;
+# ideally one round of gossip per block should be as frequent as we would go.
+vote_interval = 1

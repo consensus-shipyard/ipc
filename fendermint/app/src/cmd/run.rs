@@ -159,6 +159,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 tokio::spawn(async move {
                     publish_vote_loop(
                         parent_finality_votes,
+                        settings.ipc.vote_interval,
                         key,
                         own_subnet_id,
                         client,

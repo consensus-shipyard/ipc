@@ -141,6 +141,9 @@ pub struct TopDownSettings {
 pub struct IpcSettings {
     #[serde_as(as = "IsHumanReadable")]
     pub subnet_id: SubnetID,
+    /// Interval with which votes can be gossiped.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub vote_interval: Duration,
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
     pub topdown: Option<TopDownSettings>,
