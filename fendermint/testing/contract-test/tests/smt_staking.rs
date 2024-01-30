@@ -10,7 +10,7 @@
 //! It can be executed the following way:
 //!
 //! ```text
-//! cargo test --release -p contract-test --test smt_staking
+//! cargo test --release -p fendermint_contract_test --test smt_staking
 //! ```
 use fendermint_testing::{arb::ArbTokenAmount, smt::StateMachine, state_machine_test};
 

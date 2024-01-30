@@ -17,24 +17,11 @@ pub struct ResolverSettings {
     /// Time to wait between attempts to resolve a CID, in seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub retry_delay: Duration,
-    /// The current subnet ID for which this node can serve data.
-    ///
-    /// TODO #231: Take this from the IPC settings.
-    #[serde_as(as = "IsHumanReadable")]
-    pub subnet_id: SubnetID,
-
     pub network: NetworkSettings,
     pub discovery: DiscoverySettings,
     pub membership: MembershipSettings,
     pub connection: ConnectionSettings,
     pub content: ContentSettings,
-}
-
-impl ResolverSettings {
-    /// Indicate whether we have configured the IPLD Resolver to run.
-    pub fn enabled(&self) -> bool {
-        !self.connection.listen_addr.is_empty() && self.subnet_id != *ipc_api::subnet_id::UNDEF
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]

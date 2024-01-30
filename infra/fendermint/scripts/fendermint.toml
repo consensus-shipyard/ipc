@@ -38,7 +38,7 @@ dependencies = ["docker-network-create", "fendermint-deps"]
 
 [tasks.fendermint-start-validator]
 extend = "fendermint-run-validator"
-env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+env = { "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-run-validator]
 script = """
@@ -49,6 +49,7 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
+  --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -63,15 +64,15 @@ docker run \
   --env FM_IPC__TOPDOWN__POLLING_INTERVAL=10 \
   --env FM_IPC__TOPDOWN__PROPOSAL_DELAY=${TOPDOWN_PROPOSAL_DELAY} \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
-  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
-  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
+  --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
+  --env FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT} \
+  --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${PRIV_KEY_PATH} \
+  --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
-  --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
   ${CMD}
@@ -82,7 +83,7 @@ dependencies = ["docker-network-create", "fendermint-deps"]
 # They don't configure any validator private key.
 [tasks.fendermint-start-subnet]
 extend = "fendermint-run-subnet"
-env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
+env = { "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-run-subnet]
 script = """
@@ -93,6 +94,7 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
+  --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -107,13 +109,13 @@ docker run \
   --env FM_IPC__TOPDOWN__POLLING_INTERVAL=10 \
   --env FM_IPC__TOPDOWN__PROPOSAL_DELAY=${TOPDOWN_PROPOSAL_DELAY} \
   --env FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE=${TOPDOWN_MAX_PROPOSAL_RANGE} \
-  --env FM_ABCI__LISTEN__HOST=0.0.0.0 \
-  --env FM_ETH__LISTEN__HOST=0.0.0.0 \
+  --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
+  --env FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT} \
+  --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
-  --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
   ${CMD}
@@ -129,12 +131,24 @@ docker run \
   --volume ${BASE_DIR}:/data \
   --env LOG_LEVEL=${LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
-  --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
   ${CMD}
 """
 dependencies = ["fendermint-deps"]
+
+
+[tasks.fendermint-new-network-key]
+extend = "fendermint-tool"
+env = { "CMD" = "key gen --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR} --name ${NETWORK_KEY_NAME}" }
+script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}"
+script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
+
+
+[tasks.fendermint-network-peer-id]
+extend = "fendermint-tool"
+env = { "CMD" = "key show-peer-id --public-key /data/${NODE_NAME}/${NETWORK_PUB_KEY_PATH}" }
+
 
 [tasks.fendermint-deps]
 script = """

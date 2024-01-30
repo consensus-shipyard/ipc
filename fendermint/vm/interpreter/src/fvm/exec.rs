@@ -3,7 +3,6 @@
 
 use anyhow::Context;
 use async_trait::async_trait;
-use fendermint_vm_genesis::{Power, Validator};
 use std::collections::HashMap;
 
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
@@ -47,7 +46,7 @@ where
     /// Return validator power updates.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = Vec<Validator<Power>>;
+    type EndOutput = PowerUpdates;
 
     async fn begin(
         &self,
@@ -213,6 +212,6 @@ where
             PowerUpdates::default()
         };
 
-        Ok((state, updates.0))
+        Ok((state, updates))
     }
 }

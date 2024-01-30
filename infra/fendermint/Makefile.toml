@@ -20,14 +20,15 @@ SUBNET_ID = { value = "/r0", condition = { env_not_set = ["SUBNET_ID"] } }
 NETWORK_NAME = { script = ["echo $SUBNET_ID | sed -e 's|/|-|g' -e 's|^-||1'"] }
 # External P2P address advertised by CometBFT to other peers.
 CMT_P2P_EXTERNAL_ADDR = { value = "", condition = { env_not_set = ["CMT_P2P_EXTERNAL_ADDR"] } }
+CMT_P2P_HOST_PORT = { value = "26656", condition = { env_not_set = ["CMT_P2P_HOST_PORT"] } }
+CMT_RPC_HOST_PORT = { value = "26657", condition = { env_not_set = ["CMT_RPC_HOST_PORT"] } }
+ETHAPI_HOST_PORT = { value = "8545", condition = { env_not_set = ["ETHAPI_HOST_PORT"] } }
+RESOLVER_HOST_PORT = { value = "26655", condition = { env_not_set = ["RESOLVER_HOST_PORT"] } }
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
 BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] } }
 TIMESTAMP = { value = "1680101412", condition = { env_not_set = ["TIMESTAMP"] } }
 POWER_SCALE = { value = "3", condition = { env_not_set = ["POWER_SCALE"] } }
-CMT_P2P_HOST_PORT = { value = "26656", condition = { env_not_set = ["CMT_P2P_HOST_PORT"] } }
-CMT_RPC_HOST_PORT = { value = "26657", condition = { env_not_set = ["CMT_RPC_HOST_PORT"] } }
-ETHAPI_HOST_PORT = { value = "8545", condition = { env_not_set = ["ETHAPI_HOST_PORT"] } }
 
 # IPC subnet related parameters
 # Use calibration as default value
@@ -51,6 +52,12 @@ TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = [
 ] } }
 # Comma-separated list of bootstrap nodes to be used by the CometBFT node.
 BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }
+
+# Comma-separated list of multiaddresses for the IPLD resolver to connect to.
+# This should have the form of "/ip4/198.51.100.2/tcp/26655/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"
+# where the `/p2p/<peer-id>` can for example be obtained by the `fendermint key show-peer-id` command.
+RESOLVER_BOOTSTRAPS = { value = "", condition = { env_not_set = ["RESOLVER_BOOTSTRAPS"] } }
+
 PRIVATE_KEY_PATH = { value = "", condition = { env_not_set = ["PRIVATE_KEY_PATH"] } }
 
 # Deployment-related
@@ -63,9 +70,14 @@ ENV_FILE = "${BASE_DIR}/.env"
 
 GENESIS_FILE = "${BASE_DIR}/genesis.json"
 KEYS_SUBDIR = "keys"
-KEY_NAME = "validator_key"
-PUB_KEY_PATH = "${KEYS_SUBDIR}/${KEY_NAME}.pk"
-PRIV_KEY_PATH = "${KEYS_SUBDIR}/${KEY_NAME}.sk"
+
+VALIDATOR_KEY_NAME = "validator_key"
+VALIDATOR_PUB_KEY_PATH = "${KEYS_SUBDIR}/${VALIDATOR_KEY_NAME}.pk"
+VALIDATOR_PRIV_KEY_PATH = "${KEYS_SUBDIR}/${VALIDATOR_KEY_NAME}.sk"
+
+NETWORK_KEY_NAME = "network_key"
+NETWORK_PUB_KEY_PATH = "${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.pk"
+NETWORK_PRIV_KEY_PATH = "${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
 
 COMETBFT_SUBDIR = "cometbft"
 
@@ -103,7 +115,7 @@ echo - CometBFT directory: ${CMT_DIR}
 echo - Fendermint directory: ${FM_DIR}
 echo - Keys directory: ${KEYS_DIR}
 echo - Genesis file: ${GENESIS_FILE}
-echo - Private key: ${PRIV_KEY_PATH}
+echo - Validator Private key: ${VALIDATOR_PRIV_KEY_PATH}
 echo - Network: ${NETWORK_NAME}
 echo - CometBFT container: ${CMT_CONTAINER_NAME}
 echo - Fendermint container: ${FM_CONTAINER_NAME}
