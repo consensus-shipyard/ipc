@@ -346,7 +346,7 @@ pub async fn publish_vote_loop<V, F>(
 
             if has_power {
                 // Add our own vote to the tally directly rather than expecting a message from the gossip channel.
-                // (I'm not messages published by this node would be delivered to it, so this might be the only way).
+                // TODO (ENG-622): I'm not sure gossip messages published by this node would be delivered to it, so this might be the only way.
                 if let Err(StmError::Control(c)) =
                     vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())
                 {
