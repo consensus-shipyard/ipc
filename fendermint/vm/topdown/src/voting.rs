@@ -3,8 +3,8 @@
 
 use async_stm::{abort, atomically_or_err, retry, Stm, StmResult, TVar};
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
 use std::hash::Hash;
+use std::{fmt::Debug, time::Duration};
 
 use crate::{BlockHash, BlockHeight};
 
@@ -322,6 +322,7 @@ where
 /// Poll the vote tally for new finalized blocks and publish a vote about them if the validator is part of the power table.
 pub async fn publish_vote_loop<V, F>(
     vote_tally: VoteTally,
+    vote_interval: Duration,
     key: libp2p::identity::Keypair,
     subnet_id: ipc_api::subnet_id::SubnetID,
     client: ipc_ipld_resolver::Client<V>,
@@ -331,7 +332,12 @@ pub async fn publish_vote_loop<V, F>(
     V: Serialize + DeserializeOwned,
 {
     let validator_key = ValidatorKey::from(key.public());
+
+    let mut vote_interval = tokio::time::interval(vote_interval);
+    vote_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
     let mut prev_height = 0;
+
     loop {
         let result = atomically_or_err(|| {
             let next_height = vote_tally.latest_height()?;
@@ -367,8 +373,6 @@ pub async fn publish_vote_loop<V, F>(
             }
         };
 
-        // TODO (ENG-624): Throttle vote gossiping at periods of fast syncing.
-
         if has_power && prev_height > 0 {
             tracing::debug!(block_height = next_height, "publishing finality vote");
             match VoteRecord::signed(&key, subnet_id.clone(), to_vote(next_height, next_hash)) {
@@ -381,6 +385,12 @@ pub async fn publish_vote_loop<V, F>(
                     tracing::error!(error = e.to_string(), "failed to sign vote");
                 }
             }
+
+            // Throttle vote gossiping at periods of fast syncing. For example if we create a subnet contract on Friday
+            // and bring up a local testnet on Monday, all nodes would be ~7000 blocks behind a Lotus parent. CometBFT
+            // would be in-sync, and they could rapidly try to gossip votes on previous heights. GossipSub might not like
+            // that, and we can just cast our votes every now and then to finalize multiple blocks.
+            vote_interval.tick().await;
         }
 
         prev_height = next_height;
