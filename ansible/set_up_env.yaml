@@ -1,5 +1,5 @@
 ---
-- name: Deploy IPC cluster anchored to calibration net
+- name: Set up environment for deploying IPC from a clean system
   hosts: vm
   remote_user: ubuntu
 
