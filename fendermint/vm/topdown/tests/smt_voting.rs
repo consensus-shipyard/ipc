@@ -84,9 +84,11 @@ pub struct VotingState {
     /// There is no forking in this test because we assume that the syncing component
     /// only downloads blocks which are final, and that reorgs don't happen.
     ///
+    /// Null blocks are represented by `None`.
+    ///
     /// The tally is currently unable to handle reorgs and rejects equivocations anyway.
     ///
-    /// Null blocks are represented by `None`.
+    /// TODO (ENG-623): Decide what we want to achieve with Equivocation detection.
     chain: Vec<Option<BlockHash>>,
     /// All the validator keys to help pic random ones.
     validator_keys: Vec<VotingKey>,
