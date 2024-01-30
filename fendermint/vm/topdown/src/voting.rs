@@ -364,6 +364,8 @@ pub async fn publish_vote_loop<V, F>(
             }
         };
 
+        // TODO (ENG-624): Throttle vote gossiping at periods of fast syncing.
+
         if has_power && prev_height > 0 {
             tracing::debug!(block_height = next_height, "publishing finality vote");
             match VoteRecord::signed(&key, subnet_id.clone(), to_vote(next_height, next_hash)) {
