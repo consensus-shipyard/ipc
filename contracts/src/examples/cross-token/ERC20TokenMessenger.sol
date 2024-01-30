@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import {IpcEnvelope, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
+import {IpcExchange} from "../../../sdk/IpcContract.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 import {FvmAddress} from "../../structs/FvmAddress.sol";
 import {GatewayMessengerFacet} from "../../gateway/GatewayMessengerFacet.sol";
@@ -20,7 +21,7 @@ error ZeroAddress();
  * @title TokenMessenger
  * @notice An example of a contract that allows users to send a token across subnets.
  */
-contract ERC20TokenMessenger is ReentrancyGuard {
+abstract contract ERC20TokenMessenger is IpcExchange, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
     using SafeERC20 for IERC20;
 
@@ -42,7 +43,22 @@ contract ERC20TokenMessenger is ReentrancyGuard {
         uint256 value
     );
 
-    constructor(address _gateway) {
+    function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal override {
+        console.log("_handleIpcResult");
+    }
+
+    function _handleIpcCall(
+        IpcEnvelope memory envelope,
+        CallMsg memory callMsg
+    ) internal override returns (bytes memory) {
+        console.log("handling ipc call");
+        //console.log("envelope - ", envelope);
+        //console.log("callMsg - ", callMsg);
+        return bytes("");
+    }
+
+
+    constructor(address _gateway) IpcExchange(_gateway){
         if (_gateway == address(0)) {
             revert GatewayCannotBeZero();
         }
@@ -105,12 +121,12 @@ contract ERC20TokenMessenger is ReentrancyGuard {
             kind: IpcMsgKind.Call,
             from: IPCAddress({subnetId: info.getNetworkName(), rawAddress: FvmAddressHelper.from(sourceContract)}),
             to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)}),
-            value: 0,
+            value: DEFAULT_CROSS_MSG_FEE,
             nonce: lastNonce,
             message: abi.encode(message)
         });
 
-        return messenger.sendContractXnetMessage{value: msg.value}(crossMsg);
+        return messenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(crossMsg);
     }
 
     receive() external payable {}

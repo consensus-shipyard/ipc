@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import {SubnetID} from "../../structs/Subnet.sol";
 
 import "./SubnetUSDCProxy.sol";
 import "./ERC20TokenMessenger.sol";
 
-contract SubnetTokenBridge is ERC20TokenMessenger, Ownable {
+contract SubnetTokenBridge is ERC20TokenMessenger {
     SubnetUSDCProxy public proxyToken;
     address public parentSubnetUSDC;
     SubnetID public parentSubnet;
@@ -16,7 +15,7 @@ contract SubnetTokenBridge is ERC20TokenMessenger, Ownable {
         address _gateway,
         address _parentSubnetUSDC,
         SubnetID memory _parentSubnet
-    ) ERC20TokenMessenger(_gateway) Ownable(msg.sender) {
+    ) ERC20TokenMessenger(_gateway) {
         proxyToken = new SubnetUSDCProxy();
         parentSubnetUSDC = _parentSubnetUSDC;
         parentSubnet = _parentSubnet;
