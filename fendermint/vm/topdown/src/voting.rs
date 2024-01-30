@@ -107,10 +107,13 @@ where
     }
 
     /// Calculate the minimum weight needed for a proposal to pass with the current membership.
+    ///
+    /// This is inclusive, that is, if the sum of weight is greater or equal to this, it should pass.
+    /// The equivalent formula can be found in CometBFT [here](https://github.com/cometbft/cometbft/blob/a8991d63e5aad8be82b90329b55413e3a4933dc0/types/vote_set.go#L307).
     pub fn quorum_threshold(&self) -> Stm<Weight> {
         let total_weight: Weight = self.power_table.read().map(|pt| pt.values().sum())?;
 
-        Ok(total_weight * 2 / 3)
+        Ok(total_weight * 2 / 3 + 1)
     }
 
     /// Return the height of the first entry in the chain.
@@ -262,7 +265,7 @@ where
                 }
             }
 
-            if weight > quorum_threshold {
+            if weight >= quorum_threshold {
                 return Ok(Some((*block_height, block_hash.clone())));
             }
         }
