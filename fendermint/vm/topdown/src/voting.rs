@@ -243,7 +243,7 @@ where
 
         for (block_height, block_hash) in chain.iter().rev() {
             if block_height == finalized_height {
-                break;
+                break; // This block is already finalized in the ledger, no need to propose it again.
             }
             let Some(block_hash) = block_hash else {
                 continue; // Skip null blocks
