@@ -202,6 +202,44 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         assertEq(recipient.balance, amount);
     }
 
+    function testMultiSubnet_Erc20_FundFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        token.transfer(caller, 100);
+        vm.prank(caller);
+        token.approve(address(rootGateway), 100);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, amount);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+
+        vm.prank(caller);
+        vm.expectEmit(true, true, true, true, address(rootGateway));
+        emit LibGateway.NewTopDownMessage(address(rootTokenSubnetActor), expected);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(recipient)), amount);
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = expected;
+
+        // TODO: commitParentFinality doesn not affect anything in this test.
+        commitParentFinality(address(tokenSubnetGateway));
+
+        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+
+        assertEq(recipient.balance, amount);
+    }
+
     function commitParentFinality(address gateway) internal {
         vm.roll(10);
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
