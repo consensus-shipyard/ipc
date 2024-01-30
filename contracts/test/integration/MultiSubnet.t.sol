@@ -27,7 +27,7 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
-import {TestUtils, MockIpcContract} from "../helpers/TestUtils.sol";
+import {TestUtils, MockIpcContract, MockIpcContractPayable} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
@@ -170,7 +170,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
     function testMultiSubnet_Native_FundFromParentToChild() public {
         address caller = address(new MockIpcContract());
-        address recipient = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
         uint256 amount = 3;
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
