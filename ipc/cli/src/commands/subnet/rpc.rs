@@ -36,7 +36,7 @@ impl CommandLineHandler for RPCSubnet {
 #[derive(Debug, Args)]
 #[command(name = "rpc", about = "RPC endpoint for a subnet")]
 pub struct RPCSubnetArgs {
-    #[arg(long, short, help = "The subnet to get the ChainId from")]
+    #[arg(long, help = "The subnet to get the ChainId from")]
     pub subnet: String,
 }
 
@@ -65,6 +65,6 @@ impl CommandLineHandler for ChainIdSubnet {
 #[derive(Debug, Args)]
 #[command(name = "chain-id", about = "Chain ID endpoint for a subnet")]
 pub struct ChainIdSubnetArgs {
-    #[arg(long, short, help = "The subnet to get the Chain ID from")]
+    #[arg(long, help = "The subnet to get the Chain ID from")]
     pub subnet: String,
 }
