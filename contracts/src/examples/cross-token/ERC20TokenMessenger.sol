@@ -44,16 +44,12 @@ abstract contract ERC20TokenMessenger is IpcExchange, ReentrancyGuard {
     );
 
     function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal override {
-        console.log("_handleIpcResult");
     }
 
     function _handleIpcCall(
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-        console.log("handling ipc call");
-        //console.log("envelope - ", envelope);
-        //console.log("callMsg - ", callMsg);
         return bytes("");
     }
 
