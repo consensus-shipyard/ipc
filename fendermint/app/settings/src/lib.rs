@@ -342,9 +342,7 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use std::str::FromStr;
 
-    use ipc_api::subnet_id::SubnetID;
     use serial_test::serial;
 
     use super::expand_tilde;
@@ -372,6 +370,7 @@ mod tests {
         assert!(settings.resolver_enabled());
     }
 
+    // Run these tests serially because they modify the environment.
     #[serial]
     mod env {
         use crate::tests::try_parse_config;
@@ -425,17 +424,5 @@ mod tests {
         assert_eq!(expand_tilde("~/.project"), home_project);
         assert_eq!(expand_tilde("/foo/bar"), PathBuf::from("/foo/bar"));
         assert_eq!(expand_tilde("~foo/bar"), PathBuf::from("~foo/bar"));
-    }
-
-    #[test]
-    fn parse_subnet_id() {
-        // NOTE: It would not work with `t` prefix addresses unless the current network is changed.
-        let id = "/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq";
-        SubnetID::from_str(id).unwrap();
-    }
-
-    #[test]
-    fn parse_empty_subnet_id() {
-        assert!(SubnetID::from_str("").is_err())
     }
 }

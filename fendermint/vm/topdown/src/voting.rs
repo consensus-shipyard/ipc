@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use async_stm::{abort, atomically, retry, Stm, StmError, StmResult, TVar};
+use async_stm::{abort, atomically_or_err, retry, Stm, StmResult, TVar};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -138,7 +138,10 @@ where
 
     /// Add the next final block observed on the parent blockchain.
     ///
-    /// Returns an error unless it's exactly the next expected height.
+    /// Returns an error unless it's exactly the next expected height,
+    /// so the caller has to call this in every epoch. If the parent
+    /// chain produced no blocks in that epoch then pass `None` to
+    /// represent that null-round in the tally.
     pub fn add_block(
         &self,
         block_height: BlockHeight,
@@ -240,7 +243,7 @@ where
 
         for (block_height, block_hash) in chain.iter().rev() {
             if block_height == finalized_height {
-                break;
+                break; // This block is already finalized in the ledger, no need to propose it again.
             }
             let Some(block_hash) = block_hash else {
                 continue; // Skip null blocks
@@ -327,7 +330,7 @@ pub async fn publish_vote_loop<V, F>(
     let validator_key = ValidatorKey::from(key.public());
     let mut prev_height = 0;
     loop {
-        let (next_height, next_hash, has_power) = atomically(|| {
+        let result = atomically_or_err(|| {
             let next_height = vote_tally.latest_height()?;
 
             if next_height == prev_height {
@@ -343,18 +346,25 @@ pub async fn publish_vote_loop<V, F>(
 
             if has_power {
                 // Add our own vote to the tally directly rather than expecting a message from the gossip channel.
-                // (I'm not messages published by this node would be delivered to it, so this might be the only way).
-                if let Err(StmError::Control(c)) =
-                    vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())
-                {
-                    // We should not see any other error from this as we just checked that the validator had power.
-                    return Err(c);
-                }
+                // TODO (ENG-622): I'm not sure gossip messages published by this node would be delivered to it, so this might be the only way.
+                // NOTE: We should not see any other error from this as we just checked that the validator had power,
+                //       but for piece of mind let's return and log any potential errors, rather than ignore them.
+                vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())?;
             }
 
             Ok((next_height, next_hash, has_power))
         })
         .await;
+
+        let (next_height, next_hash, has_power) = match result {
+            Ok(vs) => vs,
+            Err(e) => {
+                tracing::error!(error = e.to_string(), "faled to get next height to vote on");
+                continue;
+            }
+        };
+
+        // TODO (ENG-624): Throttle vote gossiping at periods of fast syncing.
 
         if has_power && prev_height > 0 {
             tracing::debug!(block_height = next_height, "publishing finality vote");
