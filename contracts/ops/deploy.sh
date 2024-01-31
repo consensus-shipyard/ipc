@@ -9,6 +9,11 @@ then
     exit 1
 fi
 
+if [ -f .env ]; then
+    source .env
+fi
+
+
 LIB_OUTPUT="libraries.out"
 GATEWAY_OUTPUT="gateway.out"
 NETWORK=$1
