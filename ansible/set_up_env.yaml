@@ -4,28 +4,28 @@
   remote_user: ubuntu
 
   tasks:
-    # - name: Install build dependencies
-    #   become: yes
-    #   become_user: root
-    #   apt:
-    #     update-cache: yes
-    #     pkg:
-    #       - build-essential
-    #       - libssl-dev
-    #       - mesa-opencl-icd
-    #       - ocl-icd-opencl-dev
-    #       - gcc
-    #       - git
-    #       - bzr
-    #       - jq
-    #       - pkg-config
-    #       - curl
-    #       - clang
-    #       - hwloc
-    #       - libhwloc-dev
-    #       - wget
-    #       - ca-certificates
-    #       - gnupg
+    - name: Install build dependencies
+      become: yes
+      become_user: root
+      apt:
+        update-cache: yes
+        pkg:
+          - build-essential
+          - libssl-dev
+          - mesa-opencl-icd
+          - ocl-icd-opencl-dev
+          - gcc
+          - git
+          - bzr
+          - jq
+          - pkg-config
+          - curl
+          - clang
+          - hwloc
+          - libhwloc-dev
+          - wget
+          - ca-certificates
+          - gnupg
 
     - name: Check if rustc/cargo is installed
       shell: bash -ilc 'which cargo'
@@ -40,12 +40,6 @@
       shell: bash -ilc 'which foundryup'
       register: foundry_exists
       ignore_errors: yes
-
-    - debug:
-        var: cargo_exists
-
-    - debug:
-        var: foundry_exists
 
     - name: Install foundryup
       when: foundry_exists is failed
@@ -64,14 +58,11 @@
         ipc_folder_path: ~/ipc-{{ current_date.stdout }}
         ipc_cli_path: ~/ipc-{{ current_date.stdout }}/target/release/ipc-cli
 
-    - debug:
-        var: ipc_folder_path
-
     # TODO(jie): The repo folder name should be changed to yyyy-mm-dd-hh-ss
-    # - name: Checkout ipc repo
-    #   git:
-    #     repo: https://github.com/consensus-shipyard/ipc.git
-    #     dest: "{{ ipc_folder_path }}"
+    - name: Checkout ipc repo
+      git:
+        repo: https://github.com/consensus-shipyard/ipc.git
+        dest: "{{ ipc_folder_path }}"
 
     - name: Build contracts
       command: bash -ilc 'make build'
