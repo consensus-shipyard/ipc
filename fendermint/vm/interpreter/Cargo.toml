@@ -55,7 +55,8 @@ pin-project = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 
-fluence-fvm-syscall = { workspace = true }
+fendermint_actor_fluence = { path = "../../actors/fluence" }
+fluence-fendermint-syscall = { workspace = true }
 
 [dev-dependencies]
 quickcheck = { workspace = true }

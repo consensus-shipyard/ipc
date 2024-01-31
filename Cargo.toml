@@ -28,6 +28,7 @@ members = [
   "fendermint/vm/*",
   "fendermint/actors",
   "fendermint/actors/chainmetadata",
+  "fendermint/actors/fluence",
 ]
 
 [workspace.package]
@@ -204,7 +205,9 @@ tendermint-rpc = { version = "0.31", features = [
 ] }
 tendermint-proto = { version = "0.31" }
 
-fluence-fvm-syscall = { path = "../fluence-fvm/fluence-fvm-syscall" }
+# Fluence
+fluence-actor-sdk = { version = "0.1.2" }
+fluence-fendermint-syscall = { version = "0.1.1" }
 
 [patch.crates-io]
 # Use stable-only features.
