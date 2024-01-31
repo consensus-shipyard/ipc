@@ -3,12 +3,13 @@
 use anyhow::{anyhow, Context};
 use cid::Cid;
 use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
+use fendermint_actor_objectstore::OBJECTSTORE_ACTOR_NAME;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::CborStore;
 use std::collections::HashMap;
 
 // array of required actors
-pub const REQUIRED_ACTORS: &[&str] = &[CHAINMETADATA_ACTOR_NAME];
+pub const REQUIRED_ACTORS: &[&str] = &[CHAINMETADATA_ACTOR_NAME, OBJECTSTORE_ACTOR_NAME];
 
 /// A mapping of internal actor CIDs to their respective types.
 pub struct Manifest {
