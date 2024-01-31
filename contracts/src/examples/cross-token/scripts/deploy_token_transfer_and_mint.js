@@ -16,7 +16,7 @@ async function main() {
 
     // Deploy ERC20 token
     const ERC20 = await hre.ethers.getContractFactory('USDCMock')
-    const erc20Token = await ERC20.deploy('USDC', 'USDC')
+    const erc20Token = await ERC20.deploy();
     await erc20Token.deployed()
 
     const subnetTokenBridge = await createSubnetTokenBridge(
