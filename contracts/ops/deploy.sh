@@ -1,6 +1,7 @@
 #!/bin/bash
 # Deploys IPC on an EVM-compatible subnet using hardhat
-set -e
+set -eu
+set -o pipefail
 
 if [ $# -ne 1 ]
 then
