@@ -53,6 +53,7 @@ pub mod evm;
 pub mod init;
 pub mod ipc;
 pub mod multisig;
+pub mod objectstore;
 pub mod placeholder;
 pub mod reward;
 pub mod system;

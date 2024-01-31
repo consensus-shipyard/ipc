@@ -2723,12 +2723,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_objectstore"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_ipld_kamt",
+ "fvm_shared",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actors"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_chainmetadata",
+ "fendermint_actor_objectstore",
  "fil_actor_bundler",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
@@ -3106,6 +3125,7 @@ dependencies = [
  "cid",
  "ethers",
  "fendermint_actor_chainmetadata",
+ "fendermint_actor_objectstore",
  "fendermint_actors",
  "fendermint_crypto",
  "fendermint_eth_hardhat",
@@ -3916,6 +3936,24 @@ dependencies = [
  "once_cell",
  "serde",
  "sha2 0.10.8",
+ "thiserror",
+]
+
+[[package]]
+name = "fvm_ipld_kamt"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed361b9a0c2fb2b3b3252a7668d1656e83f696787c14ab1a695c0535bf5f8d64"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "cid",
+ "forest_hash_utils",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "multihash 0.18.1",
+ "once_cell",
+ "serde",
  "thiserror",
 ]
 
