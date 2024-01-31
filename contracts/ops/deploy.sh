@@ -1,12 +1,18 @@
 #!/bin/bash
 # Deploys IPC on an EVM-compatible subnet using hardhat
-set -e
+set -eu
+set -o pipefail
 
 if [ $# -ne 1 ]
 then
     echo "Expected a single argument with the name of the network to deploy (localnet, calibrationnet, mainnet)"
     exit 1
 fi
+
+if [ -f .env ]; then
+    source .env
+fi
+
 
 LIB_OUTPUT="libraries.out"
 GATEWAY_OUTPUT="gateway.out"
