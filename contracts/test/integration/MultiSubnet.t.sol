@@ -438,8 +438,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         subnetTokenBridge = new SubnetTokenBridge(address(nativeSubnetGateway), address(mockUSDC), rootSubnetName  );
 
         mockUSDC.mint(transferAmount);
-        address x = mockUSDC.me(); // todo learn how to get caller address from forge
-        assertEq(transferAmount,  mockUSDC.balanceOf(x));
+        address myAddress = mockUSDC.me(); // todo learn how to get caller address from forge
+        assertEq(transferAmount,  mockUSDC.balanceOf(myAddress));
         console.log(transferAmount);
 
         rootTokenBridge = new TokenTransferAndMint(
@@ -449,9 +449,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             address(subnetTokenBridge)
         );
 
-        vm.deal(x, DEFAULT_CROSS_MSG_FEE);
+        vm.deal(myAddress, DEFAULT_CROSS_MSG_FEE);
         mockUSDC.approve(address(rootTokenBridge), transferAmount);
-        rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }( x, transferAmount);
+        rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }( myAddress, transferAmount);
+        //ensure that tokens are delivered on subnet
+        address proxyUSDCToken = subnetTokenBridge.getProxyTokenAddress();
+        assertEq(IERC20(proxyUSDCToken).balanceOf(myAddress), transferAmount, "incorrect proxy token balance");
+
+
 
         commitParentFinality(address(nativeSubnetGateway));
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
