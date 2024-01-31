@@ -1,6 +1,6 @@
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::{MethodNum, METHOD_CONSTRUCTOR};
 use fvm_shared::error::ExitCode;
+use fvm_shared::{MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
 use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
@@ -47,12 +47,13 @@ impl Actor {
         log::info!("actor::run_randomx: start {params:?}");
         rt.validate_immediate_caller_accept_any()?;
 
-        let result = fluence_actor_sdk::run_randomx(params.global_nonce, params.local_nonce).map_err(|error_num| {
-            log::error!("run_randomx failed with {error_num}");
+        let result = fluence_actor_sdk::run_randomx(params.global_nonce, params.local_nonce)
+            .map_err(|error_num| {
+                log::error!("run_randomx failed with {error_num}");
 
-            let err_msg = format!("run_randomx syscall failed with {error_num}");
-            ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), err_msg, None)
-        })?;
+                let err_msg = format!("run_randomx syscall failed with {error_num}");
+                ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), err_msg, None)
+            })?;
         log::info!("actor::run_randomx: result is {result:?}");
 
         let result = RandomXResult { result };

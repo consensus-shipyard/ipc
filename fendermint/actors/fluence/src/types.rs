@@ -1,6 +1,6 @@
+use fluence_actor_sdk::TARGET_HASH_SIZE;
 use fvm_ipld_encoding::strict_bytes;
 use fvm_ipld_encoding::tuple::*;
-use fluence_actor_sdk::TARGET_HASH_SIZE;
 
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct RandomXArguments {
