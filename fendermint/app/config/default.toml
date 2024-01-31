@@ -11,6 +11,8 @@ snapshots_dir = "snapshots"
 contracts_dir = "contracts"
 # Builtin actor bundle CAR file.
 builtin_actors_bundle = "bundle.car"
+# Custom actor bundle CAR file.
+custom_actors_bundle = "custom_actors_bundle.car"
 # Where to reach CometBFT for queries or broadcasting transactions.
 tendermint_rpc_url = "http://127.0.0.1:26657"
 
@@ -116,10 +118,6 @@ port = 8545
 # Time to wait between attempts to resolve a CID after an error.
 retry_delay = 10
 
-# The current subnet ID for which this node can serve data.
-# TODO #231: Remove this and unify handling with the IPC settings.
-subnet_id = "/r0"
-
 # Network Identity
 [resolver.network]
 # Secp256k1 private key used for signing network messages.
@@ -195,4 +193,10 @@ rate_limit_period = 0
 
 # IPC related configuration parameters
 [ipc]
+# Default subnet ID, which basically means IPC is disabled.
 subnet_id = "/r0"
+# Voting interval about things such as the top-down finality, in seconds.
+# It's limited to avoid GossipSub throttling or banning the node for over production.
+# The minimum is 1 seconds which is about the minimum target block time as well;
+# ideally one round of gossip per block should be as frequent as we would go.
+vote_interval = 1

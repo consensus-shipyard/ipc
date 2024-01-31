@@ -14,19 +14,16 @@ use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
-use fendermint_vm_interpreter::chain::{
-    ChainMessageApplyRet, CheckpointPool, IllegalMessage, TopDownFinalityProvider,
-};
+use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
@@ -109,13 +106,15 @@ pub struct AppConfig<S: KVStore> {
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
     pub builtin_actors_bundle: PathBuf,
+    /// Path to the custom actor WASM bundle.
+    pub custom_actors_bundle: PathBuf,
 }
 
 /// Handle ABCI requests.
 #[derive(Clone)]
 pub struct App<DB, SS, S, I>
 where
-    SS: Blockstore + 'static,
+    SS: Blockstore + Clone + 'static,
     S: KVStore,
 {
     /// Database backing all key-value operations.
@@ -132,6 +131,8 @@ where
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
     builtin_actors_bundle: PathBuf,
+    /// Path to the custom actor WASM bundle.
+    custom_actors_bundle: PathBuf,
     /// Namespace to store app state.
     namespace: S::Namespace,
     /// Collection of past state parameters.
@@ -147,10 +148,8 @@ where
     state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
-    /// CID resolution pool.
-    resolve_pool: CheckpointPool,
-    /// The parent finality provider for top down checkpoint
-    parent_finality_provider: TopDownFinalityProvider,
+    /// Environment-like dependencies for the interpreter.
+    chain_env: ChainEnv,
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
@@ -178,8 +177,7 @@ where
         db: DB,
         state_store: SS,
         interpreter: I,
-        resolve_pool: CheckpointPool,
-        parent_finality_provider: TopDownFinalityProvider,
+        chain_env: ChainEnv,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
@@ -187,12 +185,12 @@ where
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
             builtin_actors_bundle: config.builtin_actors_bundle,
+            custom_actors_bundle: config.custom_actors_bundle,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
             interpreter: Arc::new(interpreter),
-            resolve_pool,
-            parent_finality_provider,
+            chain_env,
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
@@ -301,23 +299,14 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce((CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>)) -> R,
-        R: Future<
-            Output = Result<(
-                (CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>),
-                T,
-            )>,
-        >,
+        F: FnOnce((ChainEnv, FvmExecState<SS>)) -> R,
+        R: Future<Output = Result<((ChainEnv, FvmExecState<SS>), T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
 
-        let ((_pool, _provider, state), ret) = f((
-            self.resolve_pool.clone(),
-            self.parent_finality_provider.clone(),
-            state,
-        ))
-        .await?;
+        // NOTE: There is no need to save the `ChainEnv`; it's shared with other, meant for cloning.
+        let ((_env, state), ret) = f((self.chain_env.clone(), state)).await?;
 
         *guard = Some(state);
 
@@ -411,13 +400,13 @@ where
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<State = (CheckpointPool, TopDownFinalityProvider), Message = Vec<u8>>,
+    I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
     I: ExecInterpreter<
-        State = (CheckpointPool, TopDownFinalityProvider, FvmExecState<SS>),
+        State = (ChainEnv, FvmExecState<SS>),
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = Vec<Validator<Power>>,
+        EndOutput = PowerUpdates,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -450,12 +439,21 @@ where
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
         let bundle = &self.builtin_actors_bundle;
         let bundle = std::fs::read(bundle)
-            .map_err(|e| anyhow!("failed to load bundle CAR from {bundle:?}: {e}"))?;
+            .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
 
-        let state =
-            FvmGenesisState::new(self.state_store_clone(), self.multi_engine.clone(), &bundle)
-                .await
-                .context("failed to create genesis state")?;
+        let custom_actors_bundle = &self.custom_actors_bundle;
+        let custom_actors_bundle = std::fs::read(custom_actors_bundle).map_err(|e| {
+            anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
+        })?;
+
+        let state = FvmGenesisState::new(
+            self.state_store_clone(),
+            self.multi_engine.clone(),
+            &bundle,
+            &custom_actors_bundle,
+        )
+        .await
+        .context("failed to create genesis state")?;
 
         tracing::info!(
             manifest_root = format!("{}", state.manifest_data_cid),
@@ -635,13 +633,7 @@ where
 
         let txs = self
             .interpreter
-            .prepare(
-                (
-                    self.resolve_pool.clone(),
-                    self.parent_finality_provider.clone(),
-                ),
-                txs,
-            )
+            .prepare(self.chain_env.clone(), txs)
             .await
             .context("failed to prepare proposal")?;
 
@@ -665,13 +657,7 @@ where
 
         let accept = self
             .interpreter
-            .process(
-                (
-                    self.resolve_pool.clone(),
-                    self.parent_finality_provider.clone(),
-                ),
-                txs,
-            )
+            .process(self.chain_env.clone(), txs)
             .await
             .context("failed to process proposal")?;
 
@@ -725,9 +711,9 @@ where
         let msg = request.tx.to_vec();
         let (result, block_hash) = self
             .modify_exec_state(|s| async {
-                let ((pool, provider, state), res) = self.interpreter.deliver(s, msg).await?;
+                let ((env, state), res) = self.interpreter.deliver(s, msg).await?;
                 let block_hash = state.block_hash();
-                Ok(((pool, provider, state), (res, block_hash)))
+                Ok(((env, state), (res, block_hash)))
             })
             .await
             .context("deliver failed")?;

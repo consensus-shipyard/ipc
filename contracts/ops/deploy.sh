@@ -1,12 +1,18 @@
 #!/bin/bash
 # Deploys IPC on an EVM-compatible subnet using hardhat
-set -e
+set -eu
+set -o pipefail
 
 if [ $# -ne 1 ]
 then
     echo "Expected a single argument with the name of the network to deploy (localnet, calibrationnet, mainnet)"
     exit 1
 fi
+
+if [ -f .env ]; then
+    source .env
+fi
+
 
 LIB_OUTPUT="libraries.out"
 GATEWAY_OUTPUT="gateway.out"
@@ -31,7 +37,7 @@ echo "const GATEWAY =" | cat - scripts/${GATEWAY_OUTPUT}  > temp && mv temp scri
 echo "[*] Output gateway address in $PWD/scripts/${GATEWAY_OUTPUT}"
 
 echo "[*] Populating deploy-registry script"
-cat scripts/${LIB_OUTPUT} | sed '/StorableMsgHelper/d' | cat - scripts/deploy-registry.template.ts > temp && mv temp scripts/deploy-registry.ts
+cat scripts/${LIB_OUTPUT} | sed '/IpcMsgHelper/d' | cat - scripts/deploy-registry.template.ts > temp && mv temp scripts/deploy-registry.ts
 cat scripts/${GATEWAY_OUTPUT} |  cat - scripts/deploy-registry.ts > temp && mv temp scripts/deploy-registry.ts
 echo "[*] Registry script in $PWD/scripts/deploy-registry.ts"
 npx hardhat deploy-subnet-registry --network ${NETWORK}

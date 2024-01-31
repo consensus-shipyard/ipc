@@ -5,18 +5,18 @@ import "forge-std/Test.sol";
 
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
-import {CrossMsg, BottomUpMsgBatch, StorableMsg} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, SupplySource, SupplyKind, Validator} from "../../src/structs/Subnet.sol";
+import {IPCAddress, SubnetID, Subnet, SupplySource, SupplyKind, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
+import {IpcHandler} from "../../sdk/IpcContract.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
-import {StorableMsgHelper} from "../../src/lib/StorableMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
 import {LibGateway} from "../../src/lib/LibGateway.sol";
-import {TestUtils} from "../helpers/TestUtils.sol";
+import {MockIpcContract, TestUtils} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
@@ -33,8 +33,7 @@ import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol
 
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
-    using CrossMsgHelper for CrossMsg;
-    using StorableMsgHelper for StorableMsg;
+    using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
 
     IERC20 private token;
@@ -101,12 +100,11 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         token.approve(address(gatewayDiamond), 10);
 
         // Funding succeeds and the right event is emitted.
-        CrossMsg memory expected = CrossMsgHelper.createFundMsg(
+        IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
             subnet.id,
             caller,
             FvmAddressHelper.from(caller),
-            10,
-            0
+            10
         );
         vm.expectEmit(true, true, true, true, address(gatewayDiamond));
         emit LibGateway.NewTopDownMessage(address(saDiamond), expected);
@@ -153,37 +151,41 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         address recipient = vm.addr(42);
 
         // Commit the withdrawal message on the parent.
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         uint256 value = 8;
-        msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value, 0);
+        msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value);
 
-        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+        BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,
-            blockHeight: gwGetter.bottomUpMsgBatchPeriod(),
+            blockHash: blockhash(block.number),
+            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            nextConfigurationNumber: 0,
             msgs: msgs
         });
 
         vm.prank(address(saDiamond));
         vm.expectEmit(true, true, true, true, address(token));
         emit Transfer(address(gatewayDiamond), recipient, value);
-        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
+        gwCheckpointingFacet.commitCheckpoint(batch);
 
         // Assert post-conditions.
         (, Subnet memory subnetAfter) = gwGetter.getSubnet(subnet.id);
         assertEq(subnetAfter.circSupply, 7);
-        assertEq(subnetAfter.topDownNonce, 1);
+        assertEq(subnetAfter.topDownNonce, 2); // 2 because the result msg is also another td message
         assertEq(subnetAfter.appliedBottomUpNonce, 1);
 
         // Now attempt to withdraw beyond the circulating supply.
         // This would be a malicious message.
-        batch.msgs[0].message.value = 10;
+        batch.msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), 10);
 
         // This reverts.
         vm.prank(address(saDiamond));
         vm.expectRevert();
-        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
+        gwCheckpointingFacet.commitCheckpoint(batch);
     }
 
+    // Call a smart contract in the parent through a smart contract and with
+    // an ERC20 token supply.
     function test_childToParentCall() public {
         Subnet memory subnet = createTokenSubnet(address(token));
 
@@ -196,26 +198,33 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         gwManager.fundWithToken(subnet.id, FvmAddressHelper.from(caller), 15);
 
         // Now create a new recipient on the parent.
-        address recipient = vm.addr(42);
+        address recipient = address(new MockIpcContract());
 
         // Commit a xnet message that isn't a simple bare transfer.
-        CrossMsg[] memory msgs = new CrossMsg[](1);
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         uint256 value = 8;
-        msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value, 0);
-        msgs[0].message.method = bytes4(0x11223344);
-        msgs[0].message.params = bytes("hello");
 
-        BottomUpMsgBatch memory batch = BottomUpMsgBatch({
+        IPCAddress memory from = IPCAddress({subnetId: subnet.id, rawAddress: FvmAddressHelper.from(caller)});
+        IPCAddress memory to = IPCAddress({
+            subnetId: subnet.id.getParentSubnet(),
+            rawAddress: FvmAddressHelper.from(recipient)
+        });
+        bytes4 method = bytes4(0x11223344);
+        bytes memory params = bytes("hello");
+        msgs[0] = CrossMsgHelper.createCallMsg(from, to, value, method, params);
+
+        BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,
-            blockHeight: gwGetter.bottomUpMsgBatchPeriod(),
+            blockHash: blockhash(block.number),
+            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            nextConfigurationNumber: 0,
             msgs: msgs
         });
 
         // Verify that we received the call and that the recipient has the tokens.
         vm.prank(address(saDiamond));
-        vm.etch(recipient, bytes("foo")); // set some code at the destination address to trick Solidity into calling the contract.
-        vm.expectCall(recipient, bytes.concat(bytes4(0x11223344), bytes("hello")));
-        gwBottomUpRouterFacet.execBottomUpMsgBatch(batch);
+        vm.expectCall(recipient, abi.encodeCall(IpcHandler.handleIpcMessage, (msgs[0])), 1);
+        gwCheckpointingFacet.commitCheckpoint(batch);
         assertEq(token.balanceOf(recipient), 8);
     }
 

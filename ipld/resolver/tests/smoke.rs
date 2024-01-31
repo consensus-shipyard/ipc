@@ -30,7 +30,7 @@ use fvm_shared::{address::Address, ActorID};
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{
     Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
-    NetworkConfig, Service, VoteRecord,
+    NetworkConfig, Resolver, Service, VoteRecord,
 };
 use libp2p::{
     core::{
@@ -45,15 +45,19 @@ use multihash::{Code, MultihashDigest};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 mod store;
+use serde::{Deserialize, Serialize};
 use store::*;
 use tokio::{sync::broadcast, time::timeout};
 
 const BIT_WIDTH: u32 = 8;
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+struct TestVote(Cid);
+
 struct Agent {
     config: Config,
-    client: Client,
-    events: broadcast::Receiver<Event>,
+    client: Client<TestVote>,
+    events: broadcast::Receiver<Event<TestVote>>,
     store: TestBlockstore,
 }
 
@@ -78,7 +82,7 @@ impl Cluster {
 struct ClusterBuilder {
     size: u32,
     rng: StdRng,
-    services: Vec<Service<TestStoreParams>>,
+    services: Vec<Service<TestStoreParams, TestVote>>,
     agents: Vec<Agent>,
 }
 
@@ -219,8 +223,8 @@ async fn single_bootstrap_publish_receive_vote() {
     // Vote on some random CID.
     let validator_key = Keypair::generate_secp256k1();
     let cid = Cid::new_v1(IPLD_RAW, Code::Sha2_256.digest(b"foo"));
-    let vote = VoteRecord::signed(&validator_key, subnet_id, cid, "finalized".into())
-        .expect("failed to sign vote");
+    let vote =
+        VoteRecord::signed(&validator_key, subnet_id, TestVote(cid)).expect("failed to sign vote");
 
     // Pubilish vote
     cluster.agents[0]
@@ -295,7 +299,7 @@ async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) ->
     cluster
 }
 
-fn make_service(config: Config) -> (Service<TestStoreParams>, TestBlockstore) {
+fn make_service(config: Config) -> (Service<TestStoreParams, TestVote>, TestBlockstore) {
     let store = TestBlockstore::default();
     let svc = Service::new_with_transport(config, store.clone(), build_transport).unwrap();
     (svc, store)

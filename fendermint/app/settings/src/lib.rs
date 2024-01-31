@@ -141,16 +141,15 @@ pub struct TopDownSettings {
 pub struct IpcSettings {
     #[serde_as(as = "IsHumanReadable")]
     pub subnet_id: SubnetID,
+    /// Interval with which votes can be gossiped.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub vote_interval: Duration,
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
     pub topdown: Option<TopDownSettings>,
 }
 
 impl IpcSettings {
-    pub fn is_topdown_enabled(&self) -> bool {
-        !self.subnet_id.is_root() && self.topdown.is_some()
-    }
-
     pub fn topdown_config(&self) -> anyhow::Result<&TopDownSettings> {
         self.topdown
             .as_ref()
@@ -197,6 +196,8 @@ pub struct Settings {
     contracts_dir: PathBuf,
     /// Builtin-actors CAR file.
     builtin_actors_bundle: PathBuf,
+    /// Custom actors CAR file.
+    custom_actors_bundle: PathBuf,
 
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
@@ -242,7 +243,8 @@ impl Settings {
         data_dir,
         snapshots_dir,
         contracts_dir,
-        builtin_actors_bundle
+        builtin_actors_bundle,
+        custom_actors_bundle
     );
 
     /// Load the default configuration from a directory,
@@ -260,7 +262,12 @@ impl Settings {
             .add_source(
                 Environment::with_prefix("fm")
                     .prefix_separator("_")
-                    .separator("__"),
+                    .separator("__")
+                    .ignore_empty(true) // otherwise "" will be parsed as a list item
+                    .try_parsing(true) // required for list separator
+                    .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
+                    .with_list_parse_key("resolver.discovery.static_addresses")
+                    .with_list_parse_key("resolver.membership.static_subnets"),
             )
             // Set the home directory based on what was passed to the CLI,
             // so everything in the config can be relative to it.
@@ -285,6 +292,17 @@ impl Settings {
             Some(url) => url.parse::<Url>().context("invalid Tendermint URL"),
             None => Ok(self.tendermint_rpc_url.clone()),
         }
+    }
+
+    /// Indicate whether we have configured the top-down syncer to run.
+    pub fn topdown_enabled(&self) -> bool {
+        !self.ipc.subnet_id.is_root() && self.ipc.topdown.is_some()
+    }
+
+    /// Indicate whether we have configured the IPLD Resolver to run.
+    pub fn resolver_enabled(&self) -> bool {
+        !self.resolver.connection.listen_addr.is_empty()
+            && self.ipc.subnet_id != *ipc_api::subnet_id::UNDEF
     }
 }
 
@@ -327,29 +345,79 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use std::str::FromStr;
 
-    use ipc_api::subnet_id::SubnetID;
+    use serial_test::serial;
 
     use super::expand_tilde;
     use super::Settings;
 
-    fn parse_config(run_mode: &str) -> Settings {
+    fn try_parse_config(run_mode: &str) -> Result<Settings, config::ConfigError> {
         let current_dir = PathBuf::from(".");
         let default_dir = PathBuf::from("../config");
-        Settings::new(&default_dir, &current_dir, run_mode).unwrap()
+        Settings::new(&default_dir, &current_dir, run_mode)
+    }
+
+    fn parse_config(run_mode: &str) -> Settings {
+        try_parse_config(run_mode).expect("failed to parse Settings")
     }
 
     #[test]
     fn parse_default_config() {
         let settings = parse_config("");
-        assert!(!settings.resolver.enabled());
+        assert!(!settings.resolver_enabled());
     }
 
     #[test]
     fn parse_test_config() {
         let settings = parse_config("test");
-        assert!(settings.resolver.enabled());
+        assert!(settings.resolver_enabled());
+    }
+
+    // Run these tests serially because they modify the environment.
+    #[serial]
+    mod env {
+        use crate::tests::try_parse_config;
+
+        /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
+        fn with_env_vars<F, T, E>(vars: Vec<(&str, &str)>, f: F) -> Result<T, E>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
+            for (k, v) in vars.iter() {
+                std::env::set_var(k, v);
+            }
+            let result = f();
+            for (k, _) in vars {
+                std::env::remove_var(k);
+            }
+            result
+        }
+
+        #[test]
+        fn parse_comma_separated() {
+            let settings = with_env_vars(vec![
+            ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
+            // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
+            ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
+        ], || try_parse_config("")).unwrap();
+
+            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+        }
+
+        #[test]
+        fn parse_empty_comma_separated() {
+            let settings = with_env_vars(
+                vec![
+                    ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
+                    ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
+                ],
+                || try_parse_config(""),
+            )
+            .unwrap();
+
+            assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
+            assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
+        }
     }
 
     #[test]
@@ -359,18 +427,5 @@ mod tests {
         assert_eq!(expand_tilde("~/.project"), home_project);
         assert_eq!(expand_tilde("/foo/bar"), PathBuf::from("/foo/bar"));
         assert_eq!(expand_tilde("~foo/bar"), PathBuf::from("~foo/bar"));
-    }
-
-    #[test]
-    fn parse_subnet_id() {
-        // NOTE: It would not work with `t` prefix addresses unless the current network is changed.
-        let id = "/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq";
-        SubnetID::from_str(id).unwrap();
-    }
-
-    #[test]
-    #[ignore = "https://github.com/consensus-shipyard/ipc/issues/303"]
-    fn parse_empty_subnet_id() {
-        assert!(SubnetID::from_str("").is_err())
     }
 }

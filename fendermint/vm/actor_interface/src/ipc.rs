@@ -49,10 +49,6 @@ lazy_static! {
                             abi: ia::gateway_manager_facet::GATEWAYMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "BottomUpRouterFacet",
-                            abi: ia::bottom_up_router_facet::BOTTOMUPROUTERFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
                             name: "TopDownFinalityFacet",
                             abi: ia::top_down_finality_facet::TOPDOWNFINALITYFACET_ABI.to_owned(),
                         },
@@ -88,7 +84,7 @@ lazy_static! {
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI
                                 .to_owned(),
                         },
-                        EthFacet {
+EthFacet {
                             name: "SubnetActorRewardFacet",
                             abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
                         },
@@ -294,9 +290,9 @@ macro_rules! abi_hash {
 
 abi_hash!(struct ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint);
 abi_hash!(struct ipc_actors_abis::subnet_actor_checkpointing_facet::BottomUpCheckpoint);
-abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::CrossMsg>);
-abi_hash!(Vec<ipc_actors_abis::subnet_actor_checkpointing_facet::CrossMsg>);
-abi_hash!(Vec<ipc_actors_abis::subnet_actor_getter_facet::CrossMsg>);
+abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::IpcEnvelope>);
+abi_hash!(Vec<ipc_actors_abis::subnet_actor_checkpointing_facet::IpcEnvelope>);
+abi_hash!(Vec<ipc_actors_abis::subnet_actor_getter_facet::IpcEnvelope>);
 
 pub mod gateway {
     use super::subnet_id_to_eth;
@@ -323,7 +319,6 @@ pub mod gateway {
     /// See [GatewayDiamond.sol](https://github.com/consensus-shipyard/ipc/blob/bc3512fc7c4b0dfcdaac89f297f99cafae68f097/contracts/src/GatewayDiamond.sol#L28-L36)
     #[derive(Clone, EthAbiType, EthAbiCodec, Default, Debug, PartialEq, Eq, Hash)]
     pub struct ConstructorParameters {
-        pub msg_fee: U256,
         pub bottom_up_check_period: U256,
         pub active_validators_limit: u16,
         pub majority_percentage: u8,
@@ -354,12 +349,11 @@ pub mod gateway {
             let (root, route) = subnet_id_to_eth(&params.subnet_id)?;
 
             Ok(Self {
-                network_name: GatewaySubnetID { root, route },
                 bottom_up_check_period: U256::from(params.bottom_up_check_period),
-                msg_fee: tokens_to_u256(params.msg_fee),
-                majority_percentage: params.majority_percentage,
-                validators,
                 active_validators_limit: params.active_validators_limit,
+                majority_percentage: params.majority_percentage,
+                network_name: GatewaySubnetID { root, route },
+                validators,
             })
         }
     }
@@ -393,7 +387,6 @@ pub mod gateway {
                     route: Vec::new(),
                 },
                 bottom_up_check_period: U256::from(100),
-                msg_fee: U256::from(0),
                 majority_percentage: 67,
                 validators: vec![GatewayValidator {
                     addr: H160::zero(),
@@ -461,7 +454,6 @@ pub mod registry {
 
 pub mod subnet {
     use crate::revert_errors;
-    use ipc_actors_abis::bottom_up_router_facet::BottomUpRouterFacetErrors;
     use ipc_actors_abis::checkpointing_facet::CheckpointingFacetErrors;
     use ipc_actors_abis::gateway_manager_facet::GatewayManagerFacetErrors;
     use ipc_actors_abis::subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacetErrors;
@@ -481,7 +473,6 @@ pub mod subnet {
             SubnetActorCheckpointingFacetErrors,
             GatewayManagerFacetErrors,
             CheckpointingFacetErrors,
-            BottomUpRouterFacetErrors,
             TopDownFinalityFacetErrors
         }
     }
@@ -512,12 +503,13 @@ pub mod subnet {
                     178, 232, 216, 34, 217, 96, 27, 0, 185, 215, 8, 155, 25, 15, 1,
                 ],
                 next_configuration_number: 1,
+                msgs: vec![],
             };
 
             let param_type = BottomUpCheckpoint::param_type();
 
             // Captured value of `abi.encode` in Solidity.
-            let expected_abi: Bytes = "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000156b736f342ab34d9afe4234a92bdb190c35b2e8d822d9601b00b9d7089b190f010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000abc8e314f58b4de5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000007b11cf9ca8ccee13bb3d003c97af5c18434067a90000000000000000000000003d9019b8bf3bfd5e979ddc3b2761be54af867c47".parse().unwrap();
+            let expected_abi: Bytes = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000156b736f342ab34d9afe4234a92bdb190c35b2e8d822d9601b00b9d7089b190f0100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000abc8e314f58b4de5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000007b11cf9ca8ccee13bb3d003c97af5c18434067a90000000000000000000000003d9019b8bf3bfd5e979ddc3b2761be54af867c470000000000000000000000000000000000000000000000000000000000000000".parse().unwrap();
 
             // XXX: It doesn't work with `decode_whole`.
             let expected_tokens =

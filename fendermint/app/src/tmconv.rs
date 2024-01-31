@@ -6,7 +6,7 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{
     state::{BlockHash, FvmStateParams},
-    FvmApplyRet, FvmCheckRet, FvmQueryRet,
+    FvmApplyRet, FvmCheckRet, FvmQueryRet, PowerUpdates,
 };
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
@@ -142,9 +142,9 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
 }
 
 /// Map the return values from epoch boundary operations to validator updates.
-pub fn to_end_block(power_table: Vec<Validator<Power>>) -> anyhow::Result<response::EndBlock> {
+pub fn to_end_block(power_table: PowerUpdates) -> anyhow::Result<response::EndBlock> {
     let validator_updates =
-        to_validator_updates(power_table).context("failed to convert validator updates")?;
+        to_validator_updates(power_table.0).context("failed to convert validator updates")?;
 
     Ok(response::EndBlock {
         validator_updates,
@@ -254,6 +254,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         // the query itself is successful, even if the value represents a failure.
         FvmQueryRet::Call(_) | FvmQueryRet::EstimateGas(_) => ExitCode::OK,
         FvmQueryRet::StateParams(_) => ExitCode::OK,
+        FvmQueryRet::BuiltinActors(_) => ExitCode::OK,
     };
 
     // The return value has a `key` field which is supposed to be set to the data matched.
@@ -288,6 +289,10 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         }
         FvmQueryRet::StateParams(sp) => {
             let v = ipld_encode!(sp);
+            (Vec::new(), v)
+        }
+        FvmQueryRet::BuiltinActors(ba) => {
+            let v = ipld_encode!(ba);
             (Vec::new(), v)
         }
     };

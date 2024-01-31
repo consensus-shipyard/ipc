@@ -9,7 +9,7 @@ use crate::fvm::FvmApplyRet;
 use anyhow::Context;
 use fendermint_vm_topdown::{BlockHeight, IPCParentFinality, ParentViewProvider};
 use fvm_ipld_blockstore::Blockstore;
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 
 use super::state::ipc::tokens_to_mint;
 
@@ -22,7 +22,7 @@ pub async fn commit_finality<DB>(
     provider: &TopDownFinalityProvider,
 ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)>
 where
-    DB: Blockstore + Sync + Send + 'static,
+    DB: Blockstore + Sync + Send + Clone + 'static,
 {
     let (prev_height, prev_finality) =
         if let Some(prev_finality) = gateway_caller.commit_parent_finality(state, finality)? {
@@ -43,10 +43,10 @@ where
 pub async fn execute_topdown_msgs<DB>(
     gateway_caller: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
-    messages: Vec<CrossMsg>,
+    messages: Vec<IpcEnvelope>,
 ) -> anyhow::Result<FvmApplyRet>
 where
-    DB: Blockstore + Sync + Send + 'static,
+    DB: Blockstore + Sync + Send + Clone + 'static,
 {
     let minted_tokens = tokens_to_mint(&messages);
     tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");

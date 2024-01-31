@@ -3,7 +3,6 @@
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
 
 use arbitrary::{Arbitrary, Unstructured};
-use ethers::types as et;
 use fendermint_contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_testing::smt::StateMachine;
@@ -85,7 +84,8 @@ impl StateMachine for StakingMachine {
     }
 
     fn new_system(&self, state: &Self::State) -> Self::System {
-        let rt = tokio::runtime::Runtime::new().expect("create tokio runtime for init");
+        let rt: tokio::runtime::Runtime =
+            tokio::runtime::Runtime::new().expect("create tokio runtime for init");
 
         let (mut exec_state, _) = rt
             .block_on(fendermint_contract_test::init_exec_state(
@@ -115,7 +115,6 @@ impl StateMachine for StakingMachine {
             power_scale: state.child_genesis.power_scale,
             min_activation_collateral: to_eth_tokens(&state.min_collateral()).unwrap(),
             min_validators: state.min_validators() as u64,
-            min_cross_msg_fee: et::U256::zero(),
             permission_mode: 0, // collateral based
             supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
                 kind: 0, // native token
@@ -285,6 +284,7 @@ impl StateMachine for StakingMachine {
                     block_height: ethers::types::U256::from(*block_height),
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
+                    msgs: Vec::new(),
                 };
                 let checkpoint_hash = checkpoint.clone().abi_hash();
 
@@ -620,7 +620,7 @@ fn choose_account<'a>(
     Ok(a)
 }
 
-fn get_actor_balance<DB: Blockstore>(
+fn get_actor_balance<DB: Blockstore + Clone>(
     exec_state: &mut FvmExecState<DB>,
     addr: EthAddress,
 ) -> TokenAmount {

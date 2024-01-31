@@ -123,6 +123,12 @@ Before running our validators, at least one bootstrap needs to be deployed and a
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e SUBNET_ID=<SUBNET_ID> \
     -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \  # optional if you have additional bootstraps and want to interconnect them
+    -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT> \
+    -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
+    -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
+    -e ETHAPI_HOST_PORT=<ETH_RPC_PORT> \
+    -e RESOLVER_HOST_PORT=<RESOLVER_HOST_PORT> \
+    -e RESOLVER_BOOTSTRAPS=<RESOLVER_BOOTSTRAPS> \
     -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
     -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
     bootstrap
@@ -141,12 +147,21 @@ At the end of the output, this command should return the ID of your new bootstra
 [cargo-make] INFO - Running Task: cometbft-wait
 [cargo-make] INFO - Running Task: cometbft-node-id
 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
+[cargo-make] INFO - Running Task: bootstrap-peer-id
+QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N
 [cargo-make] INFO - Build Done in 13.38 seconds.
 ```
 
-* We can get the peer ID of the deployed bootstrap node by running:
+This same external IP address can be used to circulate the libp2p multiaddress of the bootstrap node which is used for gossiping. The format will be like `/ip4/${CMT_EXTERNAL_ADDR}/tcp/${RESOLVER_HOST_PORT}/p2p/${BOOTSTRAP_PEER_ID}`. This will go in the `RESOLVER_BOOTSTRAPS` parameter of nodes connecting to our bootstrap.
+
+* We can get the CometBFT address of the deployed bootstrap node by running:
 ```bash
 cargo make --makefile infra/fendermint/Makefile.toml bootstrap-node-id
+```
+
+* We can get the libp2p peer ID of the deployed bootstrap node by running:
+```bash
+cargo make --makefile infra/fendermint/Makefile.toml bootstrap-peer-id
 ```
 
 * To shut down the bootstrap node run:
@@ -191,6 +206,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT_n> \
     -e ETHAPI_HOST_PORT=<ETH_RPC_PORT_n> \
     -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \
+    -e RESOLVER_BOOTSTRAPS=<RESOLVER_BOOTSTRAPS> \
     -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
     -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
     -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
@@ -212,7 +228,7 @@ nano ~/.ipc/config.toml
   
 ```toml
 [[subnets]]
-id = "/r314159"
+id = <SUBNET_ID>    ## i.e. "/r314159/..."
 
 [subnets.config]
 network_type = "fevm"

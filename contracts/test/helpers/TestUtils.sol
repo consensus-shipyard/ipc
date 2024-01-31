@@ -3,6 +3,10 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
+import {IPCAddress} from "../../src/structs/Subnet.sol";
+import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../src/structs/CrossNet.sol";
+import {IpcHandler} from "../../sdk/IpcContract.sol";
+import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
 
 library TestUtils {
     uint256 public constant GX = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
@@ -147,5 +151,30 @@ library TestUtils {
         for (uint i = 0; i < array1.length; i++) {
             require(array1[i] == array2[i], errorMessage);
         }
+    }
+
+    function newXnetCallMsg(
+        IPCAddress memory from,
+        IPCAddress memory to,
+        uint256 value,
+        uint64 nonce
+    ) internal pure returns (IpcEnvelope memory) {
+        CallMsg memory message = CallMsg({method: abi.encodePacked(METHOD_SEND), params: EMPTY_BYTES});
+        return
+            IpcEnvelope({
+                kind: IpcMsgKind.Call,
+                from: from,
+                to: to,
+                value: value,
+                message: abi.encode(message),
+                nonce: nonce
+            });
+    }
+}
+
+contract MockIpcContract is IpcHandler {
+    /* solhint-disable-next-line unused-vars */
+    function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
+        return EMPTY_BYTES;
     }
 }

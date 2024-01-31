@@ -9,12 +9,13 @@ pub mod sync;
 pub mod convert;
 pub mod proxy;
 mod toggle;
+pub mod voting;
 
 use async_stm::Stm;
 use async_trait::async_trait;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
-use ipc_api::cross::CrossMsg;
+use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -143,7 +144,7 @@ pub trait ParentViewProvider {
         &self,
         from: BlockHeight,
         to: BlockHeight,
-    ) -> anyhow::Result<Vec<CrossMsg>>;
+    ) -> anyhow::Result<Vec<IpcEnvelope>>;
 }
 
 pub trait ParentFinalityProvider: ParentViewProvider {
