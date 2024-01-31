@@ -36,6 +36,8 @@ use tendermint_rpc::{
     Client,
 };
 
+use fil_actors_evm_shared::uints;
+
 use crate::conv::from_eth::to_fvm_message;
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
 use crate::error::error_with_data;
@@ -738,6 +740,23 @@ pub async fn get_storage_at<C>(
 where
     C: Client + Sync + Send,
 {
+    let encode = |data: Option<uints::U256>| {
+        let mut bz = [0u8; 32];
+        if let Some(data) = data {
+            data.to_big_endian(&mut bz);
+        }
+        // The client library expects hex encoded string.
+        Ok(hex::encode(bz))
+    };
+
+    let height = data.query_height(block_id).await?;
+
+    // If not an EVM actor, return empty.
+    if data.get_actor_type(&address, height).await? != ActorType::EVM {
+        // The client library expects hex encoded string.
+        return encode(None);
+    }
+
     let params = evm::GetStorageAtParams {
         storage_key: {
             let mut bz = [0u8; 32];
@@ -746,8 +765,6 @@ where
         },
     };
     let params = RawBytes::serialize(params).context("failed to serialize position to IPLD")?;
-    let height = data.query_height(block_id).await?;
-
     let ret = data
         .read_evm_actor::<evm::GetStorageAtReturn>(
             address,
@@ -757,12 +774,12 @@ where
         )
         .await?;
 
-    // The client library expects hex encoded string.
-    let mut bz = [0u8; 32];
     if let Some(ret) = ret {
-        ret.storage.to_big_endian(&mut bz);
+        // ret.storage.to_big_endian(&mut bz);
+        return encode(Some(ret.storage));
     }
-    Ok(hex::encode(bz))
+
+    encode(None)
 }
 
 /// Returns code at a given address.
@@ -773,9 +790,15 @@ pub async fn get_code<C>(
 where
     C: Client + Sync + Send,
 {
+    let height = data.query_height(block_id).await?;
+
+    // Return empty if not an EVM actor.
+    if data.get_actor_type(&address, height).await? != ActorType::EVM {
+        return Ok(Default::default());
+    }
+
     // This method has no input parameters.
     let params = RawBytes::default();
-    let height = data.query_height(block_id).await?;
 
     let ret = data
         .read_evm_actor::<evm::BytecodeReturn>(address, evm::Method::GetBytecode, params, height)
@@ -1074,6 +1097,7 @@ pub async fn unsubscribe<C>(
     uninstall_filter(data, Params((filter_id,))).await
 }
 
+use crate::state::ActorType;
 use params::{EstimateGasParams, SubscribeParams, TypedTransactionCompat};
 
 mod params {

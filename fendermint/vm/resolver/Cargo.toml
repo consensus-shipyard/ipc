@@ -11,6 +11,7 @@ license.workspace = true
 [dependencies]
 async-stm = { workspace = true }
 im = { workspace = true }
+serde = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 

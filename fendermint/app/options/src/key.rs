@@ -20,6 +20,8 @@ pub enum KeyCommands {
     FromEth(KeyFromEthArgs),
     /// Converts a Base64 encoded Fendermint private key into a hex encoded Ethereum secret key, public key and address (20 bytes).
     IntoEth(KeyIntoEthArgs),
+    /// Show the libp2p peer ID derived from a Secp256k1 public key.
+    ShowPeerId(KeyShowPeerIdArgs),
 }
 
 #[derive(Args, Debug)]
@@ -92,6 +94,13 @@ pub struct KeyIntoTendermintArgs {
 #[derive(Args, Debug)]
 pub struct KeyAddressArgs {
     /// Path to the public key we want to convert to f1 format.
+    #[arg(long, short)]
+    pub public_key: PathBuf,
+}
+
+#[derive(Args, Debug)]
+pub struct KeyShowPeerIdArgs {
+    /// Path to the public key we want to convert to a libp2p peer ID.
     #[arg(long, short)]
     pub public_key: PathBuf,
 }

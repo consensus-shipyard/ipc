@@ -3,16 +3,18 @@
 
 //! Tendermint RPC helper methods for the implementation of the APIs.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
+use cid::Cid;
 use ethers_core::types::{self as et};
 use fendermint_rpc::client::{FendermintClient, TendermintClient};
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_actor_interface::{evm, system};
-use fendermint_vm_message::query::FvmQueryHeight;
+use fendermint_vm_message::query::{ActorState, FvmQueryHeight};
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_message::{chain::ChainMessage, conv::from_eth::to_fvm_address};
 use fvm_ipld_encoding::{de::DeserializeOwned, RawBytes};
@@ -110,6 +112,22 @@ impl<C> JsonRpcState<C> {
             .cloned()
             .ok_or_else(|| anyhow!("web socket not found"))
     }
+}
+
+/// Represents the actor type of a concrete actor.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ActorType {
+    /// The queried actor does not exist in the state tree.
+    Inexistent,
+    /// The queried actor exists, and it's one of the built-in actor types.
+    Known(Cow<'static, str>),
+    /// The queried actor exists, but it's not a built-in actor and therefore it cannot be identified.
+    Unknown(Cid),
+}
+
+impl ActorType {
+    pub const EVM: ActorType = ActorType::Known(Cow::Borrowed("evm"));
+    pub const ETH_ACCOUNT: ActorType = ActorType::Known(Cow::Borrowed("ethaccount"));
 }
 
 impl<C> JsonRpcState<C>
@@ -394,6 +412,30 @@ where
 
             Ok(Some(data))
         }
+    }
+
+    pub async fn get_actor_type(
+        &self,
+        address: &et::H160,
+        height: FvmQueryHeight,
+    ) -> JsonRpcResult<ActorType> {
+        let addr = to_fvm_address(*address);
+        let Some((
+            _,
+            ActorState {
+                code: actor_type_cid,
+                ..
+            },
+        )) = self.client.actor_state(&addr, height).await?.value
+        else {
+            return Ok(ActorType::Inexistent);
+        };
+        let registry = self.client.builtin_actors(height).await?.value.registry;
+        let ret = match registry.into_iter().find(|(_, cid)| cid == &actor_type_cid) {
+            Some((typ, _)) => ActorType::Known(Cow::Owned(typ)),
+            None => ActorType::Unknown(actor_type_cid),
+        };
+        Ok(ret)
     }
 }
 
