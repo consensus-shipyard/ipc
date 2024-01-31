@@ -452,5 +452,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(x, DEFAULT_CROSS_MSG_FEE);
         mockUSDC.approve(address(rootTokenBridge), transferAmount);
         rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }( x, transferAmount);
+
+        commitParentFinality(address(nativeSubnetGateway));
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
     }
 }

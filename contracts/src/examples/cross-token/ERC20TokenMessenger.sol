@@ -13,6 +13,7 @@ import {FvmAddressHelper} from "../../lib/FvmAddressHelper.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
+import "forge-std/console.sol";
 
 error NoTransfer();
 error ZeroAddress();
@@ -44,12 +45,14 @@ abstract contract ERC20TokenMessenger is IpcExchange, ReentrancyGuard {
     );
 
     function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal override {
+        console.log("_handleIpcResult");
     }
 
     function _handleIpcCall(
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
+        console.log("_handleIpcCall");
         return bytes("");
     }
 
