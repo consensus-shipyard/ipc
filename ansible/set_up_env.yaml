@@ -47,9 +47,13 @@
     - debug:
         var: foundry_exists
 
+    - name: Install foundryup
+      when: foundry_exists is failed
+      shell: curl -L https://foundry.paradigm.xyz -sSf
+
     - name: Install foundry
       when: foundry_exists is failed
-      shell: curl -L https://foundry.paradigm.xyz -sSf | bash
+      shell: bash -ilc 'foundryup'
 
     - name: Get current date in yyyy-mm-dd format
       command: date +%F
@@ -67,17 +71,17 @@
     # - name: Checkout ipc repo
     #   git:
     #     repo: https://github.com/consensus-shipyard/ipc.git
-    #     dest: ipc_folder_path
+    #     dest: "{{ ipc_folder_path }}"
 
-#    - name: Build contracts
-#      command: bash -ilc 'make build'
-#      args:
-#        chdir: "{{ ipc_folder_path }}/contracts"
+    - name: Build contracts
+      command: bash -ilc 'make build'
+      args:
+        chdir: "{{ ipc_folder_path }}/contracts"
 
-#    - name: Build ipc-cli
-#      command: bash -ilc 'make build'
-#      args:
-#        chdir: "{{ ipc_folder_path }}/ipc"
+    - name: Build ipc-cli
+      command: bash -ilc 'make build'
+      args:
+        chdir: "{{ ipc_folder_path }}/ipc"
 
     - name: Initialize IPC config
       command: "{{ ipc_cli_path }} config init"
