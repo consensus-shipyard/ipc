@@ -28,7 +28,8 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 import {SubnetTokenBridge} from "../../src/examples/cross-token/SubnetTokenBridge.sol";
 import {SubnetUSDCProxy} from "../../src/examples/cross-token/SubnetUSDCProxy.sol";
-import {TokenTransferAndMint} from "../../src//examples/cross-token/TokenTransferAndMint.sol";
+import {TokenTransferAndMint} from "../../src/examples/cross-token/TokenTransferAndMint.sol";
+import {USDCMock} from "../../src/examples/cross-token/USDCMock.sol";
 
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
@@ -97,15 +98,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         nativeSubnetGateway = createGatewayDiamond(gatewayParams(nativeSubnetName));
 
         printActors();
-
-        subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(token), rootSubnetName);
-        rootTokenBridge = new TokenTransferAndMint(
-            address(rootGateway),
-            address(token),
-            rootSubnetName,
-            address(subnetTokenBridge)
-        );
-        subnetUSDCProxy = SubnetUSDCProxy(subnetTokenBridge.getProxyTokenAddress());
     }
 
     function testMultiSubnet_Native_SendCrossMessageFromChildToParent() public {
@@ -410,5 +402,65 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     function printEnvelope(IpcEnvelope memory envelope) internal {
         console.log("from %s:", envelope.from.subnetId.toString());
         console.log("to %s:", envelope.to.subnetId.toString());
+    }
+
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, amount);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
+            nativeSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+
+        vm.prank(caller);
+        vm.expectEmit(true, true, true, true, address(rootGateway));
+        emit LibGateway.NewTopDownMessage(address(rootNativeSubnetActor), expected);
+        rootGatewayManager.fund{value: amount}(nativeSubnetName, FvmAddressHelper.from(address(recipient)));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = expected;
+
+
+
+        uint256 transferAmount = 11 gwei;
+        USDCMock mockUSDC = new USDCMock();
+        subnetTokenBridge = new SubnetTokenBridge(address(nativeSubnetGateway), address(mockUSDC), rootSubnetName  );
+
+        mockUSDC.mint(transferAmount);
+        address x = mockUSDC.me(); // todo learn how to get caller address from forge
+        assertEq(transferAmount,  mockUSDC.balanceOf(x));
+        console.log(transferAmount);
+
+        rootTokenBridge = new TokenTransferAndMint(
+            address(rootGateway),
+            address(mockUSDC),
+            nativeSubnetName,
+            address(subnetTokenBridge)
+        );
+
+        vm.deal(x, DEFAULT_CROSS_MSG_FEE);
+        mockUSDC.approve(address(rootTokenBridge), transferAmount);
+        rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }( x, transferAmount);
+
+        commitParentFinality(address(tokenSubnetGateway));
+
+        // TODO: commitParentFinality doesn not affect anything in this test.
+        commitParentFinality(address(nativeSubnetGateway));
+
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+
+        assertEq(recipient.balance, amount);
+
     }
 }

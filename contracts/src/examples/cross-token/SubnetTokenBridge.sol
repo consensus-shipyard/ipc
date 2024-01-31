@@ -5,6 +5,7 @@ import {SubnetID} from "../../structs/Subnet.sol";
 
 import "./SubnetUSDCProxy.sol";
 import "./ERC20TokenMessenger.sol";
+import "forge-std/console.sol";
 
 contract SubnetTokenBridge is ERC20TokenMessenger {
     SubnetUSDCProxy public proxyToken;
@@ -35,6 +36,7 @@ contract SubnetTokenBridge is ERC20TokenMessenger {
 
     /* TODO integrate with IpcReceiver */
     function onXNetMessageReceived(address _to, uint256 _amount) public /* parameters */ {
+        console.log("onXNetMessageReceived");
         // Logic to handle IPC xnet message and mint tokens
         address to;
         uint256 amount;
