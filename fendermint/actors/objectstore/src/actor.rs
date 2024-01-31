@@ -1,3 +1,4 @@
+// Copyright 2024 Textile Inc
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -7,9 +8,11 @@ use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorDowncast;
 use fil_actors_runtime::ActorError;
+use fil_actors_runtime::Map;
+use fvm_ipld_hamt::BytesKey;
 use fvm_shared::error::ExitCode;
 
-use crate::{ConstructorParams, Method, State, OBJECTSTORE_ACTOR_NAME};
+use crate::{ConstructorParams, Method, PutObjectParams, State, OBJECTSTORE_ACTOR_NAME};
 
 fil_actors_runtime::wasm_trampoline!(Actor);
 
@@ -17,12 +20,12 @@ pub struct Actor;
 
 impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
-        // Note(sander): We're setting this up to be a subnet-wide actor for a single repo.
-        // Note(sander): In the future, this could be deployed dynamically for multi repo subnets.
+        // FIXME: (sander) We're setting this up to be a subnet-wide actor for a single repo.
+        // FIXME: (sander) In the future, this could be deployed dynamically for multi repo subnets.
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let state = State::new(rt.store()).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to create empty KAMT")
+            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to create empty Hamt")
         })?;
 
         rt.create(&state)?;
@@ -30,45 +33,130 @@ impl Actor {
         Ok(())
     }
 
-    // Note(sander): Probably obvious, but example actor method that mutates state
-    // fn push_block_hash(rt: &impl Runtime, params: PushBlockParams) -> Result<(), ActorError> {
-    //     rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-    //
-    //     rt.transaction(|st: &mut State, rt| {
-    //         // load the blockhashes AMT
-    //         let mut blockhashes = Array::load(&st.blockhashes, rt.store()).map_err(|e| {
-    //             e.downcast_default(
-    //                 ExitCode::USR_ILLEGAL_STATE,
-    //                 "failed to load blockhashes states",
-    //             )
-    //         })?;
-    //
-    //         // push the block to the AMT
-    //         blockhashes.set(params.epoch as u64, params.block).unwrap();
-    //
-    //         // remove the oldest block if the AMT is full (note that this assume the
-    //         // for_each_while iterates in order, which it seems to do)
-    //         if blockhashes.count() > st.lookback_len {
-    //             let mut first_idx = 0;
-    //             blockhashes
-    //                 .for_each_while(|i, _: &BlockHash| {
-    //                     first_idx = i;
-    //                     Ok(false)
-    //                 })
-    //                 .unwrap();
-    //             blockhashes.delete(first_idx).unwrap();
-    //         }
-    //
-    //         // save the new blockhashes AMT cid root
-    //         st.blockhashes = blockhashes.flush().map_err(|e| {
-    //             e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to save blockhashes")
-    //         })?;
-    //
-    //         Ok(())
-    //     })?;
-    //
-    //     Ok(())
-    // }
+    fn append_object(rt: &impl Runtime, params: PutObjectParams) -> Result<(), ActorError> {
+        // FIXME: (@carsonfarmer) We'll want to validate the caller is the owner of the repo.
+        rt.validate_immediate_caller_accept_any()?;
+
+        rt.transaction(|st: &mut State, rt| {
+            // Load the root Hamt
+            let mut hamt = Map::load(&st.root, rt.store()).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+            })?;
+
+            let new_content = match hamt.get(&BytesKey(key)).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object")
+            })? {
+                Some(existing) => {
+                    // Append the object to the existing object
+                    let mut new_content = existing.clone();
+                    new_content.extend(params.content);
+                    new_content
+                }
+                None => params.content,
+            };
+
+            // Put the new content into the Hamt
+            hamt.set(BytesKey(params.key), new_content).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to update key")
+            })?;
+
+            // Save the new Hamt cid root
+            st.root = hamt.flush().map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to save root")
+            })?;
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    fn put_object(rt: &impl Runtime, params: PutObjectParams) -> Result<(), ActorError> {
+        // FIXME: (@carsonfarmer) We'll want to validate the caller is the owner of the repo.
+        rt.validate_immediate_caller_accept_any()?;
+
+        rt.transaction(|st: &mut State, rt| {
+            // Load the root Hamt
+            let mut hamt = Map::load(&st.root, rt.store()).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+            })?;
+
+            // Put the object into the Hamt
+            // TODO: We could use set_if_absent here to avoid overwriting existing objects.
+            hamt.set(BytesKey(params.key), params.content)
+                .map_err(|e| {
+                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to update key")
+                })?;
+
+            // Save the new Hamt cid root
+            st.root = hamt.flush().map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to save root")
+            })?;
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    fn delete_object(rt: &impl Runtime, params: DeleteObjectParams) -> Result<(), ActorError> {
+        // FIXME: (@carsonfarmer) We'll want to validate the caller is the owner of the repo.
+        rt.validate_immediate_caller_accept_any()?;
+
+        rt.transaction(|st: &mut State, rt| {
+            // Load the root Hamt
+            let mut hamt = Map::load(&st.root, rt.store()).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+            })?;
+
+            // Delete the object from the Hamt
+            hamt.delete(&BytesKey(params.key)).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
+            })?;
+
+            // Save the new Hamt cid root
+            st.root = hamt.flush().map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to save root")
+            })?;
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<u8>>, ActorError> {
+        let st: State = rt.state()?;
+
+        // Load the root Hamt
+        let mut hamt = Map::<_, _, Vec<u8>>::load(&st.root, rt.store()).map_err(|e| {
+            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+        })?;
+
+        // Get the object from the Hamt
+        hamt.get(&BytesKey(key))
+            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))?;
+    }
+
+    fn list_objects(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<Vec<u8>>>, ActorError> {
+        let st: State = rt.state()?;
+
+        // Load the root Hamt
+        let mut hamt = Map::<_, _, Vec<u8>>::load(&st.root, rt.store()).map_err(|e| {
+            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+        })?;
+
+        let mut keys = Vec::new();
+
+        // List the keys from each item in the Hamt
+        hamt.for_each(|k| {
+            keys.push(k);
+            Ok(())
+        })
+        .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects"))?;
+
+        Ok(Some(keys))
+    }
 }
 
 impl ActorCode for Actor {
@@ -80,8 +168,10 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
-        // PushBlockHash => push_block_hash,
-        // LookbackLen => lookback_len,
-        // GetBlockHash => get_block_hash,
+        PutObject => put_object,
+        AppendObject => append_object,
+        DeleteObject => delete_object,
+        GetObject => get_object,
+        ListObjects => list_objects,
     }
 }

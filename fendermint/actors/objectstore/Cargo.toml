@@ -17,7 +17,7 @@ fil_actors_runtime = { workspace = true, optional = true, features = [
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
-fvm_ipld_kamt = { workspace = true }
+fvm_ipld_hamt = { workspace = true }
 num-derive = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }

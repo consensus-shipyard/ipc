@@ -2732,7 +2732,7 @@ dependencies = [
  "frc42_dispatch",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
- "fvm_ipld_kamt",
+ "fvm_ipld_hamt 0.9.0",
  "fvm_shared",
  "num-derive 0.3.3",
  "num-traits",
@@ -3936,24 +3936,6 @@ dependencies = [
  "once_cell",
  "serde",
  "sha2 0.10.8",
- "thiserror",
-]
-
-[[package]]
-name = "fvm_ipld_kamt"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed361b9a0c2fb2b3b3252a7668d1656e83f696787c14ab1a695c0535bf5f8d64"
-dependencies = [
- "anyhow",
- "byteorder",
- "cid",
- "forest_hash_utils",
- "fvm_ipld_blockstore",
- "fvm_ipld_encoding",
- "multihash 0.18.1",
- "once_cell",
- "serde",
  "thiserror",
 ]
 
