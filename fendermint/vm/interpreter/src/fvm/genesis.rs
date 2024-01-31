@@ -200,17 +200,6 @@ where
             )
             .context("failed to create EAM actor")?;
 
-        // Fluence actor
-        state
-            .create_builtin_actor(
-                fluence::FLUENCE_ACTOR_CODE_ID,
-                fluence::FLUENCE_ACTOR_ID,
-                &EMPTY_ARR,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create Fluence actor")?;
-
         // Burnt funds actor (it's just an account).
         state
             .create_builtin_actor(
@@ -257,6 +246,17 @@ where
                 None,
             )
             .context("failed to create chainmetadata actor")?;
+
+        // Fluence actor
+        state
+            .create_custom_actor(
+                fendermint_actor_fluence::FLUENCE_ACTOR_NAME,
+                fluence::FLUENCE_ACTOR_ID,
+                &EMPTY_ARR,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create Fluence actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

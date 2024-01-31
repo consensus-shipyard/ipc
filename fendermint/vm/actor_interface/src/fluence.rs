@@ -1,4 +1,1 @@
-define_singleton!(FLUENCE {
-    id: 17,
-    code_id: 17
-});
+define_id!(FLUENCE { id: 0x70768565 });

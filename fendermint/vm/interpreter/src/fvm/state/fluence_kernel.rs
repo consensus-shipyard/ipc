@@ -48,8 +48,10 @@ impl<K> SyscallHandler<K> for FluenceKernelImpl<K::CallManager>
         + SelfOps,
 {
     fn link_syscalls(linker: &mut Linker<K>) -> anyhow::Result<()> {
+        use fluence_fendermint_syscall::{SYSCALL_FUNCTION_NAME, SYSCALL_MODULE_NAME};
+
         DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
-        linker.link_syscall("fluence", "run_randomx", fluence_fvm_syscall::run_randomx)?;
+        linker.link_syscall(SYSCALL_MODULE_NAME, SYSCALL_FUNCTION_NAME, fluence_fendermint_syscall::run_randomx)?;
 
         Ok(())
     }
