@@ -4,50 +4,50 @@
   remote_user: ubuntu
 
   tasks:
-    - name: Install build dependencies
-      become: yes
-      become_user: root
-      apt:
-        update-cache: yes
-        pkg:
-          - build-essential
-          - libssl-dev
-          - mesa-opencl-icd
-          - ocl-icd-opencl-dev
-          - gcc
-          - git
-          - bzr
-          - jq
-          - pkg-config
-          - curl
-          - clang
-          - hwloc
-          - libhwloc-dev
-          - wget
-          - ca-certificates
-          - gnupg
-
-    - name: Check if rustc/cargo is installed
-      shell: bash -ilc 'which cargo'
-      register: cargo_exists
-      ignore_errors: yes
-
-    - name: Install rust/cargo
-      when: cargo_exists is failed
-      shell: curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-    - name: Check if foundry is installed
-      shell: bash -ilc 'which foundryup'
-      register: foundry_exists
-      ignore_errors: yes
-
-    - name: Install foundryup
-      when: foundry_exists is failed
-      shell: curl -L https://foundry.paradigm.xyz -sSf
-
-    - name: Install foundry
-      when: foundry_exists is failed
-      shell: bash -ilc 'foundryup'
+#    - name: Install build dependencies
+#      become: yes
+#      become_user: root
+#      apt:
+#        update-cache: yes
+#        pkg:
+#          - build-essential
+#          - libssl-dev
+#          - mesa-opencl-icd
+#          - ocl-icd-opencl-dev
+#          - gcc
+#          - git
+#          - bzr
+#          - jq
+#          - pkg-config
+#          - curl
+#          - clang
+#          - hwloc
+#          - libhwloc-dev
+#          - wget
+#          - ca-certificates
+#          - gnupg
+#
+#    - name: Check if rustc/cargo is installed
+#      shell: bash -ilc 'which cargo'
+#      register: cargo_exists
+#      ignore_errors: yes
+#
+#    - name: Install rust/cargo
+#      when: cargo_exists is failed
+#      shell: curl https://sh.rustup.rs -sSf | sh -s -- -y
+#
+#    - name: Check if foundry is installed
+#      shell: bash -ilc 'which foundryup'
+#      register: foundry_exists
+#      ignore_errors: yes
+#
+#    - name: Install foundryup
+#      when: foundry_exists is failed
+#      shell: curl -L https://foundry.paradigm.xyz -sSf
+#
+#    - name: Install foundry
+#      when: foundry_exists is failed
+#      shell: bash -ilc 'foundryup'
 
     - name: Get current date in yyyy-mm-dd format
       command: date +%F
@@ -58,21 +58,21 @@
         ipc_folder_path: ~/ipc-{{ current_date.stdout }}
         ipc_cli_path: ~/ipc-{{ current_date.stdout }}/target/release/ipc-cli
 
-    # TODO(jie): The repo folder name should be changed to yyyy-mm-dd-hh-ss
-    - name: Checkout ipc repo
-      git:
-        repo: https://github.com/consensus-shipyard/ipc.git
-        dest: "{{ ipc_folder_path }}"
-
-    - name: Build contracts
-      command: bash -ilc 'make build'
-      args:
-        chdir: "{{ ipc_folder_path }}/contracts"
-
-    - name: Build ipc-cli
-      command: bash -ilc 'make build'
-      args:
-        chdir: "{{ ipc_folder_path }}/ipc"
-
-    - name: Initialize IPC config
-      command: "{{ ipc_cli_path }} config init"
+#    # TODO(jie): The repo folder name should be changed to yyyy-mm-dd-hh-ss
+#    - name: Checkout ipc repo
+#      git:
+#        repo: https://github.com/consensus-shipyard/ipc.git
+#        dest: "{{ ipc_folder_path }}"
+#
+#    - name: Build contracts
+#      command: bash -ilc 'make build'
+#      args:
+#        chdir: "{{ ipc_folder_path }}/contracts"
+#
+#    - name: Build ipc-cli
+#      command: bash -ilc 'make build'
+#      args:
+#        chdir: "{{ ipc_folder_path }}/ipc"
+#
+#    - name: Initialize IPC config
+#      command: "{{ ipc_cli_path }} config init"

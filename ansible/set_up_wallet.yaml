@@ -1,0 +1,80 @@
+---
+- name: Set up wallets
+  hosts: vm
+  remote_user: ubuntu
+
+  tasks:
+    - name: Create first wallet
+      shell: "{{ ipc_cli_path }} wallet new -w evm"
+      register: wallet_new_output_1
+
+    - set_fact:
+        address_1: "{{ wallet_new_output_1.stdout_lines[-1] }}"
+
+    - name: Create second wallet
+      shell: "{{ ipc_cli_path }} wallet new -w evm"
+      register: wallet_new_output_2
+
+    - set_fact:
+        address_2: wallet_new_output_2.stdout_lines[-1]
+
+    - name: Create third wallet
+      shell: "{{ ipc_cli_path }} wallet new -w evm"
+      register: wallet_new_output_3
+
+    - set_fact:
+        address_3: wallet_new_output_3.stdout_lines[-1]
+
+    - debug:
+        var: "{{ address_1 }}"
+#        msg: " {{ address_1 }}, {{ address_2 }}, {{ address_3 }}"
+
+#    - name: Check if rustc/cargo is installed
+#      shell: bash -ilc 'which cargo'
+#      register: cargo_exists
+#      ignore_errors: yes
+
+#    - name: Install rust/cargo
+#      when: cargo_exists is failed
+#      shell: curl https://sh.rustup.rs -sSf | sh -s -- -y
+#
+#    - name: Check if foundry is installed
+#      shell: bash -ilc 'which foundryup'
+#      register: foundry_exists
+#      ignore_errors: yes
+#
+#    - name: Install foundryup
+#      when: foundry_exists is failed
+#      shell: curl -L https://foundry.paradigm.xyz -sSf
+#
+#    - name: Install foundry
+#      when: foundry_exists is failed
+#      shell: bash -ilc 'foundryup'
+#
+#    - name: Get current date in yyyy-mm-dd format
+#      command: date +%F
+#      register: current_date
+#
+#    - name: Set ipc folder name as variable
+#      set_fact:
+#        ipc_folder_path: ~/ipc-{{ current_date.stdout }}
+#        ipc_cli_path: ~/ipc-{{ current_date.stdout }}/target/release/ipc-cli
+#
+#    # TODO(jie): The repo folder name should be changed to yyyy-mm-dd-hh-ss
+#    - name: Checkout ipc repo
+#      git:
+#        repo: https://github.com/consensus-shipyard/ipc.git
+#        dest: "{{ ipc_folder_path }}"
+#
+#    - name: Build contracts
+#      command: bash -ilc 'make build'
+#      args:
+#        chdir: "{{ ipc_folder_path }}/contracts"
+#
+#    - name: Build ipc-cli
+#      command: bash -ilc 'make build'
+#      args:
+#        chdir: "{{ ipc_folder_path }}/ipc"
+#
+#    - name: Initialize IPC config
+#      command: "{{ ipc_cli_path }} config init"
