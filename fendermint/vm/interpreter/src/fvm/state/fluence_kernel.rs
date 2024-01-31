@@ -33,8 +33,8 @@ use cid::Cid;
 pub struct FluenceKernelImpl<C>(pub DefaultKernel<C>);
 
 impl<K> SyscallHandler<K> for FluenceKernelImpl<K::CallManager>
-    where
-        K: Kernel
+where
+    K: Kernel
         + ActorOps
         + SendOps
         + UpgradeOps
@@ -51,22 +51,26 @@ impl<K> SyscallHandler<K> for FluenceKernelImpl<K::CallManager>
         use fluence_fendermint_syscall::{SYSCALL_FUNCTION_NAME, SYSCALL_MODULE_NAME};
 
         DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
-        linker.link_syscall(SYSCALL_MODULE_NAME, SYSCALL_FUNCTION_NAME, fluence_fendermint_syscall::run_randomx)?;
+        linker.link_syscall(
+            SYSCALL_MODULE_NAME,
+            SYSCALL_FUNCTION_NAME,
+            fluence_fendermint_syscall::run_randomx,
+        )?;
 
         Ok(())
     }
 }
 
 impl<C> Kernel for FluenceKernelImpl<C>
-    where
-        C: CallManager,
+where
+    C: CallManager,
 {
     type CallManager = C;
     type Limiter = <DefaultKernel<C> as Kernel>::Limiter;
 
     fn into_inner(self) -> (Self::CallManager, BlockRegistry)
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         self.0.into_inner()
     }
@@ -107,5 +111,3 @@ impl<C> Kernel for FluenceKernelImpl<C>
         self.0.charge_gas(name, compute)
     }
 }
-
-
