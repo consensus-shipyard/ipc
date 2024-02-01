@@ -117,6 +117,18 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=build.rs");
+
+    // Run rustfmt on binding/src/lib.rs to make sure we don't accidentally format it in our IDEs
+    //
+    // sync the binding/src/lib.rs file to disk
+    lib.sync_all().unwrap();
+    // then run rustfmt on the file (it should be available as its specifed in our toolchain
+    let mut proc = std::process::Command::new("rustfmt")
+        .arg(lib_path)
+        .spawn()
+        .expect("rustfmt failed to start");
+    let ecode = proc.wait().expect("rustfmt failed to run");
+    assert!(ecode.success());
 }
 
 /// Convert ContractName to contract_name so we can use it as a Rust module.
