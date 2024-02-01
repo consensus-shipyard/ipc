@@ -28,7 +28,7 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 import {SubnetTokenBridge} from "../../src/examples/cross-token/SubnetTokenBridge.sol";
 import {SubnetUSDCProxy} from "../../src/examples/cross-token/SubnetUSDCProxy.sol";
-import {TokenTransferAndMint} from "../../src/examples/cross-token/TokenTransferAndMint.sol";
+import {RootnetTokenBridge} from "../../src/examples/cross-token/RootnetTokenBridge.sol";
 import {USDCMock} from "../../src/examples/cross-token/USDCMock.sol";
 
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
@@ -67,7 +67,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     IERC20 public token;
 
     SubnetTokenBridge subnetTokenBridge;
-    TokenTransferAndMint rootTokenBridge;
+    RootnetTokenBridge rootTokenBridge;
 
     SubnetUSDCProxy subnetUSDCProxy;
 
@@ -605,7 +605,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         assertEq(transferAmount,  mockUSDC.balanceOf(myAddress));
         console.log(transferAmount);
 
-        rootTokenBridge = new TokenTransferAndMint(
+        rootTokenBridge = new RootnetTokenBridge(
             address(rootGateway),
             address(mockUSDC),
             nativeSubnetName,
@@ -614,7 +614,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.deal(myAddress, DEFAULT_CROSS_MSG_FEE);
         mockUSDC.approve(address(rootTokenBridge), transferAmount);
-        rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }( myAddress, transferAmount);
+        rootTokenBridge.bridgeToken{ value: DEFAULT_CROSS_MSG_FEE }( myAddress, transferAmount);
         //ensure that tokens are delivered on subnet
         address proxyUSDCToken = subnetTokenBridge.getProxyTokenAddress();
         assertEq(IERC20(proxyUSDCToken).balanceOf(myAddress), transferAmount, "incorrect proxy token balance");

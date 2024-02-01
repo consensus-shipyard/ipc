@@ -6,10 +6,10 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title TokenTransferAndMint
+ * @title RootnetTokenBridge
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
-contract TokenTransferAndMint is ERC20TokenMessenger {
+contract RootnetTokenBridge is ERC20TokenMessenger {
     using SafeERC20 for IERC20;
 
     address private sourceContract;
@@ -17,7 +17,7 @@ contract TokenTransferAndMint is ERC20TokenMessenger {
     address private destinationContract;
 
     /**
-     * @dev Constructor for TokenTransferAndMint
+     * @dev Constructor for RootnetTokenBridge
      * @param _gateway Address of the gateway for cross-network communication
      * @param _sourceContract Address of the source ERC20 token contract
      * @param _destinationSubnet SubnetID of the destination network
@@ -39,7 +39,7 @@ contract TokenTransferAndMint is ERC20TokenMessenger {
      * @param receiver Address to receive the minted tokens on L2
      * @param amount Amount of tokens to be transferred and minted
      */
-    function transferAndMint(address receiver, uint256 amount) external payable {
+    function bridgeToken(address receiver, uint256 amount) external payable {
         // Transfer and lock tokens on L1 using the inherited sendToken function
         _sendToken(sourceContract, destinationSubnet, destinationContract, receiver, amount);
     }
