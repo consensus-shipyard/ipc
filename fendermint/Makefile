@@ -26,6 +26,9 @@ BUILDX_FLAGS ?=
 # Set to the `<repo>/<image>:<tag>` label the image.
 BUILDX_TAG   ?= fendermint:latest
 
+# Set `<repo>/<image>:<tag>` to label local image.
+BUILD_TAG ?= fendermint:latest
+
 all: test build diagrams
 
 diagrams:
@@ -91,7 +94,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 		docker build \
 			$(BUILDX_STORE) \
 			-f docker/Dockerfile \
-			-t fendermint:latest $(PWD)/..; \
+			-t $(BUILD_TAG) $(PWD)/..; \
 	fi
 
 
