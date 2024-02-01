@@ -72,7 +72,7 @@ library SupplySourceHelper {
     /// This function the `safeTransfer` function used before.
     function ierc20Transfer(
         SupplySource memory supplySource,
-        address payable recipient,
+        address recipient,
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
         return
@@ -101,13 +101,31 @@ library SupplySourceHelper {
             // Use the optimized path to send value along with the call.
             (success, ret) = functionCallWithValue({target: target, data: data, value: value});
         } else if (supplySource.kind == SupplyKind.ERC20) {
-            // Transfer the tokens first, _then_ perform the call.
-            (success, ret) = ierc20Transfer(supplySource, target, value);
-            if (success) {
-                // Perform the call only if the ERC20 was successful.
-                (success, ret) = functionCallWithValue(target, data, 0);
-            } else {
-                return (success, ret);
+            (success, ret) = functionCallWithERC20Value({supplySource: supplySource, target: target, data: data, value: value});
+        }
+        return (success, ret);
+    }
+
+    /// @dev Performs the function call with ERC20 value atomically
+    function functionCallWithERC20Value(
+        SupplySource memory supplySource,
+        address target,
+        bytes memory data,
+        uint256 value
+    ) internal returns (bool success, bytes memory ret) {
+        // Transfer the tokens first, _then_ perform the call.
+        (success, ret) = ierc20Transfer(supplySource, target, value);
+
+        if (success) {
+            // Perform the call only if the ERC20 was successful.
+            (success, ret) = functionCallWithValue(target, data, 0);
+        }
+        
+        if (!success) {
+            // following the implementation of `openzeppelin-contracts/utils/Address.sol`
+            assembly {
+                let returndata_size := mload(ret)
+                revert(add(32, ret), returndata_size)
             }
         }
         return (success, ret);
