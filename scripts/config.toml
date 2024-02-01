@@ -1,0 +1,34 @@
+
+keystore_path = "~/.ipc"
+
+# Filecoin Calibration
+[[subnets]]
+id = "/r314159"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+gateway_addr = "0x67E800DE9160547051f3E751F2f9BAe23fEA502C"
+registry_addr = "0xD01525Dc50d85ecbC054fA2ACFD1bbD28f32a39A"
+
+# Mycelium Calibration
+[[subnets]]
+id = "/r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "https://api.mycelium.calibration.node.glif.io/"
+gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
+
+# Subnet template - uncomment and adjust before using
+[[subnets]]
+id = "/r314159/t410fqhl3okhlhgecc77d3zxpbhofnxixdcv2x37sfsi"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "http://127.0.0.1:8745"
+# from genesis
+gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+# from genesis
+registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
