@@ -73,7 +73,7 @@ impl IPCEamActor {
         let caller = rt.message().caller();
 
         let state: State = rt.state()?;
-        if !state.is_deployer(rt.store(), &caller)? {
+        if !state.can_deploy(rt.store(), &caller)? {
             return Err(ActorError::forbidden(String::from(
                 "sender not allowed to deploy contracts",
             )));

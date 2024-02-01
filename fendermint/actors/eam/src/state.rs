@@ -1,3 +1,6 @@
+// Copyright 2021-2023 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
 use cid::Cid;
 use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
@@ -33,7 +36,7 @@ impl State {
         Ok(())
     }
 
-    pub fn is_deployer(
+    pub fn can_deploy(
         &self,
         store: &impl Blockstore,
         deployer: &Address,
