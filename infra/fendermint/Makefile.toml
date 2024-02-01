@@ -88,6 +88,11 @@ LOG_LEVEL = "info"
 ETHAPI_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["ETHAPI_LOG_LEVEL"] } }
 FM_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["FM_LOG_LEVEL"] } }
 
+[env.fluence]
+FM_PULL_SKIP = true
+FM_DOCKER_IMAGE = "fendermint:fluence"
+CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.1"
+
 [tasks.info]
 script = """
 echo
