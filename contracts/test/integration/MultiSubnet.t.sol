@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, CallMsg, IpcMsgKind} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -404,61 +404,105 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("to %s:", envelope.to.subnetId.toString());
     }
 
-
+    // @dev This test verifies that USDC bridge connects correctly
+    // a contract from native subnet with a contract in token subnet through the rootnet.
     function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
-        address caller = address(new MockIpcContract());
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+
+        address caller = address(new MockIpcContractPayable());
         address recipient = address(new MockIpcContractPayable());
-        uint256 amount = 3;
+        uint256 transferAmount = 11 gwei;
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
+        vm.deal(caller, transferAmount);
+
+        console.log("---------------register native subnet---------------");
 
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
+        console.log("---------------fund native subnet---------------");
+
         IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
             nativeSubnetName,
             caller,
-            FvmAddressHelper.from(recipient),
-            amount
+            FvmAddressHelper.from(caller),
+            transferAmount
         );
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, address(rootGateway));
         emit LibGateway.NewTopDownMessage(address(rootNativeSubnetActor), expected);
-        rootGatewayManager.fund{value: amount}(nativeSubnetName, FvmAddressHelper.from(address(recipient)));
+        rootGatewayManager.fund{value: transferAmount}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
 
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = expected;
+        console.log("--------------- transfer and mint (bottom-up)---------------");
+        // here starts a flow from native subnet to token subnet.
 
-
-
-        uint256 transferAmount = 11 gwei;
         USDCMock mockUSDC = new USDCMock();
-        subnetTokenBridge = new SubnetTokenBridge(address(nativeSubnetGateway), address(mockUSDC), rootSubnetName  );
-
         mockUSDC.mint(transferAmount);
-        address myAddress = mockUSDC.me(); // todo learn how to get caller address from forge
-        assertEq(transferAmount,  mockUSDC.balanceOf(myAddress));
-        console.log(transferAmount);
+        address mockUSDCOwner = mockUSDC.owner();
+        assertEq(transferAmount, mockUSDC.balanceOf(mockUSDCOwner));
+
+        subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(mockUSDC), rootSubnetName);
 
         rootTokenBridge = new TokenTransferAndMint(
-            address(rootGateway),
+            address(nativeSubnetGateway),
             address(mockUSDC),
-            nativeSubnetName,
+            tokenSubnetName,
             address(subnetTokenBridge)
         );
 
-        vm.deal(myAddress, DEFAULT_CROSS_MSG_FEE);
+        vm.deal(mockUSDCOwner, DEFAULT_CROSS_MSG_FEE);
+        vm.deal(address(rootTokenBridge), 1 ether);
+
+        vm.prank(mockUSDCOwner);
         mockUSDC.approve(address(rootTokenBridge), transferAmount);
-        rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }( myAddress, transferAmount);
+
+        console.log("mock usdc %s", address(mockUSDC));
+        console.log("mock usdc owner%s", address(mockUSDCOwner));
+        console.log("rootTokenBridge %s", address(rootTokenBridge));
+        console.log("allowance: %d", mockUSDC.allowance(address(mockUSDCOwner), address(rootTokenBridge)));
+
+        vm.prank(address(mockUSDCOwner));
+        rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }(mockUSDCOwner, transferAmount);
+
+        // after the two next calls the root gateway should store the message in its postbox.
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeSubnetName,
+            address(nativeSubnetGateway)
+        );
+
+        callSubmitCheckpointFromParentSubnet(checkpoint, address(rootNativeSubnetActor));
+
+        // check the message is in the postbox
+
+        CallMsg memory payload = CallMsg({
+            method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
+            params: abi.encode(address(mockUSDCOwner), transferAmount)
+        });
+        expected = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({subnetId: nativeSubnetName, rawAddress: FvmAddressHelper.from(address(mockUSDC))}),
+            to: IPCAddress({subnetId: tokenSubnetName, rawAddress: FvmAddressHelper.from(address(subnetTokenBridge))}),
+            value: DEFAULT_CROSS_MSG_FEE,
+            nonce: 0,
+            message: abi.encode(payload)
+        });
+
+        bytes32 expectedCid = expected.toHash();
+        IpcEnvelope memory postboxMsg = rootGatewayGetter.postbox(expectedCid);
+        assertEq(expectedCid, postboxMsg.toHash());
+
+        console.log("--------------- execute (top-down) ---------------");
+
+        // the message the root gateway's postbox is being executed in the token subnet's gateway
+        msgs[0] = expected;
+        commitParentFinality(address(tokenSubnetGateway));
+        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+
         //ensure that tokens are delivered on subnet
         address proxyUSDCToken = subnetTokenBridge.getProxyTokenAddress();
-        assertEq(IERC20(proxyUSDCToken).balanceOf(myAddress), transferAmount, "incorrect proxy token balance");
 
-
-
-        commitParentFinality(address(nativeSubnetGateway));
-        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+        assertEq(IERC20(proxyUSDCToken).balanceOf(address(mockUSDCOwner)), transferAmount, "incorrect proxy token balance");
     }
 }
