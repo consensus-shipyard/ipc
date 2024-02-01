@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -124,6 +124,53 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         callSubmitCheckpointFromParentSubnet(checkpoint, address(rootNativeSubnetActor));
 
         assertEq(recipient.balance, amount);
+    }
+
+    function testMultiSubnet_Native_SendCrossMessageFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContract());
+        address funderAddress = vm.addr(123);
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 3);
+        vm.deal(funderAddress, 1 ether);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        vm.prank(funderAddress);
+        rootGatewayManager.fund{value: 100000}(nativeSubnetName, FvmAddressHelper.from(address(funderAddress)));
+
+        IpcEnvelope memory xnetCallMsg = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: rootSubnetName, rawAddress: FvmAddressHelper.from(caller)}),
+            IPCAddress({subnetId: nativeSubnetName, rawAddress: FvmAddressHelper.from(recipient)}),
+            amount,
+            0
+        );
+
+        IpcEnvelope memory committedEvent = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({subnetId: rootSubnetName, rawAddress: FvmAddressHelper.from(caller)}),
+            to: xnetCallMsg.to,
+            value: xnetCallMsg.value,
+            message: xnetCallMsg.message,
+            nonce: 1
+        });
+
+        GatewayMessengerFacet rootGatewayMessenger = GatewayMessengerFacet(address(rootGateway));
+        vm.prank(address(caller));
+        vm.expectEmit(true, true, true, true, address(rootGateway));
+        emit LibGateway.NewTopDownMessage({subnet: address(rootNativeSubnetActor), message: committedEvent});
+        rootGatewayMessenger.sendContractXnetMessage{value: amount}(xnetCallMsg);
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = xnetCallMsg;
+
+        commitParentFinality(address(nativeSubnetGateway));
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+
+        assertEq(address(recipient).balance, amount);
     }
 
     function testMultiSubnet_Token_CallFromChildToParent() public {
@@ -450,6 +497,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
                 ++i;
             }
         }
+        console.log("minted tokens in executed top-downs: %d", minted_tokens);
 
         // The implementation of the function in fendermint is in
         // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/src/fvm/topdown.rs#L43
