@@ -5,7 +5,7 @@
 path = "dummy.sk"
 kind = "ethereum"
 
-[resolver]
+[ipc]
 subnet_id = "/r31415926"
 
 [resolver.membership]
