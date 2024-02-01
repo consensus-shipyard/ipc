@@ -5,9 +5,11 @@
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
-use fvm_ipld_hamt::{Config, Hamt};
+use fvm_ipld_hamt::Hamt;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
+
+pub const BIT_WIDTH: u32 = 8;
 
 // The state represents an object store backed by a Hamt
 #[derive(Serialize_tuple, Deserialize_tuple)]
@@ -20,15 +22,7 @@ pub struct State {
 
 impl State {
     pub fn new<BS: Blockstore>(store: &BS) -> anyhow::Result<Self> {
-        let root = match Hamt::<_, Vec<u8>>::new_with_config(
-            store,
-            Config {
-                bit_width: 8,
-                ..Default::default()
-            },
-        )
-        .flush()
-        {
+        let root = match Hamt::<_, Vec<u8>>::new_with_bit_width(store, BIT_WIDTH).flush() {
             Ok(cid) => cid,
             Err(e) => {
                 return Err(anyhow::anyhow!(
@@ -43,9 +37,6 @@ impl State {
 }
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
-
-#[derive(Default, Debug)]
-pub struct ConstructorParams {}
 
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct PutObjectParams {

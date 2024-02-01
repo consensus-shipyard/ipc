@@ -12,14 +12,15 @@ use fil_actors_runtime::Map;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::error::ExitCode;
 
-use crate::{ConstructorParams, Method, PutObjectParams, State, OBJECTSTORE_ACTOR_NAME};
+use crate::DeleteObjectParams;
+use crate::{Method, PutObjectParams, State, BIT_WIDTH, OBJECTSTORE_ACTOR_NAME};
 
 fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub struct Actor;
 
 impl Actor {
-    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
+    fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
         // FIXME: (sander) We're setting this up to be a subnet-wide actor for a single repo.
         // FIXME: (sander) In the future, this could be deployed dynamically for multi repo subnets.
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
@@ -28,9 +29,7 @@ impl Actor {
             e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to create empty Hamt")
         })?;
 
-        rt.create(&state)?;
-
-        Ok(())
+        rt.create(&state)
     }
 
     fn append_object(rt: &impl Runtime, params: PutObjectParams) -> Result<(), ActorError> {
@@ -39,11 +38,14 @@ impl Actor {
 
         rt.transaction(|st: &mut State, rt| {
             // Load the root Hamt
-            let mut hamt = Map::load(&st.root, rt.store()).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
-            })?;
+            let mut hamt = Map::<_, Vec<u8>>::load_with_bit_width(&st.root, rt.store(), BIT_WIDTH)
+                .map_err(|e| {
+                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+                })?;
 
-            let new_content = match hamt.get(&BytesKey(key)).map_err(|e| {
+            let key = BytesKey(params.key);
+
+            let new_content = match hamt.get(&key).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object")
             })? {
                 Some(existing) => {
@@ -56,7 +58,7 @@ impl Actor {
             };
 
             // Put the new content into the Hamt
-            hamt.set(BytesKey(params.key), new_content).map_err(|e| {
+            hamt.set(key, new_content).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to update key")
             })?;
 
@@ -77,9 +79,10 @@ impl Actor {
 
         rt.transaction(|st: &mut State, rt| {
             // Load the root Hamt
-            let mut hamt = Map::load(&st.root, rt.store()).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
-            })?;
+            let mut hamt =
+                Map::load_with_bit_width(&st.root, rt.store(), BIT_WIDTH).map_err(|e| {
+                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+                })?;
 
             // Put the object into the Hamt
             // TODO: We could use set_if_absent here to avoid overwriting existing objects.
@@ -105,9 +108,10 @@ impl Actor {
 
         rt.transaction(|st: &mut State, rt| {
             // Load the root Hamt
-            let mut hamt = Map::load(&st.root, rt.store()).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
-            })?;
+            let mut hamt = Map::<_, Vec<u8>>::load_with_bit_width(&st.root, rt.store(), BIT_WIDTH)
+                .map_err(|e| {
+                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+                })?;
 
             // Delete the object from the Hamt
             hamt.delete(&BytesKey(params.key)).map_err(|e| {
@@ -129,28 +133,31 @@ impl Actor {
         let st: State = rt.state()?;
 
         // Load the root Hamt
-        let mut hamt = Map::<_, _, Vec<u8>>::load(&st.root, rt.store()).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
-        })?;
+        let hamt = Map::<_, Vec<u8>>::load_with_bit_width(&st.root, rt.store(), BIT_WIDTH)
+            .map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+            })?;
 
         // Get the object from the Hamt
         hamt.get(&BytesKey(key))
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))?;
+            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
+            .map(|v| v.map(|inner| inner.to_owned()))
     }
 
-    fn list_objects(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<Vec<u8>>>, ActorError> {
+    fn list_objects(rt: &impl Runtime) -> Result<Option<Vec<Vec<u8>>>, ActorError> {
         let st: State = rt.state()?;
 
         // Load the root Hamt
-        let mut hamt = Map::<_, _, Vec<u8>>::load(&st.root, rt.store()).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
-        })?;
+        let hamt = Map::<_, Vec<u8>>::load_with_bit_width(&st.root, rt.store(), BIT_WIDTH)
+            .map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to load Hamt root")
+            })?;
 
         let mut keys = Vec::new();
 
         // List the keys from each item in the Hamt
-        hamt.for_each(|k| {
-            keys.push(k);
+        hamt.for_each(|k, _| {
+            keys.push(k.0.to_owned());
             Ok(())
         })
         .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects"))?;

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 #[cfg(feature = "fil-actor")]
-mod actor;
+pub mod actor;
 mod shared;
 
 pub use shared::*;

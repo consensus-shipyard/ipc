@@ -25,6 +25,12 @@ num-traits = { workspace = true }
 frc42_dispatch = { workspace = true }
 anyhow = { workspace = true }
 
+[dev-dependencies]
+fil_actors_runtime = { workspace = true, features = [
+    "test_utils",
+    "fil-actor",
+] }
+
 [features]
 default = []
 fil-actor = ["fil_actors_runtime"]
