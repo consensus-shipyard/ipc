@@ -2,7 +2,7 @@ services:
   fendermint-node:
     container_name: fendermint-node${NODE_ID}
     user: ${UID}:${GID}
-    image: "fendermint:latest"
+    image: ${FM_DOCKER_IMAGE}
     environment:
       - FM_DATA_DIR=/data/fendermint/data
       - FM_CHAIN_NAME=$NETWORK_NAME
@@ -42,7 +42,7 @@ services:
   ethapi-node:
     container_name: ethapi-node${NODE_ID}
     user: ${UID}:${GID}
-    image: "fendermint:latest"
+    image: ${FM_DOCKER_IMAGE}
     command: "eth run"
     environment:
       - TENDERMINT_RPC_URL=http://cometbft-node${NODE_ID}:26657
