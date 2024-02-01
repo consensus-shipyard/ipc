@@ -2723,12 +2723,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_eam"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actor_eam",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "rlp",
+ "serde",
+]
+
+[[package]]
 name = "fendermint_actors"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_chainmetadata",
+ "fendermint_actor_eam",
  "fil_actor_bundler",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
@@ -3304,6 +3326,27 @@ dependencies = [
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
+]
+
+[[package]]
+name = "fil_actor_eam"
+version = "12.0.0"
+source = "git+https://github.com/filecoin-project/builtin-actors?tag=v12.0.0#b86938e410daebf27f9397fd622370a16b24f58b"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.3.4",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "rlp",
+ "serde",
 ]
 
 [[package]]
@@ -4233,6 +4276,18 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "hex-literal"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
+
+[[package]]
+name = "hex-literal"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
 
 [[package]]
 name = "hex_fmt"
