@@ -12,6 +12,18 @@ set -x
 PREFIX='------'
 IPC_FOLDER=${HOME}/ipc
 IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
+IPC_CONFIG_FOLDER=${HOME}/.ipc
+
+wallet_addresses=()
+
+get_wallet_addresses() {
+  for i in {0..2}
+  do
+    addr=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq .[$i].address | tr -d '"')
+    wallet_addresses+=($addr)
+    echo "Wallet $i address: $addr"
+  done
+}
 
 # Step 1: Prepare system for building and running IPC
 
@@ -58,7 +70,6 @@ fi
 
 # Step 3: Prepare wallet
 #echo "$PREFIX Creating 3 address in wallet..."
-#wallet_addresses=()
 #for i in {1..3}
 #do
 #    addr=$($IPC_CLI wallet new -w evm | tr -d '"')
@@ -66,10 +77,19 @@ fi
 #    echo "Wallet $i address: $addr"
 #done
 
-#default_wallet_address=${wallet_addresses[0]}
-#echo "Default wallet address: $default_wallet_address"
+# Step 3: Prepare wallet
+echo "$PREFIX Using 3 address in wallet..."
+get_wallet_addresses
+
+default_wallet_address=${wallet_addresses[0]}
+echo "Default wallet address: $default_wallet_address"
 
 # Step 4: Create a subnet
-echo "$PREFIX Creating a child subnet..."
-subnet_id=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode 0 --supply-source-kind 0)
-echo "Created subnet ID: $subnet_id"
+#echo "$PREFIX Creating a child subnet..."
+#create_subnet_output=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode 0 --supply-source-kind 0 2>&1)
+#echo $create_subnet_output
+#subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
+#
+#echo "Created subnet ID: $subnet_id"
+
+subnet_id=/r314159/t410fqmlmt6usaeewvxdj3slk6t57ti776ycqsjp2lsa
