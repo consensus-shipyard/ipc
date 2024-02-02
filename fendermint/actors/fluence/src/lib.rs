@@ -17,28 +17,19 @@ pub const FLUENCE_ACTOR_NAME: &str = "fluence";
 const SYSCALL_FAILED_EXIT_CODE: u32 = 0x31337;
 
 #[cfg(feature = "fil-actor")]
-fil_actors_runtime::wasm_trampoline!(Actor);
+fil_actors_runtime::wasm_trampoline!(FluenceActor);
 
 /// Account actor methods available
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
-    Constructor = METHOD_CONSTRUCTOR,
     RunRandomX = frc42_dispatch::method_hash!("RunRandomX"),
 }
 
 /// Account Actor
-pub struct Actor;
+pub struct FluenceActor;
 
-impl Actor {
-    /// Constructor for the Fluence actor.
-    /// NOTE: This method is NOT currently called from anywhere, instead the FVM just deploys Fluence.
-    pub fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
-        Ok(())
-    }
-
+impl FluenceActor {
     /// Run RandomX with the provided parameters and returns its result hash.
     pub fn run_randomx(
         rt: &impl Runtime,
@@ -75,15 +66,14 @@ impl Actor {
     }
 }
 
-impl ActorCode for Actor {
+impl ActorCode for FluenceActor {
     type Methods = Method;
 
     fn name() -> &'static str {
-        "Fluence"
+        FLUENCE_ACTOR_NAME
     }
 
     actor_dispatch! {
-        Constructor => constructor,
         RunRandomX => run_randomx,
         _ => fallback,
     }
