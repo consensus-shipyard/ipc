@@ -464,7 +464,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("allowance: %d", mockUSDC.allowance(address(mockUSDCOwner), address(rootTokenBridge)));
 
         vm.prank(address(mockUSDCOwner));
-        rootTokenBridge.transferAndMint{ value: DEFAULT_CROSS_MSG_FEE }(mockUSDCOwner, transferAmount);
+        rootTokenBridge.transferAndMint{value: DEFAULT_CROSS_MSG_FEE}(mockUSDCOwner, transferAmount);
 
         // after the two next calls the root gateway should store the message in its postbox.
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -473,7 +473,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         callSubmitCheckpointFromParentSubnet(checkpoint, address(rootNativeSubnetActor));
-
         // check the message is in the postbox
 
         CallMsg memory payload = CallMsg({
@@ -482,7 +481,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         });
         expected = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: nativeSubnetName, rawAddress: FvmAddressHelper.from(address(mockUSDC))}),
+            from: IPCAddress({subnetId: nativeSubnetName, rawAddress: FvmAddressHelper.from(address(rootTokenBridge))}),
             to: IPCAddress({subnetId: tokenSubnetName, rawAddress: FvmAddressHelper.from(address(subnetTokenBridge))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
@@ -491,7 +490,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         bytes32 expectedCid = expected.toHash();
         IpcEnvelope memory postboxMsg = rootGatewayGetter.postbox(expectedCid);
-        assertEq(expectedCid, postboxMsg.toHash());
+        assertEq(expectedCid, postboxMsg.toHash(), "postboxMsg hash and cid not equal");
 
         console.log("--------------- execute (top-down) ---------------");
 
@@ -501,8 +500,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
 
         //ensure that tokens are delivered on subnet
-        address proxyUSDCToken = subnetTokenBridge.getProxyTokenAddress();
-
-        assertEq(IERC20(proxyUSDCToken).balanceOf(address(mockUSDCOwner)), transferAmount, "incorrect proxy token balance");
+        assertEq(
+            IERC20(subnetTokenBridge).balanceOf(address(mockUSDCOwner)),
+            transferAmount,
+            "incorrect proxy token balance"
+        );
     }
 }
