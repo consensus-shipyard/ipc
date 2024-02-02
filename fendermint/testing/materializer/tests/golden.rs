@@ -14,3 +14,10 @@ mod yaml {
     use quickcheck::Arbitrary;
     golden_yaml! { "manifest/yaml", manifest, Manifest::arbitrary }
 }
+
+mod toml {
+    use fendermint_testing::golden_toml;
+    use fendermint_testing_materializer::manifest::Manifest;
+    use quickcheck::Arbitrary;
+    golden_toml! { "manifest/toml", manifest, Manifest::arbitrary }
+}

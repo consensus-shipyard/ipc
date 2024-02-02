@@ -181,4 +181,14 @@ mod tests {
 
         assert_eq!(value1, value0)
     }
+
+    #[quickcheck]
+    fn manifest_toml(value0: Manifest) {
+        let repr = toml::to_string(&value0).expect("failed to encode");
+        let value1: Manifest = toml::from_str(&repr)
+            .map_err(|e| format!("{e}; {repr}"))
+            .expect("failed to decode");
+
+        assert_eq!(value1, value0)
+    }
 }

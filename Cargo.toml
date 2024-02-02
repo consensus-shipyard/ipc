@@ -140,7 +140,7 @@ tokio = { version = "1", features = [
 tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
-toml = "0.7"
+toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 trace4rs = "0.5.1"
