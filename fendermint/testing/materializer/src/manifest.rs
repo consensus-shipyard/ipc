@@ -28,9 +28,13 @@ pub type AccountId = ResourceId;
 /// A human readable name for a subnet.
 pub type SubnetId = ResourceId;
 
+/// A human readable name for a node.
+pub type NodeId = ResourceId;
+
 pub type SubnetMap = BTreeMap<SubnetId, Subnet>;
 pub type BalanceMap = BTreeMap<AccountId, Balance>;
 pub type CollateralMap = BTreeMap<AccountId, Collateral>;
+pub type NodeMap = BTreeMap<NodeId, Node>;
 
 /// The manifest is a static description of a testnet.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -48,7 +52,7 @@ pub struct Manifest {
     pub accounts: BTreeMap<AccountId, Account>,
 
     /// Which account to use to deploy the IPC contracts, if we have to.
-    pub root_deployment: RootDeployment,
+    pub deployment: RootDeployment,
 
     /// Subnets created on the rootnet.
     pub subnets: SubnetMap,
@@ -75,10 +79,10 @@ pub enum RootDeployment {
     /// Deploy a new IPC contract stack using one of the accounts.
     /// This can take a long time, but ensures we are testing with
     /// contracts that have the same version as the client.
-    DeployNew { deployer: AccountId },
+    New { deployer: AccountId },
     /// Use one of the existing deployments, given by the delegated address of
     /// the Gateway and Registry contracts.
-    UseExisting {
+    Existing {
         #[serde_as(as = "IsHumanReadable")]
         gateway: Address,
         #[serde_as(as = "IsHumanReadable")]
@@ -105,10 +109,31 @@ pub struct Subnet {
     ///
     /// These accounts will pre-fund the subnet after it's created.
     pub balances: BalanceMap,
+    /// Nodes that participate in running the chain of this subnet.
+    pub nodes: NodeMap,
     /// Child subnets under this parent.
     ///
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
     pub subnets: SubnetMap,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Node {
+    /// Indicate whether this is a validator node or a full node.
+    pub mode: NodeMode,
+    /// Indicate whether to run the Ethereum API.
+    pub ethapi: bool,
+    /// The nodes from which CometBFT should bootstrap itself.
+    pub seed_nodes: Vec<NodeId>,
+}
+
+/// The mode in which CometBFT is running.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NodeMode {
+    /// A node able to create and sign blocks.
+    Validator(AccountId),
+    /// A node which runs consensus and executes blocks, but doesn't have a validator key.
+    Full,
 }
 
 #[cfg(test)]

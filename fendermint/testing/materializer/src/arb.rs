@@ -2,18 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use lazy_static::lazy_static;
-use std::{cmp::min, ops::SubAssign};
+use std::{
+    cmp::min,
+    ops::{Mul, SubAssign},
+};
 
 use fendermint_vm_genesis::Collateral;
 use fvm_shared::{
-    bigint::{BigInt, Integer},
+    bigint::{BigInt, Integer, Zero},
     econ::TokenAmount,
 };
 use quickcheck::{Arbitrary, Gen};
 
 use crate::manifest::{
-    Account, AccountId, Balance, BalanceMap, Manifest, ResourceId, RootDeployment, Subnet,
-    SubnetId, SubnetMap,
+    Account, AccountId, Balance, BalanceMap, CollateralMap, Manifest, Node, NodeId, NodeMap,
+    NodeMode, ResourceId, RootDeployment, Subnet, SubnetId, SubnetMap,
 };
 
 const RESOURCE_ID_CHARSET: &[u8] =
@@ -98,7 +101,7 @@ impl Arbitrary for Balance {
 
 impl Arbitrary for Manifest {
     fn arbitrary(g: &mut Gen) -> Self {
-        gen_manifest(g, 3, 3, DEFAULT_BALANCE.clone())
+        gen_manifest(g, 4, 3, DEFAULT_BALANCE.clone())
     }
 }
 
@@ -127,7 +130,7 @@ fn gen_manifest(
 
     Manifest {
         accounts,
-        root_deployment: RootDeployment::DeployNew {
+        deployment: RootDeployment::New {
             deployer: choose_one(g, &account_ids),
         },
         subnets,
@@ -154,7 +157,7 @@ fn gen_subnets(
         let c = choose_one(g, account_ids);
 
         // Every subnet needs validators, so at least 1 needs to be chosen.
-        let vs = choose_at_least(g, 1, account_ids)
+        let vs: CollateralMap = choose_at_least(g, 1, account_ids)
             .into_iter()
             .map(|a| {
                 let c = gen_collateral(g, &a, balances);
@@ -165,13 +168,42 @@ fn gen_subnets(
         // It's not necessary to have accounts in a subnet; only declaring
         // some that we want to end up with some balance, but others might
         // funded to support similar ones further down the hierarchy.
-        let bs = choose_at_least(g, 0, account_ids)
+        let bs: BalanceMap = choose_at_least(g, 0, account_ids)
             .into_iter()
             .map(|a| {
-                let b = gen_balance(g, &a, balances);
+                let b: Balance = gen_balance(g, &a, balances);
                 (a, b)
             })
             .collect();
+
+        // Run at least a quroum of validators.
+        let tw: TokenAmount = vs.values().map(|c| c.0.clone()).sum();
+        let qw = tw.mul(2).div_floor(3);
+        let mut ss = Vec::new();
+        let mut ns = NodeMap::default();
+        let mut sw = TokenAmount::zero();
+
+        for (v, w) in vs.iter() {
+            let mode = if sw <= qw || bool::arbitrary(g) {
+                NodeMode::Validator(v.clone())
+            } else {
+                NodeMode::Full
+            };
+            let seed_nodes = if ss.is_empty() {
+                vec![]
+            } else {
+                choose_at_least(g, 1, &ss)
+            };
+            let node = Node {
+                mode,
+                ethapi: bool::arbitrary(g),
+                seed_nodes,
+            };
+            let id = NodeId::arbitrary(g);
+            ss.push(id.clone());
+            ns.insert(id, node);
+            sw += w.0.clone();
+        }
 
         let ss = gen_subnets(g, max_children, max_level, level + 1, account_ids, balances);
 
@@ -180,6 +212,7 @@ fn gen_subnets(
             validators: vs,
             balances: bs,
             subnets: ss,
+            nodes: ns,
         };
 
         let sid = SubnetId::arbitrary(g);
