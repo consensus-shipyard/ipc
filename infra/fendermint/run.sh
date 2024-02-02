@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -eu
+set -o pipefail
 
 if [ $# -ne 1 ]; then
   echo "usage: $0 (start|stop)"
