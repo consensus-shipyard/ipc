@@ -1,0 +1,55 @@
+accounts:
+  GamCnX0: {}
+  PK6B: {}
+  PMvAEJ-n: {}
+  RP_7Ag: {}
+  WYG: {}
+  _Prh: {}
+  ez1ujs6T: {}
+root_deployment: !DeployNew
+  deployer: GamCnX0
+subnets:
+  S_HTc:
+    creator: _Prh
+    validators:
+      GamCnX0: '9659651410249169946'
+      PMvAEJ-n: '718450414258804692'
+      ez1ujs6T: '1'
+    balances: {}
+    subnets:
+      J8r:
+        creator: ez1ujs6T
+        validators:
+          PK6B: '6949092021942008290'
+        balances: {}
+        subnets: {}
+  U4HW:
+    creator: ez1ujs6T
+    validators:
+      GamCnX0: '8949866820597065047'
+      PK6B: '8492213195322522388'
+      RP_7Ag: '7941364762653322244'
+      WYG: '4025312984394309594'
+      ez1ujs6T: '3365211198271343091'
+    balances:
+      RP_7Ag: '7508059175212872667'
+      ez1ujs6T: '3375097572646036616'
+    subnets:
+      BHNb:
+        creator: GamCnX0
+        validators:
+          ez1ujs6T: '811595388101038566'
+        balances: {}
+        subnets: {}
+      t_TTJ:
+        creator: _Prh
+        validators:
+          GamCnX0: '6068753097006410480'
+          PK6B: '6896288731556270473'
+          RP_7Ag: '2353669371800563797'
+          ez1ujs6T: '5740688463223051888'
+        balances:
+          GamCnX0: '3791930259420636184'
+          WYG: '8257221852838022480'
+          _Prh: '1'
+        subnets: {}

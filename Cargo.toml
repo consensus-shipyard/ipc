@@ -24,6 +24,7 @@ members = [
   "fendermint/rpc",
   "fendermint/storage",
   "fendermint/testing",
+  "fendermint/testing/materializer",
   "fendermint/testing/*-test",
   "fendermint/vm/*",
   "fendermint/actors",
@@ -122,6 +123,7 @@ sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1", features = ["raw_value"] }
+serde_yaml = { version = "0.9" }
 serde_tuple = "0.5"
 serde_with = "2.3"
 serial_test = "3.0"

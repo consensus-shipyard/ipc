@@ -3009,6 +3009,26 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+name = "fendermint_testing_materializer"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "fendermint_testing",
+ "fendermint_testing_materializer",
+ "fendermint_vm_encoding",
+ "fendermint_vm_genesis",
+ "fvm_shared",
+ "lazy_static",
+ "quickcheck",
+ "quickcheck_macros",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -8191,6 +8211,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_yaml"
+version = "0.9.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1bf28c79a99f70ee1f1d83d10c875d2e70618417fda01ad1785e027579d9d38"
+dependencies = [
+ "indexmap 2.1.0",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
+]
+
+[[package]]
 name = "serial_test"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9652,6 +9685,12 @@ dependencies = [
  "crypto-common",
  "subtle",
 ]
+
+[[package]]
+name = "unsafe-libyaml"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab4c90930b95a82d00dc9e9ac071b4991924390d46cbd0dfe566148667605e4b"
 
 [[package]]
 name = "unsigned-varint"
