@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -eu
+set -o pipefail
 
 REPORT_FILE="./report.md"
 

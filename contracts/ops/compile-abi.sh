@@ -1,6 +1,7 @@
 #!/bin/bash
 # Compile contract and output core contracts ABI
-set -e
+set -eu
+set -o pipefail
 
 if [ $# -ne 1 ]
 then

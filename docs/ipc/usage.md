@@ -6,41 +6,41 @@
 The `ipc-cli` has internally an EVM wallet that it uses to sign transactions and interact with IPC on behalf of specific addresses. Some of the features available for EVM addresses through the EVM are:
 * Creating new Ethereum addresses
 ```bash
-./bin/ipc-cli wallet new -w evm
+./bin/ipc-cli wallet new --wallet-type evm
 ```
 ```console
 # Sample execution
-./bin/ipc-cli wallet new -w evm
+./bin/ipc-cli wallet new --wallet-type evm
 "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
 * Exporting a key stored in the IPC cli keystore.
 ```bash
-./bin/ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE>
+./bin/ipc-cli wallet export --wallet-type evm --address <EVM-ADDRESS> > <OUTPUT_FILE>
 ```
 ```console
 # Sample execution
-./bin/ipc-cli wallet export -w evm -a 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec -o /tmp/priv.key
+./bin/ipc-cli wallet export --wallet-type evm --address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec -o /tmp/priv.key
 exported new wallet with address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec in file "/tmp/priv.key"
 ```
 
 * You can also export your private key encoded in base64 in a format that can be consumed by Fendermint by adding the `--fendermint` flag.
 ```bash
-./bin/ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE> --fendermint
+./bin/ipc-cli wallet export --wallet-type evm --address <EVM-ADDRESS>  --fendermint > <OUTPUT_FILE>
 ```
 
 * Or hex encoded as expected by Ethereum tooling (like Metamask or hardhat).
 ```bash
-./bin/ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE> --hex
+./bin/ipc-cli wallet export --wallet-type evm --address <EVM-ADDRESS> -o <OUTPUT_FILE> --hex
 ```
 
 * Importing a key from a file
 ```bash
-./bin/ipc-cli wallet import -w evm --path=<INPUT_FILE_WITH_KEY>
+./bin/ipc-cli wallet import --wallet-type evm --path=<INPUT_FILE_WITH_KEY>
 ```
 ```console
 # Sample execution
-$ ./bin/ipc-cli wallet import -w evm --path=~/tmp/wallet.key
+$ ./bin/ipc-cli wallet import --wallet-type evm --path=~/tmp/wallet.key
 imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
@@ -52,27 +52,27 @@ imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 
 * Importing an identity directly from its private key
 ```bash
-./bin/ipc-cli wallet import -w evm --private-key <PRIVATE_KEY>
+./bin/ipc-cli wallet import --wallet-type evm --private-key <PRIVATE_KEY>
 ```
 ```console
 # Sample execution
-$ ./bin/ipc-cli wallet import -w evm --private-key=0x405f50458008edd6e2eb2efc3bf34846db1d6689b89fe1a9f9ccfe7f6e301d8d
+$ ./bin/ipc-cli wallet import --wallet-type evm --private-key=0x405f50458008edd6e2eb2efc3bf34846db1d6689b89fe1a9f9ccfe7f6e301d8d
 imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
 * You can set a default key for your wallet so it is always the one used when the `--from` flag is not explicitly set
 ```bash
-./bin/ipc-cli wallet set-default --address <EVM-ADDRESS> -w evm
+./bin/ipc-cli wallet set-default --address <EVM-ADDRESS> --wallet-type evm
 ```
 
 * And check what is your current default key:
 ```bash
-./bin/ipc-cli wallet get-default -w evm
+./bin/ipc-cli wallet get-default --wallet-type evm
 ```
 
 * Check the hex encoded public key of your address with:
 ```bash
-./bin/ipc-cli wallet pub-key -w evm --address=<EVM-address>
+./bin/ipc-cli wallet pub-key --wallet-type evm --address=<EVM-address>
 ```
 
 ## Listing active subnets
@@ -121,7 +121,7 @@ $ ./bin/ipc-cli subnet stake --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53joh
 ## Listing your balance in a subnet
 In order to send messages in a subnet, you'll need to have funds in your subnt account. You can use the following command to list the balance of your wallets in a subnet:
 ```bash
-./bin/ipc-cli wallet balances -w evm --subnet <subnet-id>
+./bin/ipc-cli wallet balances --wallet-type evm --subnet <subnet-id>
 ```
 ```console
 # Example execution
@@ -247,7 +247,7 @@ IPC relies on the role of a specific type of peer on the network called the rela
 ```bash
 ./bin/ipc-cli checkpoint relayer --subnet <SUBNET_ID>
 ```
-* In order to run the relayer from a different address you can use the `--submitted` flag: 
+* In order to run the relayer from a different address you can use the `--submitted` flag:
 ```bash
 ./bin/ipc-cli checkpoint relayer --subnet <SUBNET_ID> --submitter <RELAYER_ADDR>
 ```
@@ -259,7 +259,7 @@ Relayers are rewarded through cross-net messages fees for the timely submission 
 
 ## Listing checkpoints from a subnet
 
-Subnets are periodically committing checkpoints to their parent every `bottomup-check-period` (parameter defined when creating the subnet). If you want to inspect the information of a range of bottom-up checkpoints committed in the parent for a subnet, you can use the `checkpoint list-bottomup` command provided by the agent as follows: 
+Subnets are periodically committing checkpoints to their parent every `bottomup-check-period` (parameter defined when creating the subnet). If you want to inspect the information of a range of bottom-up checkpoints committed in the parent for a subnet, you can use the `checkpoint list-bottomup` command provided by the agent as follows:
 ```bash
 ./bin/ipc-cli checkpoint list-bottomup --from-epoch <range-start> --to-epoch <range-end> --subnet <subnet-id>
 ```
@@ -316,7 +316,7 @@ Leaving a subnet will release the collateral for the validator and remove all th
 $ ./bin/ipc-cli subnet stake --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1
 ```
 
-> 💡 Remember, as described in the joining and leaving collateral section, that changes to the validator set and their collateral are not reflected immediately. Validator changes between two epochs can be inspected through: 
+> 💡 Remember, as described in the joining and leaving collateral section, that changes to the validator set and their collateral are not reflected immediately. Validator changes between two epochs can be inspected through:
 > ```bash
 > ./bin/ipc-cli checkpoint list-validator-changes --from-epoch=<START_EPOCH> --to-epoch=<END_EPOCH>
 > ```

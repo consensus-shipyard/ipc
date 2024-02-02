@@ -84,13 +84,12 @@ impl CommandLineHandler for CreateSubnet {
 #[derive(Debug, Args)]
 #[command(name = "create", about = "Create a new subnet actor")]
 pub struct CreateSubnetArgs {
-    #[arg(long, short, help = "The address that creates the subnet")]
+    #[arg(long, help = "The address that creates the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The parent subnet to create the new actor in")]
+    #[arg(long, help = "The parent subnet to create the new actor in")]
     pub parent: String,
     #[arg(
         long,
-        short,
         help = "The minimum number of collateral required for validators"
     )]
     pub min_validator_stake: f64,
@@ -105,7 +104,6 @@ pub struct CreateSubnetArgs {
     pub active_validators_limit: Option<u16>,
     #[arg(
         long,
-        short,
         default_value = "0.000001",
         help = "Minimum fee for cross-net messages in subnet (in whole FIL)"
     )]
