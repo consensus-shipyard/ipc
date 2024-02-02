@@ -1,7 +1,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::state::State;
+pub use crate::state::State;
 pub use fil_actor_eam::Method;
 use fil_actor_eam::{
     Create2Params, Create2Return, CreateExternalParams, CreateExternalReturn, CreateParams,
@@ -17,22 +17,20 @@ mod state;
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(IPCEamActor);
 
-pub const IPC_EAM_ACTOR_NAME: &str = "EVMAddressManager";
+pub const IPC_EAM_ACTOR_NAME: &str = "eam";
 
 pub struct IPCEamActor;
 
 impl IPCEamActor {
+    /// Creates the actor. If the `whitelisted_deployers` is empty, that means there is no restriction
+    /// for deployment, i.e any address can deploy.
     pub fn constructor(
         rt: &impl Runtime,
         whitelisted_deployers: Vec<Address>,
     ) -> Result<(), ActorError> {
         EamActor::constructor(rt)?;
 
-        let mut st = State::new(rt.store())?;
-        for d in whitelisted_deployers {
-            st.add_deployer(rt.store(), &d)?;
-        }
-
+        let st = State::new(rt.store(), whitelisted_deployers)?;
         rt.create(&st)?;
 
         Ok(())
@@ -168,6 +166,75 @@ mod tests {
             .unwrap_err()
             .exit_code();
         assert_eq!(exit_code, ExitCode::USR_FORBIDDEN)
+    }
+
+    #[test]
+    fn test_create_no_restriction() {
+        let deployers = vec![];
+        let rt = construct_and_verify(deployers);
+
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*EVM_ACTOR_CODE_ID, id_addr);
+        rt.expect_validate_caller_type(vec![Type::EVM]);
+
+        let initcode = vec![0xff];
+
+        let create_params = CreateParams {
+            initcode: initcode.clone(),
+            nonce: 0,
+        };
+
+        let evm_params = ConstructorParams {
+            creator: eth_addr,
+            initcode: initcode.into(),
+        };
+
+        let new_eth_addr = compute_address_create(&rt, &eth_addr, 0);
+        let params = Exec4Params {
+            code_cid: *EVM_ACTOR_CODE_ID,
+            constructor_params: RawBytes::serialize(evm_params).unwrap(),
+            subaddress: new_eth_addr.0[..].to_owned().into(),
+        };
+
+        let send_return = IpldBlock::serialize_cbor(&Exec4Return {
+            id_address: Address::new_id(111),
+            robust_address: Address::new_id(0), // not a robust address but im hacking here and nobody checks
+        })
+        .unwrap();
+
+        rt.expect_send_simple(
+            INIT_ACTOR_ADDR,
+            EXEC4_METHOD,
+            IpldBlock::serialize_cbor(&params).unwrap(),
+            TokenAmount::from_atto(0),
+            send_return,
+            ExitCode::OK,
+        );
+
+        let result = rt
+            .call::<IPCEamActor>(
+                Method::Create as u64,
+                IpldBlock::serialize_cbor(&create_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Return>()
+            .unwrap();
+
+        let expected_return = Return {
+            actor_id: 111,
+            robust_address: Some(Address::new_id(0)),
+            eth_address: new_eth_addr,
+        };
+
+        assert_eq!(result, expected_return);
+        rt.verify();
     }
 
     #[test]

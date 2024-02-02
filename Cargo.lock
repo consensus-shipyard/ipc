@@ -3128,6 +3128,7 @@ dependencies = [
  "cid",
  "ethers",
  "fendermint_actor_chainmetadata",
+ "fendermint_actor_eam",
  "fendermint_actors",
  "fendermint_crypto",
  "fendermint_eth_hardhat",

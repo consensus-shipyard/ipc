@@ -13,9 +13,7 @@ use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
-use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
-};
+use fendermint_vm_actor_interface::{account, burntfunds, chainmetadata, cron, eam, EMPTY_ARR, init, ipc, reward, system};
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
@@ -189,17 +187,6 @@ where
             )
             .context("failed to create cron actor")?;
 
-        // Ethereum Account Manager (EAM) actor
-        state
-            .create_builtin_actor(
-                eam::EAM_ACTOR_CODE_ID,
-                eam::EAM_ACTOR_ID,
-                &EMPTY_ARR,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create EAM actor")?;
-
         // Burnt funds actor (it's just an account).
         state
             .create_builtin_actor(
@@ -246,6 +233,34 @@ where
                 None,
             )
             .context("failed to create chainmetadata actor")?;
+
+        // Ethereum Account Manager (EAM) actor
+        let eam_state = fendermint_actor_eam::State::new(
+            &state.store(),
+            genesis
+                .contract_deployers
+                .into_iter()
+                .map(|a| a.0)
+                .collect(),
+        )?;
+        // state
+        //     .create_builtin_actor(
+        //             eam::EAM_ACTOR_CODE_ID,
+        //             eam::EAM_ACTOR_ID,
+        //             &EMPTY_ARR,
+        //             TokenAmount::zero(),
+        //             None,
+        //         )
+        //             .context("failed to create EAM actor")?;
+        state
+            .create_custom_actor(
+                fendermint_actor_eam::IPC_EAM_ACTOR_NAME,
+                eam::EAM_ACTOR_ID,
+                &eam_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create IPC EAM actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

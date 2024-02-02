@@ -2,38 +2,43 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
+use fil_actors_runtime::{ActorError, Map2, MapKey, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub type DeployerMap<BS> = Map2<BS, Address, ()>;
 
+/// The permission mode for controlling who can deploy contracts
+#[derive(Debug, Clone, PartialEq)]
+enum PermissionMode {
+    /// No restriction, everyone can deploy
+    NoRestriction,
+    /// Only whitelisted addresses can deploy
+    Whitelist(Cid), // HAMT[Address]()
+}
+
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct State {
-    /// The allowed deployers of contract
-    pub deployers: Cid, // HAMT[Address]()
+    permission_mode: PermissionMode,
 }
 
 impl State {
-    pub fn new<BS: Blockstore>(store: &BS) -> Result<State, ActorError> {
-        let empty_deployers = DeployerMap::empty(store, DEFAULT_HAMT_CONFIG, "empty").flush()?;
-
+    pub fn new<BS: Blockstore>(store: &BS, deployers: Vec<Address>) -> Result<State, ActorError> {
+        let mode = if deployers.is_empty() {
+            PermissionMode::NoRestriction
+        } else {
+            let mut deployers_map = DeployerMap::empty(store, DEFAULT_HAMT_CONFIG, "empty");
+            for d in deployers {
+                deployers_map.set(&d, ())?;
+            }
+            PermissionMode::Whitelist(deployers_map.flush()?)
+        };
         Ok(State {
-            deployers: empty_deployers,
+            permission_mode: mode,
         })
-    }
-
-    /// Adds a deployer, i.e. allows the deployer to deploy contracts in IPC subnets
-    pub fn add_deployer(
-        &mut self,
-        store: &impl Blockstore,
-        deployer: &Address,
-    ) -> Result<(), ActorError> {
-        let mut deployers = self.load_deployers(store)?;
-        deployers.set(deployer, ())?;
-        self.deployers = deployers.flush()?;
-        Ok(())
     }
 
     pub fn can_deploy(
@@ -41,11 +46,71 @@ impl State {
         store: &impl Blockstore,
         deployer: &Address,
     ) -> Result<bool, ActorError> {
-        let deployers = self.load_deployers(store)?;
-        deployers.contains_key(deployer)
+        Ok(match &self.permission_mode {
+            PermissionMode::NoRestriction => true,
+            PermissionMode::Whitelist(cid) => {
+                let deployers = DeployerMap::load(store, cid, DEFAULT_HAMT_CONFIG, "verifiers")?;
+                deployers.contains_key(deployer)?
+            }
+        })
     }
+}
 
-    pub fn load_deployers<BS: Blockstore>(&self, store: BS) -> Result<DeployerMap<BS>, ActorError> {
-        DeployerMap::load(store, &self.deployers, DEFAULT_HAMT_CONFIG, "verifiers")
+const NO_RESTRICTION_MODE: u8 = 0;
+const WHITELIST_MODE: u8 = 1;
+
+impl Serialize for PermissionMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            PermissionMode::NoRestriction => {
+                let inner: (_, Vec<u8>) = (NO_RESTRICTION_MODE, vec![]);
+                Serialize::serialize(&inner, serde_tuple::Serializer(serializer))
+            }
+            PermissionMode::Whitelist(cid) => {
+                let inner = (WHITELIST_MODE, cid.to_bytes());
+                Serialize::serialize(&inner, serde_tuple::Serializer(serializer))
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PermissionMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (mode, bytes): (u8, Vec<u8>) =
+            Deserialize::deserialize(serde_tuple::Deserializer(deserializer))?;
+        Ok(match mode {
+            NO_RESTRICTION_MODE => PermissionMode::NoRestriction,
+            WHITELIST_MODE => PermissionMode::Whitelist(
+                Cid::from_bytes(&bytes).map_err(|_| Error::custom("invalid cid"))?,
+            ),
+            _ => return Err(Error::custom("invalid permission mode")),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::state::PermissionMode;
+    use cid::Cid;
+
+    #[test]
+    fn test_serialization() {
+        let p = PermissionMode::NoRestriction;
+        let v = fvm_ipld_encoding::to_vec(&p).unwrap();
+
+        let dp: PermissionMode = fvm_ipld_encoding::from_slice(&v).unwrap();
+        assert_eq!(dp, p);
+
+        let p = PermissionMode::Whitelist(Cid::default());
+        let v = fvm_ipld_encoding::to_vec(&p).unwrap();
+
+        let dp: PermissionMode = fvm_ipld_encoding::from_slice(&v).unwrap();
+        assert_eq!(dp, p)
     }
 }
