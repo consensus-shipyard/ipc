@@ -1,13 +1,10 @@
 
 name: Run tests against Fendermint (remote Docker image)
 
+
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-  schedule:
-    - cron: '0 0 * * *' # Run every day at midnight
-  workflow_dispatch: # Enable manual running
+  workflow_call:
 
 jobs:
   run:
