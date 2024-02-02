@@ -28,6 +28,7 @@ jobs:
           node-version: 18.19.0
       - name: Install dependencies
         run: npm install
+        working-directory: fevm-contract-tests
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -70,14 +71,14 @@ jobs:
           foundryup
       - name: Create a docker build
         id: docker-build
+        working-directory: ipc/fendermint
         run: |
           export PATH="$PATH:/home/runner/.config/.foundry/bin"
-          cd $GITHUB_WORKSPACE/ipc/fendermint
           make docker-build
       - name: Run a testnode
         id: testnode
+        working-directory: ipc/
         run: |
-          cd $GITHUB_WORKSPACE/ipc/
           export BALANCE=10000000000
           { out=$(FM_PULL_SKIP=true cargo make --makefile ./infra/fendermint/Makefile.toml testnode | tee /dev/fd/3); } 3>&1
           private_key=$(echo $out | sed -e 's/\(.*\)\([a-f0-9]\{64\}\)/0x\2/' | grep 0x | head -c66)
@@ -88,6 +89,7 @@ jobs:
         env:
           NUM_ACCOUNTS: 5
           ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
+        working-directory: fevm-contract-tests
         run: |
           npx hardhat --network local create-fund-accounts
       - name: 'Run tests: web3.js SimpleCoin'
@@ -95,11 +97,13 @@ jobs:
         env:
           ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
           USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
+        working-directory: fevm-contract-tests
         run: |
           npx hardhat --network local test ./test/web3.js/SimpleCoin.js
       - name: 'Run tests: web3.js ERC20'
         if: always()
         timeout-minutes: 2
+        working-directory: fevm-contract-tests
         env:
           ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
           USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
@@ -108,6 +112,7 @@ jobs:
       - name: 'Run tests: ethers.js SimpleCoin'
         if: always()
         timeout-minutes: 2
+        working-directory: fevm-contract-tests
         env:
           ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
           USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
@@ -116,6 +121,7 @@ jobs:
       - name: 'Run tests: ethers.js ERC20'
         if: always()
         timeout-minutes: 2
+        working-directory: fevm-contract-tests
         env:
           ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
           USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
@@ -124,6 +130,7 @@ jobs:
       - name: 'Run tests: Uniswap -- SKIPPING'
         if: always()
         timeout-minutes: 200
+        working-directory: fevm-contract-tests
         env:
           DEPLOYER_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
           USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT2_PRIVATE_KEY }}
@@ -132,6 +139,7 @@ jobs:
           echo skipping ; #cd ./extern/fevm-uniswap-v3-core && yarn install --frozen-lockfile && yarn compile &&  npx hardhat test test/UniswapV3Pool.spec.ts #  && yarn test
       - name: 'Run tests: OpenZeppelin -- SKIPPING'
         if: always()
+        working-directory: fevm-contract-tests
         env:
           USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
           USER_2_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT2_PRIVATE_KEY }}
