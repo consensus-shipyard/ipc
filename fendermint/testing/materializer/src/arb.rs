@@ -220,9 +220,9 @@ fn gen_subnets(
         let rs = (0..1 + usize::arbitrary(g) % 3)
             .map(|_| {
                 let r = Relayer {
-                    submitter: choose_one(g, &account_ids),
+                    submitter: choose_one(g, account_ids),
                     follow_node: choose_one(g, &ss),
-                    submit_node: g.choose(&parent_node_ids).cloned(),
+                    submit_node: g.choose(parent_node_ids).cloned(),
                 };
                 let id = RelayerId::arbitrary(g);
                 (id, r)
