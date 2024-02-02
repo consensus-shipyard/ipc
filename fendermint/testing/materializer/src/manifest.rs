@@ -31,10 +31,14 @@ pub type SubnetId = ResourceId;
 /// A human readable name for a node.
 pub type NodeId = ResourceId;
 
+/// A human readable name for a relayer.
+pub type RelayerId = ResourceId;
+
 pub type SubnetMap = BTreeMap<SubnetId, Subnet>;
 pub type BalanceMap = BTreeMap<AccountId, Balance>;
 pub type CollateralMap = BTreeMap<AccountId, Collateral>;
 pub type NodeMap = BTreeMap<NodeId, Node>;
+pub type RelayerMap = BTreeMap<RelayerId, Relayer>;
 
 /// The manifest is a static description of a testnet.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -111,6 +115,8 @@ pub struct Subnet {
     pub balances: BalanceMap,
     /// Nodes that participate in running the chain of this subnet.
     pub nodes: NodeMap,
+    /// Relayers that submit bottom-up checkpoints to the parent subnet.
+    pub relayers: RelayerMap,
     /// Child subnets under this parent.
     ///
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
@@ -125,6 +131,9 @@ pub struct Node {
     pub ethapi: bool,
     /// The nodes from which CometBFT should bootstrap itself.
     pub seed_nodes: Vec<NodeId>,
+    /// The parent node that the top-down syncer follows;
+    /// or leave it empty if the parent is CalibrationNet.
+    pub parent_node: Option<NodeId>,
 }
 
 /// The mode in which CometBFT is running.
@@ -134,6 +143,17 @@ pub enum NodeMode {
     Validator(AccountId),
     /// A node which runs consensus and executes blocks, but doesn't have a validator key.
     Full,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Relayer {
+    /// The account which will pay for the submission on the parent subnet.
+    pub submitter: AccountId,
+    /// The node which the relayer is following on the subnet.
+    pub follow_node: NodeId,
+    /// The node where the relayer submits the checkpoints;
+    /// or leave it empty if the parent is CalibrationNet.
+    pub submit_node: Option<NodeId>,
 }
 
 #[cfg(test)]

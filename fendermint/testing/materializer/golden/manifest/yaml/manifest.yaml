@@ -1,370 +1,159 @@
 accounts:
-  Ocp: {}
-  Ohk_5E: {}
-  jcuRwj: {}
-  nPwn: {}
-  pcR1: {}
-  tAz7P_: {}
-  y75o: {}
-  zAG8Y1JJ: {}
+  ZHwF2TC8: {}
+  _OJb6A91: {}
+  oAlf: {}
+  tHjJ9_br: {}
+  tgBs: {}
 deployment: !New
-  deployer: pcR1
+  deployer: tHjJ9_br
 subnets:
-  ABP:
-    creator: Ohk_5E
+  E56F-JQd:
+    creator: ZHwF2TC8
     validators:
-      Ohk_5E: '6082463851052759772'
-      jcuRwj: '8098562232977135667'
-      nPwn: '3095333512423508242'
-      tAz7P_: '8692970864435743057'
+      ZHwF2TC8: '4455057413088516383'
+      oAlf: '8981520645260050433'
     balances:
-      Ocp: '9118227369064298047'
-      jcuRwj: '1'
-      nPwn: '6347414525121653225'
-      pcR1: '6582256554324345741'
-      tAz7P_: '3200999806425086491'
-      zAG8Y1JJ: '7292505135270395883'
+      ZHwF2TC8: '8500085386504004303'
     nodes:
-      LZAcQs:
-        mode: !Validator nPwn
-        ethapi: true
-        seed_nodes:
-        - iK8Kf
-      QBAe0:
-        mode: !Validator tAz7P_
+      7BwQPvg:
+        mode: !Validator ZHwF2TC8
+        ethapi: false
+        seed_nodes: []
+        parent_node: null
+      ROLzUpdk:
+        mode: !Validator oAlf
         ethapi: false
         seed_nodes:
-        - kBE
-      iK8Kf:
-        mode: !Validator jcuRwj
-        ethapi: true
-        seed_nodes:
-        - kBE
-      kBE:
-        mode: !Validator Ohk_5E
-        ethapi: true
-        seed_nodes: []
-    subnets: {}
-  Bf4og:
-    creator: tAz7P_
-    validators:
-      zAG8Y1JJ: '7653002437432776451'
-    balances:
-      Ohk_5E: '1'
-      tAz7P_: '8686773097152778951'
-      y75o: '2439442234809190138'
-      zAG8Y1JJ: '5039677753358487859'
-    nodes:
-      oaA:
-        mode: !Validator zAG8Y1JJ
-        ethapi: true
-        seed_nodes: []
+        - 7BwQPvg
+        parent_node: null
+    relayers:
+      42S:
+        submitter: _OJb6A91
+        follow_node: 7BwQPvg
+        submit_node: null
     subnets:
-      zmSCs:
-        creator: pcR1
+      B0jIp:
+        creator: oAlf
         validators:
-          Ocp: '7091207379126376328'
-          Ohk_5E: '6721384486531385031'
+          ZHwF2TC8: '4855078089553797626'
+          _OJb6A91: '7820230612362394304'
+          oAlf: '6495147154496061579'
+          tgBs: '3244442661650238689'
         balances:
-          Ocp: '1'
-          nPwn: '6124206685926188367'
-          pcR1: '3074631723137446112'
-          tAz7P_: '2374994316020934595'
-          y75o: '792490989211636269'
-          zAG8Y1JJ: '4423014004192881839'
+          oAlf: '2933855302558872843'
+          tHjJ9_br: '2349031714788948144'
+          tgBs: '1049689185234591385'
         nodes:
-          ioO:
-            mode: !Validator Ocp
-            ethapi: false
+          MB9c:
+            mode: !Validator ZHwF2TC8
+            ethapi: true
             seed_nodes: []
-          zaA:
-            mode: !Validator Ohk_5E
+            parent_node: 7BwQPvg
+          ROzMORwB:
+            mode: !Validator _OJb6A91
             ethapi: true
             seed_nodes:
-            - ioO
+            - MB9c
+            parent_node: 7BwQPvg
+          lsAEMiv:
+            mode: !Validator tgBs
+            ethapi: false
+            seed_nodes:
+            - MB9c
+            parent_node: 7BwQPvg
+          qG9J0_A:
+            mode: !Validator oAlf
+            ethapi: false
+            seed_nodes:
+            - MB9c
+            parent_node: 7BwQPvg
+        relayers:
+          I_HLIq:
+            submitter: ZHwF2TC8
+            follow_node: qG9J0_A
+            submit_node: ROLzUpdk
+          M6i7ub:
+            submitter: oAlf
+            follow_node: MB9c
+            submit_node: ROLzUpdk
         subnets: {}
-  K-fUZn4H:
-    creator: zAG8Y1JJ
-    validators:
-      Ocp: '8032827857893991486'
-      jcuRwj: '2643792669727821371'
-      y75o: '2116145176620530204'
-      zAG8Y1JJ: '2988611764703879383'
-    balances:
-      Ocp: '6208341674120385380'
-      nPwn: '5037431524618964370'
-      tAz7P_: '7512799809722296504'
-      y75o: '7078777881939542059'
-      zAG8Y1JJ: '7198540683940626838'
-    nodes:
-      8UB:
-        mode: !Validator Ocp
-        ethapi: true
-        seed_nodes: []
-      BVR9YkWl:
-        mode: !Validator zAG8Y1JJ
-        ethapi: false
-        seed_nodes:
-        - 8UB
-        - rsaU
-      eYvhjCi:
-        mode: !Validator jcuRwj
-        ethapi: true
-        seed_nodes:
-        - 8UB
-      rsaU:
-        mode: Full
-        ethapi: false
-        seed_nodes:
-        - eYvhjCi
-    subnets:
-      8BB10-A:
-        creator: pcR1
+      HVEU:
+        creator: _OJb6A91
         validators:
-          Ocp: '1624068510494637813'
-          Ohk_5E: '8716931116264544208'
-          pcR1: '5134892323775212775'
-          tAz7P_: '4913179484184960749'
-          y75o: '5567025158762507313'
-          zAG8Y1JJ: '967104091682100431'
+          ZHwF2TC8: '3059943817364050081'
+          _OJb6A91: '8699100174380778724'
+          tHjJ9_br: '5474122255922582795'
+          tgBs: '7442000236249734631'
         balances:
-          Ocp: '6055098339957230246'
-          jcuRwj: '4370414475944050083'
-          nPwn: '3618301342760281005'
-          pcR1: '6412539665492961552'
-          tAz7P_: '5867786545850078875'
-          y75o: '6249323517740405787'
-          zAG8Y1JJ: '122626027783713529'
+          tHjJ9_br: '6023497351013626645'
+          tgBs: '9127369900818383313'
         nodes:
-          3-f:
-            mode: !Validator tAz7P_
-            ethapi: false
-            seed_nodes:
-            - BwmCvaR
-            - x9B-Bl
-          BwmCvaR:
-            mode: !Validator Ocp
+          48XiIU:
+            mode: !Validator ZHwF2TC8
             ethapi: false
             seed_nodes: []
-          iLcA:
-            mode: !Validator y75o
+            parent_node: 7BwQPvg
+          P7r:
+            mode: !Validator tHjJ9_br
             ethapi: false
             seed_nodes:
-            - sGDY
-            - x9B-Bl
-            - 3-f
-          oUBA:
-            mode: !Validator zAG8Y1JJ
-            ethapi: true
-            seed_nodes:
-            - sGDY
-            - x9B-Bl
-            - iLcA
-          sGDY:
-            mode: !Validator Ohk_5E
+            - 48XiIU
+            parent_node: ROLzUpdk
+          Z_gtXBNF:
+            mode: !Validator _OJb6A91
             ethapi: false
             seed_nodes:
-            - BwmCvaR
-          x9B-Bl:
-            mode: !Validator pcR1
+            - 48XiIU
+            parent_node: 7BwQPvg
+          jyBtIP:
+            mode: Full
             ethapi: false
             seed_nodes:
-            - BwmCvaR
+            - P7r
+            parent_node: 7BwQPvg
+        relayers:
+          IoA:
+            submitter: tHjJ9_br
+            follow_node: Z_gtXBNF
+            submit_node: ROLzUpdk
         subnets: {}
-      USfltA:
-        creator: nPwn
+      TwsP:
+        creator: tgBs
         validators:
-          nPwn: '5229919184367923343'
-          y75o: '1339748001480544245'
-          zAG8Y1JJ: '4606313066834756408'
+          ZHwF2TC8: '4689764406798737329'
+          _OJb6A91: '4970630540036078221'
+          oAlf: '1522042891118870855'
+          tgBs: '1031362546208195442'
         balances:
-          zAG8Y1JJ: '4030527744700597023'
+          tHjJ9_br: '3572568633217102283'
         nodes:
-          60Iw:
-            mode: !Validator zAG8Y1JJ
-            ethapi: false
-            seed_nodes:
-            - J2eQAs7
-          FCinXAl3:
-            mode: !Validator nPwn
-            ethapi: false
-            seed_nodes: []
-          J2eQAs7:
-            mode: !Validator y75o
-            ethapi: false
-            seed_nodes:
-            - FCinXAl3
-        subnets: {}
-      ao_GDH:
-        creator: jcuRwj
-        validators:
-          Ocp: '3890542840195619038'
-          nPwn: '4648381180085801814'
-          tAz7P_: '2026266764816353394'
-        balances:
-          Ohk_5E: '5398203911507875033'
-          jcuRwj: '6423700834099361832'
-        nodes:
-          NXC5wXYb:
-            mode: !Validator tAz7P_
-            ethapi: true
-            seed_nodes:
-            - oTC8OF
-          _0Td6:
-            mode: !Validator Ocp
-            ethapi: false
-            seed_nodes: []
-          oTC8OF:
-            mode: !Validator nPwn
-            ethapi: false
-            seed_nodes:
-            - _0Td6
-        subnets: {}
-  VEV6:
-    creator: nPwn
-    validators:
-      Ohk_5E: '5774824326688745725'
-      zAG8Y1JJ: '1566291248433919687'
-    balances:
-      Ocp: '492935632376771660'
-      Ohk_5E: '662984035755672788'
-      jcuRwj: '5618079094512622400'
-      pcR1: '6724529083866091454'
-      tAz7P_: '5116430462089511113'
-      y75o: '4299028929871506795'
-      zAG8Y1JJ: '327284105724014067'
-    nodes:
-      Zz5E:
-        mode: Full
-        ethapi: false
-        seed_nodes:
-        - oMY
-      oMY:
-        mode: !Validator Ohk_5E
-        ethapi: false
-        seed_nodes: []
-    subnets:
-      6tH_vWGS:
-        creator: Ocp
-        validators:
-          Ocp: '2718599762514304977'
-        balances:
-          Ocp: '1492312557218695977'
-          Ohk_5E: '1'
-          jcuRwj: '5618438691886739063'
-          nPwn: '2768220321465911886'
-          pcR1: '912674129475703700'
-          tAz7P_: '3319639824672021124'
-          y75o: '3298343245512736421'
-        nodes:
-          uEt7MB7:
-            mode: !Validator Ocp
-            ethapi: true
-            seed_nodes: []
-        subnets: {}
-      PhY:
-        creator: zAG8Y1JJ
-        validators:
-          Ocp: '4114591819932602507'
-          Ohk_5E: '300709061414220154'
-          nPwn: '1'
-          zAG8Y1JJ: '2113426023700449121'
-        balances:
-          Ohk_5E: '3805746899151062901'
-          tAz7P_: '1899274743308419692'
-          zAG8Y1JJ: '2028437884610830782'
-        nodes:
-          0CGaiAWS:
-            mode: !Validator zAG8Y1JJ
-            ethapi: true
-            seed_nodes:
-            - JpoCBWLB
-            - XX_
-          JpoCBWLB:
-            mode: !Validator Ocp
-            ethapi: false
-            seed_nodes: []
-          XX_:
-            mode: !Validator Ohk_5E
-            ethapi: true
-            seed_nodes:
-            - JpoCBWLB
-          kgsZzAdW:
-            mode: !Validator nPwn
-            ethapi: true
-            seed_nodes:
-            - JpoCBWLB
-        subnets: {}
-      a_FB:
-        creator: nPwn
-        validators:
-          Ocp: '3043407876894043700'
-          jcuRwj: '6429616570422568643'
-          nPwn: '4299293864598604725'
-          pcR1: '5494605568055540247'
-          tAz7P_: '296164287825345102'
-          zAG8Y1JJ: '661004302173421512'
-        balances:
-          Ohk_5E: '4777658083738302573'
-          jcuRwj: '373102482061294419'
-          nPwn: '1'
-          tAz7P_: '2451362606991044343'
-          y75o: '2421668505578350906'
-          zAG8Y1JJ: '636525479565084560'
-        nodes:
-          _Lv:
-            mode: !Validator Ocp
-            ethapi: true
-            seed_nodes: []
-          _LzIRY:
+          5cZW:
             mode: Full
             ethapi: true
             seed_nodes:
-            - _Lv
-            - qvAB9Dx
-          bT7:
-            mode: !Validator nPwn
+            - vgP2
+            - PehiwB
+            parent_node: 7BwQPvg
+          7sPlOG:
+            mode: Full
             ethapi: false
             seed_nodes:
-            - qvAB9Dx
-          qvAB9Dx:
-            mode: !Validator jcuRwj
+            - vgP2
+            parent_node: 7BwQPvg
+          PehiwB:
+            mode: !Validator _OJb6A91
             ethapi: true
             seed_nodes:
-            - _Lv
-          r_4:
-            mode: !Validator zAG8Y1JJ
-            ethapi: false
-            seed_nodes:
-            - _Lv
-            - qvAB9Dx
-            - rgod
-          rgod:
-            mode: !Validator tAz7P_
-            ethapi: true
-            seed_nodes:
-            - _Lv
-            - qvAB9Dx
-        subnets: {}
-      qRgjc8:
-        creator: y75o
-        validators:
-          jcuRwj: '4126724188936891305'
-          y75o: '4566710710613575493'
-        balances:
-          Ocp: '497572225773040583'
-          Ohk_5E: '4422901079989220673'
-          tAz7P_: '3107938650702332653'
-          y75o: '179119752636531146'
-          zAG8Y1JJ: '4593525327286620288'
-        nodes:
-          NsQ0:
-            mode: !Validator y75o
-            ethapi: false
-            seed_nodes:
-            - ZlpB8M
-          ZlpB8M:
-            mode: !Validator jcuRwj
+            - vgP2
+            parent_node: 7BwQPvg
+          vgP2:
+            mode: !Validator ZHwF2TC8
             ethapi: true
             seed_nodes: []
+            parent_node: ROLzUpdk
+        relayers:
+          CSOB:
+            submitter: oAlf
+            follow_node: PehiwB
+            submit_node: 7BwQPvg
         subnets: {}

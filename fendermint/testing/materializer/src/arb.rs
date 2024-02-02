@@ -16,7 +16,7 @@ use quickcheck::{Arbitrary, Gen};
 
 use crate::manifest::{
     Account, AccountId, Balance, BalanceMap, CollateralMap, Manifest, Node, NodeId, NodeMap,
-    NodeMode, ResourceId, RootDeployment, Subnet, SubnetId, SubnetMap,
+    NodeMode, Relayer, RelayerId, ResourceId, RootDeployment, Subnet, SubnetId, SubnetMap,
 };
 
 const RESOURCE_ID_CHARSET: &[u8] =
@@ -61,12 +61,12 @@ fn choose_at_least<T: Clone>(g: &mut Gen, min_size: usize, xs: &[T]) -> Vec<T> {
     let mut remaining_items = xs.len();
 
     let mut chosen = Vec::new();
-    for i in 0..xs.len() {
+    for x in xs {
         if remaining_slots == 0 {
             break;
         }
         if usize::arbitrary(g) % remaining_items < remaining_slots {
-            chosen.push(xs[i].clone());
+            chosen.push(x.clone());
             remaining_slots -= 1;
         }
         remaining_items -= 1;
@@ -111,7 +111,7 @@ fn gen_manifest(
     max_level: usize,
     default_balance: Balance,
 ) -> Manifest {
-    let account_ids = (0..4 + usize::arbitrary(g) % 7)
+    let account_ids = (0..3 + usize::arbitrary(g) % 3)
         .map(|_| AccountId::arbitrary(g))
         .collect::<Vec<_>>();
 
@@ -120,13 +120,21 @@ fn gen_manifest(
         .map(|id| (id.clone(), Account {}))
         .collect();
 
-    let mut balances = account_ids
+    let mut balances: BalanceMap = account_ids
         .iter()
         .map(|id| (id.clone(), default_balance.clone()))
         .collect();
 
     // The rootnet is L1, immediate subnets are L2.
-    let subnets = gen_subnets(g, max_children, max_level, 2, &account_ids, &mut balances);
+    let subnets = gen_subnets(
+        g,
+        max_children,
+        max_level,
+        2,
+        &account_ids,
+        &[],
+        &mut balances,
+    );
 
     Manifest {
         accounts,
@@ -144,6 +152,7 @@ fn gen_subnets(
     max_level: usize,
     level: usize,
     account_ids: &[AccountId],
+    parent_node_ids: &[NodeId],
     balances: &mut BalanceMap,
 ) -> SubnetMap {
     let mut subnets = SubnetMap::default();
@@ -151,7 +160,9 @@ fn gen_subnets(
         return subnets;
     }
 
-    for _ in 0..usize::arbitrary(g) % max_children {
+    let min_children = if level == 2 { 1 } else { 0 };
+
+    for _ in 0..min_children + usize::arbitrary(g) % (max_children - min_children) {
         // We can pick any creator; we'll make sure this one also gets some
         // funds to pay for the creation of the subnet.
         let c = choose_one(g, account_ids);
@@ -198,6 +209,7 @@ fn gen_subnets(
                 mode,
                 ethapi: bool::arbitrary(g),
                 seed_nodes,
+                parent_node: g.choose(parent_node_ids).cloned(),
             };
             let id = NodeId::arbitrary(g);
             ss.push(id.clone());
@@ -205,14 +217,35 @@ fn gen_subnets(
             sw += w.0.clone();
         }
 
-        let ss = gen_subnets(g, max_children, max_level, level + 1, account_ids, balances);
+        let rs = (0..1 + usize::arbitrary(g) % 3)
+            .map(|_| {
+                let r = Relayer {
+                    submitter: choose_one(g, &account_ids),
+                    follow_node: choose_one(g, &ss),
+                    submit_node: g.choose(&parent_node_ids).cloned(),
+                };
+                let id = RelayerId::arbitrary(g);
+                (id, r)
+            })
+            .collect();
+
+        let ss = gen_subnets(
+            g,
+            max_children,
+            max_level,
+            level + 1,
+            account_ids,
+            &ss,
+            balances,
+        );
 
         let s = Subnet {
             creator: c,
             validators: vs,
             balances: bs,
-            subnets: ss,
             nodes: ns,
+            relayers: rs,
+            subnets: ss,
         };
 
         let sid = SubnetId::arbitrary(g);

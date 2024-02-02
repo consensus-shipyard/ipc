@@ -1,382 +1,293 @@
 {
   "accounts": {
-    "2sa": {},
-    "8vB": {},
-    "95ArvVwq": {},
-    "C_tqa": {},
-    "CkkXd": {},
-    "NgDKAi": {},
-    "_bF": {},
-    "xRDcOpxE": {},
-    "yXFBg3n": {}
+    "Kz3v": {},
+    "brXe6uRW": {},
+    "iEABs": {}
   },
   "deployment": {
     "New": {
-      "deployer": "NgDKAi"
+      "deployer": "brXe6uRW"
     }
   },
   "subnets": {
-    "ZgU": {
-      "creator": "C_tqa",
+    "1_YBx_": {
+      "creator": "iEABs",
       "validators": {
-        "95ArvVwq": "2510202431736513045",
-        "C_tqa": "2878047485467043678",
-        "CkkXd": "8008167709403972033",
-        "xRDcOpxE": "1140734166318035545"
+        "Kz3v": "1267892379513668250"
       },
-      "balances": {
-        "2sa": "2696949284254515946",
-        "CkkXd": "6984669332164296178",
-        "NgDKAi": "8630644356097866124",
-        "yXFBg3n": "6026827619234762634"
-      },
+      "balances": {},
       "nodes": {
-        "6wl": {
+        "mz6AF": {
           "mode": {
-            "Validator": "xRDcOpxE"
+            "Validator": "Kz3v"
           },
           "ethapi": true,
-          "seed_nodes": [
-            "pMWp4dH",
-            "fsSh"
-          ]
+          "seed_nodes": [],
+          "parent_node": null
+        }
+      },
+      "relayers": {
+        "8Wad57f_": {
+          "submitter": "Kz3v",
+          "follow_node": "mz6AF",
+          "submit_node": null
         },
-        "fsSh": {
-          "mode": {
-            "Validator": "C_tqa"
-          },
-          "ethapi": true,
-          "seed_nodes": [
-            "pMWp4dH"
-          ]
+        "B2qmleh1": {
+          "submitter": "brXe6uRW",
+          "follow_node": "mz6AF",
+          "submit_node": null
         },
-        "lHwW": {
-          "mode": {
-            "Validator": "CkkXd"
-          },
-          "ethapi": true,
-          "seed_nodes": [
-            "fsSh"
-          ]
-        },
-        "pMWp4dH": {
-          "mode": {
-            "Validator": "95ArvVwq"
-          },
-          "ethapi": false,
-          "seed_nodes": []
+        "CBrJzA1C": {
+          "submitter": "Kz3v",
+          "follow_node": "mz6AF",
+          "submit_node": null
         }
       },
       "subnets": {
-        "B3rpe": {
-          "creator": "C_tqa",
+        "Khi": {
+          "creator": "iEABs",
           "validators": {
-            "2sa": "2146357993265680499",
-            "8vB": "3239005825678583401",
-            "95ArvVwq": "5669302302427088255",
-            "C_tqa": "5126597362232203682",
-            "NgDKAi": "4787472349184076703",
-            "_bF": "1276516502280839209",
-            "xRDcOpxE": "6543384188325780197",
-            "yXFBg3n": "3465922535997490507"
+            "brXe6uRW": "2132167801618563071"
           },
-          "balances": {
-            "xRDcOpxE": "4856528184243038149"
-          },
+          "balances": {},
           "nodes": {
-            "A58lJK": {
+            "_B_": {
               "mode": {
-                "Validator": "95ArvVwq"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "RzNGs"
-              ]
-            },
-            "Agk4X2": {
-              "mode": "Full",
-              "ethapi": false,
-              "seed_nodes": [
-                "peAuQ-w"
-              ]
-            },
-            "EDQTBYyE": {
-              "mode": {
-                "Validator": "_bF"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "peAuQ-w"
-              ]
-            },
-            "Oiw": {
-              "mode": {
-                "Validator": "yXFBg3n"
+                "Validator": "brXe6uRW"
               },
               "ethapi": false,
-              "seed_nodes": [
-                "A58lJK",
-                "peAuQ-w",
-                "g26Z",
-                "EDQTBYyE"
-              ]
+              "seed_nodes": [],
+              "parent_node": "mz6AF"
+            }
+          },
+          "relayers": {
+            "ljcSv": {
+              "submitter": "Kz3v",
+              "follow_node": "_B_",
+              "submit_node": "mz6AF"
             },
-            "RzNGs": {
-              "mode": {
-                "Validator": "8vB"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "aO2Rs4N"
-              ]
-            },
-            "aO2Rs4N": {
-              "mode": {
-                "Validator": "2sa"
-              },
-              "ethapi": true,
-              "seed_nodes": []
-            },
-            "g26Z": {
-              "mode": {
-                "Validator": "NgDKAi"
-              },
-              "ethapi": false,
-              "seed_nodes": [
-                "A58lJK"
-              ]
-            },
-            "peAuQ-w": {
-              "mode": {
-                "Validator": "C_tqa"
-              },
-              "ethapi": false,
-              "seed_nodes": [
-                "aO2Rs4N",
-                "RzNGs"
-              ]
+            "vO-_": {
+              "submitter": "Kz3v",
+              "follow_node": "_B_",
+              "submit_node": "mz6AF"
             }
           },
           "subnets": {}
         },
-        "KCm": {
-          "creator": "2sa",
+        "UFf": {
+          "creator": "brXe6uRW",
           "validators": {
-            "2sa": "5834428285200196302",
-            "8vB": "5768922184536466120",
-            "C_tqa": "7611202568151198810",
-            "NgDKAi": "5917712193743263815",
-            "_bF": "462541386874045663",
-            "xRDcOpxE": "2894913010363927284",
-            "yXFBg3n": "3555022788322045189"
+            "brXe6uRW": "505655243245642559",
+            "iEABs": "7087466488723939970"
           },
           "balances": {
-            "C_tqa": "7124215781197828115",
-            "_bF": "933034382704050680",
-            "xRDcOpxE": "1"
+            "brXe6uRW": "1"
           },
           "nodes": {
-            "0QAcuXE": {
-              "mode": "Full",
-              "ethapi": true,
-              "seed_nodes": [
-                "Wux2B",
-                "Hxqe0T",
-                "pG2gVXvx"
-              ]
-            },
-            "92tr": {
+            "fJIl7aYQ": {
               "mode": {
-                "Validator": "NgDKAi"
+                "Validator": "iEABs"
               },
               "ethapi": true,
               "seed_nodes": [
-                "Wux2B"
-              ]
+                "i0l_"
+              ],
+              "parent_node": "mz6AF"
             },
-            "Hxqe0T": {
+            "i0l_": {
               "mode": {
-                "Validator": "8vB"
-              },
-              "ethapi": false,
-              "seed_nodes": [
-                "Wux2B"
-              ]
-            },
-            "JGfnuEl6": {
-              "mode": "Full",
-              "ethapi": true,
-              "seed_nodes": [
-                "Hxqe0T",
-                "92tr"
-              ]
-            },
-            "Wux2B": {
-              "mode": {
-                "Validator": "2sa"
+                "Validator": "brXe6uRW"
               },
               "ethapi": true,
-              "seed_nodes": []
-            },
-            "pG2gVXvx": {
-              "mode": {
-                "Validator": "C_tqa"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "Hxqe0T"
-              ]
-            },
-            "uN6v2h2n": {
-              "mode": "Full",
-              "ethapi": false,
-              "seed_nodes": [
-                "Wux2B",
-                "0QAcuXE",
-                "JGfnuEl6"
-              ]
+              "seed_nodes": [],
+              "parent_node": "mz6AF"
             }
           },
-          "subnets": {}
-        },
-        "YWBA": {
-          "creator": "_bF",
-          "validators": {
-            "2sa": "4863897884065415362",
-            "8vB": "1428737991490391662",
-            "95ArvVwq": "6385014204032874364",
-            "C_tqa": "1294434145934062060",
-            "CkkXd": "1",
-            "_bF": "5226764209965238097",
-            "xRDcOpxE": "3748236474845341211",
-            "yXFBg3n": "4505892584122311864"
-          },
-          "balances": {
-            "8vB": "3507088478297481855",
-            "C_tqa": "3809089790466665683",
-            "NgDKAi": "7742087894501076012",
-            "xRDcOpxE": "8719065870122660215",
-            "yXFBg3n": "8060717118134733106"
-          },
-          "nodes": {
-            "7532BXXA": {
-              "mode": {
-                "Validator": "_bF"
-              },
-              "ethapi": false,
-              "seed_nodes": [
-                "LPBA_"
-              ]
+          "relayers": {
+            "XSha-": {
+              "submitter": "brXe6uRW",
+              "follow_node": "fJIl7aYQ",
+              "submit_node": "mz6AF"
             },
-            "ADlzdDt": {
-              "mode": {
-                "Validator": "2sa"
-              },
-              "ethapi": false,
-              "seed_nodes": []
+            "gLaQUrRv": {
+              "submitter": "Kz3v",
+              "follow_node": "i0l_",
+              "submit_node": "mz6AF"
             },
-            "JJHJ": {
-              "mode": "Full",
-              "ethapi": true,
-              "seed_nodes": [
-                "ADlzdDt",
-                "LPBA_",
-                "zMNJb",
-                "NBRTL9C",
-                "7532BXXA"
-              ]
-            },
-            "LPBA_": {
-              "mode": {
-                "Validator": "8vB"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "ADlzdDt"
-              ]
-            },
-            "NBRTL9C": {
-              "mode": {
-                "Validator": "C_tqa"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "ADlzdDt"
-              ]
-            },
-            "SkgYSn": {
-              "mode": {
-                "Validator": "CkkXd"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "LPBA_",
-                "zMNJb"
-              ]
-            },
-            "qPY8_": {
-              "mode": {
-                "Validator": "xRDcOpxE"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "7532BXXA"
-              ]
-            },
-            "zMNJb": {
-              "mode": {
-                "Validator": "95ArvVwq"
-              },
-              "ethapi": false,
-              "seed_nodes": [
-                "LPBA_"
-              ]
-            }
-          },
-          "subnets": {}
-        },
-        "aBQI": {
-          "creator": "CkkXd",
-          "validators": {
-            "C_tqa": "4135739837733499422",
-            "NgDKAi": "4796081075820395825",
-            "yXFBg3n": "1690356333856554297"
-          },
-          "balances": {
-            "CkkXd": "5063856655797500262",
-            "NgDKAi": "6423084844515359656",
-            "xRDcOpxE": "6204640101321461340"
-          },
-          "nodes": {
-            "BCzBpQ": {
-              "mode": {
-                "Validator": "NgDKAi"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "bJXL9z_"
-              ]
-            },
-            "bJXL9z_": {
-              "mode": {
-                "Validator": "C_tqa"
-              },
-              "ethapi": true,
-              "seed_nodes": []
-            },
-            "ziD-": {
-              "mode": {
-                "Validator": "yXFBg3n"
-              },
-              "ethapi": true,
-              "seed_nodes": [
-                "BCzBpQ"
-              ]
+            "lBB0_uU": {
+              "submitter": "iEABs",
+              "follow_node": "fJIl7aYQ",
+              "submit_node": "mz6AF"
             }
           },
           "subnets": {}
         }
       }
+    },
+    "EmAQ9": {
+      "creator": "brXe6uRW",
+      "validators": {
+        "iEABs": "1125890559566752210"
+      },
+      "balances": {
+        "brXe6uRW": "9038444731847099909",
+        "iEABs": "1016341957643048110"
+      },
+      "nodes": {
+        "HAl": {
+          "mode": {
+            "Validator": "iEABs"
+          },
+          "ethapi": true,
+          "seed_nodes": [],
+          "parent_node": null
+        }
+      },
+      "relayers": {
+        "Ah5REv": {
+          "submitter": "iEABs",
+          "follow_node": "HAl",
+          "submit_node": null
+        },
+        "BTkR": {
+          "submitter": "iEABs",
+          "follow_node": "HAl",
+          "submit_node": null
+        },
+        "KqH": {
+          "submitter": "Kz3v",
+          "follow_node": "HAl",
+          "submit_node": null
+        }
+      },
+      "subnets": {
+        "0Vtpmw": {
+          "creator": "Kz3v",
+          "validators": {
+            "Kz3v": "2568317476104208023"
+          },
+          "balances": {
+            "Kz3v": "5796862532633959229",
+            "brXe6uRW": "1462644769194692827"
+          },
+          "nodes": {
+            "TaBu": {
+              "mode": {
+                "Validator": "Kz3v"
+              },
+              "ethapi": false,
+              "seed_nodes": [],
+              "parent_node": "HAl"
+            }
+          },
+          "relayers": {
+            "UjWf": {
+              "submitter": "Kz3v",
+              "follow_node": "TaBu",
+              "submit_node": "HAl"
+            }
+          },
+          "subnets": {}
+        },
+        "3aKmcuao": {
+          "creator": "iEABs",
+          "validators": {
+            "Kz3v": "6734267475634836258"
+          },
+          "balances": {
+            "Kz3v": "1",
+            "brXe6uRW": "6664498449305188348"
+          },
+          "nodes": {
+            "OUgAnBc7": {
+              "mode": {
+                "Validator": "Kz3v"
+              },
+              "ethapi": true,
+              "seed_nodes": [],
+              "parent_node": "HAl"
+            }
+          },
+          "relayers": {
+            "qBjs1Fqq": {
+              "submitter": "iEABs",
+              "follow_node": "OUgAnBc7",
+              "submit_node": "HAl"
+            }
+          },
+          "subnets": {}
+        },
+        "DOm": {
+          "creator": "Kz3v",
+          "validators": {
+            "Kz3v": "776400399761981639"
+          },
+          "balances": {
+            "iEABs": "1520704815845123406"
+          },
+          "nodes": {
+            "AdgD": {
+              "mode": {
+                "Validator": "Kz3v"
+              },
+              "ethapi": false,
+              "seed_nodes": [],
+              "parent_node": "HAl"
+            }
+          },
+          "relayers": {
+            "0FAe3o": {
+              "submitter": "brXe6uRW",
+              "follow_node": "AdgD",
+              "submit_node": "HAl"
+            },
+            "kiwlvG": {
+              "submitter": "Kz3v",
+              "follow_node": "AdgD",
+              "submit_node": "HAl"
+            }
+          },
+          "subnets": {}
+        }
+      }
+    },
+    "_AACN5qN": {
+      "creator": "brXe6uRW",
+      "validators": {
+        "Kz3v": "1305984134020640899",
+        "iEABs": "2009619582508497470"
+      },
+      "balances": {
+        "Kz3v": "3126099482816589500"
+      },
+      "nodes": {
+        "MIqBbR": {
+          "mode": {
+            "Validator": "Kz3v"
+          },
+          "ethapi": true,
+          "seed_nodes": [],
+          "parent_node": null
+        },
+        "fXVC4SK_": {
+          "mode": {
+            "Validator": "iEABs"
+          },
+          "ethapi": false,
+          "seed_nodes": [
+            "MIqBbR"
+          ],
+          "parent_node": null
+        }
+      },
+      "relayers": {
+        "590": {
+          "submitter": "brXe6uRW",
+          "follow_node": "MIqBbR",
+          "submit_node": null
+        }
+      },
+      "subnets": {}
     }
   }
 }
