@@ -63,18 +63,16 @@ impl CommandLineHandler for WalletImport {
 .args(&["path", "private_key"]),
 ))]
 pub(crate) struct WalletImportArgs {
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
     #[arg(
         long,
-        short,
         group = "key_source",
         help = "Path of key info file for the key to import"
     )]
     pub path: Option<String>,
     #[arg(
         long,
-        short,
         group = "key_source",
         help = "The evm private key to import if path is not specified"
     )]

@@ -38,10 +38,10 @@ impl CommandLineHandler for ListValidatorChanges {
 #[derive(Debug, Args)]
 #[command(about = "List of validator changes commmitted for a child subnet")]
 pub(crate) struct ListValidatorChangesArgs {
-    #[arg(long, short, help = "Lists the validator changes between two epochs")]
+    #[arg(long, help = "Lists the validator changes between two epochs")]
     pub subnet: String,
-    #[arg(long, short, help = "Include checkpoints from this epoch")]
+    #[arg(long, help = "Include checkpoints from this epoch")]
     pub from_epoch: ChainEpoch,
-    #[arg(long, short, help = "Include checkpoints up to this epoch")]
+    #[arg(long, help = "Include checkpoints up to this epoch")]
     pub to_epoch: ChainEpoch,
 }

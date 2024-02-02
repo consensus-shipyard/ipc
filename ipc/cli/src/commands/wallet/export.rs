@@ -102,23 +102,21 @@ impl CommandLineHandler for WalletExport {
 #[derive(Debug, Args)]
 #[command(about = "Export the key from a wallet address in JSON format")]
 pub(crate) struct WalletExportArgs {
-    #[arg(long, short, help = "Address of the key to export")]
+    #[arg(long, help = "Address of the key to export")]
     pub address: String,
     #[arg(
         long,
-        short,
         help = "Optional parameter that outputs the address key into the file specified"
     )]
     pub output: Option<String>,
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
     #[arg(
         long,
-        short,
         help = "Exports the secret key encoded in base64 as Fendermint expects"
     )]
     pub fendermint: bool,
-    #[arg(long, short, help = "Export the hex encoded secret key")]
+    #[arg(long, help = "Export the hex encoded secret key")]
     pub hex: bool,
 }
 
@@ -178,8 +176,8 @@ impl CommandLineHandler for WalletPublicKey {
 #[derive(Debug, Args)]
 #[command(about = "Return public key from a wallet address")]
 pub(crate) struct WalletPublicKeyArgs {
-    #[arg(long, short, help = "Address of the key to export")]
+    #[arg(long, help = "Address of the key to export")]
     pub address: String,
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
 }

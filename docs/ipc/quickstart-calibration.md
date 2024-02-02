@@ -58,14 +58,14 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 
 * Create the three different wallets
 ```bash
-ipc-cli wallet new -w evm
-ipc-cli wallet new -w evm
-ipc-cli wallet new -w evm
+ipc-cli wallet new --wallet-type evm
+ipc-cli wallet new --wallet-type evm
+ipc-cli wallet new --wallet-type evm
 ```
 
 * You can optionally set one of the wallets as your default so you don't have to use the `--from` flag explicitly in some of the commands:
 ```bash
-ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
+ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> --wallet-type evm
 ```
 
 <!-- * Convert the 0x addresses to f4 addresses for later usage (OWNER_1_F4, OWNER_2_F4, and OWNER_3_F4)  -->
@@ -77,7 +77,7 @@ ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
 
 * Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses
 
->💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `ipc-cli wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
+>💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `ipc-cli wallet export --wallet-type evm --address <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
 
 >💡 Note that you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
 
@@ -99,9 +99,9 @@ Before we deploy the infrastructure for the subnet, we will have to bootstrap th
 
 * Get the public key for all of your wallets and note it down. This is the public key that each of your validators will use to sign blocks in the subnet.
 ```bash
-ipc-cli wallet pub-key -w evm --address <WALLET_ADDR1>
-ipc-cli wallet pub-key -w evm --address <WALLET_ADDR2>
-ipc-cli wallet pub-key -w evm --address <WALLET_ADDR3>
+ipc-cli wallet pub-key --wallet-type evm --address <WALLET_ADDR1>
+ipc-cli wallet pub-key --wallet-type evm --address <WALLET_ADDR2>
+ipc-cli wallet pub-key --wallet-type evm --address <WALLET_ADDR3>
 ```
 
 * Join the subnet with each validator
@@ -190,9 +190,9 @@ With the bootstrap node deployed and advertised to the network, we are now ready
 * First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`. We'll later refer to the private key paths as `<PATH_PRIV_KEY_VALIDATOR_n>`.
 
 ```bash
-ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/validator_1.sk
-ipc-cli wallet export -w evm -a <WALLET_ADDR2> --hex -o ~/.ipc/validator_2.sk
-ipc-cli wallet export -w evm -a <WALLET_ADDR3> --hex -o ~/.ipc/validator_3.sk
+ipc-cli wallet export --wallet-type evm --address <WALLET_ADDR1> --hex > ~/.ipc/validator_1.sk
+ipc-cli wallet export --wallet-type evm --address <WALLET_ADDR2> --hex > ~/.ipc/validator_2.sk
+ipc-cli wallet export --wallet-type evm --address <WALLET_ADDR3> --hex > ~/.ipc/validator_3.sk
 ```
 
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
@@ -219,13 +219,13 @@ With this, we have everything in place, and our subnet should start automaticall
 ## Step 7: Configure your subnet in the IPC CLI
 
 * Edit the `ipc-cli` configuration `config.toml`
-  
+
 ```bash
 nano ~/.ipc/config.toml
 ```
 
 * Append the new subnet to the configuration
-  
+
 ```toml
 [[subnets]]
 id = <SUBNET_ID>    ## i.e. "/r314159/..."
@@ -239,7 +239,7 @@ registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 
 With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through the following command. The result should show the initial balance that you have included for your validators address in genesis:
 ```bash
-ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
+ipc-cli wallet balances --wallet-type evm --subnet=<SUBNET_ID>
 ```
 
 > The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively.

@@ -47,10 +47,9 @@ impl CommandLineHandler for WalletNew {
 pub(crate) struct WalletNewArgs {
     #[arg(
         long,
-        short,
         help = "The fvm key type of the wallet (secp256k1, bls, secp256k1-ledger), only for fvm wallet type"
     )]
     pub key_type: Option<String>,
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
 }
