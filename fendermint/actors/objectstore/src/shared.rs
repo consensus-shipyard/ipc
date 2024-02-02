@@ -57,7 +57,6 @@ impl State {
         content: Vec<u8>,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-
         let new_content = match hamt.get(&key)? {
             Some(existing) => {
                 let mut new_content = existing.clone();
@@ -66,7 +65,6 @@ impl State {
             }
             None => content,
         };
-
         hamt.set(key, new_content)?;
         self.root = hamt.flush()?;
         Ok(self.root)
