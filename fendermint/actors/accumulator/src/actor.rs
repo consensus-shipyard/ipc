@@ -46,6 +46,11 @@ impl Actor {
         Ok(())
     }
 
+    fn get_count(rt: &impl Runtime) -> Result<u64, ActorError> {
+        let st: State = rt.state()?;
+        Ok(st.leaf_count)
+    }
+
     fn get_peaks(rt: &impl Runtime) -> Result<Vec<Cid>, ActorError> {
         let st: State = rt.state()?;
         st.get_peaks(rt.store())
