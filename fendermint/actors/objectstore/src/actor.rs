@@ -20,8 +20,8 @@ pub struct Actor;
 
 impl Actor {
     fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
-        // FIXME: (sander) We're setting this up to be a subnet-wide actor for a single repo.
-        // FIXME: (sander) In the future, this could be deployed dynamically for multi repo subnets.
+        // FIXME:(sander) We're setting this up to be a subnet-wide actor for a single repo.
+        // FIXME:(sander) In the future, this could be deployed dynamically for multi repo subnets.
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let state = State::new(rt.store()).map_err(|e| {
@@ -35,7 +35,7 @@ impl Actor {
     }
 
     fn append_object(rt: &impl Runtime, params: PutObjectParams) -> Result<(), ActorError> {
-        // FIXME: (@carsonfarmer) We'll want to validate the caller is the owner of the repo.
+        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -49,7 +49,7 @@ impl Actor {
     }
 
     fn put_object(rt: &impl Runtime, params: PutObjectParams) -> Result<(), ActorError> {
-        // FIXME: (@carsonfarmer) We'll want to validate the caller is the owner of the repo.
+        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -63,7 +63,7 @@ impl Actor {
     }
 
     fn delete_object(rt: &impl Runtime, params: DeleteObjectParams) -> Result<(), ActorError> {
-        // FIXME: (@carsonfarmer) We'll want to validate the caller is the owner of the repo.
+        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         rt.transaction(|st: &mut State, rt| {

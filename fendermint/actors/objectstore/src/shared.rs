@@ -18,7 +18,7 @@ pub struct State {
     pub root: Cid,
 }
 
-// TODO: (@carsonfarmer) We'll likely want to define the metadata type that will actually be placed in the Hamt
+// TODO:(carsonfarmer) We'll likely want to define the metadata type that will actually be placed in the Hamt
 
 impl State {
     pub fn new<BS: Blockstore>(store: &BS) -> anyhow::Result<Self> {
@@ -45,7 +45,6 @@ impl State {
 
         let new_content = match hamt.get(&key)? {
             Some(existing) => {
-                // Append the object to the existing object
                 let mut new_content = existing.clone();
                 new_content.extend(content);
                 new_content
@@ -66,7 +65,7 @@ impl State {
     ) -> anyhow::Result<()> {
         let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
 
-        // TODO: We could use set_if_absent here to avoid overwriting existing objects.
+        // TODO:(carsonfarmer) We could use set_if_absent here to avoid overwriting existing objects.
         hamt.set(key, content)?;
         self.root = hamt.flush()?;
         Ok(())
@@ -74,7 +73,6 @@ impl State {
 
     pub fn delete<BS: Blockstore>(&mut self, store: &BS, key: &BytesKey) -> anyhow::Result<()> {
         let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-
         hamt.delete(key)?;
         self.root = hamt.flush()?;
         Ok(())
@@ -86,20 +84,17 @@ impl State {
         key: &BytesKey,
     ) -> anyhow::Result<Option<Vec<u8>>> {
         let hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-
         let value = hamt.get(key).map(|v| v.map(|inner| inner.to_owned()))?;
         Ok(value)
     }
 
     pub fn list<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Vec<u8>>> {
         let hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-
         let mut keys = Vec::new();
         hamt.for_each(|k, _| {
             keys.push(k.0.to_owned());
             Ok(())
         })?;
-
         Ok(keys)
     }
 }
@@ -130,9 +125,8 @@ pub enum Method {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_constructor() {
