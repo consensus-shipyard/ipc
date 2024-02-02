@@ -5,7 +5,7 @@
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
-use fvm_ipld_hamt::Hamt;
+use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 
@@ -34,6 +34,74 @@ impl State {
 
         Ok(Self { root })
     }
+
+    pub fn append<BS: Blockstore>(
+        &mut self,
+        store: &BS,
+        key: BytesKey,
+        content: Vec<u8>,
+    ) -> anyhow::Result<()> {
+        let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+
+        let new_content = match hamt.get(&key)? {
+            Some(existing) => {
+                // Append the object to the existing object
+                let mut new_content = existing.clone();
+                new_content.extend(content);
+                new_content
+            }
+            None => content,
+        };
+
+        hamt.set(key, new_content)?;
+        self.root = hamt.flush()?;
+        Ok(())
+    }
+
+    pub fn put<BS: Blockstore>(
+        &mut self,
+        store: &BS,
+        key: BytesKey,
+        content: Vec<u8>,
+    ) -> anyhow::Result<()> {
+        let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+
+        // TODO: We could use set_if_absent here to avoid overwriting existing objects.
+        hamt.set(key, content)?;
+        self.root = hamt.flush()?;
+        Ok(())
+    }
+
+    pub fn delete<BS: Blockstore>(&mut self, store: &BS, key: &BytesKey) -> anyhow::Result<()> {
+        let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+
+        hamt.delete(key)?;
+        self.root = hamt.flush()?;
+        Ok(())
+    }
+
+    pub fn get<BS: Blockstore>(
+        &self,
+        store: &BS,
+        key: &BytesKey,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+
+        let value = hamt.get(key).map(|v| v.map(|inner| inner.to_owned()))?;
+        Ok(value)
+    }
+
+    pub fn list<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Vec<u8>>> {
+        let hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+
+        let mut keys = Vec::new();
+        hamt.for_each(|k, _| {
+            keys.push(k.0.to_owned());
+            Ok(())
+        })?;
+
+        Ok(keys)
+    }
 }
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
@@ -58,4 +126,104 @@ pub enum Method {
     GetObject = frc42_dispatch::method_hash!("GetObject"),
     DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
     ListObjects = frc42_dispatch::method_hash!("ListObjects"),
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn test_constructor() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let state = State::new(&store);
+        assert!(state.is_ok());
+        assert_eq!(
+            state.unwrap().root,
+            Cid::from_str("bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_put_object() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let params = PutObjectParams {
+            key: vec![1, 2, 3],
+            content: vec![4, 5, 6],
+        };
+        assert!(state
+            .put(&store, BytesKey(params.key), params.content)
+            .is_ok());
+
+        assert_eq!(
+            state.root,
+            Cid::from_str("bafy2bzacedojzjpwtx565wt43ard7e3kordcw4hf7bbpywpnkctasuwfh7c5m")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_append_object() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let params = PutObjectParams {
+            key: vec![1, 2, 3],
+            content: vec![4, 5, 6],
+        };
+        assert!(state
+            .append(&store, BytesKey(params.key), params.content)
+            .is_ok());
+    }
+
+    #[test]
+    fn test_get_object() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let params = PutObjectParams {
+            key: vec![1, 2, 3],
+            content: vec![4, 5, 6],
+        };
+
+        let key = BytesKey(params.key);
+        state.put(&store, key.clone(), params.content).unwrap();
+        let result = state.get(&store, &key);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(vec![4, 5, 6]));
+    }
+
+    #[test]
+    fn test_delete_object() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let params = PutObjectParams {
+            key: vec![1, 2, 3],
+            content: vec![4, 5, 6],
+        };
+        let key = BytesKey(params.key);
+        state.put(&store, key.clone(), params.content).unwrap();
+        assert!(state.delete(&store, &key).is_ok());
+
+        let result = state.get(&store, &key);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn test_list_objects() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let params = PutObjectParams {
+            key: vec![1, 2, 3],
+            content: vec![4, 5, 6],
+        };
+        state
+            .put(&store, BytesKey(params.key), params.content)
+            .unwrap();
+        let result = state.list(&store);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), vec![vec![1, 2, 3]]);
+    }
 }
