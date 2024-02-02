@@ -1,0 +1,144 @@
+
+name: Run tests against Fendermint (remote Docker image)
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * *' # Run every day at midnight
+  workflow_dispatch: # Enable manual running
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Test Repository
+        uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Checkout Fendermint
+        uses: actions/checkout@v2
+        with:
+          repository: 'consensus-shipyard/ipc'
+          submodules: 'recursive'
+          path: 'ipc'
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18.19.0
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Set up Rust cargo cache
+        uses: actions/cache@v3
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - name: Install cargo-make
+        run: |
+          if ! command -v cargo-make &> /dev/null
+          then
+              cargo install -f cargo-make
+          fi
+
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install Foundry
+        run: |
+          cd contracts
+          curl -L https://foundry.paradigm.xyz | bash
+          export PATH="$PATH:/home/runner/.config/.foundry/bin"
+          foundryup
+      - name: Create a docker build
+        id: docker-build
+        run: |
+          export PATH="$PATH:/home/runner/.config/.foundry/bin"
+          cd $GITHUB_WORKSPACE/ipc/fendermint
+          make docker-build
+      - name: Run a testnode
+        id: testnode
+        run: |
+          cd $GITHUB_WORKSPACE/ipc/
+          export BALANCE=10000000000
+          { out=$(FM_PULL_SKIP=true cargo make --makefile ./infra/fendermint/Makefile.toml testnode | tee /dev/fd/3); } 3>&1
+          private_key=$(echo $out | sed -e 's/\(.*\)\([a-f0-9]\{64\}\)/0x\2/' | grep 0x | head -c66)
+          echo "ROOT_PRIVATE_KEY=$private_key" >> "$GITHUB_OUTPUT"
+          cat $GITHUB_OUTPUT
+      - name: 'Create and fund accounts'
+        id: accounts
+        env:
+          NUM_ACCOUNTS: 5
+          ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
+        run: |
+          npx hardhat --network local create-fund-accounts
+      - name: 'Run tests: web3.js SimpleCoin'
+        if: always()
+        env:
+          ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
+          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
+        run: |
+          npx hardhat --network local test ./test/web3.js/SimpleCoin.js
+      - name: 'Run tests: web3.js ERC20'
+        if: always()
+        timeout-minutes: 2
+        env:
+          ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
+          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
+        run: |
+          npx hardhat --network local test ./test/web3.js/ERC20.js
+      - name: 'Run tests: ethers.js SimpleCoin'
+        if: always()
+        timeout-minutes: 2
+        env:
+          ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
+          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
+        run: |
+          npx hardhat --network local test ./test/ethers.js/SimpleCoin.js
+      - name: 'Run tests: ethers.js ERC20'
+        if: always()
+        timeout-minutes: 2
+        env:
+          ROOT_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
+          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
+        run: |
+          npx hardhat --network local test ./test/ethers.js/ERC20.js
+      - name: 'Run tests: Uniswap -- SKIPPING'
+        if: always()
+        timeout-minutes: 200
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
+          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT2_PRIVATE_KEY }}
+          LOCAL_NODE_URL: 'http://127.0.0.1:8545'
+        run: |
+          echo skipping ; #cd ./extern/fevm-uniswap-v3-core && yarn install --frozen-lockfile && yarn compile &&  npx hardhat test test/UniswapV3Pool.spec.ts #  && yarn test
+      - name: 'Run tests: OpenZeppelin -- SKIPPING'
+        if: always()
+        env:
+          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
+          USER_2_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT2_PRIVATE_KEY }}
+          USER_3_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT3_PRIVATE_KEY }}
+          USER_4_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT4_PRIVATE_KEY }}
+          USER_5_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT5_PRIVATE_KEY }}
+        run: |
+          echo skipping ; #cd ./extern/openzeppelin-contracts/ && yarn && mkdir gasreport && npx hardhat --network itest test
