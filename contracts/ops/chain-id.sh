@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eu
+set -o pipefail
 
 # Check if RPC_URL is set
 if [[ -z "$RPC_URL" ]]; then
