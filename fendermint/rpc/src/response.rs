@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
+use cid::Cid;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;
@@ -57,4 +58,25 @@ pub fn decode_fevm_return_data(data: RawBytes) -> anyhow::Result<Vec<u8>> {
     fvm_ipld_encoding::from_slice::<BytesDe>(&data)
         .map(|bz| bz.0)
         .map_err(|e| anyhow!("failed to deserialize bytes returned by FEVM method invocation: {e}"))
+}
+
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.
+pub fn decode_cid(deliver_tx: &DeliverTx) -> anyhow::Result<Cid> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<Cid>(&data)
+        .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
+}
+
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.
+pub fn decode_datarepo_get(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<Vec<u8>>(&data)
+        .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
+}
+
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a list of bytes.
+pub fn decode_datarepo_list(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<Vec<u8>>> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<Vec<Vec<u8>>>(&data)
+        .map_err(|e| anyhow!("error parsing as Vec<Vec<u8>>: {e}"))
 }

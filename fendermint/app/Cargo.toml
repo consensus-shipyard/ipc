@@ -64,6 +64,8 @@ ipc-api = { workspace = true }
 ipc-provider = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
 
+warp = "0.3"
+
 [dev-dependencies]
 tempfile = { workspace = true }
 quickcheck = { workspace = true }

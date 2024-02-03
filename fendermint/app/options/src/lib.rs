@@ -6,11 +6,14 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use fvm_shared::address::Network;
 
-use self::{eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, rpc::RpcArgs, run::RunArgs};
+use self::{
+    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, proxy::ProxyArgs, rpc::RpcArgs, run::RunArgs,
+};
 
 pub mod eth;
 pub mod genesis;
 pub mod key;
+pub mod proxy;
 pub mod rpc;
 pub mod run;
 
@@ -132,6 +135,8 @@ pub enum Commands {
     Rpc(RpcArgs),
     /// Subcommands related to the Ethereum API facade.
     Eth(EthArgs),
+    /// Proxy for data repos
+    Proxy(ProxyArgs),
 }
 
 #[cfg(test)]

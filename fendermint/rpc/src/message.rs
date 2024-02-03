@@ -7,7 +7,7 @@ use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
 use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::{eam, evm};
+use fendermint_vm_actor_interface::{eam, evm, objectstore};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{
@@ -105,6 +105,124 @@ impl MessageFactory {
         let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id)?;
         let chain = ChainMessage::Signed(signed);
         Ok(chain)
+    }
+
+    /// Put an object into a data repo.
+    pub fn datarepo_put(
+        &mut self,
+        key: String,
+        content: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let params = RawBytes::serialize(fendermint_actor_objectstore::PutObjectParams {
+            key: key.into_bytes(),
+            content: content.to_vec(),
+        })?;
+        let message = self.transaction(
+            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            fendermint_actor_objectstore::Method::PutObject as u64,
+            params,
+            value,
+            gas_params,
+        )?;
+        Ok(message)
+    }
+
+    /// Append to an object in a data repo.
+    pub fn datarepo_append(
+        &mut self,
+        key: String,
+        content: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let params = RawBytes::serialize(fendermint_actor_objectstore::PutObjectParams {
+            key: key.into_bytes(),
+            content: content.to_vec(),
+        })?;
+        let message = self.transaction(
+            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            fendermint_actor_objectstore::Method::AppendObject as u64,
+            params,
+            value,
+            gas_params,
+        )?;
+        Ok(message)
+    }
+
+    /// Delete an object from a data repo.
+    pub fn datarepo_delete(
+        &mut self,
+        key: String,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let params = RawBytes::serialize(fendermint_actor_objectstore::DeleteObjectParams {
+            key: key.into_bytes(),
+        })?;
+        let message = self.transaction(
+            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            fendermint_actor_objectstore::Method::DeleteObject as u64,
+            params,
+            value,
+            gas_params,
+        )?;
+        Ok(message)
+    }
+
+    /// Get an object from a data repo. This will not create a transaction.
+    pub fn datarepo_get(
+        &mut self,
+        key: String,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let params = RawBytes::serialize(key.into_bytes())?;
+        let message = self.transaction(
+            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            fendermint_actor_objectstore::Method::GetObject as u64,
+            params,
+            value,
+            gas_params,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.set_sequence(message.sequence);
+
+        Ok(message)
+    }
+
+    /// List objects in a data repo. This will not create a transaction.
+    pub fn datarepo_list(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let message = self.transaction(
+            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            fendermint_actor_objectstore::Method::ListObjects as u64,
+            RawBytes::default(),
+            value,
+            gas_params,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.set_sequence(message.sequence);
+
+        Ok(message)
     }
 
     /// Deploy a FEVM contract.

@@ -16,6 +16,7 @@ use base64::{alphabet, Engine};
 pub mod eth;
 pub mod genesis;
 pub mod key;
+pub mod proxy;
 pub mod rpc;
 pub mod run;
 
