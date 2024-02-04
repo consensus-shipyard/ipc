@@ -43,4 +43,4 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash /home/ubuntu/scripts/remote_deployment/deploy.sh ${{ github.sha }}
+          script: bash -il /home/ubuntu/scripts/remote_deployment/deploy.sh ${{ github.sha }}
