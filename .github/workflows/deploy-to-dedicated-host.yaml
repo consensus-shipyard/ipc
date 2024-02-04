@@ -12,6 +12,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+      - name: Run a command
+        run: pwd
+      - name: Run a command
+        run: ls
+      - name: Run a command
+        run: ls ipc
       - name: Copy deployment script and config files to host
         uses: appleboy/scp-action@v0.1.7
         with:
