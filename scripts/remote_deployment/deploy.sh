@@ -25,6 +25,13 @@ CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 
+if (($# != 1)); then
+  echo "Arguments: <commit hash to checkout in the repo>"
+  exit 1
+fi
+
+commit_hash=$1
+
 # Step 1: Prepare system for building and running IPC
 
 # Step 1.1: Install build dependencies
@@ -98,6 +105,7 @@ echo "$PREFIX Preparing ipc repo..."
 cd $HOME
 if ! ls $IPC_FOLDER ; then
   git clone https://github.com/consensus-shipyard/ipc.git
+  git checkout $commit_hash
 fi
 
 echo "$PREFIX Building ipc contracts..."

@@ -12,6 +12,6 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 172.104.248.232
-          username: root
+          username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: ls /root
+          script: scripts/remote_deployment/deploy.sh ${{ github.sha }}
