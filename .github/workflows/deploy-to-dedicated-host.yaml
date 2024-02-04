@@ -24,7 +24,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "ipc/scripts/remote_deployment/deploy.sh ipc/scripts/remote_deployment/.ipc"
+          source: "/home/runner/work/ipc/ipc/scripts/remote_deployment/deploy.sh /home/runner/work/ipc/ipc/scripts/remote_deployment/.ipc"
           target: "/home/ubuntu"
       - name: Checkout code repo in the host
         uses: appleboy/ssh-action@v1.0.3
