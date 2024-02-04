@@ -17,14 +17,14 @@ jobs:
       - name: Run a command
         run: ls
       - name: Run a command
-        run: ls ipc
+        run: ls /home/runner/work/ipc/ipc/scripts/remote_deployment/deploy.sh
       - name: Copy deployment script and config files to host
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "/home/runner/work/ipc/ipc/scripts/remote_deployment/deploy.sh /home/runner/work/ipc/ipc/scripts/remote_deployment/.ipc"
+          source: "/home/runner/work/ipc/ipc/scripts/remote_deployment/deploy.sh"
           target: "/home/ubuntu"
       - name: Checkout code repo in the host
         uses: appleboy/ssh-action@v1.0.3
