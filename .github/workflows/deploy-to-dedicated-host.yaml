@@ -36,7 +36,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: rm -rf /home/ubuntu/.ipc && cp /home/ubuntu/scripts/remote_deployment/.ipc /home/ubuntu/
+          script: rm -rf /home/ubuntu/.ipc && cp -r /home/ubuntu/scripts/remote_deployment/.ipc /home/ubuntu/
       - name: Checkout code repo in the host
         uses: appleboy/ssh-action@v1.0.3
         with:
