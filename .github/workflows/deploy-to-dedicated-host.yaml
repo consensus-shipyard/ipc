@@ -18,4 +18,4 @@ jobs:
           host: 172.104.248.232
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: scripts/remote_deployment/deploy.sh ${{ github.sha }}
+          script: pwd && ls && ./ipc/scripts/remote_deployment/deploy.sh ${{ github.sha }}
