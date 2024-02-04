@@ -11,7 +11,7 @@
 set -e
 
 # Print commands as we execute
-# set -x
+set -x
 
 PREFIX='------'
 IPC_FOLDER=${HOME}/ipc
