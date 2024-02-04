@@ -1,0 +1,17 @@
+name: Deploy to calibration net on a dedicated server
+
+on:
+  workflow_dispatch
+
+jobs:
+  deploy_to_dedicated_host:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code repo in the host
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 172.104.248.232
+          username: ubuntu
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          port: 22
+          script: ls ~/
