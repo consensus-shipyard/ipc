@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Copy deployment script files to host
+      - name: Copy deployment script files to the host
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
@@ -22,7 +22,7 @@ jobs:
           target: "/home/ubuntu"
       # TODO(jie): For wallet addresses, we should read from github secrets, generate a file, then copy it over
       # Ideally we shouldn't checkin evm_keystore.json into the repo.
-      - name: Copy config files to host
+      - name: Copy config files to the host
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
@@ -30,10 +30,17 @@ jobs:
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           source: "scripts/remote_deployment/.ipc"
           target: "/home/ubuntu"
+      - name: Set up ipc config folder on the host
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: ubuntu
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          script: ln -s /home/ubuntu/scripts/remote_deployment/.ipc /home/ubuntu/.ipc
       - name: Checkout code repo in the host
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash /home/ubuntu/deploy.sh ${{ github.sha }}
+          script: bash /home/ubuntu/scripts/remote_deployment/deploy.sh ${{ github.sha }}
