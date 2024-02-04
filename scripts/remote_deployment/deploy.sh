@@ -152,7 +152,7 @@ subnet_id=/r314159/t410fqmlmt6usaeewvxdj3slk6t57ti776ycqsjp2lsa
 echo "$PREFIX Generating pubkey for wallet addresses... $default_wallet_address"
 for i in {0..2}
 do
-  pubkey=$($IPC_CLI wallet pub-key -w evm --address ${wallet_addresses[i]})
+  pubkey=$($IPC_CLI wallet pub-key --wallet-type evm --address ${wallet_addresses[i]})
   echo "Wallet $i address's pubkey: $pubkey"
   address_pubkeys+=($pubkey)
 done
