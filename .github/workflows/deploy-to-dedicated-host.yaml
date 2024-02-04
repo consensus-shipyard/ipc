@@ -12,6 +12,6 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 172.104.248.232
-          username: ubuntu
+          username: root
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: ls ~/
+          script: ls /root
