@@ -7,7 +7,6 @@ on:
 jobs:
   deploy_to_dedicated_host:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
     steps:
       - name: Checkout code repo
         uses: actions/checkout@v4
@@ -38,8 +37,9 @@ jobs:
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           script: rm -rf /home/ubuntu/.ipc && cp -r /home/ubuntu/scripts/remote_deployment/.ipc /home/ubuntu/
-      - name: Checkout code repo in the host
+      - name: Run deploy scripts on the host
         uses: appleboy/ssh-action@v1.0.3
+        timeout-minutes: 45
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
