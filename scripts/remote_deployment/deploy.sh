@@ -171,7 +171,7 @@ done
 # Step 7.1: Export validator private keys into files
 for i in {0..2}
 do
-  $IPC_CLI wallet export --wallet-type evm -a ${wallet_addresses[i]} --hex -o ${IPC_CONFIG_FOLDER}/validator_${i}.sk
+  $IPC_CLI wallet export --wallet-type evm --address ${wallet_addresses[i]} --hex -o ${IPC_CONFIG_FOLDER}/validator_${i}.sk
   echo "Export private key for ${wallet_addresses[i]} to ${IPC_CONFIG_FOLDER}/validator_${i}.sk"
 done
 
