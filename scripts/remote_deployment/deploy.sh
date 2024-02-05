@@ -105,8 +105,10 @@ echo "$PREFIX Preparing ipc repo..."
 cd $HOME
 if ! ls $IPC_FOLDER ; then
   git clone https://github.com/consensus-shipyard/ipc.git
-  git checkout $commit_hash
 fi
+cd ${IPC_FOLDER}/contracts
+git fetch
+git checkout $commit_hash
 
 echo "$PREFIX Building ipc contracts..."
 cd ${IPC_FOLDER}/contracts
