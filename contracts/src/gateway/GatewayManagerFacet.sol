@@ -8,7 +8,7 @@ import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {Membership, SupplyKind} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, AlreadyInSet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotInSet, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -44,7 +44,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
-
         if (registered) {
             revert AlreadyRegisteredSubnet();
         }
@@ -54,7 +53,12 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         subnet.genesisEpoch = block.number;
         subnet.circSupply = genesisCircSupply;
 
-        s.subnetKeys.add(subnetId.toHash());
+        // This is situation when the subnet has not been registered from the Gateway perspective,
+        // but exists in the set.
+        bool added = s.subnetKeys.add(subnetId.toHash());
+        if (!added) {
+            revert AlreadyInSet();
+        }
 
         s.totalSubnets += 1;
     }
@@ -114,7 +118,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.totalSubnets -= 1;
         delete s.subnets[id];
-        s.subnetKeys.remove(id);
+
+        bool removed = s.subnetKeys.remove(id);
+        if (!removed) {
+            revert NotInSet();
+        }
 
         payable(msg.sender).sendValue(stake);
     }

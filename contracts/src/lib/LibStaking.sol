@@ -251,8 +251,10 @@ library LibValidatorSet {
         uint256 newCollateral = self.validators[validator].confirmedCollateral - amount;
         uint256 totalCollateral = self.validators[validator].totalCollateral;
 
-        if (newCollateral == 0 && totalCollateral == 0) {
-            delete self.validators[validator];
+        if (newCollateral == 0) {
+            if (totalCollateral == 0) {
+                delete self.validators[validator];
+            }
         } else {
             self.validators[validator].confirmedCollateral = newCollateral;
         }

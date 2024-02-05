@@ -505,8 +505,10 @@ library LibGateway {
             // Check the next subnet (which can may be the destination subnet).
             reject = to.down(s.networkName).getActor().hasSupplyOfKind(SupplyKind.ERC20);
         }
-        if (reject && crossMessage.kind == IpcMsgKind.Transfer) {
-            revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
+        if (reject) {
+            if (crossMessage.kind == IpcMsgKind.Transfer) {
+                revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
+            }
         }
 
         // If the directionality is top-down, or if we're inverting the direction

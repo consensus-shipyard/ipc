@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 error AddressShouldBeValidator();
 error AlreadyRegisteredSubnet();
+error AlreadyInSet();
 error CannotConfirmFutureChanges();
 error CannotReleaseZero();
 error CannotSendCrossMsgToItself();
@@ -53,6 +54,7 @@ error NotEnoughFundsToRelease();
 error NotEnoughSubnetCircSupply();
 error NotEnoughValidatorsInSubnet();
 error NotGateway();
+error NotInSet();
 error NotOwnerOfPublicKey();
 error NotRegisteredSubnet();
 error NotStakedBefore();
