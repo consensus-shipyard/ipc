@@ -23,7 +23,7 @@ registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 
 # Subnet template - uncomment and adjust before using
 [[subnets]]
-id = "/r314159/t410fqhl3okhlhgecc77d3zxpbhofnxixdcv2x37sfsi"
+id = "/r314159/t410fqmlmt6usaeewvxdj3slk6t57ti776ycqsjp2lsa"
 
 [subnets.config]
 network_type = "fevm"
