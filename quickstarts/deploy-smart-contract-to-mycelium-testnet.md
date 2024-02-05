@@ -74,7 +74,7 @@ There are a couple of ways to check the token balance in the IPC subnet.
     Use the `subnet-id` for the Mycelium Calibration.
 
     ```sh
-    ipc-cli wallet balances --subnet /r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q -w evm
+    ipc-cli wallet balances --subnet /r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q --wallet-type evm
     ```
 
 After acquiring some test tokens in the MetaMask wallet, we can begin working on the smart contract for the IPC subnet.
@@ -303,7 +303,7 @@ async function main() {
     console.log("Token name is ", await myTokenContract.name());
     console.log("Token symbol is ", await myTokenContract.symbol());
     console.log("My token balance is ", ethers.formatUnits(await myTokenContract.balanceOf(wallet.address)));
-		
+
     //4. mint some ERC20 tokens to your wallet address
     const mintTX = await myTokenContract.mint(wallet.address,ethers.parseUnits("100"));
     console.log(mintTX.hash);

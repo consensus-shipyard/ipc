@@ -35,7 +35,7 @@ Commands:
 #### IPC initialization
 
 ```sh
-ipc-cli config init 
+ipc-cli config init
 ```
 
 This command will initialize a new empty config file under `~/.ipc` with all parameters required to connect to the IPC rootnet network.&#x20;
@@ -61,10 +61,10 @@ This command only shows subnets that have been registered to the gateway, i.e. t
 
 {% code overflow="wrap" %}
 ```
-ipc-cli subnet create 
-    --parent <parent-subnet-id> 
-    --min-validator <MIN_VALIDATORS> 
-    --min-validator-stake <MIN_VALIDATOR_STAK> 
+ipc-cli subnet create
+    --parent <parent-subnet-id>
+    --min-validator <MIN_VALIDATORS>
+    --min-validator-stake <MIN_VALIDATOR_STAK>
     --bottomup-check-period <BOTTOMUP_CHECK_PERIO>
 ```
 {% endcode %}
@@ -81,7 +81,7 @@ $ ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-sta
 
 {% code overflow="wrap" %}
 ```sh
-ipc-cli subnet join 
+ipc-cli subnet join
     --subnet <subnet-id>
     --collateral <collateral_amount>
     --public-key <public_key_validator_addr>
@@ -165,9 +165,9 @@ ipc-cli checkpoint list-validator-changes --from-epoch=<START_EPOCH> --to-epoch=
 {% code overflow="wrap" %}
 ```sh
 ipc-cli subnet send-value
-    --subnet <subnet-id> 
-    [--from <from-addr>] 
-    --to <to-addr> 
+    --subnet <subnet-id>
+    [--from <from-addr>]
+    --to <to-addr>
     <value>
 ```
 {% endcode %}
@@ -193,82 +193,82 @@ This command will create a wallet,  and store the key information in `~/.ipc/evm
 
 ```sh
 # Sample execution
-$ ipc-cli wallet new -w evm
+$ ipc-cli wallet new --wallet-type evm
 "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
 #### Check wallet balance
 
 ```sh
-ipc-cli wallet balances -w <wallet-type> --subnet <subnet-id>
+ipc-cli wallet balances --wallet-type <wallet-type> --subnet <subnet-id>
 ```
 
 You can check the token balance in your wallet addresses for any active subnet configured in the `ipc-cli`.
 
 <pre class="language-sh"><code class="lang-sh"># Sample execution
-<strong>$ ipc-cli wallet balances -w evm --subnet /r314159
+<strong>$ ipc-cli wallet balances --wallet-type evm --subnet /r314159
 </strong>0x406a7a1d002b71ece175cc7e067620ae5b58e9ec - Balance: 100
 </code></pre>
 
 #### Set default wallet address
 
 ```
-ipc-cli wallet set-default -w <wallet-type> --address <EVM-ADDRESS>
+ipc-cli wallet set-default --wallet-type <wallet-type> --address <EVM-ADDRESS>
 ```
 
 You can set a default address for your wallet so it is always the one used when the `--from` flag is not explicitly set.&#x20;
 
 ```sh
 # Sample execution
-$ ipc-cli wallet set-default -w evm --address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec
+$ ipc-cli wallet set-default --wallet-type evm --address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec
 ```
 
 #### Get the default wallet address
 
 ```sh
-ipc-cli wallet get-default -w <wallet-type>
+ipc-cli wallet get-default --wallet-type <wallet-type>
 
 # Sample execution
-$ ipc-cli wallet set-default -w evm
+$ ipc-cli wallet set-default --wallet-type evm
 "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
 #### Export a wallet key
 
 ```sh
-ipc-cli wallet export -w <wallet-type> -a <EVM-ADDRESS> -o <OUTPUT_FILE>
+ipc-cli wallet export --wallet-type <wallet-type> --address <EVM-ADDRESS> > <OUTPUT_FILE>
 ```
 
 This command will exporte a wallet private key which is stored in the `ipc-cli` keystore `~/.ipc/evm_keystore.json`.&#x20;
 
 ```sh
 # Sample execution
-$ ipc-cli wallet export -w evm -a 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec -o /tmp/priv.key
+$ ipc-cli wallet export --wallet-type evm --address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec > /tmp/priv.key
 exported new wallet with address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec in file "/tmp/priv.key"
 ```
 
 *   Export key encoded in based64 for Fendermint
 
     ```sh
-    ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE> --fendermint
+    ipc-cli wallet export --wallet-type evm --address <EVM-ADDRESS> --fendermint > <OUTPUT_FILE>
     ```
 *   Export key in HEX
 
     ```sh
-    ipc-cli wallet export -w evm -a <EVM-ADDRESS> -o <OUTPUT_FILE> --hex
+    ipc-cli wallet export --wallet-type evm --address <EVM-ADDRESS> --hex > <OUTPUT_FILE>
     ```
 
 #### Import a wallet&#x20;
 
 ```
-ipc-cli wallet import -w evm --path <INPUT_FILE_WITH_KEY> --private-key <PRIVATE_KEY>
+ipc-cli wallet import --wallet-type evm --path <INPUT_FILE_WITH_KEY> --private-key <PRIVATE_KEY>
 ```
 
 This command will import a wallet from an EVM key file with this format `{“address”:,“private_key”:<PRIVATE_KEY>}`.&#x20;
 
 ```sh
 # Sample execution
-$ ipc-cli wallet import -w evm --path=~/tmp/wallet.key
+$ ipc-cli wallet import --wallet-type evm --path=~/tmp/wallet.key
 imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
@@ -276,7 +276,7 @@ Import a wallet from the private key.
 
 ```sh
 # Sample execution
-$ ipc-cli wallet import -w evm --private-key=0x405f50458008edd6e2eb2efc3bf34846db1d6689b89fe1a9f9ccfe7f6e301d8d
+$ ipc-cli wallet import --wallet-type evm --private-key=0x405f50458008edd6e2eb2efc3bf34846db1d6689b89fe1a9f9ccfe7f6e301d8d
 imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 ```
 
@@ -290,10 +290,10 @@ At the moment, the `ipc-cli` only expose commands to perform the basic IPC inter
 #### Fund tokens in a child subnet
 
 ```sh
-ipc-cli cross-msg fund 
-    --subnet <subnet-id> 
-    [--from <from-addr>] 
-    [--to <to-addr>] 
+ipc-cli cross-msg fund
+    --subnet <subnet-id>
+    [--from <from-addr>]
+    [--to <to-addr>]
     <amount>
 ```
 
@@ -316,9 +316,9 @@ fund performed in epoch 1030279
 #### Pre-fund subnet address in genesis
 
 ```
-ipc-cli cross-msg pre-fund 
-    --subnet <subnet-id> 
-    [--from <from-addr>] 
+ipc-cli cross-msg pre-fund
+    --subnet <subnet-id>
+    [--from <from-addr>]
     she<amount>
 ```
 
@@ -332,10 +332,10 @@ $ ./bin/ipc-cli cross-msg pre-fund --subnet /r31415926/t4xwzbdu7z5sam6hc57xxwkct
 #### Release funds from a subnet
 
 ```sh
-ipc-cli cross-msg release 
-    --subnet <subnet-id> 
-    [--from <from-addr>] 
-    [--to <to-addr>] 
+ipc-cli cross-msg release
+    --subnet <subnet-id>
+    [--from <from-addr>]
+    [--to <to-addr>]
     <amount>
 ```
 
@@ -360,9 +360,9 @@ release performed in epoch 1030
 #### Release initial subnet funds
 
 ```sh
-ipc-cli cross-msg pre-release 
-    --subnet <subnet-id> 
-    [--from <from-addr>] 
+ipc-cli cross-msg pre-release
+    --subnet <subnet-id>
+    [--from <from-addr>]
     <amount>
 ```
 
@@ -384,7 +384,7 @@ The epoch in which the message is performed can give you a sense of the time the
 ```sh
 # Example execution
 $ ipc-cli cross-msg parent-finality --subnet /r314159/t410fmdbc3kcv4gody6drgztmgwnzs2ryzwiazjzu5pq
-ipc_provider::manager::evm::manager] querying latest parent finality 
+ipc_provider::manager::evm::manager] querying latest parent finality
 1070541
 ```
 
@@ -406,9 +406,9 @@ $ ipc-cli cross-msg list-topdown-msgs --subnet /r314159/t410fmdbc3kcv4gody6drgzt
 #### List checkpoints for a subnet
 
 ```sh
-ipc-cli checkpoint list-bottomup 
-    --from-epoch <range-start> 
-    --to-epoch <range-end> 
+ipc-cli checkpoint list-bottomup
+    --from-epoch <range-start>
+    --to-epoch <range-end>
     --subnet <subnet-id>
 ```
 
@@ -426,8 +426,8 @@ epoch 30 - prev_check={"/":"bafy2bzaceauzdx22hna4e4cqf55jqmd64a4fx72sxprzj72qhrw
 
 ```
 ipc-cli checkpoint quorum-reached-events
-    --from-epoch <range-start> 
-    --to-epoch <range-end> 
+    --from-epoch <range-start>
+    --to-epoch <range-end>
     --subnet <subnet-id>
 ```
 
@@ -442,8 +442,8 @@ $ ipc-cli checkpoint quorum-reached-events --from-epoch 600 --to-epoch 680 --sub
 
 #### Check if bottom-up checkpoints are submitted
 
-<pre><code><strong>ipc-cli checkpoint has-submitted-bottomup-height 
-</strong>    --subnet &#x3C;SUBNET_ID> 
+<pre><code><strong>ipc-cli checkpoint has-submitted-bottomup-height
+</strong>    --subnet &#x3C;SUBNET_ID>
     --submitter &#x3C;RELAYER_ADDR>
 </code></pre>
 
