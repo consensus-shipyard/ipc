@@ -9,10 +9,10 @@ members = [
   "ipc/provider",
   "ipc/api",
   "ipc/types",
-  # Tests seem to be obsolete (using IPC agent):
-  # "ipc/ipc/testing/*",
+
   # ipld
   "ipld/resolver",
+
   # fendermint
   "fendermint/abci",
   "fendermint/app",
