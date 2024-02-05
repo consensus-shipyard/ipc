@@ -150,7 +150,8 @@ echo "Default wallet address: $default_wallet_address"
 #echo "Created subnet ID: $subnet_id"
 
 # Step 4 (alternative): Use an already-created subnet
-subnet_id=/r314159/t410fqmlmt6usaeewvxdj3slk6t57ti776ycqsjp2lsa
+subnet_id=/r314159/t410fdgjdrxnzkw5xythvpur5egdryzlmxsh3uibpmqi
+echo "subnet id: $subnet_id"
 
 # Step 5: Generate pubkeys from addresses
 echo "$PREFIX Generating pubkey for wallet addresses... $default_wallet_address"
@@ -162,12 +163,12 @@ do
 done
 
 # Step 6: Join subnet for addresses in wallet
-#echo "$PREFIX Join subnet for addresses in wallet..."
-#for i in {0..2}
-#do
-#  echo "Joining subnet ${subnet_id} for address ${wallet_address[i]}"
-#  $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
-#done
+echo "$PREFIX Join subnet for addresses in wallet..."
+for i in {0..2}
+do
+  echo "Joining subnet ${subnet_id} for address ${wallet_address[i]}"
+  $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
+done
 
 # Step 6 (alternative): Assume we already let our addresses join in the subnet
 
