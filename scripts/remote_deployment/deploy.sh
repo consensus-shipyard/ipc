@@ -30,7 +30,7 @@ if (($# != 1)); then
   exit 1
 fi
 
-commit_hash=$1
+head_ref=$1
 
 # Step 1: Prepare system for building and running IPC
 
@@ -108,7 +108,8 @@ if ! ls $IPC_FOLDER ; then
 fi
 cd ${IPC_FOLDER}/contracts
 git fetch
-git checkout $commit_hash
+git checkout $head_ref
+git show HEAD
 
 echo "$PREFIX Building ipc contracts..."
 cd ${IPC_FOLDER}/contracts
