@@ -10,9 +10,6 @@ members = [
   "ipc/api",
   "ipc/types",
 
-  # infra
-  "infra/fendermint",
-
   # ipld
   "ipld/resolver",
 
