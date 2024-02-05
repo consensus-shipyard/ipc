@@ -1,159 +1,123 @@
 accounts:
-  ZHwF2TC8: {}
-  _OJb6A91: {}
-  oAlf: {}
-  tHjJ9_br: {}
-  tgBs: {}
-deployment: !New
-  deployer: tHjJ9_br
+  J_WmUD: {}
+  O0uRBWB: {}
+  gH_Ziu: {}
+  uK4gxA_: {}
+rootnet: !External
+  deployment: !Existing
+    gateway: f3acghldukzuracu6l6kvqsfmxy6uc7qpzq2gl3frxaaa76g6efxqt7zfsa4r4wldqel7qbbzzg72lww5onkvq
+    registry: f011904243251503077203
 subnets:
-  E56F-JQd:
-    creator: ZHwF2TC8
+  cJLRTI4:
+    creator: J_WmUD
     validators:
-      ZHwF2TC8: '4455057413088516383'
-      oAlf: '8981520645260050433'
-    balances:
-      ZHwF2TC8: '8500085386504004303'
+      J_WmUD: '885727970195438721'
+      uK4gxA_: '1299574128368018545'
+    balances: {}
     nodes:
-      7BwQPvg:
-        mode: !Validator ZHwF2TC8
+      oWY2dv:
+        mode: !Validator J_WmUD
         ethapi: false
         seed_nodes: []
         parent_node: null
-      ROLzUpdk:
-        mode: !Validator oAlf
-        ethapi: false
+      pVHEecbw:
+        mode: !Validator uK4gxA_
+        ethapi: true
         seed_nodes:
-        - 7BwQPvg
+        - oWY2dv
         parent_node: null
     relayers:
-      42S:
-        submitter: _OJb6A91
-        follow_node: 7BwQPvg
+      Atq_O:
+        submitter: gH_Ziu
+        follow_node: oWY2dv
+        submit_node: null
+      KN1y9:
+        submitter: O0uRBWB
+        follow_node: oWY2dv
         submit_node: null
     subnets:
-      B0jIp:
-        creator: oAlf
+      AcrZLY:
+        creator: gH_Ziu
         validators:
-          ZHwF2TC8: '4855078089553797626'
-          _OJb6A91: '7820230612362394304'
-          oAlf: '6495147154496061579'
-          tgBs: '3244442661650238689'
-        balances:
-          oAlf: '2933855302558872843'
-          tHjJ9_br: '2349031714788948144'
-          tgBs: '1049689185234591385'
+          O0uRBWB: '3269965112664320401'
+        balances: {}
         nodes:
-          MB9c:
-            mode: !Validator ZHwF2TC8
-            ethapi: true
+          Ntr_O6i:
+            mode: !Validator O0uRBWB
+            ethapi: false
             seed_nodes: []
-            parent_node: 7BwQPvg
-          ROzMORwB:
-            mode: !Validator _OJb6A91
-            ethapi: true
-            seed_nodes:
-            - MB9c
-            parent_node: 7BwQPvg
-          lsAEMiv:
-            mode: !Validator tgBs
-            ethapi: false
-            seed_nodes:
-            - MB9c
-            parent_node: 7BwQPvg
-          qG9J0_A:
-            mode: !Validator oAlf
-            ethapi: false
-            seed_nodes:
-            - MB9c
-            parent_node: 7BwQPvg
+            parent_node: pVHEecbw
         relayers:
-          I_HLIq:
-            submitter: ZHwF2TC8
-            follow_node: qG9J0_A
-            submit_node: ROLzUpdk
-          M6i7ub:
-            submitter: oAlf
-            follow_node: MB9c
-            submit_node: ROLzUpdk
+          94ohaGC:
+            submitter: gH_Ziu
+            follow_node: Ntr_O6i
+            submit_node: pVHEecbw
+          MN_g:
+            submitter: uK4gxA_
+            follow_node: Ntr_O6i
+            submit_node: oWY2dv
         subnets: {}
-      HVEU:
-        creator: _OJb6A91
+      dgPt8:
+        creator: O0uRBWB
         validators:
-          ZHwF2TC8: '3059943817364050081'
-          _OJb6A91: '8699100174380778724'
-          tHjJ9_br: '5474122255922582795'
-          tgBs: '7442000236249734631'
+          O0uRBWB: '8257100775081525155'
+          gH_Ziu: '4196706834963842439'
+          uK4gxA_: '2788714604261864978'
         balances:
-          tHjJ9_br: '6023497351013626645'
-          tgBs: '9127369900818383313'
+          J_WmUD: '3875145680302025945'
+          gH_Ziu: '3591010432892743070'
         nodes:
-          48XiIU:
-            mode: !Validator ZHwF2TC8
-            ethapi: false
+          AwSB:
+            mode: !Validator O0uRBWB
+            ethapi: true
             seed_nodes: []
-            parent_node: 7BwQPvg
-          P7r:
-            mode: !Validator tHjJ9_br
-            ethapi: false
-            seed_nodes:
-            - 48XiIU
-            parent_node: ROLzUpdk
-          Z_gtXBNF:
-            mode: !Validator _OJb6A91
-            ethapi: false
-            seed_nodes:
-            - 48XiIU
-            parent_node: 7BwQPvg
-          jyBtIP:
+            parent_node: pVHEecbw
+          GBHFb3w:
             mode: Full
-            ethapi: false
+            ethapi: true
             seed_nodes:
-            - P7r
-            parent_node: 7BwQPvg
+            - _AAn
+            parent_node: oWY2dv
+          _AAn:
+            mode: !Validator gH_Ziu
+            ethapi: true
+            seed_nodes:
+            - AwSB
+            parent_node: oWY2dv
         relayers:
-          IoA:
-            submitter: tHjJ9_br
-            follow_node: Z_gtXBNF
-            submit_node: ROLzUpdk
+          1VuC:
+            submitter: gH_Ziu
+            follow_node: _AAn
+            submit_node: oWY2dv
+          Jr_s1UBy:
+            submitter: uK4gxA_
+            follow_node: AwSB
+            submit_node: oWY2dv
         subnets: {}
-      TwsP:
-        creator: tgBs
+      ot5kR2:
+        creator: gH_Ziu
         validators:
-          ZHwF2TC8: '4689764406798737329'
-          _OJb6A91: '4970630540036078221'
-          oAlf: '1522042891118870855'
-          tgBs: '1031362546208195442'
+          uK4gxA_: '3622325063118132095'
         balances:
-          tHjJ9_br: '3572568633217102283'
+          J_WmUD: '6760854123099346345'
+          uK4gxA_: '4769136887087469757'
         nodes:
-          5cZW:
-            mode: Full
-            ethapi: true
-            seed_nodes:
-            - vgP2
-            - PehiwB
-            parent_node: 7BwQPvg
-          7sPlOG:
-            mode: Full
-            ethapi: false
-            seed_nodes:
-            - vgP2
-            parent_node: 7BwQPvg
-          PehiwB:
-            mode: !Validator _OJb6A91
-            ethapi: true
-            seed_nodes:
-            - vgP2
-            parent_node: 7BwQPvg
-          vgP2:
-            mode: !Validator ZHwF2TC8
+          Xr2W:
+            mode: !Validator uK4gxA_
             ethapi: true
             seed_nodes: []
-            parent_node: ROLzUpdk
+            parent_node: pVHEecbw
         relayers:
-          CSOB:
-            submitter: oAlf
-            follow_node: PehiwB
-            submit_node: 7BwQPvg
+          AK8tb:
+            submitter: O0uRBWB
+            follow_node: Xr2W
+            submit_node: pVHEecbw
+          E_x5:
+            submitter: gH_Ziu
+            follow_node: Xr2W
+            submit_node: oWY2dv
+          OM_Lt:
+            submitter: uK4gxA_
+            follow_node: Xr2W
+            submit_node: oWY2dv
         subnets: {}

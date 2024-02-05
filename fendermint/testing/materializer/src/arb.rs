@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_testing::arb::ArbAddress;
 use lazy_static::lazy_static;
 use std::{
     cmp::min,
@@ -15,8 +16,8 @@ use fvm_shared::{
 use quickcheck::{Arbitrary, Gen};
 
 use crate::manifest::{
-    Account, AccountId, Balance, BalanceMap, CollateralMap, Manifest, Node, NodeId, NodeMap,
-    NodeMode, Relayer, RelayerId, ResourceId, RootDeployment, Subnet, SubnetId, SubnetMap,
+    Account, AccountId, Balance, BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeId,
+    NodeMap, NodeMode, Relayer, RelayerId, ResourceId, Rootnet, Subnet, SubnetId, SubnetMap,
 };
 
 const RESOURCE_ID_CHARSET: &[u8] =
@@ -125,6 +126,42 @@ fn gen_manifest(
         .map(|id| (id.clone(), default_balance.clone()))
         .collect();
 
+    let rootnet = if bool::arbitrary(g) {
+        Rootnet::External {
+            deployment: if bool::arbitrary(g) {
+                IpcDeployment::Existing {
+                    gateway: ArbAddress::arbitrary(g).0,
+                    registry: ArbAddress::arbitrary(g).0,
+                }
+            } else {
+                IpcDeployment::New {
+                    deployer: choose_one(g, &account_ids),
+                }
+            },
+        }
+    } else {
+        let initial_balances = balances.clone();
+        // Reuse the subnet generation logic for picking validators and nodes.
+        let subnet = gen_subnets(g, 0, 2, 2, &account_ids, &[], &mut balances);
+        let subnet = subnet
+            .into_iter()
+            .next()
+            .expect("should have exactly 1 subnet")
+            .1;
+
+        Rootnet::New {
+            validators: subnet.validators,
+            balances: initial_balances,
+            nodes: subnet.nodes,
+        }
+    };
+
+    // Pick some node IDs targeted by relayers on the rootnet.
+    let parent_node_ids = match rootnet {
+        Rootnet::External { .. } => Vec::new(), // No specific target, it will be a JSON-RPC endpoint.
+        Rootnet::New { ref nodes, .. } => nodes.keys().cloned().collect(),
+    };
+
     // The rootnet is L1, immediate subnets are L2.
     let subnets = gen_subnets(
         g,
@@ -132,15 +169,13 @@ fn gen_manifest(
         max_level,
         2,
         &account_ids,
-        &[],
+        &parent_node_ids,
         &mut balances,
     );
 
     Manifest {
         accounts,
-        deployment: RootDeployment::New {
-            deployer: choose_one(g, &account_ids),
-        },
+        rootnet,
         subnets,
     }
 }
@@ -156,13 +191,20 @@ fn gen_subnets(
     balances: &mut BalanceMap,
 ) -> SubnetMap {
     let mut subnets = SubnetMap::default();
+
     if level > max_level {
         return subnets;
     }
 
+    // Let the root have at least 1 child, otherwise it's not interesting.
     let min_children = if level == 2 { 1 } else { 0 };
+    let num_children = if max_children <= min_children {
+        min_children
+    } else {
+        usize::arbitrary(g) % (max_children - min_children)
+    };
 
-    for _ in 0..min_children + usize::arbitrary(g) % (max_children - min_children) {
+    for _ in 0..num_children {
         // We can pick any creator; we'll make sure this one also gets some
         // funds to pay for the creation of the subnet.
         let c = choose_one(g, account_ids);

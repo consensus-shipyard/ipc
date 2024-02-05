@@ -55,8 +55,8 @@ pub struct Manifest {
     /// Fendermint itself, in which case we could set whatever balance we wanted.
     pub accounts: BTreeMap<AccountId, Account>,
 
-    /// Which account to use to deploy the IPC contracts, if we have to.
-    pub deployment: RootDeployment,
+    /// Whether we use an existing L1 or create or own.
+    pub rootnet: Rootnet,
 
     /// Subnets created on the rootnet.
     pub subnets: SubnetMap,
@@ -79,11 +79,7 @@ pub struct Balance(#[serde_as(as = "IsHumanReadable")] pub TokenAmount);
 /// and an address we learn after deployment.
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum RootDeployment {
-    /// Deploy a new IPC contract stack using one of the accounts.
-    /// This can take a long time, but ensures we are testing with
-    /// contracts that have the same version as the client.
-    New { deployer: AccountId },
+pub enum IpcDeployment {
     /// Use one of the existing deployments, given by the delegated address of
     /// the Gateway and Registry contracts.
     Existing {
@@ -91,6 +87,39 @@ pub enum RootDeployment {
         gateway: Address,
         #[serde_as(as = "IsHumanReadable")]
         registry: Address,
+    },
+    /// Deploy a new IPC contract stack using one of the accounts.
+    /// This can take a long time, but ensures we are testing with
+    /// contracts that have the same version as the client.
+    New { deployer: AccountId },
+}
+
+/// The rootnet, ie. the L1 chain, can already exist and be outside our control
+/// if we are deploying to Calibration, or it might be a chain we provision
+/// with CometBFT and Fendermint.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Rootnet {
+    /// Existing L1 running outside our control.
+    ///
+    /// This implies using some sort of Faucet to get balances for the accounts.
+    External {
+        /// Indicate whether we have to (re)deploy the IPC contract or we can use an existing one.
+        deployment: IpcDeployment,
+    },
+
+    /// Provision a new chain to run the L1.
+    ///
+    /// It is assumed that a newly provisioned chain will have built-in support for IPC,
+    /// e.g. the way Fendermint deploys IPC actors at well-known addresses.
+    New {
+        /// Collateral of the initial validator set.
+        validators: CollateralMap,
+        /// Balances of the accounts in the rootnet.
+        ///
+        /// These balances will go in the genesis file.
+        balances: BalanceMap,
+        /// Nodes that participate in running the root chain.
+        nodes: NodeMap,
     },
 }
 
