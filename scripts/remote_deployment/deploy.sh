@@ -109,6 +109,7 @@ fi
 cd ${IPC_FOLDER}/contracts
 git fetch
 git checkout $head_ref
+git pull --rebase origin $head_ref
 git show HEAD
 
 echo "$PREFIX Building ipc contracts..."
