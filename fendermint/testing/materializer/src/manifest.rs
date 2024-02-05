@@ -6,7 +6,7 @@
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, fmt::Display, path::PathBuf};
 use tendermint_rpc::Url;
 
 use fendermint_vm_encoding::IsHumanReadable;
@@ -16,11 +16,17 @@ use fendermint_vm_genesis::Collateral;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceId(pub String);
 
+impl Display for ResourceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "'{}'", self.0)
+    }
+}
+
 /// The name of a resource consists of its ID and all the IDs of its ancestors
 /// concatenated into a URL-like path.
 ///
 /// See <https://cloud.google.com/apis/design/resource_names>
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceName(pub PathBuf);
 
 /// A human readable name for an account.
@@ -82,16 +88,16 @@ pub struct Balance(#[serde_as(as = "IsHumanReadable")] pub TokenAmount);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum IpcDeployment {
+    /// Deploy a new IPC contract stack using one of the accounts.
+    /// This can take a long time, but ensures we are testing with
+    /// contracts that have the same version as the client.
+    New { deployer: AccountId },
     /// Use one of the existing deployments, given by the delegated address of
     /// the Gateway and Registry contracts.
     Existing {
         gateway: ethers::core::types::Address,
         registry: ethers::core::types::Address,
     },
-    /// Deploy a new IPC contract stack using one of the accounts.
-    /// This can take a long time, but ensures we are testing with
-    /// contracts that have the same version as the client.
-    New { deployer: AccountId },
 }
 
 /// The rootnet, ie. the L1 chain, can already exist and be outside our control
