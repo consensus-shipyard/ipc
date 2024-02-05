@@ -11,7 +11,7 @@ jobs:
       - name: Checkout code repo
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.head_ref }}
       - name: Copy deployment script files to the host
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -44,4 +44,4 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash -il /home/ubuntu/scripts/remote_deployment/deploy.sh ${{ github.sha }}
+          script: bash -il /home/ubuntu/scripts/remote_deployment/deploy.sh ${{ github.head_ref }}
