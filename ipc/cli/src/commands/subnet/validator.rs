@@ -35,8 +35,8 @@ impl CommandLineHandler for ValidatorInfo {
 #[derive(Debug, Args)]
 #[command(name = "validator-info", about = "Get the validator info")]
 pub(crate) struct ValidatorInfoArgs {
-    #[arg(long, short, help = "The subnet id to query validator info")]
+    #[arg(long, help = "The subnet id to query validator info")]
     pub subnet: String,
-    #[arg(long, short, help = "The validator address")]
+    #[arg(long, help = "The validator address")]
     pub validator: String,
 }
