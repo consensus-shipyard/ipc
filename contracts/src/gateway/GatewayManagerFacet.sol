@@ -8,7 +8,7 @@ import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {Membership, SupplyKind} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -129,8 +129,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable {
         if (msg.value == 0) {
             // prevent spamming if there's no value to fund.
-            string memory errorMessage = "Invalid Cross Msg Value";
-            revert InvalidXnetMessage(errorMessage);
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         // slither-disable-next-line unused-return
         (bool registered, ) = LibGateway.getSubnet(subnetId);
@@ -189,8 +188,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     function release(FvmAddress calldata to) external payable {
         if (msg.value == 0) {
             // prevent spamming if there's no value to release.
-            string memory errorMessage = "Invalid Cross Msg Value";
-            revert InvalidXnetMessage(errorMessage);
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg({
             subnet: s.networkName,

@@ -8,7 +8,7 @@ import {SubnetID, Subnet, SupplyKind, SupplySource} from "../structs/Subnet.sol"
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
+import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -360,8 +360,7 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
-            string memory errorMessage = "Invalid Cross Message destination subnet";
-            sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, errorMessage));
+            sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.DstSubnet));
             return;
         }
 
@@ -380,8 +379,7 @@ library LibGateway {
                 return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
-                string memory errorMessage = "Invalid Cross Msg Nonce";
-                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, errorMessage));
+                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
             subnet.appliedBottomUpNonce += 1;
@@ -392,8 +390,7 @@ library LibGateway {
         } else if (applyType == IPCMsgType.TopDown) {
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
-                string memory errorMessage = "Invalid Cross Msg Nonce";
-                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, errorMessage));
+                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
             s.appliedTopDownNonce += 1;
@@ -476,8 +473,7 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         SubnetID memory to = crossMessage.to.subnetId;
         if (to.isEmpty()) {
-            string memory errorMessage = "Invalid Cross Message destination subnet";
-            revert InvalidXnetMessage(errorMessage);
+            revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
         }
         // destination is the current network, you are better off with a good old message, no cross needed
         if (to.equals(s.networkName)) {

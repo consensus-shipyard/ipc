@@ -504,8 +504,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
-        string memory expectedErrorMessage = "Invalid Cross Msg Value";
-        vm.expectRevert(abi.encodeWithSignature("InvalidXnetMessage(string)", expectedErrorMessage));
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
@@ -585,8 +584,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
 
-        string memory expectedErrorMessage = "Invalid Cross Msg Value";
-        vm.expectRevert(abi.encodeWithSignature("InvalidXnetMessage(string)", expectedErrorMessage));
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
         gwManager.fund{value: 0}(subnetId, FvmAddressHelper.from(funderAddress));
     }
 
@@ -705,8 +703,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(callerAddress);
         vm.deal(callerAddress, 1 ether);
-        string memory expectedErrorMessage = "Invalid Cross Msg Value";
-        vm.expectRevert(abi.encodeWithSignature("InvalidXnetMessage(string)", expectedErrorMessage));
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
 
         gwManager.release{value: 0 ether}(FvmAddressHelper.from(msg.sender));
     }
@@ -813,8 +810,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
-        string memory expectedErrorMessage = "Invalid Cross Message destination subnet";
-        vm.expectRevert(abi.encodeWithSignature("InvalidXnetMessage(string)", expectedErrorMessage));
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.DstSubnet));
         gwMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
@@ -859,8 +855,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
 
-        string memory expectedErrorMessage = "Invalid Cross Msg Value";
-        vm.expectRevert(abi.encodeWithSignature("InvalidXnetMessage(string)", expectedErrorMessage));
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
@@ -882,8 +877,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
-        string memory expectedErrorMessage = "Invalid Cross Msg Sender";
-        vm.expectRevert(abi.encodeWithSignature("InvalidXnetMessage(string)", expectedErrorMessage));
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Sender));
 
         gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newXnetCallMsg(
@@ -908,8 +902,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
 
-        string memory expectedErrorMessage = "Invalid Cross Message destination subnet";
-        vm.expectRevert(abi.encodeWithSignature("InvalidXnetMessage(string)", expectedErrorMessage));
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.DstSubnet));
 
         gwMessenger.sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
