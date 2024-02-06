@@ -103,18 +103,11 @@ impl State {
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct PutObjectParams {
+pub struct ObjectParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
     #[serde(with = "strict_bytes")]
     pub content: Vec<u8>,
-}
-
-#[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
-#[serde(transparent)]
-pub struct DeleteObjectParams {
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
 }
 
 #[derive(FromPrimitive)]
@@ -149,7 +142,7 @@ mod tests {
     fn test_put_object() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
-        let params = PutObjectParams {
+        let params = ObjectParams {
             key: vec![1, 2, 3],
             content: vec![4, 5, 6],
         };
@@ -168,7 +161,7 @@ mod tests {
     fn test_append_object() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
-        let params = PutObjectParams {
+        let params = ObjectParams {
             key: vec![1, 2, 3],
             content: vec![4, 5, 6],
         };
@@ -181,7 +174,7 @@ mod tests {
     fn test_delete_object() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
-        let params = PutObjectParams {
+        let params = ObjectParams {
             key: vec![1, 2, 3],
             content: vec![4, 5, 6],
         };
@@ -198,7 +191,7 @@ mod tests {
     fn test_get_object() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
-        let params = PutObjectParams {
+        let params = ObjectParams {
             key: vec![1, 2, 3],
             content: vec![4, 5, 6],
         };
@@ -214,7 +207,7 @@ mod tests {
     fn test_list_objects() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
-        let params = PutObjectParams {
+        let params = ObjectParams {
             key: vec![1, 2, 3],
             content: vec![4, 5, 6],
         };

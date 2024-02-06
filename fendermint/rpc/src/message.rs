@@ -115,7 +115,7 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let input = fendermint_actor_objectstore::PutObjectParams {
+        let input = fendermint_actor_objectstore::ObjectParams {
             key: key.into_bytes(),
             content: content.to_vec(),
         };
@@ -138,7 +138,7 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let input = fendermint_actor_objectstore::PutObjectParams {
+        let input = fendermint_actor_objectstore::ObjectParams {
             key: key.into_bytes(),
             content: content.to_vec(),
         };
@@ -160,10 +160,7 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let input = fendermint_actor_objectstore::DeleteObjectParams {
-            key: key.into_bytes(),
-        };
-        let params = RawBytes::serialize(&input)?;
+        let params = RawBytes::serialize(key.into_bytes())?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::DeleteObject as u64,

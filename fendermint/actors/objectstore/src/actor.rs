@@ -12,8 +12,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::error::ExitCode;
 
-use crate::DeleteObjectParams;
-use crate::{Method, PutObjectParams, State, OBJECTSTORE_ACTOR_NAME};
+use crate::{Method, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
 
 fil_actors_runtime::wasm_trampoline!(Actor);
 
@@ -35,7 +34,7 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn put_object(rt: &impl Runtime, params: PutObjectParams) -> Result<Cid, ActorError> {
+    fn put_object(rt: &impl Runtime, params: ObjectParams) -> Result<Cid, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
@@ -49,7 +48,7 @@ impl Actor {
         Ok(root)
     }
 
-    fn append_object(rt: &impl Runtime, params: PutObjectParams) -> Result<Cid, ActorError> {
+    fn append_object(rt: &impl Runtime, params: ObjectParams) -> Result<Cid, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
@@ -63,12 +62,12 @@ impl Actor {
         Ok(root)
     }
 
-    fn delete_object(rt: &impl Runtime, params: DeleteObjectParams) -> Result<Cid, ActorError> {
+    fn delete_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Cid, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         let root = rt.transaction(|st: &mut State, rt| {
-            st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
+            st.delete(rt.store(), &BytesKey(key)).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete to object")
             })
         })?;
