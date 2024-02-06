@@ -17,6 +17,8 @@ import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
+import "hardhat/console.sol";
+
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -52,6 +54,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
+        console.log("createBottomUpCheckpoint");
+        console.log("block height:", checkpoint.blockHeight);
+        console.log("s.bottomUpCheckPeriod:", s.bottomUpCheckPeriod);
         if (checkpoint.blockHeight % s.bottomUpCheckPeriod != 0) {
             revert InvalidCheckpointEpoch();
         }
@@ -132,6 +137,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
         }
 
         uint256 totalAmount = totalValue;
+
+        console.log("total amount:", totalAmount);
+        console.log("circSupply amount:", subnet.circSupply);
 
         if (subnet.circSupply < totalAmount) {
             revert NotEnoughSubnetCircSupply();

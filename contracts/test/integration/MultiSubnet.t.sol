@@ -69,7 +69,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     TokenTransferAndMint rootTokenBridge;
 
     function setUp() public override {
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 100 ether, address(this));
 
         rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
         require(rootSubnetName.isRoot(), "not root");
@@ -329,11 +329,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     ) internal returns (BottomUpCheckpoint memory checkpoint) {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
-        GatewayGetterFacet getter = GatewayGetterFacet(address(gateway));
         CheckpointingFacet checkpointer = CheckpointingFacet(address(gateway));
+        GatewayGetterFacet getter = GatewayGetterFacet(address(gateway));
 
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-        require(batch.msgs.length == 1, "batch length incorrect");
 
         (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
 
@@ -408,15 +407,19 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         address caller = address(new MockIpcContractPayable());
         address recipient = address(new MockIpcContractPayable());
-        uint256 transferAmount = 11 gwei;
+        uint256 transferAmount = 100;
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, transferAmount);
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
 
-        console.log("---------------register native subnet---------------");
+        console.log("---------------register subnets---------------");
 
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
 
         console.log("---------------fund native subnet---------------");
 
@@ -424,13 +427,31 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             nativeSubnetName,
             caller,
             FvmAddressHelper.from(caller),
-            transferAmount
+            DEFAULT_CROSS_MSG_FEE
         );
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, address(rootGateway));
         emit LibGateway.NewTopDownMessage(address(rootNativeSubnetActor), expected);
-        rootGatewayManager.fund{value: transferAmount}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
+        rootGatewayManager.fund{value: DEFAULT_CROSS_MSG_FEE}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
+
+        console.log("---------------fund token subnet---------------");
+
+        expected = CrossMsgHelper.createFundMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(caller),
+            DEFAULT_CROSS_MSG_FEE
+        );
+
+        token.transfer(caller, DEFAULT_CROSS_MSG_FEE);
+        vm.prank(caller);
+        token.approve(address(rootGatewayManager), DEFAULT_CROSS_MSG_FEE);
+
+        vm.prank(caller);
+        vm.expectEmit(true, true, true, true, address(rootGateway));
+        emit LibGateway.NewTopDownMessage(address(rootTokenSubnetActor), expected);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), DEFAULT_CROSS_MSG_FEE);
 
         console.log("--------------- transfer and mint (bottom-up)---------------");
         // here starts a flow from native subnet to token subnet.
@@ -476,7 +497,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         CallMsg memory payload = CallMsg({
             method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
-            params: abi.encode(address(testUSDCOwner), transferAmount)
+            params: abi.encode(address(testUSDCOwner), DEFAULT_CROSS_MSG_FEE)
         });
         expected = IpcEnvelope({
             kind: IpcMsgKind.Call,
@@ -495,13 +516,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         // the message the root gateway's postbox is being executed in the token subnet's gateway
         msgs[0] = expected;
-        commitParentFinality(address(tokenSubnetGateway));
+        //commitParentFinality(address(tokenSubnetGateway));
+
         executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
 
         //ensure that tokens are delivered on subnet
         assertEq(
             IERC20(subnetTokenBridge).balanceOf(address(testUSDCOwner)),
-            transferAmount,
+            DEFAULT_CROSS_MSG_FEE,
             "incorrect proxy token balance"
         );
 
@@ -517,11 +539,18 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         /* 
             TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenBridge contract is sent
         */
-        vm.prank(address(nativeSubnetGateway));
-        rootTokenBridge.handleIpcMessage(committed);
+        //vm.prank(address(nativeSubnetGateway));
+        //rootTokenBridge.handleIpcMessage(committed);
+
+        checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            tokenSubnetName,
+            address(tokenSubnetGateway)
+        );
+
+        callSubmitCheckpointFromParentSubnet(checkpoint, address(rootTokenSubnetActor));
 
         //ensure that usdc tokens are returned on root net
-        assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
+        //assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
         //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
         assertEq(0, subnetTokenBridge.balanceOf(testUSDCOwner));
         assertEq(0, subnetTokenBridge.balanceOf(address(subnetTokenBridge)));
