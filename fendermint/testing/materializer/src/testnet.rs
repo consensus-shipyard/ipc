@@ -3,35 +3,35 @@
 
 use anyhow::{anyhow, bail, Context};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet},
     fmt::Display,
 };
 
 use crate::{
-    manifest::{
-        AccountId, BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeId, ResourceName,
-        Rootnet,
-    },
-    materializer::{AccountName, GenesisName, Materializer},
+    manifest::{BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, Rootnet},
+    materializer::{Materializer, NodeConfig},
+    AccountId, AccountName, NodeId, NodeName, SubnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
 /// necessary to instantiate it with the help of the materializer.
-pub struct Testnet<'a, M> {
-    materializer: &'a mut M,
-    accounts: BTreeMap<AccountId, AccountName>,
-    root_genesis: Option<GenesisName>,
+pub struct Testnet<M: Materializer> {
+    accounts: BTreeMap<AccountId, M::Account>,
+    nodes: BTreeMap<NodeName, M::Node>,
+    genesis: BTreeMap<SubnetName, M::Genesis>,
 }
 
-impl<'a, M> Testnet<'a, M>
+impl<M> Testnet<M>
 where
     M: Materializer,
+    M::Account: Ord,
+    M::Genesis: Clone,
 {
-    pub fn new(materializer: &'a mut M) -> Self {
+    pub fn new() -> Self {
         Self {
-            materializer,
             accounts: Default::default(),
-            root_genesis: None,
+            nodes: Default::default(),
+            genesis: Default::default(),
         }
     }
 
@@ -39,27 +39,40 @@ where
     ///
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
-    pub async fn setup(materializer: &'a mut M, m: Manifest) -> anyhow::Result<Self> {
-        let mut t = Self::new(materializer);
+    pub async fn setup(m: &mut M, manifest: Manifest) -> anyhow::Result<Self> {
+        let mut t = Self::new();
+        let root_name = SubnetName::root();
 
-        for (account_id, _) in m.accounts {
-            t.create_account(account_id)
+        for (account_id, _) in manifest.accounts {
+            t.create_account(m, account_id)
         }
 
-        match m.rootnet {
+        match manifest.rootnet {
             Rootnet::External {
                 deployment: IpcDeployment::New { deployer },
             } => {
-                t.deploy_ipc(deployer).await?;
+                t.deploy_root_ipc(m, deployer).await?;
+            }
+            Rootnet::External {
+                deployment: IpcDeployment::Existing { gateway, registry },
+            } => {
+                m.set_root_ipc(gateway, registry).await?;
             }
             Rootnet::New {
                 validators,
                 balances,
                 nodes,
             } => {
-                t.create_root_genesis(validators, balances)?;
-                for (node_id, node) in nodes {
-                    t.create_root_node(node_id, node).await?;
+                t.create_root_genesis(m, root_name.clone(), validators, balances)
+                    .context("failed to create root genesis")?;
+
+                let node_ids = sort_by_seeds(&nodes).context("invalid root subnet topology")?;
+
+                for node_id in node_ids.iter() {
+                    let node = nodes.get(node_id).unwrap();
+                    t.create_node(m, &root_name, &node_id, &node)
+                        .await
+                        .context("failed to create root node")?;
                 }
             }
         }
@@ -68,48 +81,61 @@ where
     }
 
     /// Create a cryptographic keypair for an account ID.
-    pub fn create_account(&mut self, account_id: AccountId) {
-        let name = self.materializer.create_account(account_id.clone());
-        self.accounts.insert(account_id, name);
+    pub fn create_account(&mut self, m: &mut M, id: AccountId) {
+        let n = AccountName::new(&id);
+        let a = m.create_account(n);
+        self.accounts.insert(id, a);
     }
 
-    /// Get the name of an account.
-    ///
-    /// Returns an error if the account doesn't exist yet.
-    pub fn account_name(&self, account_id: &AccountId) -> anyhow::Result<AccountName> {
+    /// Get an account by ID.
+    pub fn account(&self, id: &AccountId) -> anyhow::Result<&M::Account> {
         self.accounts
-            .get(account_id)
-            .cloned()
-            .ok_or_else(|| anyhow!("account {account_id} does not exist"))
+            .get(id)
+            .ok_or_else(|| anyhow!("account {id} does not exist"))
     }
 
-    /// Resolve account IDs in a map to resource names.
+    /// Get an node by name.
+    pub fn node(&self, name: &NodeName) -> anyhow::Result<&M::Node> {
+        self.nodes
+            .get(name)
+            .ok_or_else(|| anyhow!("node {name:?} does not exist"))
+    }
+
+    /// Get an genesis by subnet.
+    pub fn genesis(&self, name: &SubnetName) -> anyhow::Result<&M::Genesis> {
+        self.genesis
+            .get(name)
+            .ok_or_else(|| anyhow!("genesis for {name:?} does not exist"))
+    }
+
+    /// Resolve account IDs in a map to account references.
     fn account_map<T>(
         &self,
         m: BTreeMap<AccountId, T>,
-    ) -> anyhow::Result<BTreeMap<AccountName, T>> {
+    ) -> anyhow::Result<BTreeMap<&M::Account, T>> {
         m.into_iter()
-            .map(|(id, x)| self.account_name(&id).map(|a| (a, x)))
+            .map(|(id, x)| self.account(&id).map(|a| (a, x)))
             .collect()
     }
 
     /// Deploy the IPC contracts to the rootnet.
-    async fn deploy_ipc(&mut self, deployer: AccountId) -> anyhow::Result<()> {
-        let d = self.account_name(&deployer).context("invalid deployer")?;
-        self.materializer
-            .deploy_ipc(d)
+    async fn deploy_root_ipc(&mut self, m: &mut M, deployer: AccountId) -> anyhow::Result<()> {
+        let d = self.account(&deployer).context("invalid deployer")?;
+        m.deploy_root_ipc(d)
             .await
             .context("failed to deploy IPC to root")?;
         Ok(())
     }
 
-    /// Create a genesis file for the rootnet nodes.
+    /// Create a genesis for the rootnet nodes.
     ///
     /// On the rootnet the validator power comes out of thin air,
     /// ie. the balances don't have to cover it. On subnets this
     /// will be different, the collateral has to be funded.
     fn create_root_genesis(
-        &self,
+        &mut self,
+        m: &mut M,
+        subnet_name: SubnetName,
         validators: CollateralMap,
         balances: BalanceMap,
     ) -> anyhow::Result<()> {
@@ -121,25 +147,55 @@ where
             .account_map(balances)
             .context("invalid root balances")?;
 
-        self.root_genesis = Some(self.materializer.create_genesis(validators, balances)?);
+        // Remember the genesis so we can potentially create more nodes later.
+        let genesis = m.create_root_genesis(subnet_name.clone(), validators, balances)?;
+        self.genesis.insert(subnet_name, genesis);
 
         Ok(())
     }
 
-    /// Create a node on the rootnet.
-    ///
-    /// Fails if the root genesis or the validator hasn't been created yet.
-    async fn create_root_node(&self, node_id: NodeId, node: Node) -> anyhow::Result<()> {
-        // TODO:
-        // * validatate that seed nodes exist
-        // * sort nodes in topological order by seed ID
-        // * create a node, refer to seed nodes by name
-        // INSTEAD:
-        // * create node should merely create the configuration of a node but not start it
-        // * that way we can pre-allocate the hostnames or whatever,
-        // * then we can sort the nodes in a way that we start seeds first, and this is where
-        //   we can make final touches to the configuration to inject the address of seeds by name
-        todo!()
+    /// Create a node, but don't start it
+    async fn create_node(
+        &mut self,
+        m: &mut M,
+        subnet_name: &SubnetName,
+        node_id: &NodeId,
+        node: &Node,
+    ) -> anyhow::Result<()> {
+        let genesis = self.genesis(subnet_name)?;
+        let node_name = subnet_name.node(&node_id);
+
+        let node_config = NodeConfig {
+            genesis,
+            validator: match &node.mode {
+                NodeMode::Full => None,
+                NodeMode::Validator(id) => {
+                    let validator = self
+                        .account(id)
+                        .with_context(|| format!("invalid validator in {node_name:?}"))?;
+                    Some(validator)
+                }
+            },
+            parent_node: match (subnet_name.parent(), &node.parent_node) {
+                (Some(ps), Some(n)) => Some(
+                    self.node(&ps.node(n))
+                        .with_context(|| format!("invalid parent node in {node_name:?}"))?,
+                ),
+                (None, Some(_)) => {
+                    bail!("node {node_name:?} has parent node, but there is no parent subnet")
+                }
+                _ => None,
+            },
+            ethapi: node.ethapi,
+        };
+
+        let node = m
+            .create_node(node_name.clone(), node_config)
+            .context("failed to create node")?;
+
+        self.nodes.insert(node_name, node);
+
+        Ok(())
     }
 }
 
@@ -148,18 +204,15 @@ where
 /// Cycles can be allowed, in which case it will do its best to order the items
 /// with the least amount of dependencies first. This is so we can support nodes
 /// mutually be seeded by each other.
-fn topo_sort<K, V, F>(
-    mut items: BTreeMap<K, V>,
-    allow_cycles: bool,
-    f: F,
-) -> anyhow::Result<Vec<(K, V)>>
+fn topo_sort<K, V, F, I>(items: &BTreeMap<K, V>, allow_cycles: bool, f: F) -> anyhow::Result<Vec<K>>
 where
-    F: Fn(&V) -> BTreeSet<K>,
-    K: Ord + Display,
+    F: Fn(&V) -> I,
+    K: Ord + Display + Clone,
+    I: IntoIterator<Item = K>,
 {
     let mut deps = items
         .iter()
-        .map(|(k, v)| (k, f(v)))
+        .map(|(k, v)| (k.clone(), BTreeSet::from_iter(f(v))))
         .collect::<BTreeMap<_, _>>();
 
     for (k, ds) in deps.iter() {
@@ -173,26 +226,62 @@ where
     let mut sorted = Vec::new();
 
     while !deps.is_empty() {
-        let leaf = match deps.iter().find(|(k, ds)| ds.is_empty()) {
-            Some((k, _)) => k,
+        let leaf: K = match deps.iter().find(|(_, ds)| ds.is_empty()) {
+            Some((leaf, _)) => (*leaf).clone(),
             None if allow_cycles => {
                 let mut dcs = deps.iter().map(|(k, ds)| (k, ds.len())).collect::<Vec<_>>();
-                dcs.sort_by_key(|(_, c)| c);
-                dcs.first().unwrap().0
+                dcs.sort_by_key(|(_, c)| *c);
+                let leaf = dcs.first().unwrap().0;
+                (*leaf).clone()
             }
             None => bail!("circular reference in dependencies"),
         };
 
-        deps.remove(leaf);
+        deps.remove(&leaf);
 
         for (_, ds) in deps.iter_mut() {
-            ds.remove(leaf);
+            ds.remove(&leaf);
         }
 
-        if let Some((k, v)) = items.remove_entry(leaf) {
-            sorted.push((k, v));
-        }
+        sorted.push(leaf);
     }
 
     Ok(sorted)
+}
+
+/// Sort nodes in a subnet in topological order, so we strive to first
+/// start the ones others use as a seed node. However, do allow cycles
+/// so that we can have nodes mutually bootstrap from each other.
+fn sort_by_seeds(nodes: &BTreeMap<NodeId, Node>) -> anyhow::Result<Vec<NodeId>> {
+    topo_sort(nodes, true, |n| {
+        BTreeSet::from_iter(n.seed_nodes.iter().cloned())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::topo_sort;
+
+    #[test]
+    fn test_topo_sort() {
+        let mut tree = BTreeMap::default();
+
+        tree.insert(1, vec![]);
+        tree.insert(2, vec![5]);
+        tree.insert(3, vec![1, 5]);
+        tree.insert(4, vec![2, 3]);
+        tree.insert(5, vec![1]);
+
+        let sorted = topo_sort(&tree, false, |ds| ds.clone()).unwrap();
+        assert_eq!(sorted, vec![1, 5, 2, 3, 4]);
+
+        tree.insert(1, vec![5]);
+
+        topo_sort(&tree, false, |ds| ds.clone()).expect_err("shouldn't allow cycles");
+
+        let sorted = topo_sort(&tree, true, |ds| ds.clone()).expect("should allow cycles");
+        assert_eq!(sorted.len(), tree.len());
+    }
 }

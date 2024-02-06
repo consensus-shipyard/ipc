@@ -12,34 +12,7 @@ use tendermint_rpc::Url;
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::Collateral;
 
-/// An ID identifying a resource within its parent.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ResourceId(pub String);
-
-impl Display for ResourceId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "'{}'", self.0)
-    }
-}
-
-/// The name of a resource consists of its ID and all the IDs of its ancestors
-/// concatenated into a URL-like path.
-///
-/// See <https://cloud.google.com/apis/design/resource_names>
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ResourceName(pub PathBuf);
-
-/// A human readable name for an account.
-pub type AccountId = ResourceId;
-
-/// A human readable name for a subnet.
-pub type SubnetId = ResourceId;
-
-/// A human readable name for a node.
-pub type NodeId = ResourceId;
-
-/// A human readable name for a relayer.
-pub type RelayerId = ResourceId;
+use crate::{AccountId, NodeId, RelayerId, SubnetId};
 
 pub type SubnetMap = BTreeMap<SubnetId, Subnet>;
 pub type BalanceMap = BTreeMap<AccountId, Balance>;
