@@ -27,11 +27,7 @@ error InvalidBatchSource();
 error InvalidSubnetActor();
 error InvalidCollateral();
 error InvalidConfigurationNumber();
-error InvalidCrossMsgSender();
-error InvalidCrossMsgDstSubnet();
-error InvalidCrossMsgNonce();
-error InvalidCrossMsgValue();
-error InvalidCrossMsgKind();
+error InvalidXnetMessage(InvalidXnetMessageReason reason);
 error InvalidMajorityPercentage();
 error InvalidPowerScale();
 error InvalidRetentionHeight();
@@ -81,6 +77,14 @@ error MethodNotAllowed(string reason);
 error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
+
+enum InvalidXnetMessageReason {
+    Sender,
+    DstSubnet,
+    Nonce,
+    Value,
+    Kind
+}
 
 string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permissioned is enabled and subnet bootstrapped";
 string constant ERR_VALIDATOR_JOINED = "Method not allowed if validator has already joined";

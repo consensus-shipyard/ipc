@@ -152,7 +152,6 @@ library SupplySourceHelper {
         if (address(this).balance < value) {
             revert NotEnoughBalance();
         }
-
         (bool success, ) = recipient.call{value: value}("");
         return success;
     }
