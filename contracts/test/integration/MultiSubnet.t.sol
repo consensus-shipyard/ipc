@@ -29,7 +29,7 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {SubnetTokenBridge} from "../../src/examples/cross-token/SubnetTokenBridge.sol";
 import {SubnetUSDCProxy} from "../../src/examples/cross-token/SubnetUSDCProxy.sol";
 import {TokenTransferAndMint} from "../../src/examples/cross-token/TokenTransferAndMint.sol";
-import {USDCMock} from "../../src/examples/cross-token/USDCMock.sol";
+import {USDCTest} from "../../src/examples/cross-token/USDCTest.sol";
 
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
@@ -438,35 +438,35 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("--------------- transfer and mint (bottom-up)---------------");
         // here starts a flow from native subnet to token subnet.
 
-        USDCMock mockUSDC = new USDCMock();
-        mockUSDC.mint(transferAmount);
-        address mockUSDCOwner = mockUSDC.owner();
-        assertEq(transferAmount, mockUSDC.balanceOf(mockUSDCOwner));
+        USDCTest testUSDC = new USDCTest();
+        testUSDC.mint(transferAmount);
+        address testUSDCOwner = testUSDC.owner();
+        assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
 
-        subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(mockUSDC), rootSubnetName);
+        subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(testUSDC), rootSubnetName);
 
         rootTokenBridge = new TokenTransferAndMint(
             address(nativeSubnetGateway),
-            address(mockUSDC),
+            address(testUSDC),
             tokenSubnetName,
             address(subnetTokenBridge)
         );
 
         subnetTokenBridge.setParentSubnetUSDC(address(rootTokenBridge));
 
-        vm.deal(mockUSDCOwner, DEFAULT_CROSS_MSG_FEE);
+        vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.deal(address(rootTokenBridge), 1 ether);
 
-        vm.prank(mockUSDCOwner);
-        mockUSDC.approve(address(rootTokenBridge), transferAmount);
+        vm.prank(testUSDCOwner);
+        testUSDC.approve(address(rootTokenBridge), transferAmount);
 
-        console.log("mock usdc %s", address(mockUSDC));
-        console.log("mock usdc owner%s", address(mockUSDCOwner));
+        console.log("mock usdc %s", address(testUSDC));
+        console.log("mock usdc owner%s", address(testUSDCOwner));
         console.log("rootTokenBridge %s", address(rootTokenBridge));
-        console.log("allowance: %d", mockUSDC.allowance(address(mockUSDCOwner), address(rootTokenBridge)));
+        console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenBridge)));
 
-        vm.prank(address(mockUSDCOwner));
-        rootTokenBridge.transferAndMint{value: DEFAULT_CROSS_MSG_FEE}(mockUSDCOwner, transferAmount);
+        vm.prank(address(testUSDCOwner));
+        rootTokenBridge.transferAndMint{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         // after the two next calls the root gateway should store the message in its postbox.
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -479,7 +479,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         CallMsg memory payload = CallMsg({
             method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
-            params: abi.encode(address(mockUSDCOwner), transferAmount)
+            params: abi.encode(address(testUSDCOwner), transferAmount)
         });
         expected = IpcEnvelope({
             kind: IpcMsgKind.Call,
@@ -503,16 +503,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         //ensure that tokens are delivered on subnet
         assertEq(
-            IERC20(subnetTokenBridge).balanceOf(address(mockUSDCOwner)),
+            IERC20(subnetTokenBridge).balanceOf(address(testUSDCOwner)),
             transferAmount,
             "incorrect proxy token balance"
         );
 
         console.log("--------------- withdraw token (top-down)---------------");
 
-        vm.deal(mockUSDCOwner, DEFAULT_CROSS_MSG_FEE);
-        vm.prank(address(mockUSDCOwner));
-        IpcEnvelope memory committed = subnetTokenBridge.depositTokens{value:DEFAULT_CROSS_MSG_FEE}(mockUSDCOwner, transferAmount);
+        vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
+        vm.prank(address(testUSDCOwner));
+        IpcEnvelope memory committed = subnetTokenBridge.depositTokens{value:DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         /* 
             TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenBridge contract is sent
@@ -521,9 +521,9 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         rootTokenBridge.handleIpcMessage(committed);
 
         //ensure that usdc tokens are returned on root net
-        assertEq(transferAmount, mockUSDC.balanceOf(mockUSDCOwner));
+        assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
         //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
-        assertEq(0, subnetTokenBridge.balanceOf(mockUSDCOwner));
+        assertEq(0, subnetTokenBridge.balanceOf(testUSDCOwner));
         assertEq(0, subnetTokenBridge.balanceOf(address(subnetTokenBridge)));
     }
 }

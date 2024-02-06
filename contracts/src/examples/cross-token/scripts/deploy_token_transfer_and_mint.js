@@ -15,7 +15,7 @@ async function main() {
     const parentSubnet = [parentSubnetChainId, []]
 
     // Deploy ERC20 token
-    const ERC20 = await hre.ethers.getContractFactory('USDCMock')
+    const ERC20 = await hre.ethers.getContractFactory('USDCTest')
     const erc20Token = await ERC20.deploy('USDC', 'USDC')
     await erc20Token.deployed()
 
