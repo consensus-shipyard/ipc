@@ -44,10 +44,12 @@ impl Actor {
     }
 
     fn get_count(rt: &impl Runtime) -> Result<u64, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
         rt.state().map(|st| st.leaf_count)
     }
 
     fn get_peaks(rt: &impl Runtime) -> Result<Vec<Cid>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
         rt.state().map(|st| {
             st.get_peaks(rt.store())
                 .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get peaks"))
@@ -55,6 +57,7 @@ impl Actor {
     }
 
     fn bag_peaks(rt: &impl Runtime) -> Result<Cid, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
         rt.state().map(|st| {
             st.bag_peaks(rt.store())
                 .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to bag peaks"))

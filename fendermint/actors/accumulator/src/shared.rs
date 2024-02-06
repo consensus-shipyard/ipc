@@ -106,7 +106,8 @@ impl State {
         let leaf = store.put_cbor(&obj, Code::Blake2b256)?;
         self.peaks = push(self.leaf_count, &mut amt, leaf)?;
         self.leaf_count += 1;
-        bag_peaks(&amt) // TODO(carsonfarmer): Maybe we just want to return the root of the Amt?
+        // TODO:(carsonfarmer) Maybe we just want to return the root of the Amt?
+        bag_peaks(&amt)
     }
 
     pub fn get_peaks<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Cid>> {
