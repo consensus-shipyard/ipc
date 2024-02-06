@@ -198,7 +198,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e SUBNET_ID=${subnet_id} \
     child-validator-down
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=validator-${i} \
+    -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
     -e SUBNET_ID=${subnet_id} \
     -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[0]} \
