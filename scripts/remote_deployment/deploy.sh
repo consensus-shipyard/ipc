@@ -195,8 +195,6 @@ echo "$PREFIX Start the bootstrap validator node"
 cd ${IPC_FOLDER}
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
         -e SUBNET_ID=${subnet_id} \
-        -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[0]} \
-        -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
         -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
         -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
         -e PARENT_REGISTRY=${parent_registry_address} \
