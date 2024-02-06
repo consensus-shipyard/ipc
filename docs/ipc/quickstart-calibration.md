@@ -86,7 +86,7 @@ ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> --wallet-type evm
 
 * The next step is to create a subnet under `/r314159` in calibration. Remember to set a default wallet or explicitly specifying the wallet from which you want to perform the action with the `--from` flag.
 ```bash
-ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
+ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --permission-mode 0 --supply-source-kind 0
 ```
 
 This will output your subnet ID, which you will use below.
