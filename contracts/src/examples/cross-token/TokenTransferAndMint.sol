@@ -24,7 +24,7 @@ contract TokenTransferAndMint is ERC20TokenMessenger {
         console.logBytes(envelope.message);
         console.log(envelope.value);
         console.log(envelope.nonce);
-        CallMsg memory callMsg = abi.decode(envelope.message, (CallMsg));
+        //CallMsg memory callMsg = abi.decode(envelope.message, (CallMsg));
 
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         console.log("INFO");

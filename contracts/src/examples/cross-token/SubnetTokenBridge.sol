@@ -12,6 +12,9 @@ contract SubnetTokenBridge is ERC20TokenMessenger, ERC20 {
     address public parentSubnetUSDC;
     SubnetID public parentSubnet;
 
+    SubnetID public networkName;
+    GatewayMessengerFacet private immutable messenger;
+
     constructor(
         address _gateway,
         address _parentSubnetUSDC,
@@ -19,6 +22,9 @@ contract SubnetTokenBridge is ERC20TokenMessenger, ERC20 {
     ) ERC20TokenMessenger(_gateway) ERC20("USDCTestReplica", "USDCtR") {
         parentSubnetUSDC = _parentSubnetUSDC;
         parentSubnet = _parentSubnet;
+
+        networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
+        messenger = GatewayMessengerFacet(address(_gateway));
     }
 
     function _handleIpcCall(
@@ -29,7 +35,7 @@ contract SubnetTokenBridge is ERC20TokenMessenger, ERC20 {
         console.logBytes(envelope.message);
         console.log(envelope.value);
         console.log(envelope.nonce);
-        CallMsg memory callMsg = abi.decode(envelope.message, (CallMsg));
+        //CallMsg memory callMsg = abi.decode(envelope.message, (CallMsg));
 
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         console.log("INFO");
@@ -43,8 +49,48 @@ contract SubnetTokenBridge is ERC20TokenMessenger, ERC20 {
     function getParentSubnet() public view returns (SubnetID memory) {
         return parentSubnet;
     }
-
-    function depositTokens(address receiver, uint256 amount) public payable {
-        _sendToken(address(this), parentSubnet, parentSubnetUSDC, receiver, amount);
+    
+    function x() public payable {
+        console.log("HI");
+        //_sendToken(address(this), parentSubnet, parentSubnetUSDC, receiver, amount);
     }
+
+    function depositTokens(address receiver, uint256 amount) public payable returns (IpcEnvelope memory committed) {
+        if (receiver == address(0)) {
+            revert ZeroAddress();
+        }
+        if (msg.value != DEFAULT_CROSS_MSG_FEE) {
+            revert NotEnoughFunds();
+        }
+
+        uint64 lastNonce = nonce;
+
+        emit TokenSent({
+            sourceContract: address(this),
+            sender: msg.sender,
+            destinationSubnet: parentSubnet,
+            destinationContract: parentSubnetUSDC,
+            receiver: receiver,
+            nonce: lastNonce,
+            value: amount
+        });
+        nonce++;
+
+        CallMsg memory message = CallMsg({
+            method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
+            params: abi.encode(receiver, amount)
+        });
+        IpcEnvelope memory crossMsg = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({subnetId: networkName, rawAddress: FvmAddressHelper.from(address(this))}),
+            to: IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(parentSubnetUSDC)}),
+            value: DEFAULT_CROSS_MSG_FEE,
+            nonce: lastNonce,
+            message: abi.encode(message)
+        });
+
+        return messenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(crossMsg);
+    }
+
+
 }

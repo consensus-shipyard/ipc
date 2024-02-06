@@ -505,5 +505,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             transferAmount,
             "incorrect proxy token balance"
         );
+
+        console.log("--------------- withdraw token (top-down)---------------");
+
+        vm.deal(mockUSDCOwner, DEFAULT_CROSS_MSG_FEE);
+        vm.prank(address(mockUSDCOwner));
+        subnetTokenBridge.depositTokens{value:DEFAULT_CROSS_MSG_FEE}(mockUSDCOwner, transferAmount);
     }
 }
