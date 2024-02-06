@@ -3,12 +3,12 @@ pragma solidity 0.8.19;
 
 import {SubnetID} from "../../structs/Subnet.sol";
 
-import "./ERC20TokenMessenger.sol";
 import "forge-std/console.sol";
 
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
+import {IpcExchange} from "../../../sdk/IpcContract.sol";
 
-contract SubnetTokenBridge is ERC20TokenMessenger, ERC20 {
+contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
     using SafeERC20 for IERC20;
 
@@ -17,12 +17,25 @@ contract SubnetTokenBridge is ERC20TokenMessenger, ERC20 {
 
     SubnetID public networkName;
     GatewayMessengerFacet private immutable messenger;
+    uint256 public constant DEFAULT_CROSS_MSG_FEE = 10 gwei;
+    uint64 public nonce = 0;
+
+    event TokenSent(
+        address sourceContract,
+        address sender,
+        SubnetID destinationSubnet,
+        address destinationContract,
+        address receiver,
+        uint64 nonce,
+        uint256 value
+    );
+
 
     constructor(
         address _gateway,
         address _parentSubnetUSDC,
         SubnetID memory _parentSubnet
-    ) ERC20TokenMessenger(_gateway) ERC20("USDCTestReplica", "USDCtR") {
+    )IpcExchange(_gateway) ERC20("USDCTestReplica", "USDCtR") {
         parentSubnetUSDC = _parentSubnetUSDC;
         parentSubnet = _parentSubnet;
 
@@ -45,6 +58,15 @@ contract SubnetTokenBridge is ERC20TokenMessenger, ERC20 {
         _mint(receiver, amount);
         return bytes("");
     }
+
+    function _handleIpcResult(
+        IpcEnvelope storage original,
+        IpcEnvelope memory result,
+        ResultMsg memory resultMsg
+    ) internal override {
+        console.log("_handleIpcResult");
+    }
+
 
     function getParentSubnet() public view returns (SubnetID memory) {
         return parentSubnet;
