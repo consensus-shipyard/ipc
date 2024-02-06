@@ -16,6 +16,7 @@ use base64::{alphabet, Engine};
 pub mod eth;
 pub mod genesis;
 pub mod key;
+pub mod proxy;
 pub mod rpc;
 pub mod run;
 
@@ -85,6 +86,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
         Commands::Genesis(args) => args.exec(()).await,
         Commands::Rpc(args) => args.exec(()).await,
         Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
+        Commands::Proxy(args) => args.exec(()).await,
     }
 }
 

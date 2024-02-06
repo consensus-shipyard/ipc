@@ -8,6 +8,7 @@ use std::pin::Pin;
 use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
+use cid::Cid;
 use fendermint_app_options::genesis::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rpc::client::BoundFendermintClient;
@@ -33,7 +34,9 @@ use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
 use crate::cmd;
-use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
+use crate::options::rpc::{
+    BroadcastMode, FevmArgs, RpcDataRepoCommands, RpcFevmCommands, TransArgs,
+};
 use crate::{
     cmd::to_b64,
     options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands},
@@ -42,37 +45,56 @@ use crate::{
 use super::key::read_secret_key;
 
 cmd! {
-  RpcArgs(self) {
-    let client = FendermintClient::new_http(self.url.clone(), self.proxy_url.clone())?;
-    match self.command.clone() {
-      RpcCommands::Query { height, command } => {
-        let height = Height::try_from(height)?;
-        query(client, height, command).await
-      },
-      RpcCommands::Transfer { args, to } => {
-        transfer(client, args, to).await
-      },
-      RpcCommands::Transaction { args, to, method_number, params } => {
-        transaction(client, args, to, method_number, params.clone()).await
-      },
-      RpcCommands::Fevm { args, command } => match command {
-        RpcFevmCommands::Create { contract, constructor_args } => {
-            fevm_create(client, args, contract, constructor_args).await
+    RpcArgs(self) {
+        let client = FendermintClient::new_http(self.url.clone(), self.proxy_url.clone())?;
+        match self.command.clone() {
+            RpcCommands::Query { height, command } => {
+                let height = Height::try_from(height)?;
+                query(client, height, command).await
+            },
+            RpcCommands::Transfer { args, to } => {
+                transfer(client, args, to).await
+            },
+            RpcCommands::Transaction { args, to, method_number, params } => {
+                transaction(client, args, to, method_number, params.clone()).await
+            },
+            RpcCommands::DataRepo { args, command } => match command {
+                RpcDataRepoCommands::Put { key, content } => {
+                    datarepo_put(client, args, key, content).await
+                }
+                RpcDataRepoCommands::Append { key, content } => {
+                    datarepo_append(client, args, key, content).await
+                }
+                RpcDataRepoCommands::Delete { key } => {
+                    datarepo_delete(client, args, key).await
+                }
+                RpcDataRepoCommands::Get { key, height } => {
+                    let height = Height::try_from(height)?;
+                    datarepo_get_call(client, args, key, height).await
+                }
+                RpcDataRepoCommands::List { height } => {
+                    let height = Height::try_from(height)?;
+                    datarepo_list_call(client, args, height).await
+                }
+            },
+            RpcCommands::Fevm { args, command } => match command {
+                RpcFevmCommands::Create { contract, constructor_args } => {
+                    fevm_create(client, args, contract, constructor_args).await
+                }
+                RpcFevmCommands::Invoke { args: FevmArgs { contract, method, method_args }} => {
+                    fevm_invoke(client, args, contract, method, method_args).await
+                }
+                RpcFevmCommands::Call { args: FevmArgs { contract, method, method_args }, height} => {
+                    let height = Height::try_from(height)?;
+                    fevm_call(client, args, contract, method, method_args, height).await
+                }
+                RpcFevmCommands::EstimateGas { args: FevmArgs { contract, method, method_args }, height} => {
+                    let height = Height::try_from(height)?;
+                    fevm_estimate_gas(client, args, contract, method, method_args, height).await
+                }
+            }
         }
-        RpcFevmCommands::Invoke { args: FevmArgs { contract, method, method_args }} => {
-            fevm_invoke(client, args, contract, method, method_args).await
-        }
-        RpcFevmCommands::Call { args: FevmArgs { contract, method, method_args }, height} => {
-            let height = Height::try_from(height)?;
-            fevm_call(client, args, contract, method, method_args, height).await
-        }
-        RpcFevmCommands::EstimateGas { args: FevmArgs { contract, method, method_args }, height} => {
-            let height = Height::try_from(height)?;
-            fevm_estimate_gas(client, args, contract, method, method_args, height).await
-        }
-      }
     }
-  }
 }
 
 /// Run an ABCI query and print the results on STDOUT.
@@ -177,6 +199,101 @@ async fn transaction(
         |data| serde_json::Value::String(hex::encode(data.bytes())),
     )
     .await
+}
+
+async fn datarepo_put(
+    client: FendermintClient,
+    args: TransArgs,
+    key: String,
+    content: Bytes,
+) -> anyhow::Result<()> {
+    broadcast_and_print(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move { client.datarepo_put(key, content, value, gas_params).await })
+        },
+        cid_to_json,
+    )
+    .await
+}
+
+async fn datarepo_append(
+    client: FendermintClient,
+    args: TransArgs,
+    key: String,
+    content: Bytes,
+) -> anyhow::Result<()> {
+    broadcast_and_print(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move {
+                client
+                    .datarepo_append(key, content, value, gas_params)
+                    .await
+            })
+        },
+        cid_to_json,
+    )
+    .await
+}
+
+async fn datarepo_delete(
+    client: FendermintClient,
+    args: TransArgs,
+    key: String,
+) -> anyhow::Result<()> {
+    broadcast_and_print(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move { client.datarepo_delete(key, value, gas_params).await })
+        },
+        cid_to_json,
+    )
+    .await
+}
+
+async fn datarepo_get_call(
+    client: FendermintClient,
+    args: TransArgs,
+    key: String,
+    height: Height,
+) -> anyhow::Result<()> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let value = args.value;
+    let height = FvmQueryHeight::from(height.value());
+
+    let res = client
+        .inner
+        .datarepo_get_call(key, value, gas_params, height)
+        .await?;
+
+    let json = json!({"response": res.response, "return_data": res.return_data});
+
+    print_json(&json)
+}
+
+async fn datarepo_list_call(
+    client: FendermintClient,
+    args: TransArgs,
+    height: Height,
+) -> anyhow::Result<()> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let value = args.value;
+    let height = FvmQueryHeight::from(height.value());
+
+    let res = client
+        .inner
+        .datarepo_list_call(value, gas_params, height)
+        .await?;
+
+    let json = json!({"response": res.response, "return_data": res.return_data});
+
+    print_json(&json)
 }
 
 /// Deploy an EVM contract through RPC and print the response to STDOUT as JSON.
@@ -311,20 +428,25 @@ fn create_return_to_json(ret: CreateReturn) -> serde_json::Value {
     })
 }
 
+/// Print a Cid.
+pub fn cid_to_json(ret: Cid) -> serde_json::Value {
+    json!(ret)
+}
+
 pub enum BroadcastResponse<T> {
     Async(AsyncResponse<T>),
     Sync(SyncResponse<T>),
     Commit(CommitResponse<T>),
 }
 
-struct BroadcastModeWrapper(BroadcastMode);
+pub struct BroadcastModeWrapper(BroadcastMode);
 
 impl fendermint_rpc::tx::BroadcastMode for BroadcastModeWrapper {
     type Response<T> = BroadcastResponse<T>;
 }
 
-struct TransClient {
-    inner: BoundFendermintClient<HttpClient>,
+pub struct TransClient {
+    pub(crate) inner: BoundFendermintClient<HttpClient>,
     broadcast_mode: BroadcastModeWrapper,
 }
 
@@ -373,7 +495,7 @@ impl TxClient<BroadcastModeWrapper> for TransClient {
     }
 }
 
-fn gas_params(args: &TransArgs) -> GasParams {
+pub fn gas_params(args: &TransArgs) -> GasParams {
     GasParams {
         gas_limit: args.gas_limit,
         gas_fee_cap: args.gas_fee_cap.clone(),

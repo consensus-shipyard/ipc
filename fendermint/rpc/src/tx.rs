@@ -3,9 +3,10 @@
 
 use std::marker::PhantomData;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
+use cid::Cid;
 use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
@@ -20,7 +21,10 @@ use fendermint_vm_message::chain::ChainMessage;
 
 use crate::message::{GasParams, MessageFactory};
 use crate::query::{QueryClient, QueryResponse};
-use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke};
+use crate::response::{
+    decode_bytes, decode_cid, decode_datarepo_get, decode_datarepo_list, decode_fevm_create,
+    decode_fevm_invoke,
+};
 
 /// Abstracting away what the return value is based on whether
 /// we broadcast transactions in sync, async or commit mode.
@@ -69,6 +73,50 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         Ok(res)
     }
 
+    /// Put an object into a data repo.
+    async fn datarepo_put(
+        &mut self,
+        key: String,
+        content: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<M::Response<Cid>> {
+        let mf = self.message_factory_mut();
+        let msg = mf.datarepo_put(key, content, value, gas_params)?;
+        let fut = self.perform(msg, decode_cid);
+        let res = fut.await?;
+        Ok(res)
+    }
+
+    /// Append to an object in a data repo.
+    async fn datarepo_append(
+        &mut self,
+        key: String,
+        content: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<M::Response<Cid>> {
+        let mf = self.message_factory_mut();
+        let msg = mf.datarepo_append(key, content, value, gas_params)?;
+        let fut = self.perform(msg, decode_cid);
+        let res = fut.await?;
+        Ok(res)
+    }
+
+    /// Delete an object from a data repo.
+    async fn datarepo_delete(
+        &mut self,
+        key: String,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<M::Response<Cid>> {
+        let mf = self.message_factory_mut();
+        let msg = mf.datarepo_delete(key, value, gas_params)?;
+        let fut = self.perform(msg, decode_cid);
+        let res = fut.await?;
+        Ok(res)
+    }
+
     /// Deploy a FEVM contract.
     async fn fevm_create(
         &mut self,
@@ -108,6 +156,59 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
 /// Convenience trait to call FEVM methods in read-only mode, without doing a transaction.
 #[async_trait]
 pub trait CallClient: QueryClient + BoundClient {
+    /// Get an object in a data repo without including a transaction on the blockchain.
+    async fn datarepo_get_call(
+        &mut self,
+        key: String,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: FvmQueryHeight,
+    ) -> anyhow::Result<CallResponse<Vec<u8>>> {
+        let msg = self
+            .message_factory_mut()
+            .datarepo_get(key, value, gas_params)?;
+
+        let response = self.call(msg, height).await?;
+        if response.value.code.is_err() {
+            return Err(anyhow!("{}", response.value.info));
+        }
+        let return_data = decode_datarepo_get(&response.value)
+            .context("error decoding data from deliver_tx in call")?;
+
+        let response = CallResponse {
+            response,
+            return_data,
+        };
+
+        Ok(response)
+    }
+
+    /// List objects in a data repo without including a transaction on the blockchain.
+    async fn datarepo_list_call(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: FvmQueryHeight,
+    ) -> anyhow::Result<CallResponse<Vec<Vec<u8>>>> {
+        let msg = self
+            .message_factory_mut()
+            .datarepo_list(value, gas_params)?;
+
+        let response = self.call(msg, height).await?;
+        if response.value.code.is_err() {
+            return Err(anyhow!("{}", response.value.info));
+        }
+        let return_data = decode_datarepo_list(&response.value)
+            .context("error decoding data from deliver_tx in call")?;
+
+        let response = CallResponse {
+            response,
+            return_data,
+        };
+
+        Ok(response)
+    }
+
     /// Call a method on a FEVM contract without including a transaction on the blockchain.
     async fn fevm_call(
         &mut self,

@@ -67,6 +67,13 @@ pub enum RpcCommands {
         #[command(flatten)]
         args: TransArgs,
     },
+    /// Subcommands related to Data Repos.
+    DataRepo {
+        #[command(subcommand)]
+        command: RpcDataRepoCommands,
+        #[command(flatten)]
+        args: TransArgs,
+    },
     /// Subcommands related to FEVM.
     Fevm {
         #[command(subcommand)]
@@ -92,6 +99,38 @@ pub enum RpcQueryCommands {
     },
     /// Get the slowly changing state parameters.
     StateParams,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum RpcDataRepoCommands {
+    Put {
+        #[arg(long, short)]
+        key: String,
+        #[arg(long, short)]
+        content: Bytes,
+    },
+    Append {
+        #[arg(long, short)]
+        key: String,
+        #[arg(long, short)]
+        content: Bytes,
+    },
+    Delete {
+        #[arg(long, short)]
+        key: String,
+    },
+    Get {
+        #[arg(long, short)]
+        key: String,
+        /// Block height to query; 0 means latest.
+        #[arg(long, short = 'b', default_value_t = 0)]
+        height: u64,
+    },
+    List {
+        /// Block height to query; 0 means latest.
+        #[arg(long, short = 'b', default_value_t = 0)]
+        height: u64,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]

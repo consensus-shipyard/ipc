@@ -26,6 +26,8 @@ fendermint_crypto = { path = "../crypto" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_message = { path = "../vm/message" }
 
+fendermint_actor_objectstore = { path = "../actors/objectstore" }
+
 [dev-dependencies]
 clap = { workspace = true }
 ethers = { workspace = true, features = ["abigen"] }
