@@ -4,7 +4,8 @@
 
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
+use fvm_ipld_encoding::strict_bytes;
+use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
@@ -103,12 +104,16 @@ pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct PutObjectParams {
+    #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
+    #[serde(with = "strict_bytes")]
     pub content: Vec<u8>,
 }
 
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
+#[serde(transparent)]
 pub struct DeleteObjectParams {
+    #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }
 

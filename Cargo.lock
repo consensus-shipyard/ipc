@@ -2782,6 +2782,7 @@ dependencies = [
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
  "fendermint_vm_topdown",
+ "futures-util",
  "fvm",
  "fvm_ipld_blockstore",
  "fvm_ipld_car",

@@ -68,15 +68,15 @@ pub fn decode_cid(deliver_tx: &DeliverTx) -> anyhow::Result<Cid> {
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.
-pub fn decode_datarepo_get(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
+pub fn decode_datarepo_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Vec<u8>>> {
     let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Vec<u8>>(&data)
-        .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
+    fvm_ipld_encoding::from_slice::<Option<Vec<u8>>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<Vec<u8>>: {e}"))
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a list of bytes.
-pub fn decode_datarepo_list(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<Vec<u8>>> {
+pub fn decode_datarepo_list(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Vec<Vec<u8>>>> {
     let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Vec<Vec<u8>>>(&data)
-        .map_err(|e| anyhow!("error parsing as Vec<Vec<u8>>: {e}"))
+    fvm_ipld_encoding::from_slice::<Option<Vec<Vec<u8>>>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<Vec<Vec<u8>>>: {e}"))
 }

@@ -172,13 +172,12 @@ pub trait CallClient: QueryClient + BoundClient {
         if response.value.code.is_err() {
             return Err(anyhow!("{}", response.value.info));
         }
-
         let return_data = decode_datarepo_get(&response.value)
-            .context("error decoding data from deliver_tx in query")?;
+            .context("error decoding data from deliver_tx in call")?;
 
         let response = CallResponse {
             response,
-            return_data: Some(return_data),
+            return_data,
         };
 
         Ok(response)
@@ -199,15 +198,12 @@ pub trait CallClient: QueryClient + BoundClient {
         if response.value.code.is_err() {
             return Err(anyhow!("{}", response.value.info));
         }
-
-        // Note(sander): This decode method is named after the fevm, but it's actually
-        //               a generic byte decoder. We could replace at some point.
         let return_data = decode_datarepo_list(&response.value)
-            .context("error decoding data from deliver_tx in query")?;
+            .context("error decoding data from deliver_tx in call")?;
 
         let response = CallResponse {
             response,
-            return_data: Some(return_data),
+            return_data,
         };
 
         Ok(response)

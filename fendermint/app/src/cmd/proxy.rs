@@ -1,63 +1,72 @@
+use super::rpc::{cid_to_json, gas_params, BroadcastResponse, TransClient};
 use crate::cmd;
-use crate::cmd::key::read_secret_key;
-use crate::options::proxy::{BroadcastMode, ProxyArgs, ProxyCommands, TransArgs};
-use async_trait::async_trait;
-use bytes::Bytes;
-use fendermint_rpc::client::{BoundFendermintClient, FendermintClient};
-use fendermint_rpc::message::{GasParams, MessageFactory};
-use fendermint_rpc::tx::{
-    AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
-    TxCommit, TxSync,
+use crate::options::{
+    proxy::{ProxyArgs, ProxyCommands},
+    rpc::TransArgs,
 };
-use fendermint_vm_actor_interface::tableland::ExecuteReturn;
-use fendermint_vm_core::chainid;
-use fendermint_vm_message::chain::ChainMessage;
+use bytes::Buf;
+use bytes::Bytes;
+use fendermint_rpc::client::FendermintClient;
+use fendermint_rpc::message::GasParams;
+use fendermint_rpc::tx::{CallClient, TxClient};
+use fendermint_vm_message::query::FvmQueryHeight;
+use futures_util::{Stream, StreamExt};
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::{convert::Infallible, net::SocketAddr};
-use tendermint::abci::response::DeliverTx;
-use tendermint::block::Height;
-use tendermint_rpc::HttpClient;
+use tokio::sync::Mutex;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
-const MAX_BODY_LENGTH: u64 = 100 * 1024 * 1024;
+const MAX_BODY_LENGTH: u64 = 1024 * 1024 * 1024;
 
 cmd! {
     ProxyArgs(self) {
         let client = FendermintClient::new_http(self.url.clone(), self.proxy_url.clone())?;
         match self.command.clone() {
             ProxyCommands::Start { args } => {
+                let seq = args.sequence;
+                let nonce = Arc::new(Mutex::new(seq));
+
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
-                let execute_route = warp::path!("v1" / "execute")
-                    .and(warp::post())
+                let add_route = warp::path!("v1" / "os" / String)
+                    .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_BODY_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
-                    .and(warp::body::bytes())
-                    .and_then(execute);
-                let query_route = warp::path!("v1" / "query")
-                    .and(warp::post())
-                    .and(warp::body::content_length_limit(MAX_BODY_LENGTH))
+                    .and(with_nonce(nonce))
+                    .and(warp::header::header::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::body::stream())
+                    .and_then(handle_add);
+                let get_route = warp::path!("v1" / "os" / String)
+                    .and(warp::get())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(warp::query::<HeightQuery>())
+                    .and_then(handle_get);
+                let list_route = warp::path!("v1" / "os")
+                    .and(warp::get())
                     .and(with_client(client))
                     .and(with_args(args))
-                    .and(warp::body::bytes())
-                    .and_then(query);
+                    .and(warp::query::<HeightQuery>())
+                    .and_then(handle_list);
 
                 let router = health_route
-                    .or(execute_route)
-                    .or(query_route)
+                    .or(add_route)
+                    .or(get_route)
+                    .or(list_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
-                        .allow_methods(vec!["POST", "GET"]))
+                        .allow_methods(vec!["PUT", "GET"]))
                     .recover(handle_rejection);
 
                 let saddr: SocketAddr = self.bind.parse().expect("Unable to parse server address");
-                println!("Server started at {}", self.bind);
+                println!("Server started at {} with nonce {}", self.bind, seq);
                 Ok(warp::serve(router).run(saddr).await)
             },
         }
@@ -74,86 +83,137 @@ fn with_args(args: TransArgs) -> impl Filter<Extract = (TransArgs,), Error = Inf
     warp::any().map(move || args.clone())
 }
 
-pub async fn health() -> Result<impl Reply, Rejection> {
+fn with_nonce(
+    nonce: Arc<Mutex<u64>>,
+) -> impl Filter<Extract = (Arc<Mutex<u64>>,), Error = Infallible> + Clone {
+    warp::any().map(move || nonce.clone())
+}
+
+#[derive(Serialize, Deserialize)]
+struct HeightQuery {
+    pub height: Option<u64>,
+}
+
+async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExecuteRequest {
-    pub stmts: String,
-    pub sequence: u64,
-    #[serde(default = "block_gas_limit")]
-    pub gas_limit: u64,
-}
-
-pub async fn execute(
+async fn handle_add(
+    key: String,
     client: FendermintClient,
-    args: TransArgs,
-    body: Bytes,
+    mut args: TransArgs,
+    nonce: Arc<Mutex<u64>>,
+    gas_limit: u64,
+    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
 ) -> Result<impl Reply, Rejection> {
-    let mut req = serde_json::from_slice::<ExecuteRequest>(&body).map_err(|e| {
-        warp::reject::custom(ErrorMessage::new(
-            StatusCode::BAD_REQUEST.as_u16(),
-            format!("execute error: {}", e),
-        ))
-    })?;
-    let stmts = req
-        .stmts
-        .trim_end_matches(";")
-        .split(";")
-        .map(|p| p.to_string())
-        .collect::<Vec<String>>();
-    if req.gas_limit == 0 {
-        req.gas_limit = BLOCK_GAS_LIMIT
+    let mut nonce_lck = nonce.lock().await;
+    args.sequence = *nonce_lck;
+    if gas_limit == 0 {
+        args.gas_limit = BLOCK_GAS_LIMIT;
+    } else {
+        args.gas_limit = gas_limit;
     }
 
-    let res = tableland_execute(client, args, req.sequence, req.gas_limit, stmts)
-        .await
-        .map_err(|e| {
-            warp::reject::custom(ErrorMessage::new(
-                StatusCode::BAD_REQUEST.as_u16(),
-                format!("execute error: {}", e),
-            ))
-        })?;
+    let mut res = Value::Null;
+    while let Some(buf) = body.next().await {
+        let mut buf = buf.unwrap();
+        while buf.remaining() > 0 {
+            // Note(sander): chunk seems to max out at 504KiB, but we'll want to double-check against some limit
+            let chunk = buf.chunk().to_owned();
+            let chunk_len = chunk.len();
+            match res.is_null() {
+                true => {
+                    res = datarepo_put(
+                        client.clone(),
+                        args.clone(),
+                        key.clone(),
+                        Bytes::from(chunk),
+                    )
+                    .await
+                    .map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("put error: {}", e),
+                        })
+                    })?;
+                }
+                false => {
+                    res = datarepo_append(
+                        client.clone(),
+                        args.clone(),
+                        key.clone(),
+                        Bytes::from(chunk),
+                    )
+                    .await
+                    .map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("append error: {}", e),
+                        })
+                    })?;
+                }
+            }
+            buf.advance(chunk_len);
+
+            *nonce_lck += 1;
+            args.sequence = *nonce_lck;
+        }
+    }
 
     Ok(warp::reply::json(&res))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct QueryRequest {
-    pub stmt: String,
-    #[serde(default)]
-    pub height: u64,
-    #[serde(default = "block_gas_limit")]
-    pub gas_limit: u64,
-}
-
-pub async fn query(
+async fn handle_get(
+    key: String,
     client: FendermintClient,
     args: TransArgs,
-    body: Bytes,
+    hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let mut req = serde_json::from_slice::<QueryRequest>(&body).map_err(|e| {
-        warp::reject::custom(ErrorMessage::new(
-            StatusCode::BAD_REQUEST.as_u16(),
-            format!("query error: {}", e),
-        ))
-    })?;
-    if req.gas_limit == 0 {
-        req.gas_limit = BLOCK_GAS_LIMIT
-    }
-
-    let res = tableland_query(client, args, req.height, req.gas_limit, req.stmt)
+    let res = datarepo_get(client, args, key, hq.height.unwrap_or_else(|| 0))
         .await
         .map_err(|e| {
-            warp::reject::custom(ErrorMessage::new(
-                StatusCode::BAD_REQUEST.as_u16(),
-                format!("query error: {}", e),
-            ))
+            Rejection::from(BadRequest {
+                message: format!("get error: {}", e),
+            })
         })?;
 
-    Ok(warp::reply::json(&res))
+    match res {
+        Some(obj) => Ok(obj),
+        None => Err(Rejection::from(NotFound)),
+    }
 }
+
+async fn handle_list(
+    client: FendermintClient,
+    args: TransArgs,
+    hq: HeightQuery,
+) -> Result<impl Reply, Rejection> {
+    let res = datarepo_list(client, args, hq.height.unwrap_or_else(|| 0))
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("list error: {}", e),
+            })
+        })?;
+
+    let list: Vec<String> = res
+        .unwrap_or_default()
+        .iter()
+        .map(|v| core::str::from_utf8(v).unwrap_or_default().to_string())
+        .collect();
+
+    Ok(warp::reply::json(&list))
+}
+
+#[derive(Clone, Debug)]
+struct BadRequest {
+    message: String,
+}
+
+impl warp::reject::Reject for BadRequest {}
+
+#[derive(Debug)]
+struct NotFound;
+
+impl warp::reject::Reject for NotFound {}
 
 #[derive(Clone, Debug, Serialize)]
 struct ErrorMessage {
@@ -161,34 +221,25 @@ struct ErrorMessage {
     message: String,
 }
 
-impl warp::reject::Reject for ErrorMessage {}
-
-impl ErrorMessage {
-    fn new(code: u16, message: String) -> Self {
-        ErrorMessage { code, message }
-    }
-}
-
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
-    let (code, message) = if err.is_not_found() {
+    let (code, message) = if err.is_not_found() || err.find::<NotFound>().is_some() {
         (StatusCode::NOT_FOUND, "Not Found".to_string())
+    } else if let Some(e) = err.find::<BadRequest>() {
+        let err = e.to_owned();
+        (StatusCode::BAD_REQUEST, err.message)
     } else if err.find::<warp::reject::PayloadTooLarge>().is_some() {
         (
             StatusCode::PAYLOAD_TOO_LARGE,
             "Payload too large".to_string(),
         )
     } else {
-        let ferr = format!("{:?}", err);
-        let status = if ferr.contains("code:") {
-            StatusCode::BAD_REQUEST
-        } else {
-            eprintln!("unhandled error: {:?}", err);
-            StatusCode::INTERNAL_SERVER_ERROR
-        };
-        (status, ferr)
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}", err))
     };
 
-    let reply = warp::reply::json(&ErrorMessage::new(code.as_u16(), message));
+    let reply = warp::reply::json(&ErrorMessage {
+        code: code.as_u16(),
+        message,
+    });
     let reply = warp::reply::with_header(reply, "Access-Control-Allow-Origin", "*");
     Ok(warp::reply::with_status(reply, code))
 }
@@ -198,8 +249,6 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
 async fn broadcast<F, T, G>(
     client: FendermintClient,
     args: TransArgs,
-    sequence: u64,
-    gas_limit: u64,
     f: F,
     g: G,
 ) -> anyhow::Result<Value>
@@ -212,8 +261,8 @@ where
     G: FnOnce(T) -> Value,
     T: Sync + Send,
 {
-    let client = TransClient::new(client, &args, sequence)?;
-    let gas_params = gas_params(&args, gas_limit);
+    let client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
     let res = f(client, TokenAmount::default(), gas_params).await?;
     Ok(match res {
         BroadcastResponse::Async(res) => json!({"response": res.response}),
@@ -225,115 +274,75 @@ where
     })
 }
 
-async fn tableland_execute(
+async fn datarepo_put(
     client: FendermintClient,
     args: TransArgs,
-    sequence: u64,
-    gas_limit: u64,
-    stmts: Vec<String>,
+    key: String,
+    content: Bytes,
 ) -> anyhow::Result<Value> {
     broadcast(
         client,
         args,
-        sequence,
-        gas_limit,
         |mut client, value, gas_params| {
-            Box::pin(async move { client.tableland_execute(stmts, value, gas_params).await })
+            Box::pin(async move { client.datarepo_put(key, content, value, gas_params).await })
         },
-        |ret: ExecuteReturn| json!(ret),
+        cid_to_json,
     )
     .await
 }
 
-async fn tableland_query(
+async fn datarepo_append(
     client: FendermintClient,
     args: TransArgs,
-    height: u64,
-    gas_limit: u64,
-    stmt: String,
+    key: String,
+    content: Bytes,
 ) -> anyhow::Result<Value> {
-    let mut client = TransClient::new(client, &args, 0)?;
-    let gas_params = gas_params(&args, gas_limit);
-    let mut h = None;
-    if height > 0 {
-        h = Some(Height::try_from(height)?)
-    }
+    broadcast(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move {
+                client
+                    .datarepo_append(key, content, value, gas_params)
+                    .await
+            })
+        },
+        cid_to_json,
+    )
+    .await
+}
+
+async fn datarepo_get(
+    client: FendermintClient,
+    args: TransArgs,
+    key: String,
+    height: u64,
+) -> anyhow::Result<Option<Vec<u8>>> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let h = FvmQueryHeight::from(height);
 
     let res = client
         .inner
-        .tableland_query_call(stmt, TokenAmount::default(), gas_params, h)
+        .datarepo_get_call(key, TokenAmount::default(), gas_params, h)
         .await?;
 
-    Ok(json!(res.return_data))
+    Ok(res.return_data)
 }
 
-pub enum BroadcastResponse<T> {
-    Async(AsyncResponse<T>),
-    Sync(SyncResponse<T>),
-    Commit(CommitResponse<T>),
-}
+async fn datarepo_list(
+    client: FendermintClient,
+    args: TransArgs,
+    height: u64,
+) -> anyhow::Result<Option<Vec<Vec<u8>>>> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let h = FvmQueryHeight::from(height);
 
-impl fendermint_rpc::tx::BroadcastMode for BroadcastMode {
-    type Response<T> = BroadcastResponse<T>;
-}
+    let res = client
+        .inner
+        .datarepo_list_call(TokenAmount::default(), gas_params, h)
+        .await?;
 
-struct TransClient {
-    inner: BoundFendermintClient<HttpClient>,
-    broadcast_mode: BroadcastMode,
-}
-
-impl TransClient {
-    pub fn new(client: FendermintClient, args: &TransArgs, sequence: u64) -> anyhow::Result<Self> {
-        let sk = read_secret_key(&args.secret_key)?;
-        let chain_id = chainid::from_str_hashed(&args.chain_name)?;
-        let mf = MessageFactory::new(sk, sequence, chain_id)?;
-        let client = client.bind(mf);
-        let client = Self {
-            inner: client,
-            broadcast_mode: args.broadcast_mode,
-        };
-        Ok(client)
-    }
-}
-
-impl BoundClient for TransClient {
-    fn message_factory_mut(&mut self) -> &mut MessageFactory {
-        self.inner.message_factory_mut()
-    }
-}
-
-#[async_trait]
-impl TxClient<BroadcastMode> for TransClient {
-    async fn perform<F, T>(&self, msg: ChainMessage, f: F) -> anyhow::Result<BroadcastResponse<T>>
-    where
-        F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
-        T: Sync + Send,
-    {
-        match self.broadcast_mode {
-            BroadcastMode::Async => {
-                let res = TxClient::<TxAsync>::perform(&self.inner, msg, f).await?;
-                Ok(BroadcastResponse::Async(res))
-            }
-            BroadcastMode::Sync => {
-                let res = TxClient::<TxSync>::perform(&self.inner, msg, f).await?;
-                Ok(BroadcastResponse::Sync(res))
-            }
-            BroadcastMode::Commit => {
-                let res = TxClient::<TxCommit>::perform(&self.inner, msg, f).await?;
-                Ok(BroadcastResponse::Commit(res))
-            }
-        }
-    }
-}
-
-fn gas_params(args: &TransArgs, gas_limit: u64) -> GasParams {
-    GasParams {
-        gas_limit,
-        gas_fee_cap: args.gas_fee_cap.clone(),
-        gas_premium: args.gas_premium.clone(),
-    }
-}
-
-fn block_gas_limit() -> u64 {
-    BLOCK_GAS_LIMIT
+    Ok(res.return_data)
 }

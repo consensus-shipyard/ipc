@@ -12,14 +12,9 @@ echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
 
 source "$HOME"/.bashrc
 
-git clone https://github.com/sanderpick/builtin-actors.git
-cd builtin-actors
-git checkout sander/tableland-actor
-cd ..
-
-git clone https://github.com/sanderpick/fendermint.git
-cd fendermint
-git checkout sander/tableland-actor
+git clone https://github.com/textileio/ipc.git
+cd ipc
+git checkout textile-exp1
 cd ..
 
 git clone https://github.com/cometbft/cometbft.git
@@ -28,5 +23,5 @@ git checkout v0.37.1
 make install
 cd ..
 
-cd fendermint
+cd ipc
 ./scripts/setup.sh

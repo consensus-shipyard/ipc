@@ -77,15 +77,17 @@ impl Actor {
     }
 
     fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<u8>>, ActorError> {
-        let st: State = rt.state()?;
+        rt.validate_immediate_caller_accept_any()?;
 
+        let st: State = rt.state()?;
         st.get(rt.store(), &BytesKey(key))
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
     }
 
     fn list_objects(rt: &impl Runtime) -> Result<Option<Vec<Vec<u8>>>, ActorError> {
-        let st: State = rt.state()?;
+        rt.validate_immediate_caller_accept_any()?;
 
+        let st: State = rt.state()?;
         let objects = st.list(rt.store()).map_err(|e| {
             e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
         })?;

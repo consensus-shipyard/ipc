@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-cargo install --path fendermint/app
+#cargo install --path fendermint/app
 
 # Create a new Genesis file
 rm -rf test-network
@@ -16,7 +16,7 @@ done
 
 # Add accounts to the Genesis file
 ## A stand-alone account
-fendermint genesis --genesis-file test-network/genesis.json add-account --public-key test-network/keys/alice.pk --balance 10
+fendermint genesis --genesis-file test-network/genesis.json add-account --public-key test-network/keys/alice.pk --balance 1000
 ## A multi-sig account
 fendermint genesis --genesis-file test-network/genesis.json add-multisig --public-key test-network/keys/bob.pk --public-key test-network/keys/charlie.pk --public-key test-network/keys/dave.pk --threshold 2 --vesting-start 0 --vesting-duration 1000000 --balance 30
 
@@ -25,7 +25,7 @@ fendermint genesis --genesis-file test-network/genesis.json add-validator --publ
 
 # Configure Tendermint
 rm -rf ~/.cometbft
-cometbft init
+/home/sander/go/bin/cometbft init
 
 ## Convert the Genesis file
 mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig

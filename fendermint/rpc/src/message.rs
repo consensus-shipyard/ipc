@@ -89,7 +89,7 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let message = fvm_shared::message::Message {
+        let message = Message {
             version: Default::default(), // TODO: What does this do?
             from: self.addr,
             to,
@@ -115,10 +115,11 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let params = RawBytes::serialize(fendermint_actor_objectstore::PutObjectParams {
+        let input = fendermint_actor_objectstore::PutObjectParams {
             key: key.into_bytes(),
             content: content.to_vec(),
-        })?;
+        };
+        let params = RawBytes::serialize(&input)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::PutObject as u64,
@@ -137,10 +138,11 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let params = RawBytes::serialize(fendermint_actor_objectstore::PutObjectParams {
+        let input = fendermint_actor_objectstore::PutObjectParams {
             key: key.into_bytes(),
             content: content.to_vec(),
-        })?;
+        };
+        let params = RawBytes::serialize(&input)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::AppendObject as u64,
@@ -158,9 +160,10 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let params = RawBytes::serialize(fendermint_actor_objectstore::DeleteObjectParams {
+        let input = fendermint_actor_objectstore::DeleteObjectParams {
             key: key.into_bytes(),
-        })?;
+        };
+        let params = RawBytes::serialize(&input)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::DeleteObject as u64,

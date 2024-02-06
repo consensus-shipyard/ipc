@@ -429,7 +429,7 @@ fn create_return_to_json(ret: CreateReturn) -> serde_json::Value {
 }
 
 /// Print a Cid.
-fn cid_to_json(ret: Cid) -> serde_json::Value {
+pub fn cid_to_json(ret: Cid) -> serde_json::Value {
     json!(ret)
 }
 
@@ -439,14 +439,14 @@ pub enum BroadcastResponse<T> {
     Commit(CommitResponse<T>),
 }
 
-struct BroadcastModeWrapper(BroadcastMode);
+pub struct BroadcastModeWrapper(BroadcastMode);
 
 impl fendermint_rpc::tx::BroadcastMode for BroadcastModeWrapper {
     type Response<T> = BroadcastResponse<T>;
 }
 
-struct TransClient {
-    inner: BoundFendermintClient<HttpClient>,
+pub struct TransClient {
+    pub(crate) inner: BoundFendermintClient<HttpClient>,
     broadcast_mode: BroadcastModeWrapper,
 }
 
@@ -495,7 +495,7 @@ impl TxClient<BroadcastModeWrapper> for TransClient {
     }
 }
 
-fn gas_params(args: &TransArgs) -> GasParams {
+pub fn gas_params(args: &TransArgs) -> GasParams {
     GasParams {
         gas_limit: args.gas_limit,
         gas_fee_cap: args.gas_fee_cap.clone(),
