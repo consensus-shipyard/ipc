@@ -193,6 +193,9 @@ parent_registry_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].c
 # Step 7.4: Start the bootstrap validator node
 echo "$PREFIX Start the bootstrap validator node"
 cd ${IPC_FOLDER}
+cargo make --makefile infra/fendermint/Makefile.toml \
+      -e SUBNET_ID=${subnet_id} \
+      bootstrap-down
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
         -e SUBNET_ID=${subnet_id} \
         -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
@@ -217,6 +220,11 @@ for i in {0..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \
+      -e SUBNET_ID=${subnet_id} \
+      -e FM_PULL_SKIP=1 \
+      child-validator-down
+  cargo make --makefile infra/fendermint/Makefile.toml \
+      -e NODE_NAME=validator-${i} \
       -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_${i}.sk \
       -e SUBNET_ID=${subnet_id} \
       -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[i]} \
@@ -230,6 +238,3 @@ do
       -e FM_PULL_SKIP=1 \
       child-validator
 done
-
-# Step 8: Write down key properties into local file
-echo $subnet_id > ~/running_subnet_id
