@@ -42,7 +42,6 @@ contract TokenTransferAndMint is IpcExchange, ReentrancyGuard {
         uint256 value
     );
 
-
     function _handleIpcCall(
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
@@ -140,9 +139,7 @@ contract TokenTransferAndMint is IpcExchange, ReentrancyGuard {
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override {
-    }
-
+    ) internal override {}
 
     /* TODO integrate with IpcReceiver */
     function onXNetMessageReceived(address _to, uint256 _amount) public /* parameters */ {

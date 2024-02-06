@@ -19,7 +19,7 @@ import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 error NoTransfer();
 error ZeroAddress();
 
-contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
+contract SubnetTokenBridge is IpcExchange, ERC20, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
     using SafeERC20 for IERC20;
 
@@ -41,12 +41,11 @@ contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
         uint256 value
     );
 
-
     constructor(
         address _gateway,
         address _parentSubnetUSDC,
         SubnetID memory _parentSubnet
-    )IpcExchange(_gateway) ERC20("USDCTestReplica", "USDCtR") {
+    ) IpcExchange(_gateway) ERC20("USDCTestReplica", "USDCtR") {
         parentSubnetUSDC = _parentSubnetUSDC;
         parentSubnet = _parentSubnet;
 
@@ -58,7 +57,6 @@ contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
     function setParentSubnetUSDC(address _newAddress) public onlyOwner {
         parentSubnetUSDC = _newAddress;
     }
-
 
     function _handleIpcCall(
         IpcEnvelope memory envelope,
@@ -73,14 +71,12 @@ contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override {
-    }
-
+    ) internal override {}
 
     function getParentSubnet() public view returns (SubnetID memory) {
         return parentSubnet;
     }
-    
+
     function withdrawTokens(address receiver, uint256 amount) public payable returns (IpcEnvelope memory committed) {
         if (receiver == address(0)) {
             revert ZeroAddress();
@@ -119,6 +115,4 @@ contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
         _burn(receiver, amount);
         return committed;
     }
-
-
 }

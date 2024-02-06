@@ -11,7 +11,7 @@ contract USDCTest is ERC20, Ownable {
         _mint(msg.sender, amount);
     }
 
-    function me() public returns (address){
+    function me() public returns (address) {
         return msg.sender;
     }
 }
