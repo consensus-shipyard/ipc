@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import "../../../src/examples/cross-token/SubnetTokenBridge.sol";
-import "../../../src/examples/cross-token/SubnetUSDCProxy.sol";
 
 contract SubnetTest is Test {
     SubnetTokenBridge bridge;

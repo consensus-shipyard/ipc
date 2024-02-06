@@ -27,7 +27,6 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 import {SubnetTokenBridge} from "../../src/examples/cross-token/SubnetTokenBridge.sol";
-import {SubnetUSDCProxy} from "../../src/examples/cross-token/SubnetUSDCProxy.sol";
 import {TokenTransferAndMint} from "../../src/examples/cross-token/TokenTransferAndMint.sol";
 import {USDCTest} from "../../src/examples/cross-token/USDCTest.sol";
 
@@ -68,8 +67,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
     SubnetTokenBridge subnetTokenBridge;
     TokenTransferAndMint rootTokenBridge;
-
-    SubnetUSDCProxy subnetUSDCProxy;
 
     function setUp() public override {
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
