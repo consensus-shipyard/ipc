@@ -150,7 +150,7 @@ echo "Default wallet address: $default_wallet_address"
 #echo "Created subnet ID: $subnet_id"
 
 # Step 4 (alternative): Use an already-created subnet
-subnet_id=/r314159/t410fdgjdrxnzkw5xythvpur5egdryzlmxsh3uibpmqi
+subnet_id=/r314159/t410flp4jf7keqcf5bqogrkx4wpkygiskykcvpaigicq
 echo "subnet id: $subnet_id"
 
 # Step 5: Generate pubkeys from addresses
@@ -166,11 +166,12 @@ done
 echo "$PREFIX Join subnet for addresses in wallet..."
 for i in {0..2}
 do
-  echo "Joining subnet ${subnet_id} for address ${wallet_address[i]}"
+  echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
   $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
 done
 
 # Step 6 (alternative): Assume we already let our addresses join in the subnet
+# Because join a already-joined subnet will return failure that cannot be differentiated with failing to join a new subnet
 
 # Step 7: Start validators
 # Step 7.1: Export validator private keys into files
