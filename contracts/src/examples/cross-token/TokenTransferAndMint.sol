@@ -4,6 +4,18 @@ pragma solidity 0.8.19;
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IpcExchange} from "../../../sdk/IpcContract.sol";
+import {ReentrancyGuard} from "../../lib/LibReentrancyGuard.sol";
+import {FvmAddressHelper} from "../../lib/FvmAddressHelper.sol";
+import {FvmAddress} from "../../structs/FvmAddress.sol";
+import {GatewayMessengerFacet} from "../../gateway/GatewayMessengerFacet.sol";
+import {GatewayGetterFacet} from "../../gateway/GatewayGetterFacet.sol";
+import {GatewayCannotBeZero, NotEnoughFunds} from "../../errors/IPCErrors.sol";
+import {IpcExchange} from "../../../sdk/IpcContract.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
+import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
+
+error NoTransfer();
+error ZeroAddress();
 
 /**
  * @title TokenTransferAndMint
@@ -129,7 +141,6 @@ contract TokenTransferAndMint is IpcExchange, ReentrancyGuard {
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {
-        console.log("_handleIpcResult");
     }
 
 

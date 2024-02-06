@@ -2,11 +2,22 @@
 pragma solidity 0.8.19;
 
 import {SubnetID} from "../../structs/Subnet.sol";
-
-import "forge-std/console.sol";
-
+import {ReentrancyGuard} from "../../lib/LibReentrancyGuard.sol";
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
 import {IpcExchange} from "../../../sdk/IpcContract.sol";
+import {FvmAddressHelper} from "../../lib/FvmAddressHelper.sol";
+import {FvmAddress} from "../../structs/FvmAddress.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {GatewayMessengerFacet} from "../../gateway/GatewayMessengerFacet.sol";
+import {GatewayGetterFacet} from "../../gateway/GatewayGetterFacet.sol";
+import {GatewayCannotBeZero, NotEnoughFunds} from "../../errors/IPCErrors.sol";
+import {IpcExchange} from "../../../sdk/IpcContract.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
+import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
+
+error NoTransfer();
+error ZeroAddress();
 
 contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
@@ -53,7 +64,6 @@ contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-        console.log("_handleIpcCall");
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         _mint(receiver, amount);
         return bytes("");
@@ -64,7 +74,6 @@ contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {
-        console.log("_handleIpcResult");
     }
 
 
