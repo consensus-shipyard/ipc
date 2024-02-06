@@ -44,7 +44,7 @@ cmd! {
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
-                    .and(warp::header::header::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and(warp::body::stream())
                     .and_then(handle_add);
                 let delete_route = warp::path!("v1" / "os" / String)
@@ -52,7 +52,7 @@ cmd! {
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce))
-                    .and(warp::header::header::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and_then(handle_delete);
                 let get_route = warp::path!("v1" / "os" / String)
                     .and(warp::get())
@@ -115,16 +115,12 @@ async fn handle_add(
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
-    gas_limit: u64,
+    gas_limit: Option<u64>,
     mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
-    if gas_limit == 0 {
-        args.gas_limit = BLOCK_GAS_LIMIT;
-    } else {
-        args.gas_limit = gas_limit;
-    }
+    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
 
     let mut res: Vec<Txn> = vec![];
     while let Some(buf) = body.next().await {
@@ -176,15 +172,11 @@ async fn handle_delete(
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
-    gas_limit: u64,
+    gas_limit: Option<u64>,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
-    if gas_limit == 0 {
-        args.gas_limit = BLOCK_GAS_LIMIT;
-    } else {
-        args.gas_limit = gas_limit;
-    }
+    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
 
     let res = datarepo_delete(client.clone(), args.clone(), key.clone())
         .await
