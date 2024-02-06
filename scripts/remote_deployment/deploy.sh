@@ -194,8 +194,6 @@ parent_registry_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].c
 echo "$PREFIX Start the bootstrap validator node"
 cd ${IPC_FOLDER}
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
-        -e NODE_NAME=validator-0 \
-        -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
         -e SUBNET_ID=${subnet_id} \
         -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[0]} \
         -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
@@ -217,7 +215,7 @@ echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
 # Step 7.5: Start other validator node
 echo "$PREFIX Start the other validator nodes"
 cd ${IPC_FOLDER}
-for i in {1..2}
+for i in {0..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \

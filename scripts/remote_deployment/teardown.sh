@@ -25,7 +25,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
 # Step 2: Teardown other validator nodes
 echo "$PREFIX Start the other validator nodes"
 cd ${IPC_FOLDER}
-for i in {1..2}
+for i in {0..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \
