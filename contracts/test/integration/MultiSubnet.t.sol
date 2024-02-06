@@ -452,6 +452,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             address(subnetTokenBridge)
         );
 
+        subnetTokenBridge.setParentSubnetUSDC(address(rootTokenBridge));
+
         vm.deal(mockUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.deal(address(rootTokenBridge), 1 ether);
 
