@@ -2,7 +2,7 @@
 
 # Configure destination host
 USER=ubuntu
-HOST=10.46.49.242
+HOST=172.104.248.232
 
 if (($# != 1)); then
   echo "Arguments: <script_to_be_run_on>"
@@ -12,6 +12,6 @@ fi
 script=$1
 
 scp $script ${USER}@${HOST}:~/
-ssh ${USER}@${HOST} "rm -rf ~/.ipc"
+ssh ${USER}@${HOST} "sudo rm -rf ~/.ipc"
 scp -r .ipc ${USER}@${HOST}:~/
 ssh ${USER}@${HOST} "bash -il ~/${script}"

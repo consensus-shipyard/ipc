@@ -163,12 +163,12 @@ do
 done
 
 # Step 6: Join subnet for addresses in wallet
-echo "$PREFIX Join subnet for addresses in wallet..."
-for i in {0..2}
-do
-  echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
-  $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
-done
+#echo "$PREFIX Join subnet for addresses in wallet..."
+#for i in {0..2}
+#do
+#  echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
+#  $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
+#done
 
 # Step 6 (alternative): Assume we already let our addresses join in the subnet
 # Because join a already-joined subnet will return failure that cannot be differentiated with failing to join a new subnet
@@ -203,11 +203,16 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
         -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
         -e PARENT_REGISTRY=${parent_registry_address} \
         -e PARENT_GATEWAY=${parent_gateway_address} \
-        -e FM_PULL_SKIP=1 \
-        child-validator 2>&1)
+        bootstrap 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p}' | tr -d "[:blank:]")
-echo "Bootstrap node started. Node id ${bootstrap_node_id}"
+bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
+echo "Bootstrap node started. Node id ${bootstrap_node_id}, peer id ${bootstrap_peer_id}"
+
+bootstrap_node_endpoint=${bootstrap_node_id}@validator-1-cometbft:${CMT_P2P_HOST_PORTS[0]}
+echo "Bootstrap node endpoint: ${bootstrap_node_endpoint}"
+bootstrap_resolver_endpoint="/dns/validator-1-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
+echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
 
 # Step 7.5: Start other validator node
 echo "$PREFIX Start the other validator nodes"
@@ -222,7 +227,8 @@ do
       -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
       -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
-      -e BOOTSTRAPS=${bootstrap_node_id} \
+      -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
+      -e BOOTSTRAPS=${bootstrap_node_endpoint} \
       -e PARENT_REGISTRY=${parent_registry_address} \
       -e PARENT_GATEWAY=${parent_gateway_address} \
       -e FM_PULL_SKIP=1 \
@@ -231,4 +237,3 @@ done
 
 # Step 8: Write down key properties into local file
 echo $subnet_id > ~/running_subnet_id
-echo $bootstrap_node_id > ~/running_bootstrap_node_id
