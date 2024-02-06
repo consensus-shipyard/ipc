@@ -11,7 +11,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::error::ExitCode;
 
-use crate::{Method, PushParams, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{Method, State, ACCUMULATOR_ACTOR_NAME};
 
 fil_actors_runtime::wasm_trampoline!(Actor);
 
@@ -29,38 +29,36 @@ impl Actor {
                 "failed to construct empty store",
             )
         })?;
-
         rt.create(&state)
     }
 
-    fn push(rt: &impl Runtime, params: PushParams) -> Result<(), ActorError> {
+    fn push<S: DeserializeOwned + Serialize>(rt: &impl Runtime, obj: S) -> Result<Cid, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         rt.transaction(|st: &mut State, rt| {
-            st.push(rt.store(), params.obj).map_err(|e| {
+            st.push(rt.store(), obj).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
             })
-        })?;
-
-        Ok(())
+        })
     }
 
     fn get_count(rt: &impl Runtime) -> Result<u64, ActorError> {
-        let st: State = rt.state()?;
-        Ok(st.leaf_count)
+        rt.state().map(|st| st.leaf_count)
     }
 
     fn get_peaks(rt: &impl Runtime) -> Result<Vec<Cid>, ActorError> {
-        let st: State = rt.state()?;
-        st.get_peaks(rt.store())
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get peaks"))
+        rt.state().map(|st| {
+            st.get_peaks(rt.store())
+                .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get peaks"))
+        })
     }
 
     fn bag_peaks(rt: &impl Runtime) -> Result<Cid, ActorError> {
-        let st: State = rt.state()?;
-        st.bag_peaks(rt.store())
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to bag peaks"))
+        rt.state().map(|st| {
+            st.bag_peaks(rt.store())
+                .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to bag peaks"))
+        })
     }
 }
 

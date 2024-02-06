@@ -101,12 +101,12 @@ impl State {
         &mut self,
         store: &BS,
         obj: S,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Cid> {
         let mut amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
         let leaf = store.put_cbor(&obj, Code::Blake2b256)?;
         self.peaks = push(self.leaf_count, &mut amt, leaf)?;
         self.leaf_count += 1;
-        Ok(())
+        bag_peaks(&amt) // TODO(carsonfarmer): Maybe we just want to return the root of the Amt?
     }
 
     pub fn get_peaks<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Cid>> {
@@ -127,17 +127,13 @@ impl State {
 
 pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
 
-#[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct PushParams<O: DeserializeOwned + Serialize> {
-    pub obj: O,
-}
-
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     Append = frc42_dispatch::method_hash!("Append"),
     GetRoot = frc42_dispatch::method_hash!("GetRoot"),
+    BagPeaks = frc42_dispatch::method_hash!("BagPeaks"),
 }
 
 #[cfg(test)]
@@ -163,8 +159,8 @@ mod tests {
     fn test_push_simple() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
-        let params = PushParams { obj: vec![1, 2, 3] };
-        assert!(state.push(&store, params.obj).is_ok());
+        let obj = vec![1, 2, 3];
+        assert!(state.push(&store, obj).is_ok());
         assert_eq!(state.leaf_count, 1);
     }
 
@@ -172,8 +168,8 @@ mod tests {
     fn test_get_peaks() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
-        let params = PushParams { obj: vec![1, 2, 3] };
-        assert!(state.push(&store, params.obj).is_ok());
+        let obj = vec![1, 2, 3];
+        assert!(state.push(&store, obj).is_ok());
         assert_eq!(state.leaf_count, 1);
         let peaks = state.get_peaks(&store);
         assert!(peaks.is_ok());
