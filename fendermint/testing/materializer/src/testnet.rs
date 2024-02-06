@@ -63,19 +63,17 @@ where
                 balances,
                 nodes,
             } => {
-                t.create_root_genesis(m, root_name.clone(), validators, balances)
+                t.create_root_genesis(m, &root_name, validators, balances)
                     .context("failed to create root genesis")?;
 
-                let node_ids = sort_by_seeds(&nodes).context("invalid root subnet topology")?;
-
-                for node_id in node_ids.iter() {
-                    let node = nodes.get(node_id).unwrap();
-                    t.create_node(m, &root_name, &node_id, &node)
-                        .await
-                        .context("failed to create root node")?;
-                }
+                t.create_and_start_nodes(m, &root_name, nodes)
+                    .await
+                    .context("failed to start root nodes")?;
             }
         }
+
+        // TODO: Recursively crate and start all subnet nodes.
+        // TODO: Recursively start all relayers.
 
         Ok(t)
     }
@@ -135,7 +133,7 @@ where
     fn create_root_genesis(
         &mut self,
         m: &mut M,
-        subnet_name: SubnetName,
+        subnet_name: &SubnetName,
         validators: CollateralMap,
         balances: BalanceMap,
     ) -> anyhow::Result<()> {
@@ -149,12 +147,41 @@ where
 
         // Remember the genesis so we can potentially create more nodes later.
         let genesis = m.create_root_genesis(subnet_name.clone(), validators, balances)?;
-        self.genesis.insert(subnet_name, genesis);
+
+        self.genesis.insert(subnet_name.clone(), genesis);
 
         Ok(())
     }
 
-    /// Create a node, but don't start it
+    /// Configure and start the nodes of a subnet.
+    ///
+    /// Fails if the genesis of this subnet hasn't been created yet.
+    async fn create_and_start_nodes(
+        &mut self,
+        m: &mut M,
+        subnet_name: &SubnetName,
+        nodes: BTreeMap<NodeId, Node>,
+    ) -> anyhow::Result<()> {
+        let node_ids = sort_by_seeds(&nodes).context("invalid root subnet topology")?;
+
+        for node_id in node_ids.iter() {
+            self.create_node(m, subnet_name, node_id, nodes.get(node_id).unwrap())
+                .await
+                .with_context(|| "failed to create node {node_id} in {subnet_name:?}")?;
+        }
+
+        for node_id in node_ids.iter() {
+            self.start_node(m, subnet_name, node_id, nodes.get(node_id).unwrap())
+                .await
+                .with_context(|| "failed to start node {node_id} in {subnet_name:?}")?;
+        }
+
+        Ok(())
+    }
+
+    /// Create the configuration of a node.
+    ///
+    /// Fails if the genesis hasn't been created yet.
     async fn create_node(
         &mut self,
         m: &mut M,
@@ -191,9 +218,38 @@ where
 
         let node = m
             .create_node(node_name.clone(), node_config)
+            .await
             .context("failed to create node")?;
 
         self.nodes.insert(node_name, node);
+
+        Ok(())
+    }
+
+    /// Start a node.
+    ///
+    /// Fails if the node hasn't been created yet.
+    async fn start_node(
+        &mut self,
+        m: &mut M,
+        subnet_name: &SubnetName,
+        node_id: &NodeId,
+        node: &Node,
+    ) -> anyhow::Result<()> {
+        let node_name = subnet_name.node(node_id);
+
+        let seeds = node
+            .seed_nodes
+            .iter()
+            .map(|s| self.node(&subnet_name.node(s)))
+            .collect::<Result<Vec<_>, _>>()
+            .with_context(|| format!("failed to collect seeds for {node_name:?}"))?;
+
+        let node = self.node(&node_name)?;
+
+        m.start_node(node, &seeds)
+            .await
+            .with_context(|| format!("failed to start {node_name:?}"))?;
 
         Ok(())
     }

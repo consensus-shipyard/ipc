@@ -75,11 +75,22 @@ pub trait Materializer {
     /// This should create keys, configurations, but hold on from starting so that we can
     /// first learn about the dynamic properties of other nodes in the cluster we depend on,
     /// such as their network identities which are a function of their keys.
-    fn create_node(
+    ///
+    /// The method is async in case we have to provision some resources remotely.
+    async fn create_node(
         &mut self,
         node_name: NodeName,
         node_config: NodeConfig<Self>,
     ) -> anyhow::Result<Self::Node>;
+
+    /// Start a node.
+    ///
+    /// At this point the identities of any dependency nodes should be known.
+    async fn start_node(
+        &mut self,
+        node: &Self::Node,
+        seed_nodes: &[&Self::Node],
+    ) -> anyhow::Result<()>;
 }
 
 pub struct NodeConfig<'a, M>
