@@ -512,6 +512,18 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.deal(mockUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(mockUSDCOwner));
-        subnetTokenBridge.depositTokens{value:DEFAULT_CROSS_MSG_FEE}(mockUSDCOwner, transferAmount);
+        IpcEnvelope memory committed = subnetTokenBridge.depositTokens{value:DEFAULT_CROSS_MSG_FEE}(mockUSDCOwner, transferAmount);
+
+        /* 
+            TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenBridge contract is sent
+        */
+        vm.prank(address(nativeSubnetGateway));
+        rootTokenBridge.handleIpcMessage(committed);
+
+        //ensure that usdc tokens are returned on root net
+        assertEq(transferAmount, mockUSDC.balanceOf(mockUSDCOwner));
+        //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
+        assertEq(0, subnetTokenBridge.balanceOf(mockUSDCOwner));
+        assertEq(0, subnetTokenBridge.balanceOf(address(subnetTokenBridge)));
     }
 }
