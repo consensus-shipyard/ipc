@@ -20,10 +20,10 @@ IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 wallet_addresses=()
 address_pubkeys=()
-CMT_P2P_HOST_PORTS=(26756 26856 26956)
-CMT_RPC_HOST_PORTS=(26757 26857 26957)
+CMT_P2P_HOST_PORTS=(26656 26756 26856)
+CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
-RESOLVER_HOST_PORTS=(26755 26855 26955)
+RESOLVER_HOST_PORTS=(26655 26755 26855)
 
 if (($# != 1)); then
   echo "Arguments: <commit hash to checkout in the repo>"
@@ -191,23 +191,24 @@ parent_gateway_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].co
 parent_registry_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.registry_addr | tr -d '"')
 
 # Step 7.4: Start the bootstrap validator node
-echo "$PREFIX Start the bootstrap validator node"
+echo "$PREFIX Start the first validator node as bootstrap"
 cd ${IPC_FOLDER}
 cargo make --makefile infra/fendermint/Makefile.toml \
-      -e SUBNET_ID=${subnet_id} \
-      bootstrap-down
-#bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
-#        -e SUBNET_ID=${subnet_id} \
-#        -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
-#        -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
-#        -e PARENT_REGISTRY=${parent_registry_address} \
-#        -e PARENT_GATEWAY=${parent_gateway_address} \
-#        bootstrap 2>&1)
+    -e NODE_NAME=validator-0 \
+    -e SUBNET_ID=${subnet_id} \
+    child-validator-down
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
-        -e SUBNET_ID=${subnet_id} \
-        -e PARENT_REGISTRY=${parent_registry_address} \
-        -e PARENT_GATEWAY=${parent_gateway_address} \
-        bootstrap 2>&1)
+    -e NODE_NAME=validator-${i} \
+    -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
+    -e SUBNET_ID=${subnet_id} \
+    -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[0]} \
+    -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
+    -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
+    -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
+    -e PARENT_REGISTRY=${parent_registry_address} \
+    -e PARENT_GATEWAY=${parent_gateway_address} \
+    -e FM_PULL_SKIP=1 \
+    child-validator 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p}' | tr -d "[:blank:]")
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
@@ -221,7 +222,7 @@ echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
 # Step 7.5: Start other validator node
 echo "$PREFIX Start the other validator nodes"
 cd ${IPC_FOLDER}
-for i in {0..2}
+for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \
