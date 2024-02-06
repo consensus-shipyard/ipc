@@ -17,7 +17,7 @@ subnet_id=$(cat ~/running_subnet_id)
 echo "$PREFIX Teardown the bootstrap validator node"
 cd ${IPC_FOLDER}
 cargo make --makefile infra/fendermint/Makefile.toml \
-        -e NODE_NAME=validator-1 \
+        -e NODE_NAME=validator-0 \
         -e SUBNET_ID=${subnet_id} \
         -e FM_PULL_SKIP=1 \
         bootstrap-down
@@ -28,7 +28,7 @@ cd ${IPC_FOLDER}
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-$(($i+1)) \
+      -e NODE_NAME=validator-${i} \
       -e SUBNET_ID=${subnet_id} \
       -e FM_PULL_SKIP=1 \
       child-validator-down

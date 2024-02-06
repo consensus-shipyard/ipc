@@ -110,7 +110,7 @@ cd ${IPC_FOLDER}/contracts
 git fetch
 git checkout $head_ref
 git pull --rebase origin $head_ref
-git show HEAD
+#git show HEAD
 
 echo "$PREFIX Building ipc contracts..."
 cd ${IPC_FOLDER}/contracts
@@ -194,8 +194,8 @@ parent_registry_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].c
 echo "$PREFIX Start the bootstrap validator node"
 cd ${IPC_FOLDER}
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
-        -e NODE_NAME=validator-1 \
-        -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_1.sk \
+        -e NODE_NAME=validator-0 \
+        -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
         -e SUBNET_ID=${subnet_id} \
         -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[0]} \
         -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
@@ -209,9 +209,9 @@ bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p}
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 echo "Bootstrap node started. Node id ${bootstrap_node_id}, peer id ${bootstrap_peer_id}"
 
-bootstrap_node_endpoint=${bootstrap_node_id}@validator-1-cometbft:${CMT_P2P_HOST_PORTS[0]}
+bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
 echo "Bootstrap node endpoint: ${bootstrap_node_endpoint}"
-bootstrap_resolver_endpoint="/dns/validator-1-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
+bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
 echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
 
 # Step 7.5: Start other validator node
@@ -220,8 +220,8 @@ cd ${IPC_FOLDER}
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-$(($i+1)) \
-      -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_1.sk \
+      -e NODE_NAME=validator-${i} \
+      -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_${i}.sk \
       -e SUBNET_ID=${subnet_id} \
       -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[i]} \
       -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
