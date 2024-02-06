@@ -22,6 +22,10 @@ sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd o
 ## Step 2: Initialise your config
 
 * Initialise the config
+```shell
+alias ipc-cli="cargo run -q -p ipc-cli --release --"
+```
+
 ```bash
 ipc-cli config init
 ```
