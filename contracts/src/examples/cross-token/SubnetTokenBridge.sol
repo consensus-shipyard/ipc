@@ -81,7 +81,7 @@ contract SubnetTokenBridge is IpcExchange,ERC20, ReentrancyGuard {
         return parentSubnet;
     }
     
-    function depositTokens(address receiver, uint256 amount) public payable returns (IpcEnvelope memory committed) {
+    function withdrawTokens(address receiver, uint256 amount) public payable returns (IpcEnvelope memory committed) {
         if (receiver == address(0)) {
             revert ZeroAddress();
         }

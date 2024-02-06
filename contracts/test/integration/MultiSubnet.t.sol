@@ -463,7 +463,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenBridge)));
 
         vm.prank(address(testUSDCOwner));
-        rootTokenBridge.transferAndMint{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        rootTokenBridge.depositTokens{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         // after the two next calls the root gateway should store the message in its postbox.
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -509,7 +509,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(testUSDCOwner));
-        IpcEnvelope memory committed = subnetTokenBridge.depositTokens{value:DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        IpcEnvelope memory committed = subnetTokenBridge.withdrawTokens{value:DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         /* 
             TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenBridge contract is sent

@@ -78,7 +78,7 @@ contract TokenTransferAndMint is IpcExchange, ReentrancyGuard {
      * @param receiver Address to receive the minted tokens on L2
      * @param amount Amount of tokens to be transferred and minted
      */
-    function transferAndMint(address receiver, uint256 amount) external payable {
+    function depositTokens(address receiver, uint256 amount) external payable {
         // Transfer and lock tokens on L1 using the inherited sendToken function
         _sendToken(sourceContract, destinationSubnet, destinationContract, receiver, amount);
     }
