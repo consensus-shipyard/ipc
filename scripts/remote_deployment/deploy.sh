@@ -196,10 +196,15 @@ cd ${IPC_FOLDER}
 cargo make --makefile infra/fendermint/Makefile.toml \
       -e SUBNET_ID=${subnet_id} \
       bootstrap-down
+#bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
+#        -e SUBNET_ID=${subnet_id} \
+#        -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
+#        -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
+#        -e PARENT_REGISTRY=${parent_registry_address} \
+#        -e PARENT_GATEWAY=${parent_gateway_address} \
+#        bootstrap 2>&1)
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
         -e SUBNET_ID=${subnet_id} \
-        -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
-        -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
         -e PARENT_REGISTRY=${parent_registry_address} \
         -e PARENT_GATEWAY=${parent_gateway_address} \
         bootstrap 2>&1)
