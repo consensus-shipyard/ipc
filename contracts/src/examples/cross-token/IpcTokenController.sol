@@ -18,10 +18,10 @@ error NoTransfer();
 error ZeroAddress();
 
 /**
- * @title TokenTransferAndMint
+ * @title IpcTokenController
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
-contract TokenTransferAndMint is IpcExchange, ReentrancyGuard {
+contract IpcTokenController is IpcExchange, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address private sourceContract;
@@ -52,7 +52,7 @@ contract TokenTransferAndMint is IpcExchange, ReentrancyGuard {
     }
 
     /**
-     * @dev Constructor for TokenTransferAndMint
+     * @dev Constructor for IpcTokenController
      * @param _gateway Address of the gateway for cross-network communication
      * @param _sourceContract Address of the source ERC20 token contract
      * @param _destinationSubnet SubnetID of the destination network

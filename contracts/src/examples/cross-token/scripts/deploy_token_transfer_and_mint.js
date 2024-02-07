@@ -32,7 +32,7 @@ async function main() {
     await erc20Token.mint(mintAmount)
 
     console.log('ERC20 Token deployed to:', erc20Token.address)
-    const tokenTransferAndMint = await deployTokenTransferAndMint(
+    const ipcTokenController = await deployIpcTokenController(
         gateway,
         erc20Token,
         subnetID,
@@ -45,9 +45,9 @@ async function main() {
     // Define the DEFAULT_CROSS_MSG_FEE
     const DEFAULT_CROSS_MSG_FEE = hre.ethers.utils.parseUnits('10', 'gwei')
 
-    // Approve the TokenTransferAndMint contract to spend tokens on behalf of the deployer
-    await erc20Token.approve(tokenTransferAndMint.address, transferAmount)
-    await tokenTransferAndMint.transferAndMint(
+    // Approve the IpcTokenController contract to spend tokens on behalf of the deployer
+    await erc20Token.approve(ipcTokenController.address, transferAmount)
+    await ipcTokenController.transferAndMint(
         receiverAddress,
         transferAmount,
         { value: DEFAULT_CROSS_MSG_FEE },
@@ -87,7 +87,7 @@ async function main() {
     // todo
 
     // simulate xnetmessage on parent net to release original tokens back to the account
-    await tokenTransferAndMint.onXNetMessageReceived(
+    await ipcTokenController.onXNetMessageReceived(
         accountAddress,
         transferAmount,
     )
@@ -121,31 +121,31 @@ async function createSubnetTokenBridge(
     return subnetTokenBridge
 }
 
-async function deployTokenTransferAndMint(
+async function deployIpcTokenController(
     gateway,
     erc20Token,
     subnetID,
     subnetTokenBridge,
 ) {
-    // Getting the contract factory for TokenTransferAndMint
-    const TokenTransferAndMint = await hre.ethers.getContractFactory(
-        'TokenTransferAndMint',
+    // Getting the contract factory for IpcTokenController
+    const IpcTokenController = await hre.ethers.getContractFactory(
+        'IpcTokenController',
     )
-    // Deploying TokenTransferAndMint with the new ERC20 token as sourceContract
-    const tokenTransferAndMint = await TokenTransferAndMint.deploy(
+    // Deploying IpcTokenController with the new ERC20 token as sourceContract
+    const ipcTokenController = await IpcTokenController.deploy(
         gateway,
         erc20Token.address,
         subnetID,
         subnetTokenBridge.address,
     )
 
-    await tokenTransferAndMint.deployed()
+    await ipcTokenController.deployed()
 
     console.log(
-        'TokenTransferAndMint deployed to:',
-        tokenTransferAndMint.address,
+        'IpcTokenController deployed to:',
+        ipcTokenController.address,
     )
-    return tokenTransferAndMint
+    return ipcTokenController
 }
 
 async function getAccountAddress() {

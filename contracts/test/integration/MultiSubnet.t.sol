@@ -27,7 +27,7 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 import {SubnetTokenBridge} from "../../src/examples/cross-token/SubnetTokenBridge.sol";
-import {TokenTransferAndMint} from "../../src/examples/cross-token/TokenTransferAndMint.sol";
+import {IpcTokenController} from "../../src/examples/cross-token/IpcTokenController.sol";
 import {USDCTest} from "../../src/examples/cross-token/USDCTest.sol";
 
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
@@ -66,7 +66,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     IERC20 public token;
 
     SubnetTokenBridge subnetTokenBridge;
-    TokenTransferAndMint rootTokenBridge;
+    IpcTokenController rootTokenController;
 
     function setUp() public override {
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 100 ether, address(this));
@@ -468,28 +468,28 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(testUSDC), rootSubnetName);
 
-        rootTokenBridge = new TokenTransferAndMint(
+        rootTokenController = new IpcTokenController(
             address(nativeSubnetGateway),
             address(testUSDC),
             tokenSubnetName,
             address(subnetTokenBridge)
         );
 
-        subnetTokenBridge.setParentSubnetUSDC(address(rootTokenBridge));
+        subnetTokenBridge.setParentSubnetUSDC(address(rootTokenController));
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
-        vm.deal(address(rootTokenBridge), 1 ether);
+        vm.deal(address(rootTokenController), 1 ether);
 
         vm.prank(testUSDCOwner);
-        testUSDC.approve(address(rootTokenBridge), transferAmount);
+        testUSDC.approve(address(rootTokenController), transferAmount);
 
         console.log("mock usdc %s", address(testUSDC));
         console.log("mock usdc owner%s", address(testUSDCOwner));
-        console.log("rootTokenBridge %s", address(rootTokenBridge));
-        console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenBridge)));
+        console.log("rootTokenController %s", address(rootTokenController));
+        console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenController)));
 
         vm.prank(address(testUSDCOwner));
-        expected = rootTokenBridge.depositTokensWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        expected = rootTokenController.depositTokensWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         // after the two next calls the root gateway should store the message in its postbox.
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -531,10 +531,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         /*
-            TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenBridge contract is sent
+            TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenController contract is sent
         */
         //vm.prank(address(nativeSubnetGateway));
-        //rootTokenBridge.handleIpcMessage(committed);
+        //rootTokenController.handleIpcMessage(committed);
 
         checkpoint = callCreateBottomUpCheckpointFromChildSubnet(tokenSubnetName, address(tokenSubnetGateway));
 
