@@ -463,7 +463,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         USDCTest testUSDC = new USDCTest();
         testUSDC.mint(transferAmount);
         address testUSDCOwner = testUSDC.owner();
-        assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
+        require(transferAmount == testUSDC.balanceOf(testUSDCOwner), "unexpected transferAmount");
 
         subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(testUSDC), rootSubnetName);
 
@@ -501,7 +501,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         bytes32 expectedCid = expected.toHash();
         IpcEnvelope memory postboxMsg = rootGatewayGetter.postbox(expectedCid);
-        assertEq(expectedCid, postboxMsg.toHash());
+        require(expectedCid == postboxMsg.toHash(), "unexpected postbox message in transfer in mint");
 
         console.log("--------------- execute (top-down) ---------------");
 
@@ -512,16 +512,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
 
         //ensure that tokens are delivered on subnet
-        assertEq(
-            IERC20(subnetTokenBridge).balanceOf(address(testUSDCOwner)),
-            transferAmount,
+        require(
+            IERC20(subnetTokenBridge).balanceOf(address(testUSDCOwner)) == transferAmount,
             "incorrect proxy token balance"
         );
 
         console.log("--------------- withdraw token (bottom-up)---------------");
 
         //ensure that USDC owner has 0 tokens
-        assertEq(0, testUSDC.balanceOf(testUSDCOwner));
+        require(0 == testUSDC.balanceOf(testUSDCOwner), "unexpected owner balance in withdraw flow");
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(testUSDCOwner));
@@ -545,9 +544,9 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         //ensure that usdc tokens are returned on root net
-        assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
+        require(transferAmount == testUSDC.balanceOf(testUSDCOwner), "unexpected owner balance after withdrawal");
         //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
-        assertEq(0, subnetTokenBridge.balanceOf(testUSDCOwner));
-        assertEq(0, subnetTokenBridge.balanceOf(address(subnetTokenBridge)));
+        require(0 == subnetTokenBridge.balanceOf(testUSDCOwner), "unexpected testUSDCOwner balance in subnetTokenBridge");
+        require(0 == subnetTokenBridge.balanceOf(address(subnetTokenBridge)), "unexpected subnetTokenBridge balance in subnetTokenBridge");
     }
 }
