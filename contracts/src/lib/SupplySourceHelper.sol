@@ -130,9 +130,8 @@ library SupplySourceHelper {
                     // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
                     revert(add(32, ret), returndata_size)
                 }
-            } else {
-                revert FailedInnerCall();
             }
+            revert FailedInnerCall();
         }
         return (success, ret);
     }
