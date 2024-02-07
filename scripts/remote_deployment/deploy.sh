@@ -109,6 +109,7 @@ if ! ls $IPC_FOLDER ; then
 fi
 cd ${IPC_FOLDER}/contracts
 git fetch
+git stash
 git checkout $head_ref
 git pull --rebase origin $head_ref
 
