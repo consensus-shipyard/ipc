@@ -12,7 +12,7 @@ set -euxo pipefail
 
 # TODO: 每次运行都创建新的subnet成功了，再换成每次运行都deploy新的contract
 
-PREFIX='------'
+DASHES='------'
 IPC_FOLDER=${HOME}/ipc
 IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
 IPC_CONFIG_FOLDER=${HOME}/.ipc
@@ -34,15 +34,15 @@ head_ref=$1
 # Step 1: Prepare system for building and running IPC
 
 # Step 1.1: Install build dependencies
-echo "${PREFIX} Installing build dependencies..."
+echo "${DASHES} Installing build dependencies..."
 sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
 # Step 1.2: Install rust + cargo
-echo "$PREFIX Check rustc & cargo..."
+echo "$DASHES Check rustc & cargo..."
 if which cargo ; then
-  echo "$PREFIX rustc & cargo already installed."
+  echo "$DASHES rustc & cargo already installed."
 else
-  echo "$PREFIX Need to install rustc & cargo"
+  echo "$DASHES Need to install rustc & cargo"
   curl https://sh.rustup.rs -sSf | sh -s -- -y
   # Refresh env
   source ${HOME}/.bashrc
@@ -50,28 +50,28 @@ fi
 
 # Step 1.3: Install cargo-make and toml-cli
 # Install cargo make
-echo "$PREFIX Installing cargo-make"
+echo "$DASHES Installing cargo-make"
 cargo install cargo-make
 # Install toml-cli
-echo "$PREFIX Installing toml-cli"
+echo "$DASHES Installing toml-cli"
 cargo install toml-cli
 
 # Step 1.3: Install Foundry
-echo "$PREFIX Check foundry..."
+echo "$DASHES Check foundry..."
 if which foundryup ; then
-  echo "$PREFIX foundry is already installed."
+  echo "$DASHES foundry is already installed."
 else
-  echo "$PREFIX Need to install foundry"
+  echo "$DASHES Need to install foundry"
   curl -L https://foundry.paradigm.xyz | bash
   foundryup
 fi
 
 # Step 1.4: Install docker
-echo "$PREFIX check docker"
+echo "$DASHES check docker"
 if which docker ; then
-  echo "$PREFIX docker is already installed."
+  echo "$DASHES docker is already installed."
 else
-  echo "$PREFIX Need to install docker"
+  echo "$DASHES Need to install docker"
   # Add Docker's official GPG key:
   sudo apt-get update
   sudo apt-get install ca-certificates curl
@@ -102,7 +102,7 @@ source ${HOME}/.bashrc
 set -u
 
 # Step 2: Prepare code repo and build ipc-cli
-echo "$PREFIX Preparing ipc repo..."
+echo "$DASHES Preparing ipc repo..."
 cd $HOME
 if ! ls $IPC_FOLDER ; then
   git clone https://github.com/consensus-shipyard/ipc.git
@@ -112,16 +112,16 @@ git fetch
 git checkout $head_ref
 git pull --rebase origin $head_ref
 
-echo "$PREFIX Building ipc contracts..."
+echo "$DASHES Building ipc contracts..."
 cd ${IPC_FOLDER}/contracts
 make build
 
-echo "$PREFIX Building ipc-cli..."
+echo "$DASHES Building ipc-cli..."
 cd ${IPC_FOLDER}/ipc
 make build
 
 # Step 3: Prepare wallet by using existing wallet json file
-echo "$PREFIX Using 3 address in wallet..."
+echo "$DASHES Using 3 address in wallet..."
 for i in {0..2}
 do
   addr=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq .[$i].address | tr -d '"')
@@ -145,7 +145,7 @@ echo "New parent registry address: $parent_registry_address"
 # Step 4.1: Write back new parent gateway and registry address to IPC config file
 
 # Step 5: Create a subnet
-echo "$PREFIX Creating a child subnet..."
+echo "$DASHES Creating a child subnet..."
 create_subnet_output=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode 0 --supply-source-kind 0 2>&1)
 echo $create_subnet_output
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
@@ -157,7 +157,7 @@ echo "Created new subnet id: $subnet_id"
 #echo "Use existing subnet id: $subnet_id"
 
 # Step 6: Generate pubkeys from addresses
-echo "$PREFIX Generating pubkey for wallet addresses... $default_wallet_address"
+echo "$DASHES Generating pubkey for wallet addresses... $default_wallet_address"
 for i in {0..2}
 do
   pubkey=$($IPC_CLI wallet pub-key --wallet-type evm --address ${wallet_addresses[i]})
@@ -166,7 +166,7 @@ do
 done
 
 # Step 7: Join subnet for addresses in wallet
-echo "$PREFIX Join subnet for addresses in wallet..."
+echo "$DASHES Join subnet for addresses in wallet..."
 for i in {0..2}
 do
   echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
@@ -186,12 +186,12 @@ done
 # make docker-build
 
 ## Step 8.3: Read parent net gateway address and registry address
-#echo "$PREFIX Reading parent gateway and registry address"
+#echo "$DASHES Reading parent gateway and registry address"
 #parent_gateway_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr | tr -d '"')
 #parent_registry_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.registry_addr | tr -d '"')
 
 # Step 8.4: Start the bootstrap validator node
-echo "$PREFIX Start the first validator node as bootstrap"
+echo "$DASHES Start the first validator node as bootstrap"
 echo "First we need to force a wait to make sure the subnet is confirmed as created in the parent contracts"
 echo "Wait for 30 seconds"
 sleep 30
@@ -224,7 +224,7 @@ bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_POR
 echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
 
 # Step 8.5: Start other validator node
-echo "$PREFIX Start the other validator nodes"
+echo "$DASHES Start the other validator nodes"
 cd ${IPC_FOLDER}
 for i in {1..2}
 do
@@ -249,7 +249,7 @@ do
 done
 
 # Step 9: Test ETH API endpoint
-echo "$PREFIX Test ETH API endpoints of validator nodes"
+echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do
   curl --location http://localhost:${ETHAPI_HOST_PORTS[i]} \
