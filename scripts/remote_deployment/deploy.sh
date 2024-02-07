@@ -144,8 +144,8 @@ done
 # Step 4.2: Deploy IPC contracts
 cd ${IPC_FOLDER}/contracts
 npm install
-RPC_URL=https://calibration.filfox.info/rpc/v1
-PRIVATE_KEY=$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk)
+export RPC_URL=https://calibration.filfox.info/rpc/v1
+export PRIVATE_KEY=$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk)
 deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
 
 parent_gateway_address=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
