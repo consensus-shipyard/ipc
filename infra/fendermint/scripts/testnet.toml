@@ -48,7 +48,7 @@ dependencies = [
 [tasks.testnet-init-nodes]
 script_runner = "@duckscript"
 script = """
-nodes = range 0 4
+nodes = range 0 ${TESTNET_NODES_NUMBER}
 
 for i in ${nodes}
     NUMBER = set ${i}
@@ -66,7 +66,7 @@ for i in ${nodes}
     cm_run_task genesis-new-accounts
     cm_run_task genesis-add-validator
 
-    IP_LAST = calc ${NUMBER}+2
+    IP_LAST = calc ${NUMBER}*3+2
     NETWORK_ADDR = set "192.167.10.${IP_LAST}:26656"
     set_env NETWORK_ADDR ${NETWORK_ADDR}
     cm_run_task testnet-add-peer
@@ -107,14 +107,15 @@ unset CMT_P2P_PERSISTENT_PEERS
 export CMT_P2P_PERSISTENT_PEERS=`cat $BASE_DIR/peers`
 echo Persistent peers: $CMT_P2P_PERSISTENT_PEERS
 
-for i in $(seq 0 3); do
+for i in $(seq 0 $((${TESTNET_NODES_NUMBER} - 1))); do
+    echo Setting persistent peers for node ${i}
     sed -i'' -e "s|persistent_peers = \\"\\"|persistent_peers = \\"$CMT_P2P_PERSISTENT_PEERS\\"|" $BASE_DIR/node${i}/cometbft/config/config.toml
 done
 """
 
 [tasks.testnet-copy-genesis]
 script = """
-for i in $(seq 0 3); do
+for i in $(seq 0 $((${TESTNET_NODES_NUMBER} - 1))); do
     cp $BASE_DIR/genesis.committed.json $BASE_DIR/node${i}/cometbft/config/genesis.json
 done
 """
