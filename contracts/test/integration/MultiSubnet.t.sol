@@ -451,7 +451,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, address(rootGateway));
         emit LibGateway.NewTopDownMessage(address(rootTokenSubnetActor), expected);
-        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), DEFAULT_CROSS_MSG_FEE);
+        rootGatewayManager.fundWithToken(
+            tokenSubnetName,
+            FvmAddressHelper.from(address(caller)),
+            DEFAULT_CROSS_MSG_FEE
+        );
 
         console.log("--------------- transfer and mint (bottom-up)---------------");
         // here starts a flow from native subnet to token subnet.
@@ -484,7 +488,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenBridge)));
 
         vm.prank(address(testUSDCOwner));
-        rootTokenBridge.depositTokens{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        expected = rootTokenBridge.depositTokensWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         // after the two next calls the root gateway should store the message in its postbox.
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -495,22 +499,9 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         callSubmitCheckpointFromParentSubnet(checkpoint, address(rootNativeSubnetActor));
         // check the message is in the postbox
 
-        CallMsg memory payload = CallMsg({
-            method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
-            params: abi.encode(address(testUSDCOwner), DEFAULT_CROSS_MSG_FEE)
-        });
-        expected = IpcEnvelope({
-            kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: nativeSubnetName, rawAddress: FvmAddressHelper.from(address(rootTokenBridge))}),
-            to: IPCAddress({subnetId: tokenSubnetName, rawAddress: FvmAddressHelper.from(address(subnetTokenBridge))}),
-            value: DEFAULT_CROSS_MSG_FEE,
-            nonce: 0,
-            message: abi.encode(payload)
-        });
-
         bytes32 expectedCid = expected.toHash();
         IpcEnvelope memory postboxMsg = rootGatewayGetter.postbox(expectedCid);
-        assertEq(expectedCid, postboxMsg.toHash(), "postboxMsg hash and cid not equal");
+        assertEq(expectedCid, postboxMsg.toHash());
 
         console.log("--------------- execute (top-down) ---------------");
 
@@ -523,7 +514,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         //ensure that tokens are delivered on subnet
         assertEq(
             IERC20(subnetTokenBridge).balanceOf(address(testUSDCOwner)),
-            DEFAULT_CROSS_MSG_FEE,
+            transferAmount,
             "incorrect proxy token balance"
         );
 
@@ -536,21 +527,18 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             transferAmount
         );
 
-        /* 
+        /*
             TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenBridge contract is sent
         */
         //vm.prank(address(nativeSubnetGateway));
         //rootTokenBridge.handleIpcMessage(committed);
 
-        checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
-            tokenSubnetName,
-            address(tokenSubnetGateway)
-        );
+        checkpoint = callCreateBottomUpCheckpointFromChildSubnet(tokenSubnetName, address(tokenSubnetGateway));
 
         callSubmitCheckpointFromParentSubnet(checkpoint, address(rootTokenSubnetActor));
 
         //ensure that usdc tokens are returned on root net
-        //assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
+        assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
         //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
         assertEq(0, subnetTokenBridge.balanceOf(testUSDCOwner));
         assertEq(0, subnetTokenBridge.balanceOf(address(subnetTokenBridge)));

@@ -82,6 +82,11 @@ contract TokenTransferAndMint is IpcExchange, ReentrancyGuard {
         _sendToken(sourceContract, destinationSubnet, destinationContract, receiver, amount);
     }
 
+    function depositTokensWithReturn(address receiver, uint256 amount) external payable returns (IpcEnvelope memory) {
+        // Transfer and lock tokens on L1 using the inherited sendToken function
+        return _sendToken(sourceContract, destinationSubnet, destinationContract, receiver, amount);
+    }
+
     function _sendToken(
         address sourceContract,
         SubnetID memory destinationSubnet,
