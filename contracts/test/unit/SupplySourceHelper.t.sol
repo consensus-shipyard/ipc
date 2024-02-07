@@ -14,9 +14,17 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 
+contract FailingContract {
+    error BOOM();
+
+    function failing() external pure {
+        revert BOOM();
+    }
+}
+
 contract SupplySourceHelperTest is Test {
     /// Call fails but send value works, both should fail
-    function test_revert_atomicity() public {
+    function test_revert_atomicity_no_ret() public {
         uint256 balance = 1_000_000;
         SupplySourceHelperMock mock = new SupplySourceHelperMock();
 
@@ -26,8 +34,25 @@ contract SupplySourceHelperTest is Test {
 
         bytes memory params = bytes("hello");
 
-        vm.expectRevert();
+        vm.expectRevert(SupplySourceHelper.FailedInnerCall.selector);
         mock.performCall(source, payable(address(this)), params, 100);
+
+        require(token.balanceOf(address(mock)) == balance, "invalid balance");
+    }
+
+    function test_revert_atomicity_with_ret() public {
+        uint256 balance = 1_000_000;
+        SupplySourceHelperMock mock = new SupplySourceHelperMock();
+
+        IERC20 token = new ERC20PresetFixedSupply("TestToken", "TEST", balance, address(mock));
+
+        SupplySource memory source = SupplySource({kind: SupplyKind.ERC20, tokenAddress: address(token)});
+
+        bytes memory params = abi.encodeWithSelector(FailingContract.failing.selector);
+
+        address c = address(new FailingContract());
+        vm.expectRevert(FailingContract.BOOM.selector);
+        mock.performCall(source, payable(c), params, 100);
 
         require(token.balanceOf(address(mock)) == balance, "invalid balance");
     }

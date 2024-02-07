@@ -14,6 +14,7 @@ library SupplySourceHelper {
     error InvalidERC20Address();
     error UnexpectedSupplySource();
     error UnknownSupplySource();
+    error FailedInnerCall();
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
@@ -123,10 +124,14 @@ library SupplySourceHelper {
 
         if (!success) {
             // following the implementation of `openzeppelin-contracts/utils/Address.sol`
-            assembly {
-                let returndata_size := mload(ret)
-                // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
-                revert(add(32, ret), returndata_size)
+            if (ret.length > 0) {
+                assembly {
+                    let returndata_size := mload(ret)
+                    // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
+                    revert(add(32, ret), returndata_size)
+                }
+            } else {
+                revert FailedInnerCall();
             }
         }
         return (success, ret);
