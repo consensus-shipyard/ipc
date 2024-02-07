@@ -6,6 +6,7 @@
 # Known issues:
 # 1. Need to previously manual enable sudo without password on the host
 # 2. You may need to rerun the script after docker installation for the first time
+# 2. You may need to manually install nodejs and npm on the host
 
 set -euxo pipefail
 
@@ -34,7 +35,7 @@ head_ref=$1
 
 # Step 1.1: Install build dependencies
 echo "${PREFIX} Installing build dependencies..."
-sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates npm gnupg -y
+sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
 # Step 1.2: Install rust + cargo
 echo "$PREFIX Check rustc & cargo..."
