@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::{
-    borrow::Cow,
     fmt::Display,
     path::{Path, PathBuf},
 };
@@ -16,8 +15,17 @@ pub mod testnet;
 mod arb;
 
 /// An ID identifying a resource within its parent.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ResourceId(Cow<'static, str>);
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ResourceId(String);
+
+impl<'de> Deserialize<'de> for ResourceId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer).map(|s| Self::from(s))
+    }
+}
 
 impl Display for ResourceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -25,15 +33,15 @@ impl Display for ResourceId {
     }
 }
 
-impl From<&'static str> for ResourceId {
-    fn from(value: &'static str) -> Self {
-        Self(Cow::Borrowed(value))
+impl From<&str> for ResourceId {
+    fn from(value: &str) -> Self {
+        Self::from(value.to_string())
     }
 }
 
 impl From<String> for ResourceId {
     fn from(value: String) -> Self {
-        Self(Cow::Owned(value))
+        Self(value.replace('/', "_"))
     }
 }
 
