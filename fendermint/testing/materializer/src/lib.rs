@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 use std::{
     borrow::Cow,
     fmt::Display,
@@ -6,8 +8,6 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-// Copyright 2022-2024 Protocol Labs
-// SPDX-License-Identifier: Apache-2.0, MIT
 pub mod manifest;
 pub mod materializer;
 pub mod testnet;
@@ -108,7 +108,7 @@ impl NodeName {
 
 impl AccountName {
     pub fn new(account_id: &AccountId) -> Self {
-        Self(ResourceName::from("/account").join_id(&account_id))
+        Self(ResourceName::from("/account").join_id(account_id))
     }
 }
 
@@ -168,12 +168,12 @@ impl SubnetName {
 
         let ss1 = ss0
             .iter()
-            .cloned()
             .skip(1)
-            .chain(std::iter::once(self.clone()))
+            .chain(std::iter::once(self))
+            .cloned()
             .collect::<Vec<_>>();
 
-        ss0.into_iter().zip(ss1.into_iter()).collect()
+        ss0.into_iter().zip(ss1).collect()
     }
 
     fn path(&self) -> &Path {

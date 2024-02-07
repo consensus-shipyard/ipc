@@ -38,6 +38,21 @@ pub struct Testnet<M: Materializer> {
     relayers: BTreeMap<RelayerName, M::Relayer>,
 }
 
+impl<M> Default for Testnet<M>
+where
+    M: Materializer + Sync + Send,
+    M::Account: Ord + Sync + Send,
+    M::Genesis: Clone + Sync + Send,
+    M::Deployment: Sync + Send,
+    M::Subnet: Sync + Send,
+    M::Node: Sync + Send,
+    M::Relayer: Sync + Send,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<M> Testnet<M>
 where
     M: Materializer + Sync + Send,
@@ -313,10 +328,10 @@ where
                 let deployment = m.default_deployment(root_name);
                 self.deployments.insert(root_name.clone(), deployment);
 
-                self.create_root_genesis(m, &root_name, validators, balances)
+                self.create_root_genesis(m, root_name, validators, balances)
                     .context("failed to create root genesis")?;
 
-                self.create_and_start_nodes(m, &root_name, &nodes)
+                self.create_and_start_nodes(m, root_name, &nodes)
                     .await
                     .context("failed to start root nodes")?;
             }
@@ -353,7 +368,7 @@ where
                     min_validators: subnet.validators.len(),
                 },
                 &parent_nodes,
-                &parent_deployment,
+                parent_deployment,
             )
             .await
             .context("failed to create subnet")?;
@@ -365,7 +380,7 @@ where
             for (fund_source, fund_target) in &ancestor_hops {
                 let fund_nodes = self.nodes_by_subnet(fund_source);
                 let fund_deployment = self.deployment(fund_source)?;
-                let fund_subnet = self.subnet(&fund_target)?;
+                let fund_subnet = self.subnet(fund_target)?;
 
                 for (id, amount) in &subnet.validators {
                     let account = self
