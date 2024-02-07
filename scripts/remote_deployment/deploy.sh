@@ -9,7 +9,6 @@
 
 set -euxo pipefail
 
-# TODO: OK，下一步是要解决如何处理private key的问题
 # TODO: 然后充分调试完毕了，修完了所有其他review comments后，换成每次运行都创建新的subnet
 
 PREFIX='------'
