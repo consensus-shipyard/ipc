@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
-use fvm_shared::address::Address;
+use fvm_shared::{address::Address, econ::TokenAmount};
 use std::collections::BTreeMap;
 
 use fendermint_vm_genesis::Collateral;
@@ -34,12 +34,14 @@ use crate::{manifest::Balance, AccountName, NodeName, SubnetName};
 /// know.
 #[async_trait]
 pub trait Materializer {
+    type Deployment;
     type Account;
     type Genesis;
+    type Subnet;
     type Node;
 
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
-    fn create_account(&mut self, account_name: AccountName) -> Self::Account;
+    fn create_account(&mut self, account_name: &AccountName) -> Self::Account;
 
     /// Fund an account on the rootnet from the faucet.
     async fn fund_from_faucet(&mut self, account: &Self::Account) -> anyhow::Result<()>;
@@ -50,19 +52,29 @@ pub trait Materializer {
     /// being known to the materializer, but not being part of the manifest,
     /// as there can be multiple endpoints to choose from, some better than others.
     ///
-    /// The materializer should remember the addresses of the deployments.
-    async fn deploy_root_ipc(&mut self, deployer: &Self::Account) -> anyhow::Result<()>;
+    /// The return value should contain at the addresses of the contracts.
+    async fn new_deployment(
+        &mut self,
+        subnet_name: &SubnetName,
+        deployer: &Self::Account,
+    ) -> anyhow::Result<Self::Deployment>;
 
     /// Set the IPC contracts onto the rootnet.
     ///
     /// This is assumed to be used with external subnets, with the API address
     /// being known to the materializer, but not being part of the manifest,
     /// as there can be multiple endpoints to choose from, some better than others.
-    ///
-    /// The materializer should remember the addresses of the deployments.
-    async fn set_root_ipc(&mut self, gateway: Address, registry: Address) -> anyhow::Result<()>;
+    fn existing_deployment(
+        &mut self,
+        subnet_name: &SubnetName,
+        gateway: Address,
+        registry: Address,
+    ) -> Self::Deployment;
 
-    /// Construct the genesis for a subnet.
+    /// Return the well-known IPC contract deployments.
+    fn default_deployment(&mut self, subnet_name: &SubnetName) -> Self::Deployment;
+
+    /// Construct the genesis for the rootnet.
     ///
     /// The genesis time and the chain name (which should determine the chain ID and
     /// thus the subnet ID as well) can be chosen by the materializer.
@@ -82,7 +94,7 @@ pub trait Materializer {
     /// The method is async in case we have to provision some resources remotely.
     async fn create_node(
         &mut self,
-        node_name: NodeName,
+        node_name: &NodeName,
         node_config: NodeConfig<Self>,
     ) -> anyhow::Result<Self::Node>;
 
@@ -94,8 +106,56 @@ pub trait Materializer {
         node: &Self::Node,
         seed_nodes: &[&Self::Node],
     ) -> anyhow::Result<()>;
+
+    /// Create a subnet on the parent subnet ledger.
+    ///
+    /// The parent nodes are the ones where subnet-creating transactions
+    /// can be sent, or it can be empty if it's an external rootnet.
+    ///
+    /// The result should contain the address of the subnet.
+    async fn create_subnet(
+        &mut self,
+        subnet_name: &SubnetName,
+        subnet_config: SubnetConfig<Self>,
+        parent_nodes: &[&Self::Node],
+        parent_deployment: &Self::Deployment,
+    ) -> anyhow::Result<Self::Subnet>;
+
+    /// Fund an account on a target subnet by transferring tokens from the source subnet.
+    ///
+    /// Only works if the target subnet has been bootstrapped.
+    async fn fund_subnet(
+        &mut self,
+        account: &Self::Account,
+        subnet: &Self::Subnet,
+        amount: TokenAmount,
+        parent_nodes: &[&Self::Node],
+        parent_deployment: &Self::Deployment,
+    ) -> anyhow::Result<()>;
+
+    /// Join a target subnet as a validator.
+    async fn join_subnet(
+        &mut self,
+        account: &Self::Account,
+        subnet: &Self::Subnet,
+        collateral: Collateral,
+        balance: Balance,
+        parent_nodes: &[&Self::Node],
+        parent_deployment: &Self::Deployment,
+    ) -> anyhow::Result<()>;
+
+    /// Construct the genesis for a subnet, which involves fetching details from the parent.
+    ///
+    /// The genesis time and the chain name (which should determine the chain ID and
+    /// thus the subnet ID as well) can be chosen by the materializer.
+    fn create_subnet_genesis(
+        &mut self,
+        subnet: &Self::Subnet,
+        parent_nodes: &[&Self::Node],
+    ) -> anyhow::Result<Self::Genesis>;
 }
 
+/// Options regarding node configuration, e.g. which services to start.
 pub struct NodeConfig<'a, M>
 where
     M: Materializer + ?Sized,
@@ -108,4 +168,17 @@ where
     pub parent_node: Option<&'a M::Node>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,
+}
+
+/// Options regarding subnet configuration, e.g. how many validators are required.
+pub struct SubnetConfig<'a, M>
+where
+    M: Materializer + ?Sized,
+{
+    /// Which account to use on the parent to create the subnet.
+    ///
+    /// This account has to have the necessary balance on the parent.
+    pub creator: &'a M::Account,
+    /// Number of validators required for bootstrapping a subnet.
+    pub min_validators: usize,
 }

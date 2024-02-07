@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::Display,
     path::{Path, PathBuf},
 };
@@ -16,7 +17,7 @@ mod arb;
 
 /// An ID identifying a resource within its parent.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ResourceId(pub String);
+pub struct ResourceId(Cow<'static, str>);
 
 impl Display for ResourceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -24,9 +25,21 @@ impl Display for ResourceId {
     }
 }
 
-impl From<&str> for ResourceId {
-    fn from(value: &str) -> Self {
-        Self(value.into())
+impl From<&'static str> for ResourceId {
+    fn from(value: &'static str) -> Self {
+        Self(Cow::Borrowed(value))
+    }
+}
+
+impl From<String> for ResourceId {
+    fn from(value: String) -> Self {
+        Self(Cow::Owned(value))
+    }
+}
+
+impl From<&ResourceId> for ResourceId {
+    fn from(value: &Self) -> Self {
+        value.clone()
     }
 }
 
@@ -50,12 +63,16 @@ pub type RelayerId = ResourceId;
 pub struct ResourceName(pub PathBuf);
 
 impl ResourceName {
-    pub fn join(&self, s: &str) -> Self {
+    fn join(&self, s: &str) -> Self {
         Self(self.0.join(s))
     }
 
-    pub fn join_id(&self, id: &ResourceId) -> Self {
+    fn join_id(&self, id: &ResourceId) -> Self {
         self.join(&id.0)
+    }
+
+    pub fn is_prefix_of(&self, other: &ResourceName) -> bool {
+        other.0.starts_with(&self.0)
     }
 }
 
@@ -80,6 +97,12 @@ pub struct SubnetName(ResourceName);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodeName(ResourceName);
 
+impl NodeName {
+    pub fn is_in_subnet(&self, subnet_name: &SubnetName) -> bool {
+        subnet_name.0.is_prefix_of(&self.0)
+    }
+}
+
 impl AccountName {
     pub fn new(account_id: &AccountId) -> Self {
         Self(ResourceName::from("/account").join_id(&account_id))
@@ -91,12 +114,12 @@ impl SubnetName {
         Self(ResourceName::from("/root"))
     }
 
-    pub fn node(&self, node_id: &NodeId) -> NodeName {
-        NodeName(self.0.join("nodes").join_id(node_id))
+    pub fn node<T: Into<NodeId>>(&self, node_id: T) -> NodeName {
+        NodeName(self.0.join("nodes").join_id(&node_id.into()))
     }
 
-    pub fn subnet(&self, subnet_id: &SubnetId) -> Self {
-        Self(self.0.join("subnets").join_id(subnet_id))
+    pub fn subnet<S: Into<SubnetId>>(&self, subnet_id: S) -> Self {
+        Self(self.0.join("subnets").join_id(&subnet_id.into()))
     }
 
     pub fn is_root(&self) -> bool {
@@ -120,6 +143,32 @@ impl SubnetName {
         }
     }
 
+    /// All the subnet names from the root to the parent of the subnet.
+    pub fn ancestors(&self) -> Vec<SubnetName> {
+        let mut ss = Vec::new();
+        let mut p = self.parent();
+        while let Some(s) = p {
+            p = s.parent();
+            ss.push(s);
+        }
+        ss.reverse();
+        ss
+    }
+
+    /// parent->child hop pairs from the root to the subnet.
+    pub fn ancestor_hops(&self) -> Vec<(SubnetName, SubnetName)> {
+        let ss0 = self.ancestors();
+
+        let ss1 = ss0
+            .iter()
+            .cloned()
+            .skip(1)
+            .chain(std::iter::once(self.clone()))
+            .collect::<Vec<_>>();
+
+        ss0.into_iter().zip(ss1.into_iter()).collect()
+    }
+
     fn path(&self) -> &Path {
         &self.0 .0
     }
@@ -127,14 +176,39 @@ impl SubnetName {
 
 #[cfg(test)]
 mod tests {
-    use crate::{SubnetId, SubnetName};
+    use crate::SubnetName;
 
     #[test]
     fn test_subnet_parent() {
         let root = SubnetName::root();
         assert_eq!(root.parent(), None);
 
-        let sub = root.subnet(&SubnetId::from("foo"));
+        let sub = root.subnet("foo");
         assert_eq!(sub.parent(), Some(root));
+    }
+
+    #[test]
+    fn test_subnet_ancestors() {
+        let subnet = SubnetName::root().subnet("foo").subnet("bar");
+        assert_eq!(
+            subnet.ancestors(),
+            vec![SubnetName::root(), SubnetName::root().subnet("foo")]
+        );
+    }
+
+    #[test]
+    fn test_subnet_ancestor_hops() {
+        let root = SubnetName::root();
+        let foo = root.subnet("foo");
+        let bar = foo.subnet("bar");
+        assert_eq!(bar.ancestor_hops(), vec![(root, foo.clone()), (foo, bar)]);
+    }
+
+    #[test]
+    fn test_node_subnet() {
+        let subnet = SubnetName::root().subnet("foo");
+        let node = subnet.node("node-1");
+
+        assert!(node.is_in_subnet(&subnet));
     }
 }

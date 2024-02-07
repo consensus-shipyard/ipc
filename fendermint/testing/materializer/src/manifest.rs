@@ -48,7 +48,7 @@ pub struct Account {}
 
 /// Account balance.
 #[serde_as]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Balance(#[serde_as(as = "IsHumanReadable")] pub TokenAmount);
 
 /// Ways we can hook up with IPC contracts on the rootnet.
