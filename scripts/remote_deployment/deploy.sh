@@ -10,8 +10,6 @@
 
 set -euxo pipefail
 
-# TODO: 每次运行都创建新的subnet成功了，再换成每次运行都deploy新的contract
-
 DASHES='------'
 IPC_FOLDER=${HOME}/ipc
 IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
