@@ -85,7 +85,8 @@ pub trait Materializer {
     /// Construct the genesis for the rootnet.
     ///
     /// The genesis time and the chain name (which should determine the chain ID and
-    /// thus the subnet ID as well) can be chosen by the materializer.
+    /// thus the subnet ID as well) can be chosen by the materializer, or we could make
+    /// it part of the manifest.
     fn create_root_genesis(
         &mut self,
         subnet_name: SubnetName,
@@ -153,9 +154,6 @@ pub trait Materializer {
     ) -> anyhow::Result<()>;
 
     /// Construct the genesis for a subnet, which involves fetching details from the parent.
-    ///
-    /// The genesis time and the chain name (which should determine the chain ID and
-    /// thus the subnet ID as well) can be chosen by the materializer.
     fn create_subnet_genesis(
         &mut self,
         subnet: &Self::Subnet,

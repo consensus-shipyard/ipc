@@ -190,14 +190,14 @@ where
     ) -> anyhow::Result<()> {
         let node_ids = sort_by_seeds(nodes).context("invalid root subnet topology")?;
 
-        for node_id in node_ids.iter() {
-            self.create_node(m, subnet_name, node_id, nodes.get(node_id).unwrap())
+        for (node_id, node) in node_ids.iter() {
+            self.create_node(m, subnet_name, node_id, node)
                 .await
                 .with_context(|| "failed to create node {node_id} in {subnet_name:?}")?;
         }
 
-        for node_id in node_ids.iter() {
-            self.start_node(m, subnet_name, node_id, nodes.get(node_id).unwrap())
+        for (node_id, node) in node_ids.iter() {
+            self.start_node(m, subnet_name, node_id, node)
                 .await
                 .with_context(|| "failed to start node {node_id} in {subnet_name:?}")?;
         }
@@ -522,7 +522,11 @@ where
 /// Cycles can be allowed, in which case it will do its best to order the items
 /// with the least amount of dependencies first. This is so we can support nodes
 /// mutually be seeded by each other.
-fn topo_sort<K, V, F, I>(items: &BTreeMap<K, V>, allow_cycles: bool, f: F) -> anyhow::Result<Vec<K>>
+fn topo_sort<K, V, F, I>(
+    items: &BTreeMap<K, V>,
+    allow_cycles: bool,
+    f: F,
+) -> anyhow::Result<Vec<(&K, &V)>>
 where
     F: Fn(&V) -> I,
     K: Ord + Display + Clone,
@@ -530,7 +534,7 @@ where
 {
     let mut deps = items
         .iter()
-        .map(|(k, v)| (k.clone(), BTreeSet::from_iter(f(v))))
+        .map(|(k, v)| (k, BTreeSet::from_iter(f(v))))
         .collect::<BTreeMap<_, _>>();
 
     for (k, ds) in deps.iter() {
@@ -561,7 +565,9 @@ where
             ds.remove(&leaf);
         }
 
-        sorted.push(leaf);
+        if let Some(kv) = items.get_key_value(&leaf) {
+            sorted.push(kv);
+        }
     }
 
     Ok(sorted)
@@ -570,7 +576,7 @@ where
 /// Sort nodes in a subnet in topological order, so we strive to first
 /// start the ones others use as a seed node. However, do allow cycles
 /// so that we can have nodes mutually bootstrap from each other.
-fn sort_by_seeds(nodes: &BTreeMap<NodeId, Node>) -> anyhow::Result<Vec<NodeId>> {
+fn sort_by_seeds(nodes: &BTreeMap<NodeId, Node>) -> anyhow::Result<Vec<(&NodeId, &Node)>> {
     topo_sort(nodes, true, |n| {
         BTreeSet::from_iter(n.seed_nodes.iter().cloned())
     })
@@ -592,7 +598,12 @@ mod tests {
         tree.insert(4, vec![2, 3]);
         tree.insert(5, vec![1]);
 
-        let sorted = topo_sort(&tree, false, |ds| ds.clone()).unwrap();
+        let sorted = topo_sort(&tree, false, |ds| ds.clone())
+            .unwrap()
+            .into_iter()
+            .map(|(k, _)| *k)
+            .collect::<Vec<_>>();
+
         assert_eq!(sorted, vec![1, 5, 2, 3, 4]);
 
         tree.insert(1, vec![5]);
