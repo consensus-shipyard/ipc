@@ -1,6 +1,4 @@
-
 name: Run tests against Fendermint (remote Docker image)
-
 
 # This workflow is triggered from the main CI workflow.
 on:
