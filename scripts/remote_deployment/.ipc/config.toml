@@ -7,7 +7,7 @@ id = "/r314159"
 
 [subnets.config]
 network_type = "fevm"
-provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+provider_http = "https://calibration.filfox.info/rpc/v1"
 gateway_addr = "0xBF7a836AF7F1A1EdB939Ff2230Cd41a5e8e5C387"
 registry_addr = "0xb1110ba6507fb5f89E12Aff23C658449D11d8708"
 

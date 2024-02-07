@@ -110,7 +110,6 @@ cd ${IPC_FOLDER}/contracts
 git fetch
 git checkout $head_ref
 git pull --rebase origin $head_ref
-#git show HEAD
 
 echo "$PREFIX Building ipc contracts..."
 cd ${IPC_FOLDER}/contracts
@@ -120,16 +119,7 @@ echo "$PREFIX Building ipc-cli..."
 cd ${IPC_FOLDER}/ipc
 make build
 
-# Step 3: Prepare wallet by creating new wallet
-#echo "$PREFIX Creating 3 address in wallet..."
-#for i in {1..3}
-#do
-#    addr=$($IPC_CLI wallet new --wallet-type evm | tr -d '"')
-#    wallet_addresses+=($addr)
-#    echo "Wallet $i address: $addr"
-#done
-
-# Step 3 (alternative): Prepare wallet by using existing wallet
+# Step 3: Prepare wallet by using existing wallet json file
 echo "$PREFIX Using 3 address in wallet..."
 for i in {0..2}
 do
@@ -142,16 +132,16 @@ default_wallet_address=${wallet_addresses[0]}
 echo "Default wallet address: $default_wallet_address"
 
 # Step 4: Create a subnet
-#echo "$PREFIX Creating a child subnet..."
-#create_subnet_output=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode 0 --supply-source-kind 0 2>&1)
-#echo $create_subnet_output
-#subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
-#
-#echo "Created subnet ID: $subnet_id"
+echo "$PREFIX Creating a child subnet..."
+create_subnet_output=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode 0 --supply-source-kind 0 2>&1)
+echo $create_subnet_output
+subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
+
+echo "Created new subnet id: $subnet_id"
 
 # Step 4 (alternative): Use an already-created subnet
-subnet_id=/r314159/t410flp4jf7keqcf5bqogrkx4wpkygiskykcvpaigicq
-echo "subnet id: $subnet_id"
+#subnet_id=/r314159/t410flp4jf7keqcf5bqogrkx4wpkygiskykcvpaigicq
+#echo "Use existing subnet id: $subnet_id"
 
 # Step 5: Generate pubkeys from addresses
 echo "$PREFIX Generating pubkey for wallet addresses... $default_wallet_address"
@@ -163,15 +153,12 @@ do
 done
 
 # Step 6: Join subnet for addresses in wallet
-#echo "$PREFIX Join subnet for addresses in wallet..."
-#for i in {0..2}
-#do
-#  echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
-#  $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
-#done
-
-# Step 6 (alternative): Assume we already let our addresses join in the subnet
-# Because join a already-joined subnet will return failure that cannot be differentiated with failing to join a new subnet
+echo "$PREFIX Join subnet for addresses in wallet..."
+for i in {0..2}
+do
+  echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
+  $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
+done
 
 # Step 7: Start validators
 # Step 7.1: Export validator private keys into files
