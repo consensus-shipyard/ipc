@@ -169,7 +169,8 @@ do
   echo "Export private key for ${wallet_addresses[i]} to ${IPC_CONFIG_FOLDER}/validator_${i}.sk"
 done
 
-# Step 7.2 (optional): Rebuild fendermint docker
+# Step 7.2 (optional): Rebuild f
+# endermint docker
 # cd ${IPC_FOLDER}/fendermint
 # make docker-build
 
@@ -180,6 +181,11 @@ parent_registry_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].c
 
 # Step 7.4: Start the bootstrap validator node
 echo "$PREFIX Start the first validator node as bootstrap"
+echo "First we need to force a wait to make sure the subnet is confirmed as created in the parent contracts"
+echo "Wait for 30 seconds"
+sleep 30
+echo "Finished waiting"
+
 cd ${IPC_FOLDER}
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
