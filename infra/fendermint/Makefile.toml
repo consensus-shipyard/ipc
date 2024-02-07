@@ -87,6 +87,7 @@ VERBOSITY = ""
 LOG_LEVEL = "info"
 ETHAPI_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["ETHAPI_LOG_LEVEL"] } }
 FM_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["FM_LOG_LEVEL"] } }
+TESTNET_NODES_NUMBER = 7
 
 [env.fluence]
 FM_PULL_SKIP = true

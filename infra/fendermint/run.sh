@@ -34,14 +34,15 @@ if [ "$1" == "start" ]; then
   docker network create --subnet 192.167.0.0/16 ${NETWORK_NAME}
 fi
 
-for i in $(seq 0 3); do
+for i in $(seq 0 $(($TESTNET_NODES_NUMBER - 1))); do
+  echo "Executing command for node ${i}"
 	export NODE_ID=${i}
 	export PORT1
 	export PORT2
 	export PORT3
-	export CMT_NODE_ADDR=192.167.10.$((${i}+2))
-	export FMT_NODE_ADDR=192.167.10.$((${i}+6))
-	export ETHAPI_NODE_ADDR=192.167.10.$((${i}+10))
+	export CMT_NODE_ADDR=192.167.10.$((${i}*3 + 2))
+	export FMT_NODE_ADDR=192.167.10.$((${i}*3 + 3))
+	export ETHAPI_NODE_ADDR=192.167.10.$((${i}*3 + 4))
 	docker compose -f ./infra/fendermint/docker-compose.yml -p testnet_node_${i} $ACTION &
 	PORT1=$((PORT1+3))
 	PORT2=$((PORT2+3))
