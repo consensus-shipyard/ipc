@@ -13,7 +13,6 @@ concurrency:
 jobs:
   deploy_to_dedicated_host:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - name: Checkout code repo
         uses: actions/checkout@v4
@@ -60,3 +59,4 @@ jobs:
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           script: bash -il /home/ubuntu/scripts/remote_deployment/deploy.sh ${{ github.head_ref }}
+          command_timeout: 50m
