@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use fendermint_vm_genesis::Collateral;
 
-use crate::{manifest::Balance, AccountName, NodeName, SubnetName};
+use crate::{manifest::Balance, AccountName, NodeName, RelayerName, SubnetName};
 
 /// The materializer is a component to provision resources of a testnet, and
 /// to carry out subsequent commands on them, e.g. to restart nodes.
@@ -39,6 +39,7 @@ pub trait Materializer {
     type Genesis;
     type Subnet;
     type Node;
+    type Relayer;
 
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
     fn create_account(&mut self, account_name: &AccountName) -> Self::Account;
@@ -153,6 +154,19 @@ pub trait Materializer {
         subnet: &Self::Subnet,
         parent_nodes: &[&Self::Node],
     ) -> anyhow::Result<Self::Genesis>;
+
+    /// Create and start a relayer.
+    ///
+    /// It should follow the given node. If the submit node is empty, it should submit to an external rootnet.
+    async fn create_relayer(
+        &mut self,
+        relayer_name: &RelayerName,
+        subnet: &Self::Subnet,
+        submitter: &Self::Account,
+        follow_node: &Self::Node,
+        submit_node: Option<&Self::Node>,
+        submit_deployment: &Self::Deployment,
+    ) -> anyhow::Result<Self::Relayer>;
 }
 
 /// Options regarding node configuration, e.g. which services to start.

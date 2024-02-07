@@ -97,6 +97,9 @@ pub struct SubnetName(ResourceName);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodeName(ResourceName);
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RelayerName(ResourceName);
+
 impl NodeName {
     pub fn is_in_subnet(&self, subnet_name: &SubnetName) -> bool {
         subnet_name.0.is_prefix_of(&self.0)
@@ -114,12 +117,16 @@ impl SubnetName {
         Self(ResourceName::from("/root"))
     }
 
+    pub fn subnet<S: Into<SubnetId>>(&self, subnet_id: S) -> Self {
+        Self(self.0.join("subnets").join_id(&subnet_id.into()))
+    }
+
     pub fn node<T: Into<NodeId>>(&self, node_id: T) -> NodeName {
         NodeName(self.0.join("nodes").join_id(&node_id.into()))
     }
 
-    pub fn subnet<S: Into<SubnetId>>(&self, subnet_id: S) -> Self {
-        Self(self.0.join("subnets").join_id(&subnet_id.into()))
+    pub fn relayer<T: Into<RelayerId>>(&self, relayer_id: T) -> RelayerName {
+        RelayerName(self.0.join("relayers").join_id(&relayer_id.into()))
     }
 
     pub fn is_root(&self) -> bool {

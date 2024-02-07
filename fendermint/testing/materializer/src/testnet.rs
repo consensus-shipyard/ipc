@@ -13,7 +13,7 @@ use crate::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, Rootnet, Subnet,
     },
     materializer::{Materializer, NodeConfig, SubnetConfig},
-    AccountId, AccountName, NodeId, NodeName, SubnetId, SubnetName,
+    AccountId, AccountName, NodeId, NodeName, RelayerName, SubnetId, SubnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -35,6 +35,7 @@ pub struct Testnet<M: Materializer> {
     genesis: BTreeMap<SubnetName, M::Genesis>,
     subnets: BTreeMap<SubnetName, M::Subnet>,
     nodes: BTreeMap<NodeName, M::Node>,
+    relayers: BTreeMap<RelayerName, M::Relayer>,
 }
 
 impl<M> Testnet<M>
@@ -45,6 +46,7 @@ where
     M::Deployment: Sync + Send,
     M::Subnet: Sync + Send,
     M::Node: Sync + Send,
+    M::Relayer: Sync + Send,
 {
     pub fn new() -> Self {
         Self {
@@ -53,6 +55,7 @@ where
             genesis: Default::default(),
             subnets: Default::default(),
             nodes: Default::default(),
+            relayers: Default::default(),
         }
     }
 
@@ -430,13 +433,14 @@ where
                 .context("failed to start subnet nodes")?;
         }
 
-        // Interact with the running subnet: fund user accounts. These could be done as pre-funds if the command is available on its own.
+        // Interact with the running subnet .
         {
             let created_subnet = self.subnet(&subnet_name)?;
             let parent_deployment = self.deployment(parent_subnet_name)?;
             let parent_nodes = self.nodes_by_subnet(parent_subnet_name);
 
             // Fund all non-validator balances (which have been passed to join_validator as a pre-fund request).
+            // These could be done as pre-funds if the command is available on its own.
             for (id, b) in &subnet.balances {
                 let account = self
                     .account(id)
@@ -456,9 +460,46 @@ where
                 .await
                 .with_context(|| format!("failed to join with {id} in {subnet_name:?}"))?;
             }
-        }
 
-        // TODO: Create relayers for bottom-up checkpointing.
+            // Create relayers for bottom-up checkpointing.
+            let mut relayers = Vec::<(RelayerName, M::Relayer)>::new();
+            for (id, relayer) in &subnet.relayers {
+                let submitter = self
+                    .account(&relayer.submitter)
+                    .context("invalid relayer")?;
+
+                let follow_node = self
+                    .node(&subnet_name.node(&relayer.follow_node))
+                    .context("invalid follow node")?;
+
+                let submit_node = match (subnet_name.parent(), &relayer.submit_node) {
+                    (Some(p), Some(s)) => Some(self.node(&p.node(s)).context("invalid submit node")?),
+                    (Some(p), None) if p.is_root() => None, // must be an external endpoint
+                    (Some(_), None)  => bail!(
+                        "invalid relayer {id} in {subnet_name:?}: parent is not root, but submit node is missing"
+                    ),
+                    (None, _) => bail!(
+                        "invalid relayer {id} in {subnet_name:?}: there is no parent subnet to relay to"
+                    ),
+                };
+
+                let relayer_name = subnet_name.relayer(id);
+                let relayer = m
+                    .create_relayer(
+                        &relayer_name,
+                        created_subnet,
+                        submitter,
+                        follow_node,
+                        submit_node,
+                        parent_deployment,
+                    )
+                    .await
+                    .context("failed to create relayer")?;
+
+                relayers.push((relayer_name, relayer));
+            }
+            self.relayers.extend(relayers.into_iter());
+        }
 
         // Recursively create and start all subnet nodes.
         for (subnet_id, subnet) in subnet.subnets {
