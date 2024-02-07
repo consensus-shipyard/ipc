@@ -127,24 +127,3 @@ jobs:
           USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
         run: |
           npx hardhat --network local test ./test/ethers.js/ERC20.js
-      - name: 'Run tests: Uniswap -- SKIPPING'
-        if: always()
-        timeout-minutes: 200
-        working-directory: fevm-contract-tests
-        env:
-          DEPLOYER_PRIVATE_KEY: ${{ steps.testnode.outputs.ROOT_PRIVATE_KEY }}
-          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT2_PRIVATE_KEY }}
-          LOCAL_NODE_URL: 'http://127.0.0.1:8545'
-        run: |
-          echo skipping ; #cd ./extern/fevm-uniswap-v3-core && yarn install --frozen-lockfile && yarn compile &&  npx hardhat test test/UniswapV3Pool.spec.ts #  && yarn test
-      - name: 'Run tests: OpenZeppelin -- SKIPPING'
-        if: always()
-        working-directory: fevm-contract-tests
-        env:
-          USER_1_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT1_PRIVATE_KEY }}
-          USER_2_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT2_PRIVATE_KEY }}
-          USER_3_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT3_PRIVATE_KEY }}
-          USER_4_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT4_PRIVATE_KEY }}
-          USER_5_PRIVATE_KEY: ${{ steps.accounts.outputs.ACCOUNT5_PRIVATE_KEY }}
-        run: |
-          echo skipping ; #cd ./extern/openzeppelin-contracts/ && yarn && mkdir gasreport && npx hardhat --network itest test
