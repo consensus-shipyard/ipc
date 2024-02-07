@@ -34,12 +34,19 @@ use crate::{manifest::Balance, AccountName, NodeName, RelayerName, SubnetName};
 /// know.
 #[async_trait]
 pub trait Materializer {
-    type Deployment;
-    type Account;
-    type Genesis;
-    type Subnet;
-    type Node;
-    type Relayer;
+    /// Capture where the IPC stack (the gateway and the registry) has been deployed on a subnet.
+    /// These are the details which normally go into the `ipc-cli` configuration files.
+    type Deployment: Sync + Send;
+    /// Represents an account identity, typically a key-value pair.
+    type Account: Ord + Sync + Send;
+    /// Represents the genesis.json file (can be a file location, or a model).
+    type Genesis: Sync + Send;
+    /// The address of a dynamically created subnet.
+    type Subnet: Sync + Send;
+    /// The handle to a node; could be a (set of) docker container(s) or remote addresses.
+    type Node: Sync + Send;
+    /// The handle to a relayer process.
+    type Relayer: Sync + Send;
 
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
     fn create_account(&mut self, account_name: &AccountName) -> Self::Account;

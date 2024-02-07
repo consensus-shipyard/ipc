@@ -41,12 +41,6 @@ pub struct Testnet<M: Materializer> {
 impl<M> Default for Testnet<M>
 where
     M: Materializer + Sync + Send,
-    M::Account: Ord + Sync + Send,
-    M::Genesis: Clone + Sync + Send,
-    M::Deployment: Sync + Send,
-    M::Subnet: Sync + Send,
-    M::Node: Sync + Send,
-    M::Relayer: Sync + Send,
 {
     fn default() -> Self {
         Self::new()
@@ -56,12 +50,6 @@ where
 impl<M> Testnet<M>
 where
     M: Materializer + Sync + Send,
-    M::Account: Ord + Sync + Send,
-    M::Genesis: Clone + Sync + Send,
-    M::Deployment: Sync + Send,
-    M::Subnet: Sync + Send,
-    M::Node: Sync + Send,
-    M::Relayer: Sync + Send,
 {
     pub fn new() -> Self {
         Self {
