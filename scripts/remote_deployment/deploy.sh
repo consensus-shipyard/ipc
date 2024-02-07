@@ -10,6 +10,7 @@
 set -euxo pipefail
 
 # TODO: 然后充分调试完毕了，修完了所有其他review comments后，换成每次运行都创建新的subnet
+# TODO: 每次运行都创建新的subnet成功了，再换成每次运行都deploy新的contract
 
 PREFIX='------'
 IPC_FOLDER=${HOME}/ipc
@@ -182,7 +183,6 @@ echo "$PREFIX Start the first validator node as bootstrap"
 cd ${IPC_FOLDER}
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
-    -e SUBNET_ID=${subnet_id} \
     child-validator-down
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
@@ -213,7 +213,6 @@ for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \
-      -e SUBNET_ID=${subnet_id} \
       -e FM_PULL_SKIP=1 \
       child-validator-down
   cargo make --makefile infra/fendermint/Makefile.toml \
