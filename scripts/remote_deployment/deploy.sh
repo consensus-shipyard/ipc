@@ -236,3 +236,17 @@ do
       -e FM_PULL_SKIP=1 \
       child-validator
 done
+
+# Step 7.6: Test ETH API endpoint
+echo "$PREFIX Test ETH API endpoints of validator nodes"
+for i in {0..2}
+do
+  curl --location http://localhost:${ETHAPI_HOST_PORTS[i]} \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "jsonrpc":"2.0",
+    "method":"eth_blockNumber",
+    "params":[],
+    "id":83
+  }'
+done
