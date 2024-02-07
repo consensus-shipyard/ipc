@@ -6,12 +6,12 @@ import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 
 /// @notice Helpers to deal with a supply source.
 contract SupplySourceHelperMock {
-    function functionCallWithERC20Value(
+    function performCall(
         SupplySource memory supplySource,
-        address target,
+        address payable target,
         bytes memory data,
         uint256 value
     ) public returns (bool success, bytes memory ret) {
-        return SupplySourceHelper.functionCallWithERC20Value(supplySource, target, data, value);
+        return SupplySourceHelper.performCall(supplySource, target, data, value);
     }
 }

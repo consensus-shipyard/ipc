@@ -120,11 +120,12 @@ library SupplySourceHelper {
             // Perform the call only if the ERC20 was successful.
             (success, ret) = functionCallWithValue(target, data, 0);
         }
-        
+
         if (!success) {
             // following the implementation of `openzeppelin-contracts/utils/Address.sol`
             assembly {
                 let returndata_size := mload(ret)
+                // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
                 revert(add(32, ret), returndata_size)
             }
         }

@@ -2924,10 +2924,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_infra"
-version = "0.1.0"
-
-[[package]]
 name = "fendermint_rocksdb"
 version = "0.1.0"
 dependencies = [
