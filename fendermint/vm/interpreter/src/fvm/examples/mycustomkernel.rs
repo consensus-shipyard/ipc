@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use fvm::call_manager::CallManager;
 use fvm::gas::Gas;
-use fvm::kernel::filecoin::{DefaultFilecoinKernel, FilecoinKernel};
 use fvm::kernel::prelude::*;
 use fvm::kernel::Result;
 use fvm::kernel::{
@@ -10,13 +9,9 @@ use fvm::kernel::{
     SelfOps, SendOps, SyscallHandler, UpgradeOps,
 };
 use fvm::syscalls::Linker;
+use fvm::DefaultKernel;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::consensus::ConsensusFault;
-use fvm_shared::piece::PieceInfo;
 use fvm_shared::randomness::RANDOMNESS_LENGTH;
-use fvm_shared::sector::{
-    AggregateSealVerifyProofAndInfos, RegisteredSealProof, ReplicaUpdateInfo, SealVerifyInfo,
-};
 use fvm_shared::sys::out::network::NetworkContext;
 use fvm_shared::sys::out::vm::MessageContext;
 use fvm_shared::{address::Address, econ::TokenAmount, ActorID, MethodNum};
@@ -42,33 +37,24 @@ pub trait CustomKernel: Kernel {
 #[delegate(SelfOps, where = "C: CallManager")]
 #[delegate(SendOps<K>, generics = "K", where = "K: CustomKernel")]
 #[delegate(UpgradeOps<K>, generics = "K", where = "K: CustomKernel")]
-pub struct DefaultCustomKernel<C>(pub DefaultFilecoinKernel<C>);
+pub struct CustomKernelImpl<C>(pub DefaultKernel<C>);
 
-impl<C> CustomKernel for DefaultCustomKernel<C>
+impl<C> CustomKernel for CustomKernelImpl<C>
 where
     C: CallManager,
-    DefaultCustomKernel<C>: Kernel,
+    CustomKernelImpl<C>: Kernel,
 {
     fn my_custom_syscall(&self, doubleme: i32) -> Result<i32> {
         Ok(doubleme * 2)
     }
 }
 
-impl<C> DefaultCustomKernel<C>
-where
-    C: CallManager,
-{
-    fn price_list(&self) -> &PriceList {
-        (self.0).0.call_manager.price_list()
-    }
-}
-
-impl<C> Kernel for DefaultCustomKernel<C>
+impl<C> Kernel for CustomKernelImpl<C>
 where
     C: CallManager,
 {
     type CallManager = C;
-    type Limiter = <DefaultFilecoinKernel<C> as Kernel>::Limiter;
+    type Limiter = <DefaultKernel<C> as Kernel>::Limiter;
 
     fn into_inner(self) -> (Self::CallManager, BlockRegistry)
     where
@@ -86,7 +72,7 @@ where
         value_received: TokenAmount,
         read_only: bool,
     ) -> Self {
-        DefaultCustomKernel(DefaultFilecoinKernel::new(
+        CustomKernelImpl(DefaultKernel::new(
             mgr,
             blocks,
             caller,
@@ -114,64 +100,9 @@ where
     }
 }
 
-impl<C> FilecoinKernel for DefaultCustomKernel<C>
-where
-    C: CallManager,
-{
-    fn compute_unsealed_sector_cid(
-        &self,
-        proof_type: RegisteredSealProof,
-        pieces: &[PieceInfo],
-    ) -> Result<Cid> {
-        self.0.compute_unsealed_sector_cid(proof_type, pieces)
-    }
-
-    fn verify_post(&self, verify_info: &fvm_shared::sector::WindowPoStVerifyInfo) -> Result<bool> {
-        self.0.verify_post(verify_info)
-    }
-
-    // NOT forwarded
-    fn batch_verify_seals(&self, vis: &[SealVerifyInfo]) -> Result<Vec<bool>> {
-        Ok(vec![true; vis.len()])
-    }
-
-    // NOT forwarded
-    fn verify_consensus_fault(
-        &self,
-        h1: &[u8],
-        h2: &[u8],
-        extra: &[u8],
-    ) -> Result<Option<ConsensusFault>> {
-        let charge = self
-            .price_list()
-            .on_verify_consensus_fault(h1.len(), h2.len(), extra.len());
-        let _ = self.charge_gas(&charge.name, charge.total())?;
-        Ok(None)
-    }
-
-    // NOT forwarded
-    fn verify_aggregate_seals(&self, agg: &AggregateSealVerifyProofAndInfos) -> Result<bool> {
-        let charge = self.price_list().on_verify_aggregate_seals(agg);
-        let _ = self.charge_gas(&charge.name, charge.total())?;
-        Ok(true)
-    }
-
-    // NOT forwarded
-    fn verify_replica_update(&self, rep: &ReplicaUpdateInfo) -> Result<bool> {
-        let charge = self.price_list().on_verify_replica_update(rep);
-        let _ = self.charge_gas(&charge.name, charge.total())?;
-        Ok(true)
-    }
-
-    fn total_fil_circ_supply(&self) -> Result<TokenAmount> {
-        self.0.total_fil_circ_supply()
-    }
-}
-
-impl<K> SyscallHandler<K> for DefaultCustomKernel<K::CallManager>
+impl<K> SyscallHandler<K> for CustomKernelImpl<K::CallManager>
 where
     K: CustomKernel
-        + FilecoinKernel
         + ActorOps
         + SendOps
         + UpgradeOps
@@ -185,7 +116,7 @@ where
         + SelfOps,
 {
     fn link_syscalls(linker: &mut Linker<K>) -> anyhow::Result<()> {
-        DefaultFilecoinKernel::<K::CallManager>::link_syscalls(linker)?;
+        DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
 
         linker.link_syscall("my_custom_kernel", "my_custom_syscall", my_custom_syscall)?;
 
