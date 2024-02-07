@@ -7,11 +7,10 @@
 # 1. Need to previously manual enable sudo without password on the host
 # 2. You may need to rerun the script after docker installation for the first time
 
-# Exit on any error
-set -e
+set -euxo pipefail
 
-# Print commands as we execute
-set -x
+# TODO: OK，下一步是要解决如何处理private key的问题
+# TODO: 然后充分调试完毕了，修完了所有其他review comments后，换成每次运行都创建新的subnet
 
 PREFIX='------'
 IPC_FOLDER=${HOME}/ipc
