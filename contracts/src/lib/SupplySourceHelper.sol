@@ -130,6 +130,8 @@ library SupplySourceHelper {
                     revert(add(32, ret), returndata_size)
                 }
             }
+            // disable solhint as the failing call does not have return data as well.
+            /* solhint-disable reason-string */
             revert();
         }
         return (success, ret);
