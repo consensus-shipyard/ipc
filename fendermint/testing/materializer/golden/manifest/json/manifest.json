@@ -1,18 +1,88 @@
 {
   "accounts": {
-    "BtgoGBYW": {},
-    "qOCrI": {},
-    "xuS": {}
+    "PShFUR": {},
+    "d5AN8e": {},
+    "hxUxM_5u": {}
   },
   "rootnet": {
-    "External": {
-      "deployment": {
-        "Existing": {
-          "gateway": "f417685276786155867578ftp72alc2ehv5vvuqf7aq",
-          "registry": "f1zixzcwxwtmhgxv77cregrzmk7yauunur7zuexzy"
+    "New": {
+      "validators": {
+        "PShFUR": "3853900006602896711",
+        "d5AN8e": "2748084681763708464"
+      },
+      "balances": {
+        "PShFUR": "100000000000000000000",
+        "d5AN8e": "100000000000000000000",
+        "hxUxM_5u": "100000000000000000000"
+      },
+      "nodes": {
+        "XxkpyKK": {
+          "mode": {
+            "Validator": "d5AN8e"
+          },
+          "ethapi": true,
+          "seed_nodes": [
+            "ipMUs_15"
+          ],
+          "parent_node": null
+        },
+        "ipMUs_15": {
+          "mode": {
+            "Validator": "PShFUR"
+          },
+          "ethapi": false,
+          "seed_nodes": [],
+          "parent_node": null
         }
       }
     }
   },
-  "subnets": {}
+  "subnets": {
+    "TcBrdk": {
+      "creator": "hxUxM_5u",
+      "validators": {
+        "PShFUR": "3508197497935748119",
+        "d5AN8e": "2220733379767839375"
+      },
+      "balances": {},
+      "nodes": {
+        "G2k": {
+          "mode": {
+            "Validator": "PShFUR"
+          },
+          "ethapi": false,
+          "seed_nodes": [],
+          "parent_node": "ipMUs_15"
+        },
+        "R8B": {
+          "mode": {
+            "Validator": "d5AN8e"
+          },
+          "ethapi": true,
+          "seed_nodes": [
+            "G2k"
+          ],
+          "parent_node": "ipMUs_15"
+        }
+      },
+      "relayers": {
+        "QwlTv": {
+          "submitter": "PShFUR",
+          "follow_node": "G2k",
+          "submit_node": "XxkpyKK"
+        },
+        "jNhrWGZ": {
+          "submitter": "PShFUR",
+          "follow_node": "G2k",
+          "submit_node": "ipMUs_15"
+        },
+        "sfui": {
+          "submitter": "PShFUR",
+          "follow_node": "G2k",
+          "submit_node": "ipMUs_15"
+        }
+      },
+      "subnets": {}
+    }
+  }
 }

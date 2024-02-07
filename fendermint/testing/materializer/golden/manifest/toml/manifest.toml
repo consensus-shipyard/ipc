@@ -1,12 +1,133 @@
-[accounts.AVvbqXaA]
+[accounts.My2Bn2XY]
 
-[accounts.R4A]
+[accounts.OK5OS6]
 
-[accounts.SE0Xt]
+[accounts.Z66]
 
-[accounts.WO-Qp]
+[accounts.wk8j]
 
-[rootnet.External.deployment.New]
-deployer = "AVvbqXaA"
+[accounts.z_MP]
 
-[subnets]
+[rootnet.External.deployment.Existing]
+gateway = "f2ox74e6yb35xeeap7vy7vkaiqq2etx2owhjqrq7i"
+registry = "f04763548530978817060"
+
+[subnets.IAYNV]
+creator = "wk8j"
+
+[subnets.IAYNV.validators]
+My2Bn2XY = "2707702711287191077"
+OK5OS6 = "3852920720991473586"
+
+[subnets.IAYNV.balances]
+My2Bn2XY = "3493478323243188078"
+
+[subnets.IAYNV.nodes.1ah]
+ethapi = true
+seed_nodes = ["yB-S9cL"]
+
+[subnets.IAYNV.nodes.1ah.mode]
+Validator = "OK5OS6"
+
+[subnets.IAYNV.nodes.yB-S9cL]
+ethapi = true
+seed_nodes = []
+
+[subnets.IAYNV.nodes.yB-S9cL.mode]
+Validator = "My2Bn2XY"
+
+[subnets.IAYNV.relayers.APf86S]
+submitter = "z_MP"
+follow_node = "yB-S9cL"
+
+[subnets.IAYNV.relayers.EZi]
+submitter = "Z66"
+follow_node = "yB-S9cL"
+
+[subnets.IAYNV.relayers.xZ6e]
+submitter = "z_MP"
+follow_node = "yB-S9cL"
+
+[subnets.IAYNV.subnets.QWa]
+creator = "wk8j"
+
+[subnets.IAYNV.subnets.QWa.validators]
+Z66 = "4236981000069240434"
+
+[subnets.IAYNV.subnets.QWa.balances]
+My2Bn2XY = "1202162200411464376"
+Z66 = "9546683962838727507"
+wk8j = "9375844996493256003"
+z_MP = "9268892939970378289"
+
+[subnets.IAYNV.subnets.QWa.nodes.apy]
+ethapi = true
+seed_nodes = []
+parent_node = "1ah"
+
+[subnets.IAYNV.subnets.QWa.nodes.apy.mode]
+Validator = "Z66"
+
+[subnets.IAYNV.subnets.QWa.relayers.4l34xA]
+submitter = "My2Bn2XY"
+follow_node = "apy"
+submit_node = "1ah"
+
+[subnets.IAYNV.subnets.QWa.relayers.Axj_H]
+submitter = "Z66"
+follow_node = "apy"
+submit_node = "yB-S9cL"
+
+[subnets.IAYNV.subnets.QWa.subnets]
+
+[subnets.IAYNV.subnets.m9A]
+creator = "Z66"
+
+[subnets.IAYNV.subnets.m9A.validators]
+My2Bn2XY = "5082134360188716126"
+OK5OS6 = "3189320645764665839"
+z_MP = "7566325354090729327"
+
+[subnets.IAYNV.subnets.m9A.balances]
+My2Bn2XY = "8221003037829503961"
+
+[subnets.IAYNV.subnets.m9A.nodes.BLX1O_]
+ethapi = true
+seed_nodes = ["rod2q"]
+parent_node = "yB-S9cL"
+
+[subnets.IAYNV.subnets.m9A.nodes.BLX1O_.mode]
+Validator = "z_MP"
+
+[subnets.IAYNV.subnets.m9A.nodes.n1ZztNeA]
+ethapi = false
+seed_nodes = ["rod2q"]
+parent_node = "yB-S9cL"
+
+[subnets.IAYNV.subnets.m9A.nodes.n1ZztNeA.mode]
+Validator = "OK5OS6"
+
+[subnets.IAYNV.subnets.m9A.nodes.rod2q]
+ethapi = true
+seed_nodes = []
+parent_node = "1ah"
+
+[subnets.IAYNV.subnets.m9A.nodes.rod2q.mode]
+Validator = "My2Bn2XY"
+
+[subnets.IAYNV.subnets.m9A.relayers.2kr]
+submitter = "z_MP"
+follow_node = "rod2q"
+submit_node = "yB-S9cL"
+
+[subnets.IAYNV.subnets.m9A.relayers.S4sA_BU2]
+submitter = "Z66"
+follow_node = "rod2q"
+submit_node = "1ah"
+
+[subnets.IAYNV.subnets.m9A.relayers.qPXEeOW]
+submitter = "z_MP"
+follow_node = "BLX1O_"
+submit_node = "yB-S9cL"
+
+[subnets.IAYNV.subnets.m9A.subnets]
