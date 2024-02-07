@@ -96,8 +96,10 @@ else
   docker ps
 fi
 
-# Make sure we re-read the latest env before finishing dependency instalation.
+# Make sure we re-read the latest env before finishing dependency installation.
+set +u
 source ${HOME}/.bashrc
+set -u
 
 # Step 2: Prepare code repo and build ipc-cli
 echo "$PREFIX Preparing ipc repo..."
