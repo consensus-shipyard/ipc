@@ -463,6 +463,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         USDCTest testUSDC = new USDCTest();
         testUSDC.mint(transferAmount);
         address testUSDCOwner = testUSDC.owner();
+        require(testUSDCOwner == address(this), "unexpected owner");
         require(transferAmount == testUSDC.balanceOf(testUSDCOwner), "unexpected transferAmount");
 
         subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(testUSDC), rootSubnetName);
