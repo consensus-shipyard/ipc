@@ -1,0 +1,26 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: https://802939:glc_eyJvIjoiMTA0NTcyMCIsIm4iOiJzdGFjay04NDg0ODQtaGwtd3JpdGUtbG9jYWx0ZXN0aW5nIiwiayI6IjB1MWNHOTMxVHRXQzJpTVR5cTczMUs3ViIsIm0iOnsiciI6InByb2QtZXUtd2VzdC0yIn19@logs-prod-012.grafana.net/loki/api/v1/push
+
+scrape_configs:
+  - job_name: flog_scrape
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      - action: replace
+        source_labels:
+          - __meta_docker_container_name
+        target_label: docker_container_stdout
+  - job_name: fendermint_job
+    static_configs:
+      - targets:
+        - localhost
+      - labels:
+          job: fendermint_label
+          __path__: /var/log/fendermint/*.log

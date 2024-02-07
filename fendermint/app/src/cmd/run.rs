@@ -56,6 +56,8 @@ namespaces! {
 ///
 /// This method acts as our composition root.
 async fn run(settings: Settings) -> anyhow::Result<()> {
+    println!("Starting fendermint, opts: {:?}", settings);
+
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
