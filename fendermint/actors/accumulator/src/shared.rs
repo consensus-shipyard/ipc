@@ -110,6 +110,11 @@ impl State {
         bag_peaks(&amt)
     }
 
+    pub fn get_root<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Cid> {
+        let amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
+        bag_peaks(&amt)
+    }
+
     pub fn get_peaks<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Cid>> {
         let amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
         let mut peaks = Vec::new();
@@ -119,11 +124,6 @@ impl State {
         })?;
         Ok(peaks)
     }
-
-    pub fn bag_peaks<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Cid> {
-        let amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
-        bag_peaks(&amt)
-    }
 }
 
 pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
@@ -132,9 +132,10 @@ pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    Append = frc42_dispatch::method_hash!("Append"),
-    GetRoot = frc42_dispatch::method_hash!("GetRoot"),
-    BagPeaks = frc42_dispatch::method_hash!("BagPeaks"),
+    Push = frc42_dispatch::method_hash!("Push"),
+    Root = frc42_dispatch::method_hash!("Root"),
+    Peaks = frc42_dispatch::method_hash!("Peaks"),
+    Count = frc42_dispatch::method_hash!("Count"),
 }
 
 #[cfg(test)]
@@ -201,7 +202,7 @@ mod tests {
         let peaks = state.get_peaks(&store).unwrap();
         assert_eq!(peaks.len(), 3);
         assert_eq!(state.leaf_count, 11);
-        let root = state.bag_peaks(&store);
+        let root = state.get_root(&store);
         assert!(root.is_ok());
         assert_eq!(
             root.unwrap(),

@@ -2992,6 +2992,7 @@ dependencies = [
  "cid",
  "clap 4.4.14",
  "ethers",
+ "fendermint_actor_accumulator",
  "fendermint_actor_objectstore",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",

@@ -43,9 +43,12 @@ impl Actor {
         })
     }
 
-    fn get_count(rt: &impl Runtime) -> Result<u64, ActorError> {
+    fn get_root(rt: &impl Runtime) -> Result<Cid, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state().map(|st| st.leaf_count)
+        rt.state().map(|st| {
+            st.get_root(rt.store())
+                .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to bag peaks"))
+        })
     }
 
     fn get_peaks(rt: &impl Runtime) -> Result<Vec<Cid>, ActorError> {
@@ -56,12 +59,9 @@ impl Actor {
         })
     }
 
-    fn bag_peaks(rt: &impl Runtime) -> Result<Cid, ActorError> {
+    fn get_count(rt: &impl Runtime) -> Result<u64, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state().map(|st| {
-            st.bag_peaks(rt.store())
-                .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to bag peaks"))
-        })
+        rt.state().map(|st| st.leaf_count)
     }
 }
 
@@ -69,15 +69,14 @@ impl ActorCode for Actor {
     type Methods = Method;
 
     fn name() -> &'static str {
-        OBJECTSTORE_ACTOR_NAME
+        ACCUMULATOR_ACTOR_NAME_ACTOR_NAME
     }
 
     actor_dispatch! {
         Constructor => constructor,
-        PutObject => put_object,
-        AppendObject => append_object,
-        DeleteObject => delete_object,
-        GetObject => get_object,
-        ListObjects => list_objects,
+        Push => push,
+        Root => get_root,
+        Peaks => get_peaks,
+        Count => get_count,
     }
 }
