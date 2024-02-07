@@ -133,6 +133,7 @@ echo "Default wallet address: $default_wallet_address"
 
 # Step 4: Deploy IPC contracts to parent net (calibration net)
 cd ${IPC_FOLDER}/contracts
+npm install
 deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
 
 parent_gateway_address=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
