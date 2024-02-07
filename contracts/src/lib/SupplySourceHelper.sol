@@ -165,7 +165,6 @@ library SupplySourceHelper {
      */
     function sendValue(address payable recipient, uint256 amount) internal returns (bool) {
         require(address(this).balance >= amount, "insufficient balance");
-
         (bool success, ) = recipient.call{value: amount}("");
         return success;
     }

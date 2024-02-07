@@ -26,8 +26,8 @@ rustup target add wasm32-unknown-unknown
 sudo usermod -aG docker $USER && newgrp docker
 
 # clone this repo and build
-git clone https://github.com/consensus-shipyard/ipc-monorepo.git
-cd ipc-monorepo
+git clone https://github.com/consensus-shipyard/ipc.git
+cd ipc
 cargo build --release
 
 # building will generate the following binaries
