@@ -14,7 +14,6 @@ library SupplySourceHelper {
     error InvalidERC20Address();
     error UnexpectedSupplySource();
     error UnknownSupplySource();
-    error FailedInnerCall();
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
@@ -131,7 +130,7 @@ library SupplySourceHelper {
                     revert(add(32, ret), returndata_size)
                 }
             }
-            revert FailedInnerCall();
+            revert();
         }
         return (success, ret);
     }

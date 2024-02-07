@@ -34,7 +34,7 @@ contract SupplySourceHelperTest is Test {
 
         bytes memory params = bytes("hello");
 
-        vm.expectRevert(SupplySourceHelper.FailedInnerCall.selector);
+        vm.expectRevert();
         mock.performCall(source, payable(address(this)), params, 100);
 
         require(token.balanceOf(address(mock)) == balance, "invalid balance");
