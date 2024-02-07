@@ -41,6 +41,9 @@ pub trait Materializer {
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
     fn create_account(&mut self, account_name: AccountName) -> Self::Account;
 
+    /// Fund an account on the rootnet from the faucet.
+    async fn fund_from_faucet(&mut self, account: &Self::Account) -> anyhow::Result<()>;
+
     /// Deploy the IPC contracts onto the rootnet.
     ///
     /// This is assumed to be used with external subnets, with the API address

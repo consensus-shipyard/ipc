@@ -14,7 +14,18 @@ use crate::{
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
-/// necessary to instantiate it with the help of the materializer.
+/// necessary to instantiate it with the help of the [Materializer].
+///
+/// The `Testnet` data structure itself acts as an indexer over the
+/// resources created by the [Materializer]. It owns them, and by
+/// doing so controls their life cycle. By dropping the `Testnet`
+/// or various components from it we are able to free resources.
+///
+/// Arguably the same could be achieved by keeping the created
+/// resources inside the [Materializer] and discarding that as
+/// a whole, keeping the `Testnet` completely stateless, but
+/// perhaps this way writing a [Materializer] is just a tiny
+/// bit simpler.
 pub struct Testnet<M: Materializer> {
     accounts: BTreeMap<AccountId, M::Account>,
     nodes: BTreeMap<NodeName, M::Node>,
@@ -43,20 +54,27 @@ where
         let mut t = Self::new();
         let root_name = SubnetName::root();
 
+        // Create keys for accounts.
         for (account_id, _) in manifest.accounts {
             t.create_account(m, account_id)
         }
 
+        // Create the rootnet.
         match manifest.rootnet {
-            Rootnet::External {
-                deployment: IpcDeployment::New { deployer },
-            } => {
-                t.deploy_root_ipc(m, deployer).await?;
-            }
-            Rootnet::External {
-                deployment: IpcDeployment::Existing { gateway, registry },
-            } => {
-                m.set_root_ipc(gateway, registry).await?;
+            Rootnet::External { deployment } => {
+                // Establish root contract locations.
+                match deployment {
+                    IpcDeployment::New { deployer } => {
+                        t.deploy_root_ipc(m, deployer).await?;
+                    }
+                    IpcDeployment::Existing { gateway, registry } => {
+                        m.set_root_ipc(gateway, registry).await?;
+                    }
+                }
+                // Establish balances.
+                for a in t.accounts.values() {
+                    m.fund_from_faucet(a).await.context("faucet failed")?;
+                }
             }
             Rootnet::New {
                 validators,
