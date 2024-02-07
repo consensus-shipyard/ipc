@@ -518,11 +518,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             "incorrect proxy token balance"
         );
 
-        console.log("--------------- withdraw token (top-down)---------------");
+        console.log("--------------- withdraw token (bottom-up)---------------");
+
+        //ensure that USDC owner has 0 tokens
+        assertEq(0, testUSDC.balanceOf(testUSDCOwner));
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(testUSDCOwner));
-        IpcEnvelope memory committed = subnetTokenBridge.withdrawTokens{value: DEFAULT_CROSS_MSG_FEE}(
+        expected = subnetTokenBridge.withdrawTokens{value: DEFAULT_CROSS_MSG_FEE}(
             testUSDCOwner,
             transferAmount
         );
@@ -536,6 +539,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         checkpoint = callCreateBottomUpCheckpointFromChildSubnet(tokenSubnetName, address(tokenSubnetGateway));
 
         callSubmitCheckpointFromParentSubnet(checkpoint, address(rootTokenSubnetActor));
+
+        msgs[0] = expected;
+
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         //ensure that usdc tokens are returned on root net
         assertEq(transferAmount, testUSDC.balanceOf(testUSDCOwner));
