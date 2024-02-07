@@ -370,36 +370,24 @@ where
                 let fund_deployment = self.deployment(fund_source)?;
                 let fund_subnet = self.subnet(fund_target)?;
 
-                for (id, amount) in &subnet.validators {
+                let cs = subnet
+                    .validators
+                    .iter()
+                    .map(|(id, c)| ("validator", id, c.0.clone()));
+
+                let bs = subnet
+                    .balances
+                    .iter()
+                    .map(|(id, b)| ("balance", id, b.0.clone()));
+
+                for (label, id, amount) in cs.chain(bs) {
                     let account = self
                         .account(id)
-                        .with_context(|| format!("invalid validator in {subnet_name:?}"))?;
+                        .with_context(|| format!("invalid {label} in {subnet_name:?}"))?;
 
-                    m.fund_subnet(
-                        account,
-                        fund_subnet,
-                        amount.0.clone(),
-                        &fund_nodes,
-                        fund_deployment,
-                    )
-                    .await
-                    .with_context(|| format!("failed to fund {id} in {fund_target:?}"))?;
-                }
-
-                for (id, amount) in &subnet.balances {
-                    let account = self
-                        .account(id)
-                        .with_context(|| format!("invalid account in {subnet_name:?}"))?;
-
-                    m.fund_subnet(
-                        account,
-                        fund_subnet,
-                        amount.0.clone(),
-                        &fund_nodes,
-                        fund_deployment,
-                    )
-                    .await
-                    .with_context(|| format!("failed to fund {id} in {fund_target:?}"))?;
+                    m.fund_subnet(account, fund_subnet, amount, &fund_nodes, fund_deployment)
+                        .await
+                        .with_context(|| format!("failed to fund {id} in {fund_target:?}"))?;
                 }
             }
 
@@ -447,7 +435,7 @@ where
             for (id, b) in &subnet.balances {
                 let account = self
                     .account(id)
-                    .with_context(|| format!("invalid validator in {subnet_name:?}"))?;
+                    .with_context(|| format!("invalid balance in {subnet_name:?}"))?;
 
                 if subnet.validators.contains_key(id) {
                     continue;
