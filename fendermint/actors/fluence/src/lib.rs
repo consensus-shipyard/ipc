@@ -1,9 +1,8 @@
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::error::ExitCode;
-use fvm_shared::{MethodNum, METHOD_CONSTRUCTOR};
+use fvm_shared::MethodNum;
 use num_derive::FromPrimitive;
 
-use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::{actor_dispatch, FIRST_EXPORTED_METHOD_NUMBER};
 use fil_actors_runtime::{actor_error, ActorError};
@@ -14,7 +13,7 @@ use crate::types::RandomXResult;
 pub mod types;
 
 pub const FLUENCE_ACTOR_NAME: &str = "fluence";
-const SYSCALL_FAILED_EXIT_CODE: u32 = 0x31337;
+const SYSCALL_FAILED_EXIT_CODE: u32 = 0x10000000;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(FluenceActor);

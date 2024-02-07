@@ -210,7 +210,7 @@ tendermint-proto = { version = "0.31" }
 
 # Fluence
 fluence-actor-sdk = { version = "0.1.2" }
-fluence-fendermint-syscall = { version = "0.1.2" }
+fluence-fendermint-syscall = { version = "0.1.4" }
 
 [patch.crates-io]
 # Use stable-only features.

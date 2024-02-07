@@ -1271,6 +1271,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 
 [[package]]
+name = "cmake"
+version = "0.1.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a31c789563b815f77f4250caee12365734369f942439b7defd71e18a48197130"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "coarsetime"
 version = "0.1.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3509,14 +3518,15 @@ checksum = "8c7abd8c356076d225ab5f285b00687a3a1ea5a4eee44624593d36c6e29c8aff"
 
 [[package]]
 name = "fluence-fendermint-syscall"
-version = "0.1.2"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43f52ded4f130348e30bdf1c9b489061cc147dc45684c68743f5b9b66cdc5cd4"
+checksum = "77592a19c5f274280e473bc3fa8a3fa3743253336cf017fac69d880a47c712c2"
 dependencies = [
  "fluence-fendermint-shared",
  "fvm",
  "fvm_shared",
- "randomx-rs",
+ "num-traits",
+ "randomx-rust-wrapper",
 ]
 
 [[package]]
@@ -7460,12 +7470,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "randomx-rs"
-version = "1.3.0"
+name = "randomx-rust-wrapper"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14fb999f322669968fd0e80aeca5cb91e7a817a94ebf2b0fcd345a4a7c695203"
+checksum = "1cc1be83003e0f795a88e57684fd0dbb9f6321c186c70f56a013f5e03a48afa5"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.4.2",
+ "cmake",
  "libc",
  "thiserror",
 ]
