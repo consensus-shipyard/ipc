@@ -39,7 +39,7 @@ jobs:
           script: rm -rf /home/ubuntu/.ipc && cp -r /home/ubuntu/scripts/remote_deployment/.ipc /home/ubuntu/
       - name: Create wallet file locally
         run: |
-          echo "${{ secrets.CI_TEST_WALLET_JSON }}" > evm_keystore.json
+          echo '${{ secrets.CI_TEST_WALLET_JSON }}' > evm_keystore.json
       - name: Copy wallet file to the host
         uses: appleboy/scp-action@v0.1.7
         with:
