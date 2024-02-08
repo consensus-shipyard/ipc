@@ -1,6 +1,7 @@
 #!/bin/bash
 # Upgrades IPC Subnet Registry Diamond Facets on an EVM-compatible subnet using hardhat
-set -e
+set -eu
+set -o pipefail
 
 if [ $# -ne 1 ]
 then

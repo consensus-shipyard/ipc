@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eu
+set -o pipefail
 
 # checks if there are changes in rust binding
 if [[ `git status ./binding --porcelain` ]]; then 

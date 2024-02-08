@@ -23,11 +23,11 @@ impl CommandLineHandler for Propagate {
 #[derive(Debug, Args)]
 #[command(about = "Propagate operation in the gateway actor")]
 pub(crate) struct PropagateArgs {
-    #[arg(long, short, help = "The JSON RPC server url for ipc agent")]
+    #[arg(long, help = "The JSON RPC server url for ipc agent")]
     pub ipc_agent_url: Option<String>,
-    #[arg(long, short, help = "The address that pays for the propagation gas")]
+    #[arg(long, help = "The address that pays for the propagation gas")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet of the message to propagate")]
+    #[arg(long, help = "The subnet of the message to propagate")]
     pub subnet: String,
     #[arg(help = "The message cid to propagate")]
     pub postbox_msg_key: String,

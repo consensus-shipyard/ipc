@@ -33,8 +33,8 @@ impl CommandLineHandler for KillSubnet {
 #[derive(Debug, Args)]
 #[command(name = "kill", about = "Kill an existing subnet")]
 pub struct KillSubnetArgs {
-    #[arg(long, short, help = "The address that kills the subnet")]
+    #[arg(long, help = "The address that kills the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to kill")]
+    #[arg(long, help = "The subnet to kill")]
     pub subnet: String,
 }
