@@ -21,7 +21,7 @@ use cid::Cid;
 
 // we define a single custom syscall which simply doubles the input
 pub trait CustomKernel: Kernel {
-    fn my_custom_syscall(&self, doubleme: i32) -> Result<i32>;
+    fn my_custom_syscall(&self) -> Result<u64>;
 }
 
 // our custom kernel extends the filecoin kernel
@@ -44,8 +44,17 @@ where
     C: CallManager,
     CustomKernelImpl<C>: Kernel,
 {
-    fn my_custom_syscall(&self, doubleme: i32) -> Result<i32> {
-        Ok(doubleme * 2)
+    fn my_custom_syscall(&self) -> Result<u64> {
+        // Here we have access to the Kernel structure and can call
+        // any of its methods, send messages, etc.
+
+        // We can also run an external program, link to any rust library
+        // access the network, etc.
+
+        // In this example, lets access the file system and return
+        // the number of paths in /
+        let paths = std::fs::read_dir("/").unwrap();
+        Ok(paths.count() as u64)
     }
 }
 
@@ -124,9 +133,6 @@ where
     }
 }
 
-pub fn my_custom_syscall(
-    context: fvm::syscalls::Context<'_, impl CustomKernel>,
-    doubleme: i32,
-) -> Result<i32> {
-    context.kernel.my_custom_syscall(doubleme)
+pub fn my_custom_syscall(context: fvm::syscalls::Context<'_, impl CustomKernel>) -> Result<u64> {
+    context.kernel.my_custom_syscall()
 }
