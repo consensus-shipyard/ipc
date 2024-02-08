@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
+use cid::Cid;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm, objectstore};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
@@ -111,13 +112,15 @@ impl MessageFactory {
     pub fn datarepo_put(
         &mut self,
         key: String,
-        content: Bytes,
+        content: Vec<Cid>,
+        file_name: String,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
             key: key.into_bytes(),
-            content: content.to_vec(),
+            content,
+            file: file_name,
         };
         let params = RawBytes::serialize(&input)?;
         let message = self.transaction(
@@ -134,13 +137,15 @@ impl MessageFactory {
     pub fn datarepo_append(
         &mut self,
         key: String,
-        content: Bytes,
+        content: Vec<Cid>,
+        file_name: String,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
             key: key.into_bytes(),
-            content: content.to_vec(),
+            content,
+            file: file_name,
         };
         let params = RawBytes::serialize(&input)?;
         let message = self.transaction(

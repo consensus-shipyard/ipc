@@ -66,6 +66,9 @@ ipc_ipld_resolver = { workspace = true }
 
 warp = "0.3.6"
 futures-util = "0.3.30"
+unsigned-varint = "0.7.2"
+thiserror = "1.0.56"
+async-tempfile = "0.5.0"
 
 [dev-dependencies]
 tempfile = { workspace = true }

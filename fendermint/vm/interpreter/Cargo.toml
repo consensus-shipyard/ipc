@@ -55,6 +55,8 @@ pin-project = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 
+objectstore_syscall = { path = "../../../textile/objectstore_syscall" }
+
 [dev-dependencies]
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }

@@ -14,6 +14,8 @@ use fvm_shared::error::ExitCode;
 
 use crate::{Method, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
 
+const SYSCALL_FAILED_EXIT_CODE: u32 = 0x31337;
+
 fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub struct Actor;
@@ -38,6 +40,11 @@ impl Actor {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
+        objectstore_actor_sdk::load_car(params.file).map_err(|en| {
+            let msg = format!("load_car syscall failed with {en}");
+            ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), msg, None)
+        })?;
+
         let root = rt.transaction(|st: &mut State, rt| {
             st.put(rt.store(), BytesKey(params.key), params.content)
                 .map_err(|e| {
@@ -51,6 +58,11 @@ impl Actor {
     fn append_object(rt: &impl Runtime, params: ObjectParams) -> Result<Cid, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
+
+        objectstore_actor_sdk::load_car(params.file).map_err(|en| {
+            let msg = format!("load_car syscall failed with {en}");
+            ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), msg, None)
+        })?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.append(rt.store(), BytesKey(params.key), params.content)
@@ -75,7 +87,7 @@ impl Actor {
         Ok(root)
     }
 
-    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<u8>>, ActorError> {
+    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<Cid>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;

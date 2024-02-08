@@ -59,11 +59,11 @@ cmd! {
                 transaction(client, args, to, method_number, params.clone()).await
             },
             RpcCommands::DataRepo { args, command } => match command {
-                RpcDataRepoCommands::Put { key, content } => {
-                    datarepo_put(client, args, key, content).await
+                RpcDataRepoCommands::Put { key, content, file } => {
+                    datarepo_put(client, args, key, content, file).await
                 }
-                RpcDataRepoCommands::Append { key, content } => {
-                    datarepo_append(client, args, key, content).await
+                RpcDataRepoCommands::Append { key, content, file } => {
+                    datarepo_append(client, args, key, content, file).await
                 }
                 RpcDataRepoCommands::Delete { key } => {
                     datarepo_delete(client, args, key).await
@@ -205,13 +205,18 @@ async fn datarepo_put(
     client: FendermintClient,
     args: TransArgs,
     key: String,
-    content: Bytes,
+    content: Vec<Cid>,
+    file_name: String,
 ) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
-            Box::pin(async move { client.datarepo_put(key, content, value, gas_params).await })
+            Box::pin(async move {
+                client
+                    .datarepo_put(key, content, file_name, value, gas_params)
+                    .await
+            })
         },
         cid_to_json,
     )
@@ -222,7 +227,8 @@ async fn datarepo_append(
     client: FendermintClient,
     args: TransArgs,
     key: String,
-    content: Bytes,
+    content: Vec<Cid>,
+    file_name: String,
 ) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
@@ -230,7 +236,7 @@ async fn datarepo_append(
         |mut client, value, gas_params| {
             Box::pin(async move {
                 client
-                    .datarepo_append(key, content, value, gas_params)
+                    .datarepo_append(key, content, file_name, value, gas_params)
                     .await
             })
         },

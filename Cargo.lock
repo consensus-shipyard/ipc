@@ -460,6 +460,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbb36e985947064623dbd357f727af08ffd077f93d696782f3c56365fa2e2799"
 
 [[package]]
+name = "async-tempfile"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c17d4a3286e6518d84be399efb8901aa74a183753b0bf4a8a4afe5bcfedcbb08"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2736,6 +2745,7 @@ dependencies = [
  "fvm_shared",
  "num-derive 0.3.3",
  "num-traits",
+ "objectstore_actor_sdk",
  "serde",
  "serde_tuple",
 ]
@@ -2761,6 +2771,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-stm",
+ "async-tempfile",
  "async-trait",
  "base64 0.21.6",
  "bytes",
@@ -2812,11 +2823,13 @@ dependencies = [
  "tendermint-config 0.33.2",
  "tendermint-proto 0.31.1",
  "tendermint-rpc",
+ "thiserror",
  "tokio",
  "tower-abci",
  "trace4rs",
  "tracing",
  "tracing-subscriber",
+ "unsigned-varint 0.7.2",
  "warp",
 ]
 
@@ -3152,6 +3165,7 @@ dependencies = [
  "ipc_actors_abis",
  "libipld",
  "num-traits",
+ "objectstore_syscall",
  "pin-project",
  "quickcheck",
  "quickcheck_macros",
@@ -6466,6 +6480,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "objectstore_actor_sdk"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "fvm_sdk",
+ "fvm_shared",
+ "num-traits",
+]
+
+[[package]]
+name = "objectstore_syscall"
+version = "0.1.0"
+dependencies = [
+ "ambassador",
+ "anyhow",
+ "async-std",
+ "cid",
+ "fvm",
+ "fvm_ipld_car",
+ "fvm_shared",
+ "multihash 0.18.1",
+ "num-traits",
+ "rand",
 ]
 
 [[package]]
