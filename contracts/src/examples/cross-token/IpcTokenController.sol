@@ -29,6 +29,15 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
     SubnetID public networkName;
 
     GatewayMessengerFacet private immutable messenger;
+
+    // Define a struct to hold the sender address and the value of unconfirmed transfers
+    struct TransferDetails {
+        address sender;
+        uint256 value;
+    }
+
+    // Create the mapping of ipc envelope hash to TransferDetails
+    mapping(bytes32 => TransferDetails) public unconfirmedTransfers;
     
     uint256 public constant DEFAULT_CROSS_MSG_FEE = 10 gwei;
     uint64 public nonce = 0;
