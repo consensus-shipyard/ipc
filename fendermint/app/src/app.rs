@@ -806,13 +806,6 @@ where
         let app_hash = state.app_hash();
         let block_height = state.block_height;
 
-        // Tell CometBFT how much of the block history it can forget.
-        let retain_height = if self.state_hist_size == 0 {
-            Default::default()
-        } else {
-            block_height.saturating_sub(self.state_hist_size)
-        };
-
         tracing::debug!(
             block_height,
             update_params,
@@ -822,52 +815,63 @@ where
             "commit state"
         );
 
-        if update_params {
-            // TODO: We can defer committing changes the resolution pool to this point.
-            // For example if a checkpoint is successfully executed, that's when we want to remove
-            // that checkpoint from the pool, and not propose it to other validators again.
-            // However, once Tendermint starts delivering the transactions, the commit will surely
-            // follow at the end, so we can also remove these checkpoints from memory at the time
-            // the transaction is delivered, rather than when the whole thing is committed.
-            // It is only important to the persistent database changes as an atomic step in the
-            // commit in case the block execution fails somewhere in the middle for uknown reasons.
-            // But if that happened, we will have to restart the application again anyway, and
-            // repopulate the in-memory checkpoints based on the last committed ledger.
-            // So, while the pool is theoretically part of the evolving state and we can pass
-            // it in and out, unless we want to defer commit to here (which the interpreters aren't
-            // notified about), we could add it to the `ChainMessageInterpreter` as a constructor argument,
-            // a sort of "ambient state", and not worry about in in the `App` at all.
+        // Tell CometBFT how much of the block history it can forget.
+        let retain_height = if self.state_hist_size == 0 {
+            Default::default()
+        } else {
+            block_height.saturating_sub(self.state_hist_size)
+        };
 
-            // Notify the snapshotter. It wasn't clear whether this should be done in `commit` or `begin_block`,
-            // that is, whether the _height_ of the snapshot should be `block_height` or `block_height+1`.
-            // When CometBFT calls `offer_snapshot` it sends an `app_hash` in it that we compare to the CID
-            // of the `state_params`. Based on end-to-end testing it looks like it gives the `app_hash` from
-            // the *next* block, so we have to do it here.
-            // For example:
-            // a) Notify in `begin_block`: say we are at committing block 899, then we notify in `begin_block`
-            //    that block 900 has this state (so we use `block_height+1` in notification);
-            //    CometBFT is going to offer it with the `app_hash` of block 901, which won't match, because
-            //    by then the timestamp will be different in the state params after committing block 900.
-            // b) Notify in `commit`: say we are committing block 900 and notify immediately that it has this state
-            //    (even though this state will only be available to query from the next height);
-            //    CometBFT is going to offer it with the `app_hash` of 901, but in this case that's good, because
-            //    that hash reflects the changes made by block 900, which this state param is the result of.
-            if let Some(ref snapshots) = self.snapshots {
-                atomically(|| snapshots.notify(block_height, state.state_params.clone())).await;
-            }
-
-            // Commit app state to the datastore.
-            self.set_committed_state(state)?;
-
-            // Reset check state.
-            let mut guard = self.check_state.lock().await;
-            *guard = None;
-        }
-
-        Ok(response::Commit {
+        let commit = response::Commit {
             data: app_hash.into(),
             retain_height: retain_height.try_into().expect("height is valid"),
-        })
+        };
+
+        if !update_params {
+            return Ok(commit);
+        }
+
+        // TODO: We can defer committing changes the resolution pool to this point.
+        // For example if a checkpoint is successfully executed, that's when we want to remove
+        // that checkpoint from the pool, and not propose it to other validators again.
+        // However, once Tendermint starts delivering the transactions, the commit will surely
+        // follow at the end, so we can also remove these checkpoints from memory at the time
+        // the transaction is delivered, rather than when the whole thing is committed.
+        // It is only important to the persistent database changes as an atomic step in the
+        // commit in case the block execution fails somewhere in the middle for uknown reasons.
+        // But if that happened, we will have to restart the application again anyway, and
+        // repopulate the in-memory checkpoints based on the last committed ledger.
+        // So, while the pool is theoretically part of the evolving state and we can pass
+        // it in and out, unless we want to defer commit to here (which the interpreters aren't
+        // notified about), we could add it to the `ChainMessageInterpreter` as a constructor argument,
+        // a sort of "ambient state", and not worry about in in the `App` at all.
+
+        // Notify the snapshotter. It wasn't clear whether this should be done in `commit` or `begin_block`,
+        // that is, whether the _height_ of the snapshot should be `block_height` or `block_height+1`.
+        // When CometBFT calls `offer_snapshot` it sends an `app_hash` in it that we compare to the CID
+        // of the `state_params`. Based on end-to-end testing it looks like it gives the `app_hash` from
+        // the *next* block, so we have to do it here.
+        // For example:
+        // a) Notify in `begin_block`: say we are at committing block 899, then we notify in `begin_block`
+        //    that block 900 has this state (so we use `block_height+1` in notification);
+        //    CometBFT is going to offer it with the `app_hash` of block 901, which won't match, because
+        //    by then the timestamp will be different in the state params after committing block 900.
+        // b) Notify in `commit`: say we are committing block 900 and notify immediately that it has this state
+        //    (even though this state will only be available to query from the next height);
+        //    CometBFT is going to offer it with the `app_hash` of 901, but in this case that's good, because
+        //    that hash reflects the changes made by block 900, which this state param is the result of.
+        if let Some(ref snapshots) = self.snapshots {
+            atomically(|| snapshots.notify(block_height, state.state_params.clone())).await;
+        }
+
+        // Commit app state to the datastore.
+        self.set_committed_state(state)?;
+
+        // Reset check state.
+        let mut guard = self.check_state.lock().await;
+        *guard = None;
+
+        Ok(commit)
     }
 
     /// List the snapshots available on this node to be served to remote peers.
