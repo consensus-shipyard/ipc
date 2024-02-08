@@ -29,6 +29,7 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IpcTokenReplica} from "../../src/examples/cross-token/IpcTokenReplica.sol";
 import {IpcTokenController} from "../../src/examples/cross-token/IpcTokenController.sol";
 import {USDCTest} from "../../src/examples/cross-token/USDCTest.sol";
+import {IpcHandler, IpcExchange} from "../../sdk/IpcContract.sol";
 
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
@@ -491,6 +492,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(address(testUSDCOwner));
         expected = rootTokenController.depositTokensWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
+        //confirm that token replica only accept calls to Ipc from the gateway
+        vm.prank(address(testUSDCOwner));
+        vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
+        ipcTokenReplica.handleIpcMessage(expected);
+
         // after the two next calls the root gateway should store the message in its postbox.
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnetName,
@@ -530,11 +536,18 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             transferAmount
         );
 
+         //confirm that token controller only accept calls to Ipc from the gateway
+         vm.prank(address(testUSDCOwner));
+         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
+         rootTokenController.handleIpcMessage(expected);
+
+
         /*
             TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenController contract is sent
         */
-        //vm.prank(address(nativeSubnetGateway));
-        //rootTokenController.handleIpcMessage(committed);
+
+        // vm.prank(address(nativeSubnetGateway));
+        // rootTokenController.handleIpcMessage(expected);
 
         checkpoint = callCreateBottomUpCheckpointFromChildSubnet(tokenSubnetName, address(tokenSubnetGateway));
 
@@ -547,7 +560,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         //ensure that usdc tokens are returned on root net
         require(transferAmount == testUSDC.balanceOf(testUSDCOwner), "unexpected owner balance after withdrawal");
         //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
-        require(0 == subnetTokenBridge.balanceOf(testUSDCOwner), "unexpected testUSDCOwner balance in subnetTokenBridge");
-        require(0 == subnetTokenBridge.balanceOf(address(subnetTokenBridge)), "unexpected subnetTokenBridge balance in subnetTokenBridge");
+        require(0 == ipcTokenReplica.balanceOf(testUSDCOwner), "unexpected testUSDCOwner balance in ipcTokenReplica");
+        require(0 == ipcTokenReplica.balanceOf(address(ipcTokenReplica)), "unexpected ipcTokenReplica balance in ipcTokenReplica");
     }
 }
