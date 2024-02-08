@@ -142,7 +142,7 @@ done
 # Step 4.2: Deploy IPC contracts
 cd ${IPC_FOLDER}/contracts
 npm install
-export RPC_URL=https://filecoin-calibration.chainup.net/rpc/v1
+export RPC_URL=https://calibration.filfox.info/rpc/v1
 export PRIVATE_KEY=$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk)
 deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
 
