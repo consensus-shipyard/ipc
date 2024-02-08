@@ -40,7 +40,7 @@ impl Actor {
 
         rt.transaction(|st: &mut State, rt| {
             st.push(rt.store(), obj).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to push object")
             })
         })
     }
@@ -65,7 +65,7 @@ impl Actor {
         Ok(st.leaf_count)
     }
 }
-// body filter on warp - 500kbs
+
 impl ActorCode for Actor {
     type Methods = Method;
 

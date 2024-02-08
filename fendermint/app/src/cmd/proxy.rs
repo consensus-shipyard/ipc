@@ -17,6 +17,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -288,7 +289,8 @@ async fn handle_root(
             })
         })?;
 
-    Ok(warp::reply::html(res.unwrap_or_default().to_string()))
+    let json = json!({"repo_root": res.unwrap_or_default().to_string()});
+    Ok(warp::reply::json(&json))
 }
 
 #[derive(Clone, Debug)]
