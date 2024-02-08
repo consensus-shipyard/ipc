@@ -68,16 +68,16 @@ cmd! {
                     .and(warp::query::<HeightQuery>())
                     .and_then(handle_list);
                 // Accumulator routes
-                let push_route = warp::path!("v1" / "os")
+                let push_route = warp::path!("v1" / "acc")
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_BODY_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce))
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
-                    .and(warp::body::stream())
+                    .and(warp::body::bytes())
                     .and_then(handle_push);
-                let root_route = warp::path!("v1" / "os")
+                let root_route = warp::path!("v1" / "acc")
                     .and(warp::get())
                     .and(with_client(client))
                     .and(with_args(args))
@@ -256,20 +256,13 @@ async fn handle_push(
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
     gas_limit: Option<u64>,
-    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
+    body: Bytes,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
 
-    // TODO:(carsonfarmer) Could do a size check and fail fast if too large?
-    let content = body.fold(Vec::new(), |mut acc, buf| async move {
-        let mut buf = buf.unwrap();
-        acc.extend_from_slice(buf.chunk());
-        acc
-    });
-
-    let res = datarepo_push(client.clone(), args.clone(), content)
+    let res = datarepo_push(client.clone(), args.clone(), body)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -294,10 +287,7 @@ async fn handle_root(
             })
         })?;
 
-    match res {
-        Some(obj) => Ok(obj),
-        None => Err(Rejection::from(NotFound)),
-    }
+    Ok(warp::reply::html(res.unwrap_or_default().to_string()))
 }
 
 #[derive(Clone, Debug)]
@@ -507,7 +497,7 @@ async fn datarepo_root(
     client: FendermintClient,
     args: TransArgs,
     height: u64,
-) -> anyhow::Result<Option<Vec<Vec<u8>>>> {
+) -> anyhow::Result<Option<Cid>> {
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let h = FvmQueryHeight::from(height);
