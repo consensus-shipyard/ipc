@@ -102,8 +102,6 @@ pub struct AppConfig<S: KVStore> {
     pub state_hist_namespace: S::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
-    /// Whether to update the timestamp on empty blocks.
-    pub update_timestamp_on_empty: bool,
     /// Path to the Wasm bundle.
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
@@ -162,8 +160,6 @@ where
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
-    /// Whether to update the timestamp state on empty blocks.
-    update_timestamp_on_empty: bool,
 }
 
 impl<DB, SS, S, I> App<DB, SS, S, I>
@@ -193,7 +189,6 @@ where
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
-            update_timestamp_on_empty: config.update_timestamp_on_empty,
             interpreter: Arc::new(interpreter),
             chain_env,
             snapshots,
@@ -680,7 +675,6 @@ where
             tendermint::Hash::Sha256(h) => h,
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
         };
-        let is_empty = request.header.data_hash.is_none();
 
         let db = self.state_store_clone();
         let state = self.committed_state()?;
@@ -698,7 +692,7 @@ where
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
-            .with_block_info(block_hash, is_empty);
+            .with_block_hash(block_hash);
 
         tracing::debug!("initialized exec state");
 
@@ -767,7 +761,6 @@ where
 
         let block_timestamp = exec_state.timestamp();
         let block_height: BlockHeight = exec_state.block_height().try_into()?;
-        let block_empty = exec_state.block_info().map(|i| i.is_empty).unwrap_or(false);
 
         // Commit the execution state to the datastore.
         let (
@@ -786,16 +779,14 @@ where
         // but we can opt to not change the application hash if there was no meaningful change.
         state.block_height = block_height;
 
-        // If the block is empty, and there has been no update to the state, then we can
-        // opt to skip updating the the timestamp, because it  would be the only thing
-        // changing the application state, which would cause CometBFT to produce an empty
-        // block even if it's configured to skip them.
-        // But it might create empty blocks anyway, so we should always save the height.
+        // If there has been no update to the state then we can skip updating the the timestamp,
+        // because it would be the only thing changing the application state, which would cause
+        // CometBFT to produce an empty block even if it's configured to skip them.
+        // Leaving the timestamp unchanged only affects historical queries targetting these heights.
+        // The state timestamp will catch up with the header timestamp as soon as there is a block
+        // which does something to the ledger. This could be an empty block causing a checkpoint.
         // See https://docs.cometbft.com/v0.37/core/configuration#empty-blocks-vs-no-empty-blocks
-        let update_params = self.update_timestamp_on_empty
-            || !block_empty
-            || is_dirty
-            || state_root != state.state_params.state_root;
+        let update_params = is_dirty || state_root != state.state_params.state_root;
 
         if update_params {
             state.state_params.state_root = state_root;

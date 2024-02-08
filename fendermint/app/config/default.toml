@@ -41,14 +41,6 @@ port = 26658
 # Keep unlimited history by default.
 state_hist_size = 0
 
-# Whether to update the timestamp in the state on empty blocks if they would
-# otherwise cause no change in the application state.
-# Updating the timestamp causes the application state to change, which causes
-# CometBFT to create empty blocks even it is configured to skip them.
-#
-# This should only be set to false if CometBFT is configured to skip creating empty block.
-update_timestamp_on_empty = true
-
 [snapshots]
 # Enable the export and import of snapshots.
 enabled = false

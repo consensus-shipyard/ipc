@@ -79,17 +79,6 @@ pub struct FvmUpdatableParams {
 
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
 
-/// Information about the block that the FVM doesn't care about but we need it.
-///
-/// For queries and checks this is empty.
-///
-/// The main motivation to add it here was to make it easier to pass in data to the
-/// execution interpreter without having to add yet another piece to track at the app level.
-pub struct BlockInfo {
-    pub block_hash: BlockHash,
-    pub is_empty: bool,
-}
-
 /// A state we create for the execution of all the messages in a block.
 pub struct FvmExecState<DB>
 where
@@ -101,7 +90,12 @@ where
     >,
 
     /// Hash of the block currently being executed.
-    block_info: Option<BlockInfo>,
+    ///
+    /// For queries and checks this is empty.
+    ///
+    /// The main motivation to add it here was to make it easier to pass in data to the
+    /// execution interpreter without having to add yet another piece to track at the app level.
+    block_hash: Option<BlockHash>,
 
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
@@ -145,7 +139,7 @@ where
 
         Ok(Self {
             executor,
-            block_info: None,
+            block_hash: None,
             params: FvmUpdatableParams {
                 circ_supply: params.circ_supply,
                 power_scale: params.power_scale,
@@ -154,12 +148,9 @@ where
         })
     }
 
-    /// Set the block info during execution.
-    pub fn with_block_info(mut self, block_hash: BlockHash, is_empty: bool) -> Self {
-        self.block_info = Some(BlockInfo {
-            block_hash,
-            is_empty,
-        });
+    /// Set the block hash during execution.
+    pub fn with_block_hash(mut self, block_hash: BlockHash) -> Self {
+        self.block_hash = Some(block_hash);
         self
     }
 
@@ -202,14 +193,9 @@ where
         self.executor.context().epoch
     }
 
-    /// Info about the block being executed, if we are indeed executing any blocks.
-    pub fn block_info(&self) -> Option<&BlockInfo> {
-        self.block_info.as_ref()
-    }
-
     /// Identity of the block being executed, if we are indeed executing any blocks.
     pub fn block_hash(&self) -> Option<BlockHash> {
-        self.block_info().map(|i| i.block_hash)
+        self.block_hash
     }
 
     /// The timestamp of the currently executing block.

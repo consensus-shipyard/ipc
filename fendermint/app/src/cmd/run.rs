@@ -246,7 +246,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
             state_hist_size: settings.db.state_hist_size,
-            update_timestamp_on_empty: settings.db.update_timestamp_on_empty,
             builtin_actors_bundle: settings.builtin_actors_bundle(),
             custom_actors_bundle: settings.custom_actors_bundle(),
         },
