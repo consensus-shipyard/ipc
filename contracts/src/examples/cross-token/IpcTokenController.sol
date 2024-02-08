@@ -40,7 +40,7 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
 
     // Create the mapping of ipc envelope hash to TransferDetails
     mapping(bytes32 => TransferDetails) public unconfirmedTransfers;
-    
+
     uint256 public constant DEFAULT_CROSS_MSG_FEE = 10 gwei;
     uint64 public nonce = 0;
 
@@ -53,6 +53,8 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         uint64 nonce,
         uint256 value
     );
+
+    event TokensUnlocked(address indexed receiver, uint256 amount);
 
     /**
      * @dev Constructor for IpcTokenController
@@ -74,7 +76,6 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
         messenger = GatewayMessengerFacet(address(_gateway));
     }
-
 
     /**
      * @notice Transfers tokens from L1, locks them, and requests minting on L2.
@@ -101,8 +102,20 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
-        IERC20(tokenContractAddress).safeTransfer(receiver, amount);
+        // Call receiveAndUnlock to process the unlocking and transfer of tokens
+        receiveAndUnlock(receiver, amount);
         return bytes("");
+    }
+
+    function receiveAndUnlock(address receiver, uint256 amount) private {
+        // Ensure that the receiver address is not zero
+        require(receiver != address(0), "Receiver cannot be the zero address");
+
+        // Transfer the specified amount of tokens to the receiver
+        IERC20(tokenContractAddress).safeTransfer(receiver, amount);
+
+        // Emit an event for the token unlock and transfer
+        emit TokensUnlocked(receiver, amount);
     }
 
     function _sendToken(
