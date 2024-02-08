@@ -66,10 +66,14 @@ pub trait Materializer {
         -> anyhow::Result<Self::Network>;
 
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
-    fn create_account(&mut self, account_name: &AccountName) -> Self::Account;
+    fn create_account(&mut self, account_name: &AccountName) -> anyhow::Result<Self::Account>;
 
     /// Fund an account on the rootnet from the faucet.
-    async fn fund_from_faucet(&mut self, account: &Self::Account) -> anyhow::Result<()>;
+    async fn fund_from_faucet(
+        &mut self,
+        account: &Self::Account,
+        reference: Option<ResourceHash>,
+    ) -> anyhow::Result<()>;
 
     /// Deploy the IPC contracts onto the rootnet.
     ///
@@ -95,10 +99,10 @@ pub trait Materializer {
         subnet_name: &SubnetName,
         gateway: H160,
         registry: H160,
-    ) -> Self::Deployment;
+    ) -> anyhow::Result<Self::Deployment>;
 
     /// Return the well-known IPC contract deployments.
-    fn default_deployment(&mut self, subnet_name: &SubnetName) -> Self::Deployment;
+    fn default_deployment(&mut self, subnet_name: &SubnetName) -> anyhow::Result<Self::Deployment>;
 
     /// Construct the genesis for the rootnet.
     ///
@@ -107,7 +111,7 @@ pub trait Materializer {
     /// it part of the manifest.
     fn create_root_genesis(
         &mut self,
-        subnet_name: SubnetName,
+        subnet_name: &SubnetName,
         validators: BTreeMap<&Self::Account, Collateral>,
         balances: BTreeMap<&Self::Account, Balance>,
     ) -> anyhow::Result<Self::Genesis>;
@@ -119,11 +123,13 @@ pub trait Materializer {
     /// such as their network identities which are a function of their keys.
     ///
     /// The method is async in case we have to provision some resources remotely.
-    async fn create_node(
-        &mut self,
+    async fn create_node<'s, 'a>(
+        &'s mut self,
         node_name: &NodeName,
-        node_config: NodeConfig<Self>,
-    ) -> anyhow::Result<Self::Node>;
+        node_config: NodeConfig<'a, Self>,
+    ) -> anyhow::Result<Self::Node>
+    where
+        's: 'a;
 
     /// Start a node.
     ///
@@ -140,58 +146,68 @@ pub trait Materializer {
     /// can be sent, or it can be empty if it's an external rootnet.
     ///
     /// The result should contain the address of the subnet.
-    async fn create_subnet(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
+    async fn create_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, Self>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<Self>,
-    ) -> anyhow::Result<Self::Subnet>;
+        subnet_config: SubnetConfig<'a, Self>,
+    ) -> anyhow::Result<Self::Subnet>
+    where
+        's: 'a;
 
     /// Fund an account on a target subnet by transferring tokens from the source subnet.
     ///
     /// Only works if the target subnet has been bootstrapped.
     ///
     /// The `reference` can be used to deduplicate repeated transfer attempts.
-    async fn fund_subnet(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
+    async fn fund_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, Self>,
         account: &Self::Account,
         subnet: &Self::Subnet,
         amount: TokenAmount,
         reference: Option<ResourceHash>,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Join a target subnet as a validator.
     ///
     /// The `reference` can be used to deduplicate repeated transfer attempts.
-    async fn join_subnet(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
+    async fn join_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, Self>,
         account: &Self::Account,
         subnet: &Self::Subnet,
         collateral: Collateral,
         balance: Balance,
         reference: Option<ResourceHash>,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Construct the genesis for a subnet, which involves fetching details from the parent.
-    fn create_subnet_genesis(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
+    async fn create_subnet_genesis<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, Self>,
         subnet: &Self::Subnet,
-    ) -> anyhow::Result<Self::Genesis>;
+    ) -> anyhow::Result<Self::Genesis>
+    where
+        's: 'a;
 
     /// Create and start a relayer.
     ///
     /// It should follow the given node. If the submit node is empty, it should submit to an external rootnet.
-    async fn create_relayer(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
+    async fn create_relayer<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, Self>,
         relayer_name: &RelayerName,
         subnet: &Self::Subnet,
         submitter: &Self::Account,
         follow_node: &Self::Node,
-    ) -> anyhow::Result<Self::Relayer>;
+    ) -> anyhow::Result<Self::Relayer>
+    where
+        's: 'a;
 }
 
 /// Options regarding node configuration, e.g. which services to start.

@@ -82,7 +82,7 @@ where
 
         // Create keys for accounts.
         for (account_id, _) in manifest.accounts {
-            t.create_account(m, account_id)
+            t.create_account(m, account_id)?;
         }
 
         // Create the rootnet.
@@ -106,10 +106,11 @@ where
     }
 
     /// Create a cryptographic keypair for an account ID.
-    pub fn create_account(&mut self, m: &mut M, id: AccountId) {
+    pub fn create_account(&mut self, m: &mut M, id: AccountId) -> anyhow::Result<()> {
         let n = self.name.account(&id);
-        let a = m.create_account(&n);
+        let a = m.create_account(&n).context("failed to create account")?;
         self.accounts.insert(id, a);
+        Ok(())
     }
 
     /// Get an account by ID.
@@ -204,7 +205,7 @@ where
             .context("invalid root balances")?;
 
         // Remember the genesis so we can potentially create more nodes later.
-        let genesis = m.create_root_genesis(subnet_name.clone(), validators, balances)?;
+        let genesis = m.create_root_genesis(subnet_name, validators, balances)?;
 
         self.genesis.insert(subnet_name.clone(), genesis);
 
@@ -339,7 +340,7 @@ where
                             .context("failed to deploy IPC contracts")?
                     }
                     IpcDeployment::Existing { gateway, registry } => {
-                        m.existing_deployment(root_name, gateway, registry)
+                        m.existing_deployment(root_name, gateway, registry)?
                     }
                 };
 
@@ -347,8 +348,11 @@ where
                 self.externals = urls;
 
                 // Establish balances.
-                for a in self.accounts.values() {
-                    m.fund_from_faucet(a).await.context("faucet failed")?;
+                for (id, a) in self.accounts.iter() {
+                    let reference = ResourceHash::digest(format!("funding {id} from faucet"));
+                    m.fund_from_faucet(a, Some(reference))
+                        .await
+                        .context("faucet failed")?;
                 }
             }
             Rootnet::New {
@@ -356,7 +360,7 @@ where
                 balances,
                 nodes,
             } => {
-                let deployment = m.default_deployment(root_name);
+                let deployment = m.default_deployment(root_name)?;
                 self.deployments.insert(root_name.clone(), deployment);
 
                 self.create_root_genesis(m, root_name, validators, balances)
@@ -384,7 +388,7 @@ where
         {
             // Assume that all subnets are deployed with the default contracts.
             self.deployments
-                .insert(subnet_name.clone(), m.default_deployment(&subnet_name));
+                .insert(subnet_name.clone(), m.default_deployment(&subnet_name)?);
 
             // Where can we reach the gateway and the registry.
             let parent_submit_config = self.submit_config(parent_subnet_name)?;
@@ -635,7 +639,10 @@ fn sort_by_seeds(nodes: &BTreeMap<NodeId, Node>) -> anyhow::Result<Vec<(&NodeId,
 
 #[cfg(test)]
 mod tests {
+    use quickcheck_macros::quickcheck;
     use std::collections::BTreeMap;
+
+    use crate::manifest::Manifest;
 
     use super::topo_sort;
 
@@ -663,5 +670,10 @@ mod tests {
 
         let sorted = topo_sort(&tree, true, |ds| ds.clone()).expect("should allow cycles");
         assert_eq!(sorted.len(), tree.len());
+    }
+
+    #[quickcheck]
+    fn prop_testnet_validation(manifest: Manifest) {
+        todo!()
     }
 }

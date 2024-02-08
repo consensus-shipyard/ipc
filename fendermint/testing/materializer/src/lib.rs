@@ -10,6 +10,7 @@ use std::{
 pub mod manifest;
 pub mod materializer;
 pub mod testnet;
+mod validation;
 
 #[cfg(feature = "arb")]
 mod arb;
@@ -101,20 +102,30 @@ impl Display for ResourceName {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TestnetName(ResourceName);
+macro_rules! resource_name {
+    ($name:ident) => {
+        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+        pub struct $name(ResourceName);
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AccountName(ResourceName);
+        impl AsRef<ResourceName> for $name {
+            fn as_ref(&self) -> &ResourceName {
+                &self.0
+            }
+        }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SubnetName(ResourceName);
+        impl $name {
+            fn path(&self) -> &Path {
+                &self.0 .0
+            }
+        }
+    };
+}
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NodeName(ResourceName);
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RelayerName(ResourceName);
+resource_name!(TestnetName);
+resource_name!(AccountName);
+resource_name!(SubnetName);
+resource_name!(NodeName);
+resource_name!(RelayerName);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
@@ -127,6 +138,11 @@ impl TestnetName {
 
     pub fn root(&self) -> SubnetName {
         SubnetName(self.0.join("root"))
+    }
+
+    /// Check that the testnet contains a certain resource name, ie. it's a prefix of it.
+    pub fn contains<T: AsRef<ResourceName>>(&self, name: T) -> bool {
+        self.0.is_prefix_of(name.as_ref())
     }
 }
 
@@ -192,10 +208,6 @@ impl SubnetName {
             .collect::<Vec<_>>();
 
         ss0.into_iter().zip(ss1).collect()
-    }
-
-    fn path(&self) -> &Path {
-        &self.0 .0
     }
 }
 
