@@ -102,6 +102,11 @@ pub struct AppConfig<S: KVStore> {
     pub state_hist_namespace: S::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
+    /// Whether to update the application state on empty blocks,
+    /// which will cause those blocks to be published even if
+    /// CometBFT would otherwise skip them, due to the change
+    /// in the application hash.
+    pub state_update_on_empty: bool,
     /// Path to the Wasm bundle.
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
@@ -160,6 +165,8 @@ where
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
+    /// Whether to update the application state on empty blocks.
+    state_update_on_empty: bool,
 }
 
 impl<DB, SS, S, I> App<DB, SS, S, I>
@@ -189,6 +196,7 @@ where
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
+            state_update_on_empty: config.state_update_on_empty,
             interpreter: Arc::new(interpreter),
             chain_env,
             snapshots,
@@ -675,6 +683,7 @@ where
             tendermint::Hash::Sha256(h) => h,
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
         };
+        let is_empty = request.header.data_hash.is_none();
 
         let db = self.state_store_clone();
         let state = self.committed_state()?;
@@ -692,7 +701,7 @@ where
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
-            .with_block_hash(block_hash);
+            .with_block_info(block_hash, is_empty);
 
         tracing::debug!("initialized exec state");
 
@@ -759,23 +768,40 @@ where
     async fn commit(&self) -> AbciResult<response::Commit> {
         let exec_state = self.take_exec_state().await;
 
-        // Commit the execution state to the datastore.
-        let mut state = self.committed_state()?;
-        state.block_height = exec_state.block_height().try_into()?;
-        state.state_params.timestamp = exec_state.timestamp();
+        let block_timestamp = exec_state.timestamp();
+        let block_height: BlockHeight = exec_state.block_height().try_into()?;
+        let block_empty = exec_state.block_info().map(|i| i.is_empty).unwrap_or(false);
 
+        // Commit the execution state to the datastore.
         let (
             state_root,
             FvmUpdatableParams {
                 power_scale,
                 circ_supply,
             },
-            _,
+            is_dirty,
         ) = exec_state.commit().context("failed to commit FVM")?;
 
-        state.state_params.state_root = state_root;
-        state.state_params.power_scale = power_scale;
-        state.state_params.circ_supply = circ_supply;
+        // Update the application state.
+        let mut state = self.committed_state()?;
+
+        // If the block is empty, and there has been no update to the state,
+        // then we can opt to skip updating the the timestamp and the height,
+        // because they would be the only thing changing the application state,
+        // which would cause CometBFT to produce an empty block even if it's
+        // told to avoid that.
+        let update_params = self.state_update_on_empty
+            || !block_empty
+            || is_dirty
+            || state_root != state.state_params.state_root;
+
+        if update_params {
+            state.state_params.state_root = state_root;
+            state.state_params.power_scale = power_scale;
+            state.state_params.circ_supply = circ_supply;
+            state.state_params.timestamp = block_timestamp;
+            state.block_height = block_height;
+        }
 
         let app_hash = state.app_hash();
         let block_height = state.block_height;
@@ -789,51 +815,54 @@ where
 
         tracing::debug!(
             block_height,
+            update_params,
             state_root = state_root.to_string(),
             app_hash = app_hash.to_string(),
             timestamp = state.state_params.timestamp.0,
             "commit state"
         );
 
-        // TODO: We can defer committing changes the resolution pool to this point.
-        // For example if a checkpoint is successfully executed, that's when we want to remove
-        // that checkpoint from the pool, and not propose it to other validators again.
-        // However, once Tendermint starts delivering the transactions, the commit will surely
-        // follow at the end, so we can also remove these checkpoints from memory at the time
-        // the transaction is delivered, rather than when the whole thing is committed.
-        // It is only important to the persistent database changes as an atomic step in the
-        // commit in case the block execution fails somewhere in the middle for uknown reasons.
-        // But if that happened, we will have to restart the application again anyway, and
-        // repopulate the in-memory checkpoints based on the last committed ledger.
-        // So, while the pool is theoretically part of the evolving state and we can pass
-        // it in and out, unless we want to defer commit to here (which the interpreters aren't
-        // notified about), we could add it to the `ChainMessageInterpreter` as a constructor argument,
-        // a sort of "ambient state", and not worry about in in the `App` at all.
+        if update_params {
+            // TODO: We can defer committing changes the resolution pool to this point.
+            // For example if a checkpoint is successfully executed, that's when we want to remove
+            // that checkpoint from the pool, and not propose it to other validators again.
+            // However, once Tendermint starts delivering the transactions, the commit will surely
+            // follow at the end, so we can also remove these checkpoints from memory at the time
+            // the transaction is delivered, rather than when the whole thing is committed.
+            // It is only important to the persistent database changes as an atomic step in the
+            // commit in case the block execution fails somewhere in the middle for uknown reasons.
+            // But if that happened, we will have to restart the application again anyway, and
+            // repopulate the in-memory checkpoints based on the last committed ledger.
+            // So, while the pool is theoretically part of the evolving state and we can pass
+            // it in and out, unless we want to defer commit to here (which the interpreters aren't
+            // notified about), we could add it to the `ChainMessageInterpreter` as a constructor argument,
+            // a sort of "ambient state", and not worry about in in the `App` at all.
 
-        // Notify the snapshotter. It wasn't clear whether this should be done in `commit` or `begin_block`,
-        // that is, whether the _height_ of the snapshot should be `block_height` or `block_height+1`.
-        // When CometBFT calls `offer_snapshot` it sends an `app_hash` in it that we compare to the CID
-        // of the `state_params`. Based on end-to-end testing it looks like it gives the `app_hash` from
-        // the *next* block, so we have to do it here.
-        // For example:
-        // a) Notify in `begin_block`: say we are at committing block 899, then we notify in `begin_block`
-        //    that block 900 has this state (so we use `block_height+1` in notification);
-        //    CometBFT is going to offer it with the `app_hash` of block 901, which won't match, because
-        //    by then the timestamp will be different in the state params after committing block 900.
-        // b) Notify in `commit`: say we are committing block 900 and notify immediately that it has this state
-        //    (even though this state will only be available to query from the next height);
-        //    CometBFT is going to offer it with the `app_hash` of 901, but in this case that's good, because
-        //    that hash reflects the changes made by block 900, which this state param is the result of.
-        if let Some(ref snapshots) = self.snapshots {
-            atomically(|| snapshots.notify(block_height, state.state_params.clone())).await;
+            // Notify the snapshotter. It wasn't clear whether this should be done in `commit` or `begin_block`,
+            // that is, whether the _height_ of the snapshot should be `block_height` or `block_height+1`.
+            // When CometBFT calls `offer_snapshot` it sends an `app_hash` in it that we compare to the CID
+            // of the `state_params`. Based on end-to-end testing it looks like it gives the `app_hash` from
+            // the *next* block, so we have to do it here.
+            // For example:
+            // a) Notify in `begin_block`: say we are at committing block 899, then we notify in `begin_block`
+            //    that block 900 has this state (so we use `block_height+1` in notification);
+            //    CometBFT is going to offer it with the `app_hash` of block 901, which won't match, because
+            //    by then the timestamp will be different in the state params after committing block 900.
+            // b) Notify in `commit`: say we are committing block 900 and notify immediately that it has this state
+            //    (even though this state will only be available to query from the next height);
+            //    CometBFT is going to offer it with the `app_hash` of 901, but in this case that's good, because
+            //    that hash reflects the changes made by block 900, which this state param is the result of.
+            if let Some(ref snapshots) = self.snapshots {
+                atomically(|| snapshots.notify(block_height, state.state_params.clone())).await;
+            }
+
+            // Commit app state to the datastore.
+            self.set_committed_state(state)?;
+
+            // Reset check state.
+            let mut guard = self.check_state.lock().await;
+            *guard = None;
         }
-
-        // Commit app state to the datastore.
-        self.set_committed_state(state)?;
-
-        // Reset check state.
-        let mut guard = self.check_state.lock().await;
-        *guard = None;
 
         Ok(response::Commit {
             data: app_hash.into(),

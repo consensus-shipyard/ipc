@@ -87,6 +87,11 @@ pub struct DbSettings {
     ///
     /// This affects how long we can go back in state queries.
     pub state_hist_size: u64,
+
+    /// Whether to update the application state on empty blocks that otherwise cause no change
+    ///
+    /// This should be used in concert with the CometBFT setting to skip creating empty blocks.
+    pub state_update_on_empty: bool,
 }
 
 /// Settings affecting how we deal with failures in trying to send transactions to the local CometBFT node.
