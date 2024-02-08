@@ -151,7 +151,10 @@ parent_registry_address=$(echo "$deploy_contracts_output" | grep '"SubnetRegistr
 echo "New parent gateway address: $parent_gateway_address"
 echo "New parent registry address: $parent_registry_address"
 
-# Step 4.1: Write back new parent gateway and registry address to IPC config file (no need to?)
+# Step 4.3: Use the new parent gateway and registry address to update IPC config file
+toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr $parent_gateway_address > /tmp/config.toml.1
+toml set /tmp/config.toml.1 subnets[0].config.registry_addr $parent_registry_address > /tmp/config.toml.2
+cp /tmp/config.toml.2 ${IPC_CONFIG_FOLDER}/config.toml
 
 # Step 5: Create a subnet
 echo "$DASHES Creating a child subnet..."
@@ -164,6 +167,10 @@ echo "Created new subnet id: $subnet_id"
 # Step 5 (alternative): Use an already-created subnet
 #subnet_id=/r314159/t410flp4jf7keqcf5bqogrkx4wpkygiskykcvpaigicq
 #echo "Use existing subnet id: $subnet_id"
+
+# Step 5.1: Use the new subnet ID to update IPC config file
+toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[1].id $subnet_id > /tmp/config.toml.3
+cp /tmp/config.toml.3 ${IPC_CONFIG_FOLDER}/config.toml
 
 # Step 6: Generate pubkeys from addresses
 echo "$DASHES Generating pubkey for wallet addresses... $default_wallet_address"
@@ -188,12 +195,7 @@ done
 # cd ${IPC_FOLDER}/fendermint
 # make docker-build
 
-## Step 8.2: Read parent net gateway address and registry address
-#echo "$DASHES Reading parent gateway and registry address"
-#parent_gateway_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr | tr -d '"')
-#parent_registry_address=$(toml get ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.registry_addr | tr -d '"')
-
-# Step 8.3: Start the bootstrap validator node
+# Step 8.2: Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
 echo "First we need to force a wait to make sure the subnet is confirmed as created in the parent contracts"
 echo "Wait for 30 seconds"
@@ -226,7 +228,7 @@ echo "Bootstrap node endpoint: ${bootstrap_node_endpoint}"
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
 echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
 
-# Step 8.4: Start other validator node
+# Step 8.3: Start other validator node
 echo "$DASHES Start the other validator nodes"
 cd ${IPC_FOLDER}
 for i in {1..2}
