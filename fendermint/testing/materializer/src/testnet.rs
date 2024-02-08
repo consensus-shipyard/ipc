@@ -32,7 +32,7 @@ use crate::{
 /// bit simpler.
 pub struct Testnet<M: Materializer> {
     name: TestnetName,
-    network: Option<M::Network>,
+    network: M::Network,
     accounts: BTreeMap<AccountId, M::Account>,
     deployments: BTreeMap<SubnetName, M::Deployment>,
     genesis: BTreeMap<SubnetName, M::Genesis>,
@@ -45,17 +45,23 @@ impl<M> Testnet<M>
 where
     M: Materializer + Sync + Send,
 {
-    pub fn new(id: &TestnetId) -> Self {
-        Self {
-            name: TestnetName::new(id),
-            network: Default::default(),
+    pub async fn new(m: &mut M, id: &TestnetId) -> anyhow::Result<Self> {
+        let name = TestnetName::new(id);
+        let network = m
+            .create_network(&name)
+            .await
+            .context("failed to create the network")?;
+
+        Ok(Self {
+            name,
+            network,
             accounts: Default::default(),
             deployments: Default::default(),
             genesis: Default::default(),
             subnets: Default::default(),
             nodes: Default::default(),
             relayers: Default::default(),
-        }
+        })
     }
 
     pub fn root(&self) -> SubnetName {
@@ -67,15 +73,8 @@ where
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
     pub async fn setup(m: &mut M, id: TestnetId, manifest: Manifest) -> anyhow::Result<Self> {
-        let mut t = Self::new(&id);
+        let mut t = Self::new(m, &id).await?;
         let root_name = t.root();
-
-        // Create the common network.
-        t.network = Some(
-            m.create_network(&t.name)
-                .await
-                .context("failed to create the network")?,
-        );
 
         // Create keys for accounts.
         for (account_id, _) in manifest.accounts {
@@ -98,10 +97,8 @@ where
     }
 
     /// Return a reference to the physical network.
-    pub fn network(&self) -> anyhow::Result<&M::Network> {
-        self.network
-            .as_ref()
-            .ok_or_else(|| anyhow!("the network hasn't been created"))
+    fn network(&self) -> &M::Network {
+        &self.network
     }
 
     /// Create a cryptographic keypair for an account ID.
@@ -237,7 +234,7 @@ where
         node: &Node,
     ) -> anyhow::Result<()> {
         let genesis = self.genesis(subnet_name)?;
-        let network = self.network()?;
+        let network = self.network();
         let node_name = subnet_name.node(node_id);
 
         let node_config = NodeConfig {
