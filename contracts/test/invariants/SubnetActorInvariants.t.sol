@@ -6,6 +6,7 @@ import {StdInvariant} from "forge-std/Test.sol";
 import {SubnetID, Subnet} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
@@ -14,9 +15,13 @@ import {SubnetActorMock} from "../mocks/SubnetActorMock.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
+    using GatewayFacetsHelper for GatewayDiamond;
+    using SubnetActorFacetsHelper for SubnetActorDiamond;
 
     SubnetActorHandler private subnetActorHandler;
 
@@ -27,15 +32,15 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
 
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
 
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
+        gwGetter = gatewayDiamond.getter();
+        gwManager = gatewayDiamond.manager();
+        gwMessenger = gatewayDiamond.messenger();
         gatewayAddress = address(gatewayDiamond);
 
         saDiamond = createMockedSubnetActorWithGateway(gatewayAddress);
 
         saMock = SubnetActorMock(address(saDiamond));
-        saGetter = SubnetActorGetterFacet(address(saDiamond));
+        saGetter = saDiamond.getter();
         subnetActorHandler = new SubnetActorHandler(saDiamond);
 
         bytes4[] memory fuzzSelectors = new bytes4[](4);

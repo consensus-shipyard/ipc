@@ -34,11 +34,13 @@ import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {TestUtils, MockIpcContract} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
+    using GatewayFacetsHelper for GatewayDiamond;
 
     function setUp() public override {
         super.setUp();
@@ -146,10 +148,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_Deployment_Works_Root(uint64 checkpointPeriod) public {
         vm.assume(checkpointPeriod >= DEFAULT_CHECKPOINT_PERIOD);
 
-        GatewayDiamond dep;
-        GatewayManagerFacet depManager = new GatewayManagerFacet();
-        GatewayGetterFacet depGetter = new GatewayGetterFacet();
-
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
@@ -158,9 +156,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             activeValidatorsLimit: 100
         });
 
-        dep = createGatewayDiamond(constructorParams);
-        depGetter = GatewayGetterFacet(address(dep));
-        depManager = GatewayManagerFacet(address(dep));
+        GatewayDiamond dep = createGatewayDiamond(constructorParams);
+        GatewayGetterFacet depGetter = dep.getter();
+        GatewayManagerFacet depManager = dep.manager();
 
         SubnetID memory networkName = depGetter.getNetworkName();
 
@@ -179,9 +177,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         path[0] = address(0);
         path[1] = address(1);
 
-        GatewayDiamond dep;
-        GatewayManagerFacet depManager = new GatewayManagerFacet();
         GatewayGetterFacet depGetter = new GatewayGetterFacet();
+        GatewayManagerFacet depManager = new GatewayManagerFacet();
 
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
@@ -209,10 +206,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             })
         );
 
-        dep = new GatewayDiamond(diamondCut, constructorParams);
-
-        depGetter = GatewayGetterFacet(address(dep));
-        depManager = GatewayManagerFacet(address(dep));
+        GatewayDiamond dep = new GatewayDiamond(diamondCut, constructorParams);
+        depGetter = dep.getter();
+        depManager = dep.manager();
 
         SubnetID memory networkName = depGetter.getNetworkName();
 
@@ -692,12 +688,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             activeValidatorsLimit: 100
         });
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
+        gwGetter = gatewayDiamond.getter();
+        gwManager = gatewayDiamond.manager();
+        gwCheckpointingFacet = gatewayDiamond.checkpointer();
+        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
+        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
 
         address callerAddress = address(100);
 
@@ -724,12 +719,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
+
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
+        gwGetter = gatewayDiamond.getter();
+        gwManager = gatewayDiamond.manager();
+        gwCheckpointingFacet = gatewayDiamond.checkpointer();
+        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
+        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
+        gwMessenger = gatewayDiamond.messenger();
 
         vm.roll(0);
         vm.warp(0);
@@ -754,12 +751,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
+
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
+        gwGetter = gatewayDiamond.getter();
+        gwManager = gatewayDiamond.manager();
+        gwCheckpointingFacet = gatewayDiamond.checkpointer();
+        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
+        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
+        gwMessenger = gatewayDiamond.messenger();
 
         address callerAddress = address(100);
 
@@ -786,12 +785,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
+
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
+        gwGetter = gatewayDiamond.getter();
+        gwManager = gatewayDiamond.manager();
+        gwCheckpointingFacet = gatewayDiamond.checkpointer();
+        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
+        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
+        gwMessenger = gatewayDiamond.messenger();
 
         address callerAddress = address(100);
 
@@ -1573,12 +1574,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: 100
         });
+
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
+        gwGetter = gatewayDiamond.getter();
+        gwManager = gatewayDiamond.manager();
+        gwCheckpointingFacet = gatewayDiamond.checkpointer();
+        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
+        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
+        gwMessenger = gatewayDiamond.messenger();
 
         uint256 d = gwGetter.bottomUpCheckPeriod();
 

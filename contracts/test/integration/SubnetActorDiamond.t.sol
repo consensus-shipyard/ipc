@@ -51,9 +51,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function testSubnetActorDiamond_NewSubnetActorWithDefaultParams() public view {
         SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
-            address(gatewayDiamond)
-        );
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(gatewayDiamond));
 
         require(saGetter.ipcGatewayAddr() == params.ipcGatewayAddr, "unexpected gateway");
         require(saGetter.minActivationCollateral() == params.minActivationCollateral, "unexpected collateral");

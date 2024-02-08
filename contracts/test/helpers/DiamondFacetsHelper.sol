@@ -11,6 +11,7 @@ library DiamondFacetsHelper {
         DiamondLoupeFacet facet = DiamondLoupeFacet(a);
         return facet;
     }
+
     function diamondCutter(address a) internal pure returns (DiamondCutFacet) {
         DiamondCutFacet facet = DiamondCutFacet(a);
         return facet;
@@ -22,6 +23,7 @@ library DiamondFacetsHelper {
         DiamondLoupeFacet facet = DiamondLoupeFacet(address(a));
         return facet;
     }
+
     function diamondCutter(GatewayDiamond a) internal pure returns (DiamondCutFacet) {
         DiamondCutFacet facet = DiamondCutFacet(address(a));
         return facet;
@@ -33,6 +35,7 @@ library DiamondFacetsHelper {
         DiamondLoupeFacet facet = DiamondLoupeFacet(address(a));
         return facet;
     }
+
     function diamondCutter(SubnetActorDiamond a) internal pure returns (DiamondCutFacet) {
         DiamondCutFacet facet = DiamondCutFacet(address(a));
         return facet;

@@ -147,9 +147,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_LatestSubnetDeploy_Revert() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
-            DEFAULT_IPC_GATEWAY_ADDR
-        );
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
         params.permissionMode = PermissionMode.Collateral;
 
         registrySubnetFacet.newSubnetActor(params);
@@ -160,9 +158,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_GetSubnetDeployedByNonce_Revert() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
-            DEFAULT_IPC_GATEWAY_ADDR
-        );
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
         params.permissionMode = PermissionMode.Collateral;
 
         registrySubnetFacet.newSubnetActor(params);
@@ -173,9 +169,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_Deployment_Works() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
-            DEFAULT_IPC_GATEWAY_ADDR
-        );
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
         registrySubnetFacet.newSubnetActor(params);
         require(registrySubnetGetterFacet.latestSubnetDeployed(DEFAULT_SENDER) != address(0));
     }

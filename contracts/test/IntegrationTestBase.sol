@@ -187,7 +187,12 @@ contract TestSubnetActor is Test, TestParams {
     function defaultSubnetActorParamsWith(
         address gw
     ) internal pure virtual returns (SubnetActorDiamond.ConstructorParams memory) {
-        return defaultSubnetActorParamsWith(gw, SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), SupplySourceHelper.native());
+        return
+            defaultSubnetActorParamsWith(
+                gw,
+                SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+                SupplySourceHelper.native()
+            );
     }
 
     function defaultSubnetActorParamsWith(

@@ -14,22 +14,27 @@ library GatewayFacetsHelper {
         GatewayGetterFacet facet = GatewayGetterFacet(gw);
         return facet;
     }
+
     function manager(address gw) internal pure returns (GatewayManagerFacet) {
         GatewayManagerFacet facet = GatewayManagerFacet(gw);
         return facet;
     }
+
     function messenger(address gw) internal pure returns (GatewayMessengerFacet) {
         GatewayMessengerFacet facet = GatewayMessengerFacet(gw);
         return facet;
     }
+
     function topDownFinalizer(address gw) internal pure returns (TopDownFinalityFacet) {
         TopDownFinalityFacet facet = TopDownFinalityFacet(gw);
         return facet;
     }
+
     function checkpointer(address gw) internal pure returns (CheckpointingFacet) {
         CheckpointingFacet facet = CheckpointingFacet(gw);
         return facet;
     }
+
     function xnetMessenger(address gw) internal pure returns (XnetMessagingFacet) {
         XnetMessagingFacet facet = XnetMessagingFacet(gw);
         return facet;
@@ -41,22 +46,27 @@ library GatewayFacetsHelper {
         GatewayGetterFacet facet = GatewayGetterFacet(address(gw));
         return facet;
     }
+
     function manager(GatewayDiamond gw) internal pure returns (GatewayManagerFacet) {
         GatewayManagerFacet facet = GatewayManagerFacet(address(gw));
         return facet;
     }
+
     function messenger(GatewayDiamond gw) internal pure returns (GatewayMessengerFacet) {
         GatewayMessengerFacet facet = GatewayMessengerFacet(address(gw));
         return facet;
     }
+
     function topDownFinalizer(GatewayDiamond gw) internal pure returns (TopDownFinalityFacet) {
         TopDownFinalityFacet facet = TopDownFinalityFacet(address(gw));
         return facet;
     }
+
     function checkpointer(GatewayDiamond gw) internal pure returns (CheckpointingFacet) {
         CheckpointingFacet facet = CheckpointingFacet(address(gw));
         return facet;
     }
+
     function xnetMessenger(GatewayDiamond gw) internal pure returns (XnetMessagingFacet) {
         XnetMessagingFacet facet = XnetMessagingFacet(address(gw));
         return facet;
