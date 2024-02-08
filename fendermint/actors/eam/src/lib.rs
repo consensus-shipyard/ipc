@@ -1,16 +1,16 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::state::PermissionModeParams;
 pub use crate::state::State;
+use fil_actor_eam::EamActor;
 pub use fil_actor_eam::Method;
-use fil_actor_eam::{
-    Create2Params, Create2Return, CreateExternalParams, CreateExternalReturn, CreateParams,
-    CreateReturn, EamActor,
-};
-use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
-use fil_actors_runtime::{actor_dispatch_unrestricted, ActorError};
-use fvm_shared::address::Address;
+use fil_actors_runtime::ActorError;
+use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::ipld_block::IpldBlock;
+use fvm_ipld_encoding::tuple::*;
+use fvm_shared::MethodNum;
 
 mod state;
 
@@ -24,47 +24,13 @@ pub struct IPCEamActor;
 impl IPCEamActor {
     /// Creates the actor. If the `whitelisted_deployers` is empty, that means there is no restriction
     /// for deployment, i.e any address can deploy.
-    pub fn constructor(
-        rt: &impl Runtime,
-        whitelisted_deployers: Vec<Address>,
-    ) -> Result<(), ActorError> {
+    pub fn constructor(rt: &impl Runtime, args: ConstructorParams) -> Result<(), ActorError> {
         EamActor::constructor(rt)?;
 
-        let st = State::new(rt.store(), whitelisted_deployers)?;
+        let st = State::new(rt.store(), args.permission_mode)?;
         rt.create(&st)?;
 
         Ok(())
-    }
-
-    /// Create a new contract per the EVM's CREATE rules.
-    ///
-    /// Permissions: May be called by the EVM.
-    pub fn create(rt: &impl Runtime, params: CreateParams) -> Result<CreateReturn, ActorError> {
-        Self::ensure_deployer_allowed(rt)?;
-        EamActor::create(rt, params)
-    }
-
-    /// Create a new contract per the EVM's CREATE2 rules.
-    ///
-    /// Permissions: May be called by the EVM.
-    pub fn create2(rt: &impl Runtime, params: Create2Params) -> Result<Create2Return, ActorError> {
-        Self::ensure_deployer_allowed(rt)?;
-        EamActor::create2(rt, params)
-    }
-
-    /// Create a new contract from off-chain.
-    ///
-    /// When called by an EthAccount, this method will compute the new actor's address according to
-    /// the `CREATE` rules. When called by a "native" Account, this method will derive the address
-    /// from the _hash_ of the caller's key address.
-    ///
-    /// Permissions: May be called by builtin or eth accounts.
-    pub fn create_external(
-        rt: &impl Runtime,
-        params: CreateExternalParams,
-    ) -> Result<CreateExternalReturn, ActorError> {
-        Self::ensure_deployer_allowed(rt)?;
-        EamActor::create_external(rt, params)
     }
 
     fn ensure_deployer_allowed(rt: &impl Runtime) -> Result<(), ActorError> {
@@ -88,17 +54,33 @@ impl ActorCode for IPCEamActor {
         IPC_EAM_ACTOR_NAME
     }
 
-    actor_dispatch_unrestricted! {
-        Constructor => constructor,
-        Create => create,
-        Create2 => create2,
-        CreateExternal => create_external,
+    fn invoke_method<RT>(
+        rt: &RT,
+        method: MethodNum,
+        params: Option<IpldBlock>,
+    ) -> Result<Option<IpldBlock>, ActorError>
+    where
+        RT: Runtime,
+        RT::Blockstore: Blockstore + Clone,
+    {
+        if method == Method::Constructor as u64 {
+            fil_actors_runtime::dispatch(rt, method, Self::constructor, params)
+        } else {
+            Self::ensure_deployer_allowed(rt)?;
+            EamActor::invoke_method(rt, method, params)
+        }
     }
+}
+
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ConstructorParams {
+    permission_mode: PermissionModeParams,
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{IPCEamActor, Method};
+    use crate::state::PermissionModeParams;
+    use crate::{ConstructorParams as IPCConstructorParams, IPCEamActor, Method};
     use fil_actor_eam::ext::evm::ConstructorParams;
     use fil_actor_eam::ext::init::{Exec4Params, Exec4Return, EXEC4_METHOD};
     use fil_actor_eam::{compute_address_create, CreateParams, Return};
@@ -126,10 +108,16 @@ mod tests {
 
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
+        let permission_mode = if deployers.is_empty() {
+            PermissionModeParams::Unrestricted
+        } else {
+            PermissionModeParams::AllowList(deployers)
+        };
+
         let result = rt
             .call::<IPCEamActor>(
                 Method::Constructor as u64,
-                IpldBlock::serialize_cbor(&deployers).unwrap(),
+                IpldBlock::serialize_cbor(&IPCConstructorParams { permission_mode }).unwrap(),
             )
             .unwrap();
         expect_empty(result);
