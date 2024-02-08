@@ -37,6 +37,7 @@ use fvm_shared::{
 };
 use num_traits::Zero;
 use serde::Serialize;
+use crate::fvm::store::memory::MemoryBlockstore;
 
 use super::{exec::MachineBlockstore, FvmExecState, FvmStateParams};
 
@@ -59,12 +60,18 @@ pub struct FvmGenesisState<DB>
 where
     DB: Blockstore + Clone + 'static,
 {
+    #[deprecated]
     pub manifest_data_cid: Cid,
+    #[deprecated]
     pub manifest: Manifest,
+    #[deprecated]
     pub custom_actor_manifest: CustomActorManifest,
     store: DB,
     multi_engine: Arc<MultiEngine>,
     stage: Stage<DB>,
+
+    pub builtin_actor_bundle: Vec<u8>,
+    pub custom_actor_bundle: Vec<u8>,
 }
 
 async fn parse_bundle<DB: Blockstore>(store: &DB, bundle: &[u8]) -> anyhow::Result<(u32, Cid)> {
@@ -122,6 +129,46 @@ where
             store,
             multi_engine,
             stage: Stage::Tree(state_tree),
+
+            builtin_actor_bundle: vec![],
+            custom_actor_bundle: vec![],
+        };
+
+        Ok(state)
+    }
+
+    pub async fn new_state(
+        store: DB,
+        multi_engine: Arc<MultiEngine>,
+        builtin_actor_bundle: Vec<u8>,
+        custom_actor_bundle: Vec<u8>,
+    ) -> anyhow::Result<Self> {
+
+        // ============== TO BE DELETE =============
+        let mem_store = MemoryBlockstore::new();
+        // Load the builtin actor bundle.
+        let (manifest_version, manifest_data_cid): (u32, Cid) =
+            parse_bundle(&mem_store, &builtin_actor_bundle).await?;
+        let manifest = Manifest::load(&mem_store, &manifest_data_cid, manifest_version)?;
+
+        // Load the custom actor bundle.
+        let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) =
+            parse_bundle(&mem_store, &custom_actor_bundle).await?;
+        let custom_actor_manifest =
+            CustomActorManifest::load(&mem_store, &custom_manifest_data_cid, custom_manifest_version)?;
+        // ============== TO BE DELETE =============
+
+        let state_tree = empty_state_tree(store.clone())?;
+
+        let state = Self {
+            manifest_data_cid,
+            manifest,
+            custom_actor_manifest,
+            store,
+            multi_engine,
+            stage: Stage::Tree(state_tree),
+            builtin_actor_bundle,
+            custom_actor_bundle,
         };
 
         Ok(state)

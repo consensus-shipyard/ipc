@@ -446,11 +446,11 @@ where
             anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
         })?;
 
-        let state = FvmGenesisState::new(
+        let state = FvmGenesisState::new_state(
             self.state_store_clone(),
             self.multi_engine.clone(),
-            &bundle,
-            &custom_actors_bundle,
+            bundle,
+            custom_actors_bundle,
         )
         .await
         .context("failed to create genesis state")?;

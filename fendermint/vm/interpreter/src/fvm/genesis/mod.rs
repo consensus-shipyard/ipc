@@ -1,6 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+mod builtin;
+
 use std::collections::{BTreeSet, HashMap};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
@@ -22,6 +24,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
+use crate::fvm::genesis::builtin::BuiltInActorDeployer;
 
 use crate::GenesisInterpreter;
 
@@ -101,7 +104,7 @@ where
             timestamp: genesis.timestamp,
             network_version: genesis.network_version,
             circ_supply: circ_supply(&genesis),
-            base_fee: genesis.base_fee,
+            base_fee: genesis.base_fee.clone(),
             power_scale: genesis.power_scale,
             validators,
         };
@@ -140,83 +143,13 @@ where
         eth_libs.retain(|(_, d)| !eth_contracts.contains_key(d.as_str()));
 
         // STAGE 1: First we initialize native built-in actors.
-
-        // System actor
-        state
-            .create_builtin_actor(
-                system::SYSTEM_ACTOR_CODE_ID,
-                system::SYSTEM_ACTOR_ID,
-                &system::State {
-                    builtin_actors: state.manifest_data_cid,
-                },
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create system actor")?;
-
-        // Init actor
-        let (init_state, addr_to_id) = init::State::new(
-            state.store(),
-            genesis.chain_name.clone(),
-            &genesis.accounts,
-            &eth_builtin_ids,
-            eth_libs.len() as u64,
-        )
-        .context("failed to create init state")?;
-
-        state
-            .create_builtin_actor(
-                init::INIT_ACTOR_CODE_ID,
-                init::INIT_ACTOR_ID,
-                &init_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create init actor")?;
-
-        // Cron actor
-        state
-            .create_builtin_actor(
-                cron::CRON_ACTOR_CODE_ID,
-                cron::CRON_ACTOR_ID,
-                &cron::State {
-                    entries: vec![], // TODO: Maybe with the IPC.
-                },
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create cron actor")?;
-
-        // Burnt funds actor (it's just an account).
-        state
-            .create_builtin_actor(
-                account::ACCOUNT_ACTOR_CODE_ID,
-                burntfunds::BURNT_FUNDS_ACTOR_ID,
-                &account::State {
-                    address: burntfunds::BURNT_FUNDS_ACTOR_ADDR,
-                },
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create burnt funds actor")?;
-
-        // A placeholder for the reward actor, beause I don't think
-        // using the one in the builtin actors library would be appropriate.
-        // This effectively burns the miner rewards. Better than panicking.
-        state
-            .create_builtin_actor(
-                account::ACCOUNT_ACTOR_CODE_ID,
-                reward::REWARD_ACTOR_ID,
-                &account::State {
-                    address: reward::REWARD_ACTOR_ADDR,
-                },
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create reward actor")?;
+        let builtin_deployer = BuiltInActorDeployer::new(&eth_builtin_ids, &eth_libs);
+        let addr_to_id = builtin_deployer.process_genesis(
+            &mut state,
+            &genesis
+        ).await?;
 
         // STAGE 1b: Then we initialize the in-repo custom actors.
-        //
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
         // (e.g. block hashes) which we can query.
@@ -233,34 +166,6 @@ where
                 None,
             )
             .context("failed to create chainmetadata actor")?;
-
-        // Ethereum Account Manager (EAM) actor
-        let eam_state = fendermint_actor_eam::State::new(
-            &state.store(),
-            genesis
-                .contract_deployers
-                .into_iter()
-                .map(|a| a.0)
-                .collect(),
-        )?;
-        // state
-        //     .create_builtin_actor(
-        //             eam::EAM_ACTOR_CODE_ID,
-        //             eam::EAM_ACTOR_ID,
-        //             &EMPTY_ARR,
-        //             TokenAmount::zero(),
-        //             None,
-        //         )
-        //             .context("failed to create EAM actor")?;
-        state
-            .create_custom_actor(
-                fendermint_actor_eam::IPC_EAM_ACTOR_NAME,
-                eam::EAM_ACTOR_ID,
-                &eam_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create IPC EAM actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
