@@ -79,12 +79,12 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
      * @param receiver Address to receive the minted tokens on L2
      * @param amount Amount of tokens to be transferred and minted
      */
-    function depositTokens(address receiver, uint256 amount) external payable {
+    function lockAndTransfer(address receiver, uint256 amount) external payable {
         // Transfer and lock tokens on L1 using the inherited sendToken function
         _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
     }
 
-    function depositTokensWithReturn(address receiver, uint256 amount) external payable returns (IpcEnvelope memory) {
+    function lockAndTransferWithReturn(address receiver, uint256 amount) external payable returns (IpcEnvelope memory) {
         // Transfer and lock tokens on L1 using the inherited sendToken function
         return _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
     }

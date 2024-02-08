@@ -490,7 +490,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenController)));
 
         vm.prank(address(testUSDCOwner));
-        expected = rootTokenController.depositTokensWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        expected = rootTokenController.lockAndTransferWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         //confirm that token replica only accept calls to Ipc from the gateway
         vm.prank(address(testUSDCOwner));
