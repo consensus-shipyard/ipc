@@ -12,6 +12,7 @@ import {GatewayCannotBeZero, NotEnoughFunds} from "../../errors/IPCErrors.sol";
 import {IpcExchange} from "../../../sdk/IpcContract.sol";
 import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
+import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 
 error NoTransfer();
 error ZeroAddress();
@@ -22,6 +23,7 @@ error ZeroAddress();
  */
 contract IpcTokenController is IpcExchange, ReentrancyGuard {
     using SafeERC20 for IERC20;
+    using CrossMsgHelper for IpcEnvelope;
 
     address private tokenContractAddress;
     SubnetID private destinationSubnet;
@@ -89,6 +91,10 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         return _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
     }
 
+    function getUnconfirmedTransfer(bytes32 hash) public view returns (address, uint256) {
+        TransferDetails storage details = unconfirmedTransfers[hash];
+        return (details.sender, details.value);
+    }
 
     function _handleIpcCall(
         IpcEnvelope memory envelope,
@@ -149,6 +155,8 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
             message: abi.encode(message)
         });
 
+        //add receipt to unconfirmedTransfers
+        unconfirmedTransfers[crossMsg.toHash()] = TransferDetails(msg.sender, amount);
         return messenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(crossMsg);
     }
 

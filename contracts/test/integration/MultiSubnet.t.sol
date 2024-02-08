@@ -492,6 +492,12 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(address(testUSDCOwner));
         expected = rootTokenController.lockAndTransferWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
+        //check that the message is in unconfirmedTransfers
+        (address receiptSender, uint256 receiptValue) = rootTokenController.getUnconfirmedTransfer(expected.toHash());
+        assertEq(receiptSender, address(this),  "Transfer sender incorrect in unconfirmedTransfers");
+        assertEq(receiptValue, transferAmount,  "Transfer amount incorrect in unconfirmedTransfers");
+
+
         //confirm that token replica only accept calls to Ipc from the gateway
         vm.prank(address(testUSDCOwner));
         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
