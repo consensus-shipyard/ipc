@@ -45,7 +45,7 @@ pub fn effective_gas_premium(msg: &Message, base_fee: &TokenAmount) -> TokenAmou
 // Rust implementation of:
 // https://github.com/consensus-shipyard/lotus/blob/156f5556b3ecc042764d76308dca357da3adfb4d/node/impl/full/gas.go#L144
 pub fn median_gas_premium(
-    prices: &mut Vec<(TokenAmount, i64)>,
+    prices: &mut [(TokenAmount, i64)],
     block_gas_target: i64,
 ) -> TokenAmount {
     // Sort in descending order based on premium
