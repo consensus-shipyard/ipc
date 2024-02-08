@@ -19,7 +19,7 @@ import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 error NoTransfer();
 error ZeroAddress();
 
-contract SubnetTokenBridge is IpcExchange, ERC20, ReentrancyGuard {
+contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
     using SafeERC20 for IERC20;
 

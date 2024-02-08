@@ -26,7 +26,7 @@ import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
-import {SubnetTokenBridge} from "../../src/examples/cross-token/SubnetTokenBridge.sol";
+import {IpcTokenReplica} from "../../src/examples/cross-token/IpcTokenReplica.sol";
 import {IpcTokenController} from "../../src/examples/cross-token/IpcTokenController.sol";
 import {USDCTest} from "../../src/examples/cross-token/USDCTest.sol";
 
@@ -65,7 +65,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
     IERC20 public token;
 
-    SubnetTokenBridge subnetTokenBridge;
+    IpcTokenReplica ipcTokenReplica;
     IpcTokenController rootTokenController;
 
     function setUp() public override {
@@ -466,16 +466,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         require(testUSDCOwner == address(this), "unexpected owner");
         require(transferAmount == testUSDC.balanceOf(testUSDCOwner), "unexpected transferAmount");
 
-        subnetTokenBridge = new SubnetTokenBridge(address(tokenSubnetGateway), address(testUSDC), rootSubnetName);
+        ipcTokenReplica = new IpcTokenReplica(address(tokenSubnetGateway), address(testUSDC), rootSubnetName);
 
         rootTokenController = new IpcTokenController(
             address(nativeSubnetGateway),
             address(testUSDC),
             tokenSubnetName,
-            address(subnetTokenBridge)
+            address(ipcTokenReplica)
         );
 
-        subnetTokenBridge.setParentSubnetUSDC(address(rootTokenController));
+        ipcTokenReplica.setParentSubnetUSDC(address(rootTokenController));
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.deal(address(rootTokenController), 1 ether);
@@ -514,7 +514,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         //ensure that tokens are delivered on subnet
         require(
-            IERC20(subnetTokenBridge).balanceOf(address(testUSDCOwner)) == transferAmount,
+            IERC20(ipcTokenReplica).balanceOf(address(testUSDCOwner)) == transferAmount,
             "incorrect proxy token balance"
         );
 
@@ -525,7 +525,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(testUSDCOwner));
-        expected = subnetTokenBridge.withdrawTokens{value: DEFAULT_CROSS_MSG_FEE}(
+        expected = ipcTokenReplica.withdrawTokens{value: DEFAULT_CROSS_MSG_FEE}(
             testUSDCOwner,
             transferAmount
         );

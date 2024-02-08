@@ -2,17 +2,26 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import "../../../src/examples/cross-token/SubnetTokenBridge.sol";
+import "../../../src/examples/cross-token/IpcTokenReplica.sol";
+import {IntegrationTestBase} from "../../IntegrationTestBase.sol";
+import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
+import {SubnetIDHelper} from "../../../src/lib/SubnetIDHelper.sol";
 
-contract SubnetTest is Test {
-    SubnetTokenBridge bridge;
+contract SubnetTest is Test, IntegrationTestBase {
+    using SubnetIDHelper for SubnetID;
+
+    IpcTokenReplica bridge;
     address parentSubnetUSDC = address(0x123);
     SubnetID parentSubnet;
-    address gateway = address(0x456);
+    address gateway;
+    GatewayDiamond public rootGateway;
 
-    function setUp() public {
-        parentSubnet = SubnetID({root: 0, route: new address[](0)});
-        bridge = new SubnetTokenBridge(gateway, parentSubnetUSDC, parentSubnet);
+    function setUp() public override {
+        parentSubnet = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
+        require(parentSubnet.isRoot(), "not root");
+        rootGateway = createGatewayDiamond(gatewayParams(parentSubnet));
+        gateway = address(rootGateway);
+        bridge = new IpcTokenReplica(gateway, parentSubnetUSDC, parentSubnet);
     }
 
     function testParentSubnetUSDCAddress() public {
@@ -27,7 +36,7 @@ contract SubnetTest is Test {
     }
 
     function testDepositTokens() public {
-        // Test depositTokens function of SubnetTokenBridge
+        // Test depositTokens function of IpcTokenReplica
         // This is a placeholder test
         assertTrue(true, "depositTokens not implemented");
     }
