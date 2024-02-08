@@ -27,6 +27,7 @@ use tokio::sync::Mutex;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 const MAX_BODY_LENGTH: u64 = 1024 * 1024 * 1024;
+const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
 cmd! {
     ProxyArgs(self) {
@@ -70,7 +71,7 @@ cmd! {
                 // Accumulator routes
                 let push_route = warp::path!("v1" / "acc")
                     .and(warp::put())
-                    .and(warp::body::content_length_limit(MAX_BODY_LENGTH))
+                    .and(warp::body::content_length_limit(MAX_EVENT_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce))
