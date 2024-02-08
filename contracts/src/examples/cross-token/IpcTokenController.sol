@@ -101,6 +101,9 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
+        bytes4 methodSignature = toBytes4(callMsg.method);
+        require(methodSignature == bytes4(keccak256("receiveAndUnlock(address,uint256)")), "placeholder for ipc error");
+
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         // Call receiveAndUnlock to process the unlocking and transfer of tokens
         receiveAndUnlock(receiver, amount);
@@ -169,8 +172,8 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         });
 
         //add receipt to unconfirmedTransfers
-        unconfirmedTransfers[crossMsg.toHash()] = TransferDetails(msg.sender, amount);
-        return messenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(crossMsg);
+        committed = messenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(crossMsg);
+        unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);
     }
 
     function _handleIpcResult(
@@ -178,4 +181,12 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {}
+
+    function toBytes4(bytes memory data) internal pure returns (bytes4 result) {
+        require(data.length >= 4, "Data too short to convert to bytes4");
+        // Assembly block to directly load the first 4 bytes
+        assembly {
+            result := mload(add(data, 32))
+        }
+    }
 }

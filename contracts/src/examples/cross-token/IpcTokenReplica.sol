@@ -75,7 +75,7 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         nonce++;
 
         CallMsg memory message = CallMsg({
-            method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
+            method: abi.encodePacked(bytes4(keccak256("receiveAndUnlock(address,uint256)"))),
             params: abi.encode(receiver, amount)
         });
         IpcEnvelope memory crossMsg = IpcEnvelope({
