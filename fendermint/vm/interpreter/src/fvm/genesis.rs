@@ -189,6 +189,7 @@ where
             )
             .context("failed to create cron actor")?;
 
+        // Ethereum Account Manager (EAM) actor
         state
             .create_builtin_actor(
                 eam::EAM_ACTOR_CODE_ID,
