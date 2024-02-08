@@ -53,31 +53,7 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         messenger = GatewayMessengerFacet(address(_gateway));
     }
 
-    // Setter function to update the address of parentSubnetUSDC
-    function setParentSubnetUSDC(address _newAddress) public onlyOwner {
-        parentSubnetUSDC = _newAddress;
-    }
-
-    function _handleIpcCall(
-        IpcEnvelope memory envelope,
-        CallMsg memory callMsg
-    ) internal override returns (bytes memory) {
-        (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
-        _mint(receiver, amount);
-        return bytes("");
-    }
-
-    function _handleIpcResult(
-        IpcEnvelope storage original,
-        IpcEnvelope memory result,
-        ResultMsg memory resultMsg
-    ) internal override {}
-
-    function getParentSubnet() public view returns (SubnetID memory) {
-        return parentSubnet;
-    }
-
-    function withdrawTokens(address receiver, uint256 amount) public payable returns (IpcEnvelope memory committed) {
+    function withdrawTokens(address receiver, uint256 amount) external payable returns (IpcEnvelope memory committed) {
         if (receiver == address(0)) {
             revert ZeroAddress();
         }
@@ -115,4 +91,29 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         _burn(receiver, amount);
         return committed;
     }
+
+    // Setter function to update the address of parentSubnetUSDC
+    function setParentSubnetUSDC(address _newAddress) external onlyOwner {
+        parentSubnetUSDC = _newAddress;
+    }
+
+    function getParentSubnet() external view returns (SubnetID memory) {
+        return parentSubnet;
+    }
+
+
+    function _handleIpcCall(
+        IpcEnvelope memory envelope,
+        CallMsg memory callMsg
+    ) internal override returns (bytes memory) {
+        (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
+        _mint(receiver, amount);
+        return bytes("");
+    }
+
+    function _handleIpcResult(
+        IpcEnvelope storage original,
+        IpcEnvelope memory result,
+        ResultMsg memory resultMsg
+    ) internal override {}
 }

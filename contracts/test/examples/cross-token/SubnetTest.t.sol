@@ -31,8 +31,7 @@ contract SubnetTest is Test, IntegrationTestBase {
 
     function testParentSubnet() public {
         // Test if parentSubnet is correctly set
-        assertEq(bridge.getParentSubnet().root, parentSubnet.root, "parentSubnet.root does not match");
-        assertEq(bridge.getParentSubnet().route, parentSubnet.route, "parentSubnet.route does not match");
+        assertTrue(bridge.getParentSubnet().equals(parentSubnet), "parentSubnetdoes not match");
     }
 
     function testDepositTokens() public {
