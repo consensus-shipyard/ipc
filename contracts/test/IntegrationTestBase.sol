@@ -426,7 +426,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         SubnetActorPauseFacet pauser = new SubnetActorPauseFacet();
         SubnetActorRewardFacet rewarder = new SubnetActorRewardFacet();
         SubnetActorCheckpointingFacet checkpointer = new SubnetActorCheckpointingFacet();
-
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
 
@@ -906,8 +905,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     }
 
     function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) public {
-        GatewayManagerFacet manager = GatewayManagerFacet(address(gw));
-        GatewayGetterFacet getter = GatewayGetterFacet(address(gw));
+        GatewayManagerFacet manager = gw.manager();
+        GatewayGetterFacet getter = gw.getter();
 
         manager.register{value: collateral}(0);
 
@@ -935,7 +934,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         address subnetAddress,
         GatewayDiamond gw
     ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
-        GatewayGetterFacet getter = GatewayGetterFacet(address(gw));
+        GatewayGetterFacet getter = gw.getter();
 
         SubnetID memory subnetId = getter.getNetworkName().createSubnetId(subnetAddress);
 
