@@ -1,11 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use multihash::MultihashDigest;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     path::{Path, PathBuf},
 };
-
-use serde::{Deserialize, Serialize};
 
 pub mod manifest;
 pub mod materializer;
@@ -194,6 +194,25 @@ impl SubnetName {
 
     fn path(&self) -> &Path {
         &self.0 .0
+    }
+}
+
+/// Unique identifier for certain things that we want to keep unique.
+pub struct ResourceHash([u8; 32]);
+
+impl ResourceHash {
+    /// Digest some general unique but unwieldy label for a more compact form.
+    pub fn digest<T: AsRef<[u8]>>(value: T) -> Self {
+        let d = multihash::Code::Blake2b256.digest(value.as_ref());
+        let mut bz = [0u8; 32];
+        bz.copy_from_slice(d.digest());
+        Self(bz)
+    }
+}
+
+impl ToString for ResourceHash {
+    fn to_string(&self) -> String {
+        hex::encode(self.0)
     }
 }
 

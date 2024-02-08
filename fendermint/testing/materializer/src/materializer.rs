@@ -6,7 +6,9 @@ use std::collections::BTreeMap;
 
 use fendermint_vm_genesis::Collateral;
 
-use crate::{manifest::Balance, AccountName, NodeName, RelayerName, SubnetName, TestnetName};
+use crate::{
+    manifest::Balance, AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
+};
 
 /// The materializer is a component to provision resources of a testnet, and
 /// to carry out subsequent commands on them, e.g. to restart nodes.
@@ -146,6 +148,8 @@ pub trait Materializer {
     /// Fund an account on a target subnet by transferring tokens from the source subnet.
     ///
     /// Only works if the target subnet has been bootstrapped.
+    ///
+    /// The `reference` can be used to deduplicate repeated transfer attempts.
     async fn fund_subnet(
         &mut self,
         account: &Self::Account,
@@ -153,9 +157,12 @@ pub trait Materializer {
         amount: TokenAmount,
         parent_nodes: &[&Self::Node],
         parent_deployment: &Self::Deployment,
+        reference: Option<ResourceHash>,
     ) -> anyhow::Result<()>;
 
     /// Join a target subnet as a validator.
+    ///
+    /// The `reference` can be used to deduplicate repeated transfer attempts.
     async fn join_subnet(
         &mut self,
         account: &Self::Account,
@@ -164,6 +171,7 @@ pub trait Materializer {
         balance: Balance,
         parent_nodes: &[&Self::Node],
         parent_deployment: &Self::Deployment,
+        reference: Option<ResourceHash>,
     ) -> anyhow::Result<()>;
 
     /// Construct the genesis for a subnet, which involves fetching details from the parent.

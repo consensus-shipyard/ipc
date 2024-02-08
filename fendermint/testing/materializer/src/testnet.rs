@@ -13,7 +13,8 @@ use crate::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, Rootnet, Subnet,
     },
     materializer::{Materializer, NodeConfig, SubnetConfig},
-    AccountId, NodeId, NodeName, RelayerName, SubnetId, SubnetName, TestnetId, TestnetName,
+    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
+    TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -400,9 +401,22 @@ where
                         .account(id)
                         .with_context(|| format!("invalid {label} in {subnet_name:?}"))?;
 
-                    m.fund_subnet(account, fund_subnet, amount, &fund_nodes, fund_deployment)
-                        .await
-                        .with_context(|| format!("failed to fund {id} in {fund_target:?}"))?;
+                    // Assign a reference so we can remember that we did it, within each subnet,
+                    // which can turn this into an idempotent operation.
+                    let reference = ResourceHash::digest(format!(
+                        "funds from the top for {label} {id} for {subnet_name:?}"
+                    ));
+
+                    m.fund_subnet(
+                        account,
+                        fund_subnet,
+                        amount,
+                        &fund_nodes,
+                        fund_deployment,
+                        Some(reference),
+                    )
+                    .await
+                    .with_context(|| format!("failed to fund {id} in {fund_target:?}"))?;
                 }
             }
 
@@ -414,6 +428,9 @@ where
 
                 let b = subnet.balances.get(id).cloned().unwrap_or_default();
 
+                let reference =
+                    ResourceHash::digest(format!("initial join by {id} for {subnet_name:?}"));
+
                 m.join_subnet(
                     account,
                     created_subnet,
@@ -421,6 +438,7 @@ where
                     b,
                     &parent_nodes,
                     parent_deployment,
+                    Some(reference),
                 )
                 .await
                 .with_context(|| format!("failed to join with {id} in {subnet_name:?}"))?;
@@ -456,12 +474,15 @@ where
                     continue;
                 }
 
+                let reference = ResourceHash::digest(format!("fund {id} in {subnet_name:?}"));
+
                 m.fund_subnet(
                     account,
                     created_subnet,
                     b.0.clone(),
                     &parent_nodes,
                     parent_deployment,
+                    Some(reference),
                 )
                 .await
                 .with_context(|| format!("failed to join with {id} in {subnet_name:?}"))?;
