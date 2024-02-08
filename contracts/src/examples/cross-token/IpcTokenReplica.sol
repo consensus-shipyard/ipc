@@ -101,7 +101,6 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         return parentSubnet;
     }
 
-
     function _handleIpcCall(
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
