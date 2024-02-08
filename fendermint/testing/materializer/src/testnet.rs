@@ -12,7 +12,7 @@ use crate::{
     manifest::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, Rootnet, Subnet,
     },
-    materializer::{Materializer, NodeConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
     AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
     TestnetName,
 };
@@ -153,6 +153,13 @@ where
             .filter(|(node_name, _)| node_name.is_in_subnet(subnet_name))
             .map(|(_, n)| n)
             .collect()
+    }
+
+    /// Where can se send transactions and queries on a subnet.
+    pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<M>> {
+        let deployment = self.deployment(subnet_name)?;
+        let nodes = self.nodes_by_subnet(subnet_name);
+        Ok(SubmitConfig { deployment, nodes })
     }
 
     /// Resolve account IDs in a map to account references.
@@ -360,19 +367,17 @@ where
                 .insert(subnet_name.clone(), m.default_deployment(&subnet_name));
 
             // Where can we reach the gateway and the registry.
-            let parent_deployment = self.deployment(parent_subnet_name)?;
-            let parent_nodes = self.nodes_by_subnet(parent_subnet_name);
+            let parent_submit_config = self.submit_config(parent_subnet_name)?;
 
             // Create the subnet on the parent.
             m.create_subnet(
+                &parent_submit_config,
                 &subnet_name,
                 SubnetConfig {
                     creator: self.account(&subnet.creator).context("invalid creator")?,
                     // Make the number such that the last validator to join activates the subnet.
                     min_validators: subnet.validators.len(),
                 },
-                &parent_nodes,
-                parent_deployment,
             )
             .await
             .context("failed to create subnet")?;
@@ -382,8 +387,10 @@ where
 
             // Fund validator and balances collateral all the way from the root down to the parent.
             for (fund_source, fund_target) in &ancestor_hops {
-                let fund_nodes = self.nodes_by_subnet(fund_source);
-                let fund_deployment = self.deployment(fund_source)?;
+                // Where can we send the subnet request.
+                let fund_submit_config = self.submit_config(fund_source)?;
+
+                // Which subnet are we funding.
                 let fund_subnet = self.subnet(fund_target)?;
 
                 let cs = subnet
@@ -408,11 +415,10 @@ where
                     ));
 
                     m.fund_subnet(
+                        &fund_submit_config,
                         account,
                         fund_subnet,
                         amount,
-                        &fund_nodes,
-                        fund_deployment,
                         Some(reference),
                     )
                     .await
@@ -432,12 +438,11 @@ where
                     ResourceHash::digest(format!("initial join by {id} for {subnet_name:?}"));
 
                 m.join_subnet(
+                    &parent_submit_config,
                     account,
                     created_subnet,
                     c.clone(),
                     b,
-                    &parent_nodes,
-                    parent_deployment,
                     Some(reference),
                 )
                 .await
@@ -446,7 +451,7 @@ where
 
             // Create genesis by fetching from the parent.
             let genesis = m
-                .create_subnet_genesis(created_subnet, &parent_nodes)
+                .create_subnet_genesis(&parent_submit_config, created_subnet)
                 .context("failed to create subnet genesis")?;
 
             self.genesis.insert(subnet_name.clone(), genesis);
@@ -460,8 +465,9 @@ where
         // Interact with the running subnet .
         {
             let created_subnet = self.subnet(&subnet_name)?;
-            let parent_deployment = self.deployment(parent_subnet_name)?;
-            let parent_nodes = self.nodes_by_subnet(parent_subnet_name);
+
+            // Where can we reach the gateway and the registry.
+            let parent_submit_config = self.submit_config(parent_subnet_name)?;
 
             // Fund all non-validator balances (which have been passed to join_validator as a pre-fund request).
             // These could be done as pre-funds if the command is available on its own.
@@ -477,11 +483,10 @@ where
                 let reference = ResourceHash::digest(format!("fund {id} in {subnet_name:?}"));
 
                 m.fund_subnet(
+                    &parent_submit_config,
                     account,
                     created_subnet,
                     b.0.clone(),
-                    &parent_nodes,
-                    parent_deployment,
                     Some(reference),
                 )
                 .await
@@ -513,12 +518,14 @@ where
                 let relayer_name = subnet_name.relayer(id);
                 let relayer = m
                     .create_relayer(
+                        &SubmitConfig {
+                            nodes: submit_node.into_iter().collect(),
+                            deployment: parent_submit_config.deployment,
+                        },
                         &relayer_name,
                         created_subnet,
                         submitter,
                         follow_node,
-                        submit_node,
-                        parent_deployment,
                     )
                     .await
                     .context("failed to create relayer")?;

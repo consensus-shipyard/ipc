@@ -139,10 +139,9 @@ pub trait Materializer {
     /// The result should contain the address of the subnet.
     async fn create_subnet(
         &mut self,
+        parent_submit_config: &SubmitConfig<Self>,
         subnet_name: &SubnetName,
         subnet_config: SubnetConfig<Self>,
-        parent_nodes: &[&Self::Node],
-        parent_deployment: &Self::Deployment,
     ) -> anyhow::Result<Self::Subnet>;
 
     /// Fund an account on a target subnet by transferring tokens from the source subnet.
@@ -152,11 +151,10 @@ pub trait Materializer {
     /// The `reference` can be used to deduplicate repeated transfer attempts.
     async fn fund_subnet(
         &mut self,
+        parent_submit_config: &SubmitConfig<Self>,
         account: &Self::Account,
         subnet: &Self::Subnet,
         amount: TokenAmount,
-        parent_nodes: &[&Self::Node],
-        parent_deployment: &Self::Deployment,
         reference: Option<ResourceHash>,
     ) -> anyhow::Result<()>;
 
@@ -165,20 +163,19 @@ pub trait Materializer {
     /// The `reference` can be used to deduplicate repeated transfer attempts.
     async fn join_subnet(
         &mut self,
+        parent_submit_config: &SubmitConfig<Self>,
         account: &Self::Account,
         subnet: &Self::Subnet,
         collateral: Collateral,
         balance: Balance,
-        parent_nodes: &[&Self::Node],
-        parent_deployment: &Self::Deployment,
         reference: Option<ResourceHash>,
     ) -> anyhow::Result<()>;
 
     /// Construct the genesis for a subnet, which involves fetching details from the parent.
     fn create_subnet_genesis(
         &mut self,
+        parent_submit_config: &SubmitConfig<Self>,
         subnet: &Self::Subnet,
-        parent_nodes: &[&Self::Node],
     ) -> anyhow::Result<Self::Genesis>;
 
     /// Create and start a relayer.
@@ -186,12 +183,11 @@ pub trait Materializer {
     /// It should follow the given node. If the submit node is empty, it should submit to an external rootnet.
     async fn create_relayer(
         &mut self,
+        parent_submit_config: &SubmitConfig<Self>,
         relayer_name: &RelayerName,
         subnet: &Self::Subnet,
         submitter: &Self::Account,
         follow_node: &Self::Node,
-        submit_node: Option<&Self::Node>,
-        submit_deployment: &Self::Deployment,
     ) -> anyhow::Result<Self::Relayer>;
 }
 
@@ -225,4 +221,15 @@ where
     pub creator: &'a M::Account,
     /// Number of validators required for bootstrapping a subnet.
     pub min_validators: usize,
+}
+
+/// Options for how to submit transactions to the parent subnet.
+pub struct SubmitConfig<'a, M>
+where
+    M: Materializer + ?Sized,
+{
+    /// The nodes to which we can send transactions or queries.
+    pub nodes: Vec<&'a M::Node>,
+    /// The location of the IPC contracts on the (generally parent) subnet.
+    pub deployment: &'a M::Deployment,
 }
