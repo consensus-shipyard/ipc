@@ -51,7 +51,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function testSubnetActorDiamond_NewSubnetActorWithDefaultParams() public view {
         SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
             address(gatewayDiamond)
         );
 

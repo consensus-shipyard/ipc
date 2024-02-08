@@ -137,7 +137,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     }
 
     function test_Registry_Deployment_DifferentGateway() public {
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(address(1));
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(1));
         params.permissionMode = PermissionMode.Collateral;
 
         vm.expectRevert(WrongGateway.selector);
@@ -147,7 +147,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_LatestSubnetDeploy_Revert() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
             DEFAULT_IPC_GATEWAY_ADDR
         );
         params.permissionMode = PermissionMode.Collateral;
@@ -160,7 +160,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_GetSubnetDeployedByNonce_Revert() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
             DEFAULT_IPC_GATEWAY_ADDR
         );
         params.permissionMode = PermissionMode.Collateral;
@@ -173,7 +173,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_Deployment_Works() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
             DEFAULT_IPC_GATEWAY_ADDR
         );
         registrySubnetFacet.newSubnetActor(params);

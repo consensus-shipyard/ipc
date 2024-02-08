@@ -237,7 +237,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
     function createTokenSubnet(address tokenAddress) internal returns (Subnet memory) {
         // Create a subnet actor in the root network, with an ERC20 supply source with the specified token address.
-        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWithGateway(
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
             address(gatewayDiamond)
         );
         saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress});

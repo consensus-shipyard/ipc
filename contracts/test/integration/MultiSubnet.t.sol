@@ -70,10 +70,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         rootGatewayGetter = GatewayGetterFacet(address(rootGateway));
         rootGatewayManager = GatewayManagerFacet(address(rootGateway));
 
-        rootNativeSubnetActor = createSubnetActor(subnetActorWithParams(address(rootGateway), rootSubnetName));
+        rootNativeSubnetActor = createSubnetActor(defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName));
 
         rootTokenSubnetActor = createSubnetActor(
-            subnetActorWithParams(address(rootGateway), rootSubnetName, address(token))
+            defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName, address(token))
         );
 
         tokenSubnetPath = new address[](1);

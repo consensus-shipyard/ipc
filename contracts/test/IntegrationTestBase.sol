@@ -40,6 +40,9 @@ import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
 import {SupplySourceHelper} from "../src/lib/SupplySourceHelper.sol";
 import {TestUtils} from "./helpers/TestUtils.sol";
 import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
+import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
+import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
+import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
 contract TestParams {
     uint64 constant MAX_NONCE = type(uint64).max;
@@ -152,11 +155,19 @@ contract TestSubnetActor is Test, TestParams {
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
     }
 
-    function subnetActorWithParams(
+    function defaultSubnetActorParamsWith(
         address gw,
         SubnetID memory parentID
     ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
         SupplySource memory native = SupplySourceHelper.native();
+        return defaultSubnetActorParamsWith(gw, parentID, native);
+    }
+
+    function defaultSubnetActorParamsWith(
+        address gw,
+        SubnetID memory parentID,
+        SupplySource memory source
+    ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: parentID,
             ipcGatewayAddr: gw,
@@ -168,13 +179,18 @@ contract TestSubnetActor is Test, TestParams {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             permissionMode: PermissionMode.Collateral,
-            supplySource: native
+            supplySource: source
         });
-
         return params;
     }
 
-    function subnetActorWithParams(
+    function defaultSubnetActorParamsWith(
+        address gw
+    ) internal pure virtual returns (SubnetActorDiamond.ConstructorParams memory) {
+        return defaultSubnetActorParamsWith(gw, SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}), SupplySourceHelper.native());
+    }
+
+    function defaultSubnetActorParamsWith(
         address gw,
         SubnetID memory parentID,
         address tokenAddress
@@ -192,28 +208,6 @@ contract TestSubnetActor is Test, TestParams {
             permissionMode: PermissionMode.Collateral,
             supplySource: SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress})
         });
-
-        return params;
-    }
-
-    function defaultSubnetActorParamsWithGateway(
-        address gw
-    ) internal pure virtual returns (SubnetActorDiamond.ConstructorParams memory) {
-        SupplySource memory native = SupplySourceHelper.native();
-        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
-            parentId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-            ipcGatewayAddr: gw,
-            consensus: ConsensusType.Fendermint,
-            minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
-            minValidators: DEFAULT_MIN_VALIDATORS,
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
-            powerScale: DEFAULT_POWER_SCALE,
-            permissionMode: PermissionMode.Collateral,
-            supplySource: native
-        });
-
         return params;
     }
 }
@@ -223,6 +217,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     using SupplySourceHelper for SupplySource;
     using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
+    using GatewayFacetsHelper for address;
+    using GatewayFacetsHelper for GatewayDiamond;
+    using SubnetActorFacetsHelper for address;
+    using SubnetActorFacetsHelper for SubnetActorDiamond;
+    using DiamondFacetsHelper for address;
+    using DiamondFacetsHelper for GatewayDiamond;
+    using DiamondFacetsHelper for SubnetActorDiamond;
 
     event SubnetRegistryCreated(address indexed subnetRegistryAddress);
 
@@ -236,28 +237,28 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
 
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
-        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
-        gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
-        gwCutter = DiamondCutFacet(address(gatewayDiamond));
+        gwGetter = gatewayDiamond.getter();
+        gwManager = gatewayDiamond.manager();
+        gwCheckpointingFacet = gatewayDiamond.checkpointer();
+        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
+        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
+        gwMessenger = gatewayDiamond.messenger();
+        gwLouper = gatewayDiamond.diamondLouper();
+        gwCutter = gatewayDiamond.diamondCutter();
 
         // create a subnet actor in the root network.
-        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWithGateway(
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
             address(gatewayDiamond)
         );
 
         saDiamond = createSubnetActor(saConstructorParams);
-        saManager = SubnetActorManagerFacet(address(saDiamond));
-        saGetter = SubnetActorGetterFacet(address(saDiamond));
-        saPauser = SubnetActorPauseFacet(address(saDiamond));
-        saRewarder = SubnetActorRewardFacet(address(saDiamond));
-        saCheckpointer = SubnetActorCheckpointingFacet(address(saDiamond));
-        saLouper = DiamondLoupeFacet(address(saDiamond));
-        saCutter = DiamondCutFacet(address(saDiamond));
+        saManager = saDiamond.manager();
+        saGetter = saDiamond.getter();
+        saPauser = saDiamond.pauser();
+        saRewarder = saDiamond.rewarder();
+        saCheckpointer = saDiamond.checkpointer();
+        saLouper = saDiamond.diamondLouper();
+        saCutter = saDiamond.diamondCutter();
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
@@ -270,7 +271,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
         });
-
         return params;
     }
 
@@ -282,7 +282,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
         });
-
         return params;
     }
 
@@ -290,7 +289,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
         TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
-
         GatewayManagerFacet manager = new GatewayManagerFacet();
         GatewayGetterFacet getter = new GatewayGetterFacet();
         GatewayMessengerFacet messenger = new GatewayMessengerFacet();
@@ -610,13 +608,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
-        saManager = SubnetActorManagerFacet(address(saDiamond));
-        saPauser = SubnetActorPauseFacet(address(saDiamond));
-        saRewarder = SubnetActorRewardFacet(address(saDiamond));
-        saCheckpointer = SubnetActorCheckpointingFacet(address(saDiamond));
-        saGetter = SubnetActorGetterFacet(address(saDiamond));
-        saCutter = DiamondCutFacet(address(saDiamond));
-        saLouper = DiamondLoupeFacet(address(saDiamond));
+        saManager = saDiamond.manager();
+        saPauser = saDiamond.pauser();
+        saRewarder = saDiamond.rewarder();
+        saCheckpointer = saDiamond.checkpointer();
+        saGetter = saDiamond.getter();
+        saCutter = saDiamond.diamondCutter();
+        saLouper = saDiamond.diamondLouper();
     }
 
     function createMockedSubnetActorWithGateway(address gw) public returns (SubnetActorDiamond) {
@@ -641,7 +639,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(gw);
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(gw);
 
         SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params);
 
