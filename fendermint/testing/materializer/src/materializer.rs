@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use fendermint_vm_genesis::Collateral;
 
-use crate::{manifest::Balance, AccountName, NodeName, RelayerName, SubnetName};
+use crate::{manifest::Balance, AccountName, NodeName, RelayerName, SubnetName, TestnetName};
 
 /// The materializer is a component to provision resources of a testnet, and
 /// to carry out subsequent commands on them, e.g. to restart nodes.
@@ -35,7 +35,9 @@ use crate::{manifest::Balance, AccountName, NodeName, RelayerName, SubnetName};
 #[async_trait]
 pub trait Materializer {
     /// Represents the entire hierarchy of a testnet, e.g. a common docker network
-    /// and directory on the file system.
+    /// and directory on the file system. It has its own type so the materializer
+    /// doesn't have to remember what it created for a testnet, and different
+    /// testnets can be kept isolated from each other.
     type Network: Send + Sync;
     /// Capture where the IPC stack (the gateway and the registry) has been deployed on a subnet.
     /// These are the details which normally go into the `ipc-cli` configuration files.
@@ -50,6 +52,14 @@ pub trait Materializer {
     type Node: Sync + Send;
     /// The handle to a relayer process.
     type Relayer: Sync + Send;
+
+    /// Create the physical network group.
+    ///
+    /// The return value should be able to able to represent settings that allow nodes
+    /// to connect to each other, as well as perhaps to be labelled as a group
+    /// (although for that we can use the common name prefixes as well).
+    async fn create_network(&mut self, testnet_name: &TestnetName)
+        -> anyhow::Result<Self::Network>;
 
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
     fn create_account(&mut self, account_name: &AccountName) -> Self::Account;
@@ -182,11 +192,15 @@ pub struct NodeConfig<'a, M>
 where
     M: Materializer + ?Sized,
 {
+    /// The physical network to join.
+    pub network: &'a M::Network,
     /// The genesis of this subnet; it should indicate whether this is a rootnet or a deeper level.
     pub genesis: &'a M::Genesis,
     /// The validator keys if this is a validator node; none if just a full node.
     pub validator: Option<&'a M::Account>,
     /// The node for the top-down syncer to follow; none if this is a root node, or if the parent is an external address.
+    ///
+    /// This can potentially also be used to configure the IPLD Resolver seeds, to connect across subnets.
     pub parent_node: Option<&'a M::Node>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,

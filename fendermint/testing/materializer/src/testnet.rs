@@ -31,6 +31,7 @@ use crate::{
 /// bit simpler.
 pub struct Testnet<M: Materializer> {
     name: TestnetName,
+    network: Option<M::Network>,
     accounts: BTreeMap<AccountId, M::Account>,
     deployments: BTreeMap<SubnetName, M::Deployment>,
     genesis: BTreeMap<SubnetName, M::Genesis>,
@@ -46,6 +47,7 @@ where
     pub fn new(id: &TestnetId) -> Self {
         Self {
             name: TestnetName::new(id),
+            network: Default::default(),
             accounts: Default::default(),
             deployments: Default::default(),
             genesis: Default::default(),
@@ -67,6 +69,13 @@ where
         let mut t = Self::new(&id);
         let root_name = t.root();
 
+        // Create the common network.
+        t.network = Some(
+            m.create_network(&t.name)
+                .await
+                .context("failed to create the network")?,
+        );
+
         // Create keys for accounts.
         for (account_id, _) in manifest.accounts {
             t.create_account(m, account_id)
@@ -85,6 +94,13 @@ where
         }
 
         Ok(t)
+    }
+
+    /// Return a reference to the physical network.
+    pub fn network(&self) -> anyhow::Result<&M::Network> {
+        self.network
+            .as_ref()
+            .ok_or_else(|| anyhow!("the network hasn't been created"))
     }
 
     /// Create a cryptographic keypair for an account ID.
@@ -213,9 +229,11 @@ where
         node: &Node,
     ) -> anyhow::Result<()> {
         let genesis = self.genesis(subnet_name)?;
+        let network = self.network()?;
         let node_name = subnet_name.node(node_id);
 
         let node_config = NodeConfig {
+            network,
             genesis,
             validator: match &node.mode {
                 NodeMode::Full => None,

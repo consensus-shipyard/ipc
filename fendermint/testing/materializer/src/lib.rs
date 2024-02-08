@@ -23,7 +23,7 @@ impl<'de> Deserialize<'de> for ResourceId {
     where
         D: serde::Deserializer<'de>,
     {
-        String::deserialize(deserializer).map(|s| Self::from(s))
+        String::deserialize(deserializer).map(Self::from)
     }
 }
 
