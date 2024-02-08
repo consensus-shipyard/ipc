@@ -2705,6 +2705,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_accumulator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_amt",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_chainmetadata"
 version = "0.1.0"
 dependencies = [
@@ -2746,6 +2765,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_accumulator",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_objectstore",
  "fil_actor_bundler",
@@ -2972,6 +2992,7 @@ dependencies = [
  "cid",
  "clap 4.4.14",
  "ethers",
+ "fendermint_actor_accumulator",
  "fendermint_actor_objectstore",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",
@@ -3127,6 +3148,7 @@ dependencies = [
  "async-trait",
  "cid",
  "ethers",
+ "fendermint_actor_accumulator",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_objectstore",
  "fendermint_actors",

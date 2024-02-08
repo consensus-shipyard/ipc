@@ -57,7 +57,6 @@ impl State {
         content: Vec<u8>,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-
         let new_content = match hamt.get(&key)? {
             Some(existing) => {
                 let mut new_content = existing.clone();
@@ -66,7 +65,6 @@ impl State {
             }
             None => content,
         };
-
         hamt.set(key, new_content)?;
         self.root = hamt.flush()?;
         Ok(self.root)
@@ -74,9 +72,12 @@ impl State {
 
     pub fn delete<BS: Blockstore>(&mut self, store: &BS, key: &BytesKey) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        hamt.delete(key)?;
-        self.root = hamt.flush()?;
-        Ok(self.root)
+        if hamt.contains_key(key)? {
+            hamt.delete(key)?;
+            self.root = hamt.flush()?;
+            return Ok(self.root);
+        }
+        return Err(anyhow::anyhow!("key not found"));
     }
 
     pub fn get<BS: Blockstore>(
@@ -185,6 +186,14 @@ mod tests {
         let result = state.get(&store, &key);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn test_delete_missing() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let key = BytesKey("missing".as_bytes().to_vec());
+        assert!(state.delete(&store, &key).is_err());
     }
 
     #[test]

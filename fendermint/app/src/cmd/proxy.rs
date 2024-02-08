@@ -17,6 +17,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -27,6 +28,7 @@ use tokio::sync::Mutex;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 const MAX_BODY_LENGTH: u64 = 1024 * 1024 * 1024;
+const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
 cmd! {
     ProxyArgs(self) {
@@ -35,9 +37,10 @@ cmd! {
             ProxyCommands::Start { args } => {
                 let seq = args.sequence;
                 let nonce = Arc::new(Mutex::new(seq));
-
+                // Admin routes
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
+                // Object Store routes
                 let add_route = warp::path!("v1" / "os" / String)
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_BODY_LENGTH))
@@ -51,7 +54,7 @@ cmd! {
                     .and(warp::delete())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
-                    .and(with_nonce(nonce))
+                    .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and_then(handle_delete);
                 let get_route = warp::path!("v1" / "os" / String)
@@ -62,16 +65,34 @@ cmd! {
                     .and_then(handle_get);
                 let list_route = warp::path!("v1" / "os")
                     .and(warp::get())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(warp::query::<HeightQuery>())
+                    .and_then(handle_list);
+                // Accumulator routes
+                let push_route = warp::path!("v1" / "acc")
+                    .and(warp::put())
+                    .and(warp::body::content_length_limit(MAX_EVENT_LENGTH))
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(with_nonce(nonce))
+                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::body::bytes())
+                    .and_then(handle_push);
+                let root_route = warp::path!("v1" / "acc")
+                    .and(warp::get())
                     .and(with_client(client))
                     .and(with_args(args))
                     .and(warp::query::<HeightQuery>())
-                    .and_then(handle_list);
+                    .and_then(handle_root);
 
                 let router = health_route
                     .or(add_route)
                     .or(delete_route)
                     .or(get_route)
                     .or(list_route)
+                    .or(push_route)
+                    .or(root_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
                         .allow_methods(vec!["PUT", "DEL", "GET"]))
@@ -230,6 +251,46 @@ async fn handle_list(
         .collect();
 
     Ok(warp::reply::json(&list))
+}
+
+async fn handle_push(
+    client: FendermintClient,
+    mut args: TransArgs,
+    nonce: Arc<Mutex<u64>>,
+    gas_limit: Option<u64>,
+    body: Bytes,
+) -> Result<impl Reply, Rejection> {
+    let mut nonce_lck = nonce.lock().await;
+    args.sequence = *nonce_lck;
+    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
+
+    let res = datarepo_push(client.clone(), args.clone(), body)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("push error: {}", e),
+            })
+        })?;
+
+    *nonce_lck += 1;
+    Ok(warp::reply::json(&res))
+}
+
+async fn handle_root(
+    client: FendermintClient,
+    args: TransArgs,
+    hq: HeightQuery,
+) -> Result<impl Reply, Rejection> {
+    let res = datarepo_root(client, args, hq.height.unwrap_or_else(|| 0))
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("get error: {}", e),
+            })
+        })?;
+
+    let json = json!({"repo_root": res.unwrap_or_default().to_string()});
+    Ok(warp::reply::json(&json))
 }
 
 #[derive(Clone, Debug)]
@@ -419,6 +480,34 @@ async fn datarepo_list(
     let res = client
         .inner
         .datarepo_list_call(TokenAmount::default(), gas_params, h)
+        .await?;
+
+    Ok(res.return_data)
+}
+
+async fn datarepo_push(
+    client: FendermintClient,
+    args: TransArgs,
+    content: Bytes,
+) -> anyhow::Result<Txn> {
+    broadcast(client, args, |mut client, value, gas_params| {
+        Box::pin(async move { client.datarepo_push(content, value, gas_params).await })
+    })
+    .await
+}
+
+async fn datarepo_root(
+    client: FendermintClient,
+    args: TransArgs,
+    height: u64,
+) -> anyhow::Result<Option<Cid>> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let h = FvmQueryHeight::from(height);
+
+    let res = client
+        .inner
+        .datarepo_root_call(TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)

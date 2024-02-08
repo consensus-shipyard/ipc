@@ -22,6 +22,7 @@ fendermint_rpc = { path = "../../rpc" }
 fendermint_actors = { path = "../../actors" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_objectstore = { path = "../../actors/objectstore" }
+fendermint_actor_accumulator = { path = "../../actors/accumulator" }
 ipc_actors_abis = { workspace = true }
 
 ipc-api = { workspace = true }

@@ -29,6 +29,7 @@ members = [
   "fendermint/actors",
   "fendermint/actors/chainmetadata",
   "fendermint/actors/objectstore",
+  "fendermint/actors/accumulator",
 ]
 
 [workspace.package]
