@@ -41,13 +41,10 @@ pub fn effective_gas_premium(msg: &Message, base_fee: &TokenAmount) -> TokenAmou
     available
 }
 
-// finds 55th percntile instead of median to put negative pressure on gas price
+// finds 55th percentile instead of median to put negative pressure on gas price
 // Rust implementation of:
 // https://github.com/consensus-shipyard/lotus/blob/156f5556b3ecc042764d76308dca357da3adfb4d/node/impl/full/gas.go#L144
-pub fn median_gas_premium(
-    prices: &mut Vec<(TokenAmount, i64)>,
-    block_gas_target: i64,
-) -> TokenAmount {
+pub fn median_gas_premium(prices: &mut [(TokenAmount, i64)], block_gas_target: i64) -> TokenAmount {
     // Sort in descending order based on premium
     prices.sort_by(|a, b| b.0.cmp(&a.0));
     let blocks = prices.len() as i64;
