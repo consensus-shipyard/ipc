@@ -39,7 +39,7 @@ impl FluenceActor {
 
         let result = fluence_actor_sdk::run_randomx(params.global_nonce, params.local_nonce)
             .map_err(|error_num| {
-                log::error!("run_randomx failed with {error_num}");
+                log::error!("actor::run_randomx: run_randomx failed with {error_num}");
 
                 let err_msg = format!("run_randomx syscall failed with {error_num}");
                 ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), err_msg, None)
