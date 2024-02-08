@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use crate::fvm::store::memory::MemoryBlockstore;
 use anyhow::{anyhow, bail, Context};
 use cid::{multihash::Code, Cid};
 use ethers::{abi::Tokenize, core::abi::Abi};
@@ -37,7 +38,6 @@ use fvm_shared::{
 };
 use num_traits::Zero;
 use serde::Serialize;
-use crate::fvm::store::memory::MemoryBlockstore;
 
 use super::{exec::MachineBlockstore, FvmExecState, FvmStateParams};
 
@@ -143,7 +143,6 @@ where
         builtin_actor_bundle: Vec<u8>,
         custom_actor_bundle: Vec<u8>,
     ) -> anyhow::Result<Self> {
-
         // ============== TO BE DELETE =============
         let mem_store = MemoryBlockstore::new();
         // Load the builtin actor bundle.
@@ -154,8 +153,11 @@ where
         // Load the custom actor bundle.
         let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) =
             parse_bundle(&mem_store, &custom_actor_bundle).await?;
-        let custom_actor_manifest =
-            CustomActorManifest::load(&mem_store, &custom_manifest_data_cid, custom_manifest_version)?;
+        let custom_actor_manifest = CustomActorManifest::load(
+            &mem_store,
+            &custom_manifest_data_cid,
+            custom_manifest_version,
+        )?;
         // ============== TO BE DELETE =============
 
         let state_tree = empty_state_tree(store.clone())?;
@@ -276,7 +278,7 @@ where
     }
 
     /// Creates an actor using code specified in the manifest.
-    fn create_actor_internal(
+    pub(crate) fn create_actor_internal(
         &mut self,
         code_cid: Cid,
         id: ActorID,

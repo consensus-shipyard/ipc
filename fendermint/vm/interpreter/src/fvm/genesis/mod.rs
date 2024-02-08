@@ -7,6 +7,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
+use crate::fvm::genesis::builtin::BuiltInActorDeployer;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
@@ -15,7 +16,9 @@ use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
-use fendermint_vm_actor_interface::{account, burntfunds, chainmetadata, cron, eam, EMPTY_ARR, init, ipc, reward, system};
+use fendermint_vm_actor_interface::{
+    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+};
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
@@ -24,7 +27,6 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
-use crate::fvm::genesis::builtin::BuiltInActorDeployer;
 
 use crate::GenesisInterpreter;
 
@@ -144,10 +146,9 @@ where
 
         // STAGE 1: First we initialize native built-in actors.
         let builtin_deployer = BuiltInActorDeployer::new(&eth_builtin_ids, &eth_libs);
-        let addr_to_id = builtin_deployer.process_genesis(
-            &mut state,
-            &genesis
-        ).await?;
+        let addr_to_id = builtin_deployer
+            .process_genesis(&mut state, &genesis)
+            .await?;
 
         // STAGE 1b: Then we initialize the in-repo custom actors.
 

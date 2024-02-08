@@ -1,23 +1,23 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::BTreeSet;
+use crate::fvm::state::FvmGenesisState;
+use crate::fvm::store::memory::MemoryBlockstore;
 use anyhow::{anyhow, Context};
-use cid::Cid;
 use cid::multihash::Code;
+use cid::Cid;
+use fendermint_actors::Manifest as CustomActorManifest;
+use fendermint_eth_hardhat::ContractSourceAndName;
+use fendermint_vm_actor_interface::init::AddressMap;
+use fendermint_vm_actor_interface::{account, burntfunds, cron, eam, init, reward, system};
+use fendermint_vm_genesis::Genesis;
 use fvm_ipld_blockstore::{Block, Blockstore};
 use fvm_ipld_car::load_car_unchecked;
 use fvm_ipld_encoding::{CborStore, DAG_CBOR};
-use fvm_shared::ActorID;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::ActorID;
 use num_traits::Zero;
-use fendermint_eth_hardhat::ContractSourceAndName;
-use fendermint_vm_genesis::Genesis;
-use fendermint_actors::Manifest as CustomActorManifest;
-use fendermint_vm_actor_interface::{account, burntfunds, cron, eam, init, reward, system};
-use fendermint_vm_actor_interface::init::AddressMap;
-use crate::fvm::state::FvmGenesisState;
-use crate::fvm::store::memory::MemoryBlockstore;
+use std::collections::BTreeSet;
 
 type CodeByName = (String, Cid);
 
@@ -26,30 +26,44 @@ pub(crate) struct BuiltInActorDeployer<'a> {
     eth_libs: &'a Vec<ContractSourceAndName>,
 }
 
-impl <'a> BuiltInActorDeployer<'a> {
+impl<'a> BuiltInActorDeployer<'a> {
     pub fn new(
         eth_builtin_ids: &'a BTreeSet<ActorID>,
         eth_libs: &'a Vec<ContractSourceAndName>,
     ) -> Self {
-        Self { eth_builtin_ids, eth_libs }
+        Self {
+            eth_builtin_ids,
+            eth_libs,
+        }
     }
 
     pub async fn process_genesis<DB>(
         &self,
         state: &mut FvmGenesisState<DB>,
         genesis: &Genesis,
-    ) -> anyhow::Result<AddressMap> where DB: Blockstore + 'static + Send + Sync + Clone {
-        let (mem_store, mut builtin) = self.load_builtin(
-            &state.builtin_actor_bundle,
-        ).await?;
+    ) -> anyhow::Result<AddressMap>
+    where
+        DB: Blockstore + 'static + Send + Sync + Clone,
+    {
+        let (mem_store, mut builtin) = self.load_builtin(&state.builtin_actor_bundle).await?;
 
-        let new_cid = self.replace_eam_actor(state, &mem_store, &mut builtin).await?;
+        let (new_cid, eam_code_cid) = self
+            .replace_eam_actor(state, &mem_store, &mut builtin)
+            .await?;
 
-        self.deploy_actors(state, new_cid, genesis)
+        self.deploy_actors(state, new_cid, genesis, eam_code_cid)
     }
 
-    fn deploy_actors<DB>(&self, state: &mut FvmGenesisState<DB>, builtin_actors_cid: Cid, genesis: &Genesis)
-        -> anyhow::Result<AddressMap> where DB: Blockstore + 'static + Send + Sync + Clone {
+    fn deploy_actors<DB>(
+        &self,
+        state: &mut FvmGenesisState<DB>,
+        builtin_actors_cid: Cid,
+        genesis: &Genesis,
+        eam_code_cid: Cid,
+    ) -> anyhow::Result<AddressMap>
+    where
+        DB: Blockstore + 'static + Send + Sync + Clone,
+    {
         // System actor
         state
             .create_builtin_actor(
@@ -71,7 +85,7 @@ impl <'a> BuiltInActorDeployer<'a> {
             &self.eth_builtin_ids,
             self.eth_libs.len() as u64,
         )
-            .context("failed to create init state")?;
+        .context("failed to create init state")?;
 
         state
             .create_builtin_actor(
@@ -134,14 +148,14 @@ impl <'a> BuiltInActorDeployer<'a> {
                 .collect(),
         )?;
         state
-            .create_builtin_actor(
-                    eam::EAM_ACTOR_CODE_ID,
-                    eam::EAM_ACTOR_ID,
-                    &eam_state,
-                    TokenAmount::zero(),
-                    None,
-                )
-                    .context("failed to create EAM actor")?;
+            .create_actor_internal(
+                eam_code_cid,
+                eam::EAM_ACTOR_ID,
+                &eam_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create EAM actor")?;
 
         Ok(addr_to_id)
     }
@@ -151,12 +165,17 @@ impl <'a> BuiltInActorDeployer<'a> {
         state: &mut FvmGenesisState<DB>,
         store: &MemoryBlockstore,
         builtin: &mut Vec<CodeByName>,
-    ) -> anyhow::Result<Cid> where DB: Blockstore + 'static + Send + Sync + Clone {
-        let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) = parse_bundle(&store, &state.custom_actor_bundle).await?;
+    ) -> anyhow::Result<(Cid, Cid)>
+    where
+        DB: Blockstore + 'static + Send + Sync + Clone,
+    {
+        let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) =
+            parse_bundle(&store, &state.custom_actor_bundle).await?;
         let custom_actor_manifest =
             CustomActorManifest::load(&store, &custom_manifest_data_cid, custom_manifest_version)?;
 
-        let code = custom_actor_manifest.code_by_name(fendermint_actor_eam::IPC_EAM_ACTOR_NAME)
+        let code = custom_actor_manifest
+            .code_by_name(fendermint_actor_eam::IPC_EAM_ACTOR_NAME)
             .ok_or_else(|| anyhow!("ipc eam actor not found"))?;
 
         for (_, code_cid) in builtin.iter_mut().filter(|(name, _)| name == "eam") {
@@ -164,19 +183,27 @@ impl <'a> BuiltInActorDeployer<'a> {
         }
 
         let data = fvm_ipld_encoding::to_vec(&builtin)?;
-        let new_root_cid = store.put(Code::Blake2b256, &Block { codec: DAG_CBOR, data })?;
+        let new_root_cid = store.put(
+            Code::Blake2b256,
+            &Block {
+                codec: DAG_CBOR,
+                data,
+            },
+        )?;
 
         store.copy_to(state.store())?;
 
-        Ok(new_root_cid)
+        Ok((new_root_cid, *code))
     }
 
-    async fn load_builtin(&self, builtin_actor_bundle: &[u8]) -> anyhow::Result<(MemoryBlockstore, Vec<CodeByName>)> {
+    async fn load_builtin(
+        &self,
+        builtin_actor_bundle: &[u8],
+    ) -> anyhow::Result<(MemoryBlockstore, Vec<CodeByName>)> {
         let mem_store = MemoryBlockstore::new();
 
         // Load the builtin actor bundle.
-        let (ver, root_cid): (u32, Cid) =
-            parse_bundle(&mem_store, builtin_actor_bundle).await?;
+        let (ver, root_cid): (u32, Cid) = parse_bundle(&mem_store, builtin_actor_bundle).await?;
 
         if ver != 1 {
             return Err(anyhow!("unsupported manifest version {}", ver));

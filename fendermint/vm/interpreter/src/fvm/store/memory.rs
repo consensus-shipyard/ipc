@@ -44,4 +44,3 @@ impl Blockstore for MemoryBlockstore {
         Ok(())
     }
 }
-
