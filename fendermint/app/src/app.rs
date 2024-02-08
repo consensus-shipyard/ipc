@@ -102,11 +102,8 @@ pub struct AppConfig<S: KVStore> {
     pub state_hist_namespace: S::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
-    /// Whether to update the application state on empty blocks,
-    /// which will cause those blocks to be published even if
-    /// CometBFT would otherwise skip them, due to the change
-    /// in the application hash.
-    pub state_update_on_empty: bool,
+    /// Whether to update the timestamp on empty blocks.
+    pub update_timestamp_on_empty: bool,
     /// Path to the Wasm bundle.
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
@@ -165,8 +162,8 @@ where
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
-    /// Whether to update the application state on empty blocks.
-    state_update_on_empty: bool,
+    /// Whether to update the timestamp state on empty blocks.
+    update_timestamp_on_empty: bool,
 }
 
 impl<DB, SS, S, I> App<DB, SS, S, I>
@@ -196,7 +193,7 @@ where
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
-            state_update_on_empty: config.state_update_on_empty,
+            update_timestamp_on_empty: config.update_timestamp_on_empty,
             interpreter: Arc::new(interpreter),
             chain_env,
             snapshots,
@@ -785,12 +782,17 @@ where
         // Update the application state.
         let mut state = self.committed_state()?;
 
-        // If the block is empty, and there has been no update to the state,
-        // then we can opt to skip updating the the timestamp and the height,
-        // because they would be the only thing changing the application state,
-        // which would cause CometBFT to produce an empty block even if it's
-        // told to avoid that.
-        let update_params = self.state_update_on_empty
+        // CometBFT decided to create a block, so we must remember what height we're at,
+        // but we can opt to not change the application hash if there was no meaningful change.
+        state.block_height = block_height;
+
+        // If the block is empty, and there has been no update to the state, then we can
+        // opt to skip updating the the timestamp, because it  would be the only thing
+        // changing the application state, which would cause CometBFT to produce an empty
+        // block even if it's configured to skip them.
+        // But it might create empty blocks anyway, so we should always save the height.
+        // See https://docs.cometbft.com/v0.37/core/configuration#empty-blocks-vs-no-empty-blocks
+        let update_params = self.update_timestamp_on_empty
             || !block_empty
             || is_dirty
             || state_root != state.state_params.state_root;
@@ -800,11 +802,9 @@ where
             state.state_params.power_scale = power_scale;
             state.state_params.circ_supply = circ_supply;
             state.state_params.timestamp = block_timestamp;
-            state.block_height = block_height;
         }
 
         let app_hash = state.app_hash();
-        let block_height = state.block_height;
 
         tracing::debug!(
             block_height,
@@ -821,15 +821,6 @@ where
         } else {
             block_height.saturating_sub(self.state_hist_size)
         };
-
-        let commit = response::Commit {
-            data: app_hash.into(),
-            retain_height: retain_height.try_into().expect("height is valid"),
-        };
-
-        if !update_params {
-            return Ok(commit);
-        }
 
         // TODO: We can defer committing changes the resolution pool to this point.
         // For example if a checkpoint is successfully executed, that's when we want to remove
@@ -871,7 +862,10 @@ where
         let mut guard = self.check_state.lock().await;
         *guard = None;
 
-        Ok(commit)
+        Ok(response::Commit {
+            data: app_hash.into(),
+            retain_height: retain_height.try_into().expect("height is valid"),
+        })
     }
 
     /// List the snapshots available on this node to be served to remote peers.
