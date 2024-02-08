@@ -16,6 +16,8 @@ import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 
 error NoTransfer();
 error ZeroAddress();
+error InvalidMessageSignature();
+error InvalidMethod();
 
 /**
  * @title IpcTokenController
@@ -102,7 +104,9 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
         bytes4 methodSignature = toBytes4(callMsg.method);
-        require(methodSignature == bytes4(keccak256("receiveAndUnlock(address,uint256)")), "placeholder for ipc error");
+        if (methodSignature != bytes4(keccak256("receiveAndUnlock(address,uint256)"))) {
+            revert InvalidMethod();
+        }
 
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         // Call receiveAndUnlock to process the unlocking and transfer of tokens
@@ -111,8 +115,9 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
     }
 
     function receiveAndUnlock(address receiver, uint256 amount) private {
-        // Ensure that the receiver address is not zero
-        require(receiver != address(0), "Receiver cannot be the zero address");
+        if (receiver == address(0)) {
+            revert ZeroAddress();
+        }
 
         // Transfer the specified amount of tokens to the receiver
         IERC20(tokenContractAddress).safeTransfer(receiver, amount);
@@ -183,7 +188,10 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
     ) internal override {}
 
     function toBytes4(bytes memory data) internal pure returns (bytes4 result) {
-        require(data.length >= 4, "Data too short to convert to bytes4");
+        if (data.length < 4) {
+            revert InvalidMessageSignature();
+        }
+
         // Assembly block to directly load the first 4 bytes
         assembly {
             result := mload(add(data, 32))
