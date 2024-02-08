@@ -13,7 +13,7 @@ use crate::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, Rootnet, Subnet,
     },
     materializer::{Materializer, NodeConfig, SubnetConfig},
-    AccountId, AccountName, NodeId, NodeName, RelayerName, SubnetId, SubnetName,
+    AccountId, NodeId, NodeName, RelayerName, SubnetId, SubnetName, TestnetId, TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -30,6 +30,7 @@ use crate::{
 /// perhaps this way writing a [Materializer] is just a tiny
 /// bit simpler.
 pub struct Testnet<M: Materializer> {
+    name: TestnetName,
     accounts: BTreeMap<AccountId, M::Account>,
     deployments: BTreeMap<SubnetName, M::Deployment>,
     genesis: BTreeMap<SubnetName, M::Genesis>,
@@ -38,21 +39,13 @@ pub struct Testnet<M: Materializer> {
     relayers: BTreeMap<RelayerName, M::Relayer>,
 }
 
-impl<M> Default for Testnet<M>
-where
-    M: Materializer + Sync + Send,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<M> Testnet<M>
 where
     M: Materializer + Sync + Send,
 {
-    pub fn new() -> Self {
+    pub fn new(id: &TestnetId) -> Self {
         Self {
+            name: TestnetName::new(id),
             accounts: Default::default(),
             deployments: Default::default(),
             genesis: Default::default(),
@@ -62,13 +55,17 @@ where
         }
     }
 
+    pub fn root(&self) -> SubnetName {
+        self.name.root()
+    }
+
     /// Set up a testnet from scratch.
     ///
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
-    pub async fn setup(m: &mut M, manifest: Manifest) -> anyhow::Result<Self> {
-        let mut t = Self::new();
-        let root_name = SubnetName::root();
+    pub async fn setup(m: &mut M, id: TestnetId, manifest: Manifest) -> anyhow::Result<Self> {
+        let mut t = Self::new(&id);
+        let root_name = t.root();
 
         // Create keys for accounts.
         for (account_id, _) in manifest.accounts {
@@ -92,7 +89,7 @@ where
 
     /// Create a cryptographic keypair for an account ID.
     pub fn create_account(&mut self, m: &mut M, id: AccountId) {
-        let n = AccountName::new(&id);
+        let n = self.name.account(&id);
         let a = m.create_account(&n);
         self.accounts.insert(id, a);
     }

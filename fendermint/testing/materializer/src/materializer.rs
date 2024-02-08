@@ -34,6 +34,9 @@ use crate::{manifest::Balance, AccountName, NodeName, RelayerName, SubnetName};
 /// know.
 #[async_trait]
 pub trait Materializer {
+    /// Represents the entire hierarchy of a testnet, e.g. a common docker network
+    /// and directory on the file system.
+    type Network: Send + Sync;
     /// Capture where the IPC stack (the gateway and the registry) has been deployed on a subnet.
     /// These are the details which normally go into the `ipc-cli` configuration files.
     type Deployment: Sync + Send;
