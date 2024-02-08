@@ -41,9 +41,9 @@ impl CommandLineHandler for WalletSetDefault {
 #[derive(Debug, Args)]
 #[command(about = "Set default wallet")]
 pub(crate) struct WalletSetDefaultArgs {
-    #[arg(long, short, help = "Address of the key to default")]
+    #[arg(long, help = "Address of the key to default")]
     pub address: String,
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
 }
 
@@ -80,6 +80,6 @@ impl CommandLineHandler for WalletGetDefault {
 #[derive(Debug, Args)]
 #[command(about = "Set default wallet")]
 pub(crate) struct WalletGetDefaultArgs {
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
 }

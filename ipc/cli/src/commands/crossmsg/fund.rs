@@ -57,17 +57,16 @@ impl CommandLineHandler for Fund {
 #[derive(Debug, Args)]
 #[command(about = "Send funds from a parent to a child subnet")]
 pub(crate) struct FundArgs {
-    #[arg(long, short, help = "The gateway address of the subnet")]
+    #[arg(long, help = "The gateway address of the subnet")]
     pub gateway_address: Option<String>,
-    #[arg(long, short, help = "The address to send funds from")]
+    #[arg(long, help = "The address to send funds from")]
     pub from: Option<String>,
     #[arg(
         long,
-        short,
         help = "The address to send funds to (if not set, amount sent to from address)"
     )]
     pub to: Option<String>,
-    #[arg(long, short, help = "The subnet to fund")]
+    #[arg(long, help = "The subnet to fund")]
     pub subnet: String,
     #[arg(help = "The amount to fund in FIL, in whole FIL")]
     pub amount: f64,
@@ -107,9 +106,9 @@ impl CommandLineHandler for PreFund {
     about = "Add some funds in genesis to an address in a child-subnet"
 )]
 pub struct PreFundArgs {
-    #[arg(long, short, help = "The address funded in the subnet")]
+    #[arg(long, help = "The address funded in the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to add balance to")]
+    #[arg(long, help = "The subnet to add balance to")]
     pub subnet: String,
     #[arg(help = "Add an initial balance for the address in genesis in the subnet")]
     pub initial_balance: f64,
@@ -150,15 +149,14 @@ impl CommandLineHandler for FundWithToken {
 #[derive(Debug, Args)]
 #[command(about = "Send erc20 tokens from a parent to a child subnet")]
 pub(crate) struct FundWithTokenArgs {
-    #[arg(long, short, help = "The address to send funds from")]
+    #[arg(long, help = "The address to send funds from")]
     pub from: Option<String>,
     #[arg(
         long,
-        short,
         help = "The address to send funds to (if not set, amount sent to from address)"
     )]
     pub to: Option<String>,
-    #[arg(long, short, help = "The subnet to fund")]
+    #[arg(long, help = "The subnet to fund")]
     pub subnet: String,
     #[arg(help = "The amount to fund in erc20, in ether, supports up to 9 decimal places")]
     pub amount: f64,

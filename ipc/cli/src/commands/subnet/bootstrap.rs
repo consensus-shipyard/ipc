@@ -35,15 +35,11 @@ impl CommandLineHandler for AddBootstrap {
 #[derive(Debug, Args)]
 #[command(name = "add-bootstrap", about = "Advertise bootstrap in the subnet")]
 pub struct AddBootstrapArgs {
-    #[arg(
-        long,
-        short,
-        help = "The address of the validator adding the bootstrap"
-    )]
+    #[arg(long, help = "The address of the validator adding the bootstrap")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to add the bootstrap to")]
+    #[arg(long, help = "The subnet to add the bootstrap to")]
     pub subnet: String,
-    #[arg(long, short, help = "The bootstrap node's network endpoint")]
+    #[arg(long, help = "The bootstrap node's network endpoint")]
     pub endpoint: String,
 }
 
@@ -78,6 +74,6 @@ impl CommandLineHandler for ListBootstraps {
 #[derive(Debug, Args)]
 #[command(name = "list-bootstraps", about = "List bootstraps in the subnet")]
 pub struct ListBootstrapsArgs {
-    #[arg(long, short, help = "The subnet to list bootstraps from")]
+    #[arg(long, help = "The subnet to list bootstraps from")]
     pub subnet: String,
 }

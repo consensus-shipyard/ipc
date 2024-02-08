@@ -42,11 +42,11 @@ impl CommandLineHandler for SendValue {
 #[derive(Debug, Args)]
 #[command(about = "Send value to an address within a subnet")]
 pub(crate) struct SendValueArgs {
-    #[arg(long, short, help = "The address to send value from")]
+    #[arg(long, help = "The address to send value from")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The address to send value to")]
+    #[arg(long, help = "The address to send value to")]
     pub to: String,
-    #[arg(long, short, help = "The subnet of the addresses")]
+    #[arg(long, help = "The subnet of the addresses")]
     pub subnet: String,
     #[arg(help = "The amount to send (in whole FIL units)")]
     pub amount: f64,
