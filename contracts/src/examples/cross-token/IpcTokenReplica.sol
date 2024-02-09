@@ -16,6 +16,8 @@ import {IpcExchange} from "../../../sdk/IpcContract.sol";
 import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
+import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
+import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 error NoTransfer();
 error ZeroAddress();
@@ -26,6 +28,7 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
     using CrossMsgHelper for IpcEnvelope;
     using SafeERC20 for IERC20;
+    using SubnetIDHelper for SubnetID;
 
     address public parentSubnetUSDC;
     SubnetID public parentSubnet;
@@ -116,6 +119,9 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
 
+        //only accept messages from replica contract
+        verifyIpcEnvelope(envelope);
+
         bytes4 methodSignature = toBytes4(callMsg.method);
         if (methodSignature != bytes4(keccak256("receiveAndMint(address,uint256)"))) {
             revert InvalidMethod();
@@ -124,6 +130,17 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         receiveAndMint(receiver, amount);
         return bytes("");
+    }
+
+    function verifyIpcEnvelope(IpcEnvelope memory envelope) public {
+            SubnetID memory subnetId = envelope.from.subnetId;
+            FvmAddress memory rawAddress = envelope.from.rawAddress;
+            if(!subnetId.equals(parentSubnet)){
+                revert InvalidOriginSubnet();
+            }
+            if(!rawAddress.equal(FvmAddressHelper.from(parentSubnetUSDC))){
+                revert InvalidOriginContract();
+            }
     }
 
     function toBytes4(bytes memory data) internal pure returns (bytes4 result) {
