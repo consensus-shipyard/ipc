@@ -405,36 +405,18 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     // a contract from native subnet with a contract in token subnet through the rootnet.
     function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        IpcEnvelope memory expected;
 
         address caller = address(new MockIpcContractPayable());
-        address recipient = address(new MockIpcContractPayable());
-        uint256 transferAmount = 100;
+        uint256 transferAmount = 123;
 
-        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(caller, 1 ether);
 
-        console.log("---------------register subnets---------------");
-
-        vm.prank(address(rootNativeSubnetActor));
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+        console.log("---------------register subnet---------------");
 
         vm.prank(address(rootTokenSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
-
-        console.log("---------------fund native subnet---------------");
-
-        IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
-            nativeSubnetName,
-            caller,
-            FvmAddressHelper.from(caller),
-            DEFAULT_CROSS_MSG_FEE
-        );
-
-        vm.prank(caller);
-        vm.expectEmit(true, true, true, true, address(rootGateway));
-        emit LibGateway.NewTopDownMessage(address(rootNativeSubnetActor), expected);
-        rootGatewayManager.fund{value: DEFAULT_CROSS_MSG_FEE}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
 
         console.log("---------------fund token subnet---------------");
 
@@ -458,8 +440,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             DEFAULT_CROSS_MSG_FEE
         );
 
-        console.log("--------------- transfer and mint (bottom-up)---------------");
-        // here starts a flow from native subnet to token subnet.
+        console.log("--------------- transfer and mint (top-down) ---------------");
 
         USDCTest testUSDC = new USDCTest();
         testUSDC.mint(transferAmount);
@@ -470,7 +451,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         ipcTokenReplica = new IpcTokenReplica(address(tokenSubnetGateway), address(testUSDC), rootSubnetName);
 
         rootTokenController = new IpcTokenController(
-            address(nativeSubnetGateway),
+            address(rootGateway),
             address(testUSDC),
             tokenSubnetName,
             address(ipcTokenReplica)
@@ -490,37 +471,37 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenController)));
 
         vm.prank(address(testUSDCOwner));
-        expected = rootTokenController.lockAndTransferWithReturn{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        IpcEnvelope memory lockAndTransferEnvelope = rootTokenController.lockAndTransferWithReturn{
+            value: DEFAULT_CROSS_MSG_FEE
+        }(testUSDCOwner, transferAmount);
 
         //check that the message is in unconfirmedTransfers
-        (address receiptSender, uint256 receiptValue) = rootTokenController.getUnconfirmedTransfer(expected.toHash());
-        assertEq(receiptSender, address(this),  "Transfer sender incorrect in unconfirmedTransfers");
-        assertEq(receiptValue, transferAmount,  "Transfer amount incorrect in unconfirmedTransfers");
-
+        (address receiptSender, uint256 receiptValue) = rootTokenController.getUnconfirmedTransfer(
+            lockAndTransferEnvelope.toHash()
+        );
+        require(receiptSender == address(this), "Transfer sender incorrect in unconfirmedTransfers");
+        require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
 
         //confirm that token replica only accept calls to Ipc from the gateway
         vm.prank(address(testUSDCOwner));
         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
         ipcTokenReplica.handleIpcMessage(expected);
 
-        // after the two next calls the root gateway should store the message in its postbox.
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
-            nativeSubnetName,
-            address(nativeSubnetGateway)
-        );
-
-        callSubmitCheckpointFromParentSubnet(checkpoint, address(rootNativeSubnetActor));
-        // check the message is in the postbox
-
-        bytes32 expectedCid = expected.toHash();
-        IpcEnvelope memory postboxMsg = rootGatewayGetter.postbox(expectedCid);
-        require(expectedCid == postboxMsg.toHash(), "unexpected postbox message in transfer in mint");
-
-        console.log("--------------- execute (top-down) ---------------");
-
         // the message the root gateway's postbox is being executed in the token subnet's gateway
+
+        expected = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({
+                subnetId: rootSubnetName,
+                rawAddress: FvmAddressHelper.from(address(rootTokenController))
+            }),
+            to: lockAndTransferEnvelope.to,
+            value: DEFAULT_CROSS_MSG_FEE,
+            message: lockAndTransferEnvelope.message,
+            nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
+        });
+
         msgs[0] = expected;
-        //commitParentFinality(address(tokenSubnetGateway));
 
         executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
 
@@ -537,36 +518,27 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(testUSDCOwner));
-        expected = ipcTokenReplica.withdrawTokens{value: DEFAULT_CROSS_MSG_FEE}(
-            testUSDCOwner,
-            transferAmount
+        expected = ipcTokenReplica.withdrawTokens{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+
+        //confirm that token controller only accept calls to Ipc from the gateway
+        vm.prank(address(testUSDCOwner));
+        vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
+        rootTokenController.handleIpcMessage(expected);
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            tokenSubnetName,
+            address(tokenSubnetGateway)
         );
 
-         //confirm that token controller only accept calls to Ipc from the gateway
-         vm.prank(address(testUSDCOwner));
-         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
-         rootTokenController.handleIpcMessage(expected);
-
-
-        /*
-            TODO replace the next two lines with the test utils so that the bottom up message to the rootTokenController contract is sent
-        */
-
-        // vm.prank(address(nativeSubnetGateway));
-        // rootTokenController.handleIpcMessage(expected);
-
-        checkpoint = callCreateBottomUpCheckpointFromChildSubnet(tokenSubnetName, address(tokenSubnetGateway));
-
         callSubmitCheckpointFromParentSubnet(checkpoint, address(rootTokenSubnetActor));
-
-        msgs[0] = expected;
-
-        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         //ensure that usdc tokens are returned on root net
         require(transferAmount == testUSDC.balanceOf(testUSDCOwner), "unexpected owner balance after withdrawal");
         //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
         require(0 == ipcTokenReplica.balanceOf(testUSDCOwner), "unexpected testUSDCOwner balance in ipcTokenReplica");
-        require(0 == ipcTokenReplica.balanceOf(address(ipcTokenReplica)), "unexpected ipcTokenReplica balance in ipcTokenReplica");
+        require(
+            0 == ipcTokenReplica.balanceOf(address(ipcTokenReplica)),
+            "unexpected ipcTokenReplica balance in ipcTokenReplica"
+        );
     }
 }

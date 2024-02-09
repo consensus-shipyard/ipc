@@ -47,11 +47,9 @@ async function main() {
 
     // Approve the IpcTokenController contract to spend tokens on behalf of the deployer
     await erc20Token.approve(ipcTokenController.address, transferAmount)
-    await ipcTokenController.transferAndMint(
-        receiverAddress,
-        transferAmount,
-        { value: DEFAULT_CROSS_MSG_FEE },
-    )
+    await ipcTokenController.transferAndMint(receiverAddress, transferAmount, {
+        value: DEFAULT_CROSS_MSG_FEE,
+    })
 
     console.log(
         `Transfer and mint request made for ${transferAmount} tokens to ${receiverAddress}`,
@@ -141,10 +139,7 @@ async function deployIpcTokenController(
 
     await ipcTokenController.deployed()
 
-    console.log(
-        'IpcTokenController deployed to:',
-        ipcTokenController.address,
-    )
+    console.log('IpcTokenController deployed to:', ipcTokenController.address)
     return ipcTokenController
 }
 
