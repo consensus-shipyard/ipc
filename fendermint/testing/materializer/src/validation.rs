@@ -24,7 +24,7 @@ const DEFAULT_FAUCET_FIL: u64 = 100;
 /// * we are not over allocating the balances
 /// * relayers have balances on the parent to submit transactions
 /// * subnet creators have balances on the parent to submit transactions
-pub async fn validate_manifest(id: TestnetId, manifest: Manifest) -> anyhow::Result<()> {
+pub async fn validate_manifest(id: &TestnetId, manifest: &Manifest) -> anyhow::Result<()> {
     let mut m = ValidatingMaterializer::default();
     let _ = Testnet::setup(&mut m, id, manifest).await?;
     // We could check here that all subnets have enough validators for a quorum.
@@ -112,7 +112,7 @@ impl ValidatingMaterializer {
     ) -> anyhow::Result<()> {
         let parent = Self::parent_name(subnet)?;
         self.ensure_subnet_exists(&parent)?;
-        self.ensure_subnet_exists(&subnet)?;
+        self.ensure_subnet_exists(subnet)?;
         self.ensure_balance(&parent, account)?;
 
         let pbs = self.balances.get_mut(&parent).unwrap();
@@ -124,7 +124,7 @@ impl ValidatingMaterializer {
         *pb = pb.clone().sub(amount.clone());
 
         if credit_child {
-            let cbs = self.balances.get_mut(&subnet).unwrap();
+            let cbs = self.balances.get_mut(subnet).unwrap();
             let cb = cbs.entry(account.clone()).or_default();
             *cb = cb.clone().add(amount);
         }
