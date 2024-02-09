@@ -2739,7 +2739,6 @@ dependencies = [
  "multihash 0.18.1",
  "num-derive 0.3.3",
  "num-traits",
- "rlp",
  "serde",
 ]
 
