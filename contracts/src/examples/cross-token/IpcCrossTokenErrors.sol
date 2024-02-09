@@ -1,0 +1,2 @@
+error InvalidOriginContract();
+error InvalidOriginSubnet();

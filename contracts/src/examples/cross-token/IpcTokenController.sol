@@ -13,12 +13,13 @@ import {IpcExchange} from "../../../sdk/IpcContract.sol";
 import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
+import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
+import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
 
 error NoTransfer();
 error ZeroAddress();
 error InvalidMessageSignature();
 error InvalidMethod();
-
 /**
  * @title IpcTokenController
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
@@ -26,6 +27,8 @@ error InvalidMethod();
 contract IpcTokenController is IpcExchange, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using CrossMsgHelper for IpcEnvelope;
+    using SubnetIDHelper for SubnetID;
+    using FvmAddressHelper for FvmAddress;
 
     address private tokenContractAddress;
     SubnetID private destinationSubnet;
@@ -103,6 +106,10 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
+
+        //only accept messages from replica contract
+        verifyIpcEnvelope(envelope);
+
         bytes4 methodSignature = toBytes4(callMsg.method);
         if (methodSignature != bytes4(keccak256("receiveAndUnlock(address,uint256)"))) {
             revert InvalidMethod();
@@ -112,6 +119,17 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         // Call receiveAndUnlock to process the unlocking and transfer of tokens
         receiveAndUnlock(receiver, amount);
         return bytes("");
+    }
+
+    function verifyIpcEnvelope(IpcEnvelope memory envelope) public {
+            SubnetID memory subnetId = envelope.from.subnetId;
+            FvmAddress memory rawAddress = envelope.from.rawAddress;
+            if(!subnetId.equals(destinationSubnet)){
+                revert InvalidOriginSubnet();
+            }
+            if(!rawAddress.equal(FvmAddressHelper.from(destinationContract))){
+                revert InvalidOriginContract();
+            }
     }
 
     function receiveAndUnlock(address receiver, uint256 amount) private {
