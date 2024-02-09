@@ -35,11 +35,16 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol";
 
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
+
 import "forge-std/console.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
+    using GatewayFacetsHelper for GatewayDiamond;
+    using SubnetActorFacetsHelper for SubnetActorDiamond;
 
     GatewayDiamond public rootGateway;
     GatewayGetterFacet public rootGatewayGetter;
@@ -67,8 +72,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         require(rootSubnetName.isRoot(), "not root");
 
         rootGateway = createGatewayDiamond(gatewayParams(rootSubnetName));
-        rootGatewayGetter = GatewayGetterFacet(address(rootGateway));
-        rootGatewayManager = GatewayManagerFacet(address(rootGateway));
+        rootGatewayGetter = rootGateway.getter();
+        rootGatewayManager = rootGateway.manager();
 
         rootNativeSubnetActor = createSubnetActor(defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName));
 
@@ -122,7 +127,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         // TODO: commitParentFinality doesn't not affect anything in this test.
         commitParentFinality(address(nativeSubnetGateway));
 
-        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+        executeTopDownMsgs(msgs, nativeSubnetName, nativeSubnetGateway);
 
         assertEq(recipient.balance, amount);
     }
@@ -157,7 +162,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         commitParentFinality(address(nativeSubnetGateway));
 
         vm.expectRevert();
-        executeTopDownMsgsRevert(msgs, tokenSubnetName, address(tokenSubnetGateway));
+        executeTopDownMsgsRevert(msgs, tokenSubnetName, tokenSubnetGateway);
     }
 
     function testMultiSubnet_Erc20_FundingFromParentToChild() public {
@@ -192,7 +197,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(address(tokenSubnetGateway));
 
-        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+        executeTopDownMsgs(msgs, tokenSubnetName, tokenSubnetGateway);
 
         assertEq(recipient.balance, amount);
     }
@@ -230,7 +235,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         commitParentFinality(address(tokenSubnetGateway));
 
         vm.expectRevert();
-        executeTopDownMsgsRevert(msgs, tokenSubnetName, address(tokenSubnetGateway));
+        executeTopDownMsgsRevert(msgs, tokenSubnetName, tokenSubnetGateway);
     }
 
     //--------------------
@@ -258,10 +263,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnetName,
-            address(nativeSubnetGateway)
+            nativeSubnetGateway
         );
 
-        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, rootNativeSubnetActor);
         assertEq(recipient.balance, amount);
     }
 
@@ -285,11 +290,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnetName,
-            address(nativeSubnetGateway)
+            nativeSubnetGateway
         );
 
         vm.expectRevert();
-        submitBottomUpCheckpointRevert(checkpoint, address(rootNativeSubnetActor));
+        submitBottomUpCheckpointRevert(checkpoint, rootNativeSubnetActor);
     }
 
     function testMultiSubnet_Native_ReleaseFromChildToParent_DifferentFunderAndSenderInParent() public {
@@ -312,10 +317,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnetName,
-            address(nativeSubnetGateway)
+            nativeSubnetGateway
         );
 
-        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, rootNativeSubnetActor);
 
         assertEq(recipient.balance, amount);
     }
@@ -338,16 +343,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), amount);
 
-        GatewayManagerFacet manager = GatewayManagerFacet(address(tokenSubnetGateway));
+        GatewayManagerFacet manager = tokenSubnetGateway.manager();
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnetName,
-            address(tokenSubnetGateway)
+            tokenSubnetGateway
         );
 
-        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, rootTokenSubnetActor);
 
         assertEq(token.balanceOf(recipient), amount);
     }
@@ -370,16 +375,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), amount);
 
-        GatewayManagerFacet manager = GatewayManagerFacet(address(tokenSubnetGateway));
+        GatewayManagerFacet manager = tokenSubnetGateway.manager();
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnetName,
-            address(tokenSubnetGateway)
+            tokenSubnetGateway
         );
 
-        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, rootTokenSubnetActor);
         assertEq(token.balanceOf(recipient), amount);
         assertEq(recipient.balance, 0);
     }
@@ -402,7 +407,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         rootGatewayManager.fund{value: 100000}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
 
-        GatewayMessengerFacet messenger = GatewayMessengerFacet(address(nativeSubnetGateway));
+        GatewayMessengerFacet messenger = nativeSubnetGateway.messenger();
         vm.prank(address(caller));
         messenger.sendContractXnetMessage{value: amount}(
             TestUtils.newXnetCallMsg(
@@ -415,10 +420,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnetName,
-            address(nativeSubnetGateway)
+            nativeSubnetGateway
         );
 
-        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, rootNativeSubnetActor);
 
         assertEq(recipient.balance, amount);
     }
@@ -453,7 +458,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             nonce: 1
         });
 
-        GatewayMessengerFacet rootGatewayMessenger = GatewayMessengerFacet(address(rootGateway));
+        GatewayMessengerFacet rootGatewayMessenger = rootGateway.messenger();
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, address(rootGateway));
         emit LibGateway.NewTopDownMessage({subnet: address(rootNativeSubnetActor), message: committedEvent});
@@ -463,7 +468,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         msgs[0] = xnetCallMsg;
 
         commitParentFinality(address(nativeSubnetGateway));
-        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+        executeTopDownMsgs(msgs, nativeSubnetName, nativeSubnetGateway);
 
         assertEq(address(recipient).balance, amount);
     }
@@ -494,16 +499,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         bytes memory params = bytes("hello");
         IpcEnvelope memory envelope = CrossMsgHelper.createCallMsg(from, to, amount, method, params);
 
-        GatewayMessengerFacet messenger = GatewayMessengerFacet(address(tokenSubnetGateway));
+        GatewayMessengerFacet messenger = tokenSubnetGateway.messenger();
         vm.prank(address(caller));
         messenger.sendContractXnetMessage{value: amount}(envelope);
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnetName,
-            address(tokenSubnetGateway)
+            tokenSubnetGateway
         );
 
-        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, rootTokenSubnetActor);
 
         assertEq(token.balanceOf(recipient), amount);
     }
@@ -552,7 +557,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         msgs[0] = xnetCallMsg;
 
         commitParentFinality(address(tokenSubnetGateway));
-        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+        executeTopDownMsgs(msgs, tokenSubnetName, tokenSubnetGateway);
 
         assertEq(address(recipient).balance, amount);
     }
@@ -567,8 +572,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         gwTopDownFinalityFacet.commitParentFinality(finality);
     }
 
-    function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory subnet, address gateway) internal {
-        XnetMessagingFacet xnet = XnetMessagingFacet(address(gateway));
+    function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {
+        XnetMessagingFacet messenger = gw.xnetMessenger();
 
         uint256 minted_tokens;
 
@@ -584,27 +589,27 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/src/fvm/topdown.rs#L43
 
         // This emulates minting tokens.
-        vm.deal(address(gateway), minted_tokens);
+        vm.deal(address(gw), minted_tokens);
 
         // TODO: how to emulate increase of circulation supply?
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        xnet.applyCrossMessages(msgs);
+        messenger.applyCrossMessages(msgs);
     }
 
-    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, SubnetID memory subnet, address gateway) internal {
+    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {
         vm.expectRevert();
-        executeTopDownMsgs(msgs, subnet, gateway);
+        executeTopDownMsgs(msgs, subnet, gw);
     }
 
     function callCreateBottomUpCheckpointFromChildSubnet(
         SubnetID memory subnet,
-        address gateway
+        GatewayDiamond gw
     ) internal returns (BottomUpCheckpoint memory checkpoint) {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
-        GatewayGetterFacet getter = GatewayGetterFacet(address(gateway));
-        CheckpointingFacet checkpointer = CheckpointingFacet(address(gateway));
+        GatewayGetterFacet getter = gw.getter();
+        CheckpointingFacet checkpointer = gw.checkpointer();
 
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
         require(batch.msgs.length == 1, "batch length incorrect");
@@ -628,12 +633,12 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         return checkpoint;
     }
 
-    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, address subnetActor) internal {
+    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
         (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory parentPubKeys = new bytes[](3);
         bytes[] memory parentSignatures = new bytes[](3);
 
-        SubnetActorManagerFacet manager = SubnetActorManagerFacet(subnetActor);
+        SubnetActorManagerFacet manager = sa.manager();
 
         for (uint256 i = 0; i < 3; i++) {
             vm.deal(parentValidators[i], 10 gwei);
@@ -649,16 +654,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             parentSignatures[i] = abi.encodePacked(r, s, v);
         }
 
-        SubnetActorCheckpointingFacet checkpointer = SubnetActorCheckpointingFacet(subnetActor);
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
 
-        vm.startPrank(subnetActor);
+        vm.startPrank(address(sa));
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
     }
 
-    function submitBottomUpCheckpointRevert(BottomUpCheckpoint memory checkpoint, address subnetActor) internal {
+    function submitBottomUpCheckpointRevert(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
         vm.expectRevert();
-        submitBottomUpCheckpoint(checkpoint, subnetActor);
+        submitBottomUpCheckpoint(checkpoint, sa);
     }
 
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
