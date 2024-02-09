@@ -36,7 +36,7 @@ pub async fn init_exec_state(
 
     let store = MemoryBlockstore::new();
 
-    let state = FvmGenesisState::new_state(store, multi_engine, bundle, custom_actors_bundle)
+    let state = FvmGenesisState::new(store, multi_engine, &bundle, &custom_actors_bundle)
         .await
         .context("failed to create state")?;
 

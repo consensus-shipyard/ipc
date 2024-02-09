@@ -1,23 +1,24 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::state::PermissionModeParams;
+pub use crate::state::PermissionModeParams;
 pub use crate::state::State;
 use fil_actor_eam::EamActor;
 pub use fil_actor_eam::Method;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorError;
+use fil_actors_runtime::EAM_ACTOR_ID;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::MethodNum;
-
+use fvm_shared::{ActorID, MethodNum};
 mod state;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(IPCEamActor);
 
 pub const IPC_EAM_ACTOR_NAME: &str = "eam";
+pub const IPC_EAM_ACTOR_ID: ActorID = EAM_ACTOR_ID;
 
 pub struct IPCEamActor;
 

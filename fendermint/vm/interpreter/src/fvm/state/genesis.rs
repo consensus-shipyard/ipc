@@ -24,9 +24,9 @@ use fvm::{
     machine::Manifest,
     state_tree::{ActorState, StateTree},
 };
-use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_blockstore::{Block, Blockstore};
 use fvm_ipld_car::load_car_unchecked;
-use fvm_ipld_encoding::{BytesDe, CborStore, RawBytes};
+use fvm_ipld_encoding::{BytesDe, CborStore, RawBytes, DAG_CBOR};
 use fvm_shared::{
     address::{Address, Payload},
     clock::ChainEpoch,
@@ -60,18 +60,12 @@ pub struct FvmGenesisState<DB>
 where
     DB: Blockstore + Clone + 'static,
 {
-    #[deprecated]
     pub manifest_data_cid: Cid,
-    #[deprecated]
     pub manifest: Manifest,
-    #[deprecated]
     pub custom_actor_manifest: CustomActorManifest,
     store: DB,
     multi_engine: Arc<MultiEngine>,
     stage: Stage<DB>,
-
-    pub builtin_actor_bundle: Vec<u8>,
-    pub custom_actor_bundle: Vec<u8>,
 }
 
 async fn parse_bundle<DB: Blockstore>(store: &DB, bundle: &[u8]) -> anyhow::Result<(u32, Cid)> {
@@ -106,71 +100,39 @@ where
     pub async fn new(
         store: DB,
         multi_engine: Arc<MultiEngine>,
-        bundle: &[u8],
+        builtin_actor_bundle: &[u8],
         custom_actor_bundle: &[u8],
     ) -> anyhow::Result<Self> {
-        // Load the builtin actor bundle.
-        let (manifest_version, manifest_data_cid): (u32, Cid) =
-            parse_bundle(&store, bundle).await?;
-        let manifest = Manifest::load(&store, &manifest_data_cid, manifest_version)?;
-
         // Load the custom actor bundle.
         let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) =
             parse_bundle(&store, custom_actor_bundle).await?;
         let custom_actor_manifest =
             CustomActorManifest::load(&store, &custom_manifest_data_cid, custom_manifest_version)?;
 
-        let state_tree = empty_state_tree(store.clone())?;
+        let mut intermediate_builtin = load_builtin(builtin_actor_bundle).await?;
 
-        let state = Self {
-            manifest_data_cid,
-            manifest,
-            custom_actor_manifest,
-            store,
-            multi_engine,
-            stage: Stage::Tree(state_tree),
-
-            builtin_actor_bundle: vec![],
-            custom_actor_bundle: vec![],
-        };
-
-        Ok(state)
-    }
-
-    pub async fn new_state(
-        store: DB,
-        multi_engine: Arc<MultiEngine>,
-        builtin_actor_bundle: Vec<u8>,
-        custom_actor_bundle: Vec<u8>,
-    ) -> anyhow::Result<Self> {
-        // ============== TO BE DELETE =============
-        let mem_store = MemoryBlockstore::new();
-        // Load the builtin actor bundle.
-        let (manifest_version, manifest_data_cid): (u32, Cid) =
-            parse_bundle(&mem_store, &builtin_actor_bundle).await?;
-        let manifest = Manifest::load(&mem_store, &manifest_data_cid, manifest_version)?;
-
-        // Load the custom actor bundle.
-        let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) =
-            parse_bundle(&mem_store, &custom_actor_bundle).await?;
-        let custom_actor_manifest = CustomActorManifest::load(
-            &mem_store,
-            &custom_manifest_data_cid,
-            custom_manifest_version,
+        replace_built_in_actor(
+            fendermint_actor_eam::IPC_EAM_ACTOR_NAME,
+            &custom_actor_manifest,
+            &mut intermediate_builtin,
         )?;
-        // ============== TO BE DELETE =============
+
+        // copy builtin actors from memory to store
+        intermediate_builtin.mem_store.copy_to(&store)?;
 
         let state_tree = empty_state_tree(store.clone())?;
 
         let state = Self {
-            manifest_data_cid,
-            manifest,
+            manifest_data_cid: intermediate_builtin.root_cid,
+            manifest: Manifest::load(
+                &store,
+                &intermediate_builtin.root_cid,
+                intermediate_builtin.version,
+            )?,
             custom_actor_manifest,
             store,
             multi_engine,
             stage: Stage::Tree(state_tree),
-            builtin_actor_bundle,
-            custom_actor_bundle,
         };
 
         Ok(state)
@@ -513,4 +475,71 @@ where
             Stage::Exec(ref mut exec_state) => g(exec_state.state_tree_mut()),
         }
     }
+}
+
+type CodeByName = (String, Cid);
+struct IntermediateBuiltInActorState {
+    mem_store: MemoryBlockstore,
+    code_names: Vec<CodeByName>,
+    root_cid: Cid,
+    version: u32,
+}
+
+/// Load the built-in actor bundle but replace the certain actors with custom actor implementation.
+fn replace_built_in_actor(
+    name: &str,
+    custom_actor_manifest: &CustomActorManifest,
+    intermediate_builtin: &mut IntermediateBuiltInActorState,
+) -> anyhow::Result<()> {
+    let code = custom_actor_manifest
+        .code_by_name(name)
+        .ok_or_else(|| anyhow!("replacement actor not found"))?;
+
+    for (_, code_cid) in intermediate_builtin
+        .code_names
+        .iter_mut()
+        .filter(|(n, _)| n == name)
+    {
+        *code_cid = *code
+    }
+
+    let data = fvm_ipld_encoding::to_vec(&intermediate_builtin.code_names)?;
+    let new_root_cid = intermediate_builtin.mem_store.put(
+        Code::Blake2b256,
+        &Block {
+            codec: DAG_CBOR,
+            data,
+        },
+    )?;
+
+    intermediate_builtin.root_cid = new_root_cid;
+
+    Ok(())
+}
+
+async fn load_builtin(
+    builtin_actor_bundle: &[u8],
+) -> anyhow::Result<IntermediateBuiltInActorState> {
+    let mem_store = MemoryBlockstore::new();
+
+    // Load the builtin actor bundle.
+    let (ver, root_cid): (u32, Cid) = parse_bundle(&mem_store, builtin_actor_bundle).await?;
+
+    if ver != 1 {
+        return Err(anyhow!("unsupported manifest version {}", ver));
+    }
+
+    let vec: Vec<CodeByName> = match mem_store.get_cbor(&root_cid)? {
+        Some(vec) => vec,
+        None => {
+            return Err(anyhow!("cannot find manifest root cid {}", root_cid));
+        }
+    };
+
+    Ok(IntermediateBuiltInActorState {
+        mem_store,
+        code_names: vec,
+        root_cid,
+        version: ver,
+    })
 }

@@ -1,13 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-mod builtin;
-
 use std::collections::{BTreeSet, HashMap};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use crate::fvm::genesis::builtin::BuiltInActorDeployer;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
@@ -17,7 +14,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, burntfunds, chainmetadata, cron, init, ipc, reward, system,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -106,7 +103,7 @@ where
             timestamp: genesis.timestamp,
             network_version: genesis.network_version,
             circ_supply: circ_supply(&genesis),
-            base_fee: genesis.base_fee.clone(),
+            base_fee: genesis.base_fee,
             power_scale: genesis.power_scale,
             validators,
         };
@@ -145,10 +142,80 @@ where
         eth_libs.retain(|(_, d)| !eth_contracts.contains_key(d.as_str()));
 
         // STAGE 1: First we initialize native built-in actors.
-        let builtin_deployer = BuiltInActorDeployer::new(&eth_builtin_ids, &eth_libs);
-        let addr_to_id = builtin_deployer
-            .process_genesis(&mut state, &genesis)
-            .await?;
+
+        // System actor
+        state
+            .create_builtin_actor(
+                system::SYSTEM_ACTOR_CODE_ID,
+                system::SYSTEM_ACTOR_ID,
+                &system::State {
+                    builtin_actors: state.manifest_data_cid,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create system actor")?;
+
+        // Init actor
+        let (init_state, addr_to_id) = init::State::new(
+            state.store(),
+            genesis.chain_name.clone(),
+            &genesis.accounts,
+            &eth_builtin_ids,
+            eth_libs.len() as u64,
+        )
+        .context("failed to create init state")?;
+
+        state
+            .create_builtin_actor(
+                init::INIT_ACTOR_CODE_ID,
+                init::INIT_ACTOR_ID,
+                &init_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create init actor")?;
+
+        // Cron actor
+        state
+            .create_builtin_actor(
+                cron::CRON_ACTOR_CODE_ID,
+                cron::CRON_ACTOR_ID,
+                &cron::State {
+                    entries: vec![], // TODO: Maybe with the IPC.
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create cron actor")?;
+
+        // Burnt funds actor (it's just an account).
+        state
+            .create_builtin_actor(
+                account::ACCOUNT_ACTOR_CODE_ID,
+                burntfunds::BURNT_FUNDS_ACTOR_ID,
+                &account::State {
+                    address: burntfunds::BURNT_FUNDS_ACTOR_ADDR,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create burnt funds actor")?;
+
+        // A placeholder for the reward actor, beause I don't think
+        // using the one in the builtin actors library would be appropriate.
+        // This effectively burns the miner rewards. Better than panicking.
+        state
+            .create_builtin_actor(
+                account::ACCOUNT_ACTOR_CODE_ID,
+                reward::REWARD_ACTOR_ID,
+                &account::State {
+                    address: reward::REWARD_ACTOR_ADDR,
+                },
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create reward actor")?;
 
         // STAGE 1b: Then we initialize the in-repo custom actors.
 
@@ -163,6 +230,24 @@ where
                 fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME,
                 chainmetadata::CHAINMETADATA_ACTOR_ID,
                 &chainmetadata_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create chainmetadata actor")?;
+
+        let eam_state = fendermint_actor_eam::State::new(
+            state.store(),
+            // or we can allow certain address only with:
+            // fendermint_actor_eam::PermissionModeParams::AllowList(
+            //  vec![...]
+            // )
+            fendermint_actor_eam::PermissionModeParams::Unrestricted,
+        )?;
+        state
+            .create_custom_actor(
+                fendermint_actor_eam::IPC_EAM_ACTOR_NAME,
+                fendermint_actor_eam::IPC_EAM_ACTOR_ID,
+                &eam_state,
                 TokenAmount::zero(),
                 None,
             )
