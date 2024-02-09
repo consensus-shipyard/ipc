@@ -44,7 +44,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
-
         if (registered) {
             revert AlreadyRegisteredSubnet();
         }
@@ -55,7 +54,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         subnet.circSupply = genesisCircSupply;
 
         s.subnetKeys.add(subnetId.toHash());
-
         s.totalSubnets += 1;
     }
 
@@ -114,6 +112,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.totalSubnets -= 1;
         delete s.subnets[id];
+
         s.subnetKeys.remove(id);
 
         payable(msg.sender).sendValue(stake);
