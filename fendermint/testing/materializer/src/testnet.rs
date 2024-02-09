@@ -387,7 +387,7 @@ where
     ) -> anyhow::Result<()> {
         let subnet_name = parent_subnet_name.subnet(subnet_id);
 
-        // Pre-fund the accounts, create the subnet
+        // Create the subnet
         {
             // Assume that all subnets are deployed with the default contracts.
             self.deployments
@@ -408,24 +408,23 @@ where
                     },
                 )
                 .await
-                .context("failed to create subnet")?;
+                .with_context(|| format!("failed to create {subnet_name:?}"))?;
 
             self.subnets.insert(subnet_name.clone(), created_subnet);
         };
 
-        // Start the nodes
+        // Fund the accounts, join the subnet, start the nodes
         {
             let parent_submit_config = self.submit_config(parent_subnet_name)?;
             let created_subnet = self.subnet(&subnet_name)?;
-            let ancestor_hops = subnet_name.ancestor_hops();
 
             // Fund validator and balances collateral all the way from the root down to the parent.
-            for (fund_source, fund_target) in &ancestor_hops {
+            for (fund_source, fund_target) in subnet_name.ancestor_hops(false) {
                 // Where can we send the subnet request.
-                let fund_submit_config = self.submit_config(fund_source)?;
+                let fund_submit_config = self.submit_config(&fund_source)?;
 
                 // Which subnet are we funding.
-                let fund_subnet = self.subnet(fund_target)?;
+                let fund_subnet = self.subnet(&fund_target)?;
 
                 let cs = subnet
                     .validators

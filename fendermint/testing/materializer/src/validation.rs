@@ -131,6 +131,11 @@ impl ValidatingMaterializer {
         let parent = parent_name(subnet)?;
         self.ensure_subnet_exists(&parent)?;
         self.ensure_subnet_exists(subnet)?;
+
+        if amount.is_zero() {
+            return Ok(());
+        }
+
         self.ensure_balance(&parent, account)?;
 
         let pbs = self.balances.get_mut(&parent).unwrap();

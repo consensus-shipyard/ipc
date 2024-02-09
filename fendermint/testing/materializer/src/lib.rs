@@ -203,8 +203,8 @@ impl SubnetName {
         ss
     }
 
-    /// parent->child hop pairs from the root to the subnet.
-    pub fn ancestor_hops(&self) -> Vec<(SubnetName, SubnetName)> {
+    /// parent->child hop pairs from the root to the current subnet.
+    pub fn ancestor_hops(&self, include_self: bool) -> Vec<(SubnetName, SubnetName)> {
         let ss0 = self.ancestors();
 
         let ss1 = ss0
@@ -214,7 +214,13 @@ impl SubnetName {
             .cloned()
             .collect::<Vec<_>>();
 
-        ss0.into_iter().zip(ss1).collect()
+        let mut hops = ss0.into_iter().zip(ss1).collect::<Vec<_>>();
+
+        if !include_self {
+            hops.pop();
+        }
+
+        hops
     }
 
     fn path(&self) -> &Path {
@@ -269,7 +275,13 @@ mod tests {
         let rn = tn.root();
         let foo = rn.subnet("foo");
         let bar = foo.subnet("bar");
-        assert_eq!(bar.ancestor_hops(), vec![(rn, foo.clone()), (foo, bar)]);
+
+        let hops0 = bar.ancestor_hops(false);
+        let hops1 = bar.ancestor_hops(true);
+        let hops = vec![(rn, foo.clone()), (foo, bar)];
+
+        assert_eq!(hops0[..], hops[..1]);
+        assert_eq!(hops1[..], hops[..]);
     }
 
     #[test]

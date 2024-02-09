@@ -155,7 +155,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("fund_subnet({subnet:?}, {account:?})");
+        eprintln!("fund_subnet({subnet:?}, {account:?}, {amount})");
         tracing::info!(self.tag, ?subnet, ?account, "fund_subnet");
         self.inner
             .fund_subnet(parent_submit_config, account, subnet, amount, reference)
@@ -174,7 +174,10 @@ where
     where
         's: 'a,
     {
-        eprintln!("join_subnet({subnet:?}, {account:?})");
+        eprintln!(
+            "join_subnet({subnet:?}, {account:?}, {}, {})",
+            collateral.0, balance.0
+        );
         tracing::info!(self.tag, ?subnet, ?account, "join_subnet");
         self.inner
             .join_subnet(
