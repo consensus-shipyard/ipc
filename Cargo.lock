@@ -3103,7 +3103,12 @@ dependencies = [
  "serde_yaml",
  "tendermint-rpc",
  "tokio",
+<<<<<<< HEAD
  "toml 0.8.10",
+=======
+ "toml 0.8.8",
+ "tracing",
+>>>>>>> 4ed73390... ENG-578: Logging materializer
 ]
 
 [[package]]

@@ -3,10 +3,11 @@
 use multihash::MultihashDigest;
 use serde::{Deserialize, Serialize};
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
 
+pub mod logging;
 pub mod manifest;
 pub mod materializer;
 pub mod testnet;
@@ -16,7 +17,7 @@ pub mod validation;
 mod arb;
 
 /// An ID identifying a resource within its parent.
-#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceId(String);
 
 /// Implementing a deserializer which has the logic to sanitise URL-unfriendly characters.
@@ -32,6 +33,12 @@ impl<'de> Deserialize<'de> for ResourceId {
 impl Display for ResourceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "'{}'", self.0)
+    }
+}
+
+impl Debug for ResourceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }
 
@@ -73,7 +80,7 @@ pub type RelayerId = ResourceId;
 /// concatenated into a URL-like path.
 ///
 /// See <https://cloud.google.com/apis/design/resource_names>
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceName(PathBuf);
 
 impl ResourceName {
@@ -99,6 +106,12 @@ impl From<&str> for ResourceName {
 impl Display for ResourceName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "'{}'", self.0.to_string_lossy())
+    }
+}
+
+impl Debug for ResourceName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }
 

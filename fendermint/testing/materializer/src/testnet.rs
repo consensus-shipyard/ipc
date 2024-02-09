@@ -1,11 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-
 use anyhow::{anyhow, bail, Context};
 use async_recursion::async_recursion;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
+    marker::PhantomData,
 };
 use tendermint_rpc::Url;
 
@@ -14,7 +14,7 @@ use crate::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode, Rootnet,
         Subnet,
     },
-    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
+    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
     AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
     TestnetName,
 };
@@ -32,7 +32,7 @@ use crate::{
 /// a whole, keeping the `Testnet` completely stateless, but
 /// perhaps this way writing a [Materializer] is just a tiny
 /// bit simpler.
-pub struct Testnet<M: Materializer> {
+pub struct Testnet<M: Materials, R> {
     name: TestnetName,
     network: M::Network,
     externals: Vec<Url>,
@@ -42,13 +42,15 @@ pub struct Testnet<M: Materializer> {
     subnets: BTreeMap<SubnetName, M::Subnet>,
     nodes: BTreeMap<NodeName, M::Node>,
     relayers: BTreeMap<RelayerName, M::Relayer>,
+    _phantom_materializer: PhantomData<R>,
 }
 
-impl<M> Testnet<M>
+impl<M, R> Testnet<M, R>
 where
-    M: Materializer + Sync + Send,
+    M: Materials,
+    R: Materializer<M> + Sync + Send,
 {
-    pub async fn new(m: &mut M, id: &TestnetId) -> anyhow::Result<Self> {
+    pub async fn new(m: &mut R, id: &TestnetId) -> anyhow::Result<Self> {
         let name = TestnetName::new(id);
         let network = m
             .create_network(&name)
@@ -65,6 +67,7 @@ where
             subnets: Default::default(),
             nodes: Default::default(),
             relayers: Default::default(),
+            _phantom_materializer: PhantomData,
         })
     }
 
@@ -76,7 +79,7 @@ where
     ///
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
-    pub async fn setup(m: &mut M, id: &TestnetId, manifest: &Manifest) -> anyhow::Result<Self> {
+    pub async fn setup(m: &mut R, id: &TestnetId, manifest: &Manifest) -> anyhow::Result<Self> {
         let mut t = Self::new(m, id).await?;
         let root_name = t.root();
 
@@ -106,7 +109,7 @@ where
     }
 
     /// Create a cryptographic keypair for an account ID.
-    pub fn create_account(&mut self, m: &mut M, id: &AccountId) -> anyhow::Result<()> {
+    pub fn create_account(&mut self, m: &mut R, id: &AccountId) -> anyhow::Result<()> {
         let n = self.name.account(id);
         let a = m.create_account(&n).context("failed to create account")?;
         self.accounts.insert(id.clone(), a);
@@ -191,7 +194,7 @@ where
     /// will be different, the collateral has to be funded.
     fn create_root_genesis(
         &mut self,
-        m: &mut M,
+        m: &mut R,
         subnet_name: &SubnetName,
         validators: CollateralMap,
         balances: BalanceMap,
@@ -217,7 +220,7 @@ where
     /// Fails if the genesis of this subnet hasn't been created yet.
     async fn create_and_start_nodes(
         &mut self,
-        m: &mut M,
+        m: &mut R,
         subnet_name: &SubnetName,
         nodes: &BTreeMap<NodeId, Node>,
     ) -> anyhow::Result<()> {
@@ -243,7 +246,7 @@ where
     /// Fails if the genesis hasn't been created yet.
     async fn create_node(
         &mut self,
-        m: &mut M,
+        m: &mut R,
         subnet_name: &SubnetName,
         node_id: &NodeId,
         node: &Node,
@@ -300,7 +303,7 @@ where
     /// Fails if the node hasn't been created yet.
     async fn start_node(
         &mut self,
-        m: &mut M,
+        m: &mut R,
         subnet_name: &SubnetName,
         node_id: &NodeId,
         node: &Node,
@@ -325,12 +328,20 @@ where
 
     async fn create_and_start_rootnet(
         &mut self,
-        m: &mut M,
+        m: &mut R,
         root_name: &SubnetName,
         rootnet: &Rootnet,
     ) -> anyhow::Result<()> {
         match rootnet {
             Rootnet::External { deployment, urls } => {
+                // Establish balances.
+                for (id, a) in self.accounts.iter() {
+                    let reference = ResourceHash::digest(format!("funding {id} from faucet"));
+                    m.fund_from_faucet(a, Some(reference))
+                        .await
+                        .context("faucet failed")?;
+                }
+
                 // Establish root contract locations.
                 let deployment = match deployment {
                     IpcDeployment::New { deployer } => {
@@ -346,14 +357,6 @@ where
 
                 self.deployments.insert(root_name.clone(), deployment);
                 self.externals = urls.clone();
-
-                // Establish balances.
-                for (id, a) in self.accounts.iter() {
-                    let reference = ResourceHash::digest(format!("funding {id} from faucet"));
-                    m.fund_from_faucet(a, Some(reference))
-                        .await
-                        .context("faucet failed")?;
-                }
             }
             Rootnet::New {
                 validators,
@@ -377,7 +380,7 @@ where
     #[async_recursion]
     async fn create_and_start_subnet(
         &mut self,
-        m: &mut M,
+        m: &mut R,
         parent_subnet_name: &SubnetName,
         subnet_id: &SubnetId,
         subnet: &Subnet,
