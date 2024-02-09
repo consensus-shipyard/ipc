@@ -107,9 +107,6 @@ impl Arbitrary for Genesis {
             base_fee: ArbTokenAmount::arbitrary(g).0,
             power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
             validators: (0..nv).map(|_| Arbitrary::arbitrary(g)).collect(),
-            contract_deployers: (0..nv)
-                .map(|_| SignerAddr(Arbitrary::arbitrary(g)))
-                .collect(),
             accounts: (0..na).map(|_| Arbitrary::arbitrary(g)).collect(),
             ipc: if bool::arbitrary(g) {
                 Some(ipc::IpcParams::arbitrary(g))

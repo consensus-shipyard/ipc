@@ -40,9 +40,6 @@ pub struct Genesis {
     /// highest possible fidelity when we are deriving a genesis file in IPC,
     /// where the parent subnet tracks collateral.
     pub validators: Vec<Validator<Collateral>>,
-    /// List of contract addresses that are allowed to deploy contracts in the subnet. If
-    /// empty, indicates there is no restriction on who can deploy contracts
-    pub contract_deployers: Vec<SignerAddr>,
     pub accounts: Vec<Actor>,
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]

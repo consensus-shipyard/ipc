@@ -582,7 +582,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             base_fee: ArbTokenAmount::arbitrary(u)?.0,
             power_scale: *u.choose(&[0, 3]).expect("non empty"),
             validators: parent_validators,
-            contract_deployers: Vec::new(),
             accounts: parent_actors,
             ipc: Some(parent_ipc),
         };
@@ -603,7 +602,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             base_fee: ArbTokenAmount::arbitrary(u)?.0,
             power_scale: *u.choose(&[0, 3]).expect("non empty"),
             validators: current_configuration,
-            contract_deployers: Vec::new(),
             accounts: Vec::new(),
             ipc: Some(child_ipc),
         };

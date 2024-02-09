@@ -44,7 +44,6 @@ cmd! {
       base_fee: self.base_fee.clone(),
       power_scale: self.power_scale,
       validators: Vec::new(),
-      contract_deployers: Vec::new(),
       accounts: Vec::new(),
       ipc: None
     };
@@ -299,7 +298,6 @@ async fn new_genesis_from_parent(
         base_fee: args.base_fee.clone(),
         power_scale: args.power_scale,
         validators: Vec::new(),
-        contract_deployers: Vec::new(),
         accounts: Vec::new(),
         ipc: Some(ipc_params),
     };
