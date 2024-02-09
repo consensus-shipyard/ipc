@@ -10,7 +10,7 @@ use std::{
 pub mod manifest;
 pub mod materializer;
 pub mod testnet;
-mod validation;
+pub mod validation;
 
 #[cfg(feature = "arb")]
 mod arb;
@@ -112,12 +112,6 @@ macro_rules! resource_name {
                 &self.0
             }
         }
-
-        impl $name {
-            fn path(&self) -> &Path {
-                &self.0 .0
-            }
-        }
     };
 }
 
@@ -209,9 +203,14 @@ impl SubnetName {
 
         ss0.into_iter().zip(ss1).collect()
     }
+
+    fn path(&self) -> &Path {
+        &self.0 .0
+    }
 }
 
 /// Unique identifier for certain things that we want to keep unique.
+#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub struct ResourceHash([u8; 32]);
 
 impl ResourceHash {

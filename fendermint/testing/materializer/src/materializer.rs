@@ -187,6 +187,8 @@ pub trait Materializer {
         's: 'a;
 
     /// Construct the genesis for a subnet, which involves fetching details from the parent.
+    ///
+    /// The method is async to allow for network operations.
     async fn create_subnet_genesis<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, Self>,

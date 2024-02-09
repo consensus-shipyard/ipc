@@ -476,6 +476,7 @@ where
             // Create genesis by fetching from the parent.
             let genesis = m
                 .create_subnet_genesis(&parent_submit_config, created_subnet)
+                .await
                 .context("failed to create subnet genesis")?;
 
             self.genesis.insert(subnet_name.clone(), genesis);
@@ -673,7 +674,7 @@ mod tests {
     }
 
     #[quickcheck]
-    fn prop_testnet_validation(manifest: Manifest) {
+    fn prop_testnet_validation(_manifest: Manifest) {
         todo!()
     }
 }
