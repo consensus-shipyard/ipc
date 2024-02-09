@@ -71,6 +71,8 @@ pub struct FvmMessageInterpreter<DB, C> {
     /// Indicate whether transactions should be fully executed during the checks performed
     /// when they are added to the mempool, or just the most basic ones are performed.
     exec_in_check: bool,
+    /// Indicate whether the chain metadata should be pushed into the ledger.
+    push_chain_meta: bool,
     gateway: GatewayCaller<DB>,
 }
 
@@ -82,6 +84,7 @@ impl<DB, C> FvmMessageInterpreter<DB, C> {
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
+        push_chain_meta: bool,
     ) -> Self {
         Self {
             client,
@@ -90,6 +93,7 @@ impl<DB, C> FvmMessageInterpreter<DB, C> {
             gas_overestimation_rate,
             gas_search_step,
             exec_in_check,
+            push_chain_meta,
             gateway: GatewayCaller::default(),
         }
     }

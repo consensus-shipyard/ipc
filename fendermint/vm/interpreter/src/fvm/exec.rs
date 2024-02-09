@@ -83,32 +83,33 @@ where
         }
 
         // Push the current block hash to the chainmetadata actor
-        //
-        if let Some(block_hash) = state.block_hash() {
-            let params = fvm_ipld_encoding::RawBytes::serialize(
-                fendermint_actor_chainmetadata::PushBlockParams {
-                    epoch: height,
-                    block: block_hash,
-                },
-            )?;
+        if self.push_chain_meta {
+            if let Some(block_hash) = state.block_hash() {
+                let params = fvm_ipld_encoding::RawBytes::serialize(
+                    fendermint_actor_chainmetadata::PushBlockParams {
+                        epoch: height,
+                        block: block_hash,
+                    },
+                )?;
 
-            let msg = FvmMessage {
-                from: system::SYSTEM_ACTOR_ADDR,
-                to: chainmetadata::CHAINMETADATA_ACTOR_ADDR,
-                sequence: height as u64,
-                gas_limit,
-                method_num: fendermint_actor_chainmetadata::Method::PushBlockHash as u64,
-                params,
-                value: Default::default(),
-                version: Default::default(),
-                gas_fee_cap: Default::default(),
-                gas_premium: Default::default(),
-            };
+                let msg = FvmMessage {
+                    from: system::SYSTEM_ACTOR_ADDR,
+                    to: chainmetadata::CHAINMETADATA_ACTOR_ADDR,
+                    sequence: height as u64,
+                    gas_limit,
+                    method_num: fendermint_actor_chainmetadata::Method::PushBlockHash as u64,
+                    params,
+                    value: Default::default(),
+                    version: Default::default(),
+                    gas_fee_cap: Default::default(),
+                    gas_premium: Default::default(),
+                };
 
-            let (apply_ret, _) = state.execute_implicit(msg)?;
+                let (apply_ret, _) = state.execute_implicit(msg)?;
 
-            if let Some(err) = apply_ret.failure_info {
-                anyhow::bail!("failed to apply chainmetadata message: {}", err);
+                if let Some(err) = apply_ret.failure_info {
+                    anyhow::bail!("failed to apply chainmetadata message: {}", err);
+                }
             }
         }
 

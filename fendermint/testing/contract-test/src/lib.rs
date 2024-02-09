@@ -43,7 +43,8 @@ pub async fn init_exec_state(
     let (client, _) =
         tendermint_rpc::MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default());
 
-    let interpreter = FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false);
+    let interpreter =
+        FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false, true);
 
     let (state, out) = interpreter
         .init(state, genesis)

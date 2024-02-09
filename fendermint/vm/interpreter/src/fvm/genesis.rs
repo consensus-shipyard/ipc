@@ -635,7 +635,7 @@ mod tests {
     fn make_interpreter(
     ) -> FvmMessageInterpreter<MemoryBlockstore, MockClient<MockRequestMethodMatcher>> {
         let (client, _) = MockClient::new(MockRequestMethodMatcher::default());
-        FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false)
+        FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false, true)
     }
 
     fn read_bundle() -> Vec<u8> {
