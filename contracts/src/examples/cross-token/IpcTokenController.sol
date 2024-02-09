@@ -180,7 +180,7 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         }
 
         CallMsg memory message = CallMsg({
-            method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
+            method: abi.encodePacked(bytes4(keccak256("receiveAndMint(address,uint256)"))),
             params: abi.encode(receiver, amount)
         });
         IPCAddress memory destination = IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)});

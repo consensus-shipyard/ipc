@@ -19,6 +19,8 @@ import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 
 error NoTransfer();
 error ZeroAddress();
+error InvalidMessageSignature();
+error InvalidMethod();
 
 contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
@@ -113,9 +115,26 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-        (address recipient, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
+
+        bytes4 methodSignature = toBytes4(callMsg.method);
+        if (methodSignature != bytes4(keccak256("receiveAndMint(address,uint256)"))) {
+            revert InvalidMethod();
+        }
+
+        (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         receiveAndMint(receiver, amount);
         return bytes("");
+    }
+
+    function toBytes4(bytes memory data) internal pure returns (bytes4 result) {
+        if (data.length < 4) {
+            revert InvalidMessageSignature();
+        }
+
+        // Assembly block to directly load the first 4 bytes
+        assembly {
+            result := mload(add(data, 32))
+        }
     }
 
     function receiveAndMint(address recipient, uint256 value) private {
