@@ -15,18 +15,30 @@ import {GatewayCannotBeZero, NotEnoughFunds} from "../../errors/IPCErrors.sol";
 import {IpcExchange} from "../../../sdk/IpcContract.sol";
 import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
+import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 
 error NoTransfer();
 error ZeroAddress();
 
 contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     using FvmAddressHelper for FvmAddress;
+    using CrossMsgHelper for IpcEnvelope;
     using SafeERC20 for IERC20;
 
     address public parentSubnetUSDC;
     SubnetID public parentSubnet;
 
     SubnetID public networkName;
+
+    // Define a struct to hold the sender address and the value of unconfirmed transfers
+    struct TransferDetails {
+        address sender;
+        uint256 value;
+    }
+
+    // Create the mapping of ipc envelope hash to TransferDetails
+    mapping(bytes32 => TransferDetails) public unconfirmedTransfers;
+
     uint256 public constant DEFAULT_CROSS_MSG_FEE = 10 gwei;
     uint64 public nonce = 0;
 
@@ -78,6 +90,14 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         IPCAddress memory destination = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(parentSubnetUSDC)});
         committed= performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
         _burn(receiver, amount);
+
+        //add receipt to unconfirmedTransfers
+        unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);
+    }
+
+    function getUnconfirmedTransfer(bytes32 hash) public view returns (address, uint256) {
+        TransferDetails storage details = unconfirmedTransfers[hash];
+        return (details.sender, details.value);
     }
 
     // Setter function to update the address of parentSubnetUSDC

@@ -520,6 +520,13 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(address(testUSDCOwner));
         expected = ipcTokenReplica.burnAndTransfer{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
+        //check that the message is in unconfirmedTransfers
+        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(
+            expected.toHash()
+        );
+        require(receiptSender == address(this), "Transfer sender incorrect in unconfirmedTransfers");
+        require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
+
         //confirm that token controller only accept calls to Ipc from the gateway
         vm.prank(address(testUSDCOwner));
         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
