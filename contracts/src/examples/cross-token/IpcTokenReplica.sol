@@ -113,9 +113,16 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-        (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
-        _mint(receiver, amount);
+        (address recipient, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
+        receiveAndMint(receiver, amount);
         return bytes("");
+    }
+
+    function receiveAndMint(address recipient, uint256 value) private {
+        if (recipient == address(0)) {
+            revert ZeroAddress();
+        }
+        _mint(recipient, value);
     }
 
     function _handleIpcResult(
