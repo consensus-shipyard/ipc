@@ -127,7 +127,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
         UpgradeScheduler::new(),
-    );
+    )
+    .with_push_chain_meta(settings.fvm.push_chain_meta);
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
     let interpreter =
