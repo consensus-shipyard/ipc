@@ -26,10 +26,15 @@ import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol"
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
+import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
 
 import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 
 contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
+    using RegistryFacetsHelper for SubnetRegistryDiamond;
+    using DiamondFacetsHelper for SubnetRegistryDiamond;
+
     bytes4[] empty;
 
     function setUp() public virtual override {
@@ -64,10 +69,10 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorPauserSelectors = mockedSelectors5;
 
         registryDiamond = createSubnetRegistry(params);
-        registryLouper = DiamondLoupeFacet(address(registryDiamond));
-        registryCutter = DiamondCutFacet(address(registryDiamond));
-        registrySubnetFacet = RegisterSubnetFacet(address(registryDiamond));
-        registrySubnetGetterFacet = SubnetGetterFacet(address(registryDiamond));
+        registryLouper = registryDiamond.diamondLouper();
+        registryCutter = registryDiamond.diamondCutter();
+        registrySubnetFacet = registryDiamond.register();
+        registrySubnetGetterFacet = registryDiamond.getter();
     }
 
     function test_Registry_FacetFunctionSelectors() public view {

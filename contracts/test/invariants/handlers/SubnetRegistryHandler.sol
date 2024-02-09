@@ -12,9 +12,11 @@ import {ConsensusType} from "../../../src/enums/ConsensusType.sol";
 import {SubnetID, PermissionMode} from "../../../src/structs/Subnet.sol";
 import {SupplySourceHelper} from "../../../src/lib/SupplySourceHelper.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {RegistryFacetsHelper} from "../../helpers/RegistryFacetsHelper.sol";
 
 contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using RegistryFacetsHelper for SubnetRegistryDiamond;
 
     address private constant DEFAULT_IPC_GATEWAY_ADDR = address(1024);
     uint64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
@@ -34,8 +36,8 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
     address private subnetGetterFacetAddr;
 
     constructor(SubnetRegistryDiamond _registry) {
-        registerSubnetFacet = RegisterSubnetFacet(address(_registry));
-        registerGetterFacet = SubnetGetterFacet(address(_registry));
+        registerSubnetFacet = _registry.register();
+        registerGetterFacet = _registry.getter();
     }
 
     function getSubnetDeployedBy(address owner) external view returns (address subnet) {
