@@ -1,3 +1,5 @@
+# About promtail: https://grafana.com/docs/loki/latest/send-data/promtail/
+# Configuring promtail: https://grafana.com/docs/loki/latest/send-data/promtail/configuration/
 server:
   http_listen_port: 9080
   grpc_listen_port: 0

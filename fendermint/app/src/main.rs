@@ -3,42 +3,68 @@
 
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
-
+use tracing_appender::{
+    non_blocking::WorkerGuard,
+    rolling::{RollingFileAppender, Rotation},
+};
+use tracing_subscriber::{
+    fmt::{self, writer::MakeWriterExt},
+    layer::SubscriberExt,
+};
 mod cmd;
 
-fn init_tracing(opts: &options::Options) {
-    match &opts.log_dir {
-        Some(log_dir) => {
-            let file = tracing_appender::rolling::never(log_dir, "fendermint.log");
+fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
+    let mut guard = None;
 
-            tracing_subscriber::fmt()
-                .json()
-                .compact()
-                .with_writer(file)
-                .with_target(false)
-                .with_file(true)
-                .with_line_number(true)
-                .with_max_level(opts.tracing_level())
-                .init();
-        }
-        None => {
-            tracing_subscriber::fmt()
-                .json()
-                .compact()
-                .with_target(false)
-                .with_file(true)
-                .with_line_number(true)
-                .with_max_level(opts.tracing_level())
-                .init();
-        }
+    let Some(log_level) = opts.tracing_level() else {
+        return guard;
     };
-}
 
+    let registry = tracing_subscriber::registry();
+
+    // add a file layer if log_dir is set
+    let registry = registry.with(if let Some(log_dir) = &opts.log_dir {
+        let appender = RollingFileAppender::builder()
+            .filename_prefix("fendermint")
+            .filename_suffix("log")
+            .rotation(Rotation::DAILY)
+            .max_log_files(5)
+            .build(log_dir)
+            .expect("Error setting up log file!");
+
+        let (non_blocking, g) = tracing_appender::non_blocking(appender);
+        guard = Some(g);
+
+        Some(
+            fmt::Layer::new()
+                .json()
+                .with_writer(non_blocking.with_max_level(log_level))
+                .with_target(false)
+                .with_file(true)
+                .with_line_number(true),
+        )
+    } else {
+        None
+    });
+
+    // we also log all traces with level INFO or higher to stdout
+    let registry = registry.with(
+        tracing_subscriber::fmt::layer()
+            .with_writer(std::io::stdout.with_max_level(tracing::Level::INFO))
+            .with_target(false)
+            .with_file(true)
+            .with_line_number(true),
+    );
+
+    tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
+
+    guard
+}
 #[tokio::main]
 async fn main() {
     let opts = options::parse();
 
-    init_tracing(&opts);
+    let _guard = init_tracing(&opts);
 
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);
