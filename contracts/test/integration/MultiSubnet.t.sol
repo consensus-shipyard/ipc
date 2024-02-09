@@ -457,7 +457,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             address(ipcTokenReplica)
         );
 
-        ipcTokenReplica.setParentSubnetUSDC(address(rootTokenController));
+        ipcTokenReplica.setController(address(rootTokenController));
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.deal(address(rootTokenController), 1 ether);

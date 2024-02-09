@@ -49,7 +49,7 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
         controller = new IpcTokenController(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
-        replica.setParentSubnetUSDC(address(controller));
+        replica.setController(address(controller));
     }
 
     function testHandleIpcMessageOrigin() public {
@@ -103,12 +103,12 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
 
     function testParentSubnetUSDCAddress() public {
         // Test to check if controllerSubnetUSDC address is correctly set
-        assertEq(replica.parentSubnetUSDC(), address(controller), "controllerSubnetUSDC address does not match");
+        assertEq(replica.controller(), address(controller), "controllerSubnetUSDC address does not match");
     }
 
     function testParentSubnet() public {
         // Test if controllerSubnet is correctly set
-        assertTrue(replica.getParentSubnet().equals(controllerSubnet), "controllerSubnetdoes not match");
+        assertTrue(replica.getControllerSubnet().equals(controllerSubnet), "controllerSubnetdoes not match");
     }
 
     function testDepositTokens() public {

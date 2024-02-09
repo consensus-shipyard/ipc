@@ -30,8 +30,8 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SubnetIDHelper for SubnetID;
 
-    address public parentSubnetUSDC;
-    SubnetID public parentSubnet;
+    address public controller;
+    SubnetID public controllerSubnet;
 
     SubnetID public networkName;
 
@@ -59,11 +59,11 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
 
     constructor(
         address _gateway,
-        address _parentSubnetUSDC,
-        SubnetID memory _parentSubnet
+        address _controller,
+        SubnetID memory _controllerSubnet
     ) IpcExchange(_gateway) ERC20("USDCTestReplica", "USDCtR") {
-        parentSubnetUSDC = _parentSubnetUSDC;
-        parentSubnet = _parentSubnet;
+        controller = _controller;
+        controllerSubnet = _controllerSubnet;
         networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
     }
 
@@ -80,8 +80,8 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         emit TokenSent({
             sourceContract: address(this),
             sender: msg.sender,
-            destinationSubnet: parentSubnet,
-            destinationContract: parentSubnetUSDC,
+            destinationSubnet: controllerSubnet,
+            destinationContract: controller,
             receiver: receiver,
             nonce: lastNonce,
             value: amount
@@ -93,8 +93,8 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
             params: abi.encode(receiver, amount)
         });
         IPCAddress memory destination = IPCAddress({
-            subnetId: parentSubnet,
-            rawAddress: FvmAddressHelper.from(parentSubnetUSDC)
+            subnetId: controllerSubnet,
+            rawAddress: FvmAddressHelper.from(controller)
         });
         committed = performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
         _burn(receiver, amount);
@@ -108,13 +108,13 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         return (details.sender, details.value);
     }
 
-    // Setter function to update the address of parentSubnetUSDC
-    function setParentSubnetUSDC(address _newAddress) external onlyOwner {
-        parentSubnetUSDC = _newAddress;
+    // Setter function to update the address of controller
+    function setController(address _newAddress) external onlyOwner {
+        controller = _newAddress;
     }
 
-    function getParentSubnet() external view returns (SubnetID memory) {
-        return parentSubnet;
+    function getControllerSubnet() external view returns (SubnetID memory) {
+        return controllerSubnet;
     }
 
     function _handleIpcCall(
@@ -137,10 +137,10 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     function verifyIpcEnvelope(IpcEnvelope memory envelope) public {
         SubnetID memory subnetId = envelope.from.subnetId;
         FvmAddress memory rawAddress = envelope.from.rawAddress;
-        if (!subnetId.equals(parentSubnet)) {
+        if (!subnetId.equals(controllerSubnet)) {
             revert InvalidOriginSubnet();
         }
-        if (!rawAddress.equal(FvmAddressHelper.from(parentSubnetUSDC))) {
+        if (!rawAddress.equal(FvmAddressHelper.from(controller))) {
             revert InvalidOriginContract();
         }
     }

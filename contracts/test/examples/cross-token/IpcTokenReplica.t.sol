@@ -49,7 +49,7 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
         controller = new IpcTokenController(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
-        replica.setParentSubnetUSDC(address(controller));
+        replica.setController(address(controller));
     }
 
     function testHandleIpcMessageOrigin() public {
