@@ -35,8 +35,6 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
     address private destinationContract;
     SubnetID public networkName;
 
-    GatewayMessengerFacet private immutable messenger;
-
     // Define a struct to hold the sender address and the value of unconfirmed transfers
     struct TransferDetails {
         address sender;
@@ -79,7 +77,6 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         destinationContract = _destinationContract;
 
         networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
-        messenger = GatewayMessengerFacet(address(_gateway));
     }
 
     /**
@@ -92,7 +89,7 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
     }
 
-    function lockAndTransferWithReturn(address receiver, uint256 amount) external payable returns (IpcEnvelope memory) {
+    function lockAndTransferWithReturn(address receiver, uint256 amount) external payable returns (IpcEnvelope memory envelope) {
         // Transfer and lock tokens on L1 using the inherited sendToken function
         return _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
     }
@@ -181,21 +178,16 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         if (endingBalance <= startingBalance) {
             revert NoTransfer();
         }
+
         CallMsg memory message = CallMsg({
             method: abi.encodePacked(bytes4(keccak256("transfer(address,uint256)"))),
             params: abi.encode(receiver, amount)
         });
-        IpcEnvelope memory crossMsg = IpcEnvelope({
-            kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: networkName, rawAddress: FvmAddressHelper.from(tokenContractAddress)}),
-            to: IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)}),
-            value: DEFAULT_CROSS_MSG_FEE,
-            nonce: lastNonce,
-            message: abi.encode(message)
-        });
+        IPCAddress memory destination = IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)});
+
+        committed= performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
 
         //add receipt to unconfirmedTransfers
-        committed = messenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(crossMsg);
         unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);
     }
 

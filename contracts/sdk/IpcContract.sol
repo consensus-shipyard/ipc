@@ -76,9 +76,9 @@ abstract contract IpcExchange is IpcHandler, Ownable {
     function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal virtual;
 
     /// @notice Method the implementation of this contract can invoke to perform an IPC call.
-    function performIpcCall(IPCAddress calldata to, CallMsg calldata callMsg, uint256 value) internal {
+    function performIpcCall(IPCAddress memory to, CallMsg memory callMsg, uint256 value) internal returns (IpcEnvelope memory envelope) {
         // Queue the cross-net message for dispatch.
-        IpcEnvelope memory envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(IpcEnvelope({
+        envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(IpcEnvelope({
             kind: IpcMsgKind.Call,
             from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
             to: to,

@@ -27,7 +27,6 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     SubnetID public parentSubnet;
 
     SubnetID public networkName;
-    GatewayMessengerFacet private immutable messenger;
     uint256 public constant DEFAULT_CROSS_MSG_FEE = 10 gwei;
     uint64 public nonce = 0;
 
@@ -48,9 +47,7 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     ) IpcExchange(_gateway) ERC20("USDCTestReplica", "USDCtR") {
         parentSubnetUSDC = _parentSubnetUSDC;
         parentSubnet = _parentSubnet;
-
         networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
-        messenger = GatewayMessengerFacet(address(_gateway));
     }
 
     function withdrawTokens(address receiver, uint256 amount) external payable returns (IpcEnvelope memory committed) {
@@ -78,18 +75,9 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
             method: abi.encodePacked(bytes4(keccak256("receiveAndUnlock(address,uint256)"))),
             params: abi.encode(receiver, amount)
         });
-        IpcEnvelope memory crossMsg = IpcEnvelope({
-            kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: networkName, rawAddress: FvmAddressHelper.from(address(this))}),
-            to: IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(parentSubnetUSDC)}),
-            value: DEFAULT_CROSS_MSG_FEE,
-            nonce: lastNonce,
-            message: abi.encode(message)
-        });
-
-        committed = messenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(crossMsg);
+        IPCAddress memory destination = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(parentSubnetUSDC)});
+        committed= performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
         _burn(receiver, amount);
-        return committed;
     }
 
     // Setter function to update the address of parentSubnetUSDC
