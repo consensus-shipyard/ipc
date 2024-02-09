@@ -91,13 +91,13 @@ where
         // Create the rootnet.
         t.create_and_start_rootnet(m, &root_name, &manifest.rootnet)
             .await
-            .context("failed to start rootnet")?;
+            .context("failed to create and start rootnet")?;
 
         // Recursively create and start all subnet nodes.
         for (subnet_id, subnet) in &manifest.subnets {
             t.create_and_start_subnet(m, &root_name, subnet_id, subnet)
                 .await
-                .context("failed to start subnet")?;
+                .with_context(|| format!("failed to create and start subnet {subnet_id}"))?;
         }
 
         Ok(t)
@@ -387,7 +387,7 @@ where
     ) -> anyhow::Result<()> {
         let subnet_name = parent_subnet_name.subnet(subnet_id);
 
-        // Pre-fund the accounts, create the subnet, start the nodes.
+        // Pre-fund the accounts, create the subnet
         {
             // Assume that all subnets are deployed with the default contracts.
             self.deployments
@@ -397,18 +397,25 @@ where
             let parent_submit_config = self.submit_config(parent_subnet_name)?;
 
             // Create the subnet on the parent.
-            m.create_subnet(
-                &parent_submit_config,
-                &subnet_name,
-                SubnetConfig {
-                    creator: self.account(&subnet.creator).context("invalid creator")?,
-                    // Make the number such that the last validator to join activates the subnet.
-                    min_validators: subnet.validators.len(),
-                },
-            )
-            .await
-            .context("failed to create subnet")?;
+            let created_subnet = m
+                .create_subnet(
+                    &parent_submit_config,
+                    &subnet_name,
+                    SubnetConfig {
+                        creator: self.account(&subnet.creator).context("invalid creator")?,
+                        // Make the number such that the last validator to join activates the subnet.
+                        min_validators: subnet.validators.len(),
+                    },
+                )
+                .await
+                .context("failed to create subnet")?;
 
+            self.subnets.insert(subnet_name.clone(), created_subnet);
+        };
+
+        // Start the nodes
+        {
+            let parent_submit_config = self.submit_config(parent_subnet_name)?;
             let created_subnet = self.subnet(&subnet_name)?;
             let ancestor_hops = subnet_name.ancestor_hops();
 
@@ -457,7 +464,7 @@ where
             for (id, c) in &subnet.validators {
                 let account = self
                     .account(id)
-                    .with_context(|| format!("invalid validator in {subnet_name:?}"))?;
+                    .with_context(|| format!("invalid validator {id} in {subnet_name:?}"))?;
 
                 let b = subnet.balances.get(id).cloned().unwrap_or_default();
 
@@ -473,21 +480,23 @@ where
                     Some(reference),
                 )
                 .await
-                .with_context(|| format!("failed to join with {id} in {subnet_name:?}"))?;
+                .with_context(|| {
+                    format!("failed to join with validator {id} in {subnet_name:?}")
+                })?;
             }
 
             // Create genesis by fetching from the parent.
             let genesis = m
                 .create_subnet_genesis(&parent_submit_config, created_subnet)
                 .await
-                .context("failed to create subnet genesis")?;
+                .context("failed to create subnet genesis in {subnet_name:?}")?;
 
             self.genesis.insert(subnet_name.clone(), genesis);
 
             // Create and start nodes.
             self.create_and_start_nodes(m, &subnet_name, &subnet.nodes)
                 .await
-                .context("failed to start subnet nodes")?;
+                .context("failed to start subnet nodes in {subnet_name:?}")?;
         }
 
         // Interact with the running subnet .
@@ -556,7 +565,7 @@ where
                         follow_node,
                     )
                     .await
-                    .context("failed to create relayer")?;
+                    .with_context(|| format!("failed to create relayer {id}"))?;
 
                 relayers.push((relayer_name, relayer));
             }

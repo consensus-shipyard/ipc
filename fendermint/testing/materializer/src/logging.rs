@@ -14,12 +14,13 @@ use crate::{
 
 /// Simple in-memory logging to help debug manifests.
 pub struct LoggingMaterializer<R> {
+    tag: String,
     inner: R,
 }
 
 impl<R> LoggingMaterializer<R> {
-    pub fn new(inner: R) -> Self {
-        Self { inner }
+    pub fn new(inner: R, tag: String) -> Self {
+        Self { inner, tag }
     }
 }
 
@@ -40,12 +41,14 @@ where
         &'s mut self,
         testnet_name: &TestnetName,
     ) -> anyhow::Result<M::Network> {
-        tracing::info!(?testnet_name, "create_network");
+        eprintln!("create_network({testnet_name:?}");
+        tracing::info!(self.tag, ?testnet_name, "create_network");
         self.inner.create_network(testnet_name).await
     }
 
     fn create_account<'s>(&'s mut self, account_name: &AccountName) -> anyhow::Result<M::Account> {
-        tracing::info!(?account_name, "create_account");
+        eprintln!("create_account({account_name:?})");
+        tracing::info!(self.tag, ?account_name, "create_account");
         self.inner.create_account(account_name)
     }
 
@@ -54,7 +57,8 @@ where
         account: &'a M::Account,
         reference: Option<ResourceHash>,
     ) -> anyhow::Result<()> {
-        tracing::info!(?account, "fund_from_faucet");
+        eprintln!("fund_from_faucet({account:?})");
+        tracing::info!(self.tag, ?account, "fund_from_faucet");
         self.inner.fund_from_faucet(account, reference).await
     }
 
@@ -63,7 +67,8 @@ where
         subnet_name: &SubnetName,
         deployer: &'a M::Account,
     ) -> anyhow::Result<M::Deployment> {
-        tracing::info!(?subnet_name, ?deployer, "new_deployment");
+        eprintln!("new_deployment({subnet_name:?}, {deployer:?})");
+        tracing::info!(self.tag, ?subnet_name, ?deployer, "new_deployment");
         self.inner.new_deployment(subnet_name, deployer).await
     }
 
@@ -73,7 +78,8 @@ where
         gateway: Address,
         registry: Address,
     ) -> anyhow::Result<M::Deployment> {
-        tracing::info!(?subnet_name, "existing_deployment");
+        eprintln!("existing_deployment({subnet_name:?})");
+        tracing::info!(self.tag, ?subnet_name, "existing_deployment");
         self.inner
             .existing_deployment(subnet_name, gateway, registry)
     }
@@ -82,7 +88,8 @@ where
         &'s mut self,
         subnet_name: &SubnetName,
     ) -> anyhow::Result<M::Deployment> {
-        tracing::info!(?subnet_name, "default_deployment");
+        eprintln!("default_deployment({subnet_name:?})");
+        tracing::info!(self.tag, ?subnet_name, "default_deployment");
         self.inner.default_deployment(subnet_name)
     }
 
@@ -92,7 +99,8 @@ where
         validators: BTreeMap<&'a M::Account, Collateral>,
         balances: BTreeMap<&'a M::Account, Balance>,
     ) -> anyhow::Result<M::Genesis> {
-        tracing::info!(?subnet_name, "create_root_genesis");
+        eprintln!("create_root_genesis({subnet_name:?})");
+        tracing::info!(self.tag, ?subnet_name, "create_root_genesis");
         self.inner
             .create_root_genesis(subnet_name, validators, balances)
     }
@@ -105,7 +113,8 @@ where
     where
         's: 'a,
     {
-        tracing::info!(?node_name, "create_node");
+        eprintln!("create_node({node_name:?})");
+        tracing::info!(self.tag, ?node_name, "create_node");
         self.inner.create_node(node_name, node_config).await
     }
 
@@ -114,7 +123,8 @@ where
         node: &'a M::Node,
         seed_nodes: &'a [&'a M::Node],
     ) -> anyhow::Result<()> {
-        tracing::info!(?node, "start_node");
+        eprintln!("start_node({node:?}");
+        tracing::info!(self.tag, ?node, "start_node");
         self.inner.start_node(node, seed_nodes).await
     }
 
@@ -127,7 +137,8 @@ where
     where
         's: 'a,
     {
-        tracing::info!(?subnet_name, "create_subnet");
+        eprintln!("create_subnet({subnet_name:?})");
+        tracing::info!(self.tag, ?subnet_name, "create_subnet");
         self.inner
             .create_subnet(parent_submit_config, subnet_name, subnet_config)
             .await
@@ -144,7 +155,8 @@ where
     where
         's: 'a,
     {
-        tracing::info!(?subnet, ?account, "fund_subnet");
+        eprintln!("fund_subnet({subnet:?}, {account:?})");
+        tracing::info!(self.tag, ?subnet, ?account, "fund_subnet");
         self.inner
             .fund_subnet(parent_submit_config, account, subnet, amount, reference)
             .await
@@ -162,7 +174,8 @@ where
     where
         's: 'a,
     {
-        tracing::info!(?subnet, ?account, "join_subnet");
+        eprintln!("join_subnet({subnet:?}, {account:?})");
+        tracing::info!(self.tag, ?subnet, ?account, "join_subnet");
         self.inner
             .join_subnet(
                 parent_submit_config,
@@ -183,7 +196,8 @@ where
     where
         's: 'a,
     {
-        tracing::info!(?subnet, "create_subnet_genesis");
+        eprintln!("create_subnet_genesis({subnet:?})");
+        tracing::info!(self.tag, ?subnet, "create_subnet_genesis");
         self.inner
             .create_subnet_genesis(parent_submit_config, subnet)
             .await
@@ -200,7 +214,8 @@ where
     where
         's: 'a,
     {
-        tracing::info!(?relayer_name, "create_relayer");
+        eprintln!("create_relayer({relayer_name:?})");
+        tracing::info!(self.tag, ?relayer_name, "create_relayer");
         self.inner
             .create_relayer(
                 parent_submit_config,

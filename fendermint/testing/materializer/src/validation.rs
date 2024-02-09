@@ -13,6 +13,7 @@ use std::{
 use tendermint_rpc::Url;
 
 use crate::{
+    logging::LoggingMaterializer,
     manifest::{Balance, Manifest},
     materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig},
     testnet::Testnet,
@@ -27,7 +28,9 @@ const DEFAULT_FAUCET_FIL: u64 = 100;
 /// * relayers have balances on the parent to submit transactions
 /// * subnet creators have balances on the parent to submit transactions
 pub async fn validate_manifest(id: &TestnetId, manifest: &Manifest) -> anyhow::Result<()> {
-    let mut m = ValidatingMaterializer::default();
+    let m = ValidatingMaterializer::default();
+    // Wrap with logging so that we can debug the tests easier.
+    let mut m = LoggingMaterializer::new(m, "validation".to_string());
     let _ = Testnet::setup(&mut m, id, manifest).await?;
     // We could check here that all subnets have enough validators for a quorum.
     Ok(())
@@ -355,6 +358,16 @@ fn parent_name(subnet: &SubnetName) -> anyhow::Result<SubnetName> {
 mod tests {
 
     use crate::{manifest::Manifest, validation::validate_manifest, TestnetId};
+
+    // Unfortunately doesn't seem to work with quickcheck_async
+    // /// Run the tests with `RUST_LOG=info` to see the logs, for example:
+    // ///
+    // /// ```text
+    // /// RUST_LOG=info cargo test -p fendermint_testing_materializer prop_validation -- --nocapture
+    // /// ```
+    // fn init_log() {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+    // }
 
     /// Check that the random manifests we generate would pass validation.
     #[quickcheck_async::tokio]
