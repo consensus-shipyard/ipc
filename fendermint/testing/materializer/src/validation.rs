@@ -2,13 +2,15 @@ use anyhow::{anyhow, bail, Ok};
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
+use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
-use fvm_shared::{address::Address, econ::TokenAmount};
+use fvm_shared::econ::TokenAmount;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
     ops::{Add, Sub},
 };
+use tendermint_rpc::Url;
 
 use crate::{
     manifest::{Balance, Manifest},
@@ -177,6 +179,7 @@ impl Materializer for ValidatingMaterializer {
         &mut self,
         subnet_name: &SubnetName,
         deployer: &Self::Account,
+        urls: Vec<Url>,
     ) -> anyhow::Result<Self::Deployment> {
         self.ensure_contains(subnet_name)?;
         self.ensure_balance(subnet_name, deployer)?;
@@ -186,8 +189,8 @@ impl Materializer for ValidatingMaterializer {
     fn existing_deployment(
         &mut self,
         subnet_name: &SubnetName,
-        gateway: Address,
-        registry: Address,
+        gateway: H160,
+        registry: H160,
     ) -> anyhow::Result<Self::Deployment> {
         self.ensure_contains(subnet_name)?;
 
@@ -330,5 +333,17 @@ impl Materializer for ValidatingMaterializer {
         let parent = Self::parent_name(subnet)?;
         self.ensure_balance(&parent, submitter)?;
         Ok(relayer_name.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{manifest::Manifest, validation::validate_manifest, TestnetId};
+
+    /// Check that the random manifests we generate would pass validation.
+    #[quickcheck_async::tokio]
+    async fn prop_validation(id: TestnetId, manifest: Manifest) -> anyhow::Result<()> {
+        validate_manifest(&id, &manifest).await
     }
 }

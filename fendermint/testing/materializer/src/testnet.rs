@@ -640,10 +640,7 @@ fn sort_by_seeds(nodes: &BTreeMap<NodeId, Node>) -> anyhow::Result<Vec<(&NodeId,
 
 #[cfg(test)]
 mod tests {
-    use quickcheck_macros::quickcheck;
     use std::collections::BTreeMap;
-
-    use crate::manifest::Manifest;
 
     use super::topo_sort;
 
@@ -671,10 +668,5 @@ mod tests {
 
         let sorted = topo_sort(&tree, true, |ds| ds.clone()).expect("should allow cycles");
         assert_eq!(sorted.len(), tree.len());
-    }
-
-    #[quickcheck]
-    fn prop_testnet_validation(_manifest: Manifest) {
-        todo!()
     }
 }
