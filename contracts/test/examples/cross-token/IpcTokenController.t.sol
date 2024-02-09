@@ -8,11 +8,11 @@ import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
 import {SubnetIDHelper} from "../../../src/lib/SubnetIDHelper.sol";
 
 import {SubnetActorDiamond} from "../../../src/SubnetActorDiamond.sol";
-import {IpcTokenController } from "../../../src/examples/cross-token/IpcTokenController.sol";
-import {InvalidOriginContract, InvalidOriginSubnet } from "../../../src/examples/cross-token/IpcCrossTokenErrors.sol";
+import {IpcTokenController} from "../../../src/examples/cross-token/IpcTokenController.sol";
+import {InvalidOriginContract, InvalidOriginSubnet} from "../../../src/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../../../src/examples/cross-token/USDCTest.sol";
 
-contract IpcTokenControllerTest is Test , IntegrationTestBase {
+contract IpcTokenControllerTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
     IpcTokenController controller;
@@ -23,7 +23,6 @@ contract IpcTokenControllerTest is Test , IntegrationTestBase {
     address gateway;
     GatewayDiamond public rootGateway;
     uint256 transferAmount = 100;
-
 
     address[] public nativeSubnetPath;
 
@@ -49,7 +48,7 @@ contract IpcTokenControllerTest is Test , IntegrationTestBase {
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
-        controller = new IpcTokenController(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica) );
+        controller = new IpcTokenController(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
         replica.setParentSubnetUSDC(address(controller));
     }
 
@@ -73,7 +72,10 @@ contract IpcTokenControllerTest is Test , IntegrationTestBase {
 
         IpcEnvelope memory invalidContract = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(this)) /* invalid */   }),
+            from: IPCAddress({
+                subnetId: replicaSubnetName,
+                rawAddress: FvmAddressHelper.from(address(this)) /* invalid */
+            }),
             to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
@@ -82,7 +84,10 @@ contract IpcTokenControllerTest is Test , IntegrationTestBase {
 
         IpcEnvelope memory invalidSubnet = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: controllerSubnet /* invalid */ , rawAddress: FvmAddressHelper.from(address(controller))}),
+            from: IPCAddress({
+                subnetId: controllerSubnet /* invalid */,
+                rawAddress: FvmAddressHelper.from(address(controller))
+            }),
             to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
@@ -112,4 +117,3 @@ contract IpcTokenControllerTest is Test , IntegrationTestBase {
         assertTrue(true, "depositTokens not implemented");
     }
 }
-

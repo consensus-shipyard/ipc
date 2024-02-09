@@ -8,11 +8,11 @@ import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
 import {SubnetIDHelper} from "../../../src/lib/SubnetIDHelper.sol";
 
 import {SubnetActorDiamond} from "../../../src/SubnetActorDiamond.sol";
-import {IpcTokenController } from "../../../src/examples/cross-token/IpcTokenController.sol";
-import {InvalidOriginContract, InvalidOriginSubnet } from "../../../src/examples/cross-token/IpcCrossTokenErrors.sol";
+import {IpcTokenController} from "../../../src/examples/cross-token/IpcTokenController.sol";
+import {InvalidOriginContract, InvalidOriginSubnet} from "../../../src/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../../../src/examples/cross-token/USDCTest.sol";
 
-contract IpcTokenReplicaTest is Test , IntegrationTestBase {
+contract IpcTokenReplicaTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
     IpcTokenController controller;
@@ -23,7 +23,6 @@ contract IpcTokenReplicaTest is Test , IntegrationTestBase {
     address gateway;
     GatewayDiamond public rootGateway;
     uint256 transferAmount = 100;
-
 
     address[] public nativeSubnetPath;
 
@@ -49,12 +48,11 @@ contract IpcTokenReplicaTest is Test , IntegrationTestBase {
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
-        controller = new IpcTokenController(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica) );
+        controller = new IpcTokenController(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
         replica.setParentSubnetUSDC(address(controller));
     }
 
     function testHandleIpcMessageOrigin() public {
-
         CallMsg memory message = CallMsg({
             method: abi.encodePacked(bytes4(keccak256("receiveAndMint(address,uint256)"))),
             params: abi.encode(address(this), transferAmount)
@@ -94,4 +92,3 @@ contract IpcTokenReplicaTest is Test , IntegrationTestBase {
         replica.verifyIpcEnvelope(invalidSubnet);
     }
 }
-

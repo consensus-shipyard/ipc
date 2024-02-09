@@ -92,8 +92,11 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
             method: abi.encodePacked(bytes4(keccak256("receiveAndUnlock(address,uint256)"))),
             params: abi.encode(receiver, amount)
         });
-        IPCAddress memory destination = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(parentSubnetUSDC)});
-        committed= performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
+        IPCAddress memory destination = IPCAddress({
+            subnetId: parentSubnet,
+            rawAddress: FvmAddressHelper.from(parentSubnetUSDC)
+        });
+        committed = performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
         _burn(receiver, amount);
 
         //add receipt to unconfirmedTransfers
@@ -118,7 +121,6 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-
         //only accept messages from replica contract
         verifyIpcEnvelope(envelope);
 
@@ -133,14 +135,14 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
     }
 
     function verifyIpcEnvelope(IpcEnvelope memory envelope) public {
-            SubnetID memory subnetId = envelope.from.subnetId;
-            FvmAddress memory rawAddress = envelope.from.rawAddress;
-            if(!subnetId.equals(parentSubnet)){
-                revert InvalidOriginSubnet();
-            }
-            if(!rawAddress.equal(FvmAddressHelper.from(parentSubnetUSDC))){
-                revert InvalidOriginContract();
-            }
+        SubnetID memory subnetId = envelope.from.subnetId;
+        FvmAddress memory rawAddress = envelope.from.rawAddress;
+        if (!subnetId.equals(parentSubnet)) {
+            revert InvalidOriginSubnet();
+        }
+        if (!rawAddress.equal(FvmAddressHelper.from(parentSubnetUSDC))) {
+            revert InvalidOriginContract();
+        }
     }
 
     function toBytes4(bytes memory data) internal pure returns (bytes4 result) {

@@ -20,6 +20,7 @@ error NoTransfer();
 error ZeroAddress();
 error InvalidMessageSignature();
 error InvalidMethod();
+
 /**
  * @title IpcTokenController
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
@@ -89,7 +90,10 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
     }
 
-    function lockAndTransferWithReturn(address receiver, uint256 amount) external payable returns (IpcEnvelope memory envelope) {
+    function lockAndTransferWithReturn(
+        address receiver,
+        uint256 amount
+    ) external payable returns (IpcEnvelope memory envelope) {
         // Transfer and lock tokens on L1 using the inherited sendToken function
         return _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
     }
@@ -103,7 +107,6 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-
         //only accept messages from replica contract
         verifyIpcEnvelope(envelope);
 
@@ -119,14 +122,14 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
     }
 
     function verifyIpcEnvelope(IpcEnvelope memory envelope) public {
-            SubnetID memory subnetId = envelope.from.subnetId;
-            FvmAddress memory rawAddress = envelope.from.rawAddress;
-            if(!subnetId.equals(destinationSubnet)){
-                revert InvalidOriginSubnet();
-            }
-            if(!rawAddress.equal(FvmAddressHelper.from(destinationContract))){
-                revert InvalidOriginContract();
-            }
+        SubnetID memory subnetId = envelope.from.subnetId;
+        FvmAddress memory rawAddress = envelope.from.rawAddress;
+        if (!subnetId.equals(destinationSubnet)) {
+            revert InvalidOriginSubnet();
+        }
+        if (!rawAddress.equal(FvmAddressHelper.from(destinationContract))) {
+            revert InvalidOriginContract();
+        }
     }
 
     function receiveAndUnlock(address receiver, uint256 amount) private {
@@ -183,9 +186,12 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
             method: abi.encodePacked(bytes4(keccak256("receiveAndMint(address,uint256)"))),
             params: abi.encode(receiver, amount)
         });
-        IPCAddress memory destination = IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(destinationContract)});
+        IPCAddress memory destination = IPCAddress({
+            subnetId: destinationSubnet,
+            rawAddress: FvmAddressHelper.from(destinationContract)
+        });
 
-        committed= performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
+        committed = performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
 
         //add receipt to unconfirmedTransfers
         unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);

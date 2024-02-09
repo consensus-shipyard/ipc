@@ -521,9 +521,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         expected = ipcTokenReplica.burnAndTransfer{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         //check that the message is in unconfirmedTransfers
-        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(
-            expected.toHash()
-        );
+        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(expected.toHash());
         require(receiptSender == address(this), "Transfer sender incorrect in unconfirmedTransfers");
         require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
 
