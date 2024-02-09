@@ -50,7 +50,7 @@ contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
         networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
     }
 
-    function withdrawTokens(address receiver, uint256 amount) external payable returns (IpcEnvelope memory committed) {
+    function burnAndTransfer(address receiver, uint256 amount) external payable returns (IpcEnvelope memory committed) {
         if (receiver == address(0)) {
             revert ZeroAddress();
         }

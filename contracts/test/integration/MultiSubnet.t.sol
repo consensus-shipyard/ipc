@@ -518,7 +518,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(testUSDCOwner));
-        expected = ipcTokenReplica.withdrawTokens{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        expected = ipcTokenReplica.burnAndTransfer{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
 
         //confirm that token controller only accept calls to Ipc from the gateway
         vm.prank(address(testUSDCOwner));
