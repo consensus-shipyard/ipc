@@ -8,7 +8,7 @@ import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {Membership, SupplyKind} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, AlreadyInSet, NotInSet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -53,13 +53,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         subnet.genesisEpoch = block.number;
         subnet.circSupply = genesisCircSupply;
 
-        // This is situation when the subnet has not been registered from the Gateway perspective,
-        // but exists in the set.
-        bool added = s.subnetKeys.add(subnetId.toHash());
-        if (!added) {
-            revert AlreadyInSet();
-        }
-
+        s.subnetKeys.add(subnetId.toHash());
         s.totalSubnets += 1;
     }
 
@@ -119,10 +113,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         s.totalSubnets -= 1;
         delete s.subnets[id];
 
-        bool removed = s.subnetKeys.remove(id);
-        if (!removed) {
-            revert NotInSet();
-        }
+        s.subnetKeys.remove(id);
 
         payable(msg.sender).sendValue(stake);
     }
