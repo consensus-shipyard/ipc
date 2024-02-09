@@ -46,6 +46,25 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     using GatewayFacetsHelper for GatewayDiamond;
     using SubnetActorFacetsHelper for SubnetActorDiamond;
 
+    struct TestSubnetDefinition {
+        GatewayDiamond gateway;
+        address gatewayAddr;
+        SubnetActorDiamond subnetActor;
+        address subnetActorAddr;
+        SubnetID id;
+        address[] path;
+    }
+
+    struct RootSubnetDefinition {
+        GatewayDiamond gateway;
+        address gatewayAddr;
+        SubnetID id;
+    }
+
+    RootSubnetDefinition public rootSubnet;
+    TestSubnetDefinition public nativeSubnet;
+    TestSubnetDefinition public tokenSubnet;
+
     GatewayDiamond public rootGateway;
     GatewayGetterFacet public rootGatewayGetter;
     GatewayManagerFacet public rootGatewayManager;
@@ -91,6 +110,30 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         nativeSubnetName = SubnetID({root: ROOTNET_CHAINID, route: nativeSubnetPath});
         nativeSubnetGateway = createGatewayDiamond(gatewayParams(nativeSubnetName));
 
+        rootSubnet = RootSubnetDefinition ({
+            gateway: rootGateway,
+            gatewayAddr : address(rootGateway),
+            id: rootSubnetName
+        });
+
+        nativeSubnet = TestSubnetDefinition ({
+            gateway: nativeSubnetGateway,
+            gatewayAddr : address(nativeSubnetGateway),
+            id: nativeSubnetName,
+            subnetActor : rootNativeSubnetActor,
+            subnetActorAddr: address(rootNativeSubnetActor),
+            path : nativeSubnetPath
+        });
+
+        tokenSubnet = TestSubnetDefinition ({
+            gateway: tokenSubnetGateway,
+            gatewayAddr : address(tokenSubnetGateway),
+            id: tokenSubnetName,
+            subnetActor : rootTokenSubnetActor,
+            subnetActorAddr: address(rootTokenSubnetActor),
+            path : tokenSubnetPath
+        });
+
         printActors();
     }
 
@@ -103,14 +146,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         address recipient = address(new MockIpcContractPayable());
         uint256 amount = 3;
 
-        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(nativeSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(caller, amount);
 
-        vm.prank(address(rootNativeSubnetActor));
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+        vm.prank(nativeSubnet.subnetActorAddr);
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeSubnet.subnetActorAddr, rootGateway);
 
         IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
-            nativeSubnetName,
+            nativeSubnet.id,
             caller,
             FvmAddressHelper.from(recipient),
             amount
@@ -118,16 +161,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, address(rootGateway));
-        emit LibGateway.NewTopDownMessage(address(rootNativeSubnetActor), expected);
-        rootGatewayManager.fund{value: amount}(nativeSubnetName, FvmAddressHelper.from(address(recipient)));
+        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected);
+        rootGatewayManager.fund{value: amount}(nativeSubnet.id, FvmAddressHelper.from(address(recipient)));
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
 
         // TODO: commitParentFinality doesn't not affect anything in this test.
-        commitParentFinality(address(nativeSubnetGateway));
+        commitParentFinality(nativeSubnet.gatewayAddr);
 
-        executeTopDownMsgs(msgs, nativeSubnetName, nativeSubnetGateway);
+        executeTopDownMsgs(msgs, nativeSubnet.id, nativeSubnet.gateway);
 
         assertEq(recipient.balance, amount);
     }
