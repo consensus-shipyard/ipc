@@ -24,13 +24,18 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
 
     // add a file layer if log_dir is set
     let registry = registry.with(if let Some(log_dir) = &opts.log_dir {
+        let filename = match &opts.log_file_prefix {
+            Some(prefix) => format!("{}-{}", prefix, "fendermint"),
+            None => "fendermint".to_string(),
+        };
+
         let appender = RollingFileAppender::builder()
-            .filename_prefix("fendermint")
+            .filename_prefix(filename)
             .filename_suffix("log")
             .rotation(Rotation::DAILY)
             .max_log_files(5)
             .build(log_dir)
-            .expect("Error setting up log file!");
+            .expect("failed to initialize rolling file appender");
 
         let (non_blocking, g) = tracing_appender::non_blocking(appender);
         guard = Some(g);

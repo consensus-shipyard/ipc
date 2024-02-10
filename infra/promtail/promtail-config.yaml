@@ -19,10 +19,10 @@ scrape_configs:
         source_labels:
           - __meta_docker_container_name
         target_label: docker_container_stdout
-  - job_name: fendermint_job
+  - job_name: fendermint
     static_configs:
       - targets:
         - localhost
       - labels:
-          job: fendermint_label
+          job: fendermint_log
           __path__: /var/log/fendermint/*.log

@@ -18,11 +18,8 @@ docker run \
   --volume "$(readlink -f ../../../infra/promtail)/:/etc/promtail" \
   --volume fendermint-logs:/var/log/fendermint/ \
   ${PROMTAIL_DOCKER_IMAGE} \
-  -config.file=etc/promtail/promtail-config.yaml \
-  --client.external-labels=hostname=$(hostname) \
-  --client.external-labels=user=$(whoami) \
-  --client.external-labels=promtailrunid=$unixtime \
-  ${CMD}
+  --client.external-labels=hostname=$(hostname),promtailrunid=$unixtime \
+  --config.file=etc/promtail/promtail-config.yaml
 """
 
 [tasks.promtail-start]
