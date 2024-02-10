@@ -78,6 +78,19 @@ impl TryFrom<u8> for PermissionMode {
     }
 }
 
+impl TryFrom<&str> for PermissionMode {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(match s {
+            "collateral" => PermissionMode::Collateral,
+            "federated" => PermissionMode::Federated,
+            "static" => PermissionMode::Static,
+            _ => return Err(anyhow!("invalid permission mode: {}", s)),
+        })
+    }
+}
+
 impl TryFrom<u8> for SupplyKind {
     type Error = anyhow::Error;
 

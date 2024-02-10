@@ -32,7 +32,7 @@ impl CreateSubnet {
             None => None,
         };
 
-        let permission_mode = PermissionMode::try_from(arguments.permission_mode)?;
+        let permission_mode = PermissionMode::try_from(arguments.permission_mode.as_str())?;
         let token_address = if let Some(addr) = &arguments.supply_source_address {
             Some(Address::from_str(addr)?)
         } else {
@@ -110,9 +110,9 @@ pub struct CreateSubnetArgs {
     pub min_cross_msg_fee: f64,
     #[arg(
         long,
-        help = "The permission mode for the subnet, collateral(0), federated(1) and static(2)"
+        help = "The permission mode for the subnet: collateral, federated and static"
     )]
-    pub permission_mode: u8,
+    pub permission_mode: String,
     #[arg(
         long,
         help = "The kind of supply source of a subnet on its parent subnet: native or erc20"
