@@ -67,12 +67,12 @@ jobs:
           curl -L https://foundry.paradigm.xyz | bash
           export PATH="$PATH:/home/runner/.config/.foundry/bin"
           foundryup
-      - name: Create a docker build
+      - name: Pull latest docker build
         id: docker-build
         working-directory: ipc/fendermint
         run: |
           export PATH="$PATH:/home/runner/.config/.foundry/bin"
-          make docker-build
+          docker pull ghcr.io/consensus-shipyard/fendermint:latest
       - name: Run a testnode
         id: testnode
         working-directory: ipc/
