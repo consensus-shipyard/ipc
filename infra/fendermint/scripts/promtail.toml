@@ -11,6 +11,8 @@ script = """
 unixtime=$(date +%s)
 echo "Starting promtail with promtailrunid: $unixtime"
 
+echo "promtail client url: ${PROMTAIL_CLIENT_URL}"
+
 docker run \
   ${FLAGS} \
   --name ${PROMTAIL_CONTAINER_NAME} \
@@ -19,7 +21,8 @@ docker run \
   --volume fendermint-logs:/var/log/fendermint/ \
   ${PROMTAIL_DOCKER_IMAGE} \
   --client.external-labels=hostname=$(hostname),promtailrunid=$unixtime \
-  --config.file=etc/promtail/promtail-config.yaml
+  --config.file=etc/promtail/promtail-config.yaml \
+  --client.url=${PROMTAIL_CLIENT_URL}
 """
 
 [tasks.promtail-start]

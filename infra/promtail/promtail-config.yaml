@@ -7,9 +7,6 @@ server:
 positions:
   filename: /tmp/positions.yaml
 
-clients:
-  - url: https://802939:glc_eyJvIjoiMTA0NTcyMCIsIm4iOiJzdGFjay04NDg0ODQtaGwtd3JpdGUtbG9jYWx0ZXN0aW5nIiwiayI6IjB1MWNHOTMxVHRXQzJpTVR5cTczMUs3ViIsIm0iOnsiciI6InByb2QtZXUtd2VzdC0yIn19@logs-prod-012.grafana.net/loki/api/v1/push
-
 scrape_configs:
   - job_name: flog_scrape
     docker_sd_configs:
