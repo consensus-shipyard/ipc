@@ -108,8 +108,8 @@ impl CommandLineHandler for WalletBalances {
 #[derive(Debug, Args)]
 #[command(about = "List balance of wallets in a subnet")]
 pub(crate) struct WalletBalancesArgs {
-    #[arg(long, short, help = "The subnet to list wallets from")]
+    #[arg(long, help = "The subnet to list wallets from")]
     pub subnet: String,
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
 }

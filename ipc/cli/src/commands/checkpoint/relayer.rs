@@ -76,17 +76,16 @@ impl CommandLineHandler for BottomUpRelayer {
 #[derive(Debug, Args)]
 #[command(about = "Start the bottom up relayer daemon")]
 pub(crate) struct BottomUpRelayerArgs {
-    #[arg(long, short, help = "The subnet id of the checkpointing subnet")]
+    #[arg(long, help = "The subnet id of the checkpointing subnet")]
     pub subnet: String,
-    #[arg(long, short, help = "The number of seconds to submit checkpoint")]
+    #[arg(long, help = "The number of seconds to submit checkpoint")]
     pub checkpoint_interval_sec: Option<u64>,
     #[arg(
         long,
-        short,
         default_value = "0",
         help = "The number of blocks away from chain head that is considered final"
     )]
     pub finalization_blocks: Option<u64>,
-    #[arg(long, short, help = "The hex encoded address of the submitter")]
+    #[arg(long, help = "The hex encoded address of the submitter")]
     pub submitter: Option<String>,
 }

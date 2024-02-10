@@ -33,6 +33,6 @@ impl CommandLineHandler for GenesisEpoch {
 #[derive(Debug, Args)]
 #[command(name = "genesis-epoch", about = "Get the genesis epoch of subnet")]
 pub(crate) struct GenesisEpochArgs {
-    #[arg(long, short, help = "The subnet id to query genesis epoch")]
+    #[arg(long, help = "The subnet id to query genesis epoch")]
     pub subnet: String,
 }
