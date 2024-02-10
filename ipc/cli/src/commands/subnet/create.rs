@@ -39,7 +39,7 @@ impl CreateSubnet {
             None
         };
         let supply_source = SupplySource {
-            kind: SupplyKind::try_from(arguments.supply_source_kind)?,
+            kind: SupplyKind::try_from(arguments.supply_source_kind.as_str())?,
             token_address,
         };
         let addr = provider
@@ -115,9 +115,9 @@ pub struct CreateSubnetArgs {
     pub permission_mode: u8,
     #[arg(
         long,
-        help = "The kind of supply source of a subnet on its parent subnet, native(0), erc20(1)"
+        help = "The kind of supply source of a subnet on its parent subnet: native or erc20"
     )]
-    pub supply_source_kind: u8,
+    pub supply_source_kind: String,
     #[arg(
         long,
         help = "The address of supply source of a subnet on its parent subnet. None if kind is native"

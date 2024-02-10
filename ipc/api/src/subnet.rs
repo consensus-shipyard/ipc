@@ -89,3 +89,15 @@ impl TryFrom<u8> for SupplyKind {
         })
     }
 }
+
+impl TryFrom<&str> for SupplyKind {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(match s {
+            "native" => Self::Native,
+            "erc20" => Self::ERC20,
+            _ => return Err(anyhow!("invalid supply kind type: {}", s)),
+        })
+    }
+}
