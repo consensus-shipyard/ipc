@@ -1,26 +1,27 @@
+use ambassador::Delegate;
+use cid::Cid;
 use fvm::call_manager::CallManager;
 use fvm::gas::Gas;
 use fvm::kernel::prelude::*;
-use fvm::kernel::Result;
 use fvm::kernel::{
     ActorOps, CryptoOps, DebugOps, EventOps, IpldBlockOps, MessageOps, NetworkOps, RandomnessOps,
     SelfOps, SendOps, SyscallHandler, UpgradeOps,
 };
+use fvm::kernel::{ClassifyResult, Result};
 use fvm::syscalls::Linker;
+use fvm::DefaultKernel;
+use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::randomness::RANDOMNESS_LENGTH;
 use fvm_shared::sys::out::network::NetworkContext;
 use fvm_shared::sys::out::vm::MessageContext;
 use fvm_shared::{address::Address, econ::TokenAmount, ActorID, MethodNum};
 
-use fvm::DefaultKernel;
-
-use ambassador::Delegate;
-use cid::Cid;
-
 #[derive(Delegate)]
-#[delegate(IpldBlockOps, where = "C: CallManager")]
 #[delegate(ActorOps, where = "C: CallManager")]
+#[delegate(SendOps<K>, generics = "K", where = "K: Kernel")]
+#[delegate(UpgradeOps<K>, generics = "K", where = "K: Kernel")]
+#[delegate(IpldBlockOps, where = "C: CallManager")]
 #[delegate(CryptoOps, where = "C: CallManager")]
 #[delegate(DebugOps, where = "C: CallManager")]
 #[delegate(EventOps, where = "C: CallManager")]
@@ -28,9 +29,30 @@ use cid::Cid;
 #[delegate(NetworkOps, where = "C: CallManager")]
 #[delegate(RandomnessOps, where = "C: CallManager")]
 #[delegate(SelfOps, where = "C: CallManager")]
-#[delegate(SendOps<K>, generics = "K", where = "K: Kernel")]
-#[delegate(UpgradeOps<K>, generics = "K", where = "K: Kernel")]
 pub struct ObjectStoreKernel<C>(pub DefaultKernel<C>);
+
+pub trait ObjectStoreOps {
+    fn block_add(&mut self, cid: Cid, data: &[u8]) -> Result<()>;
+}
+
+impl<C> ObjectStoreOps for ObjectStoreKernel<C>
+where
+    C: CallManager,
+{
+    /// Directly add a block, skipping gas and reachability checks.
+    fn block_add(&mut self, cid: Cid, data: &[u8]) -> Result<()> {
+        // self.0
+        //     .blocks
+        //     .put_reachable(Block::new(cid.codec(), data, vec![]))?;
+        self.0
+            .call_manager
+            .blockstore()
+            .put_keyed(&cid, data)
+            .or_fatal()?;
+        self.0.blocks.mark_reachable(&cid);
+        Ok(())
+    }
+}
 
 impl<K> SyscallHandler<K> for ObjectStoreKernel<K::CallManager>
 where
@@ -45,7 +67,8 @@ where
         + MessageOps
         + NetworkOps
         + RandomnessOps
-        + SelfOps,
+        + SelfOps
+        + ObjectStoreOps,
 {
     fn link_syscalls(linker: &mut Linker<K>) -> anyhow::Result<()> {
         use crate::{SYSCALL_FUNCTION_NAME, SYSCALL_MODULE_NAME};

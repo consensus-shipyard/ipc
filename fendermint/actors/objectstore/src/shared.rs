@@ -83,10 +83,27 @@ impl State {
         &self,
         store: &BS,
         key: &BytesKey,
-    ) -> anyhow::Result<Option<Vec<Cid>>> {
+    ) -> anyhow::Result<Option<Vec<u8>>> {
         let hamt = Hamt::<_, Vec<Cid>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let value = hamt.get(key).map(|v| v.map(|inner| inner.to_owned()))?;
-        Ok(value)
+        let res = match value {
+            Some(cids) => {
+                let mut data: Vec<u8> = vec![];
+                for cid in cids {
+                    if let Some(d) = store.get(&cid)? {
+                        data.extend(d);
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "objectstore: cid {} not reachable",
+                            cid.to_string()
+                        ));
+                    };
+                }
+                Some(data)
+            }
+            None => None,
+        };
+        Ok(res)
     }
 
     pub fn list<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Vec<u8>>> {

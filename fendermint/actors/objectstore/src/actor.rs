@@ -87,7 +87,7 @@ impl Actor {
         Ok(root)
     }
 
-    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<Cid>>, ActorError> {
+    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<u8>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;

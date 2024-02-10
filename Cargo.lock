@@ -6501,6 +6501,7 @@ dependencies = [
  "async-std",
  "cid",
  "fvm",
+ "fvm_ipld_blockstore",
  "fvm_ipld_car",
  "fvm_shared",
  "multihash 0.18.1",
