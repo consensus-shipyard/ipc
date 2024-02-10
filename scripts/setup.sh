@@ -39,9 +39,6 @@ rm -rf ~/.fendermint
 mkdir -p ~/.fendermint/data
 cp -r ./fendermint/app/config ~/.fendermint/config
 
-mkdir -p ~/.fendermint/tmp
-cp textile/objectstore_syscall/testdata/test.car ~/.fendermint/tmp/
-
 # Build actors
 (cd fendermint && make actor-bundle)
 cp fendermint/builtin-actors/output/bundle.car ~/.fendermint/bundle.car
