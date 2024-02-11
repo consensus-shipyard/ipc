@@ -8,12 +8,15 @@ id = "/r314159"
 [subnets.config]
 network_type = "fevm"
 provider_http = "https://calibration.filfox.info/rpc/v1"
-gateway_addr = "<< to be replaced by script >>"
-registry_addr = "<< to be replaced by script >>"
+# To be replaced by deploy.sh
+gateway_addr = "0xBF7a836AF7F1A1EdB939Ff2230Cd41a5e8e5C387"
+# To be replaced by deploy.sh
+registry_addr = "0xb1110ba6507fb5f89E12Aff23C658449D11d8708"
 
 # Subnet template - uncomment and adjust before using
 [[subnets]]
-id = "<< to be replaced by script >>"
+# To be replaced by deploy.sh
+id = "/r314159/t410flp4jf7keqcf5bqogrkx4wpkygiskykcvpaigicq"
 
 [subnets.config]
 network_type = "fevm"
