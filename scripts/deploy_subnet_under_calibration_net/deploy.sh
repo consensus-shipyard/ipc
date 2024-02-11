@@ -158,7 +158,7 @@ cp /tmp/config.toml.2 ${IPC_CONFIG_FOLDER}/config.toml
 
 # Step 5: Create a subnet
 echo "$DASHES Creating a child subnet..."
-create_subnet_output=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode 0 --supply-source-kind 0 2>&1)
+create_subnet_output=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
 echo $create_subnet_output
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
 
