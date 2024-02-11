@@ -2,8 +2,6 @@ name: Deploy to calibration net on a dedicated server
 
 on:
   workflow_dispatch:
-  # TODO(jie): Remove pull_request before merge!
-  pull_request:
 
 concurrency:
   # Only allow one run at a time for this workflow
