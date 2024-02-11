@@ -253,7 +253,12 @@ do
       child-validator
 done
 
-# Step 9: Test ETH API endpoint
+# Step 9: Start a relayer process
+# Kill existing relayer if there's one
+pkill -f "relayer" || true
+$IPC_CLI checkpoint relayer --subnet $subnet_id
+
+# Step 10: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do

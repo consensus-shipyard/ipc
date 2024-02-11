@@ -24,7 +24,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "scripts/remote_deployment/deploy.sh"
+          source: "scripts/deploy_subnet_under_calibration_net/deploy.sh"
           target: "/home/ubuntu"
       - name: Copy config files to the host
         uses: appleboy/scp-action@v0.1.7
@@ -32,7 +32,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "scripts/remote_deployment/.ipc"
+          source: "scripts/deploy_subnet_under_calibration_net/.ipc"
           target: "/home/ubuntu"
       - name: Set up ipc config folder on the host
         uses: appleboy/ssh-action@v1.0.3
@@ -40,7 +40,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: rm -rf /home/ubuntu/.ipc && cp -r /home/ubuntu/scripts/remote_deployment/.ipc /home/ubuntu/
+          script: rm -rf /home/ubuntu/.ipc && cp -r /home/ubuntu/scripts/deploy_subnet_under_calibration_net/.ipc /home/ubuntu/
       - name: Create wallet file locally
         run: |
           echo '${{ secrets.CI_TEST_WALLET_JSON }}' > evm_keystore.json
@@ -58,5 +58,5 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash -il /home/ubuntu/scripts/remote_deployment/deploy.sh ${{ github.head_ref }}
+          script: bash -il /home/ubuntu/scripts/deploy_subnet_under_calibration_net/deploy.sh ${{ github.head_ref }}
           command_timeout: 50m
