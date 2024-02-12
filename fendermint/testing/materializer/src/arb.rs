@@ -138,10 +138,8 @@ fn gen_manifest(
     let rootnet = if bool::arbitrary(g) {
         Rootnet::External {
             deployment: if bool::arbitrary(g) {
-                IpcDeployment::Existing {
-                    gateway: gen_address(g),
-                    registry: gen_address(g),
-                }
+                let [gateway, registry] = gen_addresses::<2>(g);
+                IpcDeployment::Existing { gateway, registry }
             } else {
                 IpcDeployment::New {
                     deployer: choose_one(g, &account_ids),
@@ -174,7 +172,7 @@ fn gen_manifest(
         2,
         &account_ids,
         &account_ids,
-        &parent_node_ids,
+        &parent_nodes,
         &mut balances,
     );
 
@@ -186,9 +184,9 @@ fn gen_manifest(
 }
 
 /// Generate random ethereum address.
-fn gen_address(g: &mut Gen) -> H160 {
+fn gen_addresses<const N: usize>(g: &mut Gen) -> [H160; N] {
     let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
-    H160::random_using(&mut rng)
+    std::array::from_fn(|_| H160::random_using(&mut rng))
 }
 
 /// Generate something that looks like it could be a JSON-RPC endpoint of an L1.
@@ -315,7 +313,7 @@ fn gen_subnets(
             .map(ParentNode::Internal)
             .collect::<Vec<_>>();
 
-        let parent_account_ids = bs.keys().cloned().collect::<Vec<_>>();
+        let parent_account_ids = balances.keys().cloned().collect::<Vec<_>>();
 
         let child_subnets = gen_subnets(
             g,

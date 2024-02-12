@@ -1,10 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
+use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
-use fvm_shared::{address::Address, econ::TokenAmount};
+use fvm_shared::econ::TokenAmount;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use tendermint_rpc::Url;
 
 use crate::{
     manifest::Balance,
@@ -66,20 +68,21 @@ where
         &'s mut self,
         subnet_name: &SubnetName,
         deployer: &'a M::Account,
+        urls: Vec<Url>,
     ) -> anyhow::Result<M::Deployment>
     where
         's: 'a,
     {
         eprintln!("new_deployment({subnet_name:?}, {deployer:?})");
         tracing::info!(self.tag, ?subnet_name, ?deployer, "new_deployment");
-        self.inner.new_deployment(subnet_name, deployer).await
+        self.inner.new_deployment(subnet_name, deployer, urls).await
     }
 
     fn existing_deployment(
         &mut self,
         subnet_name: &SubnetName,
-        gateway: Address,
-        registry: Address,
+        gateway: H160,
+        registry: H160,
     ) -> anyhow::Result<M::Deployment> {
         eprintln!("existing_deployment({subnet_name:?})");
         tracing::info!(self.tag, ?subnet_name, "existing_deployment");

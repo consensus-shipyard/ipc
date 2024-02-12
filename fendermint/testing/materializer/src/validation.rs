@@ -192,7 +192,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         &'s mut self,
         subnet_name: &SubnetName,
         deployer: &'a VAccount,
-        urls: Vec<Url>,
+        _urls: Vec<Url>,
     ) -> anyhow::Result<VDeployment>
     where
         's: 'a,
