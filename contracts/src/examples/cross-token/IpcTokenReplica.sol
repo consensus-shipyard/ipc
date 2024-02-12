@@ -113,10 +113,12 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-        //only accept messages from replica contract
+        // only accept messages from replica contract
+        // TODO: try to turn this into a modifier.
         verifyIpcEnvelope(envelope);
 
         bytes4 methodSignature = toBytes4(callMsg.method);
+        // Note: cannot use receiveAndMint.selector because the method is private.
         if (methodSignature != bytes4(keccak256("receiveAndMint(address,uint256)"))) {
             revert InvalidMethod();
         }
@@ -159,5 +161,7 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override {}
+    ) internal override {
+        // TODO: remove correlation from unconfirmedTransfers
+    }
 }
